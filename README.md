@@ -17,6 +17,8 @@ Prompt Manager is a desktop-focused application for cataloguing, searching, and 
    pip install -r requirements.txt
    ```
 
+   Dependencies are pinned to maintain compatibility with ChromaDB (for example `numpy<2`).
+
 2. Ensure SQLite and ChromaDB have filesystem access at the configured paths (defaults applied in code).
 
 3. Provide a Redis instance (local Docker or managed) and pass the client into `PromptManager` to enable caching. Without Redis the manager still operates with SQLite as the authoritative store and ChromaDB for semantic lookups.
