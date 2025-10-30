@@ -1,5 +1,6 @@
 """High-level CRUD manager for prompt records backed by SQLite, ChromaDB, and Redis.
 
+Updates: v0.3.0 - 2025-11-03 - Require explicit database path and accept resolved settings inputs.
 Updates: v0.2.0 - 2025-10-31 - Added SQLite repository integration with ChromaDB/Redis sync.
 Updates: v0.1.0 - 2025-10-30 - Initial PromptManager with CRUD and search support.
 """
@@ -10,7 +11,7 @@ import json
 import logging
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Union
 
 import chromadb
 from chromadb.api import ClientAPI
@@ -52,7 +53,7 @@ class PromptManager:
     def __init__(
         self,
         chroma_path: str,
-        db_path: Optional[str] = None,
+        db_path: Union[str, Path, None] = None,
         collection_name: str = "prompt_manager",
         cache_ttl_seconds: int = 300,
         redis_client: Optional["redis.Redis[Any]"] = None,
@@ -72,14 +73,19 @@ class PromptManager:
             embedding_function: Optional embedding function for Chroma.
             repository: Optional preconfigured repository instance (e.g. for testing).
         """
+        # Allow tests to supply repository directly; only require db_path when building one.
+        if repository is None and db_path is None:
+            raise ValueError("db_path must be provided when no repository is supplied")
+
         self._cache_ttl_seconds = cache_ttl_seconds
         self._redis_client = redis_client
-        resolved_db_path = Path(db_path).expanduser() if db_path else Path("data") / "prompt_manager.db"
+        resolved_db_path = Path(db_path).expanduser() if db_path is not None else None
+        resolved_chroma_path = Path(chroma_path).expanduser()
         try:
             self._repository = repository or PromptRepository(str(resolved_db_path))
         except RepositoryError as exc:
             raise PromptStorageError("Unable to initialise SQLite repository") from exc
-        self._chroma_client = chroma_client or chromadb.PersistentClient(path=chroma_path)
+        self._chroma_client = chroma_client or chromadb.PersistentClient(path=str(resolved_chroma_path))
         try:
             self._collection = self._chroma_client.get_or_create_collection(
                 name=collection_name,
