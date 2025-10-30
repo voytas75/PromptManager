@@ -5,9 +5,10 @@ Updates: v0.1.0 - 2025-11-03 - Added build_prompt_manager helper for GUI/bootstr
 
 from __future__ import annotations
 
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Optional, cast
 
 from config import PromptManagerSettings
+
 from .prompt_manager import (
     PromptCacheError,
     PromptManager,
@@ -27,13 +28,17 @@ else:  # pragma: no cover - typing only
     Redis = Any  # type: ignore[misc,assignment]
 
 
-def _resolve_redis_client(redis_dsn: Optional[str], redis_client: Optional["Redis"]) -> Optional["Redis"]:
+def _resolve_redis_client(
+    redis_dsn: Optional[str],
+    redis_client: Optional["Redis"],
+) -> Optional["Redis"]:
     """Create a Redis client when a DSN is provided but no client supplied."""
     if redis_client is not None or not redis_dsn:
         return redis_client
     if redis is None:
         raise PromptCacheError("Redis DSN provided but redis package is not installed")
-    return redis.from_url(redis_dsn)
+    from_url = cast(Callable[[str], "Redis"], getattr(redis, "from_url"))
+    return from_url(redis_dsn)
 
 def build_prompt_manager(
     settings: PromptManagerSettings,

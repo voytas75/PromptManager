@@ -1,7 +1,7 @@
 """High-level CRUD manager for prompt records backed by SQLite, ChromaDB, and Redis.
 
-Updates: v0.3.0 - 2025-11-03 - Require explicit database path and accept resolved settings inputs.
-Updates: v0.2.0 - 2025-10-31 - Added SQLite repository integration with ChromaDB/Redis sync.
+Updates: v0.3.0 - 2025-11-03 - Require explicit DB path; accept resolved settings inputs.
+Updates: v0.2.0 - 2025-10-31 - Add SQLite repository integration with ChromaDB/Redis sync.
 Updates: v0.1.0 - 2025-10-30 - Initial PromptManager with CRUD and search support.
 """
 
@@ -11,7 +11,7 @@ import json
 import logging
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Union
+from typing import Any, Dict, List, Optional, Sequence, Union, cast
 
 import chromadb
 from chromadb.api import ClientAPI
@@ -26,6 +26,7 @@ except ImportError:  # pragma: no cover - redis optional during development
     RedisError = Exception  # type: ignore[misc,assignment]
 
 from models.prompt_model import Prompt
+
 from .repository import PromptRepository, RepositoryError, RepositoryNotFoundError
 
 logger = logging.getLogger(__name__)
@@ -56,7 +57,7 @@ class PromptManager:
         db_path: Union[str, Path, None] = None,
         collection_name: str = "prompt_manager",
         cache_ttl_seconds: int = 300,
-        redis_client: Optional["redis.Redis[Any]"] = None,
+        redis_client: Optional["redis.Redis"] = None,
         chroma_client: Optional[ClientAPI] = None,
         embedding_function: Optional[Any] = None,
         repository: Optional[PromptRepository] = None,
@@ -79,26 +80,48 @@ class PromptManager:
 
         self._cache_ttl_seconds = cache_ttl_seconds
         self._redis_client = redis_client
+        self._chroma_client: Any
+        self._collection: Any = cast(Any, None)
         resolved_db_path = Path(db_path).expanduser() if db_path is not None else None
         resolved_chroma_path = Path(chroma_path).expanduser()
         try:
             self._repository = repository or PromptRepository(str(resolved_db_path))
         except RepositoryError as exc:
             raise PromptStorageError("Unable to initialise SQLite repository") from exc
-        self._chroma_client = chroma_client or chromadb.PersistentClient(path=str(resolved_chroma_path))
+        # Disable Chroma anonymized telemetry to avoid noisy PostHog errors in some environments
+        # and respect privacy defaults. Use persistent client at the configured path.
+        if chroma_client is None:
+            try:
+                from chromadb.config import Settings as ChromaSettings
+
+                chroma_settings = ChromaSettings(
+                    anonymized_telemetry=False,
+                    is_persistent=True,
+                    persist_directory=str(resolved_chroma_path),
+                )
+                self._chroma_client = cast(Any, chromadb.Client(chroma_settings))
+            except Exception:
+                # Fallback to legacy PersistentClient signature if settings import or usage fails
+                self._chroma_client = cast(
+                    Any,
+                    chromadb.PersistentClient(path=str(resolved_chroma_path)),
+                )
+        else:
+            self._chroma_client = cast(Any, chroma_client)
         try:
-            self._collection = self._chroma_client.get_or_create_collection(
+            collection = self._chroma_client.get_or_create_collection(
                 name=collection_name,
                 metadata={"hnsw:space": "cosine"},
                 embedding_function=embedding_function,
             )
+            self._collection = cast(Any, collection)
         except ChromaError as exc:
             raise PromptStorageError("Unable to initialiase ChromaDB collection") from exc
 
     @property
     def collection(self) -> Collection:
         """Expose the underlying Chroma collection."""
-        return self._collection
+        return cast(Collection, self._collection)
 
     @property
     def repository(self) -> PromptRepository:
@@ -117,7 +140,7 @@ class PromptManager:
             stored_prompt = self._repository.add(prompt)
         except RepositoryError as exc:
             raise PromptStorageError(f"Failed to persist prompt {prompt.id}") from exc
-        payload = {
+        payload: Dict[str, Any] = {
             "ids": [str(prompt.id)],
             "documents": [stored_prompt.document],
             "metadatas": [stored_prompt.to_metadata()],
@@ -138,7 +161,10 @@ class PromptManager:
         try:
             self._cache_prompt(stored_prompt)
         except PromptCacheError:
-            logger.warning("Prompt created but not cached", extra={"prompt_id": str(prompt.id)})
+            logger.warning(
+                "Prompt created but not cached",
+                extra={"prompt_id": str(prompt.id)},
+            )
         return stored_prompt
 
     def get_prompt(self, prompt_id: uuid.UUID) -> Prompt:
@@ -175,7 +201,7 @@ class PromptManager:
             raise PromptNotFoundError(f"Prompt {prompt.id} not found") from exc
         except RepositoryError as exc:
             raise PromptStorageError(f"Failed to update prompt {prompt.id} in SQLite") from exc
-        payload = {
+        payload: Dict[str, Any] = {
             "ids": [str(prompt.id)],
             "documents": [updated_prompt.document],
             "metadatas": [updated_prompt.to_metadata()],
@@ -189,7 +215,10 @@ class PromptManager:
         try:
             self._cache_prompt(updated_prompt)
         except PromptCacheError:
-            logger.warning("Prompt updated but cache refresh failed", extra={"prompt_id": str(prompt.id)})
+            logger.warning(
+                "Prompt updated but cache refresh failed",
+                extra={"prompt_id": str(prompt.id)},
+            )
         return updated_prompt
 
     def delete_prompt(self, prompt_id: uuid.UUID) -> None:
@@ -224,25 +253,31 @@ class PromptManager:
             raise ValueError("query_text or embedding must be provided")
 
         try:
-            results = self._collection.query(
-                query_texts=[query_text] if query_text else None,
-                query_embeddings=[list(embedding)] if embedding is not None else None,
-                n_results=limit,
-                where=where,
+            results = cast(
+                Dict[str, Any],
+                self._collection.query(
+                    query_texts=[query_text] if query_text else None,
+                    query_embeddings=[list(embedding)] if embedding is not None else None,
+                    n_results=limit,
+                    where=where,
+                ),
             )
         except ChromaError as exc:
             raise PromptStorageError("Failed to query prompts") from exc
 
         prompts: List[Prompt] = []
-        ids = results.get("ids", [[]])[0]
-        documents = results.get("documents", [[]])[0]
-        metadatas = results.get("metadatas", [[]])[0]
+        ids = cast(List[str], results.get("ids", [[]])[0])
+        documents = cast(List[str], results.get("documents", [[]])[0])
+        metadatas = cast(List[Dict[str, Any]], results.get("metadatas", [[]])[0])
 
         for prompt_id, document, metadata in zip(ids, documents, metadatas):
             try:
                 prompt_uuid = uuid.UUID(prompt_id)
             except ValueError:
-                logger.warning("Invalid prompt UUID in Chroma results", extra={"prompt_id": prompt_id})
+                logger.warning(
+                    "Invalid prompt UUID in Chroma results",
+                    extra={"prompt_id": prompt_id},
+                )
                 continue
             try:
                 prompt_record = self._repository.get(prompt_uuid)
@@ -288,8 +323,9 @@ class PromptManager:
             raise PromptCacheError("Failed to read prompt from Redis") from exc
         if not cached:
             return None
+        cached_text = cached.decode("utf-8") if isinstance(cached, bytes) else str(cached)
         try:
-            record = json.loads(cached)
+            record = json.loads(cached_text)
         except json.JSONDecodeError as exc:
             logger.warning("Cannot decode cached prompt", extra={"prompt_id": str(prompt_id)})
             raise PromptCacheError("Invalid JSON cached value") from exc

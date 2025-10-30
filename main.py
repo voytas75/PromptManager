@@ -25,7 +25,9 @@ def _setup_logging(logging_conf_path: Optional[Path]) -> None:
             return
         except Exception:  # pragma: no cover - logging config errors are non-critical
             pass
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -56,7 +58,13 @@ def main() -> int:
         return 2
 
     if args.print_settings:
-        logger.info("Resolved settings: db=%s chroma=%s redis=%s ttl=%s", settings.db_path, settings.chroma_path, settings.redis_dsn, settings.cache_ttl_seconds)
+        logger.info(
+            "Resolved settings: db=%s chroma=%s redis=%s ttl=%s",
+            settings.db_path,
+            settings.chroma_path,
+            settings.redis_dsn,
+            settings.cache_ttl_seconds,
+        )
         return 0
 
     # Build core services; GUI wiring will attach here in later milestones
@@ -75,4 +83,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

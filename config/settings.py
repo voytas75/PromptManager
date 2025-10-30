@@ -1,21 +1,24 @@
-from __future__ import annotations
-
 """Settings management for Prompt Manager configuration.
 
-Updates: v0.3.2 - 2025-10-30 - Adjusted settings precedence docs and examples.
-Updates: v0.3.1 - 2025-10-30 - Fix settings source precedence so env overrides JSON; remove dead code.
+Updates: v0.3.2 - 2025-10-30 - Document revised settings precedence examples.
+Updates: v0.3.1 - 2025-10-30 - Ensure env overrides JSON; remove unused helpers.
 Updates: v0.3.0 - 2025-10-30 - Migrate to Pydantic v2 with pydantic-settings.
-Updates: v0.2.0 - 2025-11-03 - Introduced environment/JSON-backed settings with validation.
+Updates: v0.2.0 - 2025-11-03 - Introduce env/JSON-backed settings with validation.
 """
+
+from __future__ import annotations
 
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple, Type, cast
 
-from pydantic import Field, ValidationError
-from pydantic import field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, ValidationError, field_validator
+from pydantic_settings import (
+    BaseSettings,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+)
 
 
 class SettingsError(Exception):
@@ -31,18 +34,21 @@ class PromptManagerSettings(BaseSettings):
     cache_ttl_seconds: int = Field(default=300)
 
     # Pydantic v2 settings configuration
-    model_config = SettingsConfigDict(
-        env_prefix="PROMPT_MANAGER_",
-        case_sensitive=False,
-        populate_by_name=True,
-        # pydantic-settings v2 does not read env via field aliases by default.
-        # Provide both canonical field names and alias keys to ensure overrides work.
-        env={
-            # Accept `PROMPT_MANAGER_DATABASE_PATH` and `PROMPT_MANAGER_DB_PATH` and canonical name
-            "db_path": ["DB_PATH", "DATABASE_PATH", "db_path", "database_path"],
-            "chroma_path": ["CHROMA_PATH", "chroma_path"],
-            "redis_dsn": ["REDIS_DSN", "redis_dsn"],
-            "cache_ttl_seconds": ["CACHE_TTL_SECONDS", "cache_ttl_seconds"],
+    model_config = cast(
+        SettingsConfigDict,
+        {
+            "env_prefix": "PROMPT_MANAGER_",
+            "case_sensitive": False,
+            "populate_by_name": True,
+            # pydantic-settings v2 does not read env via field aliases by default.
+            # Provide canonical field names alongside legacy aliases.
+            "env": {
+                # Accept legacy database path aliases alongside the canonical key.
+                "db_path": ["DB_PATH", "DATABASE_PATH", "db_path", "database_path"],
+                "chroma_path": ["CHROMA_PATH", "chroma_path"],
+                "redis_dsn": ["REDIS_DSN", "redis_dsn"],
+                "cache_ttl_seconds": ["CACHE_TTL_SECONDS", "cache_ttl_seconds"],
+            },
         },
     )
 
@@ -70,7 +76,19 @@ class PromptManagerSettings(BaseSettings):
         return stripped or None
 
     @classmethod
-    def settings_customise_sources(cls, settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings):
+    def settings_customise_sources(
+        cls,
+        settings_cls: Type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> Tuple[
+        PydanticBaseSettingsSource,
+        PydanticBaseSettingsSource,
+        PydanticBaseSettingsSource,
+        PydanticBaseSettingsSource,
+    ]:
         """Inject JSON configuration loading between init arguments and environment.
 
         Pydantic v2 uses `settings_customise_sources` with a different signature.
@@ -78,9 +96,10 @@ class PromptManagerSettings(BaseSettings):
         # Source precedence: init -> environment -> JSON -> file secrets.
         # Place `env_settings` before JSON so env overrides values from file.
         # Compose an environment source that also considers aliases explicitly
-        def env_with_aliases() -> Dict[str, Any]:
+        def env_with_aliases(_: BaseSettings | None = None) -> Dict[str, Any]:
             data: Dict[str, Any] = {}
-            prefix = cls.model_config.get("env_prefix") or ""
+            config_dict = cast(Dict[str, Any], cls.model_config)
+            prefix = str(config_dict.get("env_prefix", ""))
             # Collect both alias and field-name keys from environment
             mapping = {
                 "db_path": ["DB_PATH", "DATABASE_PATH", "db_path", "database_path"],
@@ -102,15 +121,19 @@ class PromptManagerSettings(BaseSettings):
 
         return (
             init_settings,
-            env_with_aliases,
+            cast(PydanticBaseSettingsSource, env_with_aliases),
             cls._json_config_settings_source(settings_cls),  # JSON file loader
             file_secret_settings,
         )
 
     @classmethod
-    def _json_config_settings_source(cls, _: type[BaseSettings]):
+    def _json_config_settings_source(
+        cls,
+        _: Type[BaseSettings],
+    ) -> PydanticBaseSettingsSource:
         """Return settings extracted from an optional JSON config file."""
-        def _loader() -> Dict[str, Any]:
+
+        def _loader(_: BaseSettings | None = None) -> Dict[str, Any]:
             config_path = os.getenv("PROMPT_MANAGER_CONFIG_JSON")
             if not config_path:
                 return {}
@@ -124,9 +147,12 @@ class PromptManagerSettings(BaseSettings):
             try:
                 data = json.loads(raw_contents)
             except json.JSONDecodeError as exc:
-                raise SettingsError(f"Invalid JSON in configuration file: {resolved_path}") from exc
+                raise SettingsError(
+                    f"Invalid JSON in configuration file: {resolved_path}"
+                ) from exc
             if not isinstance(data, dict):
-                raise SettingsError(f"Configuration file {resolved_path} must contain a JSON object")
+                message = f"Configuration file {resolved_path} must contain a JSON object"
+                raise SettingsError(message)
             # Map JSON alias keys to canonical field names for pydantic v2
             mapped: Dict[str, Any] = {}
             if "database_path" in data and "db_path" not in data:
@@ -135,7 +161,7 @@ class PromptManagerSettings(BaseSettings):
                 if key in data:
                     mapped[key] = data[key]
             return mapped
-        return _loader
+        return cast(PydanticBaseSettingsSource, _loader)
 
 
 def load_settings(**overrides: Any) -> PromptManagerSettings:

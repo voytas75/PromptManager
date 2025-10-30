@@ -5,6 +5,7 @@ Updates: v0.2.0 - 2025-10-31 - Surface PromptRepository alongside PromptManager.
 Updates: v0.1.0 - 2025-10-30 - Expose PromptManager API.
 """
 
+from .factory import build_prompt_manager
 from .prompt_manager import (
     PromptCacheError,
     PromptManager,
@@ -13,7 +14,6 @@ from .prompt_manager import (
     PromptStorageError,
 )
 from .repository import PromptRepository, RepositoryError, RepositoryNotFoundError
-from .factory import build_prompt_manager
 
 __all__ = [
     "PromptManager",

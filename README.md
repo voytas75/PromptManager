@@ -48,7 +48,21 @@ Prompt Manager is a desktop-focused application for cataloguing, searching, and 
    pytest
    ```
 
+6. (Optional) Run static type checks with mypy in strict mode for core modules:
+
+   ```bash
+   mypy
+   ```
+
+   The configuration in `mypy.ini` enforces strict typing for `core`, `config`, and `models` while allowing tests to stay flexible. Please add annotations and narrow types when extending these packages.
+
 Further modules (GUI, session history, execution pipeline) will be introduced in subsequent milestones in line with the blueprint.
+
+## Telemetry
+
+- ChromaDB anonymized telemetry is disabled by default. Prompt Manager initialises the Chroma client with `anonymized_telemetry=False` to avoid sending usage data and to reduce noisy PostHog-related logs in restricted environments.
+- To opt in, set the environment variable `PROMPT_MANAGER_CHROMA_TELEMETRY=1` (feature placeholder). Until a dedicated toggle is exposed in settings, advanced users can fork the project and change the `ChromaSettings` flag in `core/prompt_manager.py:88`.
+
 
 ## Configuration Precedence
 

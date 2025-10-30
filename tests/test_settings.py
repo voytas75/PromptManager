@@ -67,3 +67,27 @@ def test_load_settings_rejects_invalid_cache_ttl(monkeypatch) -> None:
     monkeypatch.setenv("PROMPT_MANAGER_CACHE_TTL_SECONDS", "0")
     with pytest.raises(SettingsError):
         load_settings()
+
+
+def test_load_settings_rejects_missing_path() -> None:
+    """Ensure db/chroma path validators reject None values."""
+    with pytest.raises(SettingsError):
+        load_settings(db_path=None)
+
+
+def test_load_settings_raises_on_invalid_json(monkeypatch, tmp_path) -> None:
+    config_path = tmp_path / "invalid.json"
+    config_path.write_text("{invalid", encoding="utf-8")
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
+    with pytest.raises(SettingsError) as excinfo:
+        load_settings()
+    assert "Invalid JSON" in str(excinfo.value)
+
+
+def test_load_settings_requires_json_object(monkeypatch, tmp_path) -> None:
+    config_path = tmp_path / "array.json"
+    config_path.write_text(json.dumps(["not", "object"]), encoding="utf-8")
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
+    with pytest.raises(SettingsError) as excinfo:
+        load_settings()
+    assert "must contain a JSON object" in str(excinfo.value)

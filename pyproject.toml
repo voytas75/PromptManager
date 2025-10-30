@@ -1,0 +1,34 @@
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+include = '\\.(py|pyi)$'
+exclude = '^data/'
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["."]
+exclude = ["data/"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["core", "config", "models", "gui", "tests"]
+combine-as-imports = true
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
+warn_unused_configs = true
+show_error_codes = true
+pretty = true
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"

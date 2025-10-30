@@ -46,12 +46,14 @@ def _json_dumps(value: Optional[Any]) -> Optional[str]:
 
 def _json_loads_list(value: Optional[str]) -> List[str]:
     """Deserialize JSON-encoded lists stored in SQLite into Python lists."""
-    if value in (None, "", "null"):
+    if value is None:
+        return []
+    if value in ("", "null"):
         return []
     try:
         parsed = json.loads(value)
     except json.JSONDecodeError:
-        return [value]  # degraded fallback
+        return [str(value)]  # degraded fallback
     if isinstance(parsed, list):
         return [str(item) for item in parsed]
     return [str(parsed)]
@@ -59,7 +61,9 @@ def _json_loads_list(value: Optional[str]) -> List[str]:
 
 def _json_loads_optional(value: Optional[str]) -> Optional[Any]:
     """Deserialize JSON strings while tolerating plain-text fallbacks."""
-    if value in (None, "", "null"):
+    if value is None:
+        return None
+    if value in ("", "null"):
         return None
     try:
         return json.loads(value)
@@ -140,7 +144,11 @@ class PromptRepository:
     def update(self, prompt: Prompt) -> Prompt:
         """Persist an existing prompt."""
         payload = self._prompt_to_row(prompt)
-        assignments = ", ".join(f"{column} = :{column}" for column in self._COLUMNS if column != "id")
+        assignments = ", ".join(
+            f"{column} = :{column}"
+            for column in self._COLUMNS
+            if column != "id"
+        )
         query = f"UPDATE prompts SET {assignments} WHERE id = :id;"
         try:
             with _connect(self._db_path) as conn:

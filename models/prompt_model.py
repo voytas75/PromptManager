@@ -56,7 +56,9 @@ def _serialize_metadata(value: Optional[Any]) -> Optional[str]:
 
 def _deserialize_metadata(value: Optional[str]) -> Optional[Any]:
     """Deserialize metadata stored as JSON strings."""
-    if value in (None, "", "null"):
+    if value is None:
+        return None
+    if value in ("", "null"):
         return None
     try:
         return json.loads(value)
