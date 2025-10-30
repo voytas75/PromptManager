@@ -1,5 +1,6 @@
 """Tests for configuration loading and validation logic.
 
+Updates: v0.1.1 - 2025-11-03 - Add precedence test using example template.
 Updates: v0.1.0 - 2025-11-03 - Cover JSON/env precedence and validation errors.
 """
 
@@ -34,6 +35,23 @@ def test_load_settings_reads_json_and_env(monkeypatch, tmp_path) -> None:
     assert settings.chroma_path == Path(config_payload["chroma_path"])
     assert settings.cache_ttl_seconds == 120
     assert settings.redis_dsn == "redis://localhost:6379/1"
+
+
+def test_env_precedes_json_when_both_provided(monkeypatch, tmp_path) -> None:
+    """Environment variable values override keys from JSON config file."""
+    # Use the repo's template as a base JSON.
+    template_path = Path("config/config.json").resolve()
+    assert template_path.exists(), "template config should exist"
+
+    # Point loader at the template
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(template_path))
+    # Override two values via environment
+    monkeypatch.setenv("PROMPT_MANAGER_DATABASE_PATH", str(tmp_path / "override.db"))
+    monkeypatch.setenv("PROMPT_MANAGER_CACHE_TTL_SECONDS", "42")
+
+    settings = load_settings()
+    assert settings.db_path == (tmp_path / "override.db").resolve()
+    assert settings.cache_ttl_seconds == 42
 
 
 def test_load_settings_raises_when_json_missing(monkeypatch, tmp_path) -> None:

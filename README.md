@@ -57,7 +57,9 @@ Further modules (GUI, session history, execution pipeline) will be introduced in
   - JSON file pointed by `PROMPT_MANAGER_CONFIG_JSON`
   - Built-in defaults
 
-- Example JSON (`config/config.json`):
+- Naming note: environment variable keys use upper snake case with the `PROMPT_MANAGER_` prefix (e.g., `PROMPT_MANAGER_DATABASE_PATH`). JSON keys use lower snake case (e.g., `database_path`). Env vars always override JSON values when both are provided.
+
+- Example JSON (`config/config.json`) provided in-repo as a template:
 
   ```json
   {

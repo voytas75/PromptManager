@@ -1,0 +1,7 @@
+{
+  "database_path": "data/prompt_manager.db",
+  "chroma_path": "data/chromadb",
+  "redis_dsn": "redis://localhost:6379/0",
+  "cache_ttl_seconds": 600
+}
+

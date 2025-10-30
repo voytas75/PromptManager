@@ -25,7 +25,7 @@ class SettingsError(Exception):
 class PromptManagerSettings(BaseSettings):
     """Application configuration sourced from environment variables or JSON files."""
 
-    db_path: Path = Field(default=Path("data") / "prompt_manager.db", alias="database_path")
+    db_path: Path = Field(default=Path("data") / "prompt_manager.db")
     chroma_path: Path = Field(default=Path("data") / "chromadb")
     redis_dsn: Optional[str] = None
     cache_ttl_seconds: int = Field(default=300)
@@ -35,11 +35,14 @@ class PromptManagerSettings(BaseSettings):
         env_prefix="PROMPT_MANAGER_",
         case_sensitive=False,
         populate_by_name=True,
+        # pydantic-settings v2 does not read env via field aliases by default.
+        # Provide both canonical field names and alias keys to ensure overrides work.
         env={
-            "db_path": ["DATABASE_PATH", "DB_PATH"],
-            "chroma_path": ["CHROMA_PATH"],
-            "redis_dsn": ["REDIS_DSN"],
-            "cache_ttl_seconds": ["CACHE_TTL_SECONDS"],
+            # Accept `PROMPT_MANAGER_DATABASE_PATH` and `PROMPT_MANAGER_DB_PATH` and canonical name
+            "db_path": ["DB_PATH", "DATABASE_PATH", "db_path", "database_path"],
+            "chroma_path": ["CHROMA_PATH", "chroma_path"],
+            "redis_dsn": ["REDIS_DSN", "redis_dsn"],
+            "cache_ttl_seconds": ["CACHE_TTL_SECONDS", "cache_ttl_seconds"],
         },
     )
 
@@ -74,9 +77,32 @@ class PromptManagerSettings(BaseSettings):
         """
         # Source precedence: init -> environment -> JSON -> file secrets.
         # Place `env_settings` before JSON so env overrides values from file.
+        # Compose an environment source that also considers aliases explicitly
+        def env_with_aliases() -> Dict[str, Any]:
+            data: Dict[str, Any] = {}
+            prefix = cls.model_config.get("env_prefix") or ""
+            # Collect both alias and field-name keys from environment
+            mapping = {
+                "db_path": ["DB_PATH", "DATABASE_PATH", "db_path", "database_path"],
+                "chroma_path": ["CHROMA_PATH", "chroma_path"],
+                "redis_dsn": ["REDIS_DSN", "redis_dsn"],
+                "cache_ttl_seconds": ["CACHE_TTL_SECONDS", "cache_ttl_seconds"],
+            }
+            for field, keys in mapping.items():
+                for key in keys:
+                    val = os.getenv(f"{prefix}{key}")
+                    if val is not None:
+                        # Map to canonical field keys accepted by the model
+                        if field in {"db_path", "chroma_path"}:
+                            data[field] = str(val)
+                        else:
+                            data[field] = val
+                        break
+            return data
+
         return (
             init_settings,
-            env_settings,
+            env_with_aliases,
             cls._json_config_settings_source(settings_cls),  # JSON file loader
             file_secret_settings,
         )
@@ -101,7 +127,14 @@ class PromptManagerSettings(BaseSettings):
                 raise SettingsError(f"Invalid JSON in configuration file: {resolved_path}") from exc
             if not isinstance(data, dict):
                 raise SettingsError(f"Configuration file {resolved_path} must contain a JSON object")
-            return data
+            # Map JSON alias keys to canonical field names for pydantic v2
+            mapped: Dict[str, Any] = {}
+            if "database_path" in data and "db_path" not in data:
+                mapped["db_path"] = data["database_path"]
+            for key in ("chroma_path", "redis_dsn", "cache_ttl_seconds"):
+                if key in data:
+                    mapped[key] = data[key]
+            return mapped
         return _loader
 
 
