@@ -1,0 +1,4 @@
+chromadb==0.4.24
+redis==5.0.1
+pytest==8.2.0
+numpy>=1.26.4,<2
