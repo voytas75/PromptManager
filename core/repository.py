@@ -274,6 +274,74 @@ class PromptRepository:
             raise RepositoryError(f"Failed to fetch execution history for {prompt_id}") from exc
         return [self._row_to_execution(row) for row in rows]
 
+    def list_executions_filtered(
+        self,
+        *,
+        status: Optional[str] = None,
+        prompt_id: Optional[uuid.UUID] = None,
+        search: Optional[str] = None,
+        limit: Optional[int] = None,
+        order_desc: bool = True,
+    ) -> List[PromptExecution]:
+        """Return executions filtered by status, prompt, and search term."""
+
+        query = "SELECT * FROM prompt_executions"
+        conditions: List[str] = []
+        params: List[Any] = []
+
+        if status:
+            conditions.append("status = ?")
+            params.append(status)
+        if prompt_id:
+            conditions.append("prompt_id = ?")
+            params.append(str(prompt_id))
+        if search:
+            like = f"%{search.lower()}%"
+            conditions.append(
+                "("
+                "LOWER(request_text) LIKE ? OR "
+                "LOWER(response_text) LIKE ? OR "
+                "LOWER(COALESCE(metadata, '')) LIKE ?"
+                ")"
+            )
+            params.extend([like, like, like])
+
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+
+        order = "DESC" if order_desc else "ASC"
+        query += f" ORDER BY datetime(executed_at) {order}"
+        if limit is not None:
+            query += f" LIMIT {int(limit)}"
+
+        try:
+            with _connect(self._db_path) as conn:
+                cursor = conn.execute(query, params)
+                rows = cursor.fetchall()
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to fetch filtered executions") from exc
+        return [self._row_to_execution(row) for row in rows]
+
+    def update_execution(self, execution: PromptExecution) -> PromptExecution:
+        """Persist changes to an existing execution entry."""
+        payload = self._execution_to_row(execution)
+        assignments = ", ".join(
+            f"{column} = :{column}"
+            for column in self._EXECUTION_COLUMNS
+            if column != "id"
+        )
+        query = f"UPDATE prompt_executions SET {assignments} WHERE id = :id;"
+        try:
+            with _connect(self._db_path) as conn:
+                cursor = conn.execute(query, payload)
+                if cursor.rowcount == 0:
+                    raise RepositoryNotFoundError(f"Execution {execution.id} not found")
+        except RepositoryNotFoundError:
+            raise
+        except sqlite3.Error as exc:
+            raise RepositoryError(f"Failed to update execution {execution.id}") from exc
+        return execution
+
     def _prompt_to_row(self, prompt: Prompt) -> Dict[str, Any]:
         """Convert Prompt into SQLite-friendly mapping."""
         return {

@@ -50,3 +50,21 @@ def test_history_tracker_records_success_and_failure(tmp_path) -> None:
 
     by_prompt = tracker.list_for_prompt(prompt.id, limit=10)
     assert {entry.id for entry in by_prompt} == {success.id, failure.id}
+
+
+def test_history_tracker_updates_note(tmp_path) -> None:
+    repo = PromptRepository(str(tmp_path / "repo.db"))
+    prompt = _make_prompt()
+    repo.add(prompt)
+    tracker = HistoryTracker(repo)
+
+    execution = tracker.record_success(
+        prompt_id=prompt.id,
+        request_text="demo",
+        response_text="result",
+    )
+    updated = tracker.update_note(execution.id, "Needs follow-up")
+    assert updated.metadata and updated.metadata.get("note") == "Needs follow-up"
+
+    cleared = tracker.update_note(execution.id, "")
+    assert not (cleared.metadata or {}).get("note")

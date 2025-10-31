@@ -104,3 +104,41 @@ def test_repository_execution_roundtrip(tmp_path: Path) -> None:
 
     recent = repo.list_executions(limit=1)
     assert recent[0].id == execution.id
+
+
+def test_repository_filtered_execution_query(tmp_path: Path) -> None:
+    repo = PromptRepository(str(tmp_path / "repo.db"))
+    prompt_a = _make_prompt("Prompt A")
+    prompt_b = _make_prompt("Prompt B")
+    repo.add(prompt_a)
+    repo.add(prompt_b)
+
+    success_execution = PromptExecution(
+        id=uuid.uuid4(),
+        prompt_id=prompt_a.id,
+        request_text="success",
+        response_text="done",
+        status=ExecutionStatus.SUCCESS,
+        metadata={"note": "important"},
+    )
+    failed_execution = PromptExecution(
+        id=uuid.uuid4(),
+        prompt_id=prompt_b.id,
+        request_text="failure",
+        response_text="oops",
+        status=ExecutionStatus.FAILED,
+    )
+    repo.add_execution(success_execution)
+    repo.add_execution(failed_execution)
+
+    filtered = repo.list_executions_filtered(status=ExecutionStatus.SUCCESS.value)
+    assert len(filtered) == 1
+    assert filtered[0].id == success_execution.id
+
+    prompt_filtered = repo.list_executions_filtered(prompt_id=prompt_b.id)
+    assert len(prompt_filtered) == 1
+    assert prompt_filtered[0].id == failed_execution.id
+
+    search_filtered = repo.list_executions_filtered(search="important")
+    assert len(search_filtered) == 1
+    assert search_filtered[0].id == success_execution.id

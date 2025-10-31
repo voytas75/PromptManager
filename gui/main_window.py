@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.5.1 - 2025-11-09 - Wrap prompt details in a scroll area to avoid Wayland resize crashes.
 Updates: v0.5.0 - 2025-11-08 - Add prompt execution workflow with result pane.
 Updates: v0.4.0 - 2025-11-07 - Add intent workspace with detect/suggest/copy actions and usage logging.
 Updates: v0.3.0 - 2025-11-06 - Surface intent-aware search hints and recommendations.
@@ -12,7 +13,7 @@ from __future__ import annotations
 import json
 import uuid
 from pathlib import Path
-from typing import Iterable, List, Optional, Sequence
+from typing import Dict, Iterable, List, Optional, Sequence
 
 from PySide6.QtCore import QAbstractListModel, QModelIndex, Qt
 from PySide6.QtGui import QGuiApplication
@@ -29,8 +30,10 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPlainTextEdit,
+    QScrollArea,
     QPushButton,
     QSplitter,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -43,6 +46,7 @@ from core import (
     PromptManagerError,
     PromptExecutionError,
     PromptExecutionUnavailable,
+    PromptHistoryError,
     PromptNotFoundError,
     PromptStorageError,
     RepositoryError,
@@ -52,8 +56,8 @@ from core import (
 )
 from models.prompt_model import Prompt
 
-from .dialogs import CatalogPreviewDialog, PromptDialog
-from .history_dialog import ExecutionHistoryDialog
+from .dialogs import CatalogPreviewDialog, PromptDialog, SaveResultDialog
+from .history_panel import HistoryPanel
 from .settings_dialog import SettingsDialog, persist_settings_to_config
 from .usage_logger import IntentUsageLogger
 
@@ -105,26 +109,36 @@ class PromptDetailWidget(QWidget):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setContentsMargins(0, 0, 0, 0)
 
-        self._title = QLabel("Select a prompt to view details", self)
+        self._scroll_area = QScrollArea(self)
+        self._scroll_area.setWidgetResizable(True)
+        layout.addWidget(self._scroll_area)
+
+        content = QWidget(self._scroll_area)
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(12, 12, 12, 12)
+
+        self._title = QLabel("Select a prompt to view details", content)
         self._title.setObjectName("promptTitle")
-        self._description = QLabel("", self)
+        self._description = QLabel("", content)
         self._description.setWordWrap(True)
 
-        self._context = QLabel("", self)
+        self._context = QLabel("", content)
         self._context.setWordWrap(True)
-        self._examples = QLabel("", self)
+        self._examples = QLabel("", content)
         self._examples.setWordWrap(True)
 
-        layout.addWidget(self._title)
-        layout.addSpacing(8)
-        layout.addWidget(self._description)
-        layout.addSpacing(8)
-        layout.addWidget(self._context)
-        layout.addSpacing(8)
-        layout.addWidget(self._examples)
-        layout.addStretch(1)
+        content_layout.addWidget(self._title)
+        content_layout.addSpacing(8)
+        content_layout.addWidget(self._description)
+        content_layout.addSpacing(8)
+        content_layout.addWidget(self._context)
+        content_layout.addSpacing(8)
+        content_layout.addWidget(self._examples)
+        content_layout.addStretch(1)
+
+        self._scroll_area.setWidget(content)
 
     def display_prompt(self, prompt: Prompt) -> None:
         """Populate labels using the provided prompt."""
@@ -247,6 +261,10 @@ class MainWindow(QMainWindow):
         self._run_button.clicked.connect(self._on_run_prompt_clicked)  # type: ignore[arg-type]
         actions_layout.addWidget(self._run_button)
 
+        self._save_button = QPushButton("Save Result", self)
+        self._save_button.clicked.connect(self._on_save_result_clicked)  # type: ignore[arg-type]
+        actions_layout.addWidget(self._save_button)
+
         self._copy_button = QPushButton("Copy Prompt", self)
         self._copy_button.clicked.connect(self._on_copy_prompt_clicked)  # type: ignore[arg-type]
         actions_layout.addWidget(self._copy_button)
@@ -291,7 +309,14 @@ class MainWindow(QMainWindow):
 
         layout.addLayout(filter_layout)
 
-        splitter = QSplitter(Qt.Horizontal, self)
+        self._tab_widget = QTabWidget(self)
+        self._tab_widget.currentChanged.connect(self._on_tab_changed)  # type: ignore[arg-type]
+
+        result_tab = QWidget(self)
+        result_tab_layout = QVBoxLayout(result_tab)
+        result_tab_layout.setContentsMargins(0, 0, 0, 0)
+
+        splitter = QSplitter(Qt.Horizontal, result_tab)
 
         self._list_view = QListView(splitter)
         self._list_view.setModel(self._model)
@@ -302,10 +327,10 @@ class MainWindow(QMainWindow):
         splitter.addWidget(self._detail_widget)
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 2)
-        layout.addWidget(splitter, stretch=1)
+        result_tab_layout.addWidget(splitter, stretch=1)
 
-        result_layout = QVBoxLayout()
-        result_layout.setContentsMargins(0, 12, 0, 0)
+        result_info_layout = QVBoxLayout()
+        result_info_layout.setContentsMargins(0, 12, 0, 0)
 
         self._result_label = QLabel("No prompt executed yet", self)
         self._result_label.setObjectName("resultTitle")
@@ -315,16 +340,30 @@ class MainWindow(QMainWindow):
         self._result_view.setReadOnly(True)
         self._result_view.setPlaceholderText("Run a prompt to see output here.")
 
-        result_layout.addWidget(self._result_label)
-        result_layout.addWidget(self._result_meta)
-        result_layout.addWidget(self._result_view, 1)
-        layout.addLayout(result_layout)
+        result_info_layout.addWidget(self._result_label)
+        result_info_layout.addWidget(self._result_meta)
+        result_info_layout.addWidget(self._result_view, 1)
+        result_tab_layout.addLayout(result_info_layout)
+
+        self._history_panel = HistoryPanel(
+            self._manager,
+            self,
+            limit=self._history_limit,
+            on_note_updated=self._handle_note_update,
+            on_export=self._handle_history_export,
+        )
+
+        self._tab_widget.addTab(result_tab, "Result")
+        self._tab_widget.addTab(self._history_panel, "History")
+
+        layout.addWidget(self._tab_widget, stretch=1)
 
         self.setCentralWidget(container)
 
         has_executor = self._manager.executor is not None
         self._run_button.setEnabled(has_executor)
         self._copy_result_button.setEnabled(False)
+        self._save_button.setEnabled(False)
         self._history_button.setEnabled(True)
 
     def _load_prompts(self, search_text: str = "") -> None:
@@ -472,6 +511,7 @@ class MainWindow(QMainWindow):
         self._result_meta.setText(" | ".join(meta_parts))
         self._result_view.setPlainText(outcome.result.response_text or "")
         self._copy_result_button.setEnabled(bool(outcome.result.response_text))
+        self._save_button.setEnabled(True)
 
     def _clear_execution_result(self) -> None:
         """Reset the result pane to its default state."""
@@ -481,6 +521,7 @@ class MainWindow(QMainWindow):
         self._result_meta.clear()
         self._result_view.clear()
         self._copy_result_button.setEnabled(False)
+        self._save_button.setEnabled(False)
 
     def _generate_prompt_name(self, context: str) -> str:
         """Delegate name generation to PromptManager, surfacing errors."""
@@ -543,12 +584,68 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(f"Top suggestion: {top_name}", 5000)
 
     def _on_history_clicked(self) -> None:
-        """Open the execution history dialog."""
+        """Switch to the history tab."""
 
-        dialog = ExecutionHistoryDialog(self._manager, self, limit=self._history_limit)
-        dialog.exec()
-        total = len(self._manager.list_recent_executions(limit=self._history_limit))
-        self._usage_logger.log_history_view(total=total)
+        self._tab_widget.setCurrentWidget(self._history_panel)
+
+    def _on_tab_changed(self, index: int) -> None:
+        widget = self._tab_widget.widget(index)
+        if widget is self._history_panel:
+            self._history_panel.refresh()
+            self._usage_logger.log_history_view(total=self._history_panel.row_count())
+
+    def _on_save_result_clicked(self) -> None:
+        """Persist the latest execution result with optional user notes."""
+
+        if self._last_execution is None:
+            self.statusBar().showMessage("Run a prompt before saving the result.", 3000)
+            return
+        prompt = self._current_prompt()
+        if prompt is None and self._current_prompts:
+            prompt = self._current_prompts[0]
+        if prompt is None:
+            self.statusBar().showMessage("Select a prompt to associate with the result.", 3000)
+            return
+
+        outcome = self._last_execution
+        default_summary = outcome.result.response_text[:200] if outcome.result.response_text else ""
+        dialog = SaveResultDialog(
+            self,
+            prompt_name=prompt.name,
+            default_text=default_summary,
+            button_text="Save",
+        )
+        if dialog.exec() != QDialog.Accepted:
+            return
+        note = dialog.note
+        metadata: Dict[str, Any] = {"source": "manual-save"}
+        if note:
+            metadata["note"] = note
+        if outcome.history_entry is not None:
+            metadata["source_execution_id"] = str(outcome.history_entry.id)
+
+        usage_metadata = outcome.result.usage if outcome.result.usage else None
+        try:
+            saved_entry = self._manager.save_execution_result(
+                prompt.id,
+                outcome.result.request_text,
+                outcome.result.response_text,
+                duration_ms=outcome.result.duration_ms,
+                usage=usage_metadata,
+                metadata=metadata,
+            )
+        except PromptExecutionUnavailable as exc:
+            self._save_button.setEnabled(False)
+            self._show_error("History unavailable", str(exc))
+            return
+        except PromptHistoryError as exc:
+            self._show_error("Unable to save result", str(exc))
+            return
+
+        self._usage_logger.log_save(prompt_name=prompt.name, note_length=len(note))
+        executed_at = saved_entry.executed_at.astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
+        self.statusBar().showMessage(f"Result saved ({executed_at}).", 5000)
+        self._history_panel.refresh()
 
     def _on_run_prompt_clicked(self) -> None:
         """Execute the selected prompt via the manager."""
@@ -597,6 +694,16 @@ class MainWindow(QMainWindow):
             f"Executed '{prompt.name}' in {outcome.result.duration_ms} ms.",
             5000,
         )
+
+    def _handle_note_update(self, execution_id: uuid.UUID, note: str) -> None:
+        """Record analytics when execution notes are edited."""
+
+        self._usage_logger.log_note_edit(note_length=len(note))
+
+    def _handle_history_export(self, entries: int, path: str) -> None:
+        """Record analytics when history is exported."""
+
+        self._usage_logger.log_history_export(entries=entries, path=path)
 
     def _on_copy_prompt_clicked(self) -> None:
         """Copy the currently selected prompt body to the clipboard."""

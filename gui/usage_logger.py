@@ -100,6 +100,38 @@ class IntentUsageLogger:
         }
         self._append(record)
 
+    def log_save(self, *, prompt_name: str, note_length: int) -> None:
+        """Log that a prompt result was manually saved."""
+
+        record = {
+            "timestamp": _now_iso(),
+            "event": "save",
+            "prompt_name": prompt_name,
+            "note_length": note_length,
+        }
+        self._append(record)
+
+    def log_note_edit(self, *, note_length: int) -> None:
+        """Log note edits performed in the history dialog."""
+
+        record = {
+            "timestamp": _now_iso(),
+            "event": "edit_note",
+            "note_length": note_length,
+        }
+        self._append(record)
+
+    def log_history_export(self, *, entries: int, path: str) -> None:
+        """Log that history was exported."""
+
+        record = {
+            "timestamp": _now_iso(),
+            "event": "history_export",
+            "entries": entries,
+            "path": path,
+        }
+        self._append(record)
+
     def _base_record(self, event: str, query_text: str) -> dict[str, object]:
         digest = hashlib.blake2s(query_text.encode("utf-8"), digest_size=8).hexdigest()
         preview = " ".join(query_text.split())[:120]

@@ -110,6 +110,27 @@ class HistoryTracker:
             raise HistoryTrackerError(
                 f"Unable to list executions for prompt {prompt_id}: {exc}"
             ) from exc
+    def query_executions(
+        self,
+        *,
+        status: Optional[ExecutionStatus] = None,
+        prompt_id: Optional[uuid.UUID] = None,
+        search: Optional[str] = None,
+        limit: Optional[int] = None,
+    ) -> List[PromptExecution]:
+        """Return executions filtered by the provided parameters."""
+
+        status_value = status.value if isinstance(status, ExecutionStatus) else status
+        search_term = search.strip() if search else None
+        try:
+            return self.repository.list_executions_filtered(
+                status=status_value,
+                prompt_id=prompt_id,
+                search=search_term,
+                limit=limit,
+            )
+        except RepositoryError as exc:
+            raise HistoryTrackerError(f"Unable to query execution history: {exc}") from exc
 
     def _build_execution(
         self,
@@ -144,6 +165,31 @@ class HistoryTracker:
             return self.repository.add_execution(execution)
         except RepositoryError as exc:
             raise HistoryTrackerError(f"Unable to persist execution {execution.id}: {exc}") from exc
+
+    def update_note(self, execution_id: uuid.UUID, note: Optional[str]) -> PromptExecution:
+        """Update or clear the note metadata for an execution."""
+
+        try:
+            existing = self.repository.get_execution(execution_id)
+        except RepositoryNotFoundError as exc:
+            raise HistoryTrackerError(str(exc)) from exc
+        except RepositoryError as exc:
+            raise HistoryTrackerError(f"Unable to load execution {execution_id}: {exc}") from exc
+
+        metadata = dict(existing.metadata or {})
+        if note:
+            metadata["note"] = note
+        else:
+            metadata.pop("note", None)
+        if not metadata:
+            metadata = {}
+        existing.metadata = metadata or None
+        try:
+            return self.repository.update_execution(existing)
+        except RepositoryNotFoundError as exc:
+            raise HistoryTrackerError(str(exc)) from exc
+        except RepositoryError as exc:
+            raise HistoryTrackerError(f"Unable to update execution {execution_id}: {exc}") from exc
 
 
 __all__ = ["HistoryTracker", "HistoryTrackerError"]

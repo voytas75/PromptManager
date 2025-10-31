@@ -105,6 +105,7 @@ Further modules (session history, execution pipeline) will be introduced in subs
 - Smoke test: run `python -m main --no-gui --print-settings` to validate configuration and backend connectivity without launching the UI.
 
 - The window exposes a searchable prompt list (left), detail view (right), and toolbar actions for create/edit/delete/refresh backed by the shared `PromptManager` service.
+- The prompt detail pane is scrollable so long prompt bodies stay readable and the window remains stable when maximised on Wayland.
 
 - Use the workspace beneath the toolbar to paste text, run **Detect Need**, request **Suggest Prompt**, and copy the top-ranked prompt directly to the clipboard.
 
@@ -122,10 +123,11 @@ Further modules (session history, execution pipeline) will be introduced in subs
 ## Executing Prompts
 
 - Configure LiteLLM credentials via the Settings dialog or environment variables: set `PROMPT_MANAGER_LITELLM_MODEL` and `PROMPT_MANAGER_LITELLM_API_KEY`, plus `PROMPT_MANAGER_LITELLM_API_BASE` / `PROMPT_MANAGER_LITELLM_API_VERSION` for Azure-hosted deployments.
-- Paste code or free-form context into the workspace, select a prompt, and click **Run Prompt**. The result pane displays model output and **Copy Result** copies it to the clipboard.
+- Paste code or free-form context into the workspace, select a prompt, and click **Run Prompt**. The result pane displays model output; **Save Result** captures it in the history with optional notes, and **Copy Result** copies it to the clipboard.
 - Every run is persisted to the new `prompt_executions` table with request excerpts, model responses, duration, status, error details (when present), and LiteLLM token usage metadata.
 - Programmatic consumers can call `PromptManager.list_recent_executions()` or `PromptManager.list_executions_for_prompt(prompt_id)` to surface history in future dashboards or integrations.
 - Failures are logged with status `failed` and surfaced in the GUI. Successful runs increment `usage_count` for the prompt so catalogue analytics remain accurate.
+- Use the **History** tab to filter by status/prompt, search across notes, edit saved entries, and export the current view to CSV—changes flow straight into SQLite via the history APIs.
 
 ## CLI Catalogue Utilities
 

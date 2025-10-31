@@ -2,6 +2,10 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.8.1] - 2025-11-09
+
+- Wrapped the GUI prompt detail pane in a scrollable container to respect compositor size constraints on Wayland and avoid crashes when maximising the window with long prompt bodies selected.
+
 ## [0.7.0] - 2025-11-07
 
 - Added configurable embedding backends (LiteLLM and sentence-transformers) with deterministic fallback and new settings/env variables.
@@ -20,6 +24,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 - Extended `PromptManager` with an `execute_prompt` workflow, public history accessors, and error handling for unavailable LiteLLM credentials.
 - Updated the PySide6 GUI with **Run Prompt** / **Copy Result** actions and a result pane that surfaces execution metadata.
 - Added a GUI execution history dialog showing recent runs, durations, and failure details with copyable request/response payloads.
+- Added **Save Result** controls that let users annotate and persist the latest response manually, plus a filterable history tab with inline note editing and CSV export.
 - Recorded prompt executions in analytics via the GUI usage logger and expanded unit tests to cover repository, history, and manager execution flows.
 
 ## [0.6.0] - 2025-11-06

@@ -154,6 +154,41 @@ def test_execute_prompt_logs_failure(tmp_path: Path) -> None:
     manager.close()
 
 
+def test_save_execution_result_records_manual_entry(tmp_path: Path) -> None:
+    executor = _StubExecutor()
+    manager, prompt, tracker = _manager_with_dependencies(tmp_path, executor)
+
+    outcome = manager.execute_prompt(prompt.id, "print('hello')")
+    manual = manager.save_execution_result(
+        prompt.id,
+        outcome.result.request_text,
+        outcome.result.response_text,
+        duration_ms=outcome.result.duration_ms,
+        usage=outcome.result.usage,
+        metadata={"note": "Reviewed manually"},
+    )
+    assert manual.metadata and manual.metadata.get("note") == "Reviewed manually"
+    assert manual.metadata.get("manual") is True
+    entries = manager.list_recent_executions()
+    assert any(entry.id == manual.id for entry in entries)
+    manager.close()
+
+
+def test_update_execution_note(tmp_path: Path) -> None:
+    executor = _StubExecutor()
+    manager, prompt, tracker = _manager_with_dependencies(tmp_path, executor)
+
+    outcome = manager.execute_prompt(prompt.id, "print('hi')")
+    saved = manager.save_execution_result(
+        prompt.id,
+        outcome.result.request_text,
+        outcome.result.response_text,
+    )
+    updated = manager.update_execution_note(saved.id, "Updated note")
+    assert updated.metadata and updated.metadata.get("note") == "Updated note"
+    manager.close()
+
+
 def test_history_methods_without_tracker(tmp_path: Path) -> None:
     manager, prompt, tracker = _manager_with_dependencies(tmp_path, _StubExecutor(), history=False)
     assert tracker is None

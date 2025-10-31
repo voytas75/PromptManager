@@ -91,6 +91,10 @@ class PromptExecutionError(PromptManagerError):
     """Raised when executing a prompt via LiteLLM fails."""
 
 
+class PromptHistoryError(PromptManagerError):
+    """Raised when manual history operations fail."""
+
+
 class PromptStorageError(PromptManagerError):
     """Raised when interactions with persistent backends fail."""
 
@@ -312,6 +316,52 @@ class PromptManager:
 
         return PromptManager.ExecutionOutcome(result=result, history_entry=history_entry)
 
+    def save_execution_result(
+        self,
+        prompt_id: uuid.UUID,
+        request_text: str,
+        response_text: str,
+        *,
+        duration_ms: Optional[int] = None,
+        usage: Optional[Mapping[str, Any]] = None,
+        metadata: Optional[Mapping[str, Any]] = None,
+    ) -> PromptExecution:
+        """Persist a manual prompt execution entry (e.g., from GUI Save Result)."""
+
+        tracker = self._history_tracker
+        if tracker is None:
+            raise PromptExecutionUnavailable(
+                "Execution history is not configured; cannot save results manually."
+            )
+        payload_metadata: Dict[str, Any] = {"manual": True}
+        if metadata:
+            payload_metadata.update(dict(metadata))
+        if usage:
+            payload_metadata.setdefault("usage", dict(usage))
+        try:
+            return tracker.record_success(
+                prompt_id=prompt_id,
+                request_text=request_text,
+                response_text=response_text,
+                duration_ms=duration_ms,
+                metadata=payload_metadata,
+            )
+        except HistoryTrackerError as exc:
+            raise PromptHistoryError(str(exc)) from exc
+
+    def update_execution_note(self, execution_id: uuid.UUID, note: Optional[str]) -> PromptExecution:
+        """Update the note metadata for a history entry."""
+
+        tracker = self._history_tracker
+        if tracker is None:
+            raise PromptExecutionUnavailable(
+                "Execution history is not configured; cannot update saved results."
+            )
+        try:
+            return tracker.update_note(execution_id, note)
+        except HistoryTrackerError as exc:
+            raise PromptHistoryError(str(exc)) from exc
+
     def list_recent_executions(self, *, limit: int = 20) -> List[PromptExecution]:
         """Return recently logged executions if history tracking is enabled."""
 
@@ -343,6 +393,30 @@ class PromptManager:
                 extra={"prompt_id": str(prompt_id)},
                 exc_info=True,
             )
+            return []
+
+    def query_executions(
+        self,
+        *,
+        status: Optional[str] = None,
+        prompt_id: Optional[uuid.UUID] = None,
+        search: Optional[str] = None,
+        limit: Optional[int] = None,
+    ) -> List[PromptExecution]:
+        """Return executions filtered by status, prompt, and search term."""
+
+        tracker = self._history_tracker
+        if tracker is None:
+            return []
+        try:
+            return tracker.query_executions(
+                status=status,
+                prompt_id=prompt_id,
+                search=search,
+                limit=limit,
+            )
+        except HistoryTrackerError:
+            logger.warning("Unable to query execution history", exc_info=True)
             return []
 
     def set_name_generator(

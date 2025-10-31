@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.4.0 - 2025-11-08 - Add execution Save Result dialog with optional notes.
 Updates: v0.3.0 - 2025-11-06 - Add catalogue preview dialog with diff summary output.
 Updates: v0.2.0 - 2025-11-05 - Add prompt name suggestion based on context.
 Updates: v0.1.0 - 2025-11-04 - Implement create/edit prompt dialog backed by Prompt dataclass.
@@ -282,16 +283,20 @@ class PromptDialog(QDialog):
         example_output = self._example_output.toPlainText().strip() or None
 
         if self._source_prompt is None:
+            now = datetime.now(timezone.utc)
             return Prompt(
                 id=uuid.uuid4(),
                 name=name,
                 description=description,
-                category=category,
+                category=category or "General",
                 tags=tags,
                 language=language,
                 context=context,
                 example_input=example_input,
                 example_output=example_output,
+                created_at=now,
+                last_modified=now,
+                version="1.0",
             )
 
         base = self._source_prompt
@@ -301,7 +306,7 @@ class PromptDialog(QDialog):
             id=base.id,
             name=name,
             description=description,
-            category=category,
+            category=category or base.category,
             tags=tags,
             language=language,
             context=context,
@@ -324,6 +329,64 @@ class PromptDialog(QDialog):
             ext4=list(base.ext4) if base.ext4 is not None else None,
             ext5=ext5_copy,
         )
+
+
+class SaveResultDialog(QDialog):
+    """Collect optional notes before persisting or updating a prompt execution."""
+
+    def __init__(
+        self,
+        parent: Optional[QWidget],
+        *,
+        prompt_name: str,
+        default_text: str = "",
+        max_chars: int = 400,
+        button_text: str = "Save",
+    ) -> None:
+        super().__init__(parent)
+        self._max_chars = max_chars
+        self._summary = ""
+        self.setWindowTitle(f"{button_text} Result — {prompt_name}")
+        self._build_ui(default_text, button_text)
+
+    @property
+    def note(self) -> str:
+        """Return the trimmed note content."""
+
+        return self._summary
+
+    def _build_ui(self, default_text: str, button_text: str) -> None:
+        layout = QVBoxLayout(self)
+
+        message = QLabel(
+            "Add an optional summary or notes for this execution. The note will be stored with the history entry.",
+            self,
+        )
+        message.setWordWrap(True)
+        layout.addWidget(message)
+
+        self._note_input = QPlainTextEdit(self)
+        self._note_input.setPlaceholderText("Optional summary / notes…")
+        if default_text:
+            snippet = default_text.strip()
+            if len(snippet) > self._max_chars:
+                snippet = snippet[: self._max_chars - 3].rstrip() + "..."
+            self._note_input.setPlainText(snippet)
+        layout.addWidget(self._note_input)
+
+        buttons = QDialogButtonBox(self)
+        self._save_button = buttons.addButton(button_text, QDialogButtonBox.AcceptRole)
+        buttons.addButton(QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self._on_accept)  # type: ignore[arg-type]
+        buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
+        layout.addWidget(buttons)
+
+    def _on_accept(self) -> None:
+        summary = self._note_input.toPlainText().strip()
+        if summary and len(summary) > self._max_chars:
+            summary = summary[: self._max_chars].rstrip()
+        self._summary = summary
+        self.accept()
 
 
 def _diff_entry_to_text(entry: CatalogDiffEntry) -> str:
@@ -387,4 +450,10 @@ class CatalogPreviewDialog(QDialog):
         self.accept()
 
 
-__all__ = ["CatalogPreviewDialog", "PromptDialog", "fallback_suggest_prompt_name"]
+__all__ = [
+    "CatalogPreviewDialog",
+    "PromptDialog",
+    "SaveResultDialog",
+    "fallback_suggest_prompt_name",
+    "fallback_generate_description",
+]
