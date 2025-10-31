@@ -31,6 +31,7 @@ class LiteLLMNameGenerator:
     api_key: Optional[str] = None
     api_base: Optional[str] = None
     timeout_seconds: float = 10.0
+    api_version: Optional[str] = None
 
     _SYSTEM_PROMPT = (
         "You generate concise, descriptive prompt names for a prompt catalogue. "
@@ -60,6 +61,8 @@ class LiteLLMNameGenerator:
             request["api_key"] = self.api_key
         if self.api_base:
             request["api_base"] = self.api_base
+        if self.api_version:
+            request["api_version"] = self.api_version
 
         try:
             response = completion(**request)  # type: ignore[arg-type]
@@ -87,6 +90,7 @@ class LiteLLMDescriptionGenerator:
     api_key: Optional[str] = None
     api_base: Optional[str] = None
     timeout_seconds: float = 12.0
+    api_version: Optional[str] = None
 
     _SYSTEM_PROMPT = (
         "You write concise catalogue descriptions for reusable AI prompts. "
@@ -119,6 +123,8 @@ class LiteLLMDescriptionGenerator:
             request["api_key"] = self.api_key
         if self.api_base:
             request["api_base"] = self.api_base
+        if self.api_version:
+            request["api_version"] = self.api_version
 
         try:
             response = completion(**request)  # type: ignore[arg-type]

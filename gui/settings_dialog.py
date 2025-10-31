@@ -30,6 +30,7 @@ class SettingsDialog(QDialog):
         litellm_model: Optional[str] = None,
         litellm_api_key: Optional[str] = None,
         litellm_api_base: Optional[str] = None,
+        litellm_api_version: Optional[str] = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Prompt Manager Settings")
@@ -37,6 +38,7 @@ class SettingsDialog(QDialog):
         self._litellm_model = litellm_model or ""
         self._litellm_api_key = litellm_api_key or ""
         self._litellm_api_base = litellm_api_base or ""
+        self._litellm_api_version = litellm_api_version or ""
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -63,6 +65,9 @@ class SettingsDialog(QDialog):
 
         self._api_base_input = QLineEdit(self._litellm_api_base, self)
         form.addRow("LiteLLM API base", self._api_base_input)
+
+        self._api_version_input = QLineEdit(self._litellm_api_version, self)
+        form.addRow("LiteLLM API version", self._api_version_input)
 
         layout.addLayout(form)
 
@@ -94,6 +99,7 @@ class SettingsDialog(QDialog):
             "litellm_model": _clean(self._model_input.text()),
             "litellm_api_key": _clean(self._api_key_input.text()),
             "litellm_api_base": _clean(self._api_base_input.text()),
+            "litellm_api_version": _clean(self._api_version_input.text()),
         }
 
 

@@ -50,6 +50,7 @@ Prompt Manager is a desktop-focused application for cataloguing, searching, and 
    - `EMBEDDING_BACKEND` – one of `deterministic`, `litellm`, or `sentence-transformers` (default `deterministic`).
    - `EMBEDDING_MODEL` – embedding model identifier used by LiteLLM or sentence-transformers backends.
    - `EMBEDDING_DEVICE` – optional device string (e.g. `cpu`, `cuda`) for local sentence-transformers models.
+   - `LITELLM_API_VERSION` / `AZURE_OPENAI_API_VERSION` – optional API version (required for Azure OpenAI deployments).
 
    When a JSON file is provided, environment variables take precedence. Validation issues raise `config.SettingsError` with actionable context.
 
@@ -195,6 +196,8 @@ These commands reuse the same validation and merge logic as the GUI and honour t
   | `PROMPT_MANAGER_LITELLM_MODEL` | LiteLLM model used for name generation | `gpt-4o-mini` |
   | `PROMPT_MANAGER_LITELLM_API_KEY` | LiteLLM API key (environment only) | `sk-…` |
   | `PROMPT_MANAGER_LITELLM_API_BASE` | Optional LiteLLM API base override | `https://proxy.example.com` |
+  | `AZURE_OPENAI_API_KEY` | Alias for LiteLLM API key (Azure) | `azure-key` |
+  | `AZURE_OPENAI_ENDPOINT` | Alias for LiteLLM API base (Azure) | `https://<resource>.openai.azure.com` |
   | `PROMPT_MANAGER_EMBEDDING_BACKEND` | Embedding backend (`deterministic`, `litellm`, `sentence-transformers`) | `sentence-transformers` |
   | `PROMPT_MANAGER_EMBEDDING_MODEL` | Embedding model identifier (required when backend ≠ deterministic) | `all-MiniLM-L6-v2` |
   | `PROMPT_MANAGER_EMBEDDING_DEVICE` | Device override for local embedding models | `cuda` |

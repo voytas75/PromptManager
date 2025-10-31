@@ -78,6 +78,16 @@ def test_catalog_path_environment_variable(monkeypatch, tmp_path) -> None:
     assert settings.catalog_path == catalog_file.resolve()
 
 
+def test_litellm_settings_accept_azure_aliases(monkeypatch) -> None:
+    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "azure-key")
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://azure.example.com")
+    monkeypatch.setenv("AZURE_OPENAI_API_VERSION", "2024-05-01-preview")
+    settings = load_settings(litellm_model="azure/gpt")
+    assert settings.litellm_api_key == "azure-key"
+    assert str(settings.litellm_api_base) == "https://azure.example.com"
+    assert settings.litellm_api_version == "2024-05-01-preview"
+
+
 def test_embedding_backend_defaults_to_deterministic() -> None:
     settings = load_settings()
     assert settings.embedding_backend == "deterministic"

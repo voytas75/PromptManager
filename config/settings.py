@@ -40,6 +40,10 @@ class PromptManagerSettings(BaseSettings):
     litellm_model: Optional[str] = Field(default=None, description="LiteLLM model name for prompt name generation.")
     litellm_api_key: Optional[str] = Field(default=None, description="LiteLLM API key.", repr=False)
     litellm_api_base: Optional[str] = Field(default=None, description="Optional LiteLLM API base URL override.")
+    litellm_api_version: Optional[str] = Field(
+        default=None,
+        description="Optional LiteLLM API version (useful for Azure OpenAI).",
+    )
     embedding_backend: str = Field(
         default="deterministic",
         description="Embedding backend to use (deterministic, litellm, sentence-transformers).",
@@ -70,8 +74,9 @@ class PromptManagerSettings(BaseSettings):
                 "cache_ttl_seconds": ["CACHE_TTL_SECONDS", "cache_ttl_seconds"],
                 "catalog_path": ["CATALOG_PATH", "catalog_path"],
                 "litellm_model": ["LITELLM_MODEL", "litellm_model"],
-                "litellm_api_key": ["LITELLM_API_KEY", "litellm_api_key"],
-                "litellm_api_base": ["LITELLM_API_BASE", "litellm_api_base"],
+                "litellm_api_key": ["LITELLM_API_KEY", "litellm_api_key", "AZURE_OPENAI_API_KEY"],
+                "litellm_api_base": ["LITELLM_API_BASE", "litellm_api_base", "AZURE_OPENAI_ENDPOINT"],
+                "litellm_api_version": ["LITELLM_API_VERSION", "litellm_api_version", "AZURE_OPENAI_API_VERSION"],
                 "embedding_backend": ["EMBEDDING_BACKEND", "embedding_backend"],
                 "embedding_model": ["EMBEDDING_MODEL", "embedding_model"],
                 "embedding_device": ["EMBEDDING_DEVICE", "embedding_device"],
@@ -181,8 +186,9 @@ class PromptManagerSettings(BaseSettings):
                 "cache_ttl_seconds": ["CACHE_TTL_SECONDS", "cache_ttl_seconds"],
                 "catalog_path": ["CATALOG_PATH", "catalog_path"],
                 "litellm_model": ["LITELLM_MODEL", "litellm_model"],
-                "litellm_api_key": ["LITELLM_API_KEY", "litellm_api_key"],
-                "litellm_api_base": ["LITELLM_API_BASE", "litellm_api_base"],
+                "litellm_api_key": ["LITELLM_API_KEY", "litellm_api_key", "AZURE_OPENAI_API_KEY"],
+                "litellm_api_base": ["LITELLM_API_BASE", "litellm_api_base", "AZURE_OPENAI_ENDPOINT"],
+                "litellm_api_version": ["LITELLM_API_VERSION", "litellm_api_version", "AZURE_OPENAI_API_VERSION"],
                 "embedding_backend": ["EMBEDDING_BACKEND", "embedding_backend"],
                 "embedding_model": ["EMBEDDING_MODEL", "embedding_model"],
                 "embedding_device": ["EMBEDDING_DEVICE", "embedding_device"],
@@ -190,6 +196,8 @@ class PromptManagerSettings(BaseSettings):
             for field, keys in mapping.items():
                 for key in keys:
                     val = os.getenv(f"{prefix}{key}")
+                    if val is None and key.isupper():
+                        val = os.getenv(key)
                     if val is not None:
                         # Map to canonical field keys accepted by the model
                         if field in {"db_path", "chroma_path"}:
@@ -244,12 +252,19 @@ class PromptManagerSettings(BaseSettings):
                 "catalog_path",
                 "litellm_model",
                 "litellm_api_base",
+                "litellm_api_version",
                 "embedding_backend",
                 "embedding_model",
                 "embedding_device",
             ):
                 if key in data:
                     mapped[key] = data[key]
+            if "litellm_api_key" not in mapped and "AZURE_OPENAI_API_KEY" in data:
+                mapped["litellm_api_key"] = data["AZURE_OPENAI_API_KEY"]
+            if "litellm_api_base" not in mapped and "AZURE_OPENAI_ENDPOINT" in data:
+                mapped["litellm_api_base"] = data["AZURE_OPENAI_ENDPOINT"]
+            if "litellm_api_version" not in mapped and "AZURE_OPENAI_API_VERSION" in data:
+                mapped["litellm_api_version"] = data["AZURE_OPENAI_API_VERSION"]
             return mapped
         return cast(PydanticBaseSettingsSource, _loader)
 
