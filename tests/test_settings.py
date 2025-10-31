@@ -35,6 +35,7 @@ def test_load_settings_reads_json_and_env(monkeypatch, tmp_path) -> None:
     assert settings.chroma_path == Path(config_payload["chroma_path"])
     assert settings.cache_ttl_seconds == 120
     assert settings.redis_dsn == "redis://localhost:6379/1"
+    assert settings.catalog_path is None
 
 
 def test_env_precedes_json_when_both_provided(monkeypatch, tmp_path) -> None:
@@ -52,6 +53,15 @@ def test_env_precedes_json_when_both_provided(monkeypatch, tmp_path) -> None:
     settings = load_settings()
     assert settings.db_path == (tmp_path / "override.db").resolve()
     assert settings.cache_ttl_seconds == 42
+
+
+def test_catalog_path_environment_variable(monkeypatch, tmp_path) -> None:
+    catalog_file = tmp_path / "catalog.json"
+    monkeypatch.setenv("PROMPT_MANAGER_CATALOG_PATH", str(catalog_file))
+
+    settings = load_settings()
+
+    assert settings.catalog_path == catalog_file.resolve()
 
 
 def test_load_settings_raises_when_json_missing(monkeypatch, tmp_path) -> None:

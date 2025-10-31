@@ -64,6 +64,9 @@ def test_build_prompt_manager_forwards_dependencies(monkeypatch: pytest.MonkeyPa
             chroma_client: object,
             embedding_function: object,
             repository: object,
+            embedding_provider: object = None,
+            embedding_worker: object = None,
+            enable_background_sync: bool = True,
         ) -> None:
             self.kwargs = {
                 "chroma_path": chroma_path,
@@ -73,6 +76,9 @@ def test_build_prompt_manager_forwards_dependencies(monkeypatch: pytest.MonkeyPa
                 "chroma_client": chroma_client,
                 "embedding_function": embedding_function,
                 "repository": repository,
+                "embedding_provider": embedding_provider,
+                "embedding_worker": embedding_worker,
+                "enable_background_sync": enable_background_sync,
             }
 
     monkeypatch.setattr("core.factory.PromptManager", _PromptManager)

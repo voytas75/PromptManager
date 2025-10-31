@@ -58,6 +58,8 @@ def _deserialize_metadata(value: Optional[str]) -> Optional[Any]:
     """Deserialize metadata stored as JSON strings."""
     if value is None:
         return None
+    if isinstance(value, (list, dict)):
+        return value
     if value in ("", "null"):
         return None
     try:

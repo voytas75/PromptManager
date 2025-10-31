@@ -13,6 +13,7 @@ from .prompt_manager import (
     PromptCacheError,
     PromptManager,
 )
+from .embedding import EmbeddingProvider, EmbeddingSyncWorker
 from .repository import PromptRepository
 
 try:  # pragma: no cover - redis optional dependency
@@ -47,6 +48,9 @@ def build_prompt_manager(
     chroma_client: Optional["ClientAPI"] = None,
     embedding_function: Optional[Any] = None,
     repository: Optional[PromptRepository] = None,
+    embedding_provider: Optional[EmbeddingProvider] = None,
+    embedding_worker: Optional[EmbeddingSyncWorker] = None,
+    enable_background_sync: bool = True,
 ) -> PromptManager:
     """Return a PromptManager configured from validated settings."""
     resolved_redis = _resolve_redis_client(settings.redis_dsn, redis_client)
@@ -58,6 +62,9 @@ def build_prompt_manager(
         chroma_client=chroma_client,
         embedding_function=embedding_function,
         repository=repository,
+        embedding_provider=embedding_provider,
+        embedding_worker=embedding_worker,
+        enable_background_sync=enable_background_sync,
     )
 
 

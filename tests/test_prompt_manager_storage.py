@@ -108,6 +108,7 @@ class _FakeChromaClient:
 
     def __init__(self, collection: _FakeCollection) -> None:
         self._collection = collection
+        self.closed = False
 
     def get_or_create_collection(
         self,
@@ -116,6 +117,9 @@ class _FakeChromaClient:
         embedding_function: Optional[Any] = None,
     ) -> _FakeCollection:
         return self._collection
+
+    def close(self) -> None:
+        self.closed = True
 
 
 class _FakeRepository:
@@ -140,6 +144,35 @@ class _FakeRepository:
             return self._store[prompt_id]
         except KeyError as exc:
             raise RepositoryNotFoundError(f"Prompt {prompt_id} not found") from exc
+
+
+class _StubWorker:
+    def __init__(self) -> None:
+        self.stopped = False
+
+    def schedule(self, _: uuid.UUID) -> None:
+        return
+
+    def stop(self) -> None:
+        self.stopped = True
+
+
+class _StubRedis:
+    def __init__(self) -> None:
+        self.closed = False
+        self.pool_closed = False
+
+        class _Pool:
+            def __init__(self, outer: "_StubRedis") -> None:
+                self._outer = outer
+
+            def disconnect(self) -> None:
+                self._outer.pool_closed = True
+
+        self.connection_pool = _Pool(self)
+
+    def close(self) -> None:
+        self.closed = True
 
     def update(self, prompt: Prompt) -> Prompt:
         if prompt.id not in self._store:
@@ -212,6 +245,7 @@ def test_prompt_manager_coordinates_sqlite_and_chromadb(tmp_path) -> None:
         manager.repository.get(prompt.id)
     chroma_result = manager.collection.get(ids=[str(prompt.id)])
     assert not chroma_result.get("ids"), "ChromaDB entry should be removed"
+    manager.close()
 
 
 def test_get_prompt_reads_from_cache_before_repository() -> None:
@@ -233,6 +267,7 @@ def test_get_prompt_reads_from_cache_before_repository() -> None:
     cached = manager.get_prompt(prompt.id)
     assert cached.id == prompt.id
     assert repo.get_call_count == 0
+    manager.close()
 
 
 def test_search_prompts_returns_chroma_records_when_sqlite_missing() -> None:
@@ -271,3 +306,30 @@ def test_search_prompts_returns_chroma_records_when_sqlite_missing() -> None:
     prompt = results[0]
     assert str(prompt.id) == prompt_id
     assert prompt.description == "Recovered from metadata"
+    manager.close()
+
+
+def test_prompt_manager_close_shuts_down_workers_and_clients(tmp_path) -> None:
+    collection = _FakeCollection()
+    chroma_client = _FakeChromaClient(collection)
+    repository = _FakeRepository()
+    worker = _StubWorker()
+    redis_client = _StubRedis()
+
+    manager = PromptManager(
+        chroma_path=str(tmp_path / "chroma"),
+        db_path=None,
+        chroma_client=chroma_client,
+        repository=repository,  # type: ignore[arg-type]
+        embedding_worker=worker,
+        redis_client=redis_client,  # type: ignore[arg-type]
+        enable_background_sync=False,
+    )
+
+    manager.close()
+    manager.close()
+
+    assert worker.stopped is True
+    assert redis_client.closed is True
+    assert redis_client.pool_closed is True
+    assert chroma_client.closed is True

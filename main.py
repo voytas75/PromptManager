@@ -1,18 +1,25 @@
 """Application entry point for Prompt Manager.
 
+Updates: v0.5.0 - 2025-11-05 - Seed prompt repository from packaged catalogue before launch.
+Updates: v0.4.1 - 2025-11-05 - Launch GUI by default and add --no-gui flag.
+Updates: v0.4.0 - 2025-11-05 - Ensure manager shutdown occurs on exit and update GUI guidance.
+Updates: v0.3.0 - 2025-11-05 - Gracefully handle missing GUI dependencies.
+Updates: v0.2.0 - 2025-11-04 - Add optional PySide6 GUI launcher toggle.
 Updates: v0.1.0 - 2025-10-30 - Initial CLI bootstrap loading settings and building services.
 """
 
 from __future__ import annotations
 
 import argparse
+import importlib
 import logging
 import logging.config
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional, cast
 
 from config import load_settings
 from core import build_prompt_manager
+from core.catalog_importer import import_prompt_catalog
 
 
 def _setup_logging(logging_conf_path: Optional[Path]) -> None:
@@ -42,6 +49,19 @@ def parse_args() -> argparse.Namespace:
         "--print-settings",
         action="store_true",
         help="Print resolved settings and exit",
+    )
+    parser.add_argument(
+        "--gui",
+        dest="gui",
+        action="store_true",
+        default=None,
+        help="Launch the PySide6 interface after services are initialised (default behaviour).",
+    )
+    parser.add_argument(
+        "--no-gui",
+        dest="gui",
+        action="store_false",
+        help="Skip launching the GUI and exit once services are initialised.",
     )
     return parser.parse_args()
 
@@ -74,11 +94,69 @@ def main() -> int:
         logger.error("Failed to initialise services: %s", exc)
         return 3
 
-    # Minimal interactive stub to verify bootstrap until GUI arrives
-    logger.info("Prompt Manager ready. Database at %s", settings.db_path)
-    logger.info("ChromaDB at %s", settings.chroma_path)
-    _ = manager  # placeholder to avoid unused variable until GUI implemented
-    return 0
+    catalog_result = None
+    try:
+        catalog_result = import_prompt_catalog(manager, settings.catalog_path)
+        if catalog_result.added or catalog_result.updated:
+            logger.info(
+                "Prompt catalogue synced: added=%d updated=%d skipped=%d",
+                catalog_result.added,
+                catalog_result.updated,
+                catalog_result.skipped,
+            )
+    except Exception as exc:  # pragma: no cover - defensive logging
+        logger.error("Failed to import prompt catalogue: %s", exc)
+
+    try:
+        # Minimal interactive stub to verify bootstrap until GUI arrives
+        logger.info("Prompt Manager ready. Database at %s", settings.db_path)
+        logger.info("ChromaDB at %s", settings.chroma_path)
+        launch_gui = args.gui if args.gui is not None else True
+        if launch_gui:
+            try:
+                gui_module = importlib.import_module("gui")
+            except ModuleNotFoundError as exc:
+                logger.error(
+                    "GUI launch requested but optional dependency %s is missing. "
+                    "Install GUI extras with `pip install -r requirements-gui.txt` or rerun without --gui.",
+                    exc.name,
+                )
+                return 4
+            try:
+                launch_gui = getattr(gui_module, "launch_prompt_manager")
+            except AttributeError:
+                logger.error(
+                    "GUI module is missing the launch_prompt_manager entry point. "
+                    "Reinstall GUI extras or launch without --gui."
+                )
+                return 4
+            if not callable(launch_gui):
+                logger.error(
+                    "GUI module launch_prompt_manager entry point is not callable. "
+                    "Reinstall GUI extras or launch without --gui."
+                )
+                return 4
+            launch_callable = cast(Callable[[object], int], launch_gui)
+
+            dependency_error_type = getattr(gui_module, "GuiDependencyError", RuntimeError)
+            if not isinstance(dependency_error_type, type) or not issubclass(
+                dependency_error_type, BaseException
+            ):
+                dependency_error_type = RuntimeError
+
+            try:
+                return launch_callable(manager)
+            except Exception as exc:
+                if isinstance(exc, dependency_error_type):
+                    logger.error("Unable to start GUI: %s", exc)
+                    return 4
+                logger.error("Unexpected error while starting GUI: %s", exc)
+                return 4
+
+        _ = manager  # placeholder to avoid unused variable until GUI implemented
+        return 0
+    finally:
+        manager.close()
 
 
 if __name__ == "__main__":

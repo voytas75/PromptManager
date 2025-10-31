@@ -1,4 +1,7 @@
-"""Lightweight integration checks for main module."""
+"""Lightweight integration checks for main module.
+
+Updates: v0.2.0 - 2025-11-05 - Add coverage for GUI dependency fallback.
+"""
 
 from __future__ import annotations
 
@@ -23,12 +26,30 @@ class _DummySettings(SimpleNamespace):
         )
 
 
+class _DummyManager:
+    def __init__(self) -> None:
+        self.closed = False
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class _CatalogResult:
+    def __init__(self) -> None:
+        self.added = 0
+        self.updated = 0
+        self.skipped = 0
+        self.errors = 0
+
+
 def test_main_print_settings_logs_and_exits(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setattr("sys.argv", ["prompt-manager", "--print-settings"])
     monkeypatch.setattr(main, "load_settings", lambda: _DummySettings())
-    monkeypatch.setattr(main, "build_prompt_manager", lambda settings: object())
+    manager = _DummyManager()
+    monkeypatch.setattr(main, "build_prompt_manager", lambda settings: manager)
+    monkeypatch.setattr(main, "import_prompt_catalog", lambda *_: _CatalogResult())
 
     exit_code = main.main()
 
@@ -73,9 +94,11 @@ def test_main_returns_error_when_manager_init_fails(
 def test_main_logs_ready_message_on_success(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    monkeypatch.setattr("sys.argv", ["prompt-manager"])
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "--no-gui"])
     monkeypatch.setattr(main, "load_settings", lambda: _DummySettings())
-    monkeypatch.setattr(main, "build_prompt_manager", lambda settings: object())
+    manager = _DummyManager()
+    monkeypatch.setattr(main, "build_prompt_manager", lambda settings: manager)
+    monkeypatch.setattr(main, "import_prompt_catalog", lambda *_: _CatalogResult())
 
     exit_code = main.main()
 
@@ -83,6 +106,59 @@ def test_main_logs_ready_message_on_success(
     output = capsys.readouterr().out
     assert "Prompt Manager ready" in output
     assert "ChromaDB at" in output
+    assert manager.closed is True
+
+
+def test_main_launches_gui_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager"])
+    dummy_manager = _DummyManager()
+    monkeypatch.setattr(main, "load_settings", lambda: _DummySettings())
+    monkeypatch.setattr(main, "build_prompt_manager", lambda settings: dummy_manager)
+    monkeypatch.setattr(main, "import_prompt_catalog", lambda *_: _CatalogResult())
+
+    called = {}
+
+    def _fake_launch(manager: object) -> int:
+        called["manager"] = manager
+        return 5
+
+    gui_stub = types.SimpleNamespace(launch_prompt_manager=_fake_launch)
+    monkeypatch.setitem(sys.modules, "gui", gui_stub)
+
+    exit_code = main.main()
+
+    assert exit_code == 5
+    assert called["manager"] is dummy_manager
+    assert dummy_manager.closed is True
+
+
+def test_main_returns_error_when_gui_dependency_missing(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "--gui"])
+    manager = _DummyManager()
+    monkeypatch.setattr(main, "load_settings", lambda: _DummySettings())
+    monkeypatch.setattr(main, "build_prompt_manager", lambda settings: manager)
+    monkeypatch.setattr(main, "import_prompt_catalog", lambda *_: _CatalogResult())
+
+    class _GuiError(RuntimeError):
+        pass
+
+    def _raise(_: object) -> int:
+        raise _GuiError("PySide6 is not installed")
+
+    gui_stub = types.SimpleNamespace(
+        launch_prompt_manager=_raise,
+        GuiDependencyError=_GuiError,
+    )
+    monkeypatch.setitem(sys.modules, "gui", gui_stub)
+
+    exit_code = main.main()
+
+    assert exit_code == 4
+    output = capsys.readouterr().out
+    assert "Unable to start GUI" in output
+    assert manager.closed is True
 
 
 def test_setup_logging_basic_config_fallback(
@@ -104,10 +180,17 @@ def test_main_entrypoint_guard_executes(
     config_stub = types.ModuleType("config")
     config_stub.load_settings = lambda: _DummySettings()
     core_stub = types.ModuleType("core")
-    core_stub.build_prompt_manager = lambda settings: object()
+    dummy_manager = _DummyManager()
+    core_stub.build_prompt_manager = lambda settings: dummy_manager
 
     monkeypatch.setitem(sys.modules, "config", config_stub)
     monkeypatch.setitem(sys.modules, "core", core_stub)
+    gui_stub = types.SimpleNamespace(
+        launch_prompt_manager=lambda manager: 0,
+        GuiDependencyError=RuntimeError,
+    )
+    monkeypatch.setitem(sys.modules, "gui", gui_stub)
+    monkeypatch.setattr(main, "import_prompt_catalog", lambda *_: _CatalogResult())
 
     main_path = Path(main.__file__)
     code = compile(main_path.read_text(encoding="utf-8"), str(main_path), "exec")
@@ -118,3 +201,4 @@ def test_main_entrypoint_guard_executes(
     assert excinfo.value.code == 0
     output = capsys.readouterr().out
     assert "ChromaDB at" in output
+    assert dummy_manager.closed is True

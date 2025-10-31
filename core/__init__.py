@@ -5,6 +5,7 @@ Updates: v0.2.0 - 2025-10-31 - Surface PromptRepository alongside PromptManager.
 Updates: v0.1.0 - 2025-10-30 - Expose PromptManager API.
 """
 
+from .catalog_importer import CatalogImportResult, import_prompt_catalog, load_prompt_catalog
 from .factory import build_prompt_manager
 from .prompt_manager import (
     PromptCacheError,
@@ -25,4 +26,7 @@ __all__ = [
     "RepositoryError",
     "RepositoryNotFoundError",
     "build_prompt_manager",
+    "import_prompt_catalog",
+    "load_prompt_catalog",
+    "CatalogImportResult",
 ]

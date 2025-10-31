@@ -8,17 +8,31 @@ Prompt Manager is a desktop-focused application for cataloguing, searching, and 
 - `PromptRepository` (`core/repository.py`) persists prompts to SQLite and exposes CRUD operations.
 - `PromptManager` service (`core/prompt_manager.py`) coordinates SQLite persistence, Redis-backed caching, and ChromaDB semantic search.
 - Typed configuration loader in `config/settings.py` validates paths/TTL values and can hydrate from environment variables or a JSON file.
-- Project scaffolding prepared for config, GUI, data, and test layers.
+- Initial PySide6 GUI accessible via `--gui`, offering list/search/detail panes with create/edit/delete dialogs.
 
 ## Getting Started
 
-1. Create a virtual environment and install dependencies:
+1. Create a virtual environment and install core dependencies:
 
    ```bash
    pip install -r requirements.txt
    ```
 
    Dependencies are pinned to maintain compatibility with ChromaDB (for example `numpy<2`).
+
+   Alternatively, install the project as a package:
+
+   ```bash
+   pip install .
+   ```
+
+   To enable the desktop interface install the optional GUI extras:
+
+   ```bash
+   pip install -r requirements-gui.txt
+   # or, when installing the package form:
+   pip install .[gui]
+   ```
 
 2. Provide configuration via environment variables (prefixed `PROMPT_MANAGER_`) or a JSON file referenced through `PROMPT_MANAGER_CONFIG_JSON`. Supported keys include:
    - `DATABASE_PATH` – absolute/relative path to the SQLite database (default `data/prompt_manager.db`).
@@ -56,7 +70,53 @@ Prompt Manager is a desktop-focused application for cataloguing, searching, and 
 
    The configuration in `mypy.ini` enforces strict typing for `core`, `config`, and `models` while allowing tests to stay flexible. Please add annotations and narrow types when extending these packages.
 
-Further modules (GUI, session history, execution pipeline) will be introduced in subsequent milestones in line with the blueprint.
+Further modules (session history, execution pipeline) will be introduced in subsequent milestones in line with the blueprint.
+
+## Running the GUI
+
+- Ensure the optional GUI requirements are installed (`pip install .[gui]` or `pip install -r requirements-gui.txt`).
+
+- Launch the desktop interface. The GUI opens by default:
+
+  ```bash
+  python -m main
+  ```
+
+- To run in CLI-only bootstrap mode without starting the window:
+
+  ```bash
+  python -m main --no-gui
+  ```
+
+- Smoke test: run `python -m main --no-gui --print-settings` to validate configuration and backend connectivity without launching the UI.
+
+- The window exposes a searchable prompt list (left), detail view (right), and toolbar actions for create/edit/delete/refresh backed by the shared `PromptManager` service.
+
+- Use the category, tag, and minimum-quality filters above the list to narrow results as your catalogue grows.
+
+- Dialogs validate required fields and surface backend errors with actionable messaging while keeping data in sync across SQLite, Redis, and ChromaDB.
+
+## Prompt Catalogue
+
+- On startup Prompt Manager imports the packaged catalogue in `catalog/prompts.json`, seeding six high-signal prompts across analysis, refactoring, debugging, documentation, reporting, and enhancement.
+- Override the catalogue by setting `PROMPT_MANAGER_CATALOG_PATH` (or `catalog_path` in `config/config.json`) to a JSON file or to a directory containing JSON files. Entries with matching names update existing prompts; new names are inserted automatically.
+- Minimum JSON structure:
+
+  ```json
+  {
+    "name": "Code Review Sentinel",
+    "description": "Perform a layered static review on backend code.",
+    "category": "Code Analysis",
+    "tags": ["code-review", "static-analysis"],
+    "quality_score": 9.2,
+    "context": "Paste service modules or scripts that require validation.",
+    "example_input": "Review this Python module …",
+    "example_output": "Highlights issues and provides remediation guidance."
+  }
+  ```
+
+- Optional fields (`language`, `related_prompts`, `created_at`, `last_modified`, `usage_count`, `source`, and extension slots) map directly to the `Prompt` dataclass. Missing values fall back to sensible defaults and invalid entries are logged during import.
+- Populate `category`, `tags`, and `quality_score` to get the most value from the GUI filters and semantic search.
 
 ## Telemetry
 
@@ -80,7 +140,8 @@ Further modules (GUI, session history, execution pipeline) will be introduced in
     "database_path": "data/prompt_manager.db",
     "chroma_path": "data/chromadb",
     "redis_dsn": "redis://localhost:6379/0",
-    "cache_ttl_seconds": 600
+    "cache_ttl_seconds": 600,
+    "catalog_path": "catalog/prompts.json"
   }
   ```
 

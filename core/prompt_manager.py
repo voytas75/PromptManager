@@ -1,5 +1,7 @@
 """High-level CRUD manager for prompt records backed by SQLite, ChromaDB, and Redis.
 
+Updates: v0.4.1 - 2025-11-05 - Add lifecycle shutdown hooks and mute Chroma telemetry.
+Updates: v0.4.0 - 2025-11-05 - Add embedding provider with background sync and retry handling.
 Updates: v0.3.0 - 2025-11-03 - Require explicit DB path; accept resolved settings inputs.
 Updates: v0.2.0 - 2025-10-31 - Add SQLite repository integration with ChromaDB/Redis sync.
 Updates: v0.1.0 - 2025-10-30 - Initial PromptManager with CRUD and search support.
@@ -9,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Union, cast
@@ -17,6 +20,32 @@ import chromadb
 from chromadb.api import ClientAPI
 from chromadb.api.models.Collection import Collection
 from chromadb.errors import ChromaError
+
+os.environ.setdefault("CHROMA_TELEMETRY_IMPLEMENTATION", "none")
+os.environ.setdefault("CHROMA_ANONYMIZED_TELEMETRY", "0")
+
+
+def _mute_posthog_capture() -> None:
+    try:
+        import posthog  # type: ignore
+    except Exception:
+        return
+
+    def _noop_capture(*_: Any, **__: Any) -> None:
+        return None
+
+    try:
+        posthog.capture = _noop_capture  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
+    try:
+        posthog.disabled = True  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
+
+_mute_posthog_capture()
 
 try:
     import redis
@@ -27,6 +56,7 @@ except ImportError:  # pragma: no cover - redis optional during development
 
 from models.prompt_model import Prompt
 
+from .embedding import EmbeddingGenerationError, EmbeddingProvider, EmbeddingSyncWorker
 from .repository import PromptRepository, RepositoryError, RepositoryNotFoundError
 
 logger = logging.getLogger(__name__)
@@ -61,6 +91,9 @@ class PromptManager:
         chroma_client: Optional[ClientAPI] = None,
         embedding_function: Optional[Any] = None,
         repository: Optional[PromptRepository] = None,
+        embedding_provider: Optional[EmbeddingProvider] = None,
+        embedding_worker: Optional[EmbeddingSyncWorker] = None,
+        enable_background_sync: bool = True,
     ) -> None:
         """Initialise the manager with data backends.
 
@@ -78,6 +111,7 @@ class PromptManager:
         if repository is None and db_path is None:
             raise ValueError("db_path must be provided when no repository is supplied")
 
+        self._closed = False
         self._cache_ttl_seconds = cache_ttl_seconds
         self._redis_client = redis_client
         self._chroma_client: Any
@@ -118,6 +152,18 @@ class PromptManager:
         except ChromaError as exc:
             raise PromptStorageError("Unable to initialiase ChromaDB collection") from exc
 
+        self._embedding_provider = embedding_provider or EmbeddingProvider(embedding_function)
+        if enable_background_sync:
+            worker_logger = logger.getChild("embedding_sync")
+            self._embedding_worker = embedding_worker or EmbeddingSyncWorker(
+                provider=self._embedding_provider,
+                fetch_prompt=self._repository.get,
+                persist_callback=self._persist_embedding_from_worker,
+                logger=worker_logger,
+            )
+        else:
+            self._embedding_worker = embedding_worker or _NullEmbeddingWorker()
+
     @property
     def collection(self) -> Collection:
         """Expose the underlying Chroma collection."""
@@ -128,43 +174,104 @@ class PromptManager:
         """Expose the SQLite repository."""
         return self._repository
 
+    def close(self) -> None:
+        """Release background workers and backend connections."""
+        if self._closed:
+            return
+
+        self._closed = True
+
+        worker = getattr(self, "_embedding_worker", None)
+        stop = getattr(worker, "stop", None)
+        if callable(stop):
+            try:
+                stop()
+            except Exception:
+                logger.debug("Failed to stop embedding worker cleanly", exc_info=True)
+
+        if self._redis_client is not None:
+            redis_close = getattr(self._redis_client, "close", None)
+            if callable(redis_close):
+                try:
+                    redis_close()
+                except Exception:
+                    logger.debug(
+                        "Failed to close Redis client cleanly",
+                        exc_info=True,
+                    )
+            pool = getattr(self._redis_client, "connection_pool", None)
+            disconnect = getattr(pool, "disconnect", None)
+            if callable(disconnect):
+                try:
+                    disconnect()
+                except Exception:
+                    logger.debug(
+                        "Failed to disconnect Redis connection pool cleanly",
+                        exc_info=True,
+                    )
+
+        chroma_client = getattr(self, "_chroma_client", None)
+        if chroma_client is not None:
+            close_fn = getattr(chroma_client, "close", None)
+            if callable(close_fn):
+                try:
+                    close_fn()
+                except Exception:
+                    logger.debug(
+                        "Failed to close Chroma client cleanly",
+                        exc_info=True,
+                    )
+
+    def __enter__(self) -> "PromptManager":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:  # noqa: ANN001 - dynamic signature
+        self.close()
+
     def create_prompt(
         self,
         prompt: Prompt,
         embedding: Optional[Sequence[float]] = None,
     ) -> Prompt:
         """Persist a new prompt in SQLite/ChromaDB and prime the cache."""
+        generated_embedding: Optional[List[float]] = None
         if embedding is not None:
-            prompt.ext4 = list(embedding)
+            generated_embedding = list(embedding)
+        else:
+            try:
+                generated_embedding = self._embedding_provider.embed(prompt.document)
+            except EmbeddingGenerationError:
+                logger.warning(
+                    "Falling back to background embedding for prompt",
+                    extra={"prompt_id": str(prompt.id)},
+                )
         try:
+            if generated_embedding is not None:
+                prompt.ext4 = list(generated_embedding)
             stored_prompt = self._repository.add(prompt)
         except RepositoryError as exc:
             raise PromptStorageError(f"Failed to persist prompt {prompt.id}") from exc
-        payload: Dict[str, Any] = {
-            "ids": [str(prompt.id)],
-            "documents": [stored_prompt.document],
-            "metadatas": [stored_prompt.to_metadata()],
-        }
-        if embedding is not None:
-            payload["embeddings"] = [list(embedding)]
-        try:
-            self._collection.add(**payload)
-        except ChromaError as exc:
+        if generated_embedding is not None:
             try:
-                self._repository.delete(prompt.id)
-            except RepositoryError:
-                logger.error(
-                    "Unable to roll back SQLite insert after Chroma failure",
+                self._persist_embedding(stored_prompt, generated_embedding, is_new=True)
+            except PromptStorageError as exc:
+                try:
+                    self._repository.delete(prompt.id)
+                except RepositoryError:
+                    logger.error(
+                        "Unable to roll back SQLite insert after Chroma failure",
+                        extra={"prompt_id": str(prompt.id)},
+                    )
+                raise exc
+        else:
+            self._embedding_worker.schedule(stored_prompt.id)
+            try:
+                self._cache_prompt(stored_prompt)
+            except PromptCacheError:
+                logger.warning(
+                    "Prompt created but not cached",
                     extra={"prompt_id": str(prompt.id)},
                 )
-            raise PromptStorageError(f"Failed to create prompt {prompt.id}") from exc
-        try:
-            self._cache_prompt(stored_prompt)
-        except PromptCacheError:
-            logger.warning(
-                "Prompt created but not cached",
-                extra={"prompt_id": str(prompt.id)},
-            )
         return stored_prompt
 
     def get_prompt(self, prompt_id: uuid.UUID) -> Prompt:
@@ -193,32 +300,36 @@ class PromptManager:
         embedding: Optional[Sequence[float]] = None,
     ) -> Prompt:
         """Update an existing prompt with new metadata."""
+        generated_embedding: Optional[List[float]] = None
         if embedding is not None:
-            prompt.ext4 = list(embedding)
+            generated_embedding = list(embedding)
+        else:
+            try:
+                generated_embedding = self._embedding_provider.embed(prompt.document)
+            except EmbeddingGenerationError:
+                logger.warning(
+                    "Scheduling background embedding refresh",
+                    extra={"prompt_id": str(prompt.id)},
+                )
         try:
+            if generated_embedding is not None:
+                prompt.ext4 = list(generated_embedding)
             updated_prompt = self._repository.update(prompt)
         except RepositoryNotFoundError as exc:
             raise PromptNotFoundError(f"Prompt {prompt.id} not found") from exc
         except RepositoryError as exc:
             raise PromptStorageError(f"Failed to update prompt {prompt.id} in SQLite") from exc
-        payload: Dict[str, Any] = {
-            "ids": [str(prompt.id)],
-            "documents": [updated_prompt.document],
-            "metadatas": [updated_prompt.to_metadata()],
-        }
-        if embedding is not None:
-            payload["embeddings"] = [list(embedding)]
-        try:
-            self._collection.upsert(**payload)
-        except ChromaError as exc:
-            raise PromptStorageError(f"Failed to update prompt {prompt.id}") from exc
-        try:
-            self._cache_prompt(updated_prompt)
-        except PromptCacheError:
-            logger.warning(
-                "Prompt updated but cache refresh failed",
-                extra={"prompt_id": str(prompt.id)},
-            )
+        if generated_embedding is not None:
+            self._persist_embedding(updated_prompt, generated_embedding, is_new=False)
+        else:
+            self._embedding_worker.schedule(updated_prompt.id)
+            try:
+                self._cache_prompt(updated_prompt)
+            except PromptCacheError:
+                logger.warning(
+                    "Prompt updated but cache refresh failed",
+                    extra={"prompt_id": str(prompt.id)},
+                )
         return updated_prompt
 
     def delete_prompt(self, prompt_id: uuid.UUID) -> None:
@@ -252,12 +363,21 @@ class PromptManager:
         if not query_text and embedding is None:
             raise ValueError("query_text or embedding must be provided")
 
+        query_embedding: Optional[List[float]]
+        if embedding is not None:
+            query_embedding = list(embedding)
+        else:
+            try:
+                query_embedding = self._embedding_provider.embed(query_text)
+            except EmbeddingGenerationError as exc:
+                raise PromptStorageError("Failed to generate query embedding") from exc
+
         try:
             results = cast(
                 Dict[str, Any],
                 self._collection.query(
-                    query_texts=[query_text] if query_text else None,
-                    query_embeddings=[list(embedding)] if embedding is not None else None,
+                    query_texts=None,
+                    query_embeddings=[query_embedding] if query_embedding is not None else None,
                     n_results=limit,
                     where=where,
                 ),
@@ -344,6 +464,50 @@ class PromptManager:
     def _cache_key(prompt_id: uuid.UUID) -> str:
         """Format cache key for prompt entries."""
         return f"prompt:{prompt_id}"
+
+    def _persist_embedding(self, prompt: Prompt, embedding: Sequence[float], *, is_new: bool) -> None:
+        """Persist embeddings to Chroma and refresh caches."""
+
+        payload: Dict[str, Any] = {
+            "ids": [str(prompt.id)],
+            "documents": [prompt.document],
+            "metadatas": [prompt.to_metadata()],
+            "embeddings": [list(embedding)],
+        }
+        try:
+            if is_new:
+                self._collection.add(**payload)
+            else:
+                self._collection.upsert(**payload)
+        except ChromaError as exc:
+            raise PromptStorageError(f"Failed to persist embedding for prompt {prompt.id}") from exc
+        try:
+            self._cache_prompt(prompt)
+        except PromptCacheError:
+            logger.warning(
+                "Prompt cached embedding refresh failed",
+                extra={"prompt_id": str(prompt.id)},
+            )
+
+    def _persist_embedding_from_worker(self, prompt: Prompt, embedding: Sequence[float]) -> None:
+        """Callback invoked by background worker once embedding is generated."""
+
+        prompt.ext4 = list(embedding)
+        try:
+            self._repository.update(prompt)
+        except RepositoryError as exc:
+            raise PromptStorageError(f"Failed to persist embedding for prompt {prompt.id}") from exc
+        self._persist_embedding(prompt, embedding, is_new=False)
+
+
+class _NullEmbeddingWorker:
+    """Embedding worker placeholder used when background sync is disabled."""
+
+    def schedule(self, _: uuid.UUID) -> None:  # pragma: no cover - trivial noop
+        return
+
+    def stop(self) -> None:  # pragma: no cover - trivial noop
+        return
 
 
 __all__ = [

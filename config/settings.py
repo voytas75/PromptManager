@@ -32,6 +32,10 @@ class PromptManagerSettings(BaseSettings):
     chroma_path: Path = Field(default=Path("data") / "chromadb")
     redis_dsn: Optional[str] = None
     cache_ttl_seconds: int = Field(default=300)
+    catalog_path: Optional[Path] = Field(
+        default=None,
+        description="Optional path to a prompt catalogue (JSON file or directory).",
+    )
 
     # Pydantic v2 settings configuration
     model_config = cast(
@@ -48,6 +52,7 @@ class PromptManagerSettings(BaseSettings):
                 "chroma_path": ["CHROMA_PATH", "chroma_path"],
                 "redis_dsn": ["REDIS_DSN", "redis_dsn"],
                 "cache_ttl_seconds": ["CACHE_TTL_SECONDS", "cache_ttl_seconds"],
+                "catalog_path": ["CATALOG_PATH", "catalog_path"],
             },
         },
     )
@@ -74,6 +79,14 @@ class PromptManagerSettings(BaseSettings):
             return None
         stripped = value.strip()
         return stripped or None
+
+    @field_validator("catalog_path", mode="before")
+    def _normalise_catalog_path(cls, value: Optional[Any]) -> Optional[Path]:
+        """Normalise optional catalogue paths when provided."""
+        if value in (None, "", False):
+            return None
+        path = Path(str(value)).expanduser()
+        return path.resolve()
 
     @classmethod
     def settings_customise_sources(
@@ -106,6 +119,7 @@ class PromptManagerSettings(BaseSettings):
                 "chroma_path": ["CHROMA_PATH", "chroma_path"],
                 "redis_dsn": ["REDIS_DSN", "redis_dsn"],
                 "cache_ttl_seconds": ["CACHE_TTL_SECONDS", "cache_ttl_seconds"],
+                "catalog_path": ["CATALOG_PATH", "catalog_path"],
             }
             for field, keys in mapping.items():
                 for key in keys:
@@ -157,7 +171,7 @@ class PromptManagerSettings(BaseSettings):
             mapped: Dict[str, Any] = {}
             if "database_path" in data and "db_path" not in data:
                 mapped["db_path"] = data["database_path"]
-            for key in ("chroma_path", "redis_dsn", "cache_ttl_seconds"):
+            for key in ("chroma_path", "redis_dsn", "cache_ttl_seconds", "catalog_path"):
                 if key in data:
                     mapped[key] = data[key]
             return mapped
