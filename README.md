@@ -165,9 +165,10 @@ These commands reuse the same validation and merge logic as the GUI and honour t
 ## Configuration Precedence
 
 - Precedence (highest → lowest):
-  - Environment variables (`PROMPT_MANAGER_*`)
-  - JSON file pointed by `PROMPT_MANAGER_CONFIG_JSON`
-  - Built-in defaults
+  - Explicit overrides passed to `load_settings` / in-memory application changes.
+  - Application settings file (`config/config.json` by default, or a path specified via `PROMPT_MANAGER_CONFIG_JSON`).
+  - Environment variables (`PROMPT_MANAGER_*`, plus Azure aliases such as `AZURE_OPENAI_API_KEY`).
+  - Built-in defaults.
 
 - Naming note: environment variable keys use upper snake case with the `PROMPT_MANAGER_` prefix (e.g., `PROMPT_MANAGER_DATABASE_PATH`). JSON keys use lower snake case (e.g., `database_path`). Env vars always override JSON values when both are provided.
 

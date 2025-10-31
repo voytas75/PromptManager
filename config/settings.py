@@ -167,12 +167,14 @@ class PromptManagerSettings(BaseSettings):
         PydanticBaseSettingsSource,
         PydanticBaseSettingsSource,
     ]:
-        """Inject JSON configuration loading between init arguments and environment.
+        """Define configuration source precedence.
 
-        Pydantic v2 uses `settings_customise_sources` with a different signature.
+        Order (highest → lowest):
+            1. Explicit keyword arguments (e.g. load_settings(litellm_model="...")).
+            2. JSON configuration file (application settings).
+            3. Environment variables / aliases.
+            4. File secrets.
         """
-        # Source precedence: init -> environment -> JSON -> file secrets.
-        # Place `env_settings` before JSON so env overrides values from file.
         # Compose an environment source that also considers aliases explicitly
         def env_with_aliases(_: BaseSettings | None = None) -> Dict[str, Any]:
             data: Dict[str, Any] = {}
@@ -196,6 +198,8 @@ class PromptManagerSettings(BaseSettings):
             for field, keys in mapping.items():
                 for key in keys:
                     val = os.getenv(f"{prefix}{key}")
+                    if val is None:
+                        val = os.getenv(f"{prefix}{key.upper()}")
                     if val is None and key.isupper():
                         val = os.getenv(key)
                     if val is not None:
@@ -209,8 +213,8 @@ class PromptManagerSettings(BaseSettings):
 
         return (
             init_settings,
+            cls._json_config_settings_source(settings_cls),
             cast(PydanticBaseSettingsSource, env_with_aliases),
-            cls._json_config_settings_source(settings_cls),  # JSON file loader
             file_secret_settings,
         )
 
@@ -222,50 +226,57 @@ class PromptManagerSettings(BaseSettings):
         """Return settings extracted from an optional JSON config file."""
 
         def _loader(_: BaseSettings | None = None) -> Dict[str, Any]:
-            config_path = os.getenv("PROMPT_MANAGER_CONFIG_JSON")
-            if not config_path:
-                return {}
-            resolved_path = Path(config_path).expanduser()
-            if not resolved_path.exists():
-                raise SettingsError(f"Configuration file not found: {resolved_path}")
-            try:
-                raw_contents = resolved_path.read_text(encoding="utf-8")
-            except OSError as exc:  # pragma: no cover - filesystem failure is environment-specific
-                raise SettingsError(f"Unable to read configuration file: {resolved_path}") from exc
-            try:
-                data = json.loads(raw_contents)
-            except json.JSONDecodeError as exc:
-                raise SettingsError(
-                    f"Invalid JSON in configuration file: {resolved_path}"
-                ) from exc
-            if not isinstance(data, dict):
-                message = f"Configuration file {resolved_path} must contain a JSON object"
-                raise SettingsError(message)
-            # Map JSON alias keys to canonical field names for pydantic v2
-            mapped: Dict[str, Any] = {}
-            if "database_path" in data and "db_path" not in data:
-                mapped["db_path"] = data["database_path"]
-            for key in (
-                "chroma_path",
-                "redis_dsn",
-                "cache_ttl_seconds",
-                "catalog_path",
-                "litellm_model",
-                "litellm_api_base",
-                "litellm_api_version",
-                "embedding_backend",
-                "embedding_model",
-                "embedding_device",
-            ):
-                if key in data:
-                    mapped[key] = data[key]
-            if "litellm_api_key" not in mapped and "AZURE_OPENAI_API_KEY" in data:
-                mapped["litellm_api_key"] = data["AZURE_OPENAI_API_KEY"]
-            if "litellm_api_base" not in mapped and "AZURE_OPENAI_ENDPOINT" in data:
-                mapped["litellm_api_base"] = data["AZURE_OPENAI_ENDPOINT"]
-            if "litellm_api_version" not in mapped and "AZURE_OPENAI_API_VERSION" in data:
-                mapped["litellm_api_version"] = data["AZURE_OPENAI_API_VERSION"]
-            return mapped
+            explicit_path = os.getenv("PROMPT_MANAGER_CONFIG_JSON")
+            candidates: list[Path] = []
+            if explicit_path:
+                candidates.append(Path(explicit_path).expanduser())
+            candidates.append((Path("config") / "config.json").expanduser())
+
+            for path in candidates:
+                if not path:
+                    continue
+                if not path.exists():
+                    if path == candidates[0]:
+                        raise SettingsError(f"Configuration file not found: {path}")
+                    continue
+                try:
+                    raw_contents = path.read_text(encoding="utf-8")
+                except OSError as exc:  # pragma: no cover - filesystem failure is environment-specific
+                    raise SettingsError(f"Unable to read configuration file: {path}") from exc
+                try:
+                    data = json.loads(raw_contents)
+                except json.JSONDecodeError as exc:
+                    raise SettingsError(
+                        f"Invalid JSON in configuration file: {path}"
+                    ) from exc
+                if not isinstance(data, dict):
+                    message = f"Configuration file {path} must contain a JSON object"
+                    raise SettingsError(message)
+                mapped: Dict[str, Any] = {}
+                if "database_path" in data and "db_path" not in data:
+                    mapped["db_path"] = data["database_path"]
+                for key in (
+                    "chroma_path",
+                    "redis_dsn",
+                    "cache_ttl_seconds",
+                    "catalog_path",
+                    "litellm_model",
+                    "litellm_api_base",
+                    "litellm_api_version",
+                    "embedding_backend",
+                    "embedding_model",
+                    "embedding_device",
+                ):
+                    if key in data:
+                        mapped[key] = data[key]
+                if "litellm_api_key" not in mapped and "AZURE_OPENAI_API_KEY" in data:
+                    mapped["litellm_api_key"] = data["AZURE_OPENAI_API_KEY"]
+                if "litellm_api_base" not in mapped and "AZURE_OPENAI_ENDPOINT" in data:
+                    mapped["litellm_api_base"] = data["AZURE_OPENAI_ENDPOINT"]
+                if "litellm_api_version" not in mapped and "AZURE_OPENAI_API_VERSION" in data:
+                    mapped["litellm_api_version"] = data["AZURE_OPENAI_API_VERSION"]
+                return mapped
+            return {}
         return cast(PydanticBaseSettingsSource, _loader)
 
 
