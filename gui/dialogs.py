@@ -202,15 +202,25 @@ class PromptDialog(QDialog):
         if not context:
             return ""
         if self._name_generator is None:
+            logger.info(
+                "LiteLLM disabled (model not configured); using fallback name suggestion"
+            )
             return fallback_suggest_prompt_name(context)
         try:
             return self._name_generator(context)
         except NameGenerationError as exc:
-            message = str(exc)
-            if "not configured" in message:
-                logger.info("LiteLLM disabled; using fallback name suggestion")
+            message = str(exc).strip() or "unknown reason"
+            if "not configured" in message.lower():
+                logger.info(
+                    "LiteLLM disabled (%s); using fallback name suggestion",
+                    message,
+                )
             else:
-                logger.warning("Name generation failed; using fallback suggestion", exc_info=exc)
+                logger.warning(
+                    "Name generation failed (%s); using fallback suggestion",
+                    message,
+                    exc_info=exc,
+                )
             return fallback_suggest_prompt_name(context)
 
     def _generate_description(self, context: str) -> str:
@@ -220,15 +230,25 @@ class PromptDialog(QDialog):
         if not context:
             return ""
         if self._description_generator is None:
+            logger.info(
+                "LiteLLM disabled (model not configured); using fallback description summary"
+            )
             return fallback_generate_description(context)
         try:
             return self._description_generator(context)
         except DescriptionGenerationError as exc:
-            message = str(exc)
-            if "not configured" in message:
-                logger.info("LiteLLM disabled; using fallback description summary")
+            message = str(exc).strip() or "unknown reason"
+            if "not configured" in message.lower():
+                logger.info(
+                    "LiteLLM disabled (%s); using fallback description summary",
+                    message,
+                )
             else:
-                logger.warning("Description generation failed; using fallback summary", exc_info=exc)
+                logger.warning(
+                    "Description generation failed (%s); using fallback summary",
+                    message,
+                    exc_info=exc,
+                )
             return fallback_generate_description(context)
 
     def _build_prompt(self) -> Optional[Prompt]:

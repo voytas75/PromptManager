@@ -681,6 +681,7 @@ class MainWindow(QMainWindow):
             litellm_model=self._runtime_settings.get("litellm_model"),
             litellm_api_key=self._runtime_settings.get("litellm_api_key"),
             litellm_api_base=self._runtime_settings.get("litellm_api_base"),
+            litellm_api_version=self._runtime_settings.get("litellm_api_version"),
         )
         if dialog.exec() != QDialog.Accepted:
             return
@@ -698,6 +699,7 @@ class MainWindow(QMainWindow):
         self._runtime_settings["litellm_model"] = updates.get("litellm_model")
         self._runtime_settings["litellm_api_key"] = updates.get("litellm_api_key")
         self._runtime_settings["litellm_api_base"] = updates.get("litellm_api_base")
+        self._runtime_settings["litellm_api_version"] = updates.get("litellm_api_version")
         persist_settings_to_config(self._runtime_settings)
 
         if self._settings is not None:
@@ -709,12 +711,14 @@ class MainWindow(QMainWindow):
             self._settings.litellm_model = updates.get("litellm_model")
             self._settings.litellm_api_key = updates.get("litellm_api_key")
             self._settings.litellm_api_base = updates.get("litellm_api_base")
+            self._settings.litellm_api_version = updates.get("litellm_api_version")
 
         try:
             self._manager.set_name_generator(
                 self._runtime_settings.get("litellm_model"),
                 self._runtime_settings.get("litellm_api_key"),
                 self._runtime_settings.get("litellm_api_base"),
+                self._runtime_settings.get("litellm_api_version"),
             )
         except NameGenerationError as exc:
             QMessageBox.warning(self, "LiteLLM configuration", str(exc))
@@ -745,6 +749,7 @@ class MainWindow(QMainWindow):
             "litellm_model": settings.litellm_model if settings else None,
             "litellm_api_key": settings.litellm_api_key if settings else None,
             "litellm_api_base": settings.litellm_api_base if settings else None,
+            "litellm_api_version": settings.litellm_api_version if settings else None,
         }
 
         config_path = Path("config/config.json")
@@ -754,7 +759,13 @@ class MainWindow(QMainWindow):
             except json.JSONDecodeError:
                 data = {}
             else:
-                for key in ("catalog_path", "litellm_model", "litellm_api_key", "litellm_api_base"):
+                for key in (
+                    "catalog_path",
+                    "litellm_model",
+                    "litellm_api_key",
+                    "litellm_api_base",
+                    "litellm_api_version",
+                ):
                     if isinstance(data.get(key), str):
                         runtime[key] = data[key]
         return runtime

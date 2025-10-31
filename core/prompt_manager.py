@@ -232,6 +232,7 @@ class PromptManager:
         model: Optional[str],
         api_key: Optional[str],
         api_base: Optional[str],
+        api_version: Optional[str],
     ) -> None:
         """Configure the LiteLLM name generator at runtime."""
         if not model:
@@ -243,11 +244,13 @@ class PromptManager:
                 model=model,
                 api_key=api_key,
                 api_base=api_base,
+                api_version=api_version,
             )
             self._description_generator = LiteLLMDescriptionGenerator(
                 model=model,
                 api_key=api_key,
                 api_base=api_base,
+                api_version=api_version,
             )
         except RuntimeError as exc:
             raise NameGenerationError(str(exc)) from exc

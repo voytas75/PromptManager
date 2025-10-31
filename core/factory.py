@@ -98,11 +98,13 @@ def build_prompt_manager(
                 model=settings.litellm_model,
                 api_key=settings.litellm_api_key,
                 api_base=settings.litellm_api_base,
+                api_version=settings.litellm_api_version,
             )
             description_generator = LiteLLMDescriptionGenerator(
                 model=settings.litellm_model,
                 api_key=settings.litellm_api_key,
                 api_base=settings.litellm_api_base,
+                api_version=settings.litellm_api_version,
             )
         except RuntimeError as exc:
             raise NameGenerationError(

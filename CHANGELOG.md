@@ -11,6 +11,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 - Logged intent workspace interactions to `data/logs/intent_usage.jsonl` for lightweight UX analytics.
 - Added `python -m main usage-report` command to summarise logged workspace activity for feedback review.
 - Auto-generate prompt names and descriptions via LiteLLM when the creation dialog fields are left blank.
+- Added LiteLLM API version wiring (including Azure `AZURE_OPENAI_API_VERSION` alias) across settings, manager wiring, and generators.
 
 ## [0.6.0] - 2025-11-06
 
