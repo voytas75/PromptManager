@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.5.0 - 2025-11-08 - Add prompt execution workflow with result pane.
 Updates: v0.4.0 - 2025-11-07 - Add intent workspace with detect/suggest/copy actions and usage logging.
 Updates: v0.3.0 - 2025-11-06 - Surface intent-aware search hints and recommendations.
 Updates: v0.2.0 - 2025-11-05 - Add catalogue filters, LiteLLM name generation, and settings UI.
@@ -40,6 +41,8 @@ from core import (
     NameGenerationError,
     PromptManager,
     PromptManagerError,
+    PromptExecutionError,
+    PromptExecutionUnavailable,
     PromptNotFoundError,
     PromptStorageError,
     RepositoryError,
@@ -165,6 +168,7 @@ class MainWindow(QMainWindow):
         self._all_prompts: List[Prompt] = []
         self._current_prompts: List[Prompt] = []
         self._suggestions: Optional[PromptManager.IntentSuggestions] = None
+        self._last_execution: Optional[PromptManager.ExecutionOutcome] = None
         self._runtime_settings = self._initial_runtime_settings(settings)
         self._usage_logger = IntentUsageLogger()
         self.setWindowTitle("Prompt Manager")
@@ -233,9 +237,17 @@ class MainWindow(QMainWindow):
         self._suggest_button.clicked.connect(self._on_suggest_prompt_clicked)  # type: ignore[arg-type]
         actions_layout.addWidget(self._suggest_button)
 
+        self._run_button = QPushButton("Run Prompt", self)
+        self._run_button.clicked.connect(self._on_run_prompt_clicked)  # type: ignore[arg-type]
+        actions_layout.addWidget(self._run_button)
+
         self._copy_button = QPushButton("Copy Prompt", self)
         self._copy_button.clicked.connect(self._on_copy_prompt_clicked)  # type: ignore[arg-type]
         actions_layout.addWidget(self._copy_button)
+
+        self._copy_result_button = QPushButton("Copy Result", self)
+        self._copy_result_button.clicked.connect(self._on_copy_result_clicked)  # type: ignore[arg-type]
+        actions_layout.addWidget(self._copy_result_button)
 
         actions_layout.addStretch(1)
         layout.addLayout(actions_layout)
@@ -286,7 +298,27 @@ class MainWindow(QMainWindow):
         splitter.setStretchFactor(1, 2)
         layout.addWidget(splitter, stretch=1)
 
+        result_layout = QVBoxLayout()
+        result_layout.setContentsMargins(0, 12, 0, 0)
+
+        self._result_label = QLabel("No prompt executed yet", self)
+        self._result_label.setObjectName("resultTitle")
+        self._result_meta = QLabel("", self)
+        self._result_meta.setStyleSheet("color: #5b5b5b; font-style: italic;")
+        self._result_view = QPlainTextEdit(self)
+        self._result_view.setReadOnly(True)
+        self._result_view.setPlaceholderText("Run a prompt to see output here.")
+
+        result_layout.addWidget(self._result_label)
+        result_layout.addWidget(self._result_meta)
+        result_layout.addWidget(self._result_view, 1)
+        layout.addLayout(result_layout)
+
         self.setCentralWidget(container)
+
+        has_executor = self._manager.executor is not None
+        self._run_button.setEnabled(has_executor)
+        self._copy_result_button.setEnabled(False)
 
     def _load_prompts(self, search_text: str = "") -> None:
         """Populate the list model from the repository or semantic search."""
@@ -416,6 +448,33 @@ class MainWindow(QMainWindow):
         self._intent_hint.setText(message)
         self._intent_hint.setVisible(True)
 
+    def _display_execution_result(
+        self,
+        prompt: Prompt,
+        outcome: PromptManager.ExecutionOutcome,
+    ) -> None:
+        """Render the most recent execution result in the result pane."""
+
+        self._last_execution = outcome
+        self._result_label.setText(f"Last Result — {prompt.name}")
+        meta_parts: List[str] = [f"Duration: {outcome.result.duration_ms} ms"]
+        history_entry = outcome.history_entry
+        if history_entry is not None:
+            executed_at = history_entry.executed_at.astimezone()
+            meta_parts.append(f"Logged: {executed_at.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+        self._result_meta.setText(" | ".join(meta_parts))
+        self._result_view.setPlainText(outcome.result.response_text or "")
+        self._copy_result_button.setEnabled(bool(outcome.result.response_text))
+
+    def _clear_execution_result(self) -> None:
+        """Reset the result pane to its default state."""
+
+        self._last_execution = None
+        self._result_label.setText("No prompt executed yet")
+        self._result_meta.clear()
+        self._result_view.clear()
+        self._copy_result_button.setEnabled(False)
+
     def _generate_prompt_name(self, context: str) -> str:
         """Delegate name generation to PromptManager, surfacing errors."""
 
@@ -476,6 +535,54 @@ class MainWindow(QMainWindow):
         if top_name:
             self.statusBar().showMessage(f"Top suggestion: {top_name}", 5000)
 
+    def _on_run_prompt_clicked(self) -> None:
+        """Execute the selected prompt via the manager."""
+
+        request_text = self._query_input.toPlainText().strip()
+        if not request_text:
+            self.statusBar().showMessage("Paste some text or code before executing a prompt.", 4000)
+            return
+        prompt = self._current_prompt()
+        if prompt is None:
+            prompts = self._model.prompts()
+            prompt = prompts[0] if prompts else None
+        if prompt is None:
+            self.statusBar().showMessage("Select a prompt to execute first.", 4000)
+            return
+
+        try:
+            outcome = self._manager.execute_prompt(prompt.id, request_text)
+        except PromptExecutionUnavailable as exc:
+            self._run_button.setEnabled(False)
+            self._usage_logger.log_execute(
+                prompt_name=prompt.name,
+                success=False,
+                duration_ms=None,
+                error=str(exc),
+            )
+            self._show_error("Prompt execution unavailable", str(exc))
+            return
+        except (PromptExecutionError, PromptManagerError) as exc:
+            self._usage_logger.log_execute(
+                prompt_name=prompt.name,
+                success=False,
+                duration_ms=None,
+                error=str(exc),
+            )
+            self._show_error("Prompt execution failed", str(exc))
+            return
+
+        self._display_execution_result(prompt, outcome)
+        self._usage_logger.log_execute(
+            prompt_name=prompt.name,
+            success=True,
+            duration_ms=outcome.result.duration_ms,
+        )
+        self.statusBar().showMessage(
+            f"Executed '{prompt.name}' in {outcome.result.duration_ms} ms.",
+            5000,
+        )
+
     def _on_copy_prompt_clicked(self) -> None:
         """Copy the currently selected prompt body to the clipboard."""
 
@@ -494,6 +601,20 @@ class MainWindow(QMainWindow):
         clipboard.setText(payload)
         self.statusBar().showMessage(f"Copied '{prompt.name}' to the clipboard.", 4000)
         self._usage_logger.log_copy(prompt_name=prompt.name, prompt_has_body=bool(prompt.context))
+
+    def _on_copy_result_clicked(self) -> None:
+        """Copy the latest execution result to the clipboard."""
+
+        if self._last_execution is None:
+            self.statusBar().showMessage("Run a prompt to generate a result first.", 3000)
+            return
+        response = self._last_execution.result.response_text
+        if not response:
+            self.statusBar().showMessage("Latest result is empty; nothing to copy.", 3000)
+            return
+        clipboard = QGuiApplication.clipboard()
+        clipboard.setText(response)
+        self.statusBar().showMessage("Prompt result copied to the clipboard.", 4000)
 
     def _apply_suggestions(self, suggestions: PromptManager.IntentSuggestions) -> None:
         """Apply intent suggestions to the list view and update filters."""

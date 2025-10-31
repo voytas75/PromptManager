@@ -10,7 +10,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Optional, Sequence
 
 from core.intent_classifier import IntentPrediction
 
@@ -67,6 +67,27 @@ class IntentUsageLogger:
             "prompt_name": prompt_name,
             "has_body": prompt_has_body,
         }
+        self._append(record)
+
+    def log_execute(
+        self,
+        *,
+        prompt_name: str,
+        success: bool,
+        duration_ms: Optional[int],
+        error: Optional[str] = None,
+    ) -> None:
+        """Log prompt execution outcomes."""
+
+        record = {
+            "timestamp": _now_iso(),
+            "event": "execute",
+            "prompt_name": prompt_name,
+            "success": success,
+            "duration_ms": duration_ms,
+        }
+        if error:
+            record["error"] = error[:200]
         self._append(record)
 
     def _base_record(self, event: str, query_text: str) -> dict[str, object]:

@@ -25,6 +25,7 @@ from .intent_classifier import (
     IntentLabel,
     IntentPrediction,
 )
+from .history_tracker import HistoryTracker, HistoryTrackerError
 from .prompt_manager import (
     PromptCacheError,
     PromptManager,
@@ -35,6 +36,7 @@ from .prompt_manager import (
 from .name_generation import NameGenerationError, DescriptionGenerationError, LiteLLMDescriptionGenerator
 from .repository import PromptRepository, RepositoryError, RepositoryNotFoundError
 from .embedding import create_embedding_function
+from .execution import CodexExecutor, CodexExecutionResult, ExecutionError
 
 __all__ = [
     "PromptManager",
@@ -63,4 +65,9 @@ __all__ = [
     "IntentLabel",
     "create_embedding_function",
     "LiteLLMDescriptionGenerator",
+    "CodexExecutor",
+    "CodexExecutionResult",
+    "ExecutionError",
+    "HistoryTracker",
+    "HistoryTrackerError",
 ]

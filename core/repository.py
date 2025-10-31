@@ -1,5 +1,6 @@
 """SQLite-backed repository for persistent prompt storage.
 
+Updates: v0.2.0 - 2025-11-08 - Add prompt execution history persistence APIs.
 Updates: v0.1.0 - 2025-10-31 - Introduce PromptRepository syncing Prompt dataclass with SQLite.
 """
 
@@ -11,7 +12,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
-from models.prompt_model import Prompt
+from models.prompt_model import Prompt, PromptExecution
 
 
 class RepositoryError(Exception):
@@ -102,6 +103,19 @@ class PromptRepository:
         "ext5",
     )
 
+    _EXECUTION_COLUMNS: Sequence[str] = (
+        "id",
+        "prompt_id",
+        "request_text",
+        "response_text",
+        "status",
+        "error_message",
+        "duration_ms",
+        "executed_at",
+        "input_hash",
+        "metadata",
+    )
+
     def __init__(self, db_path: str) -> None:
         """Initialise the repository and ensure schema exists."""
         self._db_path = Path(db_path)
@@ -190,6 +204,76 @@ class PromptRepository:
             raise RepositoryError("Failed to fetch prompt list") from exc
         return [self._row_to_prompt(row) for row in rows]
 
+    def add_execution(self, execution: PromptExecution) -> PromptExecution:
+        """Persist a prompt execution history entry."""
+        payload = self._execution_to_row(execution)
+        placeholders = ", ".join(f":{column}" for column in self._EXECUTION_COLUMNS)
+        query = (
+            f"INSERT INTO prompt_executions ({', '.join(self._EXECUTION_COLUMNS)}) "
+            f"VALUES ({placeholders});"
+        )
+        try:
+            with _connect(self._db_path) as conn:
+                conn.execute(query, payload)
+        except sqlite3.IntegrityError as exc:
+            raise RepositoryError(f"Execution {execution.id} already exists") from exc
+        except sqlite3.Error as exc:
+            raise RepositoryError(f"Failed to insert execution {execution.id}") from exc
+        return execution
+
+    def get_execution(self, execution_id: uuid.UUID) -> PromptExecution:
+        """Fetch a single execution by identifier."""
+        try:
+            with _connect(self._db_path) as conn:
+                cursor = conn.execute(
+                    "SELECT * FROM prompt_executions WHERE id = ?;",
+                    (str(execution_id),),
+                )
+                row = cursor.fetchone()
+        except sqlite3.Error as exc:
+            raise RepositoryError(f"Failed to load execution {execution_id}") from exc
+        if row is None:
+            raise RepositoryNotFoundError(f"Execution {execution_id} not found")
+        return self._row_to_execution(row)
+
+    def list_executions(
+        self,
+        *,
+        limit: Optional[int] = None,
+    ) -> List[PromptExecution]:
+        """Return executions ordered by most recent first."""
+        clause = "ORDER BY datetime(executed_at) DESC"
+        if limit is not None:
+            clause += f" LIMIT {int(limit)}"
+        query = f"SELECT * FROM prompt_executions {clause};"
+        try:
+            with _connect(self._db_path) as conn:
+                cursor = conn.execute(query)
+                rows = cursor.fetchall()
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to fetch executions") from exc
+        return [self._row_to_execution(row) for row in rows]
+
+    def list_executions_for_prompt(
+        self,
+        prompt_id: uuid.UUID,
+        *,
+        limit: Optional[int] = None,
+    ) -> List[PromptExecution]:
+        """Return execution history for a given prompt."""
+        clause = "WHERE prompt_id = ? ORDER BY datetime(executed_at) DESC"
+        params: List[Any] = [str(prompt_id)]
+        if limit is not None:
+            clause += f" LIMIT {int(limit)}"
+        query = f"SELECT * FROM prompt_executions {clause};"
+        try:
+            with _connect(self._db_path) as conn:
+                cursor = conn.execute(query, params)
+                rows = cursor.fetchall()
+        except sqlite3.Error as exc:
+            raise RepositoryError(f"Failed to fetch execution history for {prompt_id}") from exc
+        return [self._row_to_execution(row) for row in rows]
+
     def _prompt_to_row(self, prompt: Prompt) -> Dict[str, Any]:
         """Convert Prompt into SQLite-friendly mapping."""
         return {
@@ -251,6 +335,28 @@ class PromptRepository:
         }
         return Prompt.from_record(record)
 
+    def _execution_to_row(self, execution: PromptExecution) -> Dict[str, Any]:
+        """Convert PromptExecution into SQLite-compatible mapping."""
+        record = execution.to_record()
+        record["metadata"] = _json_dumps(record["metadata"])
+        return record
+
+    def _row_to_execution(self, row: sqlite3.Row) -> PromptExecution:
+        """Hydrate PromptExecution from a SQLite row."""
+        payload: Dict[str, Any] = {
+            "id": row["id"],
+            "prompt_id": row["prompt_id"],
+            "request_text": row["request_text"],
+            "response_text": row["response_text"],
+            "status": row["status"],
+            "error_message": row["error_message"],
+            "duration_ms": row["duration_ms"],
+            "executed_at": row["executed_at"],
+            "input_hash": row["input_hash"],
+            "metadata": row["metadata"],
+        }
+        return PromptExecution.from_record(payload)
+
     def _ensure_schema(self, conn: sqlite3.Connection) -> None:
         """Create required tables if they do not exist."""
         conn.execute(
@@ -289,6 +395,31 @@ class PromptRepository:
         )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_prompts_name ON prompts(name);"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS prompt_executions (
+                id TEXT PRIMARY KEY,
+                prompt_id TEXT NOT NULL,
+                request_text TEXT NOT NULL,
+                response_text TEXT,
+                status TEXT NOT NULL,
+                error_message TEXT,
+                duration_ms INTEGER,
+                executed_at TEXT NOT NULL,
+                input_hash TEXT NOT NULL,
+                metadata TEXT,
+                FOREIGN KEY(prompt_id) REFERENCES prompts(id) ON DELETE CASCADE
+            );
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_prompt_executions_prompt_id "
+            "ON prompt_executions(prompt_id);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_prompt_executions_executed_at "
+            "ON prompt_executions(executed_at);"
         )
 
 

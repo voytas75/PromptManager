@@ -1,5 +1,6 @@
 """High-level CRUD manager for prompt records backed by SQLite, ChromaDB, and Redis.
 
+Updates: v0.7.0 - 2025-11-08 - Integrate prompt execution pipeline with history logging.
 Updates: v0.6.0 - 2025-11-06 - Add intent-aware search suggestions and ranking helpers.
 Updates: v0.5.0 - 2025-11-05 - Integrate LiteLLM name generator and catalogue seeding.
 Updates: v0.4.1 - 2025-11-05 - Add lifecycle shutdown hooks and mute Chroma telemetry.
@@ -17,7 +18,7 @@ import os
 import uuid
 from pathlib import Path
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Union, cast
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Union, cast
 
 import chromadb
 from chromadb.api import ClientAPI
@@ -57,9 +58,11 @@ except ImportError:  # pragma: no cover - redis optional during development
     redis = None  # type: ignore
     RedisError = Exception  # type: ignore[misc,assignment]
 
-from models.prompt_model import Prompt
+from models.prompt_model import Prompt, PromptExecution
 
 from .embedding import EmbeddingGenerationError, EmbeddingProvider, EmbeddingSyncWorker
+from .execution import CodexExecutionResult, CodexExecutor, ExecutionError
+from .history_tracker import HistoryTracker, HistoryTrackerError
 from .intent_classifier import IntentClassifier, IntentPrediction, rank_by_hints
 from .name_generation import (
     LiteLLMDescriptionGenerator,
@@ -78,6 +81,14 @@ class PromptManagerError(Exception):
 
 class PromptNotFoundError(PromptManagerError):
     """Raised when a prompt cannot be located in the backing store."""
+
+
+class PromptExecutionUnavailable(PromptManagerError):
+    """Raised when prompt execution is not configured for the manager."""
+
+
+class PromptExecutionError(PromptManagerError):
+    """Raised when executing a prompt via LiteLLM fails."""
 
 
 class PromptStorageError(PromptManagerError):
@@ -107,6 +118,8 @@ class PromptManager:
         name_generator: Optional[LiteLLMNameGenerator] = None,
         description_generator: Optional[LiteLLMDescriptionGenerator] = None,
         intent_classifier: Optional[IntentClassifier] = None,
+        executor: Optional[CodexExecutor] = None,
+        history_tracker: Optional[HistoryTracker] = None,
     ) -> None:
         """Initialise the manager with data backends.
 
@@ -119,6 +132,8 @@ class PromptManager:
             chroma_client: Optional preconfigured Chroma client.
             embedding_function: Optional embedding function for Chroma.
             repository: Optional preconfigured repository instance (e.g. for testing).
+            executor: Optional CodexExecutor responsible for running prompts.
+            history_tracker: Optional execution history tracker for persistence.
         """
         # Allow tests to supply repository directly; only require db_path when building one.
         if repository is None and db_path is None:
@@ -179,6 +194,8 @@ class PromptManager:
         self._name_generator = name_generator
         self._description_generator = description_generator
         self._intent_classifier = intent_classifier
+        self._executor = executor
+        self._history_tracker = history_tracker
 
     @dataclass(slots=True)
     class IntentSuggestions:
@@ -187,6 +204,13 @@ class PromptManager:
         prediction: IntentPrediction
         prompts: List[Prompt]
         fallback_used: bool = False
+
+    @dataclass(slots=True)
+    class ExecutionOutcome:
+        """Aggregate data returned after executing a prompt."""
+
+        result: CodexExecutionResult
+        history_entry: Optional[PromptExecution]
 
     @property
     def collection(self) -> Collection:
@@ -203,6 +227,28 @@ class PromptManager:
         """Expose the configured intent classifier for tooling hooks."""
 
         return self._intent_classifier
+
+    @property
+    def executor(self) -> Optional[CodexExecutor]:
+        """Return the configured prompt executor."""
+
+        return self._executor
+
+    def set_executor(self, executor: Optional[CodexExecutor]) -> None:
+        """Assign or replace the Codex executor at runtime."""
+
+        self._executor = executor
+
+    @property
+    def history_tracker(self) -> Optional[HistoryTracker]:
+        """Expose the execution history tracker if configured."""
+
+        return self._history_tracker
+
+    def set_history_tracker(self, tracker: Optional[HistoryTracker]) -> None:
+        """Assign or replace the history tracker at runtime."""
+
+        self._history_tracker = tracker
 
     def generate_prompt_name(self, context: str) -> str:
         """Return a prompt name using the configured LiteLLM generator."""
@@ -226,6 +272,45 @@ class PromptManager:
             return self._description_generator.generate(context)
         except Exception as exc:
             raise DescriptionGenerationError(str(exc)) from exc
+
+    def execute_prompt(
+        self,
+        prompt_id: uuid.UUID,
+        request_text: str,
+        *,
+        extra_messages: Optional[Sequence[Mapping[str, str]]] = None,
+    ) -> "PromptManager.ExecutionOutcome":
+        """Execute a prompt via LiteLLM and persist the outcome when configured."""
+
+        if not request_text.strip():
+            raise PromptExecutionError("Prompt execution requires non-empty input text.")
+        if self._executor is None:
+            raise PromptExecutionUnavailable(
+                "Prompt execution is not configured. Provide LiteLLM credentials and model."
+            )
+
+        prompt = self.get_prompt(prompt_id)
+        try:
+            result = self._executor.execute(
+                prompt,
+                request_text,
+                extra_messages=extra_messages,
+            )
+        except ExecutionError as exc:
+            self._log_execution_failure(prompt.id, request_text, str(exc))
+            raise PromptExecutionError(str(exc)) from exc
+
+        history_entry = self._log_execution_success(prompt.id, request_text, result)
+        try:
+            self.increment_usage(prompt.id)
+        except PromptManagerError:
+            logger.debug(
+                "Prompt executed but usage counter update failed",
+                extra={"prompt_id": str(prompt.id)},
+                exc_info=True,
+            )
+
+        return PromptManager.ExecutionOutcome(result=result, history_entry=history_entry)
 
     def set_name_generator(
         self,
@@ -258,6 +343,64 @@ class PromptManager:
             # Name generation and intent classification may share LiteLLM routing;
             # future integrations can configure richer classification when desired.
             logger.debug("LiteLLM powered features enabled for intent classifier")
+
+    def _log_execution_success(
+        self,
+        prompt_id: uuid.UUID,
+        request_text: str,
+        result: CodexExecutionResult,
+    ) -> Optional[PromptExecution]:
+        """Persist a successful execution outcome when the tracker is available."""
+
+        tracker = self._history_tracker
+        if tracker is None:
+            return None
+        usage_metadata: Dict[str, Any] = {}
+        try:
+            usage_metadata = dict(result.usage)
+        except Exception:  # pragma: no cover - defensive
+            usage_metadata = {}
+        metadata: Dict[str, Any] = {"usage": usage_metadata}
+        try:
+            return tracker.record_success(
+                prompt_id=prompt_id,
+                request_text=request_text,
+                response_text=result.response_text,
+                duration_ms=result.duration_ms,
+                metadata=metadata,
+            )
+        except HistoryTrackerError:
+            logger.warning(
+                "Prompt executed but history logging failed",
+                extra={"prompt_id": str(prompt_id)},
+                exc_info=True,
+            )
+            return None
+
+    def _log_execution_failure(
+        self,
+        prompt_id: uuid.UUID,
+        request_text: str,
+        error_message: str,
+    ) -> Optional[PromptExecution]:
+        """Persist a failed execution attempt when history tracking is enabled."""
+
+        tracker = self._history_tracker
+        if tracker is None:
+            return None
+        try:
+            return tracker.record_failure(
+                prompt_id=prompt_id,
+                request_text=request_text,
+                error_message=error_message,
+            )
+        except HistoryTrackerError:
+            logger.warning(
+                "Prompt execution failed and could not be logged",
+                extra={"prompt_id": str(prompt_id)},
+                exc_info=True,
+            )
+            return None
 
     def set_intent_classifier(self, classifier: Optional[IntentClassifier]) -> None:
         """Replace the runtime intent classifier implementation."""
@@ -684,4 +827,6 @@ __all__ = [
     "PromptNotFoundError",
     "PromptStorageError",
     "PromptCacheError",
+    "PromptExecutionUnavailable",
+    "PromptExecutionError",
 ]

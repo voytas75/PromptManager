@@ -1,5 +1,6 @@
 """Prompt data model definitions.
 
+Updates: v0.2.0 - 2025-11-08 - Add prompt execution records for history logging.
 Updates: v0.1.1 - 2025-11-01 - Filtered null metadata fields for Chroma compatibility.
 Updates: v0.1.0 - 2025-10-30 - Initial Prompt schema with serialization helpers.
 """
@@ -7,9 +8,11 @@ Updates: v0.1.0 - 2025-10-30 - Initial Prompt schema with serialization helpers.
 from __future__ import annotations
 
 import json
+import hashlib
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from enum import Enum
 from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence
 
 
@@ -83,6 +86,18 @@ def _deserialize_list(value: Any) -> List[str]:
     if isinstance(value, (list, tuple, set)):
         return [str(item) for item in value]
     return [str(value)]
+
+def _hash_text(value: str) -> str:
+    """Return a stable SHA-256 digest for the provided text."""
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+class ExecutionStatus(str, Enum):
+    """Enumerate prompt execution outcomes for history tracking."""
+
+    SUCCESS = "success"
+    FAILED = "failed"
+    PARTIAL = "partial"
 
 
 @dataclass(slots=True)
@@ -221,6 +236,66 @@ class Prompt:
             ext3=data.get("ext3"),
             ext4=_deserialize_metadata(data.get("ext4")),
             ext5=_deserialize_metadata(data.get("ext5")),
+        )
+
+
+@dataclass(slots=True)
+class PromptExecution:
+    """Dataclass representing a single prompt execution event."""
+
+    id: uuid.UUID
+    prompt_id: uuid.UUID
+    request_text: str
+    response_text: Optional[str] = None
+    status: ExecutionStatus = ExecutionStatus.SUCCESS
+    error_message: Optional[str] = None
+    duration_ms: Optional[int] = None
+    executed_at: datetime = field(default_factory=_utc_now)
+    input_hash: str = ""
+    metadata: Optional[MutableMapping[str, Any]] = None
+
+    def __post_init__(self) -> None:
+        if not self.input_hash:
+            self.input_hash = _hash_text(self.request_text)
+
+    def to_record(self) -> Dict[str, Any]:
+        """Return a dictionary representation suitable for persistence."""
+        return {
+            "id": str(self.id),
+            "prompt_id": str(self.prompt_id),
+            "request_text": self.request_text,
+            "response_text": self.response_text,
+            "status": self.status.value,
+            "error_message": self.error_message,
+            "duration_ms": self.duration_ms,
+            "executed_at": self.executed_at.isoformat(),
+            "input_hash": self.input_hash,
+            "metadata": self.metadata,
+        }
+
+    @classmethod
+    def from_record(cls, data: Mapping[str, Any]) -> "PromptExecution":
+        """Hydrate a PromptExecution from a mapping."""
+        status_value = str(data.get("status") or ExecutionStatus.SUCCESS.value)
+        try:
+            parsed_status = ExecutionStatus(status_value)
+        except ValueError:
+            parsed_status = ExecutionStatus.SUCCESS
+        return cls(
+            id=_ensure_uuid(data.get("id") or uuid.uuid4()),
+            prompt_id=_ensure_uuid(data["prompt_id"]),
+            request_text=str(data.get("request_text") or ""),
+            response_text=data.get("response_text"),
+            status=parsed_status,
+            error_message=data.get("error_message"),
+            duration_ms=(
+                int(data["duration_ms"])
+                if data.get("duration_ms") not in (None, "")
+                else None
+            ),
+            executed_at=_ensure_datetime(data.get("executed_at")),
+            input_hash=str(data.get("input_hash") or ""),
+            metadata=_deserialize_metadata(data.get("metadata")),
         )
 
     @classmethod

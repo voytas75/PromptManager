@@ -12,7 +12,9 @@ from typing import TYPE_CHECKING, Any, Callable, Optional, Tuple, cast
 
 from config import PromptManagerSettings
 
+from .execution import CodexExecutor
 from .embedding import EmbeddingProvider, EmbeddingSyncWorker, create_embedding_function
+from .history_tracker import HistoryTracker
 from .intent_classifier import IntentClassifier
 from .prompt_manager import NameGenerationError, PromptCacheError, PromptManager
 from .name_generation import (
@@ -112,6 +114,21 @@ def build_prompt_manager(
             ) from exc
     intent_classifier = IntentClassifier()
 
+    repository_instance = repository or PromptRepository(str(settings.db_path))
+    history_tracker = (
+        HistoryTracker(repository_instance)
+        if isinstance(repository_instance, PromptRepository)
+        else None
+    )
+    executor = None
+    if settings.litellm_model:
+        executor = CodexExecutor(
+            model=settings.litellm_model,
+            api_key=settings.litellm_api_key,
+            api_base=settings.litellm_api_base,
+            api_version=settings.litellm_api_version,
+        )
+
     manager = PromptManager(
         chroma_path=str(settings.chroma_path),
         db_path=str(settings.db_path),
@@ -119,13 +136,15 @@ def build_prompt_manager(
         redis_client=resolved_redis,
         chroma_client=chroma_client,
         embedding_function=resolved_embedding_function,
-        repository=repository,
+        repository=repository_instance,
         embedding_provider=resolved_embedding_provider,
         embedding_worker=embedding_worker,
         enable_background_sync=enable_background_sync,
         name_generator=name_generator,
         description_generator=description_generator,
         intent_classifier=intent_classifier,
+        executor=executor,
+        history_tracker=history_tracker,
     )
     return manager
 
