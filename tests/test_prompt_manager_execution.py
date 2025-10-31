@@ -1,0 +1,162 @@
+"""Tests for PromptManager prompt execution workflow."""
+
+from __future__ import annotations
+
+import uuid
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+import pytest
+
+from core import (
+    CodexExecutionResult,
+    ExecutionError,
+    HistoryTracker,
+    PromptExecutionError,
+    PromptManager,
+    PromptRepository,
+)
+from models.prompt_model import Prompt
+
+
+class _StubEmbeddingProvider:
+    def embed(self, _: str) -> list[float]:
+        return [0.0, 0.1, 0.2]
+
+
+class _StubChromaCollection:
+    def __init__(self) -> None:
+        self.calls: Dict[str, list[str]] = {}
+
+    def add(
+        self,
+        ids: list[str],
+        documents: list[str],
+        metadatas: list[Dict[str, Any]],
+        embeddings: Optional[list[list[float]]] = None,
+    ) -> None:
+        self.calls["add"] = ids
+
+    def upsert(
+        self,
+        ids: list[str],
+        documents: list[str],
+        metadatas: list[Dict[str, Any]],
+        embeddings: Optional[list[list[float]]] = None,
+    ) -> None:
+        self.calls["upsert"] = ids
+
+
+class _StubChromaClient:
+    def __init__(self) -> None:
+        self.collection = _StubChromaCollection()
+
+    def get_or_create_collection(
+        self,
+        name: str,
+        metadata: Dict[str, Any],
+        embedding_function: Optional[Any] = None,
+    ) -> _StubChromaCollection:
+        return self.collection
+
+    def close(self) -> None:
+        return
+
+
+class _StubExecutor:
+    def __init__(self) -> None:
+        self.called_with: Optional[str] = None
+
+    def execute(self, prompt: Prompt, request_text: str, extra_messages=None) -> CodexExecutionResult:  # type: ignore[override]
+        self.called_with = request_text
+        return CodexExecutionResult(
+            prompt_id=prompt.id,
+            request_text=request_text,
+            response_text="Execution complete.",
+            duration_ms=42,
+            usage={"prompt_tokens": 10, "completion_tokens": 20},
+            raw_response={"choices": [{"message": {"content": "Execution complete."}}]},
+        )
+
+
+class _FailingExecutor:
+    def execute(self, prompt: Prompt, request_text: str, extra_messages=None) -> CodexExecutionResult:  # type: ignore[override]
+        raise ExecutionError("model timeout")
+
+
+def _make_prompt(name: str = "Executable Prompt") -> Prompt:
+    return Prompt(
+        id=uuid.uuid4(),
+        name=name,
+        description="Prompt for execution tests",
+        category="tests",
+        context="Review the provided Python snippet for issues.",
+    )
+
+
+def _manager_with_dependencies(
+    tmp_path: Path,
+    executor: Any,
+    *,
+    history: bool = True,
+) -> tuple[PromptManager, Prompt, HistoryTracker | None]:
+    db_path = tmp_path / "prompt_manager.db"
+    chroma_path = tmp_path / "chroma"
+    repository = PromptRepository(str(db_path))
+    prompt = _make_prompt()
+    repository.add(prompt)
+    tracker = HistoryTracker(repository) if history else None
+    manager = PromptManager(
+        chroma_path=str(chroma_path),
+        db_path=str(db_path),
+        cache_ttl_seconds=60,
+        chroma_client=_StubChromaClient(),
+        embedding_function=None,
+        repository=repository,
+        embedding_provider=_StubEmbeddingProvider(),
+        enable_background_sync=False,
+        executor=executor,
+        history_tracker=tracker,
+    )
+    return manager, prompt, tracker
+
+
+def test_execute_prompt_returns_outcome_and_logs_history(tmp_path: Path) -> None:
+    executor = _StubExecutor()
+    manager, prompt, tracker = _manager_with_dependencies(tmp_path, executor)
+
+    outcome = manager.execute_prompt(prompt.id, "print('hello')")
+
+    assert executor.called_with == "print('hello')"
+    assert outcome.result.response_text == "Execution complete."
+    assert outcome.history_entry is not None
+    assert outcome.history_entry.status.value == "success"
+
+    recent = manager.list_recent_executions()
+    assert recent and recent[0].prompt_id == prompt.id
+
+    history_for_prompt = manager.list_executions_for_prompt(prompt.id)
+    assert history_for_prompt and history_for_prompt[0].prompt_id == prompt.id
+
+    updated_prompt = manager.repository.get(prompt.id)
+    assert updated_prompt.usage_count >= 1
+    manager.close()
+
+
+def test_execute_prompt_logs_failure(tmp_path: Path) -> None:
+    manager, prompt, tracker = _manager_with_dependencies(tmp_path, _FailingExecutor())
+
+    with pytest.raises(PromptExecutionError):
+        manager.execute_prompt(prompt.id, "raise Exception")
+
+    history = tracker.list_for_prompt(prompt.id)
+    assert history and history[0].status.value == "failed"
+    manager.close()
+
+
+def test_history_methods_without_tracker(tmp_path: Path) -> None:
+    manager, prompt, tracker = _manager_with_dependencies(tmp_path, _StubExecutor(), history=False)
+    assert tracker is None
+    assert manager.list_recent_executions() == []
+    assert manager.list_executions_for_prompt(prompt.id) == []
+    manager.close()

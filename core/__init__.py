@@ -28,6 +28,8 @@ from .intent_classifier import (
 from .history_tracker import HistoryTracker, HistoryTrackerError
 from .prompt_manager import (
     PromptCacheError,
+    PromptExecutionError,
+    PromptExecutionUnavailable,
     PromptManager,
     PromptManagerError,
     PromptNotFoundError,
@@ -44,6 +46,8 @@ __all__ = [
     "PromptNotFoundError",
     "PromptStorageError",
     "PromptCacheError",
+    "PromptExecutionError",
+    "PromptExecutionUnavailable",
     "PromptRepository",
     "RepositoryError",
     "RepositoryNotFoundError",

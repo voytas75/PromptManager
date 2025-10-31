@@ -13,6 +13,15 @@ All notable changes to **Prompt Manager** will be documented in this file.
 - Auto-generate prompt names and descriptions via LiteLLM when the creation dialog fields are left blank.
 - Added LiteLLM API version wiring (including Azure `AZURE_OPENAI_API_VERSION` alias) across settings, manager wiring, and generators.
 
+## [0.8.0] - 2025-11-08
+
+- Added LiteLLM-backed prompt execution with automatic history logging to the new `prompt_executions` table.
+- Introduced `HistoryTracker` utilities and repository APIs for retrieving recent execution history per prompt or globally.
+- Extended `PromptManager` with an `execute_prompt` workflow, public history accessors, and error handling for unavailable LiteLLM credentials.
+- Updated the PySide6 GUI with **Run Prompt** / **Copy Result** actions and a result pane that surfaces execution metadata.
+- Added a GUI execution history dialog showing recent runs, durations, and failure details with copyable request/response payloads.
+- Recorded prompt executions in analytics via the GUI usage logger and expanded unit tests to cover repository, history, and manager execution flows.
+
 ## [0.6.0] - 2025-11-06
 
 - Added a lightweight intent classifier that biases semantic search results and surfaces top recommendations directly in the GUI.

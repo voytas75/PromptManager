@@ -3,14 +3,8 @@
   "chroma_path": "data/chromadb",
   "redis_dsn": "redis://localhost:6379/0",
   "cache_ttl_seconds": 600,
-<<<<<<< HEAD
-  "litellm_model": "azure/gpt-5-mini",
-  "litellm_api_key": "65896f0af0fe4deba4e2cbf0ad55822b",
-  "litellm_api_base": "https://udtazureopenai.openai.azure.com"
-=======
   "litellm_model": "azure/gpt-4.1",
   "litellm_api_key": "65896f0af0fe4deba4e2cbf0ad55822b",
   "litellm_api_base": "https://udtazureopenai.openai.azure.com",
   "litellm_api_version": "2025-04-01-preview"
->>>>>>> 26f6baa7e59a174715dbd3d112d991dfc54edafc
 }

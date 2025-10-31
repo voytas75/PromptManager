@@ -1,0 +1,52 @@
+"""Unit tests for HistoryTracker execution logging."""
+
+from __future__ import annotations
+
+import uuid
+
+from core.history_tracker import HistoryTracker
+from core.repository import PromptRepository
+from models.prompt_model import Prompt
+
+
+def _make_prompt(name: str = "Execution Test") -> Prompt:
+    return Prompt(
+        id=uuid.uuid4(),
+        name=name,
+        description="History tracker test prompt",
+        category="tests",
+        context="Review the provided Python snippet for issues.",
+    )
+
+
+def test_history_tracker_records_success_and_failure(tmp_path) -> None:
+    repo = PromptRepository(str(tmp_path / "repo.db"))
+    prompt = _make_prompt()
+    repo.add(prompt)
+    tracker = HistoryTracker(repo, max_request_chars=20, max_response_chars=20)
+
+    request = "print('hello world that should be clipped')"
+    success = tracker.record_success(
+        prompt_id=prompt.id,
+        request_text=request,
+        response_text="All clear!",
+        duration_ms=123,
+        metadata={"usage": {"prompt_tokens": 5}},
+    )
+    assert success.response_text == "All clear!"
+    assert success.request_text.endswith("...")
+    assert success.duration_ms == 123
+
+    failure = tracker.record_failure(
+        prompt_id=prompt.id,
+        request_text="raise ValueError('boom')",
+        error_message="Timeout",
+    )
+    assert failure.status.value == "failed"
+    assert "Timeout" == failure.error_message
+
+    recent = tracker.list_recent(limit=5)
+    assert {entry.id for entry in recent} == {success.id, failure.id}
+
+    by_prompt = tracker.list_for_prompt(prompt.id, limit=10)
+    assert {entry.id for entry in by_prompt} == {success.id, failure.id}

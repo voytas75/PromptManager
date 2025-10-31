@@ -312,6 +312,39 @@ class PromptManager:
 
         return PromptManager.ExecutionOutcome(result=result, history_entry=history_entry)
 
+    def list_recent_executions(self, *, limit: int = 20) -> List[PromptExecution]:
+        """Return recently logged executions if history tracking is enabled."""
+
+        tracker = self._history_tracker
+        if tracker is None:
+            return []
+        try:
+            return tracker.list_recent(limit=limit)
+        except HistoryTrackerError:
+            logger.warning("Unable to list execution history", exc_info=True)
+            return []
+
+    def list_executions_for_prompt(
+        self,
+        prompt_id: uuid.UUID,
+        *,
+        limit: int = 20,
+    ) -> List[PromptExecution]:
+        """Return execution history for a specific prompt."""
+
+        tracker = self._history_tracker
+        if tracker is None:
+            return []
+        try:
+            return tracker.list_for_prompt(prompt_id, limit=limit)
+        except HistoryTrackerError:
+            logger.warning(
+                "Unable to list execution history for prompt",
+                extra={"prompt_id": str(prompt_id)},
+                exc_info=True,
+            )
+            return []
+
     def set_name_generator(
         self,
         model: Optional[str],

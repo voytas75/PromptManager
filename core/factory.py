@@ -8,7 +8,7 @@ Updates: v0.1.0 - 2025-11-03 - Added build_prompt_manager helper for GUI/bootstr
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, cast
 
 from config import PromptManagerSettings
 
@@ -129,23 +129,27 @@ def build_prompt_manager(
             api_version=settings.litellm_api_version,
         )
 
-    manager = PromptManager(
-        chroma_path=str(settings.chroma_path),
-        db_path=str(settings.db_path),
-        cache_ttl_seconds=settings.cache_ttl_seconds,
-        redis_client=resolved_redis,
-        chroma_client=chroma_client,
-        embedding_function=resolved_embedding_function,
-        repository=repository_instance,
-        embedding_provider=resolved_embedding_provider,
-        embedding_worker=embedding_worker,
-        enable_background_sync=enable_background_sync,
-        name_generator=name_generator,
-        description_generator=description_generator,
-        intent_classifier=intent_classifier,
-        executor=executor,
-        history_tracker=history_tracker,
-    )
+    manager_kwargs: Dict[str, Any] = {
+        "chroma_path": str(settings.chroma_path),
+        "db_path": str(settings.db_path),
+        "cache_ttl_seconds": settings.cache_ttl_seconds,
+        "redis_client": resolved_redis,
+        "chroma_client": chroma_client,
+        "embedding_function": resolved_embedding_function,
+        "repository": repository_instance,
+        "embedding_provider": resolved_embedding_provider,
+        "embedding_worker": embedding_worker,
+        "enable_background_sync": enable_background_sync,
+        "name_generator": name_generator,
+        "description_generator": description_generator,
+        "intent_classifier": intent_classifier,
+    }
+    if executor is not None:
+        manager_kwargs["executor"] = executor
+    if history_tracker is not None:
+        manager_kwargs["history_tracker"] = history_tracker
+
+    manager = PromptManager(**manager_kwargs)
     return manager
 
 

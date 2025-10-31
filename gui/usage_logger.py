@@ -90,6 +90,16 @@ class IntentUsageLogger:
             record["error"] = error[:200]
         self._append(record)
 
+    def log_history_view(self, *, total: int) -> None:
+        """Log when the execution history dialog is opened."""
+
+        record = {
+            "timestamp": _now_iso(),
+            "event": "history",
+            "entries": total,
+        }
+        self._append(record)
+
     def _base_record(self, event: str, query_text: str) -> dict[str, object]:
         digest = hashlib.blake2s(query_text.encode("utf-8"), digest_size=8).hexdigest()
         preview = " ".join(query_text.split())[:120]

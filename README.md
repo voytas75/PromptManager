@@ -10,6 +10,7 @@ Prompt Manager is a desktop-focused application for cataloguing, searching, and 
 - Intent-aware search now classifies queries (debug/refactor/enhance/etc.) to bias retrieval and surface top recommendations inline in the GUI.
 - Typed configuration loader in `config/settings.py` validates paths/TTL values and can hydrate from environment variables or a JSON file.
 - Initial PySide6 GUI accessible via `--gui`, offering list/search/detail panes with create/edit/delete dialogs.
+- LiteLLM-backed prompt execution with automatic history logging and a GUI result pane for reviewing and copying model output.
 
 ## Getting Started
 
@@ -116,6 +117,15 @@ Further modules (session history, execution pipeline) will be introduced in subs
 - Intent detection appears beneath the workspace and search bar once you start typing or analysing text, highlighting the inferred category (Debugging, Refactoring, Documentation, etc.), language hints, and the top-matching prompts.
 - When LiteLLM is configured, leaving the **Name** and **Description** fields blank will automatically populate them from the prompt body, speeding up catalogue entry for new prompts.
 - Import or export catalogues directly from the toolbar: **Import** previews a diff and applies updates, while **Export** writes the current state to JSON or YAML.
+- The **History** button opens a read-only view of recent prompt executions, including request/response excerpts, durations, and any captured errors.
+
+## Executing Prompts
+
+- Configure LiteLLM credentials via the Settings dialog or environment variables: set `PROMPT_MANAGER_LITELLM_MODEL` and `PROMPT_MANAGER_LITELLM_API_KEY`, plus `PROMPT_MANAGER_LITELLM_API_BASE` / `PROMPT_MANAGER_LITELLM_API_VERSION` for Azure-hosted deployments.
+- Paste code or free-form context into the workspace, select a prompt, and click **Run Prompt**. The result pane displays model output and **Copy Result** copies it to the clipboard.
+- Every run is persisted to the new `prompt_executions` table with request excerpts, model responses, duration, status, error details (when present), and LiteLLM token usage metadata.
+- Programmatic consumers can call `PromptManager.list_recent_executions()` or `PromptManager.list_executions_for_prompt(prompt_id)` to surface history in future dashboards or integrations.
+- Failures are logged with status `failed` and surfaced in the GUI. Successful runs increment `usage_count` for the prompt so catalogue analytics remain accurate.
 
 ## CLI Catalogue Utilities
 

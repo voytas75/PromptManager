@@ -238,6 +238,39 @@ class Prompt:
             ext5=_deserialize_metadata(data.get("ext5")),
         )
 
+    @classmethod
+    def from_chroma(cls, record: Mapping[str, Any]) -> "Prompt":
+        """Instantiate from a ChromaDB metadata record."""
+        metadata = record.get("metadata") or {}
+        base = {
+            "id": record.get("id"),
+            "name": metadata.get("name"),
+            "description": metadata.get("description"),
+            "category": metadata.get("category"),
+            "tags": _deserialize_list(metadata.get("tags")),
+            "language": metadata.get("language"),
+            "context": metadata.get("context"),
+            "example_input": metadata.get("example_input"),
+            "example_output": metadata.get("example_output"),
+            "last_modified": metadata.get("last_modified"),
+            "version": metadata.get("version"),
+            "author": metadata.get("author"),
+            "quality_score": metadata.get("quality_score"),
+            "usage_count": metadata.get("usage_count"),
+            "related_prompts": _deserialize_list(metadata.get("related_prompts")),
+            "created_at": metadata.get("created_at"),
+            "modified_by": metadata.get("modified_by"),
+            "is_active": metadata.get("is_active", True),
+            "source": metadata.get("source"),
+            "checksum": metadata.get("checksum"),
+            "ext1": metadata.get("ext1"),
+            "ext2": metadata.get("ext2"),
+            "ext3": metadata.get("ext3"),
+            "ext4": metadata.get("ext4"),
+            "ext5": metadata.get("ext5"),
+        }
+        return cls.from_record(base)
+
 
 @dataclass(slots=True)
 class PromptExecution:
@@ -298,38 +331,4 @@ class PromptExecution:
             metadata=_deserialize_metadata(data.get("metadata")),
         )
 
-    @classmethod
-    def from_chroma(cls, record: Mapping[str, Any]) -> "Prompt":
-        """Instantiate from a ChromaDB metadata record."""
-        metadata = record.get("metadata") or {}
-        base = {
-            "id": record.get("id"),
-            "name": metadata.get("name"),
-            "description": metadata.get("description"),
-            "category": metadata.get("category"),
-            "tags": _deserialize_list(metadata.get("tags")),
-            "language": metadata.get("language"),
-            "context": metadata.get("context"),
-            "example_input": metadata.get("example_input"),
-            "example_output": metadata.get("example_output"),
-            "last_modified": metadata.get("last_modified"),
-            "version": metadata.get("version"),
-            "author": metadata.get("author"),
-            "quality_score": metadata.get("quality_score"),
-            "usage_count": metadata.get("usage_count"),
-            "related_prompts": _deserialize_list(metadata.get("related_prompts")),
-            "created_at": metadata.get("created_at"),
-            "modified_by": metadata.get("modified_by"),
-            "is_active": metadata.get("is_active", True),
-            "source": metadata.get("source"),
-            "checksum": metadata.get("checksum"),
-            "ext1": metadata.get("ext1"),
-            "ext2": metadata.get("ext2"),
-            "ext3": metadata.get("ext3"),
-            "ext4": metadata.get("ext4"),
-            "ext5": metadata.get("ext5"),
-        }
-        return cls.from_record(base)
-
-
-__all__ = ["Prompt"]
+__all__ = ["Prompt", "PromptExecution", "ExecutionStatus"]

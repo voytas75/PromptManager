@@ -19,7 +19,7 @@ from core.repository import (
     _json_loads_list,
     _json_loads_optional,
 )
-from models.prompt_model import Prompt
+from models.prompt_model import ExecutionStatus, Prompt, PromptExecution
 
 
 def _make_prompt(name: str = "Repo Branch Test") -> Prompt:
@@ -76,3 +76,31 @@ def test_repository_list_with_limit(tmp_path: Path) -> None:
     limited = repo.list(limit=1)
     assert len(limited) == 1
     assert limited[0].id == prompts[0].id
+
+
+def test_repository_execution_roundtrip(tmp_path: Path) -> None:
+    repo = PromptRepository(str(tmp_path / "repo.db"))
+    prompt = _make_prompt()
+    repo.add(prompt)
+
+    execution = PromptExecution(
+        id=uuid.uuid4(),
+        prompt_id=prompt.id,
+        request_text="print('hello')",
+        response_text="Looks good!",
+        status=ExecutionStatus.SUCCESS,
+        metadata={"usage": {"prompt_tokens": 10}},
+    )
+
+    repo.add_execution(execution)
+
+    loaded = repo.get_execution(execution.id)
+    assert loaded.response_text == execution.response_text
+    assert loaded.request_text.startswith("print")
+    assert loaded.metadata["usage"]["prompt_tokens"] == 10
+
+    by_prompt = repo.list_executions_for_prompt(prompt.id)
+    assert [entry.id for entry in by_prompt] == [execution.id]
+
+    recent = repo.list_executions(limit=1)
+    assert recent[0].id == execution.id

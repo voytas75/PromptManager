@@ -53,6 +53,7 @@ from core import (
 from models.prompt_model import Prompt
 
 from .dialogs import CatalogPreviewDialog, PromptDialog
+from .history_dialog import ExecutionHistoryDialog
 from .settings_dialog import SettingsDialog, persist_settings_to_config
 from .usage_logger import IntentUsageLogger
 
@@ -169,6 +170,7 @@ class MainWindow(QMainWindow):
         self._current_prompts: List[Prompt] = []
         self._suggestions: Optional[PromptManager.IntentSuggestions] = None
         self._last_execution: Optional[PromptManager.ExecutionOutcome] = None
+        self._history_limit = 50
         self._runtime_settings = self._initial_runtime_settings(settings)
         self._usage_logger = IntentUsageLogger()
         self.setWindowTitle("Prompt Manager")
@@ -214,6 +216,10 @@ class MainWindow(QMainWindow):
         self._export_button = QPushButton("Export", self)
         self._export_button.clicked.connect(self._on_export_clicked)  # type: ignore[arg-type]
         controls_layout.addWidget(self._export_button)
+
+        self._history_button = QPushButton("History", self)
+        self._history_button.clicked.connect(self._on_history_clicked)  # type: ignore[arg-type]
+        controls_layout.addWidget(self._history_button)
 
         self._settings_button = QPushButton("Settings", self)
         self._settings_button.clicked.connect(self._on_settings_clicked)  # type: ignore[arg-type]
@@ -319,6 +325,7 @@ class MainWindow(QMainWindow):
         has_executor = self._manager.executor is not None
         self._run_button.setEnabled(has_executor)
         self._copy_result_button.setEnabled(False)
+        self._history_button.setEnabled(True)
 
     def _load_prompts(self, search_text: str = "") -> None:
         """Populate the list model from the repository or semantic search."""
@@ -534,6 +541,14 @@ class MainWindow(QMainWindow):
         top_name = suggestions.prompts[0].name if suggestions.prompts else None
         if top_name:
             self.statusBar().showMessage(f"Top suggestion: {top_name}", 5000)
+
+    def _on_history_clicked(self) -> None:
+        """Open the execution history dialog."""
+
+        dialog = ExecutionHistoryDialog(self._manager, self, limit=self._history_limit)
+        dialog.exec()
+        total = len(self._manager.list_recent_executions(limit=self._history_limit))
+        self._usage_logger.log_history_view(total=total)
 
     def _on_run_prompt_clicked(self) -> None:
         """Execute the selected prompt via the manager."""
