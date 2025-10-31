@@ -7,6 +7,7 @@ Prompt Manager is a desktop-focused application for cataloguing, searching, and 
 - Core data model defined in `models/prompt_model.py` with an extensible schema (`ext1`–`ext5`) and serialization helpers.
 - `PromptRepository` (`core/repository.py`) persists prompts to SQLite and exposes CRUD operations.
 - `PromptManager` service (`core/prompt_manager.py`) coordinates SQLite persistence, Redis-backed caching, and ChromaDB semantic search.
+- Intent-aware search now classifies queries (debug/refactor/enhance/etc.) to bias retrieval and surface top recommendations inline in the GUI.
 - Typed configuration loader in `config/settings.py` validates paths/TTL values and can hydrate from environment variables or a JSON file.
 - Initial PySide6 GUI accessible via `--gui`, offering list/search/detail panes with create/edit/delete dialogs.
 
@@ -34,11 +35,21 @@ Prompt Manager is a desktop-focused application for cataloguing, searching, and 
    pip install .[gui]
    ```
 
+   Additional extras enable optional integrations:
+
+   ```bash
+   pip install .[cache,llm,embeddings]  # Redis caching, LiteLLM helpers, sentence-transformers
+   pip install .[dev]                   # pytest/coverage tooling for contributors
+   ```
+
 2. Provide configuration via environment variables (prefixed `PROMPT_MANAGER_`) or a JSON file referenced through `PROMPT_MANAGER_CONFIG_JSON`. Supported keys include:
    - `DATABASE_PATH` – absolute/relative path to the SQLite database (default `data/prompt_manager.db`).
    - `CHROMA_PATH` – directory for ChromaDB persistence (default `data/chromadb`).
    - `REDIS_DSN` – optional Redis connection string e.g. `redis://localhost:6379/0`.
    - `CACHE_TTL_SECONDS` – positive integer TTL for cached prompts (default `300`).
+   - `EMBEDDING_BACKEND` – one of `deterministic`, `litellm`, or `sentence-transformers` (default `deterministic`).
+   - `EMBEDDING_MODEL` – embedding model identifier used by LiteLLM or sentence-transformers backends.
+   - `EMBEDDING_DEVICE` – optional device string (e.g. `cpu`, `cuda`) for local sentence-transformers models.
 
    When a JSON file is provided, environment variables take precedence. Validation issues raise `config.SettingsError` with actionable context.
 
@@ -59,6 +70,7 @@ Prompt Manager is a desktop-focused application for cataloguing, searching, and 
 5. Run the automated tests to validate storage integration:
 
    ```bash
+   pip install .[dev]
    pytest
    ```
 
@@ -92,14 +104,33 @@ Further modules (session history, execution pipeline) will be introduced in subs
 
 - The window exposes a searchable prompt list (left), detail view (right), and toolbar actions for create/edit/delete/refresh backed by the shared `PromptManager` service.
 
+- Use the workspace beneath the toolbar to paste text, run **Detect Need**, request **Suggest Prompt**, and copy the top-ranked prompt directly to the clipboard.
+
 - Use the category, tag, and minimum-quality filters above the list to narrow results as your catalogue grows.
 
 - Dialogs validate required fields and surface backend errors with actionable messaging while keeping data in sync across SQLite, Redis, and ChromaDB.
+- When adding prompts the dialog can generate a name from the context field via the **Generate** button. Configure LiteLLM (model + API key) so this suggestion comes from your chosen LLM; otherwise the UI falls back to a heuristic title.
+- The **Prompt Body** field is where you paste the actual prompt text that will be sent to the model—it's displayed prominently in the detail pane.
+- Use the **Settings** button to update the catalogue path or LiteLLM credentials at runtime; changes persist to `config/config.json` and the catalogue resyncs immediately.
+- Intent detection appears beneath the workspace and search bar once you start typing or analysing text, highlighting the inferred category (Debugging, Refactoring, Documentation, etc.), language hints, and the top-matching prompts.
+- Import or export catalogues directly from the toolbar: **Import** previews a diff and applies updates, while **Export** writes the current state to JSON or YAML.
+
+## CLI Catalogue Utilities
+
+Prompt Manager now ships dedicated catalogue tooling alongside the GUI:
+
+- `python -m main catalog-import <path>` renders a diff preview (added/updated/skipped prompts) and, unless `--dry-run` is passed, applies the changes to SQLite/ChromaDB. Use `--no-overwrite` to keep existing prompts untouched.
+- `python -m main catalog-export <path>` writes the current repository to JSON or YAML (auto-detected from the extension or forced with `--format`). A YAML export requires `PyYAML`, which is bundled in `requirements.txt`.
+- `python -m main suggest "your query"` runs the configured semantic retrieval stack and prints the top matching prompts with detected intent details—useful for validating LiteLLM or sentence-transformer embeddings.
+- `python -m main usage-report` summarises the anonymised GUI workspace analytics (counts per action, top intents, top recommended prompts). Pass `--path` to point at a different JSONL log file.
+
+These commands reuse the same validation and merge logic as the GUI and honour the configured `catalog_path` when no explicit file is provided.
 
 ## Prompt Catalogue
 
 - On startup Prompt Manager imports the packaged catalogue in `catalog/prompts.json`, seeding six high-signal prompts across analysis, refactoring, debugging, documentation, reporting, and enhancement.
 - Override the catalogue by setting `PROMPT_MANAGER_CATALOG_PATH` (or `catalog_path` in `config/config.json`) to a JSON file or to a directory containing JSON files. Entries with matching names update existing prompts; new names are inserted automatically.
+- Both the CLI (`catalog-import`) and the GUI **Import** button show a diff preview before any data changes, making it easy to confirm adds/updates.
 - Minimum JSON structure:
 
   ```json
@@ -117,13 +148,18 @@ Further modules (session history, execution pipeline) will be introduced in subs
 
 - Optional fields (`language`, `related_prompts`, `created_at`, `last_modified`, `usage_count`, `source`, and extension slots) map directly to the `Prompt` dataclass. Missing values fall back to sensible defaults and invalid entries are logged during import.
 - Populate `category`, `tags`, and `quality_score` to get the most value from the GUI filters and semantic search.
+- For LLM-based prompt naming, set `PROMPT_MANAGER_LITELLM_MODEL` and `PROMPT_MANAGER_LITELLM_API_KEY`. The catalogue importer itself does not call LiteLLM; the Generate button does when invoked.
 
 ## Telemetry
 
 - ChromaDB anonymized telemetry is disabled by default. Prompt Manager initialises the Chroma client with `anonymized_telemetry=False` to avoid sending usage data and to reduce noisy PostHog-related logs in restricted environments.
 - To opt in, set the environment variable `PROMPT_MANAGER_CHROMA_TELEMETRY=1` (feature placeholder). Until a dedicated toggle is exposed in settings, advanced users can fork the project and change the `ChromaSettings` flag in `core/prompt_manager.py:88`.
 
+## Usage Analytics
 
+- Interactions with the GUI intent workspace (Detect Need, Suggest Prompt, Copy Prompt) are logged to `data/logs/intent_usage.jsonl` as anonymised JSON lines. Each entry captures timestamps, query length/hash, detected labels, and the top prompt names—no raw query text is persisted.
+- Disable logging by editing `gui/usage_logger.IntentUsageLogger` initialisation or clearing the log file if analytics are not required.
+ 
 ## Configuration Precedence
 
 - Precedence (highest → lowest):
@@ -154,7 +190,15 @@ Further modules (session history, execution pipeline) will be introduced in subs
   | `PROMPT_MANAGER_REDIS_DSN` | Redis connection string | `redis://localhost:6379/1` |
   | `PROMPT_MANAGER_CACHE_TTL_SECONDS` | Cache TTL in seconds (>0) | `300` |
   | `PROMPT_MANAGER_CONFIG_JSON` | Path to JSON config used as base | `config/config.json` |
+  | `PROMPT_MANAGER_CATALOG_PATH` | Override prompt catalogue path | `/path/to/catalogue.json` |
+  | `PROMPT_MANAGER_LITELLM_MODEL` | LiteLLM model used for name generation | `gpt-4o-mini` |
+  | `PROMPT_MANAGER_LITELLM_API_KEY` | LiteLLM API key (environment only) | `sk-…` |
+  | `PROMPT_MANAGER_LITELLM_API_BASE` | Optional LiteLLM API base override | `https://proxy.example.com` |
+  | `PROMPT_MANAGER_EMBEDDING_BACKEND` | Embedding backend (`deterministic`, `litellm`, `sentence-transformers`) | `sentence-transformers` |
+  | `PROMPT_MANAGER_EMBEDDING_MODEL` | Embedding model identifier (required when backend ≠ deterministic) | `all-MiniLM-L6-v2` |
+  | `PROMPT_MANAGER_EMBEDDING_DEVICE` | Device override for local embedding models | `cuda` |
 
 Notes:
 - Paths expand `~` and are resolved to absolute paths.
 - Invalid values raise `config.SettingsError` with details.
+- When `EMBEDDING_BACKEND` is left at `deterministic`, Prompt Manager uses a reproducible hash-based embedding. Set the backend to `litellm` or `sentence-transformers` with an `EMBEDDING_MODEL` to enable high-quality semantic search. If `EMBEDDING_BACKEND=litellm` and no embedding model is provided, the value from `PROMPT_MANAGER_LITELLM_MODEL` is reused automatically.

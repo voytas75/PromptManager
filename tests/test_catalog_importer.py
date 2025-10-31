@@ -9,7 +9,14 @@ from typing import Dict, List
 
 import pytest
 
-from core.catalog_importer import CatalogImportResult, import_prompt_catalog, load_prompt_catalog
+from core.catalog_importer import (
+    CatalogChangeType,
+    CatalogImportResult,
+    diff_prompt_catalog,
+    export_prompt_catalog,
+    import_prompt_catalog,
+    load_prompt_catalog,
+)
 from models.prompt_model import Prompt
 
 
@@ -75,6 +82,7 @@ def test_import_prompt_catalog_adds_and_updates(tmp_path: Path) -> None:
     assert isinstance(result, CatalogImportResult)
     assert result.added == 1
     assert result.updated == 0
+    assert result.preview is not None
     assert manager.created and not manager.updated
 
     stored_prompt = manager.repository.list()[0]
@@ -91,7 +99,81 @@ def test_import_prompt_catalog_adds_and_updates(tmp_path: Path) -> None:
     second_result = import_prompt_catalog(manager, catalog_path)
     assert second_result.added == 0
     assert second_result.updated == 1
+    assert second_result.preview is not None
     assert manager.updated
     refreshed_prompt = manager.repository.list()[0]
     assert refreshed_prompt.quality_score == pytest.approx(9.1)
     assert "logs" in refreshed_prompt.tags
+
+
+def test_diff_prompt_catalog_reports_expected_changes(tmp_path: Path) -> None:
+    manager = _StubManager()
+
+    catalog_path = tmp_path / "catalog.json"
+    catalog_payload = [
+        {
+            "name": "Refactor Coach",
+            "description": "Guide towards modular structure.",
+            "category": "Refactoring",
+            "tags": ["refactor"],
+        }
+    ]
+    catalog_path.write_text(json.dumps(catalog_payload), encoding="utf-8")
+
+    diff = diff_prompt_catalog(manager, catalog_path)
+    assert diff.added == 1
+    assert diff.updated == 0
+    assert diff.entries[0].change_type is CatalogChangeType.ADD
+
+    import_prompt_catalog(manager, catalog_path)
+
+    updated_payload = dict(catalog_payload[0])
+    updated_payload["description"] = "Emphasise separation of concerns."
+    catalog_path.write_text(json.dumps([updated_payload]), encoding="utf-8")
+
+    updated_diff = diff_prompt_catalog(manager, catalog_path)
+    assert updated_diff.updated == 1
+    assert updated_diff.entries[0].change_type is CatalogChangeType.UPDATE
+    assert "separation of concerns" in updated_diff.entries[0].diff.lower()
+
+
+def test_export_prompt_catalog_json(tmp_path: Path) -> None:
+    manager = _StubManager()
+    prompt = Prompt(
+        id=uuid.uuid4(),
+        name="Diagnostics",
+        description="Investigate failures",
+        category="Reasoning / Debugging",
+        tags=["ci"],
+    )
+    manager.create_prompt(prompt)
+
+    export_path = tmp_path / "catalog.json"
+    resolved = export_prompt_catalog(manager, export_path)
+    assert resolved.exists()
+
+    data = json.loads(resolved.read_text(encoding="utf-8"))
+    assert data["count"] == 1
+    assert data["prompts"][0]["name"] == "Diagnostics"
+
+
+def test_export_prompt_catalog_yaml(tmp_path: Path) -> None:
+    yaml = pytest.importorskip("yaml")
+    manager = _StubManager()
+    prompt = Prompt(
+        id=uuid.uuid4(),
+        name="Reporter",
+        description="Summarise changes",
+        category="Reporting",
+        tags=["summary"],
+    )
+    manager.create_prompt(prompt)
+
+    export_path = tmp_path / "catalog.yaml"
+    resolved = export_prompt_catalog(manager, export_path, fmt="yaml")
+    assert resolved.exists()
+
+    with resolved.open(encoding="utf-8") as stream:
+        payload = yaml.safe_load(stream)
+    assert payload["count"] == 1
+    assert payload["prompts"][0]["category"] == "Reporting"

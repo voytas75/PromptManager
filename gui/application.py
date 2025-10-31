@@ -14,6 +14,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
 from core import PromptManager
+from config import PromptManagerSettings
 
 from .main_window import MainWindow
 
@@ -48,11 +49,13 @@ def create_qapplication(argv: Optional[Sequence[str]] = None) -> QApplication:
     return QApplication(list(argv or []))
 
 
-def launch_prompt_manager(prompt_manager: PromptManager) -> int:
+def launch_prompt_manager(
+    prompt_manager: PromptManager, settings: Optional[PromptManagerSettings] = None
+) -> int:
     """Create the Qt event loop, show the main window, and enter the GUI."""
 
     app = create_qapplication()
-    window = MainWindow(prompt_manager)
+    window = MainWindow(prompt_manager, settings=settings)
     window.show()
     return app.exec()
 

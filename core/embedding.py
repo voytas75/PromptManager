@@ -1,5 +1,6 @@
 """Embedding provider and background synchronisation helpers for Prompt Manager.
 
+Updates: v0.6.0 - 2025-11-07 - Add configurable LiteLLM and sentence-transformer backends.
 Updates: v0.1.0 - 2025-11-05 - Introduce embedding provider with retry logic and sync worker.
 """
 
@@ -15,6 +16,7 @@ from typing import Callable, Iterable, List, Optional, Sequence, Tuple
 
 from models.prompt_model import Prompt
 
+from .litellm_adapter import get_embedding
 
 EmbeddingFunction = Callable[[Sequence[str]], Sequence[Sequence[float]]]
 
@@ -44,6 +46,121 @@ class DefaultEmbeddingFunction:
             vector = [byte / 255.0 for byte in digest]
             results.append(vector)
         return results
+
+
+class LiteLLMEmbeddingFunction:
+    """Call LiteLLM embedding endpoint for semantic vectors."""
+
+    def __init__(
+        self,
+        *,
+        model: str,
+        api_key: Optional[str],
+        api_base: Optional[str],
+        timeout_seconds: float = 10.0,
+    ) -> None:
+        if not model:
+            raise ValueError("LiteLLM embedding backend requires a model name.")
+        self._model = model
+        self._api_key = api_key
+        self._api_base = api_base
+        self._timeout_seconds = timeout_seconds
+
+    def __call__(self, texts: Sequence[str]) -> List[List[float]]:
+        embedding_fn, LiteLLMException = get_embedding()
+        inputs = list(texts)
+        if not inputs:
+            return []
+        request = {
+            "model": self._model,
+            "input": inputs,
+            "timeout": self._timeout_seconds,
+        }
+        if self._api_key:
+            request["api_key"] = self._api_key
+        if self._api_base:
+            request["api_base"] = self._api_base
+        try:
+            response = embedding_fn(**request)  # type: ignore[arg-type]
+        except LiteLLMException as exc:  # type: ignore[misc]
+            raise EmbeddingGenerationError(f"LiteLLM embedding request failed: {exc}") from exc
+        except Exception as exc:  # pragma: no cover - defensive
+            raise EmbeddingGenerationError("LiteLLM embedding request failed unexpectedly") from exc
+        try:
+            data = response["data"]  # type: ignore[index]
+        except (KeyError, TypeError) as exc:  # pragma: no cover - defensive
+            raise EmbeddingGenerationError("LiteLLM returned an unexpected embedding payload") from exc
+        vectors: List[List[float]] = []
+        for index, item in enumerate(data):
+            raw_vector = getattr(item, "get", lambda key, default=None: None)("embedding")
+            if raw_vector is None:
+                raise EmbeddingGenerationError(f"LiteLLM response missing embedding at index {index}")
+            if not isinstance(raw_vector, (list, tuple)):
+                raise EmbeddingGenerationError("LiteLLM embedding payload is not a vector.")
+            vectors.append([float(value) for value in raw_vector])
+        if len(vectors) == 1 and len(inputs) > 1:
+            # Some providers return a single vector even for batched input.
+            vectors = vectors * len(inputs)
+        if len(vectors) != len(inputs):
+            raise EmbeddingGenerationError("LiteLLM embedding response length mismatch.")
+        return vectors
+
+
+class SentenceTransformersEmbeddingFunction:
+    """Use sentence-transformers models for local embeddings."""
+
+    def __init__(self, model: str, *, device: Optional[str] = None) -> None:
+        if not model:
+            raise ValueError("sentence-transformers backend requires a model name.")
+        self._model_name = model
+        self._device = device
+        self._model = self._load_model()
+
+    def _load_model(self):
+        try:  # pragma: no cover - runtime dependency
+            from sentence_transformers import SentenceTransformer
+        except ImportError as exc:
+            raise RuntimeError("sentence-transformers is not installed") from exc
+        return SentenceTransformer(self._model_name, device=self._device)
+
+    def __call__(self, texts: Sequence[str]) -> List[List[float]]:
+        inputs = list(texts)
+        if not inputs:
+            return []
+        embeddings = self._model.encode(
+            inputs,
+            convert_to_numpy=True,
+            normalize_embeddings=False,
+        )
+        if hasattr(embeddings, "tolist"):
+            embeddings = embeddings.tolist()
+        return [[float(value) for value in vector] for vector in embeddings]
+
+
+def create_embedding_function(
+    backend: str,
+    *,
+    model: Optional[str],
+    api_key: Optional[str],
+    api_base: Optional[str],
+    device: Optional[str] = None,
+    timeout_seconds: float = 10.0,
+) -> Optional[EmbeddingFunction]:
+    """Return an embedding function for the configured backend or None for the default."""
+
+    backend_normalised = (backend or "deterministic").strip().lower()
+    if backend_normalised in {"", "deterministic", "default"}:
+        return None
+    if backend_normalised in {"litellm", "openai"}:
+        return LiteLLMEmbeddingFunction(
+            model=model or "",
+            api_key=api_key,
+            api_base=api_base,
+            timeout_seconds=timeout_seconds,
+        )
+    if backend_normalised in {"sentence-transformers", "sentence_transformers", "st"}:
+        return SentenceTransformersEmbeddingFunction(model or "", device=device)
+    raise ValueError(f"Unsupported embedding backend: {backend}")
 
 
 class EmbeddingProvider:
@@ -173,4 +290,8 @@ __all__ = [
     "EmbeddingProviderError",
     "EmbeddingGenerationError",
     "EmbeddingSyncWorker",
+    "DefaultEmbeddingFunction",
+    "LiteLLMEmbeddingFunction",
+    "SentenceTransformersEmbeddingFunction",
+    "create_embedding_function",
 ]

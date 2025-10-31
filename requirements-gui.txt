@@ -1,4 +1,6 @@
 # Optional GUI dependencies for Prompt Manager.
+# Updates: v0.2.0 - 2025-11-07 - Include base requirements for convenience.
 # Updates: v0.1.0 - 2025-11-05 - Extract PySide6 to separate requirements set.
 
+-r requirements.txt
 PySide6==6.7.2

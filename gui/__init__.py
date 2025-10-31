@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, NoReturn, Optional, Sequence
 
 if TYPE_CHECKING:
+    from config import PromptManagerSettings
     from core import PromptManager
 
 
@@ -32,7 +33,7 @@ except ModuleNotFoundError as exc:  # pragma: no cover - exercised via main unit
     def _raise_create_qapplication(_: Optional[Sequence[str]] = None) -> NoReturn:
         raise GuiDependencyError(_MISSING_PYSIDE6_MESSAGE)
 
-    def _raise_launch_prompt_manager(_: "PromptManager") -> NoReturn:
+    def _raise_launch_prompt_manager(_: "PromptManager", __: "PromptManagerSettings | None" = None) -> NoReturn:
         raise GuiDependencyError(_MISSING_PYSIDE6_MESSAGE)
 
     create_qapplication = _raise_create_qapplication

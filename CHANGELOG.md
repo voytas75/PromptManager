@@ -2,10 +2,30 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.7.0] - 2025-11-07
+
+- Added configurable embedding backends (LiteLLM and sentence-transformers) with deterministic fallback and new settings/env variables.
+- Introduced GUI workspace actions for intent detection, prompt suggestion, and clipboard copying.
+- Split optional dependencies into extras (`cache`, `llm`, `embeddings`, `dev`) and refreshed installation docs/requirements.
+- Added `python -m main suggest` CLI command to verify semantic retrieval results from the configured embedding backend.
+- Logged intent workspace interactions to `data/logs/intent_usage.jsonl` for lightweight UX analytics.
+- Added `python -m main usage-report` command to summarise logged workspace activity for feedback review.
+
+## [0.6.0] - 2025-11-06
+
+- Added a lightweight intent classifier that biases semantic search results and surfaces top recommendations directly in the GUI.
+- Introduced `catalog-import` and `catalog-export` CLI commands with diff previews, optional dry-run mode, and JSON/YAML export support.
+- Extended the GUI toolbar with Import/Export actions and a catalogue diff dialog that mirrors the CLI workflow.
+- Implemented structured catalogue diff planning to guard against accidental overwrites and provide richer logging.
+- Added regression tests for catalogue diff/export, the new CLI commands, and intent-aware prompt suggestions.
+
 ## [0.5.0] - 2025-11-05
 
 - Import the packaged prompt catalogue (or a user-supplied JSON directory) into SQLite and ChromaDB on startup.
 - Add category, tag, and minimum-quality filters to the GUI alongside seeded prompt metadata.
+- Provide LiteLLM-backed prompt-name suggestions derived from context when creating entries.
+- Added in-app Settings dialog to configure catalogue path and LiteLLM credentials with persistence to `config/config.json`.
+- Clarify the prompt editor by renaming the context field to “Prompt Body” in dialogs and detail views.
 - Expose configurable `catalog_path` setting and environment variable override.
 - Package the built-in catalogue for distribution and provide catalogue import helpers with unit tests.
 

@@ -1,5 +1,7 @@
 """High-level CRUD manager for prompt records backed by SQLite, ChromaDB, and Redis.
 
+Updates: v0.6.0 - 2025-11-06 - Add intent-aware search suggestions and ranking helpers.
+Updates: v0.5.0 - 2025-11-05 - Integrate LiteLLM name generator and catalogue seeding.
 Updates: v0.4.1 - 2025-11-05 - Add lifecycle shutdown hooks and mute Chroma telemetry.
 Updates: v0.4.0 - 2025-11-05 - Add embedding provider with background sync and retry handling.
 Updates: v0.3.0 - 2025-11-03 - Require explicit DB path; accept resolved settings inputs.
@@ -14,6 +16,7 @@ import logging
 import os
 import uuid
 from pathlib import Path
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Union, cast
 
 import chromadb
@@ -57,6 +60,8 @@ except ImportError:  # pragma: no cover - redis optional during development
 from models.prompt_model import Prompt
 
 from .embedding import EmbeddingGenerationError, EmbeddingProvider, EmbeddingSyncWorker
+from .intent_classifier import IntentClassifier, IntentPrediction, rank_by_hints
+from .name_generation import LiteLLMNameGenerator, NameGenerationError
 from .repository import PromptRepository, RepositoryError, RepositoryNotFoundError
 
 logger = logging.getLogger(__name__)
@@ -94,6 +99,8 @@ class PromptManager:
         embedding_provider: Optional[EmbeddingProvider] = None,
         embedding_worker: Optional[EmbeddingSyncWorker] = None,
         enable_background_sync: bool = True,
+        name_generator: Optional[LiteLLMNameGenerator] = None,
+        intent_classifier: Optional[IntentClassifier] = None,
     ) -> None:
         """Initialise the manager with data backends.
 
@@ -163,6 +170,16 @@ class PromptManager:
             )
         else:
             self._embedding_worker = embedding_worker or _NullEmbeddingWorker()
+        self._name_generator = name_generator
+        self._intent_classifier = intent_classifier
+
+    @dataclass(slots=True)
+    class IntentSuggestions:
+        """Intent-aware search recommendations returned to callers."""
+
+        prediction: IntentPrediction
+        prompts: List[Prompt]
+        fallback_used: bool = False
 
     @property
     def collection(self) -> Collection:
@@ -173,6 +190,51 @@ class PromptManager:
     def repository(self) -> PromptRepository:
         """Expose the SQLite repository."""
         return self._repository
+
+    @property
+    def intent_classifier(self) -> Optional[IntentClassifier]:
+        """Expose the configured intent classifier for tooling hooks."""
+
+        return self._intent_classifier
+
+    def generate_prompt_name(self, context: str) -> str:
+        """Return a prompt name using the configured LiteLLM generator."""
+        if self._name_generator is None:
+            raise NameGenerationError(
+                "LiteLLM name generator is not configured. Set PROMPT_MANAGER_LITELLM_MODEL."
+            )
+        try:
+            return self._name_generator.generate(context)
+        except Exception as exc:
+            raise NameGenerationError(str(exc)) from exc
+
+    def set_name_generator(
+        self,
+        model: Optional[str],
+        api_key: Optional[str],
+        api_base: Optional[str],
+    ) -> None:
+        """Configure the LiteLLM name generator at runtime."""
+        if not model:
+            self._name_generator = None
+            return
+        try:
+            self._name_generator = LiteLLMNameGenerator(
+                model=model,
+                api_key=api_key,
+                api_base=api_base,
+            )
+        except RuntimeError as exc:
+            raise NameGenerationError(str(exc)) from exc
+        if self._intent_classifier is not None and model:
+            # Name generation and intent classification may share LiteLLM routing;
+            # future integrations can configure richer classification when desired.
+            logger.debug("LiteLLM powered features enabled for intent classifier")
+
+    def set_intent_classifier(self, classifier: Optional[IntentClassifier]) -> None:
+        """Replace the runtime intent classifier implementation."""
+
+        self._intent_classifier = classifier
 
     def close(self) -> None:
         """Release background workers and backend connections."""
@@ -410,6 +472,84 @@ class PromptManager:
                 ) from exc
             prompts.append(prompt_record)
         return prompts
+
+    def suggest_prompts(self, query_text: str, *, limit: int = 5) -> "PromptManager.IntentSuggestions":
+        """Return intent-ranked prompt recommendations for the supplied query."""
+
+        if limit <= 0:
+            raise ValueError("limit must be a positive integer")
+
+        stripped = query_text.strip()
+        if not stripped:
+            try:
+                baseline = self.repository.list(limit=limit)
+            except RepositoryError as exc:
+                raise PromptStorageError("Unable to load prompts for suggestions") from exc
+            return PromptManager.IntentSuggestions(IntentPrediction.general(), baseline, fallback_used=True)
+
+        prediction = (
+            self._intent_classifier.classify(stripped)
+            if self._intent_classifier is not None
+            else IntentPrediction.general()
+        )
+
+        augmented_query_parts = [stripped]
+        if prediction.category_hints:
+            augmented_query_parts.append(
+                "Intent categories: " + ", ".join(prediction.category_hints)
+            )
+        if prediction.tag_hints:
+            augmented_query_parts.append("Intent tags: " + ", ".join(prediction.tag_hints))
+        augmented_query = "\n".join(augmented_query_parts)
+
+        suggestions: List[Prompt] = []
+        fallback_used = False
+        try:
+            raw_results = self.search_prompts(augmented_query, limit=max(limit * 2, 10))
+        except PromptManagerError:
+            raw_results = []
+
+        ranked = rank_by_hints(
+            raw_results,
+            category_hints=prediction.category_hints,
+            tag_hints=prediction.tag_hints,
+        )
+
+        seen_ids: set[uuid.UUID] = set()
+        for prompt in ranked:
+            if prompt.id in seen_ids:
+                continue
+            suggestions.append(prompt)
+            seen_ids.add(prompt.id)
+            if len(suggestions) >= limit:
+                break
+
+        if len(suggestions) < limit:
+            fallback_used = True
+            try:
+                fallback_results = self.search_prompts(stripped, limit=max(limit * 2, 10))
+            except PromptManagerError:
+                fallback_results = []
+            for prompt in fallback_results:
+                if prompt.id in seen_ids:
+                    continue
+                suggestions.append(prompt)
+                seen_ids.add(prompt.id)
+                if len(suggestions) >= limit:
+                    break
+
+        if not suggestions:
+            fallback_used = True
+            try:
+                suggestions = self.repository.list(limit=limit)
+            except RepositoryError as exc:
+                raise PromptStorageError("Unable to load prompts for suggestions") from exc
+
+        return PromptManager.IntentSuggestions(
+            prediction=prediction,
+            prompts=suggestions[:limit],
+            fallback_used=fallback_used,
+        )
 
     def increment_usage(self, prompt_id: uuid.UUID) -> None:
         """Increment usage counter for a prompt."""

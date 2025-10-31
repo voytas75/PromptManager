@@ -12,7 +12,9 @@ from typing import Any, Dict, List, Optional
 
 import pytest
 
+from core.intent_classifier import IntentClassifier
 from core.prompt_manager import (
+    NameGenerationError,
     PromptCacheError,
     PromptManager,
     PromptNotFoundError,
@@ -167,6 +169,7 @@ def _build_manager(
         repository=repo,
         chroma_client=client,
         redis_client=redis_client,
+        intent_classifier=IntentClassifier(),
     )
 
 
@@ -190,6 +193,76 @@ def test_prompt_manager_wraps_repository_initialisation_errors(
             db_path="/tmp/db.sqlite",
             chroma_client=_StubChromaClient(fake_collection),
         )
+
+
+def test_suggest_prompts_prioritises_classifier_matches() -> None:
+    repository = _RecordingRepository()
+    debug_prompt = Prompt(
+        id=uuid.uuid4(),
+        name="Debug helper",
+        description="Fix errors",
+        category="Reasoning / Debugging",
+        tags=["debugging"],
+    )
+    doc_prompt = Prompt(
+        id=uuid.uuid4(),
+        name="Docs",
+        description="Document stuff",
+        category="Documentation",
+        tags=["docs"],
+    )
+    general_prompt = Prompt(
+        id=uuid.uuid4(),
+        name="General helper",
+        description="General purpose",
+        category="General",
+        tags=["general"],
+    )
+    for prompt in (debug_prompt, doc_prompt, general_prompt):
+        repository.add(prompt)
+
+    collection = _StubCollection(
+        query_result={
+            "ids": [[str(debug_prompt.id), str(doc_prompt.id), str(general_prompt.id)]],
+            "documents": [
+                [debug_prompt.document, doc_prompt.document, general_prompt.document]
+            ],
+            "metadatas": [
+                [
+                    debug_prompt.to_metadata(),
+                    doc_prompt.to_metadata(),
+                    general_prompt.to_metadata(),
+                ]
+            ],
+        }
+    )
+
+    manager = _build_manager(repository=repository, collection=collection)
+    suggestions = manager.suggest_prompts("error during deployment", limit=2)
+
+    assert suggestions.prediction.label.value == "debug"
+    assert suggestions.prompts[0].id == debug_prompt.id
+    assert not suggestions.fallback_used
+
+
+def test_suggest_prompts_falls_back_to_repository_list() -> None:
+    repository = _RecordingRepository()
+    prompt = Prompt(
+        id=uuid.uuid4(),
+        name="Fallback",
+        description="Baseline",
+        category="General",
+        tags=["misc"],
+    )
+    repository.add(prompt)
+
+    empty_result = {"ids": [[]], "documents": [[]], "metadatas": [[]]}
+    collection = _StubCollection(query_result=empty_result)
+    manager = _build_manager(repository=repository, collection=collection)
+
+    suggestions = manager.suggest_prompts("", limit=1)
+    assert suggestions.fallback_used
+    assert suggestions.prompts == repository.list(limit=1)
 
 
 def test_prompt_manager_falls_back_to_persistent_client(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -391,6 +464,12 @@ def test_prompt_manager_collection_initialisation_error(monkeypatch: pytest.Monk
             repository=repository,
             chroma_client=_ExplodingClient(),
         )
+
+
+def test_generate_prompt_name_requires_configured_generator() -> None:
+    manager = _build_manager()
+    with pytest.raises(NameGenerationError):
+        manager.generate_prompt_name("Generate a catchy name from this context.")
 
 
 def test_create_prompt_raises_when_repository_fails() -> None:

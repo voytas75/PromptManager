@@ -1,18 +1,21 @@
-"""Utilities for importing prompt catalogues into Prompt Manager.
+"""Utilities for importing, previewing, and exporting prompt catalogues.
 
+Updates: v0.6.0 - 2025-11-06 - Add diff previews, export helpers, and bulk directory support.
 Updates: v0.5.0 - 2025-11-05 - Seed SQLite/Chroma from packaged or user-provided catalogues.
 """
 
 from __future__ import annotations
 
+import difflib
 import json
 import logging
 import uuid
-from dataclasses import replace
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
+from enum import Enum
 from importlib.resources import as_file
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from catalog import builtin_catalog_resource
 from models.prompt_model import Prompt
@@ -20,6 +23,11 @@ from models.prompt_model import Prompt
 from .prompt_manager import PromptManager, PromptStorageError
 
 logger = logging.getLogger("prompt_manager.catalog")
+
+try:  # pragma: no cover - optional dependency for YAML export
+    import yaml  # type: ignore
+except ImportError:  # pragma: no cover - handled at runtime when exporting YAML
+    yaml = None  # type: ignore
 
 
 def _now_iso() -> str:
@@ -113,6 +121,7 @@ def _entry_to_prompt(entry: Dict[str, Any]) -> Prompt:
 
 def load_prompt_catalog(catalog_path: Optional[Path]) -> List[Prompt]:
     """Load prompts from a user-provided path or packaged defaults."""
+
     entries: List[Dict[str, Any]] = []
     if catalog_path is not None:
         try:
@@ -153,6 +162,194 @@ def _merge_prompt(existing: Prompt, incoming: Prompt) -> Prompt:
     )
 
 
+class CatalogChangeType(str, Enum):
+    """Categorise catalogue changes detected during preview."""
+
+    ADD = "add"
+    UPDATE = "update"
+    SKIP = "skip"
+    UNCHANGED = "unchanged"
+
+
+@dataclass(slots=True)
+class CatalogDiffEntry:
+    """Single change entry rendered in a preview or diff dialog."""
+
+    prompt_id: uuid.UUID
+    name: str
+    change_type: CatalogChangeType
+    diff: str
+
+
+@dataclass(slots=True)
+class CatalogDiff:
+    """Aggregate diff describing catalogue changes."""
+
+    entries: List[CatalogDiffEntry] = field(default_factory=list)
+    added: int = 0
+    updated: int = 0
+    skipped: int = 0
+    unchanged: int = 0
+    source: Optional[str] = None
+
+    def has_changes(self) -> bool:
+        return self.added > 0 or self.updated > 0
+
+    def summary(self) -> Dict[str, int]:
+        return {
+            "added": self.added,
+            "updated": self.updated,
+            "skipped": self.skipped,
+            "unchanged": self.unchanged,
+        }
+
+
+@dataclass(slots=True)
+class CatalogChangePlan:
+    """Plan describing how a catalogue import should be applied."""
+
+    create: List[Prompt] = field(default_factory=list)
+    update: List[Tuple[Prompt, Prompt]] = field(default_factory=list)
+    skip: List[Prompt] = field(default_factory=list)
+    diff: CatalogDiff = field(default_factory=CatalogDiff)
+
+
+_DIFF_FIELDS: Sequence[str] = (
+    "name",
+    "description",
+    "category",
+    "tags",
+    "language",
+    "context",
+    "example_input",
+    "example_output",
+    "version",
+    "author",
+    "quality_score",
+    "related_prompts",
+    "source",
+    "is_active",
+)
+
+
+def _prompt_snapshot(prompt: Prompt) -> Dict[str, Any]:
+    payload: Dict[str, Any] = {}
+    for field_name in _DIFF_FIELDS:
+        value = getattr(prompt, field_name)
+        if field_name in {"tags", "related_prompts"} and value is not None:
+            payload[field_name] = sorted(value)
+        else:
+            payload[field_name] = value
+    return payload
+
+
+def _format_prompt_json(prompt: Prompt) -> str:
+    return json.dumps(_prompt_snapshot(prompt), ensure_ascii=False, indent=2, sort_keys=True)
+
+
+def _diff_prompts(existing: Prompt, incoming: Prompt) -> str:
+    before = _format_prompt_json(existing).splitlines()
+    after = _format_prompt_json(incoming).splitlines()
+    diff = difflib.unified_diff(before, after, fromfile="existing", tofile="incoming", lineterm="")
+    return "\n".join(diff)
+
+
+def _prompt_to_catalog_dict(prompt: Prompt) -> Dict[str, Any]:
+    record = {
+        "id": str(prompt.id),
+        "name": prompt.name,
+        "description": prompt.description,
+        "category": prompt.category,
+        "tags": list(prompt.tags),
+        "language": prompt.language,
+        "context": prompt.context,
+        "example_input": prompt.example_input,
+        "example_output": prompt.example_output,
+        "version": prompt.version,
+        "author": prompt.author,
+        "quality_score": prompt.quality_score,
+        "usage_count": prompt.usage_count,
+        "related_prompts": list(prompt.related_prompts),
+        "created_at": prompt.created_at.isoformat(),
+        "last_modified": prompt.last_modified.isoformat(),
+        "modified_by": prompt.modified_by,
+        "is_active": prompt.is_active,
+        "source": prompt.source,
+        "checksum": prompt.checksum,
+        "ext1": prompt.ext1,
+        "ext2": prompt.ext2,
+        "ext3": prompt.ext3,
+        "ext4": list(prompt.ext4) if prompt.ext4 is not None else None,
+        "ext5": prompt.ext5,
+    }
+    return record
+
+
+def _build_change_plan(
+    manager: PromptManager,
+    prompts: Sequence[Prompt],
+    *,
+    overwrite: bool,
+) -> CatalogChangePlan:
+    try:
+        existing_prompts = manager.repository.list()
+    except Exception as exc:  # pragma: no cover - defensive
+        raise PromptStorageError("Unable to inspect existing prompts") from exc
+
+    plan = CatalogChangePlan()
+    existing_by_name: Dict[str, Prompt] = {
+        prompt.name.strip().lower(): prompt for prompt in existing_prompts
+    }
+
+    for prompt in prompts:
+        key = prompt.name.strip().lower()
+        existing = existing_by_name.get(key)
+        if existing is None:
+            plan.create.append(prompt)
+            plan.diff.entries.append(
+                CatalogDiffEntry(
+                    prompt_id=prompt.id,
+                    name=prompt.name,
+                    change_type=CatalogChangeType.ADD,
+                    diff=_format_prompt_json(prompt),
+                )
+            )
+            plan.diff.added += 1
+            existing_by_name[key] = prompt
+            continue
+
+        if not overwrite:
+            plan.diff.entries.append(
+                CatalogDiffEntry(
+                    prompt_id=existing.id,
+                    name=existing.name,
+                    change_type=CatalogChangeType.SKIP,
+                    diff="Overwrite disabled; existing prompt retained.",
+                )
+            )
+            plan.diff.skipped += 1
+            plan.skip.append(existing)
+            continue
+
+        diff_text = _diff_prompts(existing, prompt)
+        if diff_text.strip():
+            plan.update.append((existing, prompt))
+            plan.diff.entries.append(
+                CatalogDiffEntry(
+                    prompt_id=existing.id,
+                    name=existing.name,
+                    change_type=CatalogChangeType.UPDATE,
+                    diff=diff_text,
+                )
+            )
+            plan.diff.updated += 1
+            existing_by_name[key] = _merge_prompt(existing, prompt)
+        else:
+            plan.diff.unchanged += 1
+
+    return plan
+
+
 class CatalogImportResult:
     """Aggregate statistics from a catalogue import operation."""
 
@@ -161,6 +358,7 @@ class CatalogImportResult:
         self.updated = 0
         self.skipped = 0
         self.errors = 0
+        self.preview: Optional[CatalogDiff] = None
 
     def as_dict(self) -> Dict[str, int]:
         return {
@@ -171,6 +369,22 @@ class CatalogImportResult:
         }
 
 
+def diff_prompt_catalog(
+    manager: PromptManager,
+    catalog_path: Optional[Path],
+    *,
+    overwrite: bool = True,
+) -> CatalogDiff:
+    """Return a diff preview describing how a catalogue import would change prompts."""
+
+    prompts = load_prompt_catalog(catalog_path)
+    if not prompts:
+        return CatalogDiff(source=str(catalog_path) if catalog_path else "builtin")
+    plan = _build_change_plan(manager, prompts, overwrite=overwrite)
+    plan.diff.source = str(catalog_path) if catalog_path else "builtin"
+    return plan.diff
+
+
 def import_prompt_catalog(
     manager: PromptManager,
     catalog_path: Optional[Path],
@@ -178,47 +392,101 @@ def import_prompt_catalog(
     overwrite: bool = True,
 ) -> CatalogImportResult:
     """Import prompts into the manager, updating existing entries when appropriate."""
+
     prompts = load_prompt_catalog(catalog_path)
     result = CatalogImportResult()
     if not prompts:
         return result
 
     try:
-        existing_prompts = manager.repository.list()
-    except Exception as exc:  # pragma: no cover - defensive
-        logger.error("Unable to inspect existing prompts: %s", exc)
+        plan = _build_change_plan(manager, prompts, overwrite=overwrite)
+    except PromptStorageError as exc:
+        logger.error("Unable to prepare catalogue import: %s", exc)
         result.errors = len(prompts)
         return result
 
-    existing_by_name = {prompt.name.strip().lower(): prompt for prompt in existing_prompts}
-
-    for prompt in prompts:
-        key = prompt.name.strip().lower()
-        if key in existing_by_name:
-            if not overwrite:
-                result.skipped += 1
-                continue
-            merged = _merge_prompt(existing_by_name[key], prompt)
-            try:
-                manager.update_prompt(merged)
-            except PromptStorageError as exc:
-                logger.error("Failed to update prompt '%s': %s", prompt.name, exc)
-                result.errors += 1
-                continue
-            existing_by_name[key] = merged
-            result.updated += 1
-            continue
-
+    for prompt in plan.create:
         try:
             manager.create_prompt(prompt)
         except PromptStorageError as exc:
             logger.error("Failed to import prompt '%s': %s", prompt.name, exc)
             result.errors += 1
             continue
-        existing_by_name[key] = prompt
         result.added += 1
 
+    for existing, incoming in plan.update:
+        merged = _merge_prompt(existing, incoming)
+        try:
+            manager.update_prompt(merged)
+        except PromptStorageError as exc:
+            logger.error("Failed to update prompt '%s': %s", existing.name, exc)
+            result.errors += 1
+            continue
+        result.updated += 1
+
+    result.skipped = plan.diff.skipped
+    result.preview = plan.diff
     return result
 
 
-__all__ = ["load_prompt_catalog", "import_prompt_catalog", "CatalogImportResult"]
+def export_prompt_catalog(
+    manager: PromptManager,
+    output_path: Path,
+    *,
+    fmt: str = "json",
+    include_inactive: bool = False,
+) -> Path:
+    """Export the current prompt repository to JSON or YAML."""
+
+    fmt_lower = fmt.lower()
+    if fmt_lower not in {"json", "yaml"}:
+        raise ValueError("fmt must be 'json' or 'yaml'")
+
+    try:
+        prompts = manager.repository.list()
+    except Exception as exc:  # pragma: no cover - defensive
+        raise PromptStorageError("Unable to load prompts for export") from exc
+
+    exportable = [
+        _prompt_to_catalog_dict(prompt)
+        for prompt in prompts
+        if include_inactive or prompt.is_active
+    ]
+
+    payload = {
+        "generated_at": _now_iso(),
+        "count": len(exportable),
+        "prompts": exportable,
+    }
+
+    resolved_path = output_path.expanduser()
+    resolved_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if fmt_lower == "json":
+        resolved_path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+    else:
+        if yaml is None:  # pragma: no cover - optional dependency
+            raise RuntimeError(
+                "PyYAML is required for YAML export. Install it with `pip install pyyaml`."
+            )
+        with resolved_path.open("w", encoding="utf-8") as handle:
+            yaml.safe_dump(payload, handle, allow_unicode=True, sort_keys=False)
+
+    return resolved_path
+
+
+__all__ = [
+    "CatalogChangePlan",
+    "CatalogChangeType",
+    "CatalogDiff",
+    "CatalogDiffEntry",
+    "CatalogImportResult",
+    "diff_prompt_catalog",
+    "export_prompt_catalog",
+    "import_prompt_catalog",
+    "load_prompt_catalog",
+]
+

@@ -1,6 +1,6 @@
 [project]
 name = "prompt-manager"
-version = "0.5.0"
+version = "0.7.0"
 description = "Desktop application for cataloguing, searching, and launching AI prompts."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -20,15 +20,18 @@ classifiers = [
 ]
 dependencies = [
     "chromadb==0.4.24",
-    "redis==5.0.1",
-    "pytest==8.2.0",
     "numpy>=1.26.4,<2",
     "pydantic==2.12.3",
     "pydantic-settings==2.2.1",
+    "PyYAML==6.0.2",
 ]
 
 [project.optional-dependencies]
 gui = ["PySide6==6.7.2"]
+cache = ["redis==5.0.1"]
+llm = ["litellm==1.35.10"]
+embeddings = ["sentence-transformers==2.2.2"]
+dev = ["pytest==8.2.0", "pytest-cov==4.1.0"]
 
 [tool.setuptools.packages.find]
 include = ["catalog*", "config*", "core*", "gui*", "models*"]

@@ -1,5 +1,6 @@
 """Settings management for Prompt Manager configuration.
 
+Updates: v0.4.0 - 2025-11-07 - Add configurable embedding backend options.
 Updates: v0.3.2 - 2025-10-30 - Document revised settings precedence examples.
 Updates: v0.3.1 - 2025-10-30 - Ensure env overrides JSON; remove unused helpers.
 Updates: v0.3.0 - 2025-10-30 - Migrate to Pydantic v2 with pydantic-settings.
@@ -13,7 +14,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple, Type, cast
 
-from pydantic import Field, ValidationError, field_validator
+from pydantic import Field, ValidationError, field_validator, model_validator
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -36,6 +37,21 @@ class PromptManagerSettings(BaseSettings):
         default=None,
         description="Optional path to a prompt catalogue (JSON file or directory).",
     )
+    litellm_model: Optional[str] = Field(default=None, description="LiteLLM model name for prompt name generation.")
+    litellm_api_key: Optional[str] = Field(default=None, description="LiteLLM API key.", repr=False)
+    litellm_api_base: Optional[str] = Field(default=None, description="Optional LiteLLM API base URL override.")
+    embedding_backend: str = Field(
+        default="deterministic",
+        description="Embedding backend to use (deterministic, litellm, sentence-transformers).",
+    )
+    embedding_model: Optional[str] = Field(
+        default=None,
+        description="Model name for embedding backend (required for litellm/sentence-transformers).",
+    )
+    embedding_device: Optional[str] = Field(
+        default=None,
+        description="Preferred device identifier for local embedding backends (e.g. cpu, cuda).",
+    )
 
     # Pydantic v2 settings configuration
     model_config = cast(
@@ -53,6 +69,12 @@ class PromptManagerSettings(BaseSettings):
                 "redis_dsn": ["REDIS_DSN", "redis_dsn"],
                 "cache_ttl_seconds": ["CACHE_TTL_SECONDS", "cache_ttl_seconds"],
                 "catalog_path": ["CATALOG_PATH", "catalog_path"],
+                "litellm_model": ["LITELLM_MODEL", "litellm_model"],
+                "litellm_api_key": ["LITELLM_API_KEY", "litellm_api_key"],
+                "litellm_api_base": ["LITELLM_API_BASE", "litellm_api_base"],
+                "embedding_backend": ["EMBEDDING_BACKEND", "embedding_backend"],
+                "embedding_model": ["EMBEDDING_MODEL", "embedding_model"],
+                "embedding_device": ["EMBEDDING_DEVICE", "embedding_device"],
             },
         },
     )
@@ -88,6 +110,44 @@ class PromptManagerSettings(BaseSettings):
         path = Path(str(value)).expanduser()
         return path.resolve()
 
+    @field_validator(
+        "litellm_model",
+        "litellm_api_key",
+        "litellm_api_base",
+        "embedding_model",
+        "embedding_device",
+        mode="before",
+    )
+    def _strip_strings(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped or None
+
+    @field_validator("embedding_backend", mode="before")
+    def _normalise_embedding_backend(cls, value: Optional[str]) -> str:
+        if value is None:
+            return "deterministic"
+        backend = str(value).strip().lower()
+        if backend in {"", "default", "deterministic"}:
+            return "deterministic"
+        if backend in {"litellm", "openai"}:
+            return "litellm"
+        if backend in {"sentence-transformers", "sentence_transformers", "st"}:
+            return "sentence-transformers"
+        raise ValueError(f"Unsupported embedding backend '{value}'")
+
+    @model_validator(mode="after")
+    def _validate_embedding_configuration(self) -> "PromptManagerSettings":
+        if self.embedding_backend == "litellm" and not self.embedding_model and self.litellm_model:
+            object.__setattr__(self, "embedding_model", self.litellm_model)
+        if self.embedding_backend != "deterministic" and not self.embedding_model:
+            raise ValueError(
+                "embedding_model must be provided when embedding_backend is set to "
+                f"'{self.embedding_backend}'"
+            )
+        return self
+
     @classmethod
     def settings_customise_sources(
         cls,
@@ -120,6 +180,12 @@ class PromptManagerSettings(BaseSettings):
                 "redis_dsn": ["REDIS_DSN", "redis_dsn"],
                 "cache_ttl_seconds": ["CACHE_TTL_SECONDS", "cache_ttl_seconds"],
                 "catalog_path": ["CATALOG_PATH", "catalog_path"],
+                "litellm_model": ["LITELLM_MODEL", "litellm_model"],
+                "litellm_api_key": ["LITELLM_API_KEY", "litellm_api_key"],
+                "litellm_api_base": ["LITELLM_API_BASE", "litellm_api_base"],
+                "embedding_backend": ["EMBEDDING_BACKEND", "embedding_backend"],
+                "embedding_model": ["EMBEDDING_MODEL", "embedding_model"],
+                "embedding_device": ["EMBEDDING_DEVICE", "embedding_device"],
             }
             for field, keys in mapping.items():
                 for key in keys:
@@ -171,7 +237,17 @@ class PromptManagerSettings(BaseSettings):
             mapped: Dict[str, Any] = {}
             if "database_path" in data and "db_path" not in data:
                 mapped["db_path"] = data["database_path"]
-            for key in ("chroma_path", "redis_dsn", "cache_ttl_seconds", "catalog_path"):
+            for key in (
+                "chroma_path",
+                "redis_dsn",
+                "cache_ttl_seconds",
+                "catalog_path",
+                "litellm_model",
+                "litellm_api_base",
+                "embedding_backend",
+                "embedding_model",
+                "embedding_device",
+            ):
                 if key in data:
                     mapped[key] = data[key]
             return mapped

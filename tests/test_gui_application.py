@@ -53,8 +53,9 @@ def stub_qt(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     stubbed_main_window = types.ModuleType("gui.main_window")
 
     class _MainWindow:
-        def __init__(self, *_: object, **__: object) -> None:
-            return
+        def __init__(self, manager: object, settings: object | None = None) -> None:
+            self.manager = manager
+            self.settings = settings
 
     stubbed_main_window.MainWindow = _MainWindow  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "gui.main_window", stubbed_main_window)

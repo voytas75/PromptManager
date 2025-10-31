@@ -1,10 +1,12 @@
 """
 noxfile.py - Nox sessions for Prompt Manager
 
+Updates: v0.2.1 - 2025-11-07 - Document dev extra prerequisite for automation sessions.
 Updates: v0.2.0 - 2025-10-30 - Switch sessions to host interpreter and add tool detection
 Updates: v0.1.0 - 2025-10-30 - Initial scaffold of fmt/lint/tests/type-check sessions
 
-This file defines automation sessions:
+Install the project with `pip install .[dev]` to provide pytest/mypy/black before
+running these sessions. This file defines automation sessions:
 - fmt: format code with black
 - lint: lint and check style with ruff (and black --check)
 - tests: run pytest with coverage

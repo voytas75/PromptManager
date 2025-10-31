@@ -18,6 +18,13 @@ def _make_settings(**overrides: object) -> SimpleNamespace:
         "db_path": "/tmp/db.sqlite",
         "cache_ttl_seconds": 60,
         "redis_dsn": "redis://localhost:6379/0",
+        "catalog_path": None,
+        "litellm_model": None,
+        "litellm_api_key": None,
+        "litellm_api_base": None,
+        "embedding_backend": "deterministic",
+        "embedding_model": None,
+        "embedding_device": None,
     }
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
@@ -67,6 +74,8 @@ def test_build_prompt_manager_forwards_dependencies(monkeypatch: pytest.MonkeyPa
             embedding_provider: object = None,
             embedding_worker: object = None,
             enable_background_sync: bool = True,
+            name_generator: object = None,
+            intent_classifier: object = None,
         ) -> None:
             self.kwargs = {
                 "chroma_path": chroma_path,
@@ -79,6 +88,8 @@ def test_build_prompt_manager_forwards_dependencies(monkeypatch: pytest.MonkeyPa
                 "embedding_provider": embedding_provider,
                 "embedding_worker": embedding_worker,
                 "enable_background_sync": enable_background_sync,
+                "name_generator": name_generator,
+                "intent_classifier": intent_classifier,
             }
 
     monkeypatch.setattr("core.factory.PromptManager", _PromptManager)
@@ -115,3 +126,17 @@ def test_build_prompt_manager_uses_passthrough_redis_client(
     sentinel = object()
     result = build_prompt_manager(settings, redis_client=sentinel)
     assert result == "manager"
+
+
+def test_build_prompt_manager_bubbles_embedding_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = _make_settings()
+
+    def _raise_embedding(*_: object, **__: object):
+        raise ValueError("no backend")
+
+    monkeypatch.setattr("core.factory.create_embedding_function", _raise_embedding)
+    monkeypatch.setattr("core.factory.PromptManager", lambda **_: "manager")
+
+    with pytest.raises(RuntimeError) as excinfo:
+        build_prompt_manager(settings)
+    assert "Unable to configure embedding backend" in str(excinfo.value)

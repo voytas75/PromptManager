@@ -36,6 +36,8 @@ def test_load_settings_reads_json_and_env(monkeypatch, tmp_path) -> None:
     assert settings.cache_ttl_seconds == 120
     assert settings.redis_dsn == "redis://localhost:6379/1"
     assert settings.catalog_path is None
+    assert settings.litellm_model is None
+    assert settings.catalog_path is None
 
 
 def test_env_precedes_json_when_both_provided(monkeypatch, tmp_path) -> None:
@@ -55,6 +57,18 @@ def test_env_precedes_json_when_both_provided(monkeypatch, tmp_path) -> None:
     assert settings.cache_ttl_seconds == 42
 
 
+def test_litellm_settings_from_env(monkeypatch) -> None:
+    monkeypatch.setenv("PROMPT_MANAGER_LITELLM_MODEL", "gpt-4o-mini")
+    monkeypatch.setenv("PROMPT_MANAGER_LITELLM_API_KEY", "secret-key")
+    monkeypatch.setenv("PROMPT_MANAGER_LITELLM_API_BASE", "https://proxy.example.com")
+
+    settings = load_settings()
+
+    assert settings.litellm_model == "gpt-4o-mini"
+    assert settings.litellm_api_key == "secret-key"
+    assert settings.litellm_api_base == "https://proxy.example.com"
+
+
 def test_catalog_path_environment_variable(monkeypatch, tmp_path) -> None:
     catalog_file = tmp_path / "catalog.json"
     monkeypatch.setenv("PROMPT_MANAGER_CATALOG_PATH", str(catalog_file))
@@ -62,6 +76,32 @@ def test_catalog_path_environment_variable(monkeypatch, tmp_path) -> None:
     settings = load_settings()
 
     assert settings.catalog_path == catalog_file.resolve()
+
+
+def test_embedding_backend_defaults_to_deterministic() -> None:
+    settings = load_settings()
+    assert settings.embedding_backend == "deterministic"
+    assert settings.embedding_model is None
+
+
+def test_embedding_backend_requires_model(monkeypatch) -> None:
+    monkeypatch.setenv("PROMPT_MANAGER_EMBEDDING_BACKEND", "sentence-transformers")
+    with pytest.raises(SettingsError):
+        load_settings()
+
+
+def test_embedding_backend_reuses_litellm_model(monkeypatch) -> None:
+    monkeypatch.setenv("PROMPT_MANAGER_LITELLM_MODEL", "text-embedding-3-small")
+    monkeypatch.setenv("PROMPT_MANAGER_EMBEDDING_BACKEND", "litellm")
+    settings = load_settings()
+    assert settings.embedding_backend == "litellm"
+    assert settings.embedding_model == "text-embedding-3-small"
+
+
+def test_embedding_backend_rejects_unknown(monkeypatch) -> None:
+    monkeypatch.setenv("PROMPT_MANAGER_EMBEDDING_BACKEND", "unsupported")
+    with pytest.raises(SettingsError):
+        load_settings()
 
 
 def test_load_settings_raises_when_json_missing(monkeypatch, tmp_path) -> None:

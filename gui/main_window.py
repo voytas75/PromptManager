@@ -1,17 +1,24 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.4.0 - 2025-11-07 - Add intent workspace with detect/suggest/copy actions and usage logging.
+Updates: v0.3.0 - 2025-11-06 - Surface intent-aware search hints and recommendations.
+Updates: v0.2.0 - 2025-11-05 - Add catalogue filters, LiteLLM name generation, and settings UI.
 Updates: v0.1.0 - 2025-11-04 - Provide list/search/detail panes with CRUD controls.
 """
 
 from __future__ import annotations
 
+import json
 import uuid
+from pathlib import Path
 from typing import Iterable, List, Optional, Sequence
 
 from PySide6.QtCore import QAbstractListModel, QModelIndex, Qt
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
+    QFileDialog,
     QDialog,
     QDoubleSpinBox,
     QHBoxLayout,
@@ -20,22 +27,31 @@ from PySide6.QtWidgets import (
     QListView,
     QMainWindow,
     QMessageBox,
+    QPlainTextEdit,
     QPushButton,
     QSplitter,
     QVBoxLayout,
     QWidget,
 )
 
+from config import PromptManagerSettings
 from core import (
+    IntentLabel,
+    NameGenerationError,
     PromptManager,
     PromptManagerError,
     PromptNotFoundError,
     PromptStorageError,
     RepositoryError,
+    diff_prompt_catalog,
+    export_prompt_catalog,
+    import_prompt_catalog,
 )
 from models.prompt_model import Prompt
 
-from .dialogs import PromptDialog
+from .dialogs import CatalogPreviewDialog, PromptDialog
+from .settings_dialog import SettingsDialog, persist_settings_to_config
+from .usage_logger import IntentUsageLogger
 
 
 class PromptListModel(QAbstractListModel):
@@ -114,8 +130,8 @@ class PromptDetailWidget(QWidget):
         header = f"{prompt.name} — {prompt.category or 'Uncategorised'}\nLanguage: {language}\nTags: {tags}"
         self._title.setText(header)
         self._description.setText(prompt.description)
-        context_text = prompt.context or "No additional context provided."
-        self._context.setText(f"Context:\n{context_text}")
+        context_text = prompt.context or "No prompt text provided."
+        self._context.setText(f"Prompt Body:\n{context_text}")
         example_lines = []
         if prompt.example_input:
             example_lines.append(f"Example input:\n{prompt.example_input}")
@@ -135,13 +151,22 @@ class PromptDetailWidget(QWidget):
 class MainWindow(QMainWindow):
     """Primary window exposing prompt CRUD operations."""
 
-    def __init__(self, prompt_manager: PromptManager, parent=None) -> None:
+    def __init__(
+        self,
+        prompt_manager: PromptManager,
+        settings: Optional[PromptManagerSettings] = None,
+        parent=None,
+    ) -> None:
         super().__init__(parent)
         self._manager = prompt_manager
+        self._settings = settings
         self._model = PromptListModel(parent=self)
         self._detail_widget = PromptDetailWidget(self)
         self._all_prompts: List[Prompt] = []
         self._current_prompts: List[Prompt] = []
+        self._suggestions: Optional[PromptManager.IntentSuggestions] = None
+        self._runtime_settings = self._initial_runtime_settings(settings)
+        self._usage_logger = IntentUsageLogger()
         self.setWindowTitle("Prompt Manager")
         self.resize(1024, 640)
         self._build_ui()
@@ -178,7 +203,48 @@ class MainWindow(QMainWindow):
         self._delete_button.clicked.connect(self._on_delete_clicked)  # type: ignore[arg-type]
         controls_layout.addWidget(self._delete_button)
 
+        self._import_button = QPushButton("Import", self)
+        self._import_button.clicked.connect(self._on_import_clicked)  # type: ignore[arg-type]
+        controls_layout.addWidget(self._import_button)
+
+        self._export_button = QPushButton("Export", self)
+        self._export_button.clicked.connect(self._on_export_clicked)  # type: ignore[arg-type]
+        controls_layout.addWidget(self._export_button)
+
+        self._settings_button = QPushButton("Settings", self)
+        self._settings_button.clicked.connect(self._on_settings_clicked)  # type: ignore[arg-type]
+        controls_layout.addWidget(self._settings_button)
+
         layout.addLayout(controls_layout)
+
+        self._query_input = QPlainTextEdit(self)
+        self._query_input.setPlaceholderText("Paste code or text to analyse and suggest prompts…")
+        self._query_input.setMinimumHeight(120)
+        layout.addWidget(self._query_input)
+
+        actions_layout = QHBoxLayout()
+        actions_layout.setSpacing(8)
+
+        self._detect_button = QPushButton("Detect Need", self)
+        self._detect_button.clicked.connect(self._on_detect_intent_clicked)  # type: ignore[arg-type]
+        actions_layout.addWidget(self._detect_button)
+
+        self._suggest_button = QPushButton("Suggest Prompt", self)
+        self._suggest_button.clicked.connect(self._on_suggest_prompt_clicked)  # type: ignore[arg-type]
+        actions_layout.addWidget(self._suggest_button)
+
+        self._copy_button = QPushButton("Copy Prompt", self)
+        self._copy_button.clicked.connect(self._on_copy_prompt_clicked)  # type: ignore[arg-type]
+        actions_layout.addWidget(self._copy_button)
+
+        actions_layout.addStretch(1)
+        layout.addLayout(actions_layout)
+
+        self._intent_hint = QLabel("", self)
+        self._intent_hint.setObjectName("intentHintLabel")
+        self._intent_hint.setStyleSheet("color: #5b5b5b; font-style: italic;")
+        self._intent_hint.setVisible(False)
+        layout.addWidget(self._intent_hint)
 
         filter_layout = QHBoxLayout()
         filter_layout.setSpacing(8)
@@ -233,20 +299,25 @@ class MainWindow(QMainWindow):
 
         self._populate_filters(self._all_prompts)
 
-        try:
-            if search_text.strip():
-                self._current_prompts = self._manager.search_prompts(search_text.strip(), limit=50)
+        stripped = search_text.strip()
+        if stripped:
+            try:
+                suggestions = self._manager.suggest_prompts(stripped, limit=50)
+            except PromptManagerError as exc:
+                self._show_error("Unable to search prompts", str(exc))
             else:
-                self._current_prompts = list(self._all_prompts)
-        except PromptManagerError as exc:
-            self._show_error("Unable to search prompts", str(exc))
-            self._current_prompts = list(self._all_prompts)
+                self._apply_suggestions(suggestions)
+                return
+
+        self._suggestions = None
+        self._current_prompts = list(self._all_prompts)
 
         filtered = self._apply_filters(self._current_prompts)
         self._model.set_prompts(filtered)
         self._list_view.clearSelection()
         if not filtered:
             self._detail_widget.clear()
+        self._update_intent_hint(filtered)
 
     def _populate_filters(self, prompts: Sequence[Prompt]) -> None:
         """Refresh category and tag filters based on available prompts."""
@@ -304,6 +375,132 @@ class MainWindow(QMainWindow):
         self._list_view.clearSelection()
         if not filtered:
             self._detail_widget.clear()
+        self._update_intent_hint(filtered)
+
+    def _update_intent_hint(self, prompts: Sequence[Prompt]) -> None:
+        """Update the hint label with detected intent context and matches."""
+
+        if self._suggestions is None:
+            self._intent_hint.clear()
+            self._intent_hint.setVisible(False)
+            return
+
+        prompt_list = list(prompts)
+        prediction = self._suggestions.prediction
+        label_text = prediction.label.value.replace("_", " ").title()
+        confidence_pct = int(round(prediction.confidence * 100))
+
+        summary_parts: List[str] = []
+        if prediction.label is not IntentLabel.GENERAL or prediction.category_hints:
+            summary_parts.append(f"Detected intent: {label_text} ({confidence_pct}%).")
+        if prediction.category_hints:
+            summary_parts.append(f"Focus: {', '.join(prediction.category_hints)}")
+        if prediction.language_hints:
+            summary_parts.append(f"Lang: {', '.join(prediction.language_hints)}")
+
+        top_names = [prompt.name for prompt in prompt_list[:3]]
+        if top_names:
+            summary_parts.append(f"Top matches: {', '.join(top_names)}")
+        if self._suggestions.fallback_used:
+            summary_parts.append("Fallback ranking applied")
+
+        if summary_parts:
+            message = " | ".join(summary_parts)
+        elif top_names:
+            message = "Top matches: " + ", ".join(top_names)
+        else:
+            self._intent_hint.clear()
+            self._intent_hint.setVisible(False)
+            return
+
+        self._intent_hint.setText(message)
+        self._intent_hint.setVisible(True)
+
+    def _generate_prompt_name(self, context: str) -> str:
+        """Delegate name generation to PromptManager, surfacing errors."""
+
+        if not context.strip():
+            return ""
+        return self._manager.generate_prompt_name(context)
+
+    def _on_detect_intent_clicked(self) -> None:
+        """Run intent detection on the free-form query input."""
+
+        text = self._query_input.toPlainText().strip()
+        if not text:
+            self.statusBar().showMessage("Paste some text or code to analyse.", 4000)
+            return
+        classifier = self._manager.intent_classifier
+        if classifier is None:
+            self._show_error("Intent detection unavailable", "No intent classifier is configured.")
+            return
+        prediction = classifier.classify(text)
+        current_prompts = list(self._model.prompts())
+        self._suggestions = PromptManager.IntentSuggestions(
+            prediction=prediction,
+            prompts=list(current_prompts),
+            fallback_used=False,
+        )
+        self._update_intent_hint(current_prompts)
+        label = prediction.label.value.replace("_", " ").title()
+        self.statusBar().showMessage(f"Detected intent: {label} ({int(prediction.confidence * 100)}%)", 5000)
+        self._usage_logger.log_detect(prediction=prediction, query_text=text)
+
+    def _on_suggest_prompt_clicked(self) -> None:
+        """Generate prompt suggestions from the free-form query input."""
+
+        query = self._query_input.toPlainText().strip() or self._search_input.text().strip()
+        if not query:
+            self.statusBar().showMessage("Provide text or use search to fetch suggestions.", 4000)
+            return
+        try:
+            suggestions = self._manager.suggest_prompts(query, limit=20)
+        except PromptManagerError as exc:
+            self._show_error("Unable to suggest prompts", str(exc))
+            return
+        self._usage_logger.log_suggest(
+            prediction=suggestions.prediction,
+            query_text=query,
+            prompts=suggestions.prompts,
+            fallback_used=suggestions.fallback_used,
+        )
+        self._apply_suggestions(suggestions)
+        top_name = suggestions.prompts[0].name if suggestions.prompts else None
+        if top_name:
+            self.statusBar().showMessage(f"Top suggestion: {top_name}", 5000)
+
+    def _on_copy_prompt_clicked(self) -> None:
+        """Copy the currently selected prompt body to the clipboard."""
+
+        prompt = self._current_prompt()
+        if prompt is None:
+            prompts = self._model.prompts()
+            prompt = prompts[0] if prompts else None
+        if prompt is None:
+            self.statusBar().showMessage("Select a prompt to copy first.", 3000)
+            return
+        payload = prompt.context or prompt.description
+        if not payload:
+            self.statusBar().showMessage("Selected prompt does not include a body to copy.", 3000)
+            return
+        clipboard = QGuiApplication.clipboard()
+        clipboard.setText(payload)
+        self.statusBar().showMessage(f"Copied '{prompt.name}' to the clipboard.", 4000)
+        self._usage_logger.log_copy(prompt_name=prompt.name, prompt_has_body=bool(prompt.context))
+
+    def _apply_suggestions(self, suggestions: PromptManager.IntentSuggestions) -> None:
+        """Apply intent suggestions to the list view and update filters."""
+
+        self._suggestions = suggestions
+        self._current_prompts = list(suggestions.prompts)
+        filtered = self._apply_filters(self._current_prompts)
+        self._model.set_prompts(filtered)
+        self._list_view.clearSelection()
+        if filtered:
+            self._select_prompt(filtered[0].id)
+        else:
+            self._detail_widget.clear()
+        self._update_intent_hint(filtered)
 
     def _current_prompt(self) -> Optional[Prompt]:
         """Return the prompt currently selected in the list."""
@@ -327,7 +524,7 @@ class MainWindow(QMainWindow):
     def _on_add_clicked(self) -> None:
         """Open the creation dialog and persist a new prompt."""
 
-        dialog = PromptDialog(self)
+        dialog = PromptDialog(self, name_generator=self._generate_prompt_name)
         if dialog.exec() != QDialog.Accepted:
             return
         prompt = dialog.result_prompt
@@ -347,7 +544,7 @@ class MainWindow(QMainWindow):
         prompt = self._current_prompt()
         if prompt is None:
             return
-        dialog = PromptDialog(self, prompt)
+        dialog = PromptDialog(self, prompt, name_generator=self._generate_prompt_name)
         if dialog.exec() != QDialog.Accepted:
             return
         updated = dialog.result_prompt
@@ -388,6 +585,163 @@ class MainWindow(QMainWindow):
             self._show_error("Unable to delete prompt", str(exc))
             return
         self._load_prompts(self._search_input.text())
+
+    def _on_import_clicked(self) -> None:
+        """Preview catalogue diff and optionally apply updates."""
+
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select catalogue file",
+            "",
+            "JSON Files (*.json);;All Files (*)",
+        )
+        catalog_path: Optional[Path]
+        if file_path:
+            catalog_path = Path(file_path)
+        else:
+            directory = QFileDialog.getExistingDirectory(self, "Select catalogue directory", "")
+            if not directory:
+                return
+            catalog_path = Path(directory)
+
+        catalog_path = catalog_path.expanduser()
+
+        try:
+            preview = diff_prompt_catalog(self._manager, catalog_path)
+        except Exception as exc:
+            QMessageBox.warning(self, "Catalogue preview failed", str(exc))
+            return
+
+        dialog = CatalogPreviewDialog(preview, self)
+        if dialog.exec() != QDialog.Accepted or not dialog.apply_requested:
+            return
+
+        try:
+            result = import_prompt_catalog(self._manager, catalog_path)
+        except Exception as exc:
+            QMessageBox.critical(self, "Catalogue import failed", str(exc))
+            return
+
+        message = (
+            f"Catalogue applied (added {result.added}, updated {result.updated}, "
+            f"skipped {result.skipped}, errors {result.errors})"
+        )
+        if result.errors:
+            QMessageBox.warning(self, "Catalogue applied with errors", message)
+        else:
+            self.statusBar().showMessage(message, 5000)
+        self._load_prompts(self._search_input.text())
+
+    def _on_export_clicked(self) -> None:
+        """Export current prompts to JSON or YAML."""
+
+        default_path = str(Path.home() / "prompt_catalog.json")
+        file_path, selected_filter = QFileDialog.getSaveFileName(
+            self,
+            "Export prompt catalogue",
+            default_path,
+            "JSON Files (*.json);;YAML Files (*.yaml *.yml);;All Files (*)",
+        )
+        if not file_path:
+            return
+        export_path = Path(file_path)
+        lower_suffix = export_path.suffix.lower()
+        if selected_filter.startswith("YAML") or lower_suffix in {".yaml", ".yml"}:
+            fmt = "yaml"
+        else:
+            fmt = "json"
+        try:
+            resolved = export_prompt_catalog(self._manager, export_path, fmt=fmt)
+        except Exception as exc:
+            QMessageBox.critical(self, "Export failed", str(exc))
+            return
+        self.statusBar().showMessage(f"Catalogue exported to {resolved}", 5000)
+    def _on_settings_clicked(self) -> None:
+        """Open configuration dialog and apply updates."""
+
+        dialog = SettingsDialog(
+            self,
+            catalog_path=self._runtime_settings.get("catalog_path"),
+            litellm_model=self._runtime_settings.get("litellm_model"),
+            litellm_api_key=self._runtime_settings.get("litellm_api_key"),
+            litellm_api_base=self._runtime_settings.get("litellm_api_base"),
+        )
+        if dialog.exec() != QDialog.Accepted:
+            return
+        updates = dialog.result_settings()
+        self._apply_settings(updates)
+
+    def _apply_settings(self, updates: dict[str, Optional[str]]) -> None:
+        """Persist settings, refresh catalogue, and update name generator."""
+
+        catalog_path = updates.get("catalog_path")
+        normalized_catalog = (
+            str(Path(catalog_path).expanduser()) if catalog_path else None
+        )
+        self._runtime_settings["catalog_path"] = normalized_catalog
+        self._runtime_settings["litellm_model"] = updates.get("litellm_model")
+        self._runtime_settings["litellm_api_key"] = updates.get("litellm_api_key")
+        self._runtime_settings["litellm_api_base"] = updates.get("litellm_api_base")
+        persist_settings_to_config(self._runtime_settings)
+
+        if self._settings is not None:
+            self._settings.catalog_path = (
+                Path(normalized_catalog).expanduser()
+                if normalized_catalog
+                else None
+            )
+            self._settings.litellm_model = updates.get("litellm_model")
+            self._settings.litellm_api_key = updates.get("litellm_api_key")
+            self._settings.litellm_api_base = updates.get("litellm_api_base")
+
+        try:
+            self._manager.set_name_generator(
+                self._runtime_settings.get("litellm_model"),
+                self._runtime_settings.get("litellm_api_key"),
+                self._runtime_settings.get("litellm_api_base"),
+            )
+        except NameGenerationError as exc:
+            QMessageBox.warning(self, "LiteLLM configuration", str(exc))
+
+        try:
+            result = import_prompt_catalog(
+                self._manager,
+                Path(normalized_catalog).expanduser() if normalized_catalog else None,
+            )
+            self.statusBar().showMessage(
+                f"Catalogue synced (added {result.added}, updated {result.updated}, skipped {result.skipped})",
+                5000,
+            )
+        except Exception as exc:
+            QMessageBox.warning(self, "Catalogue import failed", str(exc))
+
+        self._load_prompts(self._search_input.text())
+
+    def _initial_runtime_settings(
+        self, settings: Optional[PromptManagerSettings]
+    ) -> dict[str, Optional[str]]:
+        """Load current settings snapshot from configuration."""
+
+        runtime = {
+            "catalog_path": str(settings.catalog_path)
+            if settings and settings.catalog_path is not None
+            else None,
+            "litellm_model": settings.litellm_model if settings else None,
+            "litellm_api_key": settings.litellm_api_key if settings else None,
+            "litellm_api_base": settings.litellm_api_base if settings else None,
+        }
+
+        config_path = Path("config/config.json")
+        if config_path.exists():
+            try:
+                data = json.loads(config_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                data = {}
+            else:
+                for key in ("catalog_path", "litellm_model", "litellm_api_key", "litellm_api_base"):
+                    if isinstance(data.get(key), str):
+                        runtime[key] = data[key]
+        return runtime
 
     def _on_selection_changed(self, *_: object) -> None:
         """Update the detail panel to reflect the new selection."""

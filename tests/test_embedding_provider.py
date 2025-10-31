@@ -8,7 +8,14 @@ import uuid
 
 import pytest
 
-from core.embedding import EmbeddingGenerationError, EmbeddingProvider, EmbeddingSyncWorker
+from core.embedding import (
+    EmbeddingGenerationError,
+    EmbeddingProvider,
+    EmbeddingSyncWorker,
+    create_embedding_function,
+    LiteLLMEmbeddingFunction,
+    SentenceTransformersEmbeddingFunction,
+)
 from models.prompt_model import Prompt
 
 
@@ -123,3 +130,64 @@ def test_embedding_sync_worker_stops_after_max_attempts() -> None:
 
     assert calls["count"] == 2
     assert not completion.is_set()
+
+
+def test_create_embedding_function_returns_none_for_default() -> None:
+    assert create_embedding_function("deterministic", model=None, api_key=None, api_base=None) is None
+
+
+def test_create_embedding_function_rejects_unknown_backend() -> None:
+    with pytest.raises(ValueError):
+        create_embedding_function("unknown-backend", model=None, api_key=None, api_base=None)
+
+
+def test_litellm_embedding_function_uses_adapter(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    def _fake_get_embedding():
+        class _FakeException(Exception):
+            pass
+
+        def _fake_embedding(**kwargs):
+            captured["request"] = kwargs
+            return {"data": [{"embedding": [0.1, 0.2, 0.3]}]}
+
+        return _fake_embedding, _FakeException
+
+    monkeypatch.setattr("core.embedding.get_embedding", _fake_get_embedding)
+    func = create_embedding_function(
+        "litellm",
+        model="text-embedding-3-small",
+        api_key="secret",
+        api_base="https://api.invalid",
+    )
+    assert isinstance(func, LiteLLMEmbeddingFunction)
+    vectors = func(["sample text"])
+    assert vectors == [[0.1, 0.2, 0.3]]
+    assert captured["request"]["api_key"] == "secret"
+    assert captured["request"]["api_base"] == "https://api.invalid"
+    assert captured["request"]["model"] == "text-embedding-3-small"
+
+
+def test_sentence_transformers_embedding_function_encodes(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _FakeModel:
+        def encode(self, inputs, convert_to_numpy: bool, normalize_embeddings: bool):
+            assert convert_to_numpy is True
+            assert normalize_embeddings is False
+            return [[float(len(text))] for text in inputs]
+
+    monkeypatch.setattr(
+        SentenceTransformersEmbeddingFunction,
+        "_load_model",
+        lambda self: _FakeModel(),
+        raising=False,
+    )
+    func = create_embedding_function(
+        "sentence-transformers",
+        model="all-MiniLM-L6-v2",
+        api_key=None,
+        api_base=None,
+    )
+    assert isinstance(func, SentenceTransformersEmbeddingFunction)
+    vectors = func(["hello", "world!"])
+    assert vectors == [[5.0], [6.0]]
