@@ -22,6 +22,7 @@ from core.prompt_manager import (
     RepositoryError,
     RepositoryNotFoundError,
 )
+from core.name_generation import DescriptionGenerationError
 from models.prompt_model import Prompt
 
 
@@ -159,6 +160,8 @@ def _build_manager(
     repository: Optional[_RecordingRepository] = None,
     collection: Optional[_StubCollection] = None,
     redis_client: Optional[_RedisStub] = None,
+    name_generator: Optional[Any] = None,
+    description_generator: Optional[Any] = None,
 ) -> PromptManager:
     repo = repository or _RecordingRepository()
     coll = collection or _StubCollection()
@@ -170,6 +173,8 @@ def _build_manager(
         chroma_client=client,
         redis_client=redis_client,
         intent_classifier=IntentClassifier(),
+        name_generator=name_generator,
+        description_generator=description_generator,
     )
 
 
@@ -470,6 +475,28 @@ def test_generate_prompt_name_requires_configured_generator() -> None:
     manager = _build_manager()
     with pytest.raises(NameGenerationError):
         manager.generate_prompt_name("Generate a catchy name from this context.")
+
+
+def test_generate_prompt_description_requires_configured_generator() -> None:
+    manager = _build_manager()
+    with pytest.raises(DescriptionGenerationError):
+        manager.generate_prompt_description("Provide summary for this context.")
+
+
+def test_generate_prompt_description_uses_generator() -> None:
+    class _DescriptionGenerator:
+        def __init__(self) -> None:
+            self.calls: list[str] = []
+
+        def generate(self, context: str) -> str:
+            self.calls.append(context)
+            return "Auto generated description"
+
+    generator = _DescriptionGenerator()
+    manager = _build_manager(description_generator=generator)
+    summary = manager.generate_prompt_description("My prompt body")
+    assert summary == "Auto generated description"
+    assert generator.calls == ["My prompt body"]
 
 
 def test_create_prompt_raises_when_repository_fails() -> None:

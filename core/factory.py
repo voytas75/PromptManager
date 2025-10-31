@@ -15,7 +15,11 @@ from config import PromptManagerSettings
 from .embedding import EmbeddingProvider, EmbeddingSyncWorker, create_embedding_function
 from .intent_classifier import IntentClassifier
 from .prompt_manager import NameGenerationError, PromptCacheError, PromptManager
-from .name_generation import LiteLLMNameGenerator, NameGenerationError
+from .name_generation import (
+    LiteLLMDescriptionGenerator,
+    LiteLLMNameGenerator,
+    NameGenerationError,
+)
 from .repository import PromptRepository
 
 try:  # pragma: no cover - redis optional dependency
@@ -87,9 +91,15 @@ def build_prompt_manager(
         embedding_provider,
     )
     name_generator = None
+    description_generator = None
     if settings.litellm_model:
         try:
             name_generator = LiteLLMNameGenerator(
+                model=settings.litellm_model,
+                api_key=settings.litellm_api_key,
+                api_base=settings.litellm_api_base,
+            )
+            description_generator = LiteLLMDescriptionGenerator(
                 model=settings.litellm_model,
                 api_key=settings.litellm_api_key,
                 api_base=settings.litellm_api_base,
@@ -112,6 +122,7 @@ def build_prompt_manager(
         embedding_worker=embedding_worker,
         enable_background_sync=enable_background_sync,
         name_generator=name_generator,
+        description_generator=description_generator,
         intent_classifier=intent_classifier,
     )
     return manager

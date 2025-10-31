@@ -29,7 +29,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from core import CatalogDiff, CatalogDiffEntry, NameGenerationError
+from core import (
+    CatalogDiff,
+    CatalogDiffEntry,
+    NameGenerationError,
+    DescriptionGenerationError,
+)
 from models.prompt_model import Prompt
 
 
@@ -54,6 +59,21 @@ def fallback_suggest_prompt_name(context: str, *, max_words: int = 5) -> str:
     return name
 
 
+def fallback_generate_description(context: str, *, max_length: int = 240) -> str:
+    """Create a lightweight summary from the prompt body when LLMs are unavailable."""
+
+    stripped = " ".join(context.split())
+    if not stripped:
+        return ""
+    if len(stripped) <= max_length:
+        return stripped
+    trimmed = stripped[:max_length]
+    last_space = trimmed.rfind(" ")
+    if last_space > 0:
+        trimmed = trimmed[:last_space]
+    return trimmed.rstrip(".") + "…"
+
+
 class PromptDialog(QDialog):
     """Modal dialog used for creating or editing prompt records."""
 
@@ -62,11 +82,13 @@ class PromptDialog(QDialog):
         parent=None,
         prompt: Optional[Prompt] = None,
         name_generator: Optional[Callable[[str], str]] = None,
+        description_generator: Optional[Callable[[str], str]] = None,
     ) -> None:
         super().__init__(parent)
         self._source_prompt = prompt
         self._result_prompt: Optional[Prompt] = None
         self._name_generator = name_generator
+        self._description_generator = description_generator
         self.setWindowTitle("Create Prompt" if prompt is None else "Edit Prompt")
         self._build_ui()
         if prompt is not None:
@@ -180,16 +202,54 @@ class PromptDialog(QDialog):
         if not context:
             return ""
         if self._name_generator is None:
-            raise NameGenerationError(
-                "Prompt name generator is not configured. Set LiteLLM settings in the application preferences."
-            )
-        return self._name_generator(context)
+            return fallback_suggest_prompt_name(context)
+        try:
+            return self._name_generator(context)
+        except NameGenerationError as exc:
+            message = str(exc)
+            if "not configured" in message:
+                logger.info("LiteLLM disabled; using fallback name suggestion")
+            else:
+                logger.warning("Name generation failed; using fallback suggestion", exc_info=exc)
+            return fallback_suggest_prompt_name(context)
+
+    def _generate_description(self, context: str) -> str:
+        """Generate description using LiteLLM when configured."""
+
+        context = context.strip()
+        if not context:
+            return ""
+        if self._description_generator is None:
+            return fallback_generate_description(context)
+        try:
+            return self._description_generator(context)
+        except DescriptionGenerationError as exc:
+            message = str(exc)
+            if "not configured" in message:
+                logger.info("LiteLLM disabled; using fallback description summary")
+            else:
+                logger.warning("Description generation failed; using fallback summary", exc_info=exc)
+            return fallback_generate_description(context)
 
     def _build_prompt(self) -> Optional[Prompt]:
         """Construct a Prompt object from the dialog inputs."""
 
+        context_text = self._context_input.toPlainText().strip()
         name = self._name_input.text().strip()
         description = self._description_input.toPlainText().strip()
+
+        if not name and context_text:
+            generated_name = self._generate_name(context_text)
+            if generated_name:
+                name = generated_name
+                self._name_input.setText(generated_name)
+
+        if not description and context_text:
+            generated_description = self._generate_description(context_text)
+            if generated_description:
+                description = generated_description
+                self._description_input.setPlainText(generated_description)
+
         category = self._category_input.text().strip()
         if not name or not description:
             QMessageBox.warning(self, "Missing fields", "Name and description are required.")
@@ -197,7 +257,7 @@ class PromptDialog(QDialog):
 
         language = self._language_input.text().strip() or "en"
         tags = [tag.strip() for tag in self._tags_input.text().split(",") if tag.strip()]
-        context = self._context_input.toPlainText().strip() or None
+        context = context_text or None
         example_input = self._example_input.toPlainText().strip() or None
         example_output = self._example_output.toPlainText().strip() or None
 

@@ -423,6 +423,13 @@ class MainWindow(QMainWindow):
             return ""
         return self._manager.generate_prompt_name(context)
 
+    def _generate_prompt_description(self, context: str) -> str:
+        """Delegate description generation to PromptManager."""
+
+        if not context.strip():
+            return ""
+        return self._manager.generate_prompt_description(context)
+
     def _on_detect_intent_clicked(self) -> None:
         """Run intent detection on the free-form query input."""
 
@@ -524,7 +531,11 @@ class MainWindow(QMainWindow):
     def _on_add_clicked(self) -> None:
         """Open the creation dialog and persist a new prompt."""
 
-        dialog = PromptDialog(self, name_generator=self._generate_prompt_name)
+        dialog = PromptDialog(
+            self,
+            name_generator=self._generate_prompt_name,
+            description_generator=self._generate_prompt_description,
+        )
         if dialog.exec() != QDialog.Accepted:
             return
         prompt = dialog.result_prompt
@@ -544,7 +555,12 @@ class MainWindow(QMainWindow):
         prompt = self._current_prompt()
         if prompt is None:
             return
-        dialog = PromptDialog(self, prompt, name_generator=self._generate_prompt_name)
+        dialog = PromptDialog(
+            self,
+            prompt,
+            name_generator=self._generate_prompt_name,
+            description_generator=self._generate_prompt_description,
+        )
         if dialog.exec() != QDialog.Accepted:
             return
         updated = dialog.result_prompt

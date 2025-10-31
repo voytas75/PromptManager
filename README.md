@@ -113,6 +113,7 @@ Further modules (session history, execution pipeline) will be introduced in subs
 - The **Prompt Body** field is where you paste the actual prompt text that will be sent to the model—it's displayed prominently in the detail pane.
 - Use the **Settings** button to update the catalogue path or LiteLLM credentials at runtime; changes persist to `config/config.json` and the catalogue resyncs immediately.
 - Intent detection appears beneath the workspace and search bar once you start typing or analysing text, highlighting the inferred category (Debugging, Refactoring, Documentation, etc.), language hints, and the top-matching prompts.
+- When LiteLLM is configured, leaving the **Name** and **Description** fields blank will automatically populate them from the prompt body, speeding up catalogue entry for new prompts.
 - Import or export catalogues directly from the toolbar: **Import** previews a diff and applies updates, while **Export** writes the current state to JSON or YAML.
 
 ## CLI Catalogue Utilities

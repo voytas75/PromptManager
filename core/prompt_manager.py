@@ -61,7 +61,12 @@ from models.prompt_model import Prompt
 
 from .embedding import EmbeddingGenerationError, EmbeddingProvider, EmbeddingSyncWorker
 from .intent_classifier import IntentClassifier, IntentPrediction, rank_by_hints
-from .name_generation import LiteLLMNameGenerator, NameGenerationError
+from .name_generation import (
+    LiteLLMDescriptionGenerator,
+    LiteLLMNameGenerator,
+    DescriptionGenerationError,
+    NameGenerationError,
+)
 from .repository import PromptRepository, RepositoryError, RepositoryNotFoundError
 
 logger = logging.getLogger(__name__)
@@ -100,6 +105,7 @@ class PromptManager:
         embedding_worker: Optional[EmbeddingSyncWorker] = None,
         enable_background_sync: bool = True,
         name_generator: Optional[LiteLLMNameGenerator] = None,
+        description_generator: Optional[LiteLLMDescriptionGenerator] = None,
         intent_classifier: Optional[IntentClassifier] = None,
     ) -> None:
         """Initialise the manager with data backends.
@@ -171,6 +177,7 @@ class PromptManager:
         else:
             self._embedding_worker = embedding_worker or _NullEmbeddingWorker()
         self._name_generator = name_generator
+        self._description_generator = description_generator
         self._intent_classifier = intent_classifier
 
     @dataclass(slots=True)
@@ -208,6 +215,18 @@ class PromptManager:
         except Exception as exc:
             raise NameGenerationError(str(exc)) from exc
 
+    def generate_prompt_description(self, context: str) -> str:
+        """Return a prompt description using the configured LiteLLM generator."""
+
+        if self._description_generator is None:
+            raise DescriptionGenerationError(
+                "LiteLLM description generator is not configured. Set PROMPT_MANAGER_LITELLM_MODEL."
+            )
+        try:
+            return self._description_generator.generate(context)
+        except Exception as exc:
+            raise DescriptionGenerationError(str(exc)) from exc
+
     def set_name_generator(
         self,
         model: Optional[str],
@@ -217,9 +236,15 @@ class PromptManager:
         """Configure the LiteLLM name generator at runtime."""
         if not model:
             self._name_generator = None
+            self._description_generator = None
             return
         try:
             self._name_generator = LiteLLMNameGenerator(
+                model=model,
+                api_key=api_key,
+                api_base=api_base,
+            )
+            self._description_generator = LiteLLMDescriptionGenerator(
                 model=model,
                 api_key=api_key,
                 api_base=api_base,

@@ -75,6 +75,7 @@ def test_build_prompt_manager_forwards_dependencies(monkeypatch: pytest.MonkeyPa
             embedding_worker: object = None,
             enable_background_sync: bool = True,
             name_generator: object = None,
+            description_generator: object = None,
             intent_classifier: object = None,
         ) -> None:
             self.kwargs = {
@@ -89,6 +90,7 @@ def test_build_prompt_manager_forwards_dependencies(monkeypatch: pytest.MonkeyPa
                 "embedding_worker": embedding_worker,
                 "enable_background_sync": enable_background_sync,
                 "name_generator": name_generator,
+                "description_generator": description_generator,
                 "intent_classifier": intent_classifier,
             }
 
@@ -111,6 +113,7 @@ def test_build_prompt_manager_forwards_dependencies(monkeypatch: pytest.MonkeyPa
     assert manager.kwargs["repository"] is sentinel_repo
     assert manager.kwargs["chroma_client"] == "chroma"
     assert manager.kwargs["embedding_function"] == "embed"
+    assert manager.kwargs["description_generator"] is None
 
 
 def test_build_prompt_manager_uses_passthrough_redis_client(

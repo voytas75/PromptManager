@@ -32,7 +32,7 @@ from .prompt_manager import (
     PromptNotFoundError,
     PromptStorageError,
 )
-from .name_generation import NameGenerationError
+from .name_generation import NameGenerationError, DescriptionGenerationError, LiteLLMDescriptionGenerator
 from .repository import PromptRepository, RepositoryError, RepositoryNotFoundError
 from .embedding import create_embedding_function
 
@@ -56,9 +56,11 @@ __all__ = [
     "CatalogChangeType",
     "CatalogChangePlan",
     "NameGenerationError",
+    "DescriptionGenerationError",
     "IntentClassifier",
     "IntentClassifierError",
     "IntentPrediction",
     "IntentLabel",
     "create_embedding_function",
+    "LiteLLMDescriptionGenerator",
 ]

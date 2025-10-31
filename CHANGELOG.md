@@ -10,6 +10,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 - Added `python -m main suggest` CLI command to verify semantic retrieval results from the configured embedding backend.
 - Logged intent workspace interactions to `data/logs/intent_usage.jsonl` for lightweight UX analytics.
 - Added `python -m main usage-report` command to summarise logged workspace activity for feedback review.
+- Auto-generate prompt names and descriptions via LiteLLM when the creation dialog fields are left blank.
 
 ## [0.6.0] - 2025-11-06
 
