@@ -1,5 +1,6 @@
 """Prompt data model definitions.
 
+Updates: v0.3.0 - 2025-11-09 - Add rating aggregates and execution rating support.
 Updates: v0.2.0 - 2025-11-08 - Add prompt execution records for history logging.
 Updates: v0.1.1 - 2025-11-01 - Filtered null metadata fields for Chroma compatibility.
 Updates: v0.1.0 - 2025-10-30 - Initial Prompt schema with serialization helpers.
@@ -118,6 +119,8 @@ class Prompt:
     author: Optional[str] = None
     quality_score: Optional[float] = None
     usage_count: int = 0
+    rating_count: int = 0
+    rating_sum: float = 0.0
     related_prompts: List[str] = field(default_factory=list)
     created_at: datetime = field(default_factory=_utc_now)
     modified_by: Optional[str] = None
@@ -159,6 +162,8 @@ class Prompt:
             "author": self.author,
             "quality_score": self.quality_score,
             "usage_count": self.usage_count,
+            "rating_count": self.rating_count,
+            "rating_sum": self.rating_sum,
             "related_prompts": json.dumps(self.related_prompts, ensure_ascii=False),
             "created_at": self.created_at.isoformat(),
             "last_modified": self.last_modified.isoformat(),
@@ -191,6 +196,8 @@ class Prompt:
             "author": self.author,
             "quality_score": self.quality_score,
             "usage_count": self.usage_count,
+            "rating_count": self.rating_count,
+            "rating_sum": self.rating_sum,
             "related_prompts": self.related_prompts,
             "created_at": self.created_at.isoformat(),
             "modified_by": self.modified_by,
@@ -225,6 +232,8 @@ class Prompt:
                 float(data["quality_score"]) if data.get("quality_score") is not None else None
             ),
             usage_count=int(data.get("usage_count") or 0),
+            rating_count=int(data.get("rating_count") or 0),
+            rating_sum=float(data.get("rating_sum") or 0.0),
             related_prompts=_serialize_list(data.get("related_prompts")),
             created_at=_ensure_datetime(data.get("created_at")),
             modified_by=data.get("modified_by"),
@@ -257,6 +266,8 @@ class Prompt:
             "author": metadata.get("author"),
             "quality_score": metadata.get("quality_score"),
             "usage_count": metadata.get("usage_count"),
+            "rating_count": metadata.get("rating_count"),
+            "rating_sum": metadata.get("rating_sum"),
             "related_prompts": _deserialize_list(metadata.get("related_prompts")),
             "created_at": metadata.get("created_at"),
             "modified_by": metadata.get("modified_by"),
@@ -285,6 +296,7 @@ class PromptExecution:
     duration_ms: Optional[int] = None
     executed_at: datetime = field(default_factory=_utc_now)
     input_hash: str = ""
+    rating: Optional[float] = None
     metadata: Optional[MutableMapping[str, Any]] = None
 
     def __post_init__(self) -> None:
@@ -303,6 +315,7 @@ class PromptExecution:
             "duration_ms": self.duration_ms,
             "executed_at": self.executed_at.isoformat(),
             "input_hash": self.input_hash,
+            "rating": self.rating,
             "metadata": self.metadata,
         }
 
@@ -328,6 +341,11 @@ class PromptExecution:
             ),
             executed_at=_ensure_datetime(data.get("executed_at")),
             input_hash=str(data.get("input_hash") or ""),
+            rating=(
+                float(data["rating"])
+                if data.get("rating") not in (None, "")
+                else None
+            ),
             metadata=_deserialize_metadata(data.get("metadata")),
         )
 

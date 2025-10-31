@@ -166,11 +166,17 @@ def test_save_execution_result_records_manual_entry(tmp_path: Path) -> None:
         duration_ms=outcome.result.duration_ms,
         usage=outcome.result.usage,
         metadata={"note": "Reviewed manually"},
+        rating=8,
     )
     assert manual.metadata and manual.metadata.get("note") == "Reviewed manually"
     assert manual.metadata.get("manual") is True
+    assert manual.rating == 8
     entries = manager.list_recent_executions()
     assert any(entry.id == manual.id for entry in entries)
+    refreshed_prompt = manager.get_prompt(prompt.id)
+    assert refreshed_prompt.rating_count == 1
+    assert refreshed_prompt.rating_sum == pytest.approx(8.0)
+    assert refreshed_prompt.quality_score == pytest.approx(8.0)
     manager.close()
 
 

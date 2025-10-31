@@ -1,5 +1,6 @@
 """Prompt execution history tracking utilities.
 
+Updates: v0.2.0 - 2025-11-09 - Capture optional ratings alongside execution logs.
 Updates: v0.1.0 - 2025-11-08 - Introduce HistoryTracker for execution logs.
 """
 
@@ -48,6 +49,7 @@ class HistoryTracker:
         *,
         duration_ms: Optional[int] = None,
         metadata: Optional[Mapping[str, object]] = None,
+        rating: Optional[float] = None,
     ) -> PromptExecution:
         """Persist a successful execution."""
         execution = self._build_execution(
@@ -57,6 +59,7 @@ class HistoryTracker:
             status=ExecutionStatus.SUCCESS,
             duration_ms=duration_ms,
             metadata=metadata,
+            rating=rating,
         )
         return self._store(execution)
 
@@ -78,6 +81,7 @@ class HistoryTracker:
             error_message=error_message,
             duration_ms=duration_ms,
             metadata=metadata,
+            rating=None,
         )
         return self._store(execution)
 
@@ -143,6 +147,7 @@ class HistoryTracker:
         metadata: Optional[Mapping[str, object]],
         error_message: Optional[str] = None,
         executed_at: Optional[datetime] = None,
+        rating: Optional[float] = None,
     ) -> PromptExecution:
         """Create a PromptExecution dataclass instance with sanitised payloads."""
 
@@ -157,6 +162,7 @@ class HistoryTracker:
             duration_ms=duration_ms,
             executed_at=executed_at or datetime.now(timezone.utc),
             metadata=execution_metadata,
+            rating=rating,
         )
 
     def _store(self, execution: PromptExecution) -> PromptExecution:

@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.5.0 - 2025-11-09 - Capture execution ratings alongside optional notes.
 Updates: v0.4.0 - 2025-11-08 - Add execution Save Result dialog with optional notes.
 Updates: v0.3.0 - 2025-11-06 - Add catalogue preview dialog with diff summary output.
 Updates: v0.2.0 - 2025-11-05 - Add prompt name suggestion based on context.
@@ -28,6 +29,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QVBoxLayout,
     QWidget,
+    QComboBox,
 )
 
 from core import (
@@ -342,10 +344,16 @@ class SaveResultDialog(QDialog):
         default_text: str = "",
         max_chars: int = 400,
         button_text: str = "Save",
+        enable_rating: bool = True,
+        initial_rating: Optional[float] = None,
     ) -> None:
         super().__init__(parent)
         self._max_chars = max_chars
         self._summary = ""
+        self._rating: Optional[int] = (
+            int(initial_rating) if initial_rating is not None else None
+        )
+        self._enable_rating = enable_rating
         self.setWindowTitle(f"{button_text} Result — {prompt_name}")
         self._build_ui(default_text, button_text)
 
@@ -354,6 +362,12 @@ class SaveResultDialog(QDialog):
         """Return the trimmed note content."""
 
         return self._summary
+
+    @property
+    def rating(self) -> Optional[int]:
+        """Return the selected rating, if any."""
+
+        return self._rating
 
     def _build_ui(self, default_text: str, button_text: str) -> None:
         layout = QVBoxLayout(self)
@@ -374,6 +388,23 @@ class SaveResultDialog(QDialog):
             self._note_input.setPlainText(snippet)
         layout.addWidget(self._note_input)
 
+        if self._enable_rating:
+            rating_layout = QHBoxLayout()
+            rating_label = QLabel("Rating (1-10):", self)
+            self._rating_input = QComboBox(self)
+            self._rating_input.addItem("No rating", None)
+            for value in range(1, 11):
+                self._rating_input.addItem(str(value), value)
+            if self._rating is not None:
+                index = self._rating_input.findData(self._rating)
+                if index >= 0:
+                    self._rating_input.setCurrentIndex(index)
+            rating_layout.addWidget(rating_label)
+            rating_layout.addWidget(self._rating_input)
+            layout.addLayout(rating_layout)
+        else:
+            self._rating_input = None
+
         buttons = QDialogButtonBox(self)
         self._save_button = buttons.addButton(button_text, QDialogButtonBox.AcceptRole)
         buttons.addButton(QDialogButtonBox.Cancel)
@@ -386,6 +417,9 @@ class SaveResultDialog(QDialog):
         if summary and len(summary) > self._max_chars:
             summary = summary[: self._max_chars].rstrip()
         self._summary = summary
+        if self._enable_rating and self._rating_input is not None:
+            selected = self._rating_input.currentData()
+            self._rating = int(selected) if selected is not None else None
         self.accept()
 
 

@@ -70,6 +70,32 @@ def _install_qt_stubs() -> None:
     qt_widgets.QWidget = _Widget  # type: ignore[attr-defined]
     qt_widgets.QApplication = _Widget  # type: ignore[attr-defined]
     qt_widgets.QLabel = _Widget  # type: ignore[attr-defined]
+    class _ComboBox(_Widget):
+        def __init__(self, *_: object, **__: object) -> None:
+            self._items: list[tuple[str, object]] = []
+            self._current_index = 0
+
+        def addItem(self, text: str, data: object = None) -> None:
+            self._items.append((text, data))
+            if len(self._items) == 1:
+                self._current_index = 0
+
+        def currentData(self) -> object:
+            if not self._items:
+                return None
+            return self._items[self._current_index][1]
+
+        def setCurrentIndex(self, index: int) -> None:
+            if 0 <= index < len(self._items):
+                self._current_index = index
+
+        def findData(self, target: object) -> int:
+            for idx, (_, data) in enumerate(self._items):
+                if data == target:
+                    return idx
+            return -1
+
+    qt_widgets.QComboBox = _ComboBox  # type: ignore[attr-defined]
 
     qt_core = types.ModuleType("PySide6.QtCore")
     class _Qt:

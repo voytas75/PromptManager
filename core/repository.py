@@ -1,5 +1,6 @@
 """SQLite-backed repository for persistent prompt storage.
 
+Updates: v0.3.0 - 2025-11-09 - Add rating aggregation columns and execution rating support.
 Updates: v0.2.0 - 2025-11-08 - Add prompt execution history persistence APIs.
 Updates: v0.1.0 - 2025-10-31 - Introduce PromptRepository syncing Prompt dataclass with SQLite.
 """
@@ -90,6 +91,8 @@ class PromptRepository:
         "author",
         "quality_score",
         "usage_count",
+        "rating_count",
+        "rating_sum",
         "related_prompts",
         "created_at",
         "modified_by",
@@ -113,6 +116,7 @@ class PromptRepository:
         "duration_ms",
         "executed_at",
         "input_hash",
+        "rating",
         "metadata",
     )
 
@@ -359,6 +363,8 @@ class PromptRepository:
             "author": prompt.author,
             "quality_score": prompt.quality_score,
             "usage_count": prompt.usage_count,
+            "rating_count": prompt.rating_count,
+            "rating_sum": prompt.rating_sum,
             "related_prompts": _json_dumps(prompt.related_prompts),
             "created_at": prompt.created_at.isoformat(),
             "modified_by": prompt.modified_by,
@@ -389,6 +395,8 @@ class PromptRepository:
             "author": row["author"],
             "quality_score": row["quality_score"],
             "usage_count": row["usage_count"],
+            "rating_count": row["rating_count"],
+            "rating_sum": row["rating_sum"],
             "related_prompts": _json_loads_list(row["related_prompts"]),
             "created_at": row["created_at"],
             "modified_by": row["modified_by"],
@@ -421,6 +429,7 @@ class PromptRepository:
             "duration_ms": row["duration_ms"],
             "executed_at": row["executed_at"],
             "input_hash": row["input_hash"],
+            "rating": row["rating"],
             "metadata": row["metadata"],
         }
         return PromptExecution.from_record(payload)
@@ -476,6 +485,7 @@ class PromptRepository:
                 duration_ms INTEGER,
                 executed_at TEXT NOT NULL,
                 input_hash TEXT NOT NULL,
+                rating REAL,
                 metadata TEXT,
                 FOREIGN KEY(prompt_id) REFERENCES prompts(id) ON DELETE CASCADE
             );
@@ -489,6 +499,18 @@ class PromptRepository:
             "CREATE INDEX IF NOT EXISTS idx_prompt_executions_executed_at "
             "ON prompt_executions(executed_at);"
         )
+        prompt_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(prompts);")
+        }
+        if "rating_count" not in prompt_columns:
+            conn.execute("ALTER TABLE prompts ADD COLUMN rating_count INTEGER NOT NULL DEFAULT 0;")
+        if "rating_sum" not in prompt_columns:
+            conn.execute("ALTER TABLE prompts ADD COLUMN rating_sum REAL NOT NULL DEFAULT 0.0;")
+        execution_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(prompt_executions);")
+        }
+        if "rating" not in execution_columns:
+            conn.execute("ALTER TABLE prompt_executions ADD COLUMN rating REAL;")
 
 
 __all__ = ["PromptRepository", "RepositoryError", "RepositoryNotFoundError"]

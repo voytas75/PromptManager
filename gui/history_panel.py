@@ -1,5 +1,6 @@
 """Execution history panel for Prompt Manager.
 
+Updates: v0.2.0 - 2025-11-09 - Surface execution ratings in tables, details, and exports.
 Updates: v0.1.0 - 2025-11-08 - Provide filterable, editable execution history workspace.
 """
 
@@ -110,9 +111,9 @@ class HistoryPanel(QWidget):
         layout.addLayout(filter_layout)
 
         self._table = QTableWidget(self)
-        self._table.setColumnCount(6)
+        self._table.setColumnCount(7)
         self._table.setHorizontalHeaderLabels(
-            ["Prompt", "Status", "Duration (ms)", "Executed At", "Error", "Note"]
+            ["Prompt", "Status", "Rating", "Duration (ms)", "Executed At", "Error", "Note"]
         )
         self._table.setSelectionBehavior(QTableWidget.SelectRows)
         self._table.setSelectionMode(QTableWidget.SingleSelection)
@@ -205,9 +206,13 @@ class HistoryPanel(QWidget):
                 note_preview = str(execution.metadata.get("note") or "")
                 if len(note_preview) > 80:
                     note_preview = note_preview[:77] + "..."
+            rating_text = (
+                f"{execution.rating:.1f}" if execution.rating is not None else "-"
+            )
             values = [
                 row.prompt_name,
                 execution.status.value.title(),
+                rating_text,
                 duration_text,
                 executed_at_display,
                 error_preview[:120],
@@ -239,6 +244,8 @@ class HistoryPanel(QWidget):
         ]
         if execution.duration_ms is not None:
             detail_lines.append(f"Duration: {execution.duration_ms} ms")
+        if execution.rating is not None:
+            detail_lines.append(f"Rating: {execution.rating:.1f}/10")
         note_text = ""
         if execution.metadata:
             note_text = str(execution.metadata.get("note") or "")
@@ -290,6 +297,7 @@ class HistoryPanel(QWidget):
             prompt_name=entry.prompt_name,
             default_text=current_note,
             button_text="Update",
+            enable_rating=False,
         )
         if dialog.exec() != QDialog.Accepted:
             return
@@ -301,7 +309,7 @@ class HistoryPanel(QWidget):
             return
         self._rows[row_index] = _ExecutionRow(updated_execution, entry.prompt_name)
         note_preview = note if len(note) <= 80 else note[:77] + "..."
-        self._table.item(row_index, 5).setText(note_preview)
+        self._table.item(row_index, 6).setText(note_preview)
         self._on_selection_changed()
         if self._note_callback:
             self._note_callback(entry.execution.id, note)
@@ -322,7 +330,17 @@ class HistoryPanel(QWidget):
             with open(path, "w", encoding="utf-8", newline="") as handle:
                 writer = csv.writer(handle)
                 writer.writerow(
-                    ["prompt", "status", "duration_ms", "executed_at", "error", "note", "request", "response"]
+                    [
+                        "prompt",
+                        "status",
+                        "rating",
+                        "duration_ms",
+                        "executed_at",
+                        "error",
+                        "note",
+                        "request",
+                        "response",
+                    ]
                 )
                 for row in self._rows:
                     execution = row.execution
@@ -330,14 +348,15 @@ class HistoryPanel(QWidget):
                     if execution.metadata:
                         note = str(execution.metadata.get("note") or "")
                     writer.writerow(
-                        [
-                            row.prompt_name,
-                            execution.status.value,
-                            execution.duration_ms if execution.duration_ms is not None else "",
-                            execution.executed_at.isoformat(),
-                            execution.error_message or "",
-                            note,
-                            execution.request_text,
+                            [
+                                row.prompt_name,
+                                execution.status.value,
+                                execution.rating if execution.rating is not None else "",
+                                execution.duration_ms if execution.duration_ms is not None else "",
+                                execution.executed_at.isoformat(),
+                                execution.error_message or "",
+                                note,
+                                execution.request_text,
                             execution.response_text,
                         ]
                     )

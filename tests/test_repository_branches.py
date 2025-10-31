@@ -90,6 +90,7 @@ def test_repository_execution_roundtrip(tmp_path: Path) -> None:
         response_text="Looks good!",
         status=ExecutionStatus.SUCCESS,
         metadata={"usage": {"prompt_tokens": 10}},
+        rating=6.0,
     )
 
     repo.add_execution(execution)
@@ -98,9 +99,11 @@ def test_repository_execution_roundtrip(tmp_path: Path) -> None:
     assert loaded.response_text == execution.response_text
     assert loaded.request_text.startswith("print")
     assert loaded.metadata["usage"]["prompt_tokens"] == 10
+    assert loaded.rating == pytest.approx(6.0)
 
     by_prompt = repo.list_executions_for_prompt(prompt.id)
     assert [entry.id for entry in by_prompt] == [execution.id]
+    assert by_prompt[0].rating == pytest.approx(6.0)
 
     recent = repo.list_executions(limit=1)
     assert recent[0].id == execution.id
@@ -120,6 +123,7 @@ def test_repository_filtered_execution_query(tmp_path: Path) -> None:
         response_text="done",
         status=ExecutionStatus.SUCCESS,
         metadata={"note": "important"},
+        rating=9,
     )
     failed_execution = PromptExecution(
         id=uuid.uuid4(),

@@ -106,6 +106,7 @@ Further modules (session history, execution pipeline) will be introduced in subs
 
 - The window exposes a searchable prompt list (left), detail view (right), and toolbar actions for create/edit/delete/refresh backed by the shared `PromptManager` service.
 - The prompt detail pane is scrollable so long prompt bodies stay readable and the window remains stable when maximised on Wayland.
+- When saving execution results you can apply a 1–10 rating; the average updates the prompt's quality score so filters and recommendations stay aligned with real-world usage.
 
 - Use the workspace beneath the toolbar to paste text, run **Detect Need**, request **Suggest Prompt**, and copy the top-ranked prompt directly to the clipboard.
 

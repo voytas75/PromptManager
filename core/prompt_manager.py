@@ -1,5 +1,6 @@
 """High-level CRUD manager for prompt records backed by SQLite, ChromaDB, and Redis.
 
+Updates: v0.8.0 - 2025-11-09 - Capture prompt ratings from executions and update quality scores.
 Updates: v0.7.0 - 2025-11-08 - Integrate prompt execution pipeline with history logging.
 Updates: v0.6.0 - 2025-11-06 - Add intent-aware search suggestions and ranking helpers.
 Updates: v0.5.0 - 2025-11-05 - Integrate LiteLLM name generator and catalogue seeding.
@@ -12,13 +13,15 @@ Updates: v0.1.0 - 2025-10-30 - Initial PromptManager with CRUD and search suppor
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Union, cast
+
 import json
 import logging
 import os
 import uuid
-from pathlib import Path
-from dataclasses import dataclass
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Union, cast
 
 import chromadb
 from chromadb.api import ClientAPI
@@ -325,6 +328,7 @@ class PromptManager:
         duration_ms: Optional[int] = None,
         usage: Optional[Mapping[str, Any]] = None,
         metadata: Optional[Mapping[str, Any]] = None,
+        rating: Optional[float] = None,
     ) -> PromptExecution:
         """Persist a manual prompt execution entry (e.g., from GUI Save Result)."""
 
@@ -338,16 +342,22 @@ class PromptManager:
             payload_metadata.update(dict(metadata))
         if usage:
             payload_metadata.setdefault("usage", dict(usage))
+        if rating is not None:
+            payload_metadata["rating"] = rating
         try:
-            return tracker.record_success(
+            execution = tracker.record_success(
                 prompt_id=prompt_id,
                 request_text=request_text,
                 response_text=response_text,
                 duration_ms=duration_ms,
                 metadata=payload_metadata,
+                rating=rating,
             )
         except HistoryTrackerError as exc:
             raise PromptHistoryError(str(exc)) from exc
+        if rating is not None:
+            self._apply_rating(prompt_id, rating)
+        return execution
 
     def update_execution_note(self, execution_id: uuid.UUID, note: Optional[str]) -> PromptExecution:
         """Update the note metadata for a history entry."""
@@ -834,6 +844,33 @@ class PromptManager:
         prompt = self.get_prompt(prompt_id)
         prompt.usage_count += 1
         self.update_prompt(prompt)
+
+    def _apply_rating(self, prompt_id: uuid.UUID, rating: float) -> None:
+        """Update prompt aggregates from a new rating."""
+        try:
+            prompt = self.get_prompt(prompt_id)
+        except PromptManagerError:
+            logger.warning(
+                "Unable to fetch prompt for rating update",
+                extra={"prompt_id": str(prompt_id)},
+                exc_info=True,
+            )
+            return
+
+        prompt.rating_count += 1
+        prompt.rating_sum += float(rating)
+        if prompt.rating_count > 0:
+            prompt.quality_score = round(prompt.rating_sum / prompt.rating_count, 2)
+        prompt.last_modified = datetime.now(timezone.utc)
+
+        try:
+            self.update_prompt(prompt)
+        except PromptManagerError:
+            logger.warning(
+                "Unable to persist rating update for prompt",
+                extra={"prompt_id": str(prompt_id)},
+                exc_info=True,
+            )
 
     # Cache helpers ----------------------------------------------------- #
 

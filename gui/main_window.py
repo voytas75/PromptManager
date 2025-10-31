@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.6.0 - 2025-11-09 - Add execution rating workflow and display aggregated prompt scores.
 Updates: v0.5.1 - 2025-11-09 - Wrap prompt details in a scroll area to avoid Wayland resize crashes.
 Updates: v0.5.0 - 2025-11-08 - Add prompt execution workflow with result pane.
 Updates: v0.4.0 - 2025-11-07 - Add intent workspace with detect/suggest/copy actions and usage logging.
@@ -121,6 +122,7 @@ class PromptDetailWidget(QWidget):
 
         self._title = QLabel("Select a prompt to view details", content)
         self._title.setObjectName("promptTitle")
+        self._rating_label = QLabel("Rating: n/a", content)
         self._description = QLabel("", content)
         self._description.setWordWrap(True)
 
@@ -131,6 +133,8 @@ class PromptDetailWidget(QWidget):
 
         content_layout.addWidget(self._title)
         content_layout.addSpacing(8)
+        content_layout.addWidget(self._rating_label)
+        content_layout.addSpacing(4)
         content_layout.addWidget(self._description)
         content_layout.addSpacing(8)
         content_layout.addWidget(self._context)
@@ -147,6 +151,11 @@ class PromptDetailWidget(QWidget):
         language = prompt.language or "en"
         header = f"{prompt.name} — {prompt.category or 'Uncategorised'}\nLanguage: {language}\nTags: {tags}"
         self._title.setText(header)
+        if prompt.rating_count > 0 and prompt.quality_score is not None:
+            rating_text = f"Rating: {prompt.quality_score:.1f}/10 ({prompt.rating_count} ratings)"
+        else:
+            rating_text = "Rating: not yet rated"
+        self._rating_label.setText(rating_text)
         self._description.setText(prompt.description)
         context_text = prompt.context or "No prompt text provided."
         self._context.setText(f"Prompt Body:\n{context_text}")
@@ -161,6 +170,7 @@ class PromptDetailWidget(QWidget):
         """Reset the panel to its empty state."""
 
         self._title.setText("Select a prompt to view details")
+        self._rating_label.setText("Rating: n/a")
         self._description.clear()
         self._context.clear()
         self._examples.clear()
@@ -455,6 +465,52 @@ class MainWindow(QMainWindow):
             self._detail_widget.clear()
         self._update_intent_hint(filtered)
 
+    @staticmethod
+    def _replace_prompt_in_collection(collection: List[Prompt], updated: Prompt) -> bool:
+        """Replace a prompt in the provided collection when present."""
+
+        for index, existing in enumerate(collection):
+            if existing.id == updated.id:
+                collection[index] = updated
+                return True
+        return False
+
+    def _refresh_prompt_after_rating(self, prompt_id: uuid.UUID) -> None:
+        """Refresh prompt collections and UI after capturing a rating."""
+
+        try:
+            updated_prompt = self._manager.get_prompt(prompt_id)
+        except PromptManagerError:
+            return
+
+        search_text = self._search_input.text().strip()
+        if search_text:
+            self._load_prompts(search_text)
+            self._select_prompt(prompt_id)
+            return
+
+        updated_any = self._replace_prompt_in_collection(self._all_prompts, updated_prompt)
+        if self._replace_prompt_in_collection(self._current_prompts, updated_prompt):
+            updated_any = True
+
+        if not updated_any:
+            self._load_prompts()
+            self._select_prompt(prompt_id)
+            return
+
+        filtered = self._apply_filters(self._current_prompts)
+        self._model.set_prompts(filtered)
+        if filtered:
+            self._update_intent_hint(filtered)
+        else:
+            self._detail_widget.clear()
+            self._intent_hint.clear()
+            self._intent_hint.setVisible(False)
+
+        if any(prompt.id == prompt_id for prompt in filtered):
+            self._select_prompt(prompt_id)
+            self._detail_widget.display_prompt(updated_prompt)
+
     def _update_intent_hint(self, prompts: Sequence[Prompt]) -> None:
         """Update the hint label with detected intent context and matches."""
 
@@ -614,10 +670,12 @@ class MainWindow(QMainWindow):
             prompt_name=prompt.name,
             default_text=default_summary,
             button_text="Save",
+            enable_rating=True,
         )
         if dialog.exec() != QDialog.Accepted:
             return
         note = dialog.note
+        rating_value = dialog.rating
         metadata: Dict[str, Any] = {"source": "manual-save"}
         if note:
             metadata["note"] = note
@@ -633,6 +691,7 @@ class MainWindow(QMainWindow):
                 duration_ms=outcome.result.duration_ms,
                 usage=usage_metadata,
                 metadata=metadata,
+                rating=rating_value,
             )
         except PromptExecutionUnavailable as exc:
             self._save_button.setEnabled(False)
@@ -642,9 +701,15 @@ class MainWindow(QMainWindow):
             self._show_error("Unable to save result", str(exc))
             return
 
-        self._usage_logger.log_save(prompt_name=prompt.name, note_length=len(note))
+        self._usage_logger.log_save(
+            prompt_name=prompt.name,
+            note_length=len(note),
+            rating=rating_value,
+        )
         executed_at = saved_entry.executed_at.astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
         self.statusBar().showMessage(f"Result saved ({executed_at}).", 5000)
+        if rating_value is not None:
+            self._refresh_prompt_after_rating(prompt.id)
         self._history_panel.refresh()
 
     def _on_run_prompt_clicked(self) -> None:

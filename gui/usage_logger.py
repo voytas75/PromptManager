@@ -1,5 +1,6 @@
 """Usage logging utilities for intent workspace interactions.
 
+Updates: v0.2.0 - 2025-11-09 - Record manual save ratings alongside notes.
 Updates: v0.1.0 - 2025-11-07 - Introduce JSONL logger for detect/suggest/copy events.
 """
 
@@ -100,7 +101,7 @@ class IntentUsageLogger:
         }
         self._append(record)
 
-    def log_save(self, *, prompt_name: str, note_length: int) -> None:
+    def log_save(self, *, prompt_name: str, note_length: int, rating: Optional[float] = None) -> None:
         """Log that a prompt result was manually saved."""
 
         record = {
@@ -109,6 +110,8 @@ class IntentUsageLogger:
             "prompt_name": prompt_name,
             "note_length": note_length,
         }
+        if rating is not None:
+            record["rating"] = rating
         self._append(record)
 
     def log_note_edit(self, *, note_length: int) -> None:

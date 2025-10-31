@@ -6,6 +6,8 @@ import json
 import uuid
 from datetime import datetime, timezone
 
+import pytest
+
 from models.prompt_model import (
     Prompt,
     _deserialize_list,
@@ -61,8 +63,10 @@ def test_prompt_roundtrip_metadata_and_record() -> None:
         example_output="output",
         version="2.0",
         author="tester",
-        quality_score=0.9,
+        quality_score=9.0,
         usage_count=5,
+        rating_count=3,
+        rating_sum=27.0,
         related_prompts=["other"],
         modified_by="ci",
         ext2={"nested": True},
@@ -85,6 +89,8 @@ def test_prompt_roundtrip_metadata_and_record() -> None:
     assert reconstructed.id == prompt.id
     assert reconstructed.ext2 == {"nested": True}
     assert reconstructed.ext4 == [0.1, 0.2]
+    assert reconstructed.rating_count == 3
+    assert reconstructed.rating_sum == pytest.approx(27.0)
 
 
 def test_prompt_from_chroma_handles_stringified_lists() -> None:

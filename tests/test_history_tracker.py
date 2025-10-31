@@ -32,10 +32,12 @@ def test_history_tracker_records_success_and_failure(tmp_path) -> None:
         response_text="All clear!",
         duration_ms=123,
         metadata={"usage": {"prompt_tokens": 5}},
+        rating=7,
     )
     assert success.response_text == "All clear!"
     assert success.request_text.endswith("...")
     assert success.duration_ms == 123
+    assert success.rating == 7
 
     failure = tracker.record_failure(
         prompt_id=prompt.id,

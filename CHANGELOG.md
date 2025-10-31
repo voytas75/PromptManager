@@ -2,6 +2,12 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.8.2] - 2025-11-09
+
+- Added prompt execution rating workflow in the GUI, storing per-run ratings and surfacing averaged quality scores in prompt details and filters.
+- Persisted rating aggregates in SQLite with automatic migrations and updated CLI/manual saves to refresh prompt quality metrics.
+- Extended history views, exports, and analytics logging to include captured ratings.
+
 ## [0.8.1] - 2025-11-09
 
 - Wrapped the GUI prompt detail pane in a scrollable container to respect compositor size constraints on Wayland and avoid crashes when maximising the window with long prompt bodies selected.
