@@ -109,6 +109,7 @@ Further modules (session history, execution pipeline) will be introduced in subs
 - When saving execution results you can apply a 1–10 rating; the average updates the prompt's quality score so filters and recommendations stay aligned with real-world usage.
 
 - Use the workspace beneath the toolbar to paste text, run **Detect Need**, request **Suggest Prompt**, and copy the top-ranked prompt directly to the clipboard.
+- As you type, the workspace auto-detects the language (Python, PowerShell, Bash, Markdown, JSON, YAML, or plain text) and applies lightweight syntax highlighting so prompts stay readable.
 
 - Use the category, tag, and minimum-quality filters above the list to narrow results as your catalogue grows.
 

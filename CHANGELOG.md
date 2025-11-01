@@ -2,6 +2,12 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.8.4] - 2025-11-10
+
+- Added automatic language detection and syntax highlighting to the GUI query workspace.
+- Introduced reusable detection utilities and covered them with unit tests.
+- Updated documentation to describe the highlighted workspace behaviour.
+
 ## [0.8.3] - 2025-11-10
 
 - Added an Output/Diff view in the GUI result panel to compare generated text with the original request.

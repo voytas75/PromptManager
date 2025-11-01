@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.8.0 - 2025-11-10 - Add language detection and syntax highlighting to the query workspace.
 Updates: v0.7.0 - 2025-11-10 - Add diff preview tab alongside generated output for prompt executions.
 Updates: v0.6.0 - 2025-11-09 - Add execution rating workflow and display aggregated prompt scores.
 Updates: v0.5.1 - 2025-11-09 - Wrap prompt details in a scroll area to avoid Wayland resize crashes.
@@ -61,7 +62,9 @@ from models.prompt_model import Prompt
 from .dialogs import CatalogPreviewDialog, PromptDialog, SaveResultDialog
 from .history_panel import HistoryPanel
 from .settings_dialog import SettingsDialog, persist_settings_to_config
+from .code_highlighter import CodeHighlighter
 from .diff_utils import build_diff_preview
+from .language_tools import DetectedLanguage, detect_language
 from .usage_logger import IntentUsageLogger
 
 
@@ -199,6 +202,7 @@ class MainWindow(QMainWindow):
         self._history_limit = 50
         self._runtime_settings = self._initial_runtime_settings(settings)
         self._usage_logger = IntentUsageLogger()
+        self._detected_language: DetectedLanguage = detect_language("")
         self.setWindowTitle("Prompt Manager")
         self.resize(1024, 640)
         self._build_ui()
@@ -256,7 +260,18 @@ class MainWindow(QMainWindow):
         self._query_input = QPlainTextEdit(self)
         self._query_input.setPlaceholderText("Paste code or text to analyse and suggest prompts…")
         self._query_input.setMinimumHeight(120)
+        self._query_input.textChanged.connect(self._on_query_text_changed)
+        self._highlighter = CodeHighlighter(self._query_input.document())
         layout.addWidget(self._query_input)
+
+        language_layout = QHBoxLayout()
+        language_layout.setContentsMargins(0, 0, 0, 0)
+        self._language_label = QLabel(self)
+        self._language_label.setObjectName("detectedLanguageLabel")
+        language_layout.addWidget(self._language_label)
+        language_layout.addStretch(1)
+        layout.addLayout(language_layout)
+        self._update_detected_language(self._query_input.toPlainText(), force=True)
 
         actions_layout = QHBoxLayout()
         actions_layout.setSpacing(8)
@@ -600,6 +615,26 @@ class MainWindow(QMainWindow):
 
         diff_text = build_diff_preview(original, generated)
         self._diff_view.setPlainText(diff_text)
+
+    def _on_query_text_changed(self) -> None:
+        """Update language detection and syntax highlighting as the user types."""
+
+        text = self._query_input.toPlainText()
+        self._update_detected_language(text)
+
+    def _update_detected_language(self, text: str, *, force: bool = False) -> None:
+        """Detect the language for `text` and refresh UI elements when it changes."""
+
+        detection = detect_language(text)
+        if not force and detection.code == self._detected_language.code:
+            return
+        self._detected_language = detection
+        if detection.confidence:
+            percentage = int(round(detection.confidence * 100))
+            self._language_label.setText(f"Language: {detection.name} ({percentage}%)")
+        else:
+            self._language_label.setText(f"Language: {detection.name}")
+        self._highlighter.set_language(detection.code)
 
     def _generate_prompt_name(self, context: str) -> str:
         """Delegate name generation to PromptManager, surfacing errors."""
