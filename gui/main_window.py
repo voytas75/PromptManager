@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.9.0 - 2025-11-10 - Introduce command palette quick actions with keyboard shortcuts.
 Updates: v0.8.0 - 2025-11-10 - Add language detection and syntax highlighting to the query workspace.
 Updates: v0.7.0 - 2025-11-10 - Add diff preview tab alongside generated output for prompt executions.
 Updates: v0.6.0 - 2025-11-09 - Add execution rating workflow and display aggregated prompt scores.
@@ -19,7 +20,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence
 
 from PySide6.QtCore import QAbstractListModel, QModelIndex, Qt
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QGuiApplication, QKeySequence, QTextCursor
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -33,6 +34,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPlainTextEdit,
+    QShortcut,
     QScrollArea,
     QPushButton,
     QSplitter,
@@ -59,10 +61,11 @@ from core import (
 )
 from models.prompt_model import Prompt
 
+from .command_palette import CommandPaletteDialog, QuickAction, rank_prompts_for_action
+from .code_highlighter import CodeHighlighter
 from .dialogs import CatalogPreviewDialog, PromptDialog, SaveResultDialog
 from .history_panel import HistoryPanel
 from .settings_dialog import SettingsDialog, persist_settings_to_config
-from .code_highlighter import CodeHighlighter
 from .diff_utils import build_diff_preview
 from .language_tools import DetectedLanguage, detect_language
 from .usage_logger import IntentUsageLogger
@@ -203,9 +206,12 @@ class MainWindow(QMainWindow):
         self._runtime_settings = self._initial_runtime_settings(settings)
         self._usage_logger = IntentUsageLogger()
         self._detected_language: DetectedLanguage = detect_language("")
+        self._quick_actions: List[QuickAction] = self._build_quick_actions()
+        self._quick_shortcuts: List[QShortcut] = []
         self.setWindowTitle("Prompt Manager")
         self.resize(1024, 640)
         self._build_ui()
+        self._register_quick_shortcuts()
         self._load_prompts()
 
     def _build_ui(self) -> None:
@@ -275,6 +281,10 @@ class MainWindow(QMainWindow):
 
         actions_layout = QHBoxLayout()
         actions_layout.setSpacing(8)
+
+        self._quick_actions_button = QPushButton("Quick Actions", self)
+        self._quick_actions_button.clicked.connect(self._show_command_palette)  # type: ignore[arg-type]
+        actions_layout.addWidget(self._quick_actions_button)
 
         self._detect_button = QPushButton("Detect Need", self)
         self._detect_button.clicked.connect(self._on_detect_intent_clicked)  # type: ignore[arg-type]
@@ -635,6 +645,109 @@ class MainWindow(QMainWindow):
         else:
             self._language_label.setText(f"Language: {detection.name}")
         self._highlighter.set_language(detection.code)
+        self.statusBar().showMessage(
+            f"Workspace language: {detection.name}",
+            3000,
+        )
+
+    def _show_command_palette(self) -> None:
+        dialog = CommandPaletteDialog(self._quick_actions, self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        action = dialog.selected_action
+        if action is not None:
+            self._execute_quick_action(action)
+
+    def _execute_quick_action(self, action: QuickAction) -> None:
+        try:
+            prompts = self._manager.repository.list()
+        except RepositoryError as exc:
+            self._show_error("Unable to load prompts", str(exc))
+            return
+
+        self._all_prompts = prompts
+        ranked = rank_prompts_for_action(prompts, action)
+        selected_prompt = ranked[0] if ranked else None
+
+        if selected_prompt is None:
+            self.statusBar().showMessage(
+                f"No prompts matched quick action '{action.title}'.",
+                5000,
+            )
+            return
+
+        self._suggestions = None
+        self._populate_filters(prompts)
+        self._current_prompts = list(prompts)
+        filtered = self._apply_filters(self._current_prompts)
+        self._model.set_prompts(filtered)
+        self._select_prompt(selected_prompt.id)
+        self._detail_widget.display_prompt(selected_prompt)
+        if action.template and not self._query_input.toPlainText().strip():
+            self._query_input.setPlainText(action.template)
+            cursor = self._query_input.textCursor()
+            cursor.movePosition(QTextCursor.End)
+            self._query_input.setTextCursor(cursor)
+        self._query_input.setFocus(Qt.ShortcutFocusReason)
+        self.statusBar().showMessage(f"Quick action applied: {action.title}", 4000)
+
+    def _register_quick_shortcuts(self) -> None:
+        for shortcut in self._quick_shortcuts:
+            shortcut.setParent(None)
+        self._quick_shortcuts.clear()
+
+        palette_shortcuts = ["Ctrl+K", "Ctrl+Shift+P"]
+        for seq in palette_shortcuts:
+            shortcut = QShortcut(QKeySequence(seq), self)
+            shortcut.activated.connect(self._show_command_palette)  # type: ignore[arg-type]
+            self._quick_shortcuts.append(shortcut)
+
+        for action in self._quick_actions:
+            if not action.shortcut:
+                continue
+            shortcut = QShortcut(QKeySequence(action.shortcut), self)
+            shortcut.activated.connect(lambda a=action: self._execute_quick_action(a))  # type: ignore[arg-type]
+            self._quick_shortcuts.append(shortcut)
+
+    def _build_quick_actions(self) -> List[QuickAction]:
+        return [
+            QuickAction(
+                identifier="explain",
+                title="Explain This Code",
+                description="Select analysis prompts to describe behaviour and intent.",
+                category_hint="Code Analysis",
+                tag_hints=("analysis", "code-review"),
+                template="Explain what this code does and highlight any risks:\n",
+                shortcut="Ctrl+1",
+            ),
+            QuickAction(
+                identifier="fix-errors",
+                title="Fix Errors",
+                description="Surface debugging prompts to diagnose and resolve failures.",
+                category_hint="Reasoning / Debugging",
+                tag_hints=("debugging", "incident-response"),
+                template="Identify and fix the issues in this snippet:\n",
+                shortcut="Ctrl+2",
+            ),
+            QuickAction(
+                identifier="add-comments",
+                title="Add Comments",
+                description="Jump to documentation prompts that generate docstrings and commentary.",
+                category_hint="Documentation",
+                tag_hints=("documentation", "docstrings"),
+                template="Add detailed docstrings and inline comments explaining this code:\n",
+                shortcut="Ctrl+3",
+            ),
+            QuickAction(
+                identifier="enhance",
+                title="Suggest Improvements",
+                description="Open enhancement prompts that brainstorm new ideas or edge cases.",
+                category_hint="Enhancement",
+                tag_hints=("enhancement", "product"),
+                template="Suggest improvements, safeguards, and edge cases for this work:\n",
+                shortcut="Ctrl+4",
+            ),
+        ]
 
     def _generate_prompt_name(self, context: str) -> str:
         """Delegate name generation to PromptManager, surfacing errors."""
