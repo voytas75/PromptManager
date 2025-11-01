@@ -44,6 +44,10 @@ class PromptManagerSettings(BaseSettings):
         default=None,
         description="Optional LiteLLM API version (useful for Azure OpenAI).",
     )
+    quick_actions: Optional[list[dict[str, object]]] = Field(
+        default=None,
+        description="Optional list of custom quick action definitions for the command palette.",
+    )
     embedding_backend: str = Field(
         default="deterministic",
         description="Embedding backend to use (deterministic, litellm, sentence-transformers).",
@@ -80,6 +84,7 @@ class PromptManagerSettings(BaseSettings):
                 "embedding_backend": ["EMBEDDING_BACKEND", "embedding_backend"],
                 "embedding_model": ["EMBEDDING_MODEL", "embedding_model"],
                 "embedding_device": ["EMBEDDING_DEVICE", "embedding_device"],
+                "quick_actions": ["QUICK_ACTIONS", "quick_actions"],
             },
         },
     )
@@ -153,6 +158,25 @@ class PromptManagerSettings(BaseSettings):
             )
         return self
 
+    @field_validator("quick_actions", mode="before")
+    def _validate_quick_actions(cls, value: object) -> Optional[list[dict[str, object]]]:
+        if value in (None, "", []):
+            return None
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+            except json.JSONDecodeError as exc:
+                raise ValueError("quick_actions must be valid JSON") from exc
+            value = parsed
+        if not isinstance(value, list):
+            raise ValueError("quick_actions must be a list of action definitions")
+        normalised: list[dict[str, object]] = []
+        for entry in value:
+            if not isinstance(entry, dict):
+                raise ValueError("quick_actions items must be objects")
+            normalised.append({str(key): entry[key] for key in entry})
+        return normalised
+
     @classmethod
     def settings_customise_sources(
         cls,
@@ -194,6 +218,7 @@ class PromptManagerSettings(BaseSettings):
                 "embedding_backend": ["EMBEDDING_BACKEND", "embedding_backend"],
                 "embedding_model": ["EMBEDDING_MODEL", "embedding_model"],
                 "embedding_device": ["EMBEDDING_DEVICE", "embedding_device"],
+                "quick_actions": ["QUICK_ACTIONS", "quick_actions"],
             }
             for field, keys in mapping.items():
                 for key in keys:
@@ -266,6 +291,7 @@ class PromptManagerSettings(BaseSettings):
                     "embedding_backend",
                     "embedding_model",
                     "embedding_device",
+                    "quick_actions",
                 ):
                     if key in data:
                         mapped[key] = data[key]

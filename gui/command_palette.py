@@ -6,7 +6,7 @@ Updates: v0.1.0 - 2025-11-10 - Introduce keyboard-driven quick action palette.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence
@@ -36,6 +36,34 @@ class QuickAction:
     tag_hints: Tuple[str, ...] = ()
     template: Optional[str] = None
     shortcut: Optional[str] = None
+    prompt_id: Optional[str] = None
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> "QuickAction":
+        identifier = str(data.get("identifier") or data.get("id") or "").strip()
+        title = str(data.get("title") or "").strip()
+        description = str(data.get("description") or "").strip()
+        if not identifier or not title or not description:
+            raise ValueError("Quick action requires identifier, title, and description")
+        category_hint = data.get("category_hint") or data.get("category")
+        shortcut = data.get("shortcut")
+        template = data.get("template")
+        prompt_id = data.get("prompt_id") or data.get("prompt")
+        tag_hints_value = data.get("tag_hints") or data.get("tags") or ()
+        if isinstance(tag_hints_value, str):
+            tag_hints = tuple(tag.strip() for tag in tag_hints_value.split(",") if tag.strip())
+        else:
+            tag_hints = tuple(str(tag).strip() for tag in tag_hints_value if str(tag).strip())
+        return cls(
+            identifier=identifier,
+            title=title,
+            description=description,
+            category_hint=str(category_hint).strip() if category_hint else None,
+            tag_hints=tag_hints,
+            template=str(template) if template is not None else None,
+            shortcut=str(shortcut).strip() if shortcut else None,
+            prompt_id=str(prompt_id).strip() if prompt_id else None,
+        )
 
 
 def rank_prompts_for_action(prompts: Iterable[Prompt], action: QuickAction) -> List[Prompt]:

@@ -12,7 +12,10 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
     QHBoxLayout,
+    QLabel,
     QLineEdit,
+    QMessageBox,
+    QPlainTextEdit,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -31,6 +34,7 @@ class SettingsDialog(QDialog):
         litellm_api_key: Optional[str] = None,
         litellm_api_base: Optional[str] = None,
         litellm_api_version: Optional[str] = None,
+        quick_actions: Optional[list[dict[str, object]]] = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Prompt Manager Settings")
@@ -39,6 +43,9 @@ class SettingsDialog(QDialog):
         self._litellm_api_key = litellm_api_key or ""
         self._litellm_api_base = litellm_api_base or ""
         self._litellm_api_version = litellm_api_version or ""
+        original_actions = [dict(entry) for entry in (quick_actions or []) if isinstance(entry, dict)]
+        self._original_quick_actions = original_actions
+        self._quick_actions_value: Optional[list[dict[str, object]]] = original_actions or None
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -71,6 +78,19 @@ class SettingsDialog(QDialog):
 
         layout.addLayout(form)
 
+        self._quick_actions_input = QPlainTextEdit(self)
+        self._quick_actions_input.setPlaceholderText(
+            "Paste JSON array of quick action definitions (identifier, title, description, optional hints)."
+        )
+        if self._original_quick_actions:
+            try:
+                pretty = json.dumps(self._original_quick_actions, indent=2, ensure_ascii=False)
+            except TypeError:
+                pretty = ""
+            self._quick_actions_input.setPlainText(pretty)
+        layout.addWidget(QLabel("Quick actions (JSON)", self))
+        layout.addWidget(self._quick_actions_input)
+
         button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
         button_box.accepted.connect(self.accept)  # type: ignore[arg-type]
         button_box.rejected.connect(self.reject)  # type: ignore[arg-type]
@@ -87,7 +107,35 @@ class SettingsDialog(QDialog):
             if selected:
                 self._catalog_input.setText(selected[0])
 
-    def result_settings(self) -> dict[str, Optional[str]]:
+    def accept(self) -> None:
+        text = self._quick_actions_input.toPlainText().strip()
+        if text:
+            try:
+                data = json.loads(text)
+            except json.JSONDecodeError as exc:
+                QMessageBox.critical(self, "Invalid quick actions", f"JSON parse error: {exc}")
+                return
+            if not isinstance(data, list):
+                QMessageBox.critical(
+                    self,
+                    "Invalid quick actions",
+                    "Quick actions must be provided as a JSON array of objects.",
+                )
+                return
+            for entry in data:
+                if not isinstance(entry, dict):
+                    QMessageBox.critical(
+                        self,
+                        "Invalid quick actions",
+                        "Each quick action entry must be a JSON object.",
+                    )
+                    return
+            self._quick_actions_value = data
+        else:
+            self._quick_actions_value = None
+        super().accept()
+
+    def result_settings(self) -> dict[str, Optional[str | list[dict[str, object]]]]:
         """Return cleaned settings data."""
 
         def _clean(value: str) -> Optional[str]:
@@ -100,10 +148,11 @@ class SettingsDialog(QDialog):
             "litellm_api_key": _clean(self._api_key_input.text()),
             "litellm_api_base": _clean(self._api_base_input.text()),
             "litellm_api_version": _clean(self._api_version_input.text()),
+            "quick_actions": self._quick_actions_value,
         }
 
 
-def persist_settings_to_config(updates: dict[str, Optional[str]]) -> None:
+def persist_settings_to_config(updates: dict[str, Optional[str | list[dict[str, object]]]]) -> None:
     """Merge settings into config/config.json to persist between sessions."""
     config_path = Path("config/config.json")
     config_data = {}

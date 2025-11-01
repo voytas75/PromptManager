@@ -6,7 +6,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 - Added a keyboard-driven command palette (`Ctrl+K` / `Ctrl+Shift+P`) with quick actions mapped to common prompt workflows.
 - Introduced configurable quick action shortcuts (`Ctrl+1`–`Ctrl+4`) and prompt matching logic for explain, debug, document, and enhance flows.
-- Documented the command palette shortcuts and ensured prompt matching is covered by unit tests.
+- Allowed users to define custom quick actions via settings/config JSON (including hints, templates, shortcuts, and prompt IDs) and added unit tests for the palette utilities.
 
 ## [0.8.4] - 2025-11-10
 

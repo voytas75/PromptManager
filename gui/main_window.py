@@ -15,9 +15,10 @@ Updates: v0.1.0 - 2025-11-04 - Provide list/search/detail panes with CRUD contro
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 from PySide6.QtCore import QAbstractListModel, QModelIndex, Qt
 from PySide6.QtGui import QGuiApplication, QKeySequence, QTextCursor
@@ -69,6 +70,9 @@ from .settings_dialog import SettingsDialog, persist_settings_to_config
 from .diff_utils import build_diff_preview
 from .language_tools import DetectedLanguage, detect_language
 from .usage_logger import IntentUsageLogger
+
+
+logger = logging.getLogger(__name__)
 
 
 class PromptListModel(QAbstractListModel):
@@ -206,7 +210,9 @@ class MainWindow(QMainWindow):
         self._runtime_settings = self._initial_runtime_settings(settings)
         self._usage_logger = IntentUsageLogger()
         self._detected_language: DetectedLanguage = detect_language("")
-        self._quick_actions: List[QuickAction] = self._build_quick_actions()
+        self._quick_actions: List[QuickAction] = self._build_quick_actions(
+            self._runtime_settings.get("quick_actions")
+        )
         self._quick_shortcuts: List[QShortcut] = []
         self.setWindowTitle("Prompt Manager")
         self.resize(1024, 640)
@@ -645,10 +651,7 @@ class MainWindow(QMainWindow):
         else:
             self._language_label.setText(f"Language: {detection.name}")
         self._highlighter.set_language(detection.code)
-        self.statusBar().showMessage(
-            f"Workspace language: {detection.name}",
-            3000,
-        )
+        self.statusBar().showMessage(f"Workspace language: {detection.name}", 3000)
 
     def _show_command_palette(self) -> None:
         dialog = CommandPaletteDialog(self._quick_actions, self)
@@ -667,7 +670,7 @@ class MainWindow(QMainWindow):
 
         self._all_prompts = prompts
         ranked = rank_prompts_for_action(prompts, action)
-        selected_prompt = ranked[0] if ranked else None
+        selected_prompt = self._resolve_quick_action_prompt(action, prompts, ranked)
 
         if selected_prompt is None:
             self.statusBar().showMessage(
@@ -709,7 +712,7 @@ class MainWindow(QMainWindow):
             shortcut.activated.connect(lambda a=action: self._execute_quick_action(a))  # type: ignore[arg-type]
             self._quick_shortcuts.append(shortcut)
 
-    def _build_quick_actions(self) -> List[QuickAction]:
+    def _default_quick_actions(self) -> List[QuickAction]:
         return [
             QuickAction(
                 identifier="explain",
@@ -748,6 +751,55 @@ class MainWindow(QMainWindow):
                 shortcut="Ctrl+4",
             ),
         ]
+
+    def _build_quick_actions(
+        self, custom_actions: Optional[object]
+    ) -> List[QuickAction]:
+        actions_by_id: Dict[str, QuickAction] = {
+            action.identifier: action for action in self._default_quick_actions()
+        }
+        if not custom_actions:
+            return list(actions_by_id.values())
+
+        data: Iterable[dict[str, Any]]
+        if isinstance(custom_actions, list):
+            data = [
+                entry
+                for entry in custom_actions
+                if isinstance(entry, dict)
+            ]
+        else:
+            logger.warning("Ignoring invalid quick_actions settings value: %s", custom_actions)
+            return list(actions_by_id.values())
+
+        for entry in data:
+            try:
+                action = QuickAction.from_mapping(entry)
+            except ValueError as exc:
+                logger.warning("Skipping invalid quick action definition: %s", exc)
+                continue
+            actions_by_id[action.identifier] = action
+        return list(actions_by_id.values())
+
+    def _resolve_quick_action_prompt(
+        self,
+        action: QuickAction,
+        prompts: Iterable[Prompt],
+        ranked: List[Prompt],
+    ) -> Optional[Prompt]:
+        if action.prompt_id:
+            prompt_id = action.prompt_id
+            try:
+                target_uuid = uuid.UUID(prompt_id)
+            except ValueError:
+                for prompt in prompts:
+                    if prompt.name.lower() == prompt_id.lower():
+                        return prompt
+            else:
+                for prompt in prompts:
+                    if prompt.id == target_uuid:
+                        return prompt
+        return ranked[0] if ranked else None
 
     def _generate_prompt_name(self, context: str) -> str:
         """Delegate name generation to PromptManager, surfacing errors."""
@@ -1160,13 +1212,14 @@ class MainWindow(QMainWindow):
             litellm_api_key=self._runtime_settings.get("litellm_api_key"),
             litellm_api_base=self._runtime_settings.get("litellm_api_base"),
             litellm_api_version=self._runtime_settings.get("litellm_api_version"),
+            quick_actions=self._runtime_settings.get("quick_actions"),
         )
         if dialog.exec() != QDialog.Accepted:
             return
         updates = dialog.result_settings()
         self._apply_settings(updates)
 
-    def _apply_settings(self, updates: dict[str, Optional[str]]) -> None:
+    def _apply_settings(self, updates: dict[str, Optional[str | list[dict[str, object]]]]) -> None:
         """Persist settings, refresh catalogue, and update name generator."""
 
         catalog_path = updates.get("catalog_path")
@@ -1178,6 +1231,14 @@ class MainWindow(QMainWindow):
         self._runtime_settings["litellm_api_key"] = updates.get("litellm_api_key")
         self._runtime_settings["litellm_api_base"] = updates.get("litellm_api_base")
         self._runtime_settings["litellm_api_version"] = updates.get("litellm_api_version")
+        quick_actions_value = updates.get("quick_actions")
+        if isinstance(quick_actions_value, list):
+            cleaned_quick_actions = [
+                dict(entry) for entry in quick_actions_value if isinstance(entry, dict)
+            ]
+        else:
+            cleaned_quick_actions = None
+        self._runtime_settings["quick_actions"] = cleaned_quick_actions
         persist_settings_to_config(self._runtime_settings)
 
         if self._settings is not None:
@@ -1190,6 +1251,10 @@ class MainWindow(QMainWindow):
             self._settings.litellm_api_key = updates.get("litellm_api_key")
             self._settings.litellm_api_base = updates.get("litellm_api_base")
             self._settings.litellm_api_version = updates.get("litellm_api_version")
+            self._settings.quick_actions = cleaned_quick_actions
+
+        self._quick_actions = self._build_quick_actions(self._runtime_settings.get("quick_actions"))
+        self._register_quick_shortcuts()
 
         try:
             self._manager.set_name_generator(
@@ -1217,8 +1282,14 @@ class MainWindow(QMainWindow):
 
     def _initial_runtime_settings(
         self, settings: Optional[PromptManagerSettings]
-    ) -> dict[str, Optional[str]]:
+    ) -> dict[str, Optional[str | list[dict[str, object]]]]:
         """Load current settings snapshot from configuration."""
+
+        derived_quick_actions: Optional[list[dict[str, object]]]
+        if settings and settings.quick_actions:
+            derived_quick_actions = [dict(entry) for entry in settings.quick_actions]
+        else:
+            derived_quick_actions = None
 
         runtime = {
             "catalog_path": str(settings.catalog_path)
@@ -1228,6 +1299,7 @@ class MainWindow(QMainWindow):
             "litellm_api_key": settings.litellm_api_key if settings else None,
             "litellm_api_base": settings.litellm_api_base if settings else None,
             "litellm_api_version": settings.litellm_api_version if settings else None,
+            "quick_actions": derived_quick_actions,
         }
 
         config_path = Path("config/config.json")
@@ -1246,6 +1318,8 @@ class MainWindow(QMainWindow):
                 ):
                     if isinstance(data.get(key), str):
                         runtime[key] = data[key]
+                if isinstance(data.get("quick_actions"), list):
+                    runtime["quick_actions"] = [dict(entry) for entry in data["quick_actions"] if isinstance(entry, dict)]
         return runtime
 
     def _on_selection_changed(self, *_: object) -> None:

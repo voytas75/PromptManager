@@ -53,3 +53,21 @@ def test_rank_prompts_empty_when_no_match() -> None:
         tag_hints=("documentation",),
     )
     assert rank_prompts_for_action(prompts, action) == []
+
+
+def test_quick_action_from_mapping_with_shortcut() -> None:
+    mapping = {
+        "identifier": "custom",
+        "title": "Custom Action",
+        "description": "Does something special",
+        "category_hint": "Code Analysis",
+        "tag_hints": ["analysis", "review"],
+        "template": "Explain the following:\n",
+        "shortcut": "Ctrl+9",
+        "prompt_id": "Example Prompt",
+    }
+    action = QuickAction.from_mapping(mapping)
+    assert action.identifier == "custom"
+    assert action.shortcut == "Ctrl+9"
+    assert action.tag_hints == ("analysis", "review")
+    assert action.prompt_id == "Example Prompt"
