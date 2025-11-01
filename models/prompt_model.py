@@ -1,5 +1,6 @@
 """Prompt data model definitions.
 
+Updates: v0.4.0 - 2025-11-11 - Add single-user profile dataclass with preference helpers.
 Updates: v0.3.0 - 2025-11-09 - Add rating aggregates and execution rating support.
 Updates: v0.2.0 - 2025-11-08 - Add prompt execution records for history logging.
 Updates: v0.1.1 - 2025-11-01 - Filtered null metadata fields for Chroma compatibility.
@@ -349,4 +350,138 @@ class PromptExecution:
             metadata=_deserialize_metadata(data.get("metadata")),
         )
 
-__all__ = ["Prompt", "PromptExecution", "ExecutionStatus"]
+DEFAULT_PROFILE_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
+
+
+@dataclass(slots=True)
+class UserProfile:
+    """Lightweight preference profile for the single Prompt Manager user."""
+
+    id: uuid.UUID
+    username: str = "default"
+    preferred_language: Optional[str] = None
+    category_weights: MutableMapping[str, int] = field(default_factory=dict)
+    tag_weights: MutableMapping[str, int] = field(default_factory=dict)
+    recent_prompts: List[str] = field(default_factory=list)
+    settings: MutableMapping[str, Any] = field(default_factory=dict)
+    updated_at: datetime = field(default_factory=_utc_now)
+    ext1: Optional[str] = None
+    ext2: Optional[MutableMapping[str, Any]] = None
+    ext3: Optional[MutableMapping[str, Any]] = None
+
+    def touch(self) -> None:
+        """Refresh the profile timestamp."""
+
+        self.updated_at = _utc_now()
+
+    def record_prompt_usage(self, prompt: Prompt, *, max_recent: int = 20) -> None:
+        """Update preference counters and recency list from a prompt usage."""
+
+        category = (prompt.category or "").strip()
+        if category:
+            self.category_weights[category] = int(self.category_weights.get(category, 0)) + 1
+
+        for raw_tag in prompt.tags or []:
+            tag = raw_tag.strip()
+            if not tag:
+                continue
+            self.tag_weights[tag] = int(self.tag_weights.get(tag, 0)) + 1
+
+        prompt_id = str(prompt.id)
+        if prompt_id in self.recent_prompts:
+            self.recent_prompts.remove(prompt_id)
+        self.recent_prompts.insert(0, prompt_id)
+        if len(self.recent_prompts) > max_recent:
+            del self.recent_prompts[max_recent:]
+
+        self.touch()
+
+    def favorite_categories(self, *, limit: int = 3) -> List[str]:
+        """Return the most frequently used categories."""
+
+        if not self.category_weights:
+            return []
+        ordered = sorted(
+            self.category_weights.items(),
+            key=lambda item: (int(item[1]), item[0].lower()),
+            reverse=True,
+        )
+        return [name for name, _ in ordered[:limit]]
+
+    def favorite_tags(self, *, limit: int = 5) -> List[str]:
+        """Return the most frequently used tags."""
+
+        if not self.tag_weights:
+            return []
+        ordered = sorted(
+            self.tag_weights.items(),
+            key=lambda item: (int(item[1]), item[0].lower()),
+            reverse=True,
+        )
+        return [name for name, _ in ordered[:limit]]
+
+    def to_record(self) -> Dict[str, Any]:
+        """Serialise the profile into a plain mapping."""
+
+        return {
+            "id": str(self.id),
+            "username": self.username,
+            "preferred_language": self.preferred_language,
+            "category_weights": dict(self.category_weights),
+            "tag_weights": dict(self.tag_weights),
+            "recent_prompts": list(self.recent_prompts),
+            "settings": dict(self.settings),
+            "updated_at": self.updated_at.isoformat(),
+            "ext1": self.ext1,
+            "ext2": self.ext2,
+            "ext3": self.ext3,
+        }
+
+    @classmethod
+    def from_record(cls, data: Mapping[str, Any]) -> "UserProfile":
+        """Hydrate a profile from a mapping."""
+
+        settings_value = data.get("settings")
+        if isinstance(settings_value, Mapping):
+            settings_dict = {str(key): settings_value[key] for key in settings_value}
+        else:
+            settings_dict = {}
+
+        return cls(
+            id=_ensure_uuid(data.get("id") or DEFAULT_PROFILE_ID),
+            username=str(data.get("username") or "default"),
+            preferred_language=(
+                str(data["preferred_language"])
+                if data.get("preferred_language") not in (None, "")
+                else None
+            ),
+            category_weights={
+                str(key): int(value)
+                for key, value in dict(data.get("category_weights") or {}).items()
+            },
+            tag_weights={
+                str(key): int(value)
+                for key, value in dict(data.get("tag_weights") or {}).items()
+            },
+            recent_prompts=_serialize_list(data.get("recent_prompts")),
+            settings=settings_dict,
+            updated_at=_ensure_datetime(data.get("updated_at")),
+            ext1=data.get("ext1"),
+            ext2=_deserialize_metadata(data.get("ext2")),
+            ext3=_deserialize_metadata(data.get("ext3")),
+        )
+
+    @classmethod
+    def create_default(cls, username: str = "default") -> "UserProfile":
+        """Return a default profile for single-user deployments."""
+
+        return cls(id=DEFAULT_PROFILE_ID, username=username)
+
+
+__all__ = [
+    "Prompt",
+    "PromptExecution",
+    "ExecutionStatus",
+    "UserProfile",
+    "DEFAULT_PROFILE_ID",
+]

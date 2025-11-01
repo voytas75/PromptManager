@@ -1,5 +1,6 @@
 """High-level CRUD manager for prompt records backed by SQLite, ChromaDB, and Redis.
 
+Updates: v0.9.0 - 2025-11-11 - Track single-user preferences and personalise intent suggestions.
 Updates: v0.8.0 - 2025-11-09 - Capture prompt ratings from executions and update quality scores.
 Updates: v0.7.0 - 2025-11-08 - Integrate prompt execution pipeline with history logging.
 Updates: v0.6.0 - 2025-11-06 - Add intent-aware search suggestions and ranking helpers.
@@ -61,7 +62,7 @@ except ImportError:  # pragma: no cover - redis optional during development
     redis = None  # type: ignore
     RedisError = Exception  # type: ignore[misc,assignment]
 
-from models.prompt_model import Prompt, PromptExecution
+from models.prompt_model import Prompt, PromptExecution, UserProfile
 
 from .embedding import EmbeddingGenerationError, EmbeddingProvider, EmbeddingSyncWorker
 from .execution import CodexExecutionResult, CodexExecutor, ExecutionError
@@ -126,6 +127,7 @@ class PromptManager:
         description_generator: Optional[LiteLLMDescriptionGenerator] = None,
         intent_classifier: Optional[IntentClassifier] = None,
         executor: Optional[CodexExecutor] = None,
+        user_profile: Optional[UserProfile] = None,
         history_tracker: Optional[HistoryTracker] = None,
     ) -> None:
         """Initialise the manager with data backends.
@@ -141,6 +143,7 @@ class PromptManager:
             repository: Optional preconfigured repository instance (e.g. for testing).
             executor: Optional CodexExecutor responsible for running prompts.
             history_tracker: Optional execution history tracker for persistence.
+            user_profile: Optional profile to seed single-user personalisation state.
         """
         # Allow tests to supply repository directly; only require db_path when building one.
         if repository is None and db_path is None:
@@ -203,6 +206,14 @@ class PromptManager:
         self._intent_classifier = intent_classifier
         self._executor = executor
         self._history_tracker = history_tracker
+        if user_profile is not None:
+            self._user_profile: Optional[UserProfile] = user_profile
+        else:
+            try:
+                self._user_profile = self._repository.get_user_profile()
+            except RepositoryError:
+                logger.warning("Unable to load persisted user profile", exc_info=True)
+                self._user_profile = None
 
     @dataclass(slots=True)
     class IntentSuggestions:
@@ -256,6 +267,21 @@ class PromptManager:
         """Assign or replace the history tracker at runtime."""
 
         self._history_tracker = tracker
+
+    @property
+    def user_profile(self) -> Optional[UserProfile]:
+        """Return the stored single-user profile when available."""
+
+        return self._user_profile
+
+    def refresh_user_profile(self) -> Optional[UserProfile]:
+        """Reload the persisted profile from the repository."""
+
+        try:
+            self._user_profile = self._repository.get_user_profile()
+        except RepositoryError:
+            logger.warning("Unable to refresh user profile from storage", exc_info=True)
+        return self._user_profile
 
     def generate_prompt_name(self, context: str) -> str:
         """Return a prompt name using the configured LiteLLM generator."""
@@ -773,7 +799,10 @@ class PromptManager:
                 baseline = self.repository.list(limit=limit)
             except RepositoryError as exc:
                 raise PromptStorageError("Unable to load prompts for suggestions") from exc
-            return PromptManager.IntentSuggestions(IntentPrediction.general(), baseline, fallback_used=True)
+            personalised = self._personalize_ranked_prompts(baseline)
+            return PromptManager.IntentSuggestions(
+                IntentPrediction.general(), personalised[:limit], fallback_used=True
+            )
 
         prediction = (
             self._intent_classifier.classify(stripped)
@@ -802,6 +831,7 @@ class PromptManager:
             category_hints=prediction.category_hints,
             tag_hints=prediction.tag_hints,
         )
+        ranked = self._personalize_ranked_prompts(ranked)
 
         seen_ids: set[uuid.UUID] = set()
         for prompt in ranked:
@@ -818,6 +848,8 @@ class PromptManager:
                 fallback_results = self.search_prompts(stripped, limit=max(limit * 2, 10))
             except PromptManagerError:
                 fallback_results = []
+            else:
+                fallback_results = self._personalize_ranked_prompts(fallback_results)
             for prompt in fallback_results:
                 if prompt.id in seen_ids:
                     continue
@@ -833,17 +865,65 @@ class PromptManager:
             except RepositoryError as exc:
                 raise PromptStorageError("Unable to load prompts for suggestions") from exc
 
+        personalised = self._personalize_ranked_prompts(suggestions)
         return PromptManager.IntentSuggestions(
             prediction=prediction,
-            prompts=suggestions[:limit],
+            prompts=personalised[:limit],
             fallback_used=fallback_used,
         )
+
+    def _personalize_ranked_prompts(self, prompts: Sequence[Prompt]) -> List[Prompt]:
+        """Bias prompt order using stored user preferences while preserving stability."""
+
+        if not prompts:
+            return []
+        profile = self._user_profile
+        if profile is None:
+            return list(prompts)
+
+        favorite_categories = profile.favorite_categories(limit=5)
+        favorite_tags = profile.favorite_tags(limit=8)
+        if not favorite_categories and not favorite_tags:
+            return list(prompts)
+
+        category_weights = {name: (len(favorite_categories) - idx) * 2 for idx, name in enumerate(favorite_categories)}
+        tag_weights = {name: len(favorite_tags) - idx for idx, name in enumerate(favorite_tags)}
+
+        scored: List[tuple[float, int, Prompt]] = []
+        for index, prompt in enumerate(prompts):
+            score = 0.0
+            category = (prompt.category or "").strip()
+            if category in category_weights:
+                score += float(category_weights[category])
+            for tag in prompt.tags or []:
+                weight = tag_weights.get(tag)
+                if weight:
+                    score += float(weight)
+            scored.append((score, index, prompt))
+
+        scored.sort(key=lambda item: (-item[0], item[1]))
+        return [prompt for _, _, prompt in scored]
 
     def increment_usage(self, prompt_id: uuid.UUID) -> None:
         """Increment usage counter for a prompt."""
         prompt = self.get_prompt(prompt_id)
         prompt.usage_count += 1
         self.update_prompt(prompt)
+        self._record_prompt_usage(prompt)
+
+    def _record_prompt_usage(self, prompt: Prompt) -> None:
+        """Persist prompt usage into the single-user profile when possible."""
+
+        try:
+            profile = self._repository.record_user_prompt_usage(prompt)
+        except RepositoryError:
+            logger.debug(
+                "Failed to update user profile preferences",
+                extra={"prompt_id": str(prompt.id)},
+                exc_info=True,
+            )
+            return
+        self._user_profile = profile
 
     def _apply_rating(self, prompt_id: uuid.UUID, rating: float) -> None:
         """Update prompt aggregates from a new rating."""

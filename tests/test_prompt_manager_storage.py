@@ -17,7 +17,7 @@ from core import (
     RepositoryError,
     RepositoryNotFoundError,
 )
-from models.prompt_model import Prompt
+from models.prompt_model import Prompt, UserProfile
 
 
 def _make_prompt(name: str = "Sample Prompt") -> Prompt:
@@ -129,6 +129,7 @@ class _FakeRepository:
         self._store: Dict[uuid.UUID, Prompt] = {}
         self.get_call_count = 0
         self.fail_on_get = False
+        self._profile = UserProfile.create_default()
 
     def add(self, prompt: Prompt) -> Prompt:
         if prompt.id in self._store:
@@ -144,6 +145,13 @@ class _FakeRepository:
             return self._store[prompt_id]
         except KeyError as exc:
             raise RepositoryNotFoundError(f"Prompt {prompt_id} not found") from exc
+
+    def get_user_profile(self) -> UserProfile:
+        return self._profile
+
+    def record_user_prompt_usage(self, prompt: Prompt, *, max_recent: int = 20) -> UserProfile:  # noqa: ARG002
+        self._profile.record_prompt_usage(prompt)
+        return self._profile
 
 
 class _StubWorker:

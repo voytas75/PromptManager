@@ -23,7 +23,7 @@ from core.prompt_manager import (
     RepositoryNotFoundError,
 )
 from core.name_generation import DescriptionGenerationError
-from models.prompt_model import Prompt
+from models.prompt_model import Prompt, UserProfile
 
 
 @dataclass
@@ -82,6 +82,7 @@ class _RecordingRepository:
     def __init__(self) -> None:
         self.storage: Dict[uuid.UUID, Prompt] = {}
         self.deleted: List[uuid.UUID] = []
+        self.profile = UserProfile.create_default()
 
     def add(self, prompt: Prompt) -> Prompt:
         self.storage[prompt.id] = prompt
@@ -107,6 +108,13 @@ class _RecordingRepository:
     def list(self, limit: Optional[int] = None) -> List[Prompt]:
         values = list(self.storage.values())
         return values[:limit] if limit is not None else values
+
+    def get_user_profile(self) -> UserProfile:
+        return self.profile
+
+    def record_user_prompt_usage(self, prompt: Prompt, *, max_recent: int = 20) -> UserProfile:  # noqa: ARG002
+        self.profile.record_prompt_usage(prompt)
+        return self.profile
 
 
 class _RedisStub:

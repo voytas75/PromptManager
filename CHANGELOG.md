@@ -4,6 +4,12 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ## [0.8.5] - 2025-11-10
 
+## [0.9.0] - 2025-11-11
+
+- Tracked prompt usage in a single-user profile persisted to SQLite, powering personalised categories, tags, and recent history.
+- Biased intent suggestions with stored preferences so frequently used categories surface first in GUI and CLI queries.
+- Added regression tests for profile persistence along with lightweight collection stubs to keep factories decoupled from Chroma.
+
 - Added a keyboard-driven command palette (`Ctrl+K` / `Ctrl+Shift+P`) with quick actions mapped to common prompt workflows.
 - Introduced configurable quick action shortcuts (`Ctrl+1`–`Ctrl+4`) and prompt matching logic for explain, debug, document, and enhance flows.
 - Allowed users to define custom quick actions via settings/config JSON (including hints, templates, shortcuts, and prompt IDs) and added unit tests for the palette utilities.

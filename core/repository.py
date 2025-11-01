@@ -1,5 +1,6 @@
 """SQLite-backed repository for persistent prompt storage.
 
+Updates: v0.4.0 - 2025-11-11 - Persist single-user profile preferences alongside prompts.
 Updates: v0.3.0 - 2025-11-09 - Add rating aggregation columns and execution rating support.
 Updates: v0.2.0 - 2025-11-08 - Add prompt execution history persistence APIs.
 Updates: v0.1.0 - 2025-10-31 - Introduce PromptRepository syncing Prompt dataclass with SQLite.
@@ -10,10 +11,11 @@ from __future__ import annotations
 import json
 import sqlite3
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
-from models.prompt_model import Prompt, PromptExecution
+from models.prompt_model import DEFAULT_PROFILE_ID, Prompt, PromptExecution, UserProfile
 
 
 class RepositoryError(Exception):
@@ -73,6 +75,20 @@ def _json_loads_optional(value: Optional[str]) -> Optional[Any]:
         return value
 
 
+def _json_loads_dict(value: Optional[str]) -> Dict[str, Any]:
+    """Deserialize JSON strings into dictionaries."""
+
+    if value is None or value in ("", "null"):
+        return {}
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return {}
+    if isinstance(parsed, dict):
+        return {str(key): parsed[key] for key in parsed}
+    return {}
+
+
 class PromptRepository:
     """Persist prompts to SQLite and hydrate `Prompt` objects."""
 
@@ -118,6 +134,20 @@ class PromptRepository:
         "input_hash",
         "rating",
         "metadata",
+    )
+
+    _PROFILE_COLUMNS: Sequence[str] = (
+        "id",
+        "username",
+        "preferred_language",
+        "category_weights",
+        "tag_weights",
+        "recent_prompts",
+        "settings",
+        "updated_at",
+        "ext1",
+        "ext2",
+        "ext3",
     )
 
     def __init__(self, db_path: str) -> None:
@@ -434,6 +464,42 @@ class PromptRepository:
         }
         return PromptExecution.from_record(payload)
 
+    def _user_profile_to_row(self, profile: UserProfile) -> Dict[str, Any]:
+        """Serialize UserProfile to SQLite row mapping."""
+
+        record = profile.to_record()
+        return {
+            "id": record["id"],
+            "username": record["username"],
+            "preferred_language": record["preferred_language"],
+            "category_weights": _json_dumps(record["category_weights"]),
+            "tag_weights": _json_dumps(record["tag_weights"]),
+            "recent_prompts": _json_dumps(record["recent_prompts"]),
+            "settings": _json_dumps(record["settings"]),
+            "updated_at": record["updated_at"],
+            "ext1": record["ext1"],
+            "ext2": _json_dumps(record["ext2"]),
+            "ext3": _json_dumps(record["ext3"]),
+        }
+
+    def _row_to_user_profile(self, row: sqlite3.Row) -> UserProfile:
+        """Hydrate UserProfile from SQLite row."""
+
+        payload: Dict[str, Any] = {
+            "id": row["id"],
+            "username": row["username"],
+            "preferred_language": row["preferred_language"],
+            "category_weights": _json_loads_dict(row["category_weights"]),
+            "tag_weights": _json_loads_dict(row["tag_weights"]),
+            "recent_prompts": _json_loads_list(row["recent_prompts"]),
+            "settings": _json_loads_optional(row["settings"]),
+            "updated_at": row["updated_at"],
+            "ext1": row["ext1"],
+            "ext2": _json_loads_optional(row["ext2"]),
+            "ext3": _json_loads_optional(row["ext3"]),
+        }
+        return UserProfile.from_record(payload)
+
     def _ensure_schema(self, conn: sqlite3.Connection) -> None:
         """Create required tables if they do not exist."""
         conn.execute(
@@ -511,6 +577,90 @@ class PromptRepository:
         }
         if "rating" not in execution_columns:
             conn.execute("ALTER TABLE prompt_executions ADD COLUMN rating REAL;")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_profile (
+                id TEXT PRIMARY KEY,
+                username TEXT NOT NULL,
+                preferred_language TEXT,
+                category_weights TEXT,
+                tag_weights TEXT,
+                recent_prompts TEXT,
+                settings TEXT,
+                updated_at TEXT NOT NULL,
+                ext1 TEXT,
+                ext2 TEXT,
+                ext3 TEXT
+            );
+            """
+        )
+        profile_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(user_profile);")
+        }
+        for column, ddl in (
+            ("category_weights", "ALTER TABLE user_profile ADD COLUMN category_weights TEXT;"),
+            ("tag_weights", "ALTER TABLE user_profile ADD COLUMN tag_weights TEXT;"),
+            ("recent_prompts", "ALTER TABLE user_profile ADD COLUMN recent_prompts TEXT;"),
+            ("settings", "ALTER TABLE user_profile ADD COLUMN settings TEXT;"),
+            ("ext1", "ALTER TABLE user_profile ADD COLUMN ext1 TEXT;"),
+            ("ext2", "ALTER TABLE user_profile ADD COLUMN ext2 TEXT;"),
+            ("ext3", "ALTER TABLE user_profile ADD COLUMN ext3 TEXT;"),
+        ):
+            if column not in profile_columns:
+                conn.execute(ddl)
+
+        existing_profile = conn.execute("SELECT 1 FROM user_profile LIMIT 1;").fetchone()
+        if existing_profile is None:
+            conn.execute(
+                "INSERT INTO user_profile (id, username, updated_at) VALUES (?, ?, ?);",
+                (str(DEFAULT_PROFILE_ID), "default", datetime.now(timezone.utc).isoformat()),
+            )
+
+    # User profile helpers ------------------------------------------------- #
+
+    def get_user_profile(self) -> UserProfile:
+        """Return the single stored user profile, creating a default if missing."""
+
+        try:
+            with _connect(self._db_path) as conn:
+                cursor = conn.execute("SELECT * FROM user_profile LIMIT 1;")
+                row = cursor.fetchone()
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to load user profile") from exc
+
+        if row is None:
+            profile = UserProfile.create_default()
+            return self.save_user_profile(profile)
+
+        return self._row_to_user_profile(row)
+
+    def save_user_profile(self, profile: UserProfile) -> UserProfile:
+        """Insert or update the singleton user profile."""
+
+        payload = self._user_profile_to_row(profile)
+        assignments = ", ".join(
+            f"{column} = excluded.{column}" for column in self._PROFILE_COLUMNS if column != "id"
+        )
+        query = (
+            f"INSERT INTO user_profile ({', '.join(self._PROFILE_COLUMNS)}) "
+            f"VALUES ({', '.join(f':{column}' for column in self._PROFILE_COLUMNS)}) "
+            f"ON CONFLICT(id) DO UPDATE SET {assignments};"
+        )
+
+        try:
+            with _connect(self._db_path) as conn:
+                conn.execute(query, payload)
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to persist user profile") from exc
+
+        return profile
+
+    def record_user_prompt_usage(self, prompt: Prompt, *, max_recent: int = 20) -> UserProfile:
+        """Update stored profile preferences using a prompt usage event."""
+
+        profile = self.get_user_profile()
+        profile.record_prompt_usage(prompt, max_recent=max_recent)
+        return self.save_user_profile(profile)
 
 
 __all__ = ["PromptRepository", "RepositoryError", "RepositoryNotFoundError"]

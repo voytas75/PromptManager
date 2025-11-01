@@ -4,3 +4,4 @@ numpy>=1.26.4,<2
 pydantic==2.12.3
 pydantic-settings==2.2.1
 PyYAML==6.0.2
+redis==5.0.1
