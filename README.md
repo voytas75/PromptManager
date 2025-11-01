@@ -124,7 +124,7 @@ Further modules (session history, execution pipeline) will be introduced in subs
 ## Executing Prompts
 
 - Configure LiteLLM credentials via the Settings dialog or environment variables: set `PROMPT_MANAGER_LITELLM_MODEL` and `PROMPT_MANAGER_LITELLM_API_KEY`, plus `PROMPT_MANAGER_LITELLM_API_BASE` / `PROMPT_MANAGER_LITELLM_API_VERSION` for Azure-hosted deployments.
-- Paste code or free-form context into the workspace, select a prompt, and click **Run Prompt**. The result pane displays model output; **Save Result** captures it in the history with optional notes, and **Copy Result** copies it to the clipboard.
+- Paste code or free-form context into the workspace, select a prompt, and click **Run Prompt**. The result pane now exposes **Output** and **Diff** tabs so you can inspect the raw model response or view a unified diff against your original input; **Save Result** captures the run in history with optional notes, and **Copy Result** copies the generated text to the clipboard.
 - Every run is persisted to the new `prompt_executions` table with request excerpts, model responses, duration, status, error details (when present), and LiteLLM token usage metadata.
 - Programmatic consumers can call `PromptManager.list_recent_executions()` or `PromptManager.list_executions_for_prompt(prompt_id)` to surface history in future dashboards or integrations.
 - Failures are logged with status `failed` and surfaced in the GUI. Successful runs increment `usage_count` for the prompt so catalogue analytics remain accurate.

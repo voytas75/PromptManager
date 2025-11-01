@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.7.0 - 2025-11-10 - Add diff preview tab alongside generated output for prompt executions.
 Updates: v0.6.0 - 2025-11-09 - Add execution rating workflow and display aggregated prompt scores.
 Updates: v0.5.1 - 2025-11-09 - Wrap prompt details in a scroll area to avoid Wayland resize crashes.
 Updates: v0.5.0 - 2025-11-08 - Add prompt execution workflow with result pane.
@@ -60,6 +61,7 @@ from models.prompt_model import Prompt
 from .dialogs import CatalogPreviewDialog, PromptDialog, SaveResultDialog
 from .history_panel import HistoryPanel
 from .settings_dialog import SettingsDialog, persist_settings_to_config
+from .diff_utils import build_diff_preview
 from .usage_logger import IntentUsageLogger
 
 
@@ -346,13 +348,21 @@ class MainWindow(QMainWindow):
         self._result_label.setObjectName("resultTitle")
         self._result_meta = QLabel("", self)
         self._result_meta.setStyleSheet("color: #5b5b5b; font-style: italic;")
-        self._result_view = QPlainTextEdit(self)
-        self._result_view.setReadOnly(True)
-        self._result_view.setPlaceholderText("Run a prompt to see output here.")
+
+        self._result_tabs = QTabWidget(self)
+        self._result_text = QPlainTextEdit(self)
+        self._result_text.setReadOnly(True)
+        self._result_text.setPlaceholderText("Run a prompt to see output here.")
+        self._result_tabs.addTab(self._result_text, "Output")
+
+        self._diff_view = QPlainTextEdit(self)
+        self._diff_view.setReadOnly(True)
+        self._diff_view.setPlaceholderText("Run a prompt to compare input and output.")
+        self._result_tabs.addTab(self._diff_view, "Diff")
 
         result_info_layout.addWidget(self._result_label)
         result_info_layout.addWidget(self._result_meta)
-        result_info_layout.addWidget(self._result_view, 1)
+        result_info_layout.addWidget(self._result_tabs, 1)
         result_tab_layout.addLayout(result_info_layout)
 
         self._history_panel = HistoryPanel(
@@ -565,7 +575,11 @@ class MainWindow(QMainWindow):
             executed_at = history_entry.executed_at.astimezone()
             meta_parts.append(f"Logged: {executed_at.strftime('%Y-%m-%d %H:%M:%S %Z')}")
         self._result_meta.setText(" | ".join(meta_parts))
-        self._result_view.setPlainText(outcome.result.response_text or "")
+        response_text = outcome.result.response_text or ""
+        request_text = outcome.result.request_text or ""
+        self._result_text.setPlainText(response_text)
+        self._update_diff_view(request_text, response_text)
+        self._result_tabs.setCurrentIndex(0)
         self._copy_result_button.setEnabled(bool(outcome.result.response_text))
         self._save_button.setEnabled(True)
 
@@ -575,9 +589,17 @@ class MainWindow(QMainWindow):
         self._last_execution = None
         self._result_label.setText("No prompt executed yet")
         self._result_meta.clear()
-        self._result_view.clear()
+        self._result_text.clear()
+        self._diff_view.clear()
+        self._diff_view.setPlaceholderText("Run a prompt to compare input and output.")
         self._copy_result_button.setEnabled(False)
         self._save_button.setEnabled(False)
+
+    def _update_diff_view(self, original: str, generated: str) -> None:
+        """Render a unified diff comparing the request text with the response."""
+
+        diff_text = build_diff_preview(original, generated)
+        self._diff_view.setPlainText(diff_text)
 
     def _generate_prompt_name(self, context: str) -> str:
         """Delegate name generation to PromptManager, surfacing errors."""

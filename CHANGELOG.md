@@ -2,6 +2,13 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.8.3] - 2025-11-10
+
+- Added an Output/Diff view in the GUI result panel to compare generated text with the original request.
+- Introduced a shared diff preview helper so other surfaces can reuse the same comparison logic.
+- Covered the diff helper with unit tests to guard against regressions.
+- Updated documentation to reflect the new diff viewer workflow.
+
 ## [0.8.2] - 2025-11-09
 
 - Added prompt execution rating workflow in the GUI, storing per-run ratings and surfacing averaged quality scores in prompt details and filters.
