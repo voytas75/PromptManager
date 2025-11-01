@@ -1,5 +1,6 @@
 """Embedding provider and background synchronisation helpers for Prompt Manager.
 
+Updates: v0.7.0 - 2025-11-11 - Publish notifications for background embedding sync progress.
 Updates: v0.6.0 - 2025-11-07 - Add configurable LiteLLM and sentence-transformer backends.
 Updates: v0.1.0 - 2025-11-05 - Introduce embedding provider with retry logic and sync worker.
 """
@@ -17,6 +18,11 @@ from typing import Callable, Iterable, List, Optional, Sequence, Tuple
 from models.prompt_model import Prompt
 
 from .litellm_adapter import get_embedding
+from .notifications import (
+    NotificationCenter,
+    NotificationLevel,
+    notification_center as default_notification_center,
+)
 
 EmbeddingFunction = Callable[[Sequence[str]], Sequence[Sequence[float]]]
 
@@ -204,6 +210,7 @@ class EmbeddingSyncWorker:
         fetch_prompt: Callable[[uuid.UUID], Prompt],
         persist_callback: Callable[[Prompt, Sequence[float]], None],
         *,
+        notification_center: Optional[NotificationCenter] = None,
         logger: Optional[logging.Logger] = None,
         max_attempts: int = 3,
         retry_delay_seconds: float = 0.5,
@@ -211,6 +218,7 @@ class EmbeddingSyncWorker:
         self._provider = provider
         self._fetch_prompt = fetch_prompt
         self._persist_callback = persist_callback
+        self._notification_center = notification_center or default_notification_center
         self._logger = logger or logging.getLogger("prompt_manager.embedding_worker")
         self._max_attempts = max(1, max_attempts)
         self._retry_delay_seconds = max(0.0, retry_delay_seconds)
@@ -252,21 +260,42 @@ class EmbeddingSyncWorker:
             self._maybe_reschedule(prompt_id, attempts)
             return
 
+        label = prompt.name or str(prompt.id)
+        metadata = {"prompt_id": str(prompt.id), "attempt": attempts + 1}
+        task_id = f"embedding-sync:{prompt.id}:{attempts + 1}"
+
         try:
-            vector = self._provider.embed(prompt.document)
-        except EmbeddingGenerationError as exc:
+            with self._notification_center.track_task(
+                title="Embedding synchronisation",
+                task_id=task_id,
+                start_message=f"Updating embedding for '{label}'…",
+                success_message=f"Embedding updated for '{label}'.",
+                failure_message=f"Embedding sync failed for '{label}'",
+                metadata=metadata,
+                level=NotificationLevel.INFO,
+                failure_level=NotificationLevel.WARNING,
+            ):
+                vector = self._provider.embed(prompt.document)
+                try:
+                    self._persist_callback(prompt, vector)
+                except Exception as exc:  # noqa: BLE001
+                    raise RuntimeError("Persisting embedding failed") from exc
+        except EmbeddingGenerationError:
             self._logger.warning(
                 "Embedding generation failed during background sync",
                 extra={"prompt_id": str(prompt_id), "attempt": attempts + 1},
             )
             self._maybe_reschedule(prompt_id, attempts, backoff=True)
-            return
-
-        try:
-            self._persist_callback(prompt, vector)
-        except Exception as exc:  # noqa: BLE001
+        except RuntimeError as exc:
             self._logger.error(
                 "Persisting embedding failed",
+                exc_info=exc.__cause__ if exc.__cause__ is not None else exc,
+                extra={"prompt_id": str(prompt_id), "attempt": attempts + 1},
+            )
+            self._maybe_reschedule(prompt_id, attempts, backoff=True)
+        except Exception as exc:  # noqa: BLE001 - defensive catch-all
+            self._logger.error(
+                "Unexpected embedding sync failure",
                 exc_info=exc,
                 extra={"prompt_id": str(prompt_id), "attempt": attempts + 1},
             )

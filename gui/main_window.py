@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.10.0 - 2025-11-11 - Surface notification centre with task status indicator and history dialog.
 Updates: v0.9.0 - 2025-11-10 - Introduce command palette quick actions with keyboard shortcuts.
 Updates: v0.8.0 - 2025-11-10 - Add language detection and syntax highlighting to the query workspace.
 Updates: v0.7.0 - 2025-11-10 - Add diff preview tab alongside generated output for prompt executions.
@@ -17,8 +18,9 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from collections import deque
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Deque, Dict, Iterable, List, Optional, Sequence
 
 from PySide6.QtCore import QAbstractListModel, QModelIndex, Qt
 from PySide6.QtGui import QGuiApplication, QKeySequence, QTextCursor, QShortcut
@@ -59,6 +61,7 @@ from core import (
     export_prompt_catalog,
     import_prompt_catalog,
 )
+from core.notifications import Notification, NotificationStatus
 from models.prompt_model import Prompt
 
 from .command_palette import CommandPaletteDialog, QuickAction, rank_prompts_for_action
@@ -69,6 +72,7 @@ from .settings_dialog import SettingsDialog, persist_settings_to_config
 from .diff_utils import build_diff_preview
 from .language_tools import DetectedLanguage, detect_language
 from .usage_logger import IntentUsageLogger
+from .notifications import QtNotificationBridge, NotificationHistoryDialog
 
 
 logger = logging.getLogger(__name__)
@@ -213,9 +217,22 @@ class MainWindow(QMainWindow):
             self._runtime_settings.get("quick_actions")
         )
         self._quick_shortcuts: List[QShortcut] = []
+        self._notification_history: Deque[Notification] = deque(maxlen=200)
+        self._active_notifications: Dict[str, Notification] = {}
+        for note in self._manager.notification_center.history():
+            self._notification_history.append(note)
+            self._update_active_notification(note)
+        self._notification_indicator = QLabel("", self)
+        self._notification_indicator.setObjectName("notificationIndicator")
+        self._notification_indicator.setStyleSheet("color: #2f80ed; font-weight: 500;")
+        self._notification_indicator.setVisible(bool(self._active_notifications))
+        self._notification_bridge = QtNotificationBridge(self._manager.notification_center, self)
+        self._notification_bridge.notification_received.connect(self._handle_notification)
         self.setWindowTitle("Prompt Manager")
         self.resize(1024, 640)
         self._build_ui()
+        self.statusBar().addPermanentWidget(self._notification_indicator)
+        self._update_notification_indicator()
         self._register_quick_shortcuts()
         self._load_prompts()
 
@@ -261,6 +278,10 @@ class MainWindow(QMainWindow):
         self._history_button = QPushButton("History", self)
         self._history_button.clicked.connect(self._on_history_clicked)  # type: ignore[arg-type]
         controls_layout.addWidget(self._history_button)
+
+        self._notifications_button = QPushButton("Notifications", self)
+        self._notifications_button.clicked.connect(self._on_notifications_clicked)  # type: ignore[arg-type]
+        controls_layout.addWidget(self._notifications_button)
 
         self._settings_button = QPushButton("Settings", self)
         self._settings_button.clicked.connect(self._on_settings_clicked)  # type: ignore[arg-type]
@@ -1338,6 +1359,52 @@ class MainWindow(QMainWindow):
                 index = self._model.index(row, 0)
                 self._list_view.setCurrentIndex(index)
                 break
+
+    def _handle_notification(self, notification: Notification) -> None:
+        """React to notification updates published by the core manager."""
+
+        self._register_notification(notification, show_status=True)
+
+    def _register_notification(self, notification: Notification, *, show_status: bool) -> None:
+        self._notification_history.append(notification)
+        self._update_active_notification(notification)
+        self._update_notification_indicator()
+        if show_status:
+            message = self._format_notification_message(notification)
+            duration = 0 if notification.status is NotificationStatus.STARTED else 5000
+            self.statusBar().showMessage(message, duration)
+
+    def _update_active_notification(self, notification: Notification) -> None:
+        task_id = notification.task_id
+        if not task_id:
+            return
+        if notification.status is NotificationStatus.STARTED:
+            self._active_notifications[task_id] = notification
+        elif notification.status in {NotificationStatus.SUCCEEDED, NotificationStatus.FAILED}:
+            self._active_notifications.pop(task_id, None)
+
+    def _update_notification_indicator(self) -> None:
+        active = len(self._active_notifications)
+        if active:
+            self._notification_indicator.setText(f"Tasks: {active}")
+            self._notification_indicator.setVisible(True)
+        else:
+            self._notification_indicator.clear()
+            self._notification_indicator.setVisible(False)
+
+    @staticmethod
+    def _format_notification_message(notification: Notification) -> str:
+        status = notification.status.value.replace("_", " ").title()
+        return f"{notification.title}: {status} — {notification.message}"
+
+    def _on_notifications_clicked(self) -> None:
+        dialog = NotificationHistoryDialog(tuple(self._notification_history), self)
+        dialog.exec()
+
+    def closeEvent(self, event) -> None:  # type: ignore[override]
+        if hasattr(self, "_notification_bridge"):
+            self._notification_bridge.close()
+        super().closeEvent(event)
 
     def _show_error(self, title: str, message: str) -> None:
         """Display an error dialog and log to status bar."""

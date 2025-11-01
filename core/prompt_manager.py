@@ -1,5 +1,6 @@
 """High-level CRUD manager for prompt records backed by SQLite, ChromaDB, and Redis.
 
+Updates: v0.10.0 - 2025-11-11 - Emit notifications for managed LLM and embedding tasks.
 Updates: v0.9.0 - 2025-11-11 - Track single-user preferences and personalise intent suggestions.
 Updates: v0.8.0 - 2025-11-09 - Capture prompt ratings from executions and update quality scores.
 Updates: v0.7.0 - 2025-11-08 - Integrate prompt execution pipeline with history logging.
@@ -75,6 +76,11 @@ from .name_generation import (
     NameGenerationError,
 )
 from .repository import PromptRepository, RepositoryError, RepositoryNotFoundError
+from .notifications import (
+    NotificationCenter,
+    NotificationLevel,
+    notification_center as default_notification_center,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +132,7 @@ class PromptManager:
         name_generator: Optional[LiteLLMNameGenerator] = None,
         description_generator: Optional[LiteLLMDescriptionGenerator] = None,
         intent_classifier: Optional[IntentClassifier] = None,
+        notification_center: Optional[NotificationCenter] = None,
         executor: Optional[CodexExecutor] = None,
         user_profile: Optional[UserProfile] = None,
         history_tracker: Optional[HistoryTracker] = None,
@@ -141,6 +148,7 @@ class PromptManager:
             chroma_client: Optional preconfigured Chroma client.
             embedding_function: Optional embedding function for Chroma.
             repository: Optional preconfigured repository instance (e.g. for testing).
+            notification_center: Optional NotificationCenter override for task events.
             executor: Optional CodexExecutor responsible for running prompts.
             history_tracker: Optional execution history tracker for persistence.
             user_profile: Optional profile to seed single-user personalisation state.
@@ -190,6 +198,8 @@ class PromptManager:
         except ChromaError as exc:
             raise PromptStorageError("Unable to initialiase ChromaDB collection") from exc
 
+        self._notification_center = notification_center or default_notification_center
+
         self._embedding_provider = embedding_provider or EmbeddingProvider(embedding_function)
         if enable_background_sync:
             worker_logger = logger.getChild("embedding_sync")
@@ -197,6 +207,7 @@ class PromptManager:
                 provider=self._embedding_provider,
                 fetch_prompt=self._repository.get,
                 persist_callback=self._persist_embedding_from_worker,
+                notification_center=self._notification_center,
                 logger=worker_logger,
             )
         else:
@@ -269,6 +280,12 @@ class PromptManager:
         self._history_tracker = tracker
 
     @property
+    def notification_center(self) -> NotificationCenter:
+        """Expose the notification centre for UI and tooling integrations."""
+
+        return self._notification_center
+
+    @property
     def user_profile(self) -> Optional[UserProfile]:
         """Return the stored single-user profile when available."""
 
@@ -289,10 +306,22 @@ class PromptManager:
             raise NameGenerationError(
                 "LiteLLM name generator is not configured. Set PROMPT_MANAGER_LITELLM_MODEL."
             )
-        try:
-            return self._name_generator.generate(context)
-        except Exception as exc:
-            raise NameGenerationError(str(exc)) from exc
+        task_id = f"name-gen:{uuid.uuid4()}"
+        metadata = {"context_length": len(context or "")}
+        with self._notification_center.track_task(
+            title="Prompt name generation",
+            task_id=task_id,
+            start_message="Generating prompt name via LiteLLM…",
+            success_message="Prompt name generated.",
+            failure_message="Prompt name generation failed",
+            metadata=metadata,
+            level=NotificationLevel.INFO,
+        ):
+            try:
+                suggestion = self._name_generator.generate(context)
+            except Exception as exc:
+                raise NameGenerationError(str(exc)) from exc
+        return suggestion
 
     def generate_prompt_description(self, context: str) -> str:
         """Return a prompt description using the configured LiteLLM generator."""
@@ -301,10 +330,22 @@ class PromptManager:
             raise DescriptionGenerationError(
                 "LiteLLM description generator is not configured. Set PROMPT_MANAGER_LITELLM_MODEL."
             )
-        try:
-            return self._description_generator.generate(context)
-        except Exception as exc:
-            raise DescriptionGenerationError(str(exc)) from exc
+        task_id = f"description-gen:{uuid.uuid4()}"
+        metadata = {"context_length": len(context or "")}
+        with self._notification_center.track_task(
+            title="Prompt description generation",
+            task_id=task_id,
+            start_message="Generating prompt description via LiteLLM…",
+            success_message="Prompt description generated.",
+            failure_message="Prompt description generation failed",
+            metadata=metadata,
+            level=NotificationLevel.INFO,
+        ):
+            try:
+                summary = self._description_generator.generate(context)
+            except Exception as exc:
+                raise DescriptionGenerationError(str(exc)) from exc
+        return summary
 
     def execute_prompt(
         self,
@@ -323,25 +364,40 @@ class PromptManager:
             )
 
         prompt = self.get_prompt(prompt_id)
-        try:
-            result = self._executor.execute(
-                prompt,
-                request_text,
-                extra_messages=extra_messages,
-            )
-        except ExecutionError as exc:
-            self._log_execution_failure(prompt.id, request_text, str(exc))
-            raise PromptExecutionError(str(exc)) from exc
+        task_id = f"prompt-exec:{prompt.id}:{uuid.uuid4()}"
+        metadata = {
+            "prompt_id": str(prompt.id),
+            "prompt_name": prompt.name,
+            "request_length": len(request_text or ""),
+        }
+        with self._notification_center.track_task(
+            title="Prompt execution",
+            task_id=task_id,
+            start_message=f"Running '{prompt.name}' via LiteLLM…",
+            success_message=f"Completed '{prompt.name}'.",
+            failure_message=f"Prompt execution failed for '{prompt.name}'",
+            metadata=metadata,
+            level=NotificationLevel.INFO,
+        ):
+            try:
+                result = self._executor.execute(
+                    prompt,
+                    request_text,
+                    extra_messages=extra_messages,
+                )
+            except ExecutionError as exc:
+                self._log_execution_failure(prompt.id, request_text, str(exc))
+                raise PromptExecutionError(str(exc)) from exc
 
-        history_entry = self._log_execution_success(prompt.id, request_text, result)
-        try:
-            self.increment_usage(prompt.id)
-        except PromptManagerError:
-            logger.debug(
-                "Prompt executed but usage counter update failed",
-                extra={"prompt_id": str(prompt.id)},
-                exc_info=True,
-            )
+            history_entry = self._log_execution_success(prompt.id, request_text, result)
+            try:
+                self.increment_usage(prompt.id)
+            except PromptManagerError:
+                logger.debug(
+                    "Prompt executed but usage counter update failed",
+                    extra={"prompt_id": str(prompt.id)},
+                    exc_info=True,
+                )
 
         return PromptManager.ExecutionOutcome(result=result, history_entry=history_entry)
 

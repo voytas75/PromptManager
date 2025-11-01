@@ -40,6 +40,14 @@ from .name_generation import NameGenerationError, DescriptionGenerationError, Li
 from .repository import PromptRepository, RepositoryError, RepositoryNotFoundError
 from .embedding import create_embedding_function
 from .execution import CodexExecutor, CodexExecutionResult, ExecutionError
+from .notifications import (
+    Notification,
+    NotificationCenter,
+    NotificationLevel,
+    NotificationStatus,
+    NotificationSubscription,
+    notification_center,
+)
 
 __all__ = [
     "PromptManager",
@@ -76,4 +84,10 @@ __all__ = [
     "ExecutionError",
     "HistoryTracker",
     "HistoryTrackerError",
+    "Notification",
+    "NotificationCenter",
+    "NotificationLevel",
+    "NotificationStatus",
+    "NotificationSubscription",
+    "notification_center",
 ]

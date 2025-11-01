@@ -77,6 +77,7 @@ def test_build_prompt_manager_forwards_dependencies(monkeypatch: pytest.MonkeyPa
             name_generator: object = None,
             description_generator: object = None,
             intent_classifier: object = None,
+            notification_center: object = None,
         ) -> None:
             self.kwargs = {
                 "chroma_path": chroma_path,
@@ -92,6 +93,7 @@ def test_build_prompt_manager_forwards_dependencies(monkeypatch: pytest.MonkeyPa
                 "name_generator": name_generator,
                 "description_generator": description_generator,
                 "intent_classifier": intent_classifier,
+                "notification_center": notification_center,
             }
 
     monkeypatch.setattr("core.factory.PromptManager", _PromptManager)

@@ -23,6 +23,7 @@ from .name_generation import (
     NameGenerationError,
 )
 from .repository import PromptRepository
+from .notifications import NotificationCenter, notification_center as default_notification_center
 
 try:  # pragma: no cover - redis optional dependency
     import redis
@@ -84,6 +85,7 @@ def build_prompt_manager(
     embedding_provider: Optional[EmbeddingProvider] = None,
     embedding_worker: Optional[EmbeddingSyncWorker] = None,
     enable_background_sync: bool = True,
+    notification_center: Optional[NotificationCenter] = None,
 ) -> PromptManager:
     """Return a PromptManager configured from validated settings."""
     resolved_redis = _resolve_redis_client(settings.redis_dsn, redis_client)
@@ -143,6 +145,7 @@ def build_prompt_manager(
         "name_generator": name_generator,
         "description_generator": description_generator,
         "intent_classifier": intent_classifier,
+        "notification_center": notification_center or default_notification_center,
     }
     if executor is not None:
         manager_kwargs["executor"] = executor

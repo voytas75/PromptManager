@@ -9,6 +9,7 @@ Prompt Manager is a desktop-focused application for cataloguing, searching, and 
 - `PromptManager` service (`core/prompt_manager.py`) coordinates SQLite persistence, Redis-backed caching, and ChromaDB semantic search.
 - Intent-aware search now classifies queries (debug/refactor/enhance/etc.) to bias retrieval and surface top recommendations inline in the GUI.
 - Single-user preference profile captures prompt usage to personalise ranking and quick suggestions without multi-account overhead.
+- Notification center tracks long-running LLM and embedding tasks and surfaces progress via the GUI status bar with a history dialog.
 - Typed configuration loader in `config/settings.py` validates paths/TTL values and can hydrate from environment variables or a JSON file.
 - Initial PySide6 GUI accessible via `--gui`, offering list/search/detail panes with create/edit/delete dialogs.
 - LiteLLM-backed prompt execution with automatic history logging and a GUI result pane for reviewing and copying model output.
