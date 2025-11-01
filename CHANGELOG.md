@@ -9,6 +9,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 - Tracked prompt usage in a single-user profile persisted to SQLite, powering personalised categories, tags, and recent history.
 - Biased intent suggestions with stored preferences so frequently used categories surface first in GUI and CLI queries.
 - Added regression tests for profile persistence along with lightweight collection stubs to keep factories decoupled from Chroma.
+- Softened LiteLLM/Azure content filter failures with concise messaging and fallback-friendly handling in the GUI.
 
 - Added a keyboard-driven command palette (`Ctrl+K` / `Ctrl+Shift+P`) with quick actions mapped to common prompt workflows.
 - Introduced configurable quick action shortcuts (`Ctrl+1`–`Ctrl+4`) and prompt matching logic for explain, debug, document, and enhance flows.

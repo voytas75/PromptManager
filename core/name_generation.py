@@ -1,5 +1,6 @@
 """LiteLLM-backed prompt metadata generation utilities.
 
+Updates: v0.7.1 - 2025-11-11 - Summarise LiteLLM errors for friendlier GUI fallbacks.
 Updates: v0.7.0 - 2025-11-07 - Add description generator alongside name helper.
 Updates: v0.6.0 - 2025-11-07 - Share LiteLLM import helper with embedding adapters.
 Updates: v0.5.0 - 2025-11-05 - Introduce LiteLLM name generator with graceful fallbacks.
@@ -67,7 +68,7 @@ class LiteLLMNameGenerator:
         try:
             response = completion(**request)  # type: ignore[arg-type]
         except LiteLLMException as exc:  # type: ignore[arg-type]
-            raise NameGenerationError(f"LiteLLM request failed: {exc}") from exc
+            raise NameGenerationError(_summarise_litellm_error(exc)) from exc
         except Exception as exc:  # pragma: no cover - defensive
             raise NameGenerationError("Unexpected error while calling LiteLLM") from exc
 
@@ -129,7 +130,7 @@ class LiteLLMDescriptionGenerator:
         try:
             response = completion(**request)  # type: ignore[arg-type]
         except LiteLLMException as exc:  # type: ignore[arg-type]
-            raise DescriptionGenerationError(f"LiteLLM request failed: {exc}") from exc
+            raise DescriptionGenerationError(_summarise_litellm_error(exc)) from exc
         except Exception as exc:  # pragma: no cover - defensive
             raise DescriptionGenerationError("Unexpected error while calling LiteLLM") from exc
 
@@ -142,6 +143,24 @@ class LiteLLMDescriptionGenerator:
         if not summary:
             raise DescriptionGenerationError("LiteLLM returned an empty description.")
         return summary
+
+
+def _summarise_litellm_error(exc: Exception) -> str:
+    """Return a concise, user-friendly message for LiteLLM failures."""
+
+    text = str(exc).strip()
+    if not text:
+        return "LiteLLM request failed."
+
+    lowered = text.lower()
+    if "content_filter" in lowered or "responsibleaipolicyviolation" in lowered:
+        return (
+            "Azure OpenAI blocked this request by content policy. "
+            "Adjust the prompt text and try again."
+        )
+    if "timeout" in lowered or "timed out" in lowered:
+        return "LiteLLM request timed out. Please retry or check network connectivity."
+    return f"LiteLLM request failed: {text}" if not text.startswith("LiteLLM") else text
 
 
 __all__ = [
