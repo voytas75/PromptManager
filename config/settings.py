@@ -1,5 +1,6 @@
 """Settings management for Prompt Manager configuration.
 
+Updates: v0.4.2 - 2025-11-15 - Disallow LiteLLM API secrets in JSON configuration files.
 Updates: v0.4.1 - 2025-11-14 - Load LiteLLM API key from JSON configuration files.
 Updates: v0.4.0 - 2025-11-07 - Add configurable embedding backend options.
 Updates: v0.3.2 - 2025-10-30 - Document revised settings precedence examples.
@@ -281,12 +282,20 @@ class PromptManagerSettings(BaseSettings):
                 mapped: Dict[str, Any] = {}
                 if "database_path" in data and "db_path" not in data:
                     mapped["db_path"] = data["database_path"]
+                disallowed_secret_keys = {
+                    "litellm_api_key",
+                    "AZURE_OPENAI_API_KEY",
+                }
+                if any(key in data for key in disallowed_secret_keys):
+                    raise SettingsError(
+                        "LiteLLM API credentials must be supplied via environment variables or a secret manager."
+                    )
+
                 for key in (
                     "chroma_path",
                     "redis_dsn",
                     "cache_ttl_seconds",
                     "catalog_path",
-                    "litellm_api_key",
                     "litellm_model",
                     "litellm_api_base",
                     "litellm_api_version",
@@ -297,8 +306,6 @@ class PromptManagerSettings(BaseSettings):
                 ):
                     if key in data:
                         mapped[key] = data[key]
-                if "litellm_api_key" not in mapped and "AZURE_OPENAI_API_KEY" in data:
-                    mapped["litellm_api_key"] = data["AZURE_OPENAI_API_KEY"]
                 if "litellm_api_base" not in mapped and "AZURE_OPENAI_ENDPOINT" in data:
                     mapped["litellm_api_base"] = data["AZURE_OPENAI_ENDPOINT"]
                 if "litellm_api_version" not in mapped and "AZURE_OPENAI_API_VERSION" in data:

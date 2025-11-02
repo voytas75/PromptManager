@@ -1,4 +1,8 @@
-"""Settings dialog for configuring Prompt Manager runtime options."""
+"""Settings dialog for configuring Prompt Manager runtime options.
+
+Updates: v0.1.1 - 2025-11-15 - Avoid persisting LiteLLM API secrets to disk.
+Updates: v0.1.0 - 2025-11-04 - Initial settings dialog implementation.
+"""
 
 from __future__ import annotations
 
@@ -161,7 +165,12 @@ def persist_settings_to_config(updates: dict[str, Optional[str | list[dict[str, 
             config_data = json.loads(config_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             config_data = {}
+    secret_keys = {"litellm_api_key"}
     for key, value in updates.items():
+        if key in secret_keys:
+            # Always drop secrets from on-disk configuration; rely on env/secret store instead.
+            config_data.pop(key, None)
+            continue
         if value is not None:
             config_data[key] = value
         elif key in config_data:

@@ -1,5 +1,6 @@
 """Tests for configuration loading and validation logic.
 
+Updates: v0.1.3 - 2025-11-15 - Forbid LiteLLM API secrets sourced from JSON configuration.
 Updates: v0.1.2 - 2025-11-14 - Cover LiteLLM API key loading from JSON configuration.
 Updates: v0.1.1 - 2025-11-03 - Add precedence test using example template.
 Updates: v0.1.0 - 2025-11-03 - Cover JSON/env precedence and validation errors.
@@ -45,7 +46,7 @@ def test_load_settings_reads_json_and_env(monkeypatch, tmp_path) -> None:
 def test_json_precedes_env_when_both_provided(monkeypatch, tmp_path) -> None:
     """Application JSON settings override environment variables for overlapping keys."""
     # Use the repo's template as a base JSON.
-    template_path = Path("config/config.json").resolve()
+    template_path = Path("config/config.template.json").resolve()
     assert template_path.exists(), "template config should exist"
 
     # Point loader at the template
@@ -59,7 +60,7 @@ def test_json_precedes_env_when_both_provided(monkeypatch, tmp_path) -> None:
     assert settings.cache_ttl_seconds == 600
 
 
-def test_json_supplies_litellm_api_key(monkeypatch, tmp_path) -> None:
+def test_json_with_litellm_api_key_raises_error(monkeypatch, tmp_path) -> None:
     config_payload = {
         "litellm_model": "azure/gpt-4o",
         "litellm_api_key": "from-json",
@@ -71,11 +72,9 @@ def test_json_supplies_litellm_api_key(monkeypatch, tmp_path) -> None:
     config_path.write_text(json.dumps(config_payload), encoding="utf-8")
     monkeypatch.chdir(tmp_path)
 
-    settings = load_settings()
-
-    assert settings.litellm_model == "azure/gpt-4o"
-    assert settings.litellm_api_key == "from-json"
-    assert settings.litellm_api_base == "https://azure.example.com"
+    with pytest.raises(SettingsError) as excinfo:
+        load_settings()
+    assert "LiteLLM API credentials must be supplied" in str(excinfo.value)
 
 
 def test_litellm_settings_from_env(monkeypatch, tmp_path) -> None:

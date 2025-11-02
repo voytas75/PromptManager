@@ -30,10 +30,13 @@ Prompt Manager is a desktop-focused application for cataloguing, searching, and 
    - `CHROMA_PATH` – directory for ChromaDB persistence (default `data/chromadb`).
    - `REDIS_DSN` – optional Redis connection string e.g. `redis://localhost:6379/0`.
    - `CACHE_TTL_SECONDS` – positive integer TTL for cached prompts (default `300`).
+   - `LITELLM_MODEL` – optional LiteLLM model identifier used for name generation and execution.
    - `EMBEDDING_BACKEND` – one of `deterministic`, `litellm`, or `sentence-transformers` (default `deterministic`).
    - `EMBEDDING_MODEL` – embedding model identifier used by LiteLLM or sentence-transformers backends.
    - `EMBEDDING_DEVICE` – optional device string (e.g. `cpu`, `cuda`) for local sentence-transformers models.
    - `LITELLM_API_VERSION` / `AZURE_OPENAI_API_VERSION` – optional API version (required for Azure OpenAI deployments).
+
+   Copy `config/config.template.json` to `config/config.json` as a starting point for non-secret defaults. LiteLLM API keys are **never** read from JSON; set `PROMPT_MANAGER_LITELLM_API_KEY` (or `AZURE_OPENAI_API_KEY`) in your environment or secrets manager instead.
 
    When a JSON file is provided, environment variables take precedence. Validation issues raise `config.SettingsError` with actionable context.
 
@@ -98,7 +101,7 @@ Further modules (session history, execution pipeline) will be introduced in subs
 - Dialogs validate required fields and surface backend errors with actionable messaging while keeping data in sync across SQLite, Redis, and ChromaDB.
 - When adding prompts the dialog can generate a name from the context field via the **Generate** button. Configure LiteLLM (model + API key) so this suggestion comes from your chosen LLM; otherwise the UI falls back to a heuristic title.
 - The **Prompt Body** field is where you paste the actual prompt text that will be sent to the model—it's displayed prominently in the detail pane.
-- Use the **Settings** button to update the catalogue path or LiteLLM credentials at runtime; changes persist to `config/config.json` and the catalogue resyncs immediately.
+- Use the **Settings** button to update the catalogue path or LiteLLM routing options (model/base/version) at runtime; these values persist to `config/config.json` while API keys entered in the dialog stay in-memory only. Set `PROMPT_MANAGER_LITELLM_API_KEY` in your environment to reuse the key across sessions.
 - Intent detection appears beneath the workspace and search bar once you start typing or analysing text, highlighting the inferred category (Debugging, Refactoring, Documentation, etc.), language hints, and the top-matching prompts.
 - When LiteLLM is configured, leaving the **Name** and **Description** fields blank will automatically populate them from the prompt body, speeding up catalogue entry for new prompts.
 - Import or export catalogues directly from the toolbar: **Import** previews a diff and applies updates, while **Export** writes the current state to JSON or YAML.
@@ -107,7 +110,7 @@ Further modules (session history, execution pipeline) will be introduced in subs
 ## Executing Prompts
 
 - LiteLLM support is bundled with the main requirements, so once dependencies are installed the execution backend is ready to use on every platform.
-- Configure LiteLLM credentials via the Settings dialog or environment variables: set `PROMPT_MANAGER_LITELLM_MODEL` and `PROMPT_MANAGER_LITELLM_API_KEY`, plus `PROMPT_MANAGER_LITELLM_API_BASE` / `PROMPT_MANAGER_LITELLM_API_VERSION` for Azure-hosted deployments.
+- Configure LiteLLM credentials via the Settings dialog and environment variables: choose the model/Base/Version in Settings and export `PROMPT_MANAGER_LITELLM_API_KEY` (or `AZURE_OPENAI_API_KEY`) so the key comes from your shell or secret store. The GUI never writes the key to disk.
 - Paste code or free-form context into the workspace, select a prompt, and click **Run Prompt**. The result pane now exposes **Output** and **Diff** tabs so you can inspect the raw model response or view a unified diff against your original input; **Save Result** captures the run in history with optional notes, and **Copy Result** copies the generated text to the clipboard.
 - Continue the conversation after a response with **Continue Chat**, review the live transcript in the new **Chat** tab, and end the session with **End Chat**—the entire dialogue is persisted to history entries.
 - Every run is persisted to the new `prompt_executions` table with request excerpts, model responses, duration, status, error details (when present), and LiteLLM token usage metadata.
@@ -164,13 +167,13 @@ These commands reuse the same validation and merge logic as the GUI and honour t
 
 - Precedence (highest → lowest):
   - Explicit overrides passed to `load_settings` / in-memory application changes.
-  - Application settings file (`config/config.json` by default, or a path specified via `PROMPT_MANAGER_CONFIG_JSON`).
+- Application settings file (copy `config/config.template.json` to `config/config.json`, or provide an alternate path via `PROMPT_MANAGER_CONFIG_JSON`).
   - Environment variables (`PROMPT_MANAGER_*`, plus Azure aliases such as `AZURE_OPENAI_API_KEY`).
   - Built-in defaults.
 
 - Naming note: environment variable keys use upper snake case with the `PROMPT_MANAGER_` prefix (e.g., `PROMPT_MANAGER_DATABASE_PATH`). JSON keys use lower snake case (e.g., `database_path`). Env vars always override JSON values when both are provided.
 
-- Example JSON (`config/config.json`) provided in-repo as a template:
+- Example JSON (`config/config.template.json`) provided in-repo as a template:
 
   ```json
   {

@@ -2,6 +2,12 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.11.1] - 2025-11-15
+
+- Removed LiteLLM API key loading from JSON configuration files to prevent accidental secret leaks; credentials must now be supplied via environment variables or a secret manager.
+- Added a checked-in `config/config.template.json` with non-secret defaults and scrubbed the local example config.
+- Updated the settings dialog and documentation so LiteLLM API keys are never persisted to disk and existing configs remain valid.
+
 ## [0.11.0] - 2025-11-12
 
 - Enabled multi-turn chat continuation in the GUI with **Continue Chat** / **End Chat** controls and a dedicated chat transcript tab.

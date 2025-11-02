@@ -1,0 +1,10 @@
+{
+  "database_path": "data/prompt_manager.db",
+  "chroma_path": "data/chromadb",
+  "redis_dsn": "redis://localhost:6379/0",
+  "cache_ttl_seconds": 600,
+  "catalog_path": "catalog/prompts.json",
+  "litellm_model": "azure/gpt-4o-mini",
+  "litellm_api_base": "https://example.openai.azure.com",
+  "litellm_api_version": "2025-04-01-preview"
+}
