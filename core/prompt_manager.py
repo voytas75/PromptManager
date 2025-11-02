@@ -1,5 +1,6 @@
 """High-level CRUD manager for prompt records backed by SQLite, ChromaDB, and Redis.
 
+Updates: v0.12.0 - 2025-11-15 - Add LiteLLM-backed prompt engineering workflow.
 Updates: v0.11.0 - 2025-11-12 - Add multi-turn chat execution with conversation history logging.
 Updates: v0.10.0 - 2025-11-11 - Emit notifications for managed LLM and embedding tasks.
 Updates: v0.9.0 - 2025-11-11 - Track single-user preferences and personalise intent suggestions.
@@ -95,6 +96,7 @@ from .name_generation import (
     DescriptionGenerationError,
     NameGenerationError,
 )
+from .prompt_engineering import PromptEngineer, PromptEngineeringError, PromptRefinement
 from .repository import PromptRepository, RepositoryError, RepositoryNotFoundError
 from .notifications import (
     NotificationCenter,
@@ -133,6 +135,10 @@ class PromptCacheError(PromptManagerError):
     """Raised when Redis cache lookups or writes fail."""
 
 
+class PromptEngineeringUnavailable(PromptManagerError):
+    """Raised when prompt refinement is requested without an engineer configured."""
+
+
 class PromptManager:
     """Manage prompt persistence, caching, and semantic search."""
 
@@ -151,6 +157,7 @@ class PromptManager:
         enable_background_sync: bool = True,
         name_generator: Optional[LiteLLMNameGenerator] = None,
         description_generator: Optional[LiteLLMDescriptionGenerator] = None,
+        prompt_engineer: Optional[PromptEngineer] = None,
         intent_classifier: Optional[IntentClassifier] = None,
         notification_center: Optional[NotificationCenter] = None,
         executor: Optional[CodexExecutor] = None,
@@ -172,6 +179,7 @@ class PromptManager:
             executor: Optional CodexExecutor responsible for running prompts.
             history_tracker: Optional execution history tracker for persistence.
             user_profile: Optional profile to seed single-user personalisation state.
+            prompt_engineer: Optional prompt refinement helper using LiteLLM.
         """
         # Allow tests to supply repository directly; only require db_path when building one.
         if repository is None and db_path is None:
@@ -234,6 +242,7 @@ class PromptManager:
             self._embedding_worker = embedding_worker or _NullEmbeddingWorker()
         self._name_generator = name_generator
         self._description_generator = description_generator
+        self._prompt_engineer = prompt_engineer
         self._intent_classifier = intent_classifier
         self._executor = executor
         self._history_tracker = history_tracker
@@ -312,6 +321,12 @@ class PromptManager:
 
         return self._user_profile
 
+    @property
+    def prompt_engineer(self) -> Optional[PromptEngineer]:
+        """Return the configured prompt engineering helper, if any."""
+
+        return self._prompt_engineer
+
     def refresh_user_profile(self) -> Optional[UserProfile]:
         """Reload the persisted profile from the repository."""
 
@@ -367,6 +382,53 @@ class PromptManager:
             except Exception as exc:
                 raise DescriptionGenerationError(str(exc)) from exc
         return summary
+
+    def refine_prompt_text(
+        self,
+        prompt_text: str,
+        *,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        category: Optional[str] = None,
+        tags: Optional[Sequence[str]] = None,
+        negative_constraints: Optional[Sequence[str]] = None,
+    ) -> PromptRefinement:
+        """Improve a prompt using the configured prompt engineer."""
+
+        if not prompt_text.strip():
+            raise PromptEngineeringError("Prompt refinement requires non-empty prompt text.")
+        if self._prompt_engineer is None:
+            raise PromptEngineeringUnavailable(
+                "Prompt engineering is not configured. Set PROMPT_MANAGER_LITELLM_MODEL to enable refinement."
+            )
+        task_id = f"prompt-refine:{uuid.uuid4()}"
+        metadata = {
+            "prompt_length": len(prompt_text or ""),
+            "has_name": bool(name),
+            "tag_count": len(tags or []),
+        }
+        with self._notification_center.track_task(
+            title="Prompt refinement",
+            task_id=task_id,
+            start_message="Analysing prompt via LiteLLM…",
+            success_message="Prompt refined.",
+            failure_message="Prompt refinement failed",
+            metadata=metadata,
+            level=NotificationLevel.INFO,
+        ):
+            try:
+                return self._prompt_engineer.refine(
+                    prompt_text,
+                    name=name,
+                    description=description,
+                    category=category,
+                    tags=tags,
+                    negative_constraints=negative_constraints,
+                )
+            except PromptEngineeringError:
+                raise
+            except Exception as exc:  # pragma: no cover - defensive
+                raise PromptEngineeringError("Prompt refinement failed unexpectedly.") from exc
 
     def execute_prompt(
         self,
@@ -566,6 +628,7 @@ class PromptManager:
         if not model:
             self._name_generator = None
             self._description_generator = None
+            self._prompt_engineer = None
             return
         try:
             self._name_generator = LiteLLMNameGenerator(
@@ -575,6 +638,12 @@ class PromptManager:
                 api_version=api_version,
             )
             self._description_generator = LiteLLMDescriptionGenerator(
+                model=model,
+                api_key=api_key,
+                api_base=api_base,
+                api_version=api_version,
+            )
+            self._prompt_engineer = PromptEngineer(
                 model=model,
                 api_key=api_key,
                 api_base=api_base,
@@ -1163,4 +1232,5 @@ __all__ = [
     "PromptCacheError",
     "PromptExecutionUnavailable",
     "PromptExecutionError",
+    "PromptEngineeringUnavailable",
 ]

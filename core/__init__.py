@@ -1,5 +1,6 @@
 """Core service layer for Prompt Manager.
 
+Updates: v0.6.0 - 2025-11-15 - Export prompt engineering helpers alongside manager API.
 Updates: v0.5.0 - 2025-11-07 - Export embedding factory helper for external use.
 Updates: v0.4.0 - 2025-11-06 - Export intent classifier utilities for GUI integration.
 Updates: v0.3.0 - 2025-11-03 - Export build_prompt_manager factory for shared bootstrap.
@@ -30,6 +31,7 @@ from .prompt_manager import (
     PromptCacheError,
     PromptExecutionError,
     PromptExecutionUnavailable,
+    PromptEngineeringUnavailable,
     PromptHistoryError,
     PromptManager,
     PromptManagerError,
@@ -48,6 +50,7 @@ from .notifications import (
     NotificationSubscription,
     notification_center,
 )
+from .prompt_engineering import PromptEngineer, PromptEngineeringError, PromptRefinement
 
 __all__ = [
     "PromptManager",
@@ -57,6 +60,7 @@ __all__ = [
     "PromptCacheError",
     "PromptExecutionError",
     "PromptExecutionUnavailable",
+    "PromptEngineeringUnavailable",
     "PromptHistoryError",
     "PromptRepository",
     "RepositoryError",
@@ -82,6 +86,9 @@ __all__ = [
     "CodexExecutor",
     "CodexExecutionResult",
     "ExecutionError",
+    "PromptEngineer",
+    "PromptEngineeringError",
+    "PromptRefinement",
     "HistoryTracker",
     "HistoryTrackerError",
     "Notification",

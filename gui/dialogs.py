@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.6.0 - 2025-11-15 - Add prompt engineering refinement button to prompt dialog.
 Updates: v0.5.0 - 2025-11-09 - Capture execution ratings alongside optional notes.
 Updates: v0.4.0 - 2025-11-08 - Add execution Save Result dialog with optional notes.
 Updates: v0.3.0 - 2025-11-06 - Add catalogue preview dialog with diff summary output.
@@ -15,7 +16,7 @@ import textwrap
 import uuid
 from copy import deepcopy
 from datetime import datetime, timezone
-from typing import Callable, Optional
+from typing import Callable, Optional, Sequence
 
 from PySide6.QtWidgets import (
     QDialog,
@@ -37,7 +38,9 @@ from core import (
     CatalogDiffEntry,
     NameGenerationError,
     DescriptionGenerationError,
+    PromptEngineeringUnavailable,
 )
+from core.prompt_engineering import PromptEngineeringError, PromptRefinement
 from models.prompt_model import Prompt
 
 
@@ -86,12 +89,14 @@ class PromptDialog(QDialog):
         prompt: Optional[Prompt] = None,
         name_generator: Optional[Callable[[str], str]] = None,
         description_generator: Optional[Callable[[str], str]] = None,
+        prompt_engineer: Optional[Callable[..., PromptRefinement]] = None,
     ) -> None:
         super().__init__(parent)
         self._source_prompt = prompt
         self._result_prompt: Optional[Prompt] = None
         self._name_generator = name_generator
         self._description_generator = description_generator
+        self._prompt_engineer = prompt_engineer
         self.setWindowTitle("Create Prompt" if prompt is None else "Edit Prompt")
         self._build_ui()
         if prompt is not None:
@@ -137,6 +142,20 @@ class PromptDialog(QDialog):
         form_layout.addRow("Language", self._language_input)
         form_layout.addRow("Tags", self._tags_input)
         form_layout.addRow("Prompt Body", self._context_input)
+        self._refine_button = QPushButton("Refine", self)
+        self._refine_button.setToolTip(
+            "Analyse and refine the prompt using LiteLLM when configured."
+        )
+        self._refine_button.clicked.connect(self._on_refine_clicked)  # type: ignore[arg-type]
+        if self._prompt_engineer is None:
+            try:
+                self._refine_button.setEnabled(False)
+            except AttributeError:  # pragma: no cover - stubbed widgets during tests
+                pass
+            self._refine_button.setToolTip(
+                "Configure LiteLLM in Settings to enable prompt engineering."
+            )
+        form_layout.addRow("", self._refine_button)
         form_layout.addRow("Description", self._description_input)
         form_layout.addRow("Example Input", self._example_input)
         form_layout.addRow("Example Output", self._example_output)
@@ -253,6 +272,72 @@ class PromptDialog(QDialog):
                     exc_info=exc,
                 )
             return fallback_generate_description(context)
+
+    def _on_refine_clicked(self) -> None:
+        """Invoke the prompt engineer to refine the prompt body when available."""
+
+        if self._prompt_engineer is None:
+            QMessageBox.information(
+                self,
+                "Prompt refinement unavailable",
+                "Configure LiteLLM in Settings to enable prompt engineering.",
+            )
+            return
+
+        prompt_text = self._context_input.toPlainText()
+        if not prompt_text.strip():
+            QMessageBox.information(
+                self,
+                "Prompt required",
+                "Enter prompt text before running refinement.",
+            )
+            return
+
+        name = self._name_input.text().strip() or None
+        description = self._description_input.toPlainText().strip() or None
+        category = self._category_input.text().strip() or None
+        tags = [tag.strip() for tag in self._tags_input.text().split(",") if tag.strip()]
+
+        try:
+            result = self._prompt_engineer(
+                prompt_text,
+                name=name,
+                description=description,
+                category=category,
+                tags=tags,
+            )
+        except PromptEngineeringError as exc:
+            QMessageBox.warning(self, "Prompt refinement failed", str(exc))
+            return
+        except PromptEngineeringUnavailable as exc:
+            QMessageBox.warning(self, "Prompt refinement unavailable", str(exc))
+            return
+        except Exception as exc:  # pragma: no cover - defensive
+            QMessageBox.warning(
+                self,
+                "Prompt refinement failed",
+                f"Unexpected error: {exc}",
+            )
+            return
+
+        self._context_input.setPlainText(result.improved_prompt)
+
+        summary_parts: list[str] = []
+        if result.analysis:
+            summary_parts.append(result.analysis)
+        if result.checklist:
+            checklist = "\n".join(f"• {item}" for item in result.checklist)
+            summary_parts.append(f"Checklist:\n{checklist}")
+        if result.warnings:
+            warnings = "\n".join(f"• {item}" for item in result.warnings)
+            summary_parts.append(f"Warnings:\n{warnings}")
+
+        message = (
+            "\n\n".join(summary_parts)
+            if summary_parts
+            else "The prompt has been updated with the refined version."
+        )
+        QMessageBox.information(self, "Prompt refined", message)
 
     def _build_prompt(self) -> Optional[Prompt]:
         """Construct a Prompt object from the dialog inputs."""

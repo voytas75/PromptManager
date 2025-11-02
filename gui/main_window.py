@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.12.0 - 2025-11-15 - Wire prompt engineering refinement into prompt editor dialogs.
 Updates: v0.11.0 - 2025-11-12 - Add multi-turn chat controls and conversation history display.
 Updates: v0.10.0 - 2025-11-11 - Surface notification centre with task status indicator and history dialog.
 Updates: v0.9.0 - 2025-11-10 - Introduce command palette quick actions with keyboard shortcuts.
@@ -62,6 +63,7 @@ from core import (
     export_prompt_catalog,
     import_prompt_catalog,
 )
+from core.prompt_engineering import PromptRefinement
 from core.notifications import Notification, NotificationStatus
 from models.prompt_model import Prompt
 
@@ -901,6 +903,25 @@ class MainWindow(QMainWindow):
             return ""
         return self._manager.generate_prompt_description(context)
 
+    def _refine_prompt_body(
+        self,
+        prompt_text: str,
+        *,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        category: Optional[str] = None,
+        tags: Optional[Sequence[str]] = None,
+    ) -> PromptRefinement:
+        """Delegate prompt refinement to PromptManager."""
+
+        return self._manager.refine_prompt_text(
+            prompt_text,
+            name=name,
+            description=description,
+            category=category,
+            tags=tags,
+        )
+
     def _on_detect_intent_clicked(self) -> None:
         """Run intent detection on the free-form query input."""
 
@@ -1219,6 +1240,9 @@ class MainWindow(QMainWindow):
             self,
             name_generator=self._generate_prompt_name,
             description_generator=self._generate_prompt_description,
+            prompt_engineer=(
+                self._refine_prompt_body if self._manager.prompt_engineer is not None else None
+            ),
         )
         if dialog.exec() != QDialog.Accepted:
             return
@@ -1244,6 +1268,9 @@ class MainWindow(QMainWindow):
             prompt,
             name_generator=self._generate_prompt_name,
             description_generator=self._generate_prompt_description,
+            prompt_engineer=(
+                self._refine_prompt_body if self._manager.prompt_engineer is not None else None
+            ),
         )
         if dialog.exec() != QDialog.Accepted:
             return

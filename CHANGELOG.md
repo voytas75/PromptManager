@@ -2,6 +2,12 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.12.0] - 2025-11-15
+
+- Added a LiteLLM-backed prompt engineering workflow that analyses and refines prompt bodies using the new meta-prompt ruleset.
+- Exposed a **Refine** button in the prompt editor dialog that applies the improved prompt and surfaces analysis, checklist items, and warnings to the user.
+- Introduced unit tests covering the prompt engineering helper and manager integration, plus updated documentation to describe the new capability.
+
 ## [0.11.1] - 2025-11-15
 
 - Removed LiteLLM API key loading from JSON configuration files to prevent accidental secret leaks; credentials must now be supplied via environment variables or a secret manager.
