@@ -107,12 +107,14 @@ def build_prompt_manager(
                 api_key=settings.litellm_api_key,
                 api_base=settings.litellm_api_base,
                 api_version=settings.litellm_api_version,
+                drop_params=settings.litellm_drop_params,
             )
             description_generator = LiteLLMDescriptionGenerator(
                 model=settings.litellm_model,
                 api_key=settings.litellm_api_key,
                 api_base=settings.litellm_api_base,
                 api_version=settings.litellm_api_version,
+                drop_params=settings.litellm_drop_params,
             )
             if resolved_prompt_engineer is None:
                 resolved_prompt_engineer = PromptEngineer(
@@ -120,6 +122,7 @@ def build_prompt_manager(
                     api_key=settings.litellm_api_key,
                     api_base=settings.litellm_api_base,
                     api_version=settings.litellm_api_version,
+                    drop_params=settings.litellm_drop_params,
                 )
         except RuntimeError as exc:
             raise NameGenerationError(
@@ -140,6 +143,7 @@ def build_prompt_manager(
             api_key=settings.litellm_api_key,
             api_base=settings.litellm_api_base,
             api_version=settings.litellm_api_version,
+            drop_params=settings.litellm_drop_params,
         )
 
     manager_kwargs: Dict[str, Any] = {

@@ -40,6 +40,7 @@ def test_load_settings_reads_json_and_env(monkeypatch, tmp_path) -> None:
     assert settings.cache_ttl_seconds == 900
     assert settings.redis_dsn == "redis://localhost:6379/1"
     assert settings.litellm_model is None
+    assert settings.litellm_drop_params is None
 
 
 def test_json_precedes_env_when_both_provided(monkeypatch, tmp_path) -> None:
@@ -57,6 +58,7 @@ def test_json_precedes_env_when_both_provided(monkeypatch, tmp_path) -> None:
     settings = load_settings()
     assert settings.db_path == Path("data/prompt_manager.db").resolve()
     assert settings.cache_ttl_seconds == 600
+    assert settings.litellm_drop_params == ["max_tokens", "temperature", "timeout"]
 
 
 def test_json_with_litellm_api_key_is_ignored(monkeypatch, tmp_path, caplog) -> None:
@@ -77,6 +79,7 @@ def test_json_with_litellm_api_key_is_ignored(monkeypatch, tmp_path, caplog) -> 
     assert settings.litellm_model == "azure/gpt-4o"
     assert settings.litellm_api_key is None
     assert settings.litellm_api_base == "https://azure.example.com"
+    assert settings.litellm_drop_params is None
     assert "Ignoring LiteLLM secret key" in caplog.text
 
 
@@ -93,6 +96,7 @@ def test_litellm_settings_from_env(monkeypatch, tmp_path) -> None:
     assert settings.litellm_model == "gpt-4o-mini"
     assert settings.litellm_api_key == "secret-key"
     assert settings.litellm_api_base == "https://proxy.example.com"
+    assert settings.litellm_drop_params is None
 
 
 def test_litellm_settings_accept_azure_aliases(monkeypatch, tmp_path) -> None:
@@ -106,6 +110,7 @@ def test_litellm_settings_accept_azure_aliases(monkeypatch, tmp_path) -> None:
     assert settings.litellm_api_key == "azure-key"
     assert str(settings.litellm_api_base) == "https://azure.example.com"
     assert settings.litellm_api_version == "2024-05-01-preview"
+    assert settings.litellm_drop_params is None
 
 
 def test_embedding_backend_defaults_to_deterministic() -> None:

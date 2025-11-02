@@ -2075,6 +2075,9 @@ class MainWindow(QMainWindow):
                 self._refine_prompt_body if self._manager.prompt_engineer is not None else None
             ),
         )
+        dialog.applied.connect(  # type: ignore[arg-type]
+            lambda updated_prompt: self._on_prompt_applied(updated_prompt, dialog)
+        )
         if dialog.exec() != QDialog.Accepted:
             return
         if dialog.delete_requested:
@@ -2102,6 +2105,28 @@ class MainWindow(QMainWindow):
         if prompt is None:
             return
         self._delete_prompt(prompt)
+
+    def _on_prompt_applied(self, prompt: Prompt, dialog: PromptDialog) -> None:
+        """Persist prompt edits triggered via the Apply button."""
+
+        try:
+            stored = self._manager.update_prompt(prompt)
+        except PromptNotFoundError:
+            self._show_error(
+                "Prompt missing",
+                "The prompt cannot be located. Refresh and try again.",
+            )
+            self._load_prompts()
+            dialog.reject()
+            return
+        except PromptStorageError as exc:
+            self._show_error("Unable to update prompt", str(exc))
+            return
+
+        dialog.update_source_prompt(stored)
+        self._load_prompts(self._search_input.text())
+        self._select_prompt(stored.id)
+        self.statusBar().showMessage("Prompt changes applied.", 4000)
 
     def _delete_prompt(self, prompt: Prompt, *, skip_confirmation: bool = False) -> None:
         """Delete the provided prompt and refresh listings."""
@@ -2243,6 +2268,14 @@ class MainWindow(QMainWindow):
         self._runtime_settings["litellm_api_key"] = updates.get("litellm_api_key")
         self._runtime_settings["litellm_api_base"] = updates.get("litellm_api_base")
         self._runtime_settings["litellm_api_version"] = updates.get("litellm_api_version")
+        drop_params_value = updates.get("litellm_drop_params")
+        if isinstance(drop_params_value, list):
+            cleaned_drop_params = [str(item).strip() for item in drop_params_value if str(item).strip()]
+        elif isinstance(drop_params_value, str):
+            cleaned_drop_params = [part.strip() for part in drop_params_value.split(",") if part.strip()]
+        else:
+            cleaned_drop_params = None
+        self._runtime_settings["litellm_drop_params"] = cleaned_drop_params
         quick_actions_value = updates.get("quick_actions")
         if isinstance(quick_actions_value, list):
             cleaned_quick_actions = [
@@ -2257,6 +2290,7 @@ class MainWindow(QMainWindow):
                 "litellm_api_base": self._runtime_settings.get("litellm_api_base"),
                 "litellm_api_version": self._runtime_settings.get("litellm_api_version"),
                 "quick_actions": self._runtime_settings.get("quick_actions"),
+                "litellm_drop_params": self._runtime_settings.get("litellm_drop_params"),
                 "litellm_api_key": self._runtime_settings.get("litellm_api_key"),
             }
         )
@@ -2267,6 +2301,7 @@ class MainWindow(QMainWindow):
             self._settings.litellm_api_base = updates.get("litellm_api_base")
             self._settings.litellm_api_version = updates.get("litellm_api_version")
             self._settings.quick_actions = cleaned_quick_actions
+            self._settings.litellm_drop_params = cleaned_drop_params
 
         self._quick_actions = self._build_quick_actions(self._runtime_settings.get("quick_actions"))
         self._register_quick_shortcuts()
@@ -2277,6 +2312,7 @@ class MainWindow(QMainWindow):
                 self._runtime_settings.get("litellm_api_key"),
                 self._runtime_settings.get("litellm_api_base"),
                 self._runtime_settings.get("litellm_api_version"),
+                drop_params=self._runtime_settings.get("litellm_drop_params"),
             )
         except NameGenerationError as exc:
             QMessageBox.warning(self, "LiteLLM configuration", str(exc))
@@ -2285,7 +2321,7 @@ class MainWindow(QMainWindow):
 
     def _initial_runtime_settings(
         self, settings: Optional[PromptManagerSettings]
-    ) -> dict[str, Optional[str | list[dict[str, object]]]]:
+    ) -> dict[str, Optional[object]]:
         """Load current settings snapshot from configuration."""
 
         derived_quick_actions: Optional[list[dict[str, object]]]
@@ -2299,6 +2335,9 @@ class MainWindow(QMainWindow):
             "litellm_api_key": settings.litellm_api_key if settings else None,
             "litellm_api_base": settings.litellm_api_base if settings else None,
             "litellm_api_version": settings.litellm_api_version if settings else None,
+            "litellm_drop_params": list(settings.litellm_drop_params)
+            if settings and settings.litellm_drop_params
+            else None,
             "quick_actions": derived_quick_actions,
         }
 
@@ -2315,10 +2354,21 @@ class MainWindow(QMainWindow):
                     "litellm_api_base",
                     "litellm_api_version",
                 ):
-                    if isinstance(data.get(key), str):
+                    if runtime.get(key) is None and isinstance(data.get(key), str):
                         runtime[key] = data[key]
-                if isinstance(data.get("quick_actions"), list):
-                    runtime["quick_actions"] = [dict(entry) for entry in data["quick_actions"] if isinstance(entry, dict)]
+                if runtime.get("litellm_drop_params") is None:
+                    drop_value = data.get("litellm_drop_params")
+                    if isinstance(drop_value, list):
+                        runtime["litellm_drop_params"] = [
+                            str(item).strip() for item in drop_value if str(item).strip()
+                        ]
+                    elif isinstance(drop_value, str):
+                        parsed = [part.strip() for part in drop_value.split(",") if part.strip()]
+                        runtime["litellm_drop_params"] = parsed or None
+                if runtime["quick_actions"] is None and isinstance(data.get("quick_actions"), list):
+                    runtime["quick_actions"] = [
+                        dict(entry) for entry in data["quick_actions"] if isinstance(entry, dict)
+                    ]
         return runtime
 
     def _on_selection_changed(self, *_: object) -> None:

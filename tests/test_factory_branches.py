@@ -21,6 +21,7 @@ def _make_settings(**overrides: object) -> SimpleNamespace:
         "litellm_model": None,
         "litellm_api_key": None,
         "litellm_api_base": None,
+        "litellm_drop_params": None,
         "embedding_backend": "deterministic",
         "embedding_model": None,
         "embedding_device": None,

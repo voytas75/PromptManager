@@ -185,9 +185,12 @@ These commands reuse the same validation and merge logic as the GUI; pass an exp
     "database_path": "data/prompt_manager.db",
     "chroma_path": "data/chromadb",
     "redis_dsn": "redis://localhost:6379/0",
-    "cache_ttl_seconds": 600
+    "cache_ttl_seconds": 600,
+    "litellm_drop_params": ["max_tokens", "temperature", "timeout"]
   }
   ```
+
+- Prompt Manager strips any `litellm_drop_params` entries from outgoing LiteLLM requests locally, ensuring providers such as Azure OpenAI never receive unsupported fields like `drop_params`.
 
 - Environment variables (override JSON when set):
 
@@ -201,6 +204,7 @@ These commands reuse the same validation and merge logic as the GUI; pass an exp
   | `PROMPT_MANAGER_LITELLM_MODEL` | LiteLLM model used for name generation | `gpt-4o-mini` |
   | `PROMPT_MANAGER_LITELLM_API_KEY` | LiteLLM API key (environment only) | `sk-…` |
   | `PROMPT_MANAGER_LITELLM_API_BASE` | Optional LiteLLM API base override | `https://proxy.example.com` |
+  | `PROMPT_MANAGER_LITELLM_DROP_PARAMS` | Comma/JSON list of LiteLLM parameters to drop before sending requests | `max_tokens,temperature` |
   | `AZURE_OPENAI_API_KEY` | Alias for LiteLLM API key (Azure) | `azure-key` |
   | `AZURE_OPENAI_ENDPOINT` | Alias for LiteLLM API base (Azure) | `https://<resource>.openai.azure.com` |
   | `PROMPT_MANAGER_EMBEDDING_BACKEND` | Embedding backend (`deterministic`, `litellm`, `sentence-transformers`) | `sentence-transformers` |

@@ -246,8 +246,16 @@ class PromptManager:
         self._name_generator = name_generator
         self._description_generator = description_generator
         self._prompt_engineer = prompt_engineer
-        self._intent_classifier = intent_classifier
+        self._litellm_drop_params: Optional[Sequence[str]] = None
+        for candidate in (name_generator, prompt_engineer, executor):
+            if candidate is not None and getattr(candidate, "drop_params", None):
+                params = getattr(candidate, "drop_params")
+                self._litellm_drop_params = tuple(params)  # type: ignore[arg-type]
+                break
+        self._intent_classifier = intent_classifier or IntentClassifier()
         self._executor = executor
+        if self._executor is not None and self._litellm_drop_params:
+            self._executor.drop_params = list(self._litellm_drop_params)
         self._history_tracker = history_tracker
         if user_profile is not None:
             self._user_profile: Optional[UserProfile] = user_profile
@@ -726,12 +734,16 @@ class PromptManager:
         api_key: Optional[str],
         api_base: Optional[str],
         api_version: Optional[str],
+        *,
+        drop_params: Optional[Sequence[str]] = None,
     ) -> None:
         """Configure the LiteLLM name generator at runtime."""
         if not model:
             self._name_generator = None
             self._description_generator = None
             self._prompt_engineer = None
+            self._litellm_drop_params = None
+            self._executor = None
             return
         try:
             self._name_generator = LiteLLMNameGenerator(
@@ -739,18 +751,29 @@ class PromptManager:
                 api_key=api_key,
                 api_base=api_base,
                 api_version=api_version,
+                drop_params=drop_params,
             )
             self._description_generator = LiteLLMDescriptionGenerator(
                 model=model,
                 api_key=api_key,
                 api_base=api_base,
                 api_version=api_version,
+                drop_params=drop_params,
             )
             self._prompt_engineer = PromptEngineer(
                 model=model,
                 api_key=api_key,
                 api_base=api_base,
                 api_version=api_version,
+                drop_params=drop_params,
+            )
+            self._litellm_drop_params = tuple(drop_params) if drop_params else None
+            self._executor = CodexExecutor(
+                model=model,
+                api_key=api_key,
+                api_base=api_base,
+                api_version=api_version,
+                drop_params=drop_params,
             )
         except RuntimeError as exc:
             raise NameGenerationError(str(exc)) from exc

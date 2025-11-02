@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import (
@@ -37,6 +37,7 @@ class SettingsDialog(QDialog):
         litellm_api_key: Optional[str] = None,
         litellm_api_base: Optional[str] = None,
         litellm_api_version: Optional[str] = None,
+        litellm_drop_params: Optional[Sequence[str]] = None,
         quick_actions: Optional[list[dict[str, object]]] = None,
     ) -> None:
         super().__init__(parent)
@@ -46,6 +47,7 @@ class SettingsDialog(QDialog):
         self._litellm_api_key = litellm_api_key or ""
         self._litellm_api_base = litellm_api_base or ""
         self._litellm_api_version = litellm_api_version or ""
+        self._litellm_drop_params = ", ".join(litellm_drop_params) if litellm_drop_params else ""
         original_actions = [dict(entry) for entry in (quick_actions or []) if isinstance(entry, dict)]
         self._original_quick_actions = original_actions
         self._quick_actions_value: Optional[list[dict[str, object]]] = original_actions or None
@@ -87,6 +89,10 @@ class SettingsDialog(QDialog):
 
         self._api_version_input = QLineEdit(self._litellm_api_version, self)
         form.addRow("LiteLLM API version", self._api_version_input)
+
+        self._drop_params_input = QLineEdit(self._litellm_drop_params, self)
+        self._drop_params_input.setPlaceholderText("max_tokens, temperature")
+        form.addRow("LiteLLM drop params", self._drop_params_input)
 
         layout.addLayout(form)
 
@@ -144,11 +150,15 @@ class SettingsDialog(QDialog):
             stripped = value.strip()
             return stripped or None
 
+        drop_text = self._drop_params_input.text().strip()
+        drop_params = [item.strip() for item in drop_text.split(",") if item.strip()] if drop_text else None
+
         return {
             "litellm_model": _clean(self._model_input.text()),
             "litellm_api_key": _clean(self._api_key_input.text()),
             "litellm_api_base": _clean(self._api_base_input.text()),
             "litellm_api_version": _clean(self._api_version_input.text()),
+            "litellm_drop_params": drop_params,
             "quick_actions": self._quick_actions_value,
         }
 

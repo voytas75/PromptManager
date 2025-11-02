@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.8.2 - 2025-11-17 - Add Apply workflow so prompt edits can be persisted without closing the dialog.
 Updates: v0.8.1 - 2025-11-16 - Add destructive delete control and metadata suggestion helpers to the prompt dialog.
 Updates: v0.8.0 - 2025-11-16 - Add task template editor dialog.
 Updates: v0.7.2 - 2025-11-02 - Collapse example sections when empty and expand on demand.
@@ -186,6 +187,8 @@ def fallback_generate_description(context: str, *, max_length: int = 240) -> str
 class PromptDialog(QDialog):
     """Modal dialog used for creating or editing prompt records."""
 
+    applied = Signal(Prompt)
+
     def __init__(
         self,
         parent=None,
@@ -206,6 +209,7 @@ class PromptDialog(QDialog):
         self._tags_generator = tags_generator
         self._delete_requested = False
         self._delete_button: Optional[QPushButton] = None
+        self._apply_button: Optional[QPushButton] = None
         self._generate_category_button: Optional[QPushButton] = None
         self._generate_tags_button: Optional[QPushButton] = None
         self.setWindowTitle("Create Prompt" if prompt is None else "Edit Prompt")
@@ -318,6 +322,9 @@ class PromptDialog(QDialog):
         self._buttons.accepted.connect(self._on_accept)  # type: ignore[arg-type]
         self._buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         if self._source_prompt is not None:
+            self._apply_button = self._buttons.addButton("Apply", QDialogButtonBox.ApplyRole)
+            self._apply_button.setToolTip("Save changes without closing the dialog.")
+            self._apply_button.clicked.connect(self._on_apply_clicked)  # type: ignore[arg-type]
             self._delete_button = self._buttons.addButton(
                 "Delete",
                 QDialogButtonBox.DestructiveRole,
@@ -347,6 +354,15 @@ class PromptDialog(QDialog):
             return
         self._result_prompt = prompt
         self.accept()
+
+    def _on_apply_clicked(self) -> None:
+        """Persist prompt edits while keeping the dialog open."""
+
+        prompt = self._build_prompt()
+        if prompt is None:
+            return
+        self._result_prompt = prompt
+        self.applied.emit(prompt)
 
     def _on_delete_clicked(self) -> None:
         """Handle delete requests issued from the dialog."""
@@ -636,6 +652,12 @@ class PromptDialog(QDialog):
             ext4=list(base.ext4) if base.ext4 is not None else None,
             ext5=ext5_copy,
         )
+
+    def update_source_prompt(self, prompt: Prompt) -> None:
+        """Refresh the backing prompt after an in-place update."""
+
+        self._source_prompt = prompt
+        self._populate(prompt)
 
 
 class PromptMaintenanceDialog(QDialog):

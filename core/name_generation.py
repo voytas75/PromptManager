@@ -1,5 +1,7 @@
 """LiteLLM-backed prompt metadata generation utilities.
 
+Updates: v0.7.3 - 2025-11-02 - Strip configured drop parameters before calling LiteLLM.
+Updates: v0.7.2 - 2025-11-17 - Retry without unsupported LiteLLM parameters when models reject them.
 Updates: v0.7.1 - 2025-11-11 - Summarise LiteLLM errors for friendlier GUI fallbacks.
 Updates: v0.7.0 - 2025-11-07 - Add description generator alongside name helper.
 Updates: v0.6.0 - 2025-11-07 - Share LiteLLM import helper with embedding adapters.
@@ -10,11 +12,15 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
+from typing import Dict, Optional, Sequence
 
 logger = logging.getLogger(__name__)
 
-from .litellm_adapter import get_completion
+from .litellm_adapter import (
+    apply_configured_drop_params,
+    call_completion_with_fallback,
+    get_completion,
+)
 
 class NameGenerationError(Exception):
     """Raised when a prompt name cannot be generated."""
@@ -33,6 +39,7 @@ class LiteLLMNameGenerator:
     api_base: Optional[str] = None
     timeout_seconds: float = 10.0
     api_version: Optional[str] = None
+    drop_params: Optional[Sequence[str]] = None
 
     _SYSTEM_PROMPT = (
         "You generate concise, descriptive prompt names for a prompt catalogue. "
@@ -45,7 +52,7 @@ class LiteLLMNameGenerator:
         if not context.strip():
             raise NameGenerationError("Prompt context is required to generate a name.")
 
-        request = {
+        request: Dict[str, object] = {
             "model": self.model,
             "messages": [
                 {"role": "system", "content": self._SYSTEM_PROMPT},
@@ -64,9 +71,21 @@ class LiteLLMNameGenerator:
             request["api_base"] = self.api_base
         if self.api_version:
             request["api_version"] = self.api_version
+        dropped_params = apply_configured_drop_params(request, self.drop_params)
+        if dropped_params:
+            logger.debug(
+                "Dropping LiteLLM parameters for name generation",
+                extra={"dropped_params": list(dropped_params)},
+            )
 
         try:
-            response = completion(**request)  # type: ignore[arg-type]
+            response = call_completion_with_fallback(
+                request,
+                completion,
+                LiteLLMException,
+                drop_candidates={"max_tokens", "max_output_tokens", "temperature", "timeout"},
+                pre_dropped=dropped_params,
+            )
         except LiteLLMException as exc:  # type: ignore[arg-type]
             raise NameGenerationError(_summarise_litellm_error(exc)) from exc
         except Exception as exc:  # pragma: no cover - defensive
@@ -92,6 +111,7 @@ class LiteLLMDescriptionGenerator:
     api_base: Optional[str] = None
     timeout_seconds: float = 12.0
     api_version: Optional[str] = None
+    drop_params: Optional[Sequence[str]] = None
 
     _SYSTEM_PROMPT = (
         "You write concise catalogue descriptions for reusable AI prompts. "
@@ -103,7 +123,7 @@ class LiteLLMDescriptionGenerator:
         completion, LiteLLMException = get_completion()
         if not context.strip():
             raise DescriptionGenerationError("Prompt context is required to generate a description.")
-        request = {
+        request: Dict[str, object] = {
             "model": self.model,
             "messages": [
                 {"role": "system", "content": self._SYSTEM_PROMPT},
@@ -126,9 +146,21 @@ class LiteLLMDescriptionGenerator:
             request["api_base"] = self.api_base
         if self.api_version:
             request["api_version"] = self.api_version
+        dropped_params = apply_configured_drop_params(request, self.drop_params)
+        if dropped_params:
+            logger.debug(
+                "Dropping LiteLLM parameters for description generation",
+                extra={"dropped_params": list(dropped_params)},
+            )
 
         try:
-            response = completion(**request)  # type: ignore[arg-type]
+            response = call_completion_with_fallback(
+                request,
+                completion,
+                LiteLLMException,
+                drop_candidates={"max_tokens", "max_output_tokens", "temperature", "timeout"},
+                pre_dropped=dropped_params,
+            )
         except LiteLLMException as exc:  # type: ignore[arg-type]
             raise DescriptionGenerationError(_summarise_litellm_error(exc)) from exc
         except Exception as exc:  # pragma: no cover - defensive

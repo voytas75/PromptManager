@@ -15,7 +15,7 @@ from typing import Any, Dict, Mapping, Optional, Sequence
 
 from models.prompt_model import Prompt
 
-from .litellm_adapter import get_completion
+from .litellm_adapter import apply_configured_drop_params, call_completion_with_fallback, get_completion
 
 logger = logging.getLogger("prompt_manager.execution")
 
@@ -47,6 +47,7 @@ class CodexExecutor:
     timeout_seconds: float = 30.0
     max_output_tokens: int = 1024
     temperature: float = 0.2
+    drop_params: Optional[Sequence[str]] = None
 
     def execute(
         self,
@@ -98,6 +99,15 @@ class CodexExecutor:
             request["api_base"] = self.api_base
         if self.api_version:
             request["api_version"] = self.api_version
+        dropped_params = apply_configured_drop_params(request, self.drop_params)
+        if dropped_params:
+            logger.debug(
+                "Dropping LiteLLM parameters before execution",
+                extra={
+                    "prompt_id": str(prompt.id),
+                    "dropped_params": list(dropped_params),
+                },
+            )
 
         logger.debug(
             "Executing prompt via LiteLLM",
@@ -110,7 +120,13 @@ class CodexExecutor:
         )
         started = time.perf_counter()
         try:
-            response = completion(**request)  # type: ignore[arg-type]
+            response = call_completion_with_fallback(
+                request,
+                completion,
+                LiteLLMException,
+                drop_candidates={"max_tokens", "max_output_tokens", "temperature", "timeout"},
+                pre_dropped=dropped_params,
+            )
         except LiteLLMException as exc:  # type: ignore[arg-type]
             raise ExecutionError(f"LiteLLM execution failed: {exc}") from exc
         except Exception as exc:  # pragma: no cover - defensive

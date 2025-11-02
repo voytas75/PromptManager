@@ -2,10 +2,18 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.13.3] - 2025-11-02
+
+- Stop forwarding LiteLLM `drop_params` directives to Azure/OpenAI providers; configured keys are now stripped locally before requests, preventing `Unknown parameter: 'drop_params'` failures during prompt execution.
+- Adjust LiteLLM fallback retries to reuse the stripped parameter set without injecting unsupported fields back into follow-up requests.
+
 ## [0.13.2] - 2025-11-17
 
 - Removed the bundled default prompt catalogue and associated packaging assets; catalogue imports now require an explicit JSON file or directory.
 - Removed the `catalog_path` configuration knob; startup no longer consults settings for catalogue imports, and the GUI/CLI now require explicit paths each time.
+- Added an Apply button to the prompt editor so changes can be saved without closing the dialog.
+- LiteLLM name/description generators now retry without unsupported parameters (e.g., `max_tokens`) when models reject them.
+- Added `litellm_drop_params` configuration support and propagate it through prompt execution, metadata generation, and prompt engineering so LiteLLM can pre-drop unsupported parameters per official guidance.
 
 ## [0.13.1] - 2025-11-16
 

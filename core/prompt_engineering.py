@@ -1,5 +1,6 @@
 """LiteLLM-backed prompt engineering utilities for refining prompts.
 
+Updates: v0.1.1 - 2025-11-02 - Drop configured LiteLLM parameters locally before refinement calls.
 Updates: v0.1.0 - 2025-11-15 - Introduce prompt refinement helper using meta-prompt rules.
 """
 
@@ -10,7 +11,11 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Iterable, Optional, Sequence
 
-from .litellm_adapter import get_completion
+from .litellm_adapter import (
+    apply_configured_drop_params,
+    call_completion_with_fallback,
+    get_completion,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +72,7 @@ class PromptEngineer:
     top_p: float = 0.9
     timeout_seconds: float = 25.0
     max_tokens: int = 1200
+    drop_params: Optional[Sequence[str]] = None
 
     _SYSTEM_PROMPT = (
         "You are a meticulous prompt engineering assistant."
@@ -153,6 +159,15 @@ class PromptEngineer:
             request["api_base"] = self.api_base
         if self.api_version:
             request["api_version"] = self.api_version
+        dropped_params = apply_configured_drop_params(request, self.drop_params)
+        if dropped_params:
+            logger.debug(
+                "Dropping LiteLLM parameters for prompt engineering",
+                extra={
+                    "model": self.model,
+                    "dropped_params": list(dropped_params),
+                },
+            )
 
         logger.debug(
             "Refining prompt via LiteLLM",
@@ -164,7 +179,13 @@ class PromptEngineer:
             },
         )
         try:
-            response = completion(**request)  # type: ignore[arg-type]
+            response = call_completion_with_fallback(
+                request,
+                completion,
+                LiteLLMException,
+                drop_candidates={"max_tokens", "max_output_tokens", "temperature", "timeout", "top_p"},
+                pre_dropped=dropped_params,
+            )
         except LiteLLMException as exc:  # type: ignore[arg-type]
             raise PromptEngineeringError(f"LiteLLM refinement failed: {exc}") from exc
         except Exception as exc:  # pragma: no cover - defensive

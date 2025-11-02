@@ -15,7 +15,7 @@ import json
 import os
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple, Type, cast
+from typing import Any, Dict, List, Optional, Tuple, Type, cast
 
 from pydantic import Field, ValidationError, field_validator, model_validator
 from pydantic_settings import (
@@ -42,6 +42,10 @@ class PromptManagerSettings(BaseSettings):
     litellm_api_version: Optional[str] = Field(
         default=None,
         description="Optional LiteLLM API version (useful for Azure OpenAI).",
+    )
+    litellm_drop_params: Optional[List[str]] = Field(
+        default=None,
+        description="Optional list of LiteLLM parameters to drop before forwarding requests (see https://docs.litellm.ai/docs/completion/drop_params).",
     )
     quick_actions: Optional[list[dict[str, object]]] = Field(
         default=None,
@@ -79,6 +83,7 @@ class PromptManagerSettings(BaseSettings):
                 "litellm_api_key": ["LITELLM_API_KEY", "litellm_api_key", "AZURE_OPENAI_API_KEY"],
                 "litellm_api_base": ["LITELLM_API_BASE", "litellm_api_base", "AZURE_OPENAI_ENDPOINT"],
                 "litellm_api_version": ["LITELLM_API_VERSION", "litellm_api_version", "AZURE_OPENAI_API_VERSION"],
+                "litellm_drop_params": ["LITELLM_DROP_PARAMS", "litellm_drop_params"],
                 "embedding_backend": ["EMBEDDING_BACKEND", "embedding_backend"],
                 "embedding_model": ["EMBEDDING_MODEL", "embedding_model"],
                 "embedding_device": ["EMBEDDING_DEVICE", "embedding_device"],
@@ -167,6 +172,31 @@ class PromptManagerSettings(BaseSettings):
                 raise ValueError("quick_actions items must be objects")
             normalised.append({str(key): entry[key] for key in entry})
         return normalised
+
+    @field_validator("litellm_drop_params", mode="before")
+    def _normalise_drop_params(cls, value: object) -> Optional[List[str]]:
+        if value in (None, "", [], ()):  # type: ignore[comparison-overlap]
+            return None
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                return None
+            try:
+                parsed = json.loads(stripped)
+            except json.JSONDecodeError:
+                items = [item.strip() for item in stripped.split(",") if item.strip()]
+            else:
+                if isinstance(parsed, list):
+                    items = [str(item).strip() for item in parsed if str(item).strip()]
+                elif isinstance(parsed, (tuple, set)):
+                    items = [str(item).strip() for item in parsed if str(item).strip()]
+                else:
+                    items = [str(parsed).strip()]
+            return items or None
+        if isinstance(value, (list, tuple, set)):
+            items = [str(item).strip() for item in value if str(item).strip()]
+            return items or None
+        raise ValueError("litellm_drop_params must be a list, comma-separated string, or JSON array")
 
     @classmethod
     def settings_customise_sources(
@@ -292,6 +322,7 @@ class PromptManagerSettings(BaseSettings):
                     "litellm_model",
                     "litellm_api_base",
                     "litellm_api_version",
+                    "litellm_drop_params",
                     "embedding_backend",
                     "embedding_model",
                     "embedding_device",
