@@ -1,6 +1,6 @@
 """Tests for configuration loading and validation logic.
 
-Updates: v0.1.3 - 2025-11-15 - Forbid LiteLLM API secrets sourced from JSON configuration.
+Updates: v0.1.3 - 2025-11-15 - Warn and ignore LiteLLM API secrets supplied via JSON configuration.
 Updates: v0.1.2 - 2025-11-14 - Cover LiteLLM API key loading from JSON configuration.
 Updates: v0.1.1 - 2025-11-03 - Add precedence test using example template.
 Updates: v0.1.0 - 2025-11-03 - Cover JSON/env precedence and validation errors.
@@ -8,6 +8,7 @@ Updates: v0.1.0 - 2025-11-03 - Cover JSON/env precedence and validation errors.
 
 from __future__ import annotations
 
+import logging
 import json
 from pathlib import Path
 
@@ -60,7 +61,7 @@ def test_json_precedes_env_when_both_provided(monkeypatch, tmp_path) -> None:
     assert settings.cache_ttl_seconds == 600
 
 
-def test_json_with_litellm_api_key_raises_error(monkeypatch, tmp_path) -> None:
+def test_json_with_litellm_api_key_is_ignored(monkeypatch, tmp_path, caplog) -> None:
     config_payload = {
         "litellm_model": "azure/gpt-4o",
         "litellm_api_key": "from-json",
@@ -72,9 +73,13 @@ def test_json_with_litellm_api_key_raises_error(monkeypatch, tmp_path) -> None:
     config_path.write_text(json.dumps(config_payload), encoding="utf-8")
     monkeypatch.chdir(tmp_path)
 
-    with pytest.raises(SettingsError) as excinfo:
-        load_settings()
-    assert "LiteLLM API credentials must be supplied" in str(excinfo.value)
+    with caplog.at_level(logging.WARNING, logger="prompt_manager.settings"):
+        settings = load_settings()
+
+    assert settings.litellm_model == "azure/gpt-4o"
+    assert settings.litellm_api_key is None
+    assert settings.litellm_api_base == "https://azure.example.com"
+    assert "Ignoring LiteLLM secret key" in caplog.text
 
 
 def test_litellm_settings_from_env(monkeypatch, tmp_path) -> None:

@@ -1,6 +1,6 @@
 """Settings management for Prompt Manager configuration.
 
-Updates: v0.4.2 - 2025-11-15 - Disallow LiteLLM API secrets in JSON configuration files.
+Updates: v0.4.2 - 2025-11-15 - Ignore LiteLLM API secrets in JSON configuration files with warnings.
 Updates: v0.4.1 - 2025-11-14 - Load LiteLLM API key from JSON configuration files.
 Updates: v0.4.0 - 2025-11-07 - Add configurable embedding backend options.
 Updates: v0.3.2 - 2025-10-30 - Document revised settings precedence examples.
@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import logging
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple, Type, cast
 
@@ -286,9 +287,15 @@ class PromptManagerSettings(BaseSettings):
                     "litellm_api_key",
                     "AZURE_OPENAI_API_KEY",
                 }
-                if any(key in data for key in disallowed_secret_keys):
-                    raise SettingsError(
-                        "LiteLLM API credentials must be supplied via environment variables or a secret manager."
+                removed_secrets = [
+                    key for key in disallowed_secret_keys if key in data and data.pop(key, None) is not None
+                ]
+                if removed_secrets:
+                    logger.warning(
+                        "Ignoring LiteLLM secret key(s) %s in configuration file %s; "
+                        "set credentials via environment variables instead.",
+                        ", ".join(sorted(removed_secrets)),
+                        path,
                     )
 
                 for key in (
@@ -323,3 +330,4 @@ def load_settings(**overrides: Any) -> PromptManagerSettings:
         raise
     except ValidationError as exc:
         raise SettingsError("Invalid Prompt Manager configuration") from exc
+logger = logging.getLogger("prompt_manager.settings")
