@@ -45,6 +45,7 @@ class SettingsDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Prompt Manager Settings")
+        self.setMinimumWidth(860)
         self._catalog_path = catalog_path or ""
         self._litellm_model = litellm_model or ""
         self._litellm_api_key = litellm_api_key or ""
