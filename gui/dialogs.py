@@ -23,6 +23,7 @@ from copy import deepcopy
 from dataclasses import replace
 from datetime import datetime, timezone
 from typing import Callable, Optional, Sequence, List
+from pathlib import Path
 
 from PySide6.QtCore import Qt, QEvent, Signal
 from PySide6.QtWidgets import (
@@ -664,11 +665,16 @@ class PromptMaintenanceDialog(QDialog):
         self._chroma_path_label: QLabel
         self._chroma_stats_view: QPlainTextEdit
         self._chroma_refresh_button: QPushButton
+        self._storage_status_label: QLabel
+        self._storage_path_label: QLabel
+        self._storage_stats_view: QPlainTextEdit
+        self._storage_refresh_button: QPushButton
         self.setWindowTitle("Prompt Maintenance")
         self.resize(640, 420)
         self._build_ui()
         self._refresh_redis_info()
         self._refresh_chroma_info()
+        self._refresh_storage_info()
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -780,6 +786,39 @@ class PromptMaintenanceDialog(QDialog):
         chroma_layout.addWidget(self._chroma_stats_view, stretch=1)
 
         self._tab_widget.addTab(chroma_tab, "ChromaDB")
+
+        storage_tab = QWidget(self)
+        storage_layout = QVBoxLayout(storage_tab)
+
+        storage_description = QLabel(
+            "Inspect the SQLite repository backing prompt storage.", storage_tab
+        )
+        storage_description.setWordWrap(True)
+        storage_layout.addWidget(storage_description)
+
+        storage_status_container = QWidget(storage_tab)
+        storage_status_layout = QHBoxLayout(storage_status_container)
+        storage_status_layout.setContentsMargins(0, 0, 0, 0)
+        storage_status_layout.setSpacing(12)
+
+        self._storage_status_label = QLabel("Checking…", storage_status_container)
+        storage_status_layout.addWidget(self._storage_status_label)
+
+        self._storage_path_label = QLabel("", storage_status_container)
+        self._storage_path_label.setWordWrap(True)
+        storage_status_layout.addWidget(self._storage_path_label, stretch=1)
+
+        self._storage_refresh_button = QPushButton("Refresh", storage_status_container)
+        self._storage_refresh_button.clicked.connect(self._refresh_storage_info)  # type: ignore[arg-type]
+        storage_status_layout.addWidget(self._storage_refresh_button)
+
+        storage_layout.addWidget(storage_status_container)
+
+        self._storage_stats_view = QPlainTextEdit(storage_tab)
+        self._storage_stats_view.setReadOnly(True)
+        storage_layout.addWidget(self._storage_stats_view, stretch=1)
+
+        self._tab_widget.addTab(storage_tab, "SQLite")
 
         self._buttons = QDialogButtonBox(QDialogButtonBox.Close, self)
         self._buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
@@ -971,6 +1010,52 @@ class PromptMaintenanceDialog(QDialog):
             if value is not None:
                 lines.append(f"{label}: {value}")
         self._chroma_stats_view.setPlainText("\n".join(lines) if lines else "No ChromaDB statistics available.")
+
+    def _refresh_storage_info(self) -> None:
+        """Update the SQLite tab with repository information."""
+
+        repository = self._manager.repository
+        db_path_obj = getattr(repository, "_db_path", None)
+        if isinstance(db_path_obj, Path):
+            db_path = str(db_path_obj)
+        else:
+            db_path = str(db_path_obj) if db_path_obj is not None else ""
+
+        self._storage_path_label.setText(f"Path: {db_path}" if db_path else "Path: unknown")
+
+        size_bytes = None
+        if db_path:
+            try:
+                path_obj = Path(db_path)
+                if path_obj.exists():
+                    size_bytes = path_obj.stat().st_size
+            except OSError:
+                size_bytes = None
+
+        stats_lines: List[str] = []
+        if size_bytes is not None:
+            stats_lines.append(f"File size: {size_bytes} bytes")
+
+        try:
+            prompt_count = len(repository.list())
+            stats_lines.append(f"Prompts: {prompt_count}")
+        except RepositoryError as exc:
+            stats_lines.append(f"Prompts: error ({exc})")
+
+        try:
+            template_count = len(repository.list_templates())
+            stats_lines.append(f"Templates: {template_count}")
+        except RepositoryError as exc:
+            stats_lines.append(f"Templates: error ({exc})")
+
+        try:
+            execution_count = len(repository.list_executions())
+            stats_lines.append(f"Executions: {execution_count}")
+        except RepositoryError as exc:
+            stats_lines.append(f"Executions: error ({exc})")
+
+        self._storage_stats_view.setPlainText("\n".join(stats_lines))
+        self._storage_status_label.setText("Status: ready")
 
 class TemplateDialog(QDialog):
     """Modal dialog for creating or editing task templates."""
