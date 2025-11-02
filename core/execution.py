@@ -1,5 +1,6 @@
 """LiteLLM-backed prompt execution helpers.
 
+Updates: v0.3.0 - 2025-11-02 - Support reasoning-effort configuration and max_output_tokens for new OpenAI model families.
 Updates: v0.2.1 - 2025-11-14 - Surface missing LiteLLM dependency as ExecutionError.
 Updates: v0.2.0 - 2025-11-12 - Support multi-turn conversation payloads for LiteLLM execution.
 Updates: v0.1.0 - 2025-11-08 - Introduce CodexExecutor for running prompts via LiteLLM.
@@ -22,6 +23,14 @@ logger = logging.getLogger("prompt_manager.execution")
 
 class ExecutionError(Exception):
     """Raised when LiteLLM prompt execution fails."""
+
+
+def _supports_reasoning(model: str) -> bool:
+    """Return True when the target model supports OpenAI reasoning payloads."""
+
+    lowered = model.lower()
+    reasoning_markers = ("o1", "o3", "o4", "gpt-4.1", "gpt-5")
+    return any(marker in lowered for marker in reasoning_markers)
 
 
 @dataclass(slots=True)
@@ -48,6 +57,7 @@ class CodexExecutor:
     max_output_tokens: int = 1024
     temperature: float = 0.2
     drop_params: Optional[Sequence[str]] = None
+    reasoning_effort: Optional[str] = None
 
     def execute(
         self,
@@ -91,6 +101,7 @@ class CodexExecutor:
             "messages": payload_messages,
             "temperature": self.temperature,
             "max_tokens": self.max_output_tokens,
+            "max_output_tokens": self.max_output_tokens,
             "timeout": self.timeout_seconds,
         }
         if self.api_key:
@@ -99,6 +110,10 @@ class CodexExecutor:
             request["api_base"] = self.api_base
         if self.api_version:
             request["api_version"] = self.api_version
+        reasoning_payload: Optional[Dict[str, str]] = None
+        if self.reasoning_effort and _supports_reasoning(self.model):
+            reasoning_payload = {"effort": self.reasoning_effort}
+            request["reasoning"] = reasoning_payload
         dropped_params = apply_configured_drop_params(request, self.drop_params)
         if dropped_params:
             logger.debug(
@@ -124,7 +139,13 @@ class CodexExecutor:
                 request,
                 completion,
                 LiteLLMException,
-                drop_candidates={"max_tokens", "max_output_tokens", "temperature", "timeout"},
+                drop_candidates={
+                    "max_tokens",
+                    "max_output_tokens",
+                    "temperature",
+                    "timeout",
+                    "reasoning",
+                },
                 pre_dropped=dropped_params,
             )
         except LiteLLMException as exc:  # type: ignore[arg-type]

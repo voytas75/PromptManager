@@ -2254,6 +2254,7 @@ class MainWindow(QMainWindow):
             litellm_api_key=self._runtime_settings.get("litellm_api_key"),
             litellm_api_base=self._runtime_settings.get("litellm_api_base"),
             litellm_api_version=self._runtime_settings.get("litellm_api_version"),
+            litellm_reasoning_effort=self._runtime_settings.get("litellm_reasoning_effort"),
             quick_actions=self._runtime_settings.get("quick_actions"),
         )
         if dialog.exec() != QDialog.Accepted:
@@ -2268,6 +2269,7 @@ class MainWindow(QMainWindow):
         self._runtime_settings["litellm_api_key"] = updates.get("litellm_api_key")
         self._runtime_settings["litellm_api_base"] = updates.get("litellm_api_base")
         self._runtime_settings["litellm_api_version"] = updates.get("litellm_api_version")
+        self._runtime_settings["litellm_reasoning_effort"] = updates.get("litellm_reasoning_effort")
         drop_params_value = updates.get("litellm_drop_params")
         if isinstance(drop_params_value, list):
             cleaned_drop_params = [str(item).strip() for item in drop_params_value if str(item).strip()]
@@ -2289,6 +2291,7 @@ class MainWindow(QMainWindow):
                 "litellm_model": self._runtime_settings.get("litellm_model"),
                 "litellm_api_base": self._runtime_settings.get("litellm_api_base"),
                 "litellm_api_version": self._runtime_settings.get("litellm_api_version"),
+                "litellm_reasoning_effort": self._runtime_settings.get("litellm_reasoning_effort"),
                 "quick_actions": self._runtime_settings.get("quick_actions"),
                 "litellm_drop_params": self._runtime_settings.get("litellm_drop_params"),
                 "litellm_api_key": self._runtime_settings.get("litellm_api_key"),
@@ -2300,6 +2303,7 @@ class MainWindow(QMainWindow):
             self._settings.litellm_api_key = updates.get("litellm_api_key")
             self._settings.litellm_api_base = updates.get("litellm_api_base")
             self._settings.litellm_api_version = updates.get("litellm_api_version")
+            self._settings.litellm_reasoning_effort = updates.get("litellm_reasoning_effort")
             self._settings.quick_actions = cleaned_quick_actions
             self._settings.litellm_drop_params = cleaned_drop_params
 
@@ -2313,6 +2317,7 @@ class MainWindow(QMainWindow):
                 self._runtime_settings.get("litellm_api_base"),
                 self._runtime_settings.get("litellm_api_version"),
                 drop_params=self._runtime_settings.get("litellm_drop_params"),
+                reasoning_effort=self._runtime_settings.get("litellm_reasoning_effort"),
             )
         except NameGenerationError as exc:
             QMessageBox.warning(self, "LiteLLM configuration", str(exc))
@@ -2338,6 +2343,7 @@ class MainWindow(QMainWindow):
             "litellm_drop_params": list(settings.litellm_drop_params)
             if settings and settings.litellm_drop_params
             else None,
+            "litellm_reasoning_effort": settings.litellm_reasoning_effort if settings else None,
             "quick_actions": derived_quick_actions,
         }
 
@@ -2353,6 +2359,7 @@ class MainWindow(QMainWindow):
                     "litellm_api_key",
                     "litellm_api_base",
                     "litellm_api_version",
+                    "litellm_reasoning_effort",
                 ):
                     if runtime.get(key) is None and isinstance(data.get(key), str):
                         runtime[key] = data[key]

@@ -9,6 +9,12 @@ import types
 from pathlib import Path
 
 def _install_qt_stubs() -> None:
+    try:
+        import PySide6  # noqa: F401
+        return
+    except ImportError:
+        pass
+
     qt_widgets = types.ModuleType("PySide6.QtWidgets")
 
     class _Widget:
@@ -104,6 +110,8 @@ def _install_qt_stubs() -> None:
         Horizontal = 0
 
     qt_core.Qt = _Qt  # type: ignore[attr-defined]
+    qt_core.QEvent = type("QEvent", (), {})  # type: ignore[attr-defined]
+    qt_core.Signal = type("Signal", (), {"__init__": lambda self, *args, **kwargs: None})  # type: ignore[attr-defined]
 
     sys.modules.setdefault("PySide6", types.ModuleType("PySide6"))
     sys.modules["PySide6.QtWidgets"] = qt_widgets

@@ -47,6 +47,10 @@ class PromptManagerSettings(BaseSettings):
         default=None,
         description="Optional list of LiteLLM parameters to drop before forwarding requests (see https://docs.litellm.ai/docs/completion/drop_params).",
     )
+    litellm_reasoning_effort: Optional[str] = Field(
+        default=None,
+        description="Optional reasoning effort level for OpenAI reasoning models (minimal, medium, high).",
+    )
     quick_actions: Optional[list[dict[str, object]]] = Field(
         default=None,
         description="Optional list of custom quick action definitions for the command palette.",
@@ -84,6 +88,7 @@ class PromptManagerSettings(BaseSettings):
                 "litellm_api_base": ["LITELLM_API_BASE", "litellm_api_base", "AZURE_OPENAI_ENDPOINT"],
                 "litellm_api_version": ["LITELLM_API_VERSION", "litellm_api_version", "AZURE_OPENAI_API_VERSION"],
                 "litellm_drop_params": ["LITELLM_DROP_PARAMS", "litellm_drop_params"],
+                "litellm_reasoning_effort": ["LITELLM_REASONING_EFFORT", "litellm_reasoning_effort"],
                 "embedding_backend": ["EMBEDDING_BACKEND", "embedding_backend"],
                 "embedding_model": ["EMBEDDING_MODEL", "embedding_model"],
                 "embedding_device": ["EMBEDDING_DEVICE", "embedding_device"],
@@ -145,12 +150,21 @@ class PromptManagerSettings(BaseSettings):
 
     @model_validator(mode="after")
     def _validate_embedding_configuration(self) -> "PromptManagerSettings":
-        if self.embedding_backend == "litellm" and not self.embedding_model and self.litellm_model:
-            object.__setattr__(self, "embedding_model", self.litellm_model)
-        if self.embedding_backend != "deterministic" and not self.embedding_model:
+        backend = self.embedding_backend
+        model = self.embedding_model
+
+        if model and backend == "deterministic":
+            backend = "litellm"
+            object.__setattr__(self, "embedding_backend", backend)
+
+        if backend == "litellm" and not model and self.litellm_model:
+            model = self.litellm_model
+            object.__setattr__(self, "embedding_model", model)
+
+        if backend != "deterministic" and not model:
             raise ValueError(
                 "embedding_model must be provided when embedding_backend is set to "
-                f"'{self.embedding_backend}'"
+                f"'{backend}'"
             )
         return self
 
@@ -198,6 +212,15 @@ class PromptManagerSettings(BaseSettings):
             return items or None
         raise ValueError("litellm_drop_params must be a list, comma-separated string, or JSON array")
 
+    @field_validator("litellm_reasoning_effort", mode="before")
+    def _normalise_reasoning_effort(cls, value: object) -> Optional[str]:
+        if value in (None, ""):
+            return None
+        effort = str(value).strip().lower()
+        if effort not in {"minimal", "medium", "high"}:
+            raise ValueError("litellm_reasoning_effort must be one of: minimal, medium, high")
+        return effort
+
     @classmethod
     def settings_customise_sources(
         cls,
@@ -239,6 +262,7 @@ class PromptManagerSettings(BaseSettings):
                 "embedding_model": ["EMBEDDING_MODEL", "embedding_model"],
                 "embedding_device": ["EMBEDDING_DEVICE", "embedding_device"],
                 "quick_actions": ["QUICK_ACTIONS", "quick_actions"],
+                "litellm_reasoning_effort": ["LITELLM_REASONING_EFFORT", "litellm_reasoning_effort"],
             }
             for field, keys in mapping.items():
                 for key in keys:
@@ -323,6 +347,7 @@ class PromptManagerSettings(BaseSettings):
                     "litellm_api_base",
                     "litellm_api_version",
                     "litellm_drop_params",
+                    "litellm_reasoning_effort",
                     "embedding_backend",
                     "embedding_model",
                     "embedding_device",

@@ -82,6 +82,7 @@ def _print_settings_summary(settings: PromptManagerSettings) -> None:
     litellm_api_key = getattr(settings, "litellm_api_key", None)
     litellm_api_base = getattr(settings, "litellm_api_base", None)
     litellm_api_version = getattr(settings, "litellm_api_version", None)
+    litellm_reasoning_effort = getattr(settings, "litellm_reasoning_effort", None)
     embedding_backend = getattr(settings, "embedding_backend", None)
     embedding_model = getattr(settings, "embedding_model", None)
 
@@ -99,6 +100,7 @@ def _print_settings_summary(settings: PromptManagerSettings) -> None:
         f"LiteLLM API key: {_mask_secret(litellm_api_key)}",
         f"LiteLLM API base: {litellm_api_base or 'not set'}",
         f"LiteLLM API version: {litellm_api_version or 'not set'}",
+        f"Reasoning effort: {litellm_reasoning_effort or 'not set'}",
         "",
         "Embedding configuration",
         "-----------------------",

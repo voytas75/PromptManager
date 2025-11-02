@@ -6,6 +6,8 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 - Stop forwarding LiteLLM `drop_params` directives to Azure/OpenAI providers; configured keys are now stripped locally before requests, preventing `Unknown parameter: 'drop_params'` failures during prompt execution.
 - Adjust LiteLLM fallback retries to reuse the stripped parameter set without injecting unsupported fields back into follow-up requests.
+- Added optional `litellm_reasoning_effort` configuration so reasoning-capable models (gpt-4.1, o-series, gpt-5) can request `minimal`, `medium`, or `high` effort without code changes.
+- Automatically switch embeddings to LiteLLM when an `embedding_model` is configured so semantic sync uses your OpenAI embedding choice out of the box.
 
 ## [0.13.2] - 2025-11-17
 

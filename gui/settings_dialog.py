@@ -9,7 +9,6 @@ Updates: v0.1.0 - 2025-11-04 - Initial settings dialog implementation.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Optional, Sequence
 
 from PySide6.QtGui import QColor, QPalette
@@ -25,6 +24,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from config.persistence import persist_settings_to_config
+
 
 class SettingsDialog(QDialog):
     """Modal dialog enabling users to configure catalogue and LiteLLM options."""
@@ -38,6 +39,7 @@ class SettingsDialog(QDialog):
         litellm_api_base: Optional[str] = None,
         litellm_api_version: Optional[str] = None,
         litellm_drop_params: Optional[Sequence[str]] = None,
+        litellm_reasoning_effort: Optional[str] = None,
         quick_actions: Optional[list[dict[str, object]]] = None,
     ) -> None:
         super().__init__(parent)
@@ -48,6 +50,7 @@ class SettingsDialog(QDialog):
         self._litellm_api_base = litellm_api_base or ""
         self._litellm_api_version = litellm_api_version or ""
         self._litellm_drop_params = ", ".join(litellm_drop_params) if litellm_drop_params else ""
+        self._litellm_reasoning_effort = (litellm_reasoning_effort or "").strip()
         original_actions = [dict(entry) for entry in (quick_actions or []) if isinstance(entry, dict)]
         self._original_quick_actions = original_actions
         self._quick_actions_value: Optional[list[dict[str, object]]] = original_actions or None
@@ -93,6 +96,10 @@ class SettingsDialog(QDialog):
         self._drop_params_input = QLineEdit(self._litellm_drop_params, self)
         self._drop_params_input.setPlaceholderText("max_tokens, temperature")
         form.addRow("LiteLLM drop params", self._drop_params_input)
+
+        self._reasoning_effort_input = QLineEdit(self._litellm_reasoning_effort, self)
+        self._reasoning_effort_input.setPlaceholderText("minimal / medium / high")
+        form.addRow("LiteLLM reasoning effort", self._reasoning_effort_input)
 
         layout.addLayout(form)
 
@@ -159,33 +166,9 @@ class SettingsDialog(QDialog):
             "litellm_api_base": _clean(self._api_base_input.text()),
             "litellm_api_version": _clean(self._api_version_input.text()),
             "litellm_drop_params": drop_params,
+            "litellm_reasoning_effort": _clean(self._reasoning_effort_input.text()),
             "quick_actions": self._quick_actions_value,
         }
-
-
-def persist_settings_to_config(updates: dict[str, Optional[str | list[dict[str, object]]]]) -> None:
-    """Merge settings into config/config.json to persist between sessions."""
-    config_path = Path("config/config.json")
-    config_data = {}
-    if config_path.exists():
-        try:
-            config_data = json.loads(config_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            config_data = {}
-    secret_keys = {"litellm_api_key"}
-    for key, value in updates.items():
-        if key in secret_keys:
-            # Always drop secrets from on-disk configuration; rely on env/secret store instead.
-            config_data.pop(key, None)
-            continue
-        if value is not None:
-            config_data[key] = value
-        elif key in config_data:
-            del config_data[key]
-    # Remove deprecated catalogue configuration if present.
-    config_data.pop("catalog_path", None)
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-    config_path.write_text(json.dumps(config_data, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 __all__ = ["SettingsDialog", "persist_settings_to_config"]

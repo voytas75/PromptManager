@@ -144,6 +144,7 @@ def build_prompt_manager(
             api_base=settings.litellm_api_base,
             api_version=settings.litellm_api_version,
             drop_params=settings.litellm_drop_params,
+            reasoning_effort=settings.litellm_reasoning_effort,
         )
 
     manager_kwargs: Dict[str, Any] = {

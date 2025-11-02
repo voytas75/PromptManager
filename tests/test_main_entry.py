@@ -31,6 +31,7 @@ class _DummySettings(SimpleNamespace):
             litellm_api_base=None,
             litellm_api_version=None,
             litellm_drop_params=None,
+            litellm_reasoning_effort=None,
             embedding_backend="deterministic",
             embedding_model=None,
         )

@@ -58,7 +58,12 @@ def test_json_precedes_env_when_both_provided(monkeypatch, tmp_path) -> None:
     settings = load_settings()
     assert settings.db_path == Path("data/prompt_manager.db").resolve()
     assert settings.cache_ttl_seconds == 600
-    assert settings.litellm_drop_params == ["max_tokens", "temperature", "timeout"]
+    assert settings.litellm_drop_params == [
+        "max_tokens",
+        "max_output_tokens",
+        "temperature",
+        "timeout",
+    ]
 
 
 def test_json_with_litellm_api_key_is_ignored(monkeypatch, tmp_path, caplog) -> None:
@@ -99,10 +104,36 @@ def test_litellm_settings_from_env(monkeypatch, tmp_path) -> None:
     assert settings.litellm_drop_params is None
 
 
+def test_reasoning_effort_normalised(monkeypatch, tmp_path) -> None:
+    config_payload = {"litellm_reasoning_effort": "Medium"}
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps(config_payload), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
+
+    settings = load_settings()
+
+    assert settings.litellm_reasoning_effort == "medium"
+
+
+def test_reasoning_effort_rejects_invalid(monkeypatch, tmp_path) -> None:
+    config_payload = {"litellm_reasoning_effort": "fast"}
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps(config_payload), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
+
+    with pytest.raises(SettingsError):
+        load_settings()
+
+
 def test_litellm_settings_accept_azure_aliases(monkeypatch, tmp_path) -> None:
     tmp_config = tmp_path / "config.json"
     tmp_config.write_text("{}", encoding="utf-8")
     monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(tmp_config))
+    monkeypatch.delenv("PROMPT_MANAGER_LITELLM_API_BASE", raising=False)
+    monkeypatch.delenv("LITELLM_API_BASE", raising=False)
+    monkeypatch.delenv("AZURE_OPENAI_ENDPOINT", raising=False)
     monkeypatch.setenv("AZURE_OPENAI_API_KEY", "azure-key")
     monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://azure.example.com")
     monkeypatch.setenv("AZURE_OPENAI_API_VERSION", "2024-05-01-preview")
@@ -132,6 +163,18 @@ def test_embedding_backend_reuses_litellm_model(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("PROMPT_MANAGER_LITELLM_MODEL", "text-embedding-3-small")
     monkeypatch.setenv("PROMPT_MANAGER_EMBEDDING_BACKEND", "litellm")
     settings = load_settings()
+    assert settings.embedding_backend == "litellm"
+    assert settings.embedding_model == "text-embedding-3-small"
+
+
+def test_embedding_model_auto_switches_backend(monkeypatch, tmp_path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps({"embedding_model": "text-embedding-3-small"}), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
+
+    settings = load_settings()
+
     assert settings.embedding_backend == "litellm"
     assert settings.embedding_model == "text-embedding-3-small"
 

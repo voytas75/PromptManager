@@ -247,15 +247,22 @@ class PromptManager:
         self._description_generator = description_generator
         self._prompt_engineer = prompt_engineer
         self._litellm_drop_params: Optional[Sequence[str]] = None
+        self._litellm_reasoning_effort: Optional[str] = None
         for candidate in (name_generator, prompt_engineer, executor):
             if candidate is not None and getattr(candidate, "drop_params", None):
                 params = getattr(candidate, "drop_params")
                 self._litellm_drop_params = tuple(params)  # type: ignore[arg-type]
                 break
+        if executor is not None and getattr(executor, "reasoning_effort", None):
+            effort = getattr(executor, "reasoning_effort")
+            self._litellm_reasoning_effort = str(effort) if effort else None
         self._intent_classifier = intent_classifier or IntentClassifier()
         self._executor = executor
-        if self._executor is not None and self._litellm_drop_params:
-            self._executor.drop_params = list(self._litellm_drop_params)
+        if self._executor is not None:
+            if self._litellm_drop_params:
+                self._executor.drop_params = list(self._litellm_drop_params)
+            if self._litellm_reasoning_effort:
+                self._executor.reasoning_effort = self._litellm_reasoning_effort
         self._history_tracker = history_tracker
         if user_profile is not None:
             self._user_profile: Optional[UserProfile] = user_profile
@@ -736,6 +743,7 @@ class PromptManager:
         api_version: Optional[str],
         *,
         drop_params: Optional[Sequence[str]] = None,
+        reasoning_effort: Optional[str] = None,
     ) -> None:
         """Configure the LiteLLM name generator at runtime."""
         if not model:
@@ -743,6 +751,7 @@ class PromptManager:
             self._description_generator = None
             self._prompt_engineer = None
             self._litellm_drop_params = None
+            self._litellm_reasoning_effort = None
             self._executor = None
             return
         try:
@@ -768,15 +777,22 @@ class PromptManager:
                 drop_params=drop_params,
             )
             self._litellm_drop_params = tuple(drop_params) if drop_params else None
+            self._litellm_reasoning_effort = reasoning_effort
             self._executor = CodexExecutor(
                 model=model,
                 api_key=api_key,
                 api_base=api_base,
                 api_version=api_version,
                 drop_params=drop_params,
+                reasoning_effort=reasoning_effort,
             )
         except RuntimeError as exc:
             raise NameGenerationError(str(exc)) from exc
+        if self._executor is not None:
+            if self._litellm_drop_params:
+                self._executor.drop_params = list(self._litellm_drop_params)
+            if self._litellm_reasoning_effort:
+                self._executor.reasoning_effort = self._litellm_reasoning_effort
         if self._intent_classifier is not None and model:
             # Name generation and intent classification may share LiteLLM routing;
             # future integrations can configure richer classification when desired.
