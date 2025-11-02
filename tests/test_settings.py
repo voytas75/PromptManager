@@ -1,5 +1,6 @@
 """Tests for configuration loading and validation logic.
 
+Updates: v0.1.2 - 2025-11-14 - Cover LiteLLM API key loading from JSON configuration.
 Updates: v0.1.1 - 2025-11-03 - Add precedence test using example template.
 Updates: v0.1.0 - 2025-11-03 - Cover JSON/env precedence and validation errors.
 """
@@ -56,6 +57,25 @@ def test_json_precedes_env_when_both_provided(monkeypatch, tmp_path) -> None:
     settings = load_settings()
     assert settings.db_path == Path("data/prompt_manager.db").resolve()
     assert settings.cache_ttl_seconds == 600
+
+
+def test_json_supplies_litellm_api_key(monkeypatch, tmp_path) -> None:
+    config_payload = {
+        "litellm_model": "azure/gpt-4o",
+        "litellm_api_key": "from-json",
+        "litellm_api_base": "https://azure.example.com",
+    }
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    config_path = config_dir / "config.json"
+    config_path.write_text(json.dumps(config_payload), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    settings = load_settings()
+
+    assert settings.litellm_model == "azure/gpt-4o"
+    assert settings.litellm_api_key == "from-json"
+    assert settings.litellm_api_base == "https://azure.example.com"
 
 
 def test_litellm_settings_from_env(monkeypatch, tmp_path) -> None:

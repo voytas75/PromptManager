@@ -1,5 +1,6 @@
 """Settings management for Prompt Manager configuration.
 
+Updates: v0.4.1 - 2025-11-14 - Load LiteLLM API key from JSON configuration files.
 Updates: v0.4.0 - 2025-11-07 - Add configurable embedding backend options.
 Updates: v0.3.2 - 2025-10-30 - Document revised settings precedence examples.
 Updates: v0.3.1 - 2025-10-30 - Ensure env overrides JSON; remove unused helpers.
@@ -285,6 +286,7 @@ class PromptManagerSettings(BaseSettings):
                     "redis_dsn",
                     "cache_ttl_seconds",
                     "catalog_path",
+                    "litellm_api_key",
                     "litellm_model",
                     "litellm_api_base",
                     "litellm_api_version",
