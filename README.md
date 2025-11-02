@@ -85,7 +85,7 @@ Further modules (session history, execution pipeline) will be introduced in subs
   python -m main --no-gui
   ```
 
-- Smoke test: run `python -m main --no-gui --print-settings` to validate configuration and backend connectivity without launching the UI.
+- Smoke test: run `python -m main --no-gui --print-settings` to validate configuration and backend connectivity without launching the UI; the summary includes path health checks and masks any LiteLLM API key.
 
 - The window exposes a searchable prompt list (left), detail view (right), and toolbar actions for create/edit/delete/refresh backed by the shared `PromptManager` service.
 - The prompt detail pane is scrollable so long prompt bodies stay readable and the window remains stable when maximised on Wayland.

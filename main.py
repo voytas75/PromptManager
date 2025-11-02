@@ -1,5 +1,6 @@
 """Application entry point for Prompt Manager.
 
+Updates: v0.7.2 - 2025-11-15 - Extend --print-settings with health checks and masked secret output.
 Updates: v0.7.1 - 2025-11-14 - Simplify GUI dependency guidance for unified installs.
 Updates: v0.7.0 - 2025-11-07 - Add semantic suggestion CLI to verify embedding backends.
 Updates: v0.6.0 - 2025-11-06 - Add CLI catalogue import/export commands with diff previews.
@@ -23,7 +24,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Callable, Optional, cast
 
-from config import load_settings
+from config import PromptManagerSettings, load_settings
 from core import (
     CatalogDiff,
     build_prompt_manager,
@@ -31,6 +32,82 @@ from core import (
     export_prompt_catalog,
     import_prompt_catalog,
 )
+
+
+def _mask_secret(value: Optional[str]) -> str:
+    """Return masked representation of secret values."""
+
+    if not value:
+        return "not set"
+    secret = value.strip()
+    if len(secret) <= 6:
+        return "set (****)"
+    prefix = secret[:4]
+    suffix = secret[-4:]
+    return f"set ({prefix}...{suffix})"
+
+
+def _describe_path(path_value: object, *, expect_directory: bool, allow_missing_file: bool = False) -> str:
+    """Return a human-readable description of a configured filesystem path."""
+
+    try:
+        path = Path(path_value) if path_value is not None else None
+    except TypeError:
+        path = None
+    if path is None:
+        return "not set"
+
+    resolved = path.expanduser()
+    if resolved.exists():
+        if expect_directory and not resolved.is_dir():
+            return f"{resolved} (exists but is not a directory)"
+        if not expect_directory and resolved.is_dir():
+            return f"{resolved} (exists but is a directory)"
+        return f"{resolved} (exists)"
+
+    message = f"{resolved} (missing)"
+    if not expect_directory and allow_missing_file:
+        message = f"{resolved} (missing - created on demand)"
+    parent = resolved.parent
+    if not parent.exists():
+        message += f", parent missing: {parent}"
+    return message
+
+
+def _print_settings_summary(settings: PromptManagerSettings) -> None:
+    """Emit a readable summary of core configuration and health checks."""
+
+    catalog_path = getattr(settings, "catalog_path", None)
+    redis_dsn = getattr(settings, "redis_dsn", None)
+    litellm_model = getattr(settings, "litellm_model", None)
+    litellm_api_key = getattr(settings, "litellm_api_key", None)
+    litellm_api_base = getattr(settings, "litellm_api_base", None)
+    litellm_api_version = getattr(settings, "litellm_api_version", None)
+    embedding_backend = getattr(settings, "embedding_backend", None)
+    embedding_model = getattr(settings, "embedding_model", None)
+
+    lines = [
+        "Prompt Manager configuration summary",
+        "------------------------------------",
+        f"Database path: {_describe_path(settings.db_path, expect_directory=False, allow_missing_file=True)}",
+        f"Chroma directory: {_describe_path(settings.chroma_path, expect_directory=True)}",
+        f"Catalogue path: {_describe_path(catalog_path, expect_directory=False) if catalog_path else 'not set'}",
+        f"Redis DSN: {redis_dsn or 'not set'}",
+        f"Cache TTL (seconds): {getattr(settings, 'cache_ttl_seconds', 'n/a')}",
+        "",
+        "LiteLLM configuration",
+        "---------------------",
+        f"Model: {litellm_model or 'not set'}",
+        f"LiteLLM API key: {_mask_secret(litellm_api_key)}",
+        f"LiteLLM API base: {litellm_api_base or 'not set'}",
+        f"LiteLLM API version: {litellm_api_version or 'not set'}",
+        "",
+        "Embedding configuration",
+        "-----------------------",
+        f"Backend: {embedding_backend or 'deterministic'}",
+        f"Model: {embedding_model or ('(auto)' if embedding_backend == 'litellm' and litellm_model else 'not set')}",
+    ]
+    print("\n".join(lines))
 
 
 def _setup_logging(logging_conf_path: Optional[Path]) -> None:
@@ -316,15 +393,7 @@ def main() -> int:
         return 2
 
     if args.print_settings:
-        logger.info(
-            "Resolved settings: db=%s chroma=%s redis=%s ttl=%s catalog=%s litellm_model=%s",
-            settings.db_path,
-            settings.chroma_path,
-            settings.redis_dsn,
-            settings.cache_ttl_seconds,
-            settings.catalog_path,
-            settings.litellm_model,
-        )
+        _print_settings_summary(settings)
         return 0
 
     # Build core services; GUI wiring will attach here in later milestones

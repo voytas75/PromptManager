@@ -1,5 +1,6 @@
 """Lightweight integration checks for main module.
 
+Updates: v0.3.0 - 2025-11-15 - Cover enhanced --print-settings summary and masked API keys.
 Updates: v0.2.0 - 2025-11-05 - Add coverage for GUI dependency fallback.
 """
 
@@ -29,6 +30,9 @@ class _DummySettings(SimpleNamespace):
             litellm_model=None,
             litellm_api_key=None,
             litellm_api_base=None,
+            litellm_api_version=None,
+            embedding_backend="deterministic",
+            embedding_model=None,
         )
 
 
@@ -70,7 +74,25 @@ def test_main_print_settings_logs_and_exits(
 
     assert exit_code == 0
     captured = capsys.readouterr()
-    assert "Resolved settings" in captured.out
+    assert "Prompt Manager configuration summary" in captured.out
+    assert "LiteLLM API key: not set" in captured.out
+
+
+def test_main_print_settings_masks_api_key(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "--print-settings"])
+    settings = _DummySettings()
+    settings.litellm_model = "azure/gpt-4o"
+    settings.litellm_api_key = "sk-1234567890abcd"
+    monkeypatch.setattr(main, "load_settings", lambda: settings)
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "LiteLLM API key: set (sk-1...abcd)" in output
+    assert "Model: azure/gpt-4o" in output
 
 
 def test_main_returns_error_when_settings_fail(
@@ -236,6 +258,7 @@ def test_main_entrypoint_guard_executes(
 
     config_stub = types.ModuleType("config")
     config_stub.load_settings = lambda: _DummySettings()
+    config_stub.PromptManagerSettings = type("PromptManagerSettings", (), {})
     core_stub = types.ModuleType("core")
     dummy_manager = _DummyManager()
     core_stub.build_prompt_manager = lambda settings: dummy_manager

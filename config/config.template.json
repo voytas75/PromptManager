@@ -5,6 +5,5 @@
   "cache_ttl_seconds": 600,
   "catalog_path": "catalog/prompts.json",
   "litellm_model": "azure/gpt-4o-mini",
-  "litellm_api_base": "https://example.openai.azure.com",
   "litellm_api_version": "2025-04-01-preview"
 }
