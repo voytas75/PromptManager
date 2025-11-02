@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.7.0 - 2025-11-16 - Add markdown preview dialog for rendered execution output.
 Updates: v0.6.0 - 2025-11-15 - Add prompt engineering refinement button to prompt dialog.
 Updates: v0.5.0 - 2025-11-09 - Capture execution ratings alongside optional notes.
 Updates: v0.4.0 - 2025-11-08 - Add execution Save Result dialog with optional notes.
@@ -19,6 +20,7 @@ from datetime import datetime, timezone
 from typing import Callable, Optional, Sequence
 
 from PySide6.QtWidgets import (
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -28,9 +30,9 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QTextBrowser,
     QVBoxLayout,
     QWidget,
-    QComboBox,
 )
 
 from core import (
@@ -508,6 +510,35 @@ class SaveResultDialog(QDialog):
         self.accept()
 
 
+class MarkdownPreviewDialog(QDialog):
+    """Display markdown content rendered in a read-only viewer."""
+
+    def __init__(self, markdown_text: str, parent: Optional[QWidget], *, title: str = "Rendered Output") -> None:
+        super().__init__(parent)
+        self._markdown_text = markdown_text
+        self.setWindowTitle(title)
+        self.resize(720, 540)
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        """Construct the markdown preview layout and wire controls."""
+
+        layout = QVBoxLayout(self)
+        viewer = QTextBrowser(self)
+        viewer.setOpenExternalLinks(True)
+        content = self._markdown_text.strip()
+        if content:
+            viewer.setMarkdown(content)
+        else:
+            viewer.setMarkdown("*No content available.*")
+        layout.addWidget(viewer, stretch=1)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Close, parent=self)
+        buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
+        buttons.accepted.connect(self.accept)  # type: ignore[arg-type]
+        layout.addWidget(buttons)
+
+
 def _diff_entry_to_text(entry: CatalogDiffEntry) -> str:
     header = f"[{entry.change_type.value.upper()}] {entry.name} ({entry.prompt_id})"
     if entry.diff:
@@ -571,6 +602,7 @@ class CatalogPreviewDialog(QDialog):
 
 __all__ = [
     "CatalogPreviewDialog",
+    "MarkdownPreviewDialog",
     "PromptDialog",
     "SaveResultDialog",
     "fallback_suggest_prompt_name",

@@ -13,6 +13,7 @@ Prompt Manager is a desktop-focused application for cataloguing, searching, and 
 - Typed configuration loader in `config/settings.py` validates paths/TTL values and can hydrate from environment variables or a JSON file.
 - Initial PySide6 GUI accessible via `--gui`, offering list/search/detail panes with create/edit/delete dialogs.
 - LiteLLM-backed prompt execution with automatic history logging and a GUI result pane for reviewing and copying model output.
+- Result pane includes a Render Output button that previews LLM responses as rendered Markdown in a dedicated window.
 - Prompt engineering workflow that analyses stored prompts against the meta-guidelines and proposes a refined prompt body directly in the editor.
 
 ## Getting Started

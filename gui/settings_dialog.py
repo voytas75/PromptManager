@@ -1,5 +1,6 @@
 """Settings dialog for configuring Prompt Manager runtime options.
 
+Updates: v0.2.0 - 2025-11-16 - Apply palette-aware border styling to match main window chrome.
 Updates: v0.1.1 - 2025-11-15 - Avoid persisting LiteLLM API secrets to disk.
 Updates: v0.1.0 - 2025-11-04 - Initial settings dialog implementation.
 """
@@ -10,6 +11,7 @@ import json
 from pathlib import Path
 from typing import Optional
 
+from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -18,6 +20,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QFrame,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
@@ -53,7 +56,27 @@ class SettingsDialog(QDialog):
         self._build_ui()
 
     def _build_ui(self) -> None:
-        layout = QVBoxLayout(self)
+        palette = self.palette()
+        window_color = palette.color(QPalette.Window)
+        border_color = QColor(
+            255 - window_color.red(),
+            255 - window_color.green(),
+            255 - window_color.blue(),
+        )
+        border_color.setAlpha(255)
+
+        outer_layout = QVBoxLayout(self)
+        container = QFrame(self)
+        container.setObjectName("settingsContainer")
+        container.setStyleSheet(
+            "#settingsContainer { "
+            f"border: 1px solid {border_color.name()}; "
+            "border-radius: 8px; background-color: palette(base); }"
+        )
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(12, 12, 12, 12)
+        outer_layout.addWidget(container)
+
         form = QFormLayout()
 
         self._catalog_input = QLineEdit(self._catalog_path, self)
@@ -92,7 +115,8 @@ class SettingsDialog(QDialog):
             except TypeError:
                 pretty = ""
             self._quick_actions_input.setPlainText(pretty)
-        layout.addWidget(QLabel("Quick actions (JSON)", self))
+        quick_actions_label = QLabel("Quick actions (JSON)", self)
+        layout.addWidget(quick_actions_label)
         layout.addWidget(self._quick_actions_input)
 
         button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)

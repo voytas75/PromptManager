@@ -1,5 +1,7 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.13.1 - 2025-11-16 - Add palette-aware border styling to the primary window frame.
+Updates: v0.13.0 - 2025-11-16 - Add rendered markdown preview for prompt execution output.
 Updates: v0.12.0 - 2025-11-15 - Wire prompt engineering refinement into prompt editor dialogs.
 Updates: v0.11.0 - 2025-11-12 - Add multi-turn chat controls and conversation history display.
 Updates: v0.10.0 - 2025-11-11 - Surface notification centre with task status indicator and history dialog.
@@ -25,13 +27,14 @@ from pathlib import Path
 from typing import Any, Deque, Dict, Iterable, List, Optional, Sequence
 
 from PySide6.QtCore import QAbstractListModel, QModelIndex, Qt
-from PySide6.QtGui import QGuiApplication, QKeySequence, QTextCursor, QShortcut
+from PySide6.QtGui import QColor, QGuiApplication, QKeySequence, QPalette, QTextCursor, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
     QFileDialog,
     QDialog,
     QDoubleSpinBox,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -69,7 +72,7 @@ from models.prompt_model import Prompt
 
 from .command_palette import CommandPaletteDialog, QuickAction, rank_prompts_for_action
 from .code_highlighter import CodeHighlighter
-from .dialogs import CatalogPreviewDialog, PromptDialog, SaveResultDialog
+from .dialogs import CatalogPreviewDialog, MarkdownPreviewDialog, PromptDialog, SaveResultDialog
 from .history_panel import HistoryPanel
 from .settings_dialog import SettingsDialog, persist_settings_to_config
 from .diff_utils import build_diff_preview
@@ -212,6 +215,7 @@ class MainWindow(QMainWindow):
         self._current_prompts: List[Prompt] = []
         self._suggestions: Optional[PromptManager.IntentSuggestions] = None
         self._last_execution: Optional[PromptManager.ExecutionOutcome] = None
+        self._last_prompt_name: Optional[str] = None
         self._chat_conversation: List[Dict[str, str]] = []
         self._chat_prompt_id: Optional[uuid.UUID] = None
         self._history_limit = 50
@@ -244,7 +248,22 @@ class MainWindow(QMainWindow):
     def _build_ui(self) -> None:
         """Create the main layout with list/search/detail panes."""
 
-        container = QWidget(self)
+        palette = self.palette()
+        window_color = palette.color(QPalette.Window)
+        border_color = QColor(
+            255 - window_color.red(),
+            255 - window_color.green(),
+            255 - window_color.blue(),
+        )
+        border_color.setAlpha(255)
+
+        container = QFrame(self)
+        container.setObjectName("mainContainer")
+        container.setStyleSheet(
+            "#mainContainer { "
+            f"border: 1px solid {border_color.name()}; "
+            "border-radius: 6px; background-color: palette(base); }"
+        )
         layout = QVBoxLayout(container)
         layout.setContentsMargins(12, 12, 12, 12)
 
@@ -348,6 +367,11 @@ class MainWindow(QMainWindow):
         self._copy_result_button = QPushButton("Copy Result", self)
         self._copy_result_button.clicked.connect(self._on_copy_result_clicked)  # type: ignore[arg-type]
         actions_layout.addWidget(self._copy_result_button)
+
+        self._render_markdown_button = QPushButton("Render Output", self)
+        self._render_markdown_button.setEnabled(False)
+        self._render_markdown_button.clicked.connect(self._on_render_markdown_clicked)  # type: ignore[arg-type]
+        actions_layout.addWidget(self._render_markdown_button)
 
         actions_layout.addStretch(1)
         layout.addLayout(actions_layout)
@@ -639,6 +663,7 @@ class MainWindow(QMainWindow):
         """Render the most recent execution result in the result pane."""
 
         self._last_execution = outcome
+        self._last_prompt_name = prompt.name
         self._chat_prompt_id = prompt.id
         self._chat_conversation = [dict(message) for message in outcome.conversation]
         self._result_label.setText(f"Last Result — {prompt.name}")
@@ -652,6 +677,7 @@ class MainWindow(QMainWindow):
         request_text = outcome.result.request_text or ""
         self._result_text.setPlainText(response_text)
         self._update_diff_view(request_text, response_text)
+        self._render_markdown_button.setEnabled(bool(response_text.strip()))
         self._result_tabs.setCurrentIndex(0)
         self._copy_result_button.setEnabled(bool(outcome.result.response_text))
         self._save_button.setEnabled(True)
@@ -665,11 +691,13 @@ class MainWindow(QMainWindow):
         """Reset the result pane to its default state."""
 
         self._last_execution = None
+        self._last_prompt_name = None
         self._result_label.setText("No prompt executed yet")
         self._result_meta.clear()
         self._result_text.clear()
         self._diff_view.clear()
         self._diff_view.setPlaceholderText("Run a prompt to compare input and output.")
+        self._render_markdown_button.setEnabled(False)
         self._copy_result_button.setEnabled(False)
         self._save_button.setEnabled(False)
         self._reset_chat_session()
@@ -1185,6 +1213,32 @@ class MainWindow(QMainWindow):
         clipboard.setText(payload)
         self.statusBar().showMessage(f"Copied '{prompt.name}' to the clipboard.", 4000)
         self._usage_logger.log_copy(prompt_name=prompt.name, prompt_has_body=bool(prompt.context))
+
+    def _on_render_markdown_clicked(self) -> None:
+        """Open a rendered markdown preview for the latest execution result."""
+
+        if self._last_execution is None:
+            QMessageBox.information(
+                self,
+                "No output available",
+                "Run a prompt to view rendered output.",
+            )
+            return
+        content = (self._last_execution.result.response_text or "").strip()
+        if not content:
+            QMessageBox.information(
+                self,
+                "No output available",
+                "The latest result did not include any text to render.",
+            )
+            return
+        prompt_name = self._last_prompt_name or "Prompt Output"
+        dialog = MarkdownPreviewDialog(
+            content,
+            self,
+            title=f"Rendered Output — {prompt_name}",
+        )
+        dialog.exec()
 
     def _on_copy_result_clicked(self) -> None:
         """Copy the latest execution result to the clipboard."""

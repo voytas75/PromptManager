@@ -2,6 +2,16 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.13.1] - 2025-11-16
+
+- Applied palette-aware borders to the main Prompt Manager window and settings dialog so both stay visually distinct across light and dark themes.
+
+## [0.13.0] - 2025-11-16
+
+- Added a Render Output action in the GUI result pane that opens LLM responses as rendered Markdown within a dedicated preview window.
+- Introduced a reusable markdown preview dialog so other workflows can surface formatted content without leaving the application.
+- Updated project documentation to cover the new viewing option and guide users towards the Markdown preview button.
+
 ## [0.12.0] - 2025-11-15
 
 - Added a LiteLLM-backed prompt engineering workflow that analyses and refines prompt bodies using the new meta-prompt ruleset.
