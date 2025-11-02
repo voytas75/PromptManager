@@ -39,9 +39,7 @@ def test_load_settings_reads_json_and_env(monkeypatch, tmp_path) -> None:
     # JSON is higher precedence for overlapping keys
     assert settings.cache_ttl_seconds == 900
     assert settings.redis_dsn == "redis://localhost:6379/1"
-    assert settings.catalog_path is None
     assert settings.litellm_model is None
-    assert settings.catalog_path is None
 
 
 def test_json_precedes_env_when_both_provided(monkeypatch, tmp_path) -> None:
@@ -95,15 +93,6 @@ def test_litellm_settings_from_env(monkeypatch, tmp_path) -> None:
     assert settings.litellm_model == "gpt-4o-mini"
     assert settings.litellm_api_key == "secret-key"
     assert settings.litellm_api_base == "https://proxy.example.com"
-
-
-def test_catalog_path_environment_variable(monkeypatch, tmp_path) -> None:
-    catalog_file = tmp_path / "catalog.json"
-    monkeypatch.setenv("PROMPT_MANAGER_CATALOG_PATH", str(catalog_file))
-
-    settings = load_settings()
-
-    assert settings.catalog_path == catalog_file.resolve()
 
 
 def test_litellm_settings_accept_azure_aliases(monkeypatch, tmp_path) -> None:

@@ -54,10 +54,9 @@ class _StubManager:
         return self.repository.update(prompt)
 
 
-def test_load_prompt_catalog_falls_back_to_builtin() -> None:
+def test_load_prompt_catalog_without_path_returns_empty() -> None:
     prompts = load_prompt_catalog(None)
-    assert prompts, "Built-in catalogue should yield prompts"
-    assert all(isinstance(prompt, Prompt) for prompt in prompts)
+    assert prompts == []
 
 
 def test_import_prompt_catalog_adds_and_updates(tmp_path: Path) -> None:

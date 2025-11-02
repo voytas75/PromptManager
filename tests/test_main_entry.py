@@ -26,7 +26,6 @@ class _DummySettings(SimpleNamespace):
             chroma_path="/tmp/chroma",
             redis_dsn="redis://localhost:6379/0",
             cache_ttl_seconds=120,
-            catalog_path=None,
             litellm_model=None,
             litellm_api_key=None,
             litellm_api_base=None,

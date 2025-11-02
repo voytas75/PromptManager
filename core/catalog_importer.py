@@ -1,5 +1,6 @@
 """Utilities for importing, previewing, and exporting prompt catalogues.
 
+Updates: v0.6.1 - 2025-11-17 - Require explicit catalogue paths; remove built-in fallback prompts.
 Updates: v0.6.0 - 2025-11-06 - Add diff previews, export helpers, and bulk directory support.
 Updates: v0.5.0 - 2025-11-05 - Seed SQLite/Chroma from packaged or user-provided catalogues.
 """
@@ -13,11 +14,9 @@ import uuid
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
-from importlib.resources import as_file
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
-from catalog import builtin_catalog_resource
 from models.prompt_model import Prompt
 
 from .prompt_manager import PromptManager, PromptStorageError
@@ -73,12 +72,6 @@ def _load_entries_from_path(path: Path) -> List[Dict[str, Any]]:
     return _read_json(path)
 
 
-def _load_builtin_entries() -> List[Dict[str, Any]]:
-    resource = builtin_catalog_resource()
-    with as_file(resource) as resolved_path:
-        return _load_entries_from_path(Path(resolved_path))
-
-
 def _entry_to_prompt(entry: Dict[str, Any]) -> Prompt:
     if "name" not in entry or "description" not in entry:
         raise ValueError("Prompt catalogue entries must include 'name' and 'description'")
@@ -120,26 +113,24 @@ def _entry_to_prompt(entry: Dict[str, Any]) -> Prompt:
 
 
 def load_prompt_catalog(catalog_path: Optional[Path]) -> List[Prompt]:
-    """Load prompts from a user-provided path or packaged defaults."""
+    """Load prompts from a user-provided path.
 
-    entries: List[Dict[str, Any]] = []
-    if catalog_path is not None:
-        try:
-            entries = _load_entries_from_path(catalog_path)
-        except FileNotFoundError:
-            logger.warning(
-                "Prompt catalogue not found at %s; falling back to built-in entries.",
-                catalog_path,
-            )
-        except ValueError as exc:
-            logger.error("Skipping catalogue %s: %s", catalog_path, exc)
+    When ``catalog_path`` is ``None`` or the file cannot be read, an empty list is
+    returned and the caller is responsible for reacting accordingly.
+    """
 
-    if not entries:
-        try:
-            entries = _load_builtin_entries()
-        except Exception as exc:  # pragma: no cover - IO failures
-            logger.error("Unable to load built-in prompt catalogue: %s", exc)
-            return []
+    if catalog_path is None:
+        logger.debug("No prompt catalogue path provided; returning empty list.")
+        return []
+
+    try:
+        entries = _load_entries_from_path(catalog_path)
+    except FileNotFoundError:
+        logger.error("Prompt catalogue not found at %s", catalog_path)
+        return []
+    except ValueError as exc:
+        logger.error("Skipping catalogue %s: %s", catalog_path, exc)
+        return []
 
     prompts: List[Prompt] = []
     for entry in entries:
@@ -379,9 +370,9 @@ def diff_prompt_catalog(
 
     prompts = load_prompt_catalog(catalog_path)
     if not prompts:
-        return CatalogDiff(source=str(catalog_path) if catalog_path else "builtin")
+        return CatalogDiff(source=str(catalog_path) if catalog_path else None)
     plan = _build_change_plan(manager, prompts, overwrite=overwrite)
-    plan.diff.source = str(catalog_path) if catalog_path else "builtin"
+    plan.diff.source = str(catalog_path) if catalog_path else None
     return plan.diff
 
 
@@ -489,4 +480,3 @@ __all__ = [
     "import_prompt_catalog",
     "load_prompt_catalog",
 ]
-

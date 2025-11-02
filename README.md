@@ -132,12 +132,12 @@ Prompt Manager now ships dedicated catalogue tooling alongside the GUI:
 - `python -m main suggest "your query"` runs the configured semantic retrieval stack and prints the top matching prompts with detected intent details—useful for validating LiteLLM or sentence-transformer embeddings.
 - `python -m main usage-report` summarises the anonymised GUI workspace analytics (counts per action, top intents, top recommended prompts). Pass `--path` to point at a different JSONL log file.
 
-These commands reuse the same validation and merge logic as the GUI and honour the configured `catalog_path` when no explicit file is provided.
+These commands reuse the same validation and merge logic as the GUI; pass an explicit path each time you import or export.
 
 ## Prompt Catalogue
 
-- On startup Prompt Manager imports the packaged catalogue in `catalog/prompts.json`, seeding six high-signal prompts across analysis, refactoring, debugging, documentation, reporting, and enhancement.
-- Override the catalogue by setting `PROMPT_MANAGER_CATALOG_PATH` (or `catalog_path` in `config/config.json`) to a JSON file or to a directory containing JSON files. Entries with matching names update existing prompts; new names are inserted automatically.
+- Prompt Manager no longer seeds default prompts. Configure a catalogue path if you want prompts pre-loaded during startup or via the CLI import command.
+- Provide a JSON file (or directory of JSON files) when prompted to import via the GUI or `catalog-import` CLI command. Entries with matching names update existing prompts; new names are inserted automatically.
 - Both the CLI (`catalog-import`) and the GUI **Import** button show a diff preview before any data changes, making it easy to confirm adds/updates.
 - Minimum JSON structure:
 
@@ -185,8 +185,7 @@ These commands reuse the same validation and merge logic as the GUI and honour t
     "database_path": "data/prompt_manager.db",
     "chroma_path": "data/chromadb",
     "redis_dsn": "redis://localhost:6379/0",
-    "cache_ttl_seconds": 600,
-    "catalog_path": "catalog/prompts.json"
+    "cache_ttl_seconds": 600
   }
   ```
 
@@ -199,7 +198,6 @@ These commands reuse the same validation and merge logic as the GUI and honour t
   | `PROMPT_MANAGER_REDIS_DSN` | Redis connection string | `redis://localhost:6379/1` |
   | `PROMPT_MANAGER_CACHE_TTL_SECONDS` | Cache TTL in seconds (>0) | `300` |
   | `PROMPT_MANAGER_CONFIG_JSON` | Path to JSON config used as base | `config/config.json` |
-  | `PROMPT_MANAGER_CATALOG_PATH` | Override prompt catalogue path | `/path/to/catalogue.json` |
   | `PROMPT_MANAGER_LITELLM_MODEL` | LiteLLM model used for name generation | `gpt-4o-mini` |
   | `PROMPT_MANAGER_LITELLM_API_KEY` | LiteLLM API key (environment only) | `sk-…` |
   | `PROMPT_MANAGER_LITELLM_API_BASE` | Optional LiteLLM API base override | `https://proxy.example.com` |

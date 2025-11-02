@@ -2,6 +2,11 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.13.2] - 2025-11-17
+
+- Removed the bundled default prompt catalogue and associated packaging assets; catalogue imports now require an explicit JSON file or directory.
+- Removed the `catalog_path` configuration knob; startup no longer consults settings for catalogue imports, and the GUI/CLI now require explicit paths each time.
+
 ## [0.13.1] - 2025-11-16
 
 - Applied palette-aware borders to the main Prompt Manager window and settings dialog so both stay visually distinct across light and dark themes.

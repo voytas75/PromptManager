@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.14.9 - 2025-11-17 - Add basic/all metadata buttons to reveal prompt details on demand.
 Updates: v0.14.8 - 2025-11-16 - Add maintenance dialog for batch metadata suggestions.
 Updates: v0.14.7 - 2025-11-16 - Move prompt edit/delete controls into the detail pane.
 Updates: v0.14.6 - 2025-11-16 - Stack workspace vertically so result tabs consume remaining height.
@@ -196,6 +197,41 @@ class PromptDetailWidget(QWidget):
         content_layout.addWidget(self._examples)
         content_layout.addSpacing(12)
 
+        metadata_buttons = QHBoxLayout()
+        metadata_buttons.setContentsMargins(0, 0, 0, 0)
+        metadata_buttons.setSpacing(8)
+
+        self._basic_metadata_button = QPushButton("Basic Metadata", content)
+        self._basic_metadata_button.setObjectName("showBasicMetadataButton")
+        self._basic_metadata_button.setEnabled(False)
+        self._basic_metadata_button.clicked.connect(self._show_basic_metadata)  # type: ignore[arg-type]
+        metadata_buttons.addWidget(self._basic_metadata_button)
+
+        self._all_metadata_button = QPushButton("All Metadata", content)
+        self._all_metadata_button.setObjectName("showAllMetadataButton")
+        self._all_metadata_button.setEnabled(False)
+        self._all_metadata_button.clicked.connect(self._show_all_metadata)  # type: ignore[arg-type]
+        metadata_buttons.addWidget(self._all_metadata_button)
+
+        metadata_buttons.addStretch(1)
+        content_layout.addLayout(metadata_buttons)
+
+        self._metadata_label = QLabel("Metadata", content)
+        self._metadata_label.setObjectName("promptMetadataTitle")
+        self._metadata_label.setVisible(False)
+        content_layout.addWidget(self._metadata_label)
+
+        self._metadata_view = QPlainTextEdit(content)
+        self._metadata_view.setReadOnly(True)
+        self._metadata_view.setObjectName("promptMetadata")
+        self._metadata_view.setMinimumHeight(160)
+        self._metadata_view.setVisible(False)
+        content_layout.addWidget(self._metadata_view)
+
+        self._full_metadata_text = ""
+        self._basic_metadata_text = ""
+        self._current_prompt: Optional[Prompt] = None
+
         actions_layout = QHBoxLayout()
         actions_layout.setContentsMargins(0, 0, 0, 0)
         actions_layout.addStretch(1)
@@ -238,6 +274,32 @@ class PromptDetailWidget(QWidget):
         if prompt.example_output:
             example_lines.append(f"Example output:\n{prompt.example_output}")
         self._examples.setText("\n\n".join(example_lines) or "")
+        record_payload = prompt.to_record()
+        metadata_extra = {
+            key: value
+            for key, value in prompt.to_metadata().items()
+            if key not in record_payload
+        }
+        if metadata_extra:
+            record_payload["metadata_extra"] = metadata_extra
+        self._full_metadata_text = json.dumps(record_payload, ensure_ascii=False, indent=2)
+        self._basic_metadata_text = json.dumps(
+            {
+                "id": str(prompt.id),
+                "last_modified": prompt.last_modified.isoformat(),
+                "version": prompt.version,
+                "quality_score": prompt.quality_score,
+                "created_at": prompt.created_at.isoformat(),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        self._current_prompt = prompt
+        self._metadata_label.setVisible(False)
+        self._metadata_view.setVisible(False)
+        self._metadata_view.clear()
+        self._basic_metadata_button.setEnabled(True)
+        self._all_metadata_button.setEnabled(True)
         self._edit_button.setEnabled(True)
         self._delete_button.setEnabled(True)
 
@@ -249,8 +311,40 @@ class PromptDetailWidget(QWidget):
         self._description.clear()
         self._context.clear()
         self._examples.clear()
+        self._basic_metadata_button.setEnabled(False)
+        self._all_metadata_button.setEnabled(False)
+        self._metadata_label.setVisible(False)
+        self._metadata_view.clear()
+        self._metadata_view.setVisible(False)
+        self._full_metadata_text = ""
+        self._basic_metadata_text = ""
+        self._current_prompt = None
         self._edit_button.setEnabled(False)
         self._delete_button.setEnabled(False)
+
+    def _ensure_metadata_visible(self, title: str, payload: str) -> None:
+        """Reveal the metadata widget with the provided payload."""
+
+        if not payload:
+            return
+        self._metadata_label.setText(title)
+        self._metadata_view.setPlainText(payload)
+        self._metadata_label.setVisible(True)
+        self._metadata_view.setVisible(True)
+
+    def _show_basic_metadata(self) -> None:
+        """Display the basic prompt metadata subset."""
+
+        if not self._basic_metadata_text:
+            return
+        self._ensure_metadata_visible("Metadata (Basic)", self._basic_metadata_text)
+
+    def _show_all_metadata(self) -> None:
+        """Display the full prompt metadata payload."""
+
+        if not self._full_metadata_text:
+            return
+        self._ensure_metadata_visible("Metadata (All)", self._full_metadata_text)
 
 
 class FlowLayout(QLayout):
@@ -2131,7 +2225,6 @@ class MainWindow(QMainWindow):
 
         dialog = SettingsDialog(
             self,
-            catalog_path=self._runtime_settings.get("catalog_path"),
             litellm_model=self._runtime_settings.get("litellm_model"),
             litellm_api_key=self._runtime_settings.get("litellm_api_key"),
             litellm_api_base=self._runtime_settings.get("litellm_api_base"),
@@ -2146,11 +2239,6 @@ class MainWindow(QMainWindow):
     def _apply_settings(self, updates: dict[str, Optional[str | list[dict[str, object]]]]) -> None:
         """Persist settings, refresh catalogue, and update name generator."""
 
-        catalog_path = updates.get("catalog_path")
-        normalized_catalog = (
-            str(Path(catalog_path).expanduser()) if catalog_path else None
-        )
-        self._runtime_settings["catalog_path"] = normalized_catalog
         self._runtime_settings["litellm_model"] = updates.get("litellm_model")
         self._runtime_settings["litellm_api_key"] = updates.get("litellm_api_key")
         self._runtime_settings["litellm_api_base"] = updates.get("litellm_api_base")
@@ -2163,14 +2251,17 @@ class MainWindow(QMainWindow):
         else:
             cleaned_quick_actions = None
         self._runtime_settings["quick_actions"] = cleaned_quick_actions
-        persist_settings_to_config(self._runtime_settings)
+        persist_settings_to_config(
+            {
+                "litellm_model": self._runtime_settings.get("litellm_model"),
+                "litellm_api_base": self._runtime_settings.get("litellm_api_base"),
+                "litellm_api_version": self._runtime_settings.get("litellm_api_version"),
+                "quick_actions": self._runtime_settings.get("quick_actions"),
+                "litellm_api_key": self._runtime_settings.get("litellm_api_key"),
+            }
+        )
 
         if self._settings is not None:
-            self._settings.catalog_path = (
-                Path(normalized_catalog).expanduser()
-                if normalized_catalog
-                else None
-            )
             self._settings.litellm_model = updates.get("litellm_model")
             self._settings.litellm_api_key = updates.get("litellm_api_key")
             self._settings.litellm_api_base = updates.get("litellm_api_base")
@@ -2190,18 +2281,6 @@ class MainWindow(QMainWindow):
         except NameGenerationError as exc:
             QMessageBox.warning(self, "LiteLLM configuration", str(exc))
 
-        try:
-            result = import_prompt_catalog(
-                self._manager,
-                Path(normalized_catalog).expanduser() if normalized_catalog else None,
-            )
-            self.statusBar().showMessage(
-                f"Catalogue synced (added {result.added}, updated {result.updated}, skipped {result.skipped})",
-                5000,
-            )
-        except Exception as exc:
-            QMessageBox.warning(self, "Catalogue import failed", str(exc))
-
         self._load_prompts(self._search_input.text())
 
     def _initial_runtime_settings(
@@ -2216,9 +2295,6 @@ class MainWindow(QMainWindow):
             derived_quick_actions = None
 
         runtime = {
-            "catalog_path": str(settings.catalog_path)
-            if settings and settings.catalog_path is not None
-            else None,
             "litellm_model": settings.litellm_model if settings else None,
             "litellm_api_key": settings.litellm_api_key if settings else None,
             "litellm_api_base": settings.litellm_api_base if settings else None,
@@ -2234,7 +2310,6 @@ class MainWindow(QMainWindow):
                 data = {}
             else:
                 for key in (
-                    "catalog_path",
                     "litellm_model",
                     "litellm_api_key",
                     "litellm_api_base",

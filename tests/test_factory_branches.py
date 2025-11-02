@@ -18,7 +18,6 @@ def _make_settings(**overrides: object) -> SimpleNamespace:
         "db_path": "/tmp/db.sqlite",
         "cache_ttl_seconds": 60,
         "redis_dsn": "redis://localhost:6379/0",
-        "catalog_path": None,
         "litellm_model": None,
         "litellm_api_key": None,
         "litellm_api_base": None,

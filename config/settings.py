@@ -36,10 +36,6 @@ class PromptManagerSettings(BaseSettings):
     chroma_path: Path = Field(default=Path("data") / "chromadb")
     redis_dsn: Optional[str] = None
     cache_ttl_seconds: int = Field(default=300)
-    catalog_path: Optional[Path] = Field(
-        default=None,
-        description="Optional path to a prompt catalogue (JSON file or directory).",
-    )
     litellm_model: Optional[str] = Field(default=None, description="LiteLLM model name for prompt name generation.")
     litellm_api_key: Optional[str] = Field(default=None, description="LiteLLM API key.", repr=False)
     litellm_api_base: Optional[str] = Field(default=None, description="Optional LiteLLM API base URL override.")
@@ -79,7 +75,6 @@ class PromptManagerSettings(BaseSettings):
                 "chroma_path": ["CHROMA_PATH", "chroma_path"],
                 "redis_dsn": ["REDIS_DSN", "redis_dsn"],
                 "cache_ttl_seconds": ["CACHE_TTL_SECONDS", "cache_ttl_seconds"],
-                "catalog_path": ["CATALOG_PATH", "catalog_path"],
                 "litellm_model": ["LITELLM_MODEL", "litellm_model"],
                 "litellm_api_key": ["LITELLM_API_KEY", "litellm_api_key", "AZURE_OPENAI_API_KEY"],
                 "litellm_api_base": ["LITELLM_API_BASE", "litellm_api_base", "AZURE_OPENAI_ENDPOINT"],
@@ -115,13 +110,6 @@ class PromptManagerSettings(BaseSettings):
         stripped = value.strip()
         return stripped or None
 
-    @field_validator("catalog_path", mode="before")
-    def _normalise_catalog_path(cls, value: Optional[Any]) -> Optional[Path]:
-        """Normalise optional catalogue paths when provided."""
-        if value in (None, "", False):
-            return None
-        path = Path(str(value)).expanduser()
-        return path.resolve()
 
     @field_validator(
         "litellm_model",
@@ -213,7 +201,6 @@ class PromptManagerSettings(BaseSettings):
                 "chroma_path": ["CHROMA_PATH", "chroma_path"],
                 "redis_dsn": ["REDIS_DSN", "redis_dsn"],
                 "cache_ttl_seconds": ["CACHE_TTL_SECONDS", "cache_ttl_seconds"],
-                "catalog_path": ["CATALOG_PATH", "catalog_path"],
                 "litellm_model": ["LITELLM_MODEL", "litellm_model"],
                 "litellm_api_key": ["LITELLM_API_KEY", "litellm_api_key", "AZURE_OPENAI_API_KEY"],
                 "litellm_api_base": ["LITELLM_API_BASE", "litellm_api_base", "AZURE_OPENAI_ENDPOINT"],
@@ -302,7 +289,6 @@ class PromptManagerSettings(BaseSettings):
                     "chroma_path",
                     "redis_dsn",
                     "cache_ttl_seconds",
-                    "catalog_path",
                     "litellm_model",
                     "litellm_api_base",
                     "litellm_api_version",

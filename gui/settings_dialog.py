@@ -1,5 +1,6 @@
 """Settings dialog for configuring Prompt Manager runtime options.
 
+Updates: v0.2.1 - 2025-11-17 - Remove catalogue path configuration; imports now require explicit selection.
 Updates: v0.2.0 - 2025-11-16 - Apply palette-aware border styling to match main window chrome.
 Updates: v0.1.1 - 2025-11-15 - Avoid persisting LiteLLM API secrets to disk.
 Updates: v0.1.0 - 2025-11-04 - Initial settings dialog implementation.
@@ -15,17 +16,13 @@ from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
-    QFileDialog,
     QFormLayout,
-    QHBoxLayout,
     QLabel,
     QLineEdit,
     QFrame,
     QMessageBox,
     QPlainTextEdit,
-    QPushButton,
     QVBoxLayout,
-    QWidget,
 )
 
 
@@ -36,7 +33,6 @@ class SettingsDialog(QDialog):
         self,
         parent=None,
         *,
-        catalog_path: Optional[str] = None,
         litellm_model: Optional[str] = None,
         litellm_api_key: Optional[str] = None,
         litellm_api_base: Optional[str] = None,
@@ -46,7 +42,6 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Prompt Manager Settings")
         self.setMinimumWidth(860)
-        self._catalog_path = catalog_path or ""
         self._litellm_model = litellm_model or ""
         self._litellm_api_key = litellm_api_key or ""
         self._litellm_api_base = litellm_api_base or ""
@@ -79,17 +74,6 @@ class SettingsDialog(QDialog):
         outer_layout.addWidget(container)
 
         form = QFormLayout()
-
-        self._catalog_input = QLineEdit(self._catalog_path, self)
-        browse_button = QPushButton("Browse…", self)
-        browse_button.clicked.connect(self._browse_catalog)  # type: ignore[arg-type]
-        catalog_row = QWidget(self)
-        catalog_layout = QHBoxLayout(catalog_row)
-        catalog_layout.setContentsMargins(0, 0, 0, 0)
-        catalog_layout.setSpacing(6)
-        catalog_layout.addWidget(self._catalog_input)
-        catalog_layout.addWidget(browse_button)
-        form.addRow("Catalogue path", catalog_row)
 
         self._model_input = QLineEdit(self._litellm_model, self)
         form.addRow("LiteLLM model", self._model_input)
@@ -124,17 +108,6 @@ class SettingsDialog(QDialog):
         button_box.accepted.connect(self.accept)  # type: ignore[arg-type]
         button_box.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(button_box)
-
-    def _browse_catalog(self) -> None:
-        current = self._catalog_input.text().strip() or str(Path("config").resolve())
-        dialog = QFileDialog(self)
-        dialog.setFileMode(QFileDialog.AnyFile)
-        dialog.setNameFilter("JSON files (*.json);;All files (*)")
-        dialog.setDirectory(str(Path(current).parent if Path(current).exists() else Path(current)))
-        if dialog.exec():
-            selected = dialog.selectedFiles()
-            if selected:
-                self._catalog_input.setText(selected[0])
 
     def accept(self) -> None:
         text = self._quick_actions_input.toPlainText().strip()
@@ -172,7 +145,6 @@ class SettingsDialog(QDialog):
             return stripped or None
 
         return {
-            "catalog_path": _clean(self._catalog_input.text()),
             "litellm_model": _clean(self._model_input.text()),
             "litellm_api_key": _clean(self._api_key_input.text()),
             "litellm_api_base": _clean(self._api_base_input.text()),
@@ -200,6 +172,8 @@ def persist_settings_to_config(updates: dict[str, Optional[str | list[dict[str, 
             config_data[key] = value
         elif key in config_data:
             del config_data[key]
+    # Remove deprecated catalogue configuration if present.
+    config_data.pop("catalog_path", None)
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(json.dumps(config_data, indent=2, ensure_ascii=False), encoding="utf-8")
 

@@ -1,10 +1,10 @@
 """Application entry point for Prompt Manager.
 
+Updates: v0.7.3 - 2025-11-17 - Require explicit catalogue paths; skip built-in seeding on startup.
 Updates: v0.7.2 - 2025-11-15 - Extend --print-settings with health checks and masked secret output.
 Updates: v0.7.1 - 2025-11-14 - Simplify GUI dependency guidance for unified installs.
 Updates: v0.7.0 - 2025-11-07 - Add semantic suggestion CLI to verify embedding backends.
 Updates: v0.6.0 - 2025-11-06 - Add CLI catalogue import/export commands with diff previews.
-Updates: v0.5.0 - 2025-11-05 - Seed prompt repository from packaged catalogue before launch.
 Updates: v0.4.1 - 2025-11-05 - Launch GUI by default and add --no-gui flag.
 Updates: v0.4.0 - 2025-11-05 - Ensure manager shutdown occurs on exit and update GUI guidance.
 Updates: v0.3.0 - 2025-11-05 - Gracefully handle missing GUI dependencies.
@@ -77,7 +77,6 @@ def _describe_path(path_value: object, *, expect_directory: bool, allow_missing_
 def _print_settings_summary(settings: PromptManagerSettings) -> None:
     """Emit a readable summary of core configuration and health checks."""
 
-    catalog_path = getattr(settings, "catalog_path", None)
     redis_dsn = getattr(settings, "redis_dsn", None)
     litellm_model = getattr(settings, "litellm_model", None)
     litellm_api_key = getattr(settings, "litellm_api_key", None)
@@ -91,7 +90,6 @@ def _print_settings_summary(settings: PromptManagerSettings) -> None:
         "------------------------------------",
         f"Database path: {_describe_path(settings.db_path, expect_directory=False, allow_missing_file=True)}",
         f"Chroma directory: {_describe_path(settings.chroma_path, expect_directory=True)}",
-        f"Catalogue path: {_describe_path(catalog_path, expect_directory=False) if catalog_path else 'not set'}",
         f"Redis DSN: {redis_dsn or 'not set'}",
         f"Cache TTL (seconds): {getattr(settings, 'cache_ttl_seconds', 'n/a')}",
         "",
@@ -425,18 +423,7 @@ def main() -> int:
                 manager.close()
             return result
 
-        catalog_result = None
-        try:
-            catalog_result = import_prompt_catalog(manager, settings.catalog_path)
-            if catalog_result.added or catalog_result.updated:
-                logger.info(
-                    "Prompt catalogue synced: added=%d updated=%d skipped=%d",
-                    catalog_result.added,
-                    catalog_result.updated,
-                    catalog_result.skipped,
-                )
-        except Exception as exc:  # pragma: no cover - defensive logging
-            logger.error("Failed to import prompt catalogue: %s", exc)
+        logger.info("Skipping automatic catalogue import; provide a path via the GUI or catalog-import command when needed.")
 
         # Minimal interactive stub to verify bootstrap until GUI arrives
         logger.info("Prompt Manager ready. Database at %s", settings.db_path)
