@@ -2,6 +2,12 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.11.0] - 2025-11-12
+
+- Enabled multi-turn chat continuation in the GUI with **Continue Chat** / **End Chat** controls and a dedicated chat transcript tab.
+- Persisted full conversations alongside each execution record and surfaced them in the history panel for review and export.
+- Extended the LiteLLM execution pipeline to accept conversation context so follow-up turns reuse prior exchanges reliably.
+
 ## [0.10.0] - 2025-11-11
 
 - Added a reusable notification centre with task tracking helpers and GUI integration (status indicator, history dialog).

@@ -66,9 +66,18 @@ class _StubChromaClient:
 class _StubExecutor:
     def __init__(self) -> None:
         self.called_with: Optional[str] = None
+        self.conversation_length: int = 0
 
-    def execute(self, prompt: Prompt, request_text: str, extra_messages=None) -> CodexExecutionResult:  # type: ignore[override]
+    def execute(  # type: ignore[override]
+        self,
+        prompt: Prompt,
+        request_text: str,
+        *,
+        conversation=None,
+    ) -> CodexExecutionResult:
         self.called_with = request_text
+        if conversation is not None:
+            self.conversation_length = len(list(conversation))
         return CodexExecutionResult(
             prompt_id=prompt.id,
             request_text=request_text,
@@ -80,7 +89,13 @@ class _StubExecutor:
 
 
 class _FailingExecutor:
-    def execute(self, prompt: Prompt, request_text: str, extra_messages=None) -> CodexExecutionResult:  # type: ignore[override]
+    def execute(  # type: ignore[override]
+        self,
+        prompt: Prompt,
+        request_text: str,
+        *,
+        conversation=None,
+    ) -> CodexExecutionResult:
         raise ExecutionError("model timeout")
 
 
@@ -131,6 +146,12 @@ def test_execute_prompt_returns_outcome_and_logs_history(tmp_path: Path) -> None
     assert outcome.result.response_text == "Execution complete."
     assert outcome.history_entry is not None
     assert outcome.history_entry.status.value == "success"
+    assert outcome.conversation == [
+        {"role": "user", "content": "print('hello')"},
+        {"role": "assistant", "content": "Execution complete."},
+    ]
+    assert outcome.history_entry.metadata is not None
+    assert outcome.history_entry.metadata["conversation"] == outcome.conversation
 
     recent = manager.list_recent_executions()
     assert recent and recent[0].prompt_id == prompt.id
@@ -151,6 +172,36 @@ def test_execute_prompt_logs_failure(tmp_path: Path) -> None:
 
     history = tracker.list_for_prompt(prompt.id)
     assert history and history[0].status.value == "failed"
+    assert history[0].metadata is not None
+    assert history[0].metadata["conversation"] == [
+        {"role": "user", "content": "raise Exception"}
+    ]
+    manager.close()
+
+
+def test_execute_prompt_supports_conversation(tmp_path: Path) -> None:
+    executor = _StubExecutor()
+    manager, prompt, tracker = _manager_with_dependencies(tmp_path, executor)
+
+    first = manager.execute_prompt(prompt.id, "print('hello')")
+    assert first.conversation[-1]["role"] == "assistant"
+
+    follow_up = manager.execute_prompt(
+        prompt.id,
+        "Thanks!",
+        conversation=first.conversation,
+    )
+
+    assert executor.conversation_length == len(first.conversation)
+    assert follow_up.conversation == [
+        {"role": "user", "content": "print('hello')"},
+        {"role": "assistant", "content": "Execution complete."},
+        {"role": "user", "content": "Thanks!"},
+        {"role": "assistant", "content": "Execution complete."},
+    ]
+    assert follow_up.history_entry is not None
+    assert follow_up.history_entry.metadata is not None
+    assert follow_up.history_entry.metadata["conversation"] == follow_up.conversation
     manager.close()
 
 

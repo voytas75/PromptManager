@@ -1,5 +1,6 @@
 """Shared LiteLLM adapters for Prompt Manager.
 
+Updates: v0.6.2 - 2025-11-14 - Raise actionable error when LiteLLM is missing.
 Updates: v0.6.1 - 2025-11-07 - Tolerate LiteLLM builds without embedding support.
 Updates: v0.6.0 - 2025-11-07 - Provide shared completion/embedding import helpers.
 """
@@ -8,6 +9,10 @@ from __future__ import annotations
 
 import importlib
 from typing import Callable, Optional, Tuple, Type
+
+
+class LiteLLMNotInstalledError(RuntimeError):
+    """Raised when LiteLLM is not available in the current environment."""
 
 _completion: Optional[Callable[..., object]] = None
 _embedding: Optional[Callable[..., object]] = None
@@ -23,7 +28,10 @@ def _ensure_loaded() -> None:
     try:  # pragma: no cover - runtime import path
         litellm = importlib.import_module("litellm")
     except ImportError as exc:
-        raise RuntimeError("litellm is not installed") from exc
+        raise LiteLLMNotInstalledError(
+            "LiteLLM integration requires the optional dependency 'litellm'. "
+            "Install it with `pip install litellm` or `pip install .[llm]`."
+        ) from exc
 
     completion = getattr(litellm, "completion", None)
     if completion is None:
@@ -61,4 +69,4 @@ def get_embedding() -> Tuple[Callable[..., object], Type[Exception]]:
     return _embedding, _LiteLLMException
 
 
-__all__ = ["get_completion", "get_embedding"]
+__all__ = ["get_completion", "get_embedding", "LiteLLMNotInstalledError"]

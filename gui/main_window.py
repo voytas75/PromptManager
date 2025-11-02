@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.11.0 - 2025-11-12 - Add multi-turn chat controls and conversation history display.
 Updates: v0.10.0 - 2025-11-11 - Surface notification centre with task status indicator and history dialog.
 Updates: v0.9.0 - 2025-11-10 - Introduce command palette quick actions with keyboard shortcuts.
 Updates: v0.8.0 - 2025-11-10 - Add language detection and syntax highlighting to the query workspace.
@@ -209,6 +210,8 @@ class MainWindow(QMainWindow):
         self._current_prompts: List[Prompt] = []
         self._suggestions: Optional[PromptManager.IntentSuggestions] = None
         self._last_execution: Optional[PromptManager.ExecutionOutcome] = None
+        self._chat_conversation: List[Dict[str, str]] = []
+        self._chat_prompt_id: Optional[uuid.UUID] = None
         self._history_limit = 50
         self._runtime_settings = self._initial_runtime_settings(settings)
         self._usage_logger = IntentUsageLogger()
@@ -324,6 +327,14 @@ class MainWindow(QMainWindow):
         self._run_button.clicked.connect(self._on_run_prompt_clicked)  # type: ignore[arg-type]
         actions_layout.addWidget(self._run_button)
 
+        self._continue_chat_button = QPushButton("Continue Chat", self)
+        self._continue_chat_button.clicked.connect(self._on_continue_chat_clicked)  # type: ignore[arg-type]
+        actions_layout.addWidget(self._continue_chat_button)
+
+        self._end_chat_button = QPushButton("End Chat", self)
+        self._end_chat_button.clicked.connect(self._on_end_chat_clicked)  # type: ignore[arg-type]
+        actions_layout.addWidget(self._end_chat_button)
+
         self._save_button = QPushButton("Save Result", self)
         self._save_button.clicked.connect(self._on_save_result_clicked)  # type: ignore[arg-type]
         actions_layout.addWidget(self._save_button)
@@ -411,6 +422,11 @@ class MainWindow(QMainWindow):
         self._diff_view.setPlaceholderText("Run a prompt to compare input and output.")
         self._result_tabs.addTab(self._diff_view, "Diff")
 
+        self._chat_history_view = QPlainTextEdit(self)
+        self._chat_history_view.setReadOnly(True)
+        self._chat_history_view.setPlaceholderText("Run a prompt to start chatting.")
+        self._result_tabs.addTab(self._chat_history_view, "Chat")
+
         result_info_layout.addWidget(self._result_label)
         result_info_layout.addWidget(self._result_meta)
         result_info_layout.addWidget(self._result_tabs, 1)
@@ -435,6 +451,8 @@ class MainWindow(QMainWindow):
         self._run_button.setEnabled(has_executor)
         self._copy_result_button.setEnabled(False)
         self._save_button.setEnabled(False)
+        self._continue_chat_button.setEnabled(False)
+        self._end_chat_button.setEnabled(False)
         self._history_button.setEnabled(True)
 
     def _load_prompts(self, search_text: str = "") -> None:
@@ -619,6 +637,8 @@ class MainWindow(QMainWindow):
         """Render the most recent execution result in the result pane."""
 
         self._last_execution = outcome
+        self._chat_prompt_id = prompt.id
+        self._chat_conversation = [dict(message) for message in outcome.conversation]
         self._result_label.setText(f"Last Result — {prompt.name}")
         meta_parts: List[str] = [f"Duration: {outcome.result.duration_ms} ms"]
         history_entry = outcome.history_entry
@@ -633,6 +653,11 @@ class MainWindow(QMainWindow):
         self._result_tabs.setCurrentIndex(0)
         self._copy_result_button.setEnabled(bool(outcome.result.response_text))
         self._save_button.setEnabled(True)
+        self._continue_chat_button.setEnabled(True)
+        self._end_chat_button.setEnabled(True)
+        self._refresh_chat_history_view()
+        self._query_input.clear()
+        self._query_input.setFocus(Qt.ShortcutFocusReason)
 
     def _clear_execution_result(self) -> None:
         """Reset the result pane to its default state."""
@@ -645,6 +670,47 @@ class MainWindow(QMainWindow):
         self._diff_view.setPlaceholderText("Run a prompt to compare input and output.")
         self._copy_result_button.setEnabled(False)
         self._save_button.setEnabled(False)
+        self._reset_chat_session()
+
+    def _reset_chat_session(self, *, clear_view: bool = True) -> None:
+        """Disable chat continuation controls and optionally clear the transcript."""
+
+        self._chat_prompt_id = None
+        self._chat_conversation = []
+        self._continue_chat_button.setEnabled(False)
+        self._end_chat_button.setEnabled(False)
+        if clear_view:
+            self._chat_history_view.clear()
+            self._chat_history_view.setPlaceholderText("Run a prompt to start chatting.")
+
+    def _refresh_chat_history_view(self) -> None:
+        """Render the active conversation into the chat tab."""
+
+        if not self._chat_conversation:
+            self._chat_history_view.clear()
+            self._chat_history_view.setPlaceholderText("Run a prompt to start chatting.")
+            return
+        formatted = self._format_chat_history(self._chat_conversation)
+        self._chat_history_view.setPlainText(formatted)
+
+    @staticmethod
+    def _format_chat_history(conversation: Sequence[Dict[str, str]]) -> str:
+        """Return a readable transcript for the chat history tab."""
+
+        lines: List[str] = []
+        for message in conversation:
+            role = message.get("role", "").strip().lower()
+            content = message.get("content", "")
+            if role == "user":
+                speaker = "You"
+            elif role == "assistant":
+                speaker = "Assistant"
+            elif role == "system":
+                speaker = "System"
+            else:
+                speaker = message.get("role", "Message")
+            lines.append(f"{speaker}:\n{content}")
+        return "\n\n".join(lines)
 
     def _update_diff_view(self, original: str, generated: str) -> None:
         """Render a unified diff comparing the request text with the response."""
@@ -953,6 +1019,74 @@ class MainWindow(QMainWindow):
         if rating_value is not None:
             self._refresh_prompt_after_rating(prompt.id)
         self._history_panel.refresh()
+
+    def _on_continue_chat_clicked(self) -> None:
+        """Send a follow-up message within the active chat session."""
+
+        if not self._chat_conversation or self._chat_prompt_id is None:
+            self.statusBar().showMessage("Run a prompt to start a chat before continuing.", 4000)
+            return
+
+        follow_up = self._query_input.toPlainText().strip()
+        if not follow_up:
+            self.statusBar().showMessage("Type a follow-up message before continuing the chat.", 4000)
+            return
+
+        prompt_id = self._chat_prompt_id
+        try:
+            prompt = self._manager.get_prompt(prompt_id)
+        except (PromptNotFoundError, PromptManagerError) as exc:
+            self._show_error("Prompt unavailable", str(exc))
+            self._reset_chat_session()
+            return
+
+        try:
+            outcome = self._manager.execute_prompt(
+                prompt.id,
+                follow_up,
+                conversation=self._chat_conversation,
+            )
+        except PromptExecutionUnavailable as exc:
+            self._continue_chat_button.setEnabled(False)
+            self._usage_logger.log_execute(
+                prompt_name=prompt.name,
+                success=False,
+                duration_ms=None,
+                error=str(exc),
+            )
+            self._show_error("Prompt execution unavailable", str(exc))
+            return
+        except (PromptExecutionError, PromptManagerError) as exc:
+            self._usage_logger.log_execute(
+                prompt_name=prompt.name,
+                success=False,
+                duration_ms=None,
+                error=str(exc),
+            )
+            self._show_error("Continue chat failed", str(exc))
+            return
+
+        self._display_execution_result(prompt, outcome)
+        self._usage_logger.log_execute(
+            prompt_name=prompt.name,
+            success=True,
+            duration_ms=outcome.result.duration_ms,
+        )
+        self.statusBar().showMessage(
+            f"Continued chat with '{prompt.name}' in {outcome.result.duration_ms} ms.",
+            5000,
+        )
+
+    def _on_end_chat_clicked(self) -> None:
+        """Terminate the active chat session without clearing the transcript."""
+
+        if not self._chat_conversation:
+            self.statusBar().showMessage("There is no active chat session to end.", 4000)
+            return
+        self._chat_prompt_id = None
+        self._continue_chat_button.setEnabled(False)
+        self._end_chat_button.setEnabled(False)
+        self.statusBar().showMessage("Chat session ended. Conversation preserved in history.", 5000)
 
     def _on_run_prompt_clicked(self) -> None:
         """Execute the selected prompt via the manager."""
@@ -1348,7 +1482,10 @@ class MainWindow(QMainWindow):
         prompt = self._current_prompt()
         if prompt is None:
             self._detail_widget.clear()
+            self._reset_chat_session()
             return
+        if self._chat_prompt_id and prompt.id != self._chat_prompt_id:
+            self._reset_chat_session()
         self._detail_widget.display_prompt(prompt)
 
     def _select_prompt(self, prompt_id: uuid.UUID) -> None:

@@ -1,5 +1,6 @@
 """High-level CRUD manager for prompt records backed by SQLite, ChromaDB, and Redis.
 
+Updates: v0.11.0 - 2025-11-12 - Add multi-turn chat execution with conversation history logging.
 Updates: v0.10.0 - 2025-11-11 - Emit notifications for managed LLM and embedding tasks.
 Updates: v0.9.0 - 2025-11-11 - Track single-user preferences and personalise intent suggestions.
 Updates: v0.8.0 - 2025-11-09 - Capture prompt ratings from executions and update quality scores.
@@ -55,6 +56,25 @@ def _mute_posthog_capture() -> None:
 
 
 _mute_posthog_capture()
+
+
+def _normalise_conversation(
+    messages: Optional[Sequence[Mapping[str, str]]],
+) -> List[Dict[str, str]]:
+    """Return a sanitised copy of conversation messages for execution and logging."""
+
+    normalised: List[Dict[str, str]] = []
+    if not messages:
+        return normalised
+    for index, message in enumerate(messages):
+        role = str(message.get("role", "")).strip()
+        if not role:
+            raise PromptExecutionError(f"Conversation entry {index} is missing a role.")
+        content = message.get("content")
+        if content is None:
+            raise PromptExecutionError(f"Conversation entry {index} is missing content.")
+        normalised.append({"role": role, "content": str(content)})
+    return normalised
 
 try:
     import redis
@@ -240,6 +260,7 @@ class PromptManager:
 
         result: CodexExecutionResult
         history_entry: Optional[PromptExecution]
+        conversation: List[Dict[str, str]]
 
     @property
     def collection(self) -> Collection:
@@ -352,7 +373,7 @@ class PromptManager:
         prompt_id: uuid.UUID,
         request_text: str,
         *,
-        extra_messages: Optional[Sequence[Mapping[str, str]]] = None,
+        conversation: Optional[Sequence[Mapping[str, str]]] = None,
     ) -> "PromptManager.ExecutionOutcome":
         """Execute a prompt via LiteLLM and persist the outcome when configured."""
 
@@ -363,6 +384,7 @@ class PromptManager:
                 "Prompt execution is not configured. Provide LiteLLM credentials and model."
             )
 
+        conversation_history = _normalise_conversation(conversation)
         prompt = self.get_prompt(prompt_id)
         task_id = f"prompt-exec:{prompt.id}:{uuid.uuid4()}"
         metadata = {
@@ -383,13 +405,31 @@ class PromptManager:
                 result = self._executor.execute(
                     prompt,
                     request_text,
-                    extra_messages=extra_messages,
+                    conversation=conversation_history,
                 )
             except ExecutionError as exc:
-                self._log_execution_failure(prompt.id, request_text, str(exc))
+                failed_messages = list(conversation_history)
+                failed_messages.append({"role": "user", "content": request_text.strip()})
+                self._log_execution_failure(
+                    prompt.id,
+                    request_text,
+                    str(exc),
+                    conversation=failed_messages,
+                )
                 raise PromptExecutionError(str(exc)) from exc
 
-            history_entry = self._log_execution_success(prompt.id, request_text, result)
+            augmented_conversation = list(conversation_history)
+            augmented_conversation.append({"role": "user", "content": request_text.strip()})
+            if result.response_text:
+                augmented_conversation.append(
+                    {"role": "assistant", "content": result.response_text}
+                )
+            history_entry = self._log_execution_success(
+                prompt.id,
+                request_text,
+                result,
+                conversation=augmented_conversation,
+            )
             try:
                 self.increment_usage(prompt.id)
             except PromptManagerError:
@@ -399,7 +439,11 @@ class PromptManager:
                     exc_info=True,
                 )
 
-        return PromptManager.ExecutionOutcome(result=result, history_entry=history_entry)
+        return PromptManager.ExecutionOutcome(
+            result=result,
+            history_entry=history_entry,
+            conversation=augmented_conversation,
+        )
 
     def save_execution_result(
         self,
@@ -548,6 +592,8 @@ class PromptManager:
         prompt_id: uuid.UUID,
         request_text: str,
         result: CodexExecutionResult,
+        *,
+        conversation: Optional[Sequence[Mapping[str, str]]] = None,
     ) -> Optional[PromptExecution]:
         """Persist a successful execution outcome when the tracker is available."""
 
@@ -560,6 +606,8 @@ class PromptManager:
         except Exception:  # pragma: no cover - defensive
             usage_metadata = {}
         metadata: Dict[str, Any] = {"usage": usage_metadata}
+        if conversation:
+            metadata["conversation"] = list(conversation)
         try:
             return tracker.record_success(
                 prompt_id=prompt_id,
@@ -581,17 +629,23 @@ class PromptManager:
         prompt_id: uuid.UUID,
         request_text: str,
         error_message: str,
+        *,
+        conversation: Optional[Sequence[Mapping[str, str]]] = None,
     ) -> Optional[PromptExecution]:
         """Persist a failed execution attempt when history tracking is enabled."""
 
         tracker = self._history_tracker
         if tracker is None:
             return None
+        metadata: Optional[Mapping[str, Any]] = None
+        if conversation:
+            metadata = {"conversation": list(conversation)}
         try:
             return tracker.record_failure(
                 prompt_id=prompt_id,
                 request_text=request_text,
                 error_message=error_message,
+                metadata=metadata,
             )
         except HistoryTrackerError:
             logger.warning(

@@ -1,5 +1,6 @@
 """Execution history panel for Prompt Manager.
 
+Updates: v0.3.0 - 2025-11-12 - Display chat conversations alongside execution details.
 Updates: v0.2.0 - 2025-11-09 - Surface execution ratings in tables, details, and exports.
 Updates: v0.1.0 - 2025-11-08 - Provide filterable, editable execution history workspace.
 """
@@ -11,7 +12,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Any, Callable, List, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -261,6 +262,16 @@ class HistoryPanel(QWidget):
             detail_lines.append("")
         detail_lines.append("Response:")
         detail_lines.append(execution.response_text or "(empty)")
+        conversation_lines: List[str] = []
+        if execution.metadata:
+            raw_conversation = execution.metadata.get("conversation")
+            if isinstance(raw_conversation, list):
+                conversation_lines = self._format_conversation(raw_conversation)
+        if conversation_lines:
+            detail_lines.append("")
+            detail_lines.append("Conversation:")
+            detail_lines.append("")
+            detail_lines.extend(conversation_lines)
         self._detail_label.setText(f"Execution detail — {row.prompt_name}")
         self._detail_view.setPlainText("\n".join(detail_lines))
 
@@ -370,3 +381,31 @@ class HistoryPanel(QWidget):
         """Return the number of rows currently displayed."""
 
         return len(self._rows)
+
+    @staticmethod
+    def _format_conversation(messages: List[Any]) -> List[str]:
+        """Convert stored chat messages into plain text lines."""
+
+        lines: List[str] = []
+        for message in messages:
+            if not isinstance(message, dict):
+                continue
+            role = str(message.get("role", "")).strip().lower()
+            content = str(message.get("content", "") or "")
+            if role == "user":
+                speaker = "You"
+            elif role == "assistant":
+                speaker = "Assistant"
+            elif role == "system":
+                speaker = "System"
+            else:
+                speaker = str(message.get("role", "Message"))
+            lines.append(f"{speaker}:")
+            if content:
+                lines.extend(content.splitlines())
+            else:
+                lines.append("(empty)")
+            lines.append("")
+        if lines and lines[-1] == "":
+            lines.pop()
+        return lines

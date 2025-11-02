@@ -1,5 +1,7 @@
 """LiteLLM-backed prompt execution helpers.
 
+Updates: v0.2.1 - 2025-11-14 - Surface missing LiteLLM dependency as ExecutionError.
+Updates: v0.2.0 - 2025-11-12 - Support multi-turn conversation payloads for LiteLLM execution.
 Updates: v0.1.0 - 2025-11-08 - Introduce CodexExecutor for running prompts via LiteLLM.
 """
 
@@ -51,21 +53,37 @@ class CodexExecutor:
         prompt: Prompt,
         request_text: str,
         *,
-        extra_messages: Optional[Sequence[Mapping[str, str]]] = None,
+        conversation: Optional[Sequence[Mapping[str, str]]] = None,
     ) -> CodexExecutionResult:
         """Run the supplied request through LiteLLM and return the response."""
 
-        completion, LiteLLMException = get_completion()
+        try:
+            completion, LiteLLMException = get_completion()
+        except RuntimeError as exc:
+            raise ExecutionError(str(exc)) from exc
         instructions = prompt.context or prompt.description
         if not instructions:
             raise ExecutionError(f"Prompt {prompt.id} is missing context to execute.")
 
         payload_messages: list[Mapping[str, str]] = [
             {"role": "system", "content": instructions},
-            {"role": "user", "content": request_text.strip()},
         ]
-        if extra_messages:
-            payload_messages.extend(extra_messages)
+        normalised_conversation: list[Mapping[str, str]] = []
+        if conversation:
+            for index, message in enumerate(conversation):
+                role = str(message.get("role", "")).strip()
+                if not role:
+                    raise ExecutionError(
+                        f"Conversation message at index {index} is missing a role."
+                    )
+                content = message.get("content")
+                if content is None:
+                    raise ExecutionError(
+                        f"Conversation message '{role}' is missing content."
+                    )
+                normalised_conversation.append({"role": role, "content": str(content)})
+        payload_messages.extend(normalised_conversation)
+        payload_messages.append({"role": "user", "content": request_text.strip()})
 
         request: Dict[str, Any] = {
             "model": self.model,
