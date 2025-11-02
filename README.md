@@ -16,34 +16,14 @@ Prompt Manager is a desktop-focused application for cataloguing, searching, and 
 
 ## Getting Started
 
-1. Create a virtual environment and install core dependencies:
+1. Create a virtual environment and install the application's dependencies in one step:
 
    ```bash
    pip install -r requirements.txt
    ```
 
-   Dependencies are pinned to maintain compatibility with ChromaDB (for example `numpy<2`).
-
-   Alternatively, install the project as a package:
-
-   ```bash
-   pip install .
-   ```
-
-   To enable the desktop interface install the optional GUI extras:
-
-   ```bash
-   pip install -r requirements-gui.txt
-   # or, when installing the package form:
-   pip install .[gui]
-   ```
-
-   Additional extras enable optional integrations:
-
-   ```bash
-   pip install .[cache,llm,embeddings]  # Redis caching, LiteLLM helpers, sentence-transformers
-   pip install .[dev]                   # pytest/coverage tooling for contributors
-   ```
+   Dependencies are pinned to maintain compatibility with ChromaDB (for example `numpy<2`). No
+   additional extras or package installation steps are required.
 
 2. Provide configuration via environment variables (prefixed `PROMPT_MANAGER_`) or a JSON file referenced through `PROMPT_MANAGER_CONFIG_JSON`. Supported keys include:
    - `DATABASE_PATH` – absolute/relative path to the SQLite database (default `data/prompt_manager.db`).
@@ -71,10 +51,10 @@ Prompt Manager is a desktop-focused application for cataloguing, searching, and 
 
 4. Ensure SQLite and ChromaDB have filesystem access at the configured paths.
 
-5. Run the automated tests to validate storage integration:
+5. (Optional) Install developer tooling and run the automated tests:
 
    ```bash
-   pip install .[dev]
+   pip install pytest pytest-cov
    pytest
    ```
 
@@ -89,8 +69,6 @@ Prompt Manager is a desktop-focused application for cataloguing, searching, and 
 Further modules (session history, execution pipeline) will be introduced in subsequent milestones in line with the blueprint.
 
 ## Running the GUI
-
-- Ensure the optional GUI requirements are installed (`pip install .[gui]` or `pip install -r requirements-gui.txt`).
 
 - Launch the desktop interface. The GUI opens by default:
 
@@ -128,7 +106,7 @@ Further modules (session history, execution pipeline) will be introduced in subs
 
 ## Executing Prompts
 
-- Install the optional LiteLLM dependency group (`pip install .[llm]` or `pip install litellm`) so the execution backend is available on all platforms.
+- LiteLLM support is bundled with the main requirements, so once dependencies are installed the execution backend is ready to use on every platform.
 - Configure LiteLLM credentials via the Settings dialog or environment variables: set `PROMPT_MANAGER_LITELLM_MODEL` and `PROMPT_MANAGER_LITELLM_API_KEY`, plus `PROMPT_MANAGER_LITELLM_API_BASE` / `PROMPT_MANAGER_LITELLM_API_VERSION` for Azure-hosted deployments.
 - Paste code or free-form context into the workspace, select a prompt, and click **Run Prompt**. The result pane now exposes **Output** and **Diff** tabs so you can inspect the raw model response or view a unified diff against your original input; **Save Result** captures the run in history with optional notes, and **Copy Result** copies the generated text to the clipboard.
 - Continue the conversation after a response with **Continue Chat**, review the live transcript in the new **Chat** tab, and end the session with **End Chat**—the entire dialogue is persisted to history entries.

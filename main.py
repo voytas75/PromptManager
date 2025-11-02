@@ -1,5 +1,6 @@
 """Application entry point for Prompt Manager.
 
+Updates: v0.7.1 - 2025-11-14 - Simplify GUI dependency guidance for unified installs.
 Updates: v0.7.0 - 2025-11-07 - Add semantic suggestion CLI to verify embedding backends.
 Updates: v0.6.0 - 2025-11-06 - Add CLI catalogue import/export commands with diff previews.
 Updates: v0.5.0 - 2025-11-05 - Seed prompt repository from packaged catalogue before launch.
@@ -377,8 +378,8 @@ def main() -> int:
                 gui_module = importlib.import_module("gui")
             except ModuleNotFoundError as exc:
                 logger.error(
-                    "GUI launch requested but optional dependency %s is missing. "
-                    "Install GUI extras with `pip install -r requirements-gui.txt` or rerun without --gui.",
+                    "GUI launch requested but dependency %s is missing. Install requirements with "
+                    "`pip install -r requirements.txt` or rerun without --gui.",
                     exc.name,
                 )
                 return 4
@@ -387,13 +388,13 @@ def main() -> int:
             except AttributeError:
                 logger.error(
                     "GUI module is missing the launch_prompt_manager entry point. "
-                    "Reinstall GUI extras or launch without --gui."
+                    "Reinstall dependencies with `pip install -r requirements.txt` or launch without --gui."
                 )
                 return 4
             if not callable(launch_gui_callable):
                 logger.error(
                     "GUI module launch_prompt_manager entry point is not callable. "
-                    "Reinstall GUI extras or launch without --gui."
+                    "Reinstall dependencies with `pip install -r requirements.txt` or launch without --gui."
                 )
                 return 4
             launch_callable = cast(Callable[[object, Optional[object]], int], launch_gui_callable)
