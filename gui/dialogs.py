@@ -1,5 +1,7 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.7.2 - 2025-11-02 - Collapse example sections when empty and expand on demand.
+Updates: v0.7.1 - 2025-11-02 - Increase default prompt dialog size for edit and creation workflows.
 Updates: v0.7.0 - 2025-11-16 - Add markdown preview dialog for rendered execution output.
 Updates: v0.6.0 - 2025-11-15 - Add prompt engineering refinement button to prompt dialog.
 Updates: v0.5.0 - 2025-11-09 - Capture execution ratings alongside optional notes.
@@ -19,6 +21,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Callable, Optional, Sequence
 
+from PySide6.QtCore import Qt, QEvent, Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -30,6 +33,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QToolButton,
     QTextBrowser,
     QVBoxLayout,
     QWidget,
@@ -49,6 +53,85 @@ from models.prompt_model import Prompt
 logger = logging.getLogger("prompt_manager.gui.dialogs")
 
 _WORD_PATTERN = re.compile(r"[A-Za-z0-9]+")
+
+
+class CollapsibleTextSection(QWidget):
+    """Wrapper providing an expandable/collapsible plain text editor."""
+
+    textChanged = Signal()
+
+    def __init__(self, title: str, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self._title = title
+        self._layout = QVBoxLayout(self)
+        self._layout.setContentsMargins(0, 0, 0, 0)
+        self._layout.setSpacing(4)
+
+        self._toggle = QToolButton(self)
+        self._toggle.setText(title)
+        self._toggle.setCheckable(True)
+        self._toggle.setChecked(False)
+        self._toggle.setArrowType(Qt.RightArrow)
+        self._toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self._toggle.clicked.connect(self._on_toggle_clicked)  # type: ignore[arg-type]
+        self._layout.addWidget(self._toggle)
+
+        self._editor = QPlainTextEdit(self)
+        self._editor.setVisible(False)
+        self._layout.addWidget(self._editor)
+
+        self._editor.textChanged.connect(self._on_text_changed)  # type: ignore[arg-type]
+        self._editor.installEventFilter(self)
+
+    def setPlaceholderText(self, text: str) -> None:
+        self._editor.setPlaceholderText(text)
+
+    def setPlainText(self, text: str) -> None:
+        self._editor.setPlainText(text)
+        stripped = text.strip()
+        expanded = bool(stripped)
+        self._set_expanded(expanded, focus=False)
+
+    def toPlainText(self) -> str:
+        return self._editor.toPlainText()
+
+    def editor(self) -> QPlainTextEdit:
+        return self._editor
+
+    def focusEditor(self) -> None:
+        self._set_expanded(True, focus=True)
+
+    def isExpanded(self) -> bool:
+        return self._toggle.isChecked()
+
+    def setExpanded(self, expanded: bool) -> None:
+        self._set_expanded(expanded, focus=expanded)
+
+    def eventFilter(self, obj, event):  # type: ignore[override]
+        if obj is self._editor and event.type() == QEvent.FocusOut:
+            if not self._editor.toPlainText().strip():
+                self._set_expanded(False, focus=False)
+        return super().eventFilter(obj, event)
+
+    def _set_expanded(self, expanded: bool, *, focus: bool) -> None:
+        if self._toggle.isChecked() == expanded and self._editor.isVisible() == expanded:
+            return
+        self._toggle.blockSignals(True)
+        self._toggle.setChecked(expanded)
+        self._toggle.blockSignals(False)
+        self._toggle.setArrowType(Qt.DownArrow if expanded else Qt.RightArrow)
+        self._editor.setVisible(expanded)
+        if expanded and focus:
+            self._editor.setFocus(Qt.OtherFocusReason)
+
+    def _on_toggle_clicked(self, checked: bool) -> None:
+        self._set_expanded(checked, focus=checked)
+
+    def _on_text_changed(self) -> None:
+        if self._editor.toPlainText().strip():
+            if not self._toggle.isChecked():
+                self._set_expanded(True, focus=False)
+        self.textChanged.emit()
 
 
 def fallback_suggest_prompt_name(context: str, *, max_words: int = 5) -> str:
@@ -100,6 +183,8 @@ class PromptDialog(QDialog):
         self._description_generator = description_generator
         self._prompt_engineer = prompt_engineer
         self.setWindowTitle("Create Prompt" if prompt is None else "Edit Prompt")
+        self.setMinimumWidth(760)
+        self.resize(960, 700)
         self._build_ui()
         if prompt is not None:
             self._populate(prompt)
@@ -134,8 +219,11 @@ class PromptDialog(QDialog):
         self._context_input = QPlainTextEdit(self)
         self._context_input.setPlaceholderText("Paste the full prompt text here…")
         self._description_input = QPlainTextEdit(self)
-        self._example_input = QPlainTextEdit(self)
-        self._example_output = QPlainTextEdit(self)
+        self._description_input.setFixedHeight(60)
+        self._example_input = CollapsibleTextSection("Example Input", self)
+        self._example_input.setPlaceholderText("Optional example input…")
+        self._example_output = CollapsibleTextSection("Example Output", self)
+        self._example_output.setPlaceholderText("Optional example output…")
 
         self._language_input.setPlaceholderText("en")
         self._tags_input.setPlaceholderText("tag-a, tag-b")
@@ -159,8 +247,8 @@ class PromptDialog(QDialog):
             )
         form_layout.addRow("", self._refine_button)
         form_layout.addRow("Description", self._description_input)
-        form_layout.addRow("Example Input", self._example_input)
-        form_layout.addRow("Example Output", self._example_output)
+        form_layout.addRow(self._example_input)
+        form_layout.addRow(self._example_output)
 
         main_layout.addLayout(form_layout)
 

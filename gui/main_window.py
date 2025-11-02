@@ -1,5 +1,8 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.14.5 - 2025-11-02 - Persist main window geometry across sessions.
+Updates: v0.14.4 - 2025-11-02 - Enable double-click editing for prompts in the list view.
+Updates: v0.14.3 - 2025-11-02 - Stabilise query workspace layout by fixing editor height and wrapping detection hints.
 Updates: v0.14.2 - 2025-11-02 - Persist splitter sizes so panel layout is restored between sessions.
 Updates: v0.14.1 - 2025-11-02 - Allow action toolbar buttons to wrap on resize for responsive layouts.
 Updates: v0.14.0 - 2025-11-02 - Rework layout to align query editor with output and expand prompt browsing area.
@@ -29,7 +32,16 @@ from collections import deque
 from pathlib import Path
 from typing import Any, Deque, Dict, Iterable, List, Optional, Sequence
 
-from PySide6.QtCore import QAbstractListModel, QModelIndex, QPoint, QRect, QSize, Qt, QSettings
+from PySide6.QtCore import (
+    QAbstractListModel,
+    QByteArray,
+    QModelIndex,
+    QPoint,
+    QRect,
+    QSize,
+    Qt,
+    QSettings,
+)
 from PySide6.QtGui import QColor, QGuiApplication, QKeySequence, QPalette, QTextCursor, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -54,6 +66,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QWidgetItem,
+    QSizePolicy,
 )
 
 from config import PromptManagerSettings
@@ -330,7 +343,7 @@ class MainWindow(QMainWindow):
         self._notification_bridge = QtNotificationBridge(self._manager.notification_center, self)
         self._notification_bridge.notification_received.connect(self._handle_notification)
         self.setWindowTitle("Prompt Manager")
-        self.resize(1024, 640)
+        self._restore_window_geometry()
         self._build_ui()
         self._restore_splitter_state()
         self.statusBar().addPermanentWidget(self._notification_indicator)
@@ -459,6 +472,8 @@ class MainWindow(QMainWindow):
         self._intent_hint = QLabel("", self)
         self._intent_hint.setObjectName("intentHintLabel")
         self._intent_hint.setStyleSheet("color: #5b5b5b; font-style: italic;")
+        self._intent_hint.setWordWrap(True)
+        self._intent_hint.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
         self._intent_hint.setVisible(False)
 
         filter_layout = QHBoxLayout()
@@ -490,7 +505,10 @@ class MainWindow(QMainWindow):
 
         self._query_input = QPlainTextEdit(self)
         self._query_input.setPlaceholderText("Paste code or text to analyse and suggest prompts…")
-        self._query_input.setMinimumHeight(120)
+        fixed_query_height = 160
+        self._query_input.setMinimumHeight(fixed_query_height)
+        self._query_input.setMaximumHeight(fixed_query_height)
+        self._query_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self._query_input.textChanged.connect(self._on_query_text_changed)
         self._highlighter = CodeHighlighter(self._query_input.document())
 
@@ -509,6 +527,7 @@ class MainWindow(QMainWindow):
         self._list_view.setModel(self._model)
         self._list_view.setSelectionMode(QAbstractItemView.SingleSelection)
         self._list_view.selectionModel().selectionChanged.connect(self._on_selection_changed)  # type: ignore[arg-type]
+        self._list_view.doubleClicked.connect(self._on_prompt_double_clicked)  # type: ignore[arg-type]
         self._list_splitter.addWidget(self._list_view)
 
         self._list_splitter.addWidget(self._detail_widget)
@@ -601,6 +620,33 @@ class MainWindow(QMainWindow):
         self._end_chat_button.setEnabled(False)
         self._history_button.setEnabled(True)
 
+    def _restore_window_geometry(self) -> None:
+        """Restore window size/position from persistent settings."""
+
+        stored = self._layout_settings.value("windowGeometry")
+        if isinstance(stored, QByteArray):
+            if not self.restoreGeometry(stored):
+                self.resize(1024, 640)
+            return
+        if isinstance(stored, (bytes, bytearray)):
+            if not self.restoreGeometry(QByteArray(stored)):
+                self.resize(1024, 640)
+            return
+        if isinstance(stored, str):
+            try:
+                width_str, height_str, *_ = stored.split(",")
+                width = int(width_str)
+                height = int(height_str)
+            except (ValueError, TypeError):
+                self.resize(1024, 640)
+            else:
+                if width > 0 and height > 0:
+                    self.resize(width, height)
+                else:
+                    self.resize(1024, 640)
+            return
+        self.resize(1024, 640)
+
     def _restore_splitter_state(self) -> None:
         """Restore splitter sizes from persisted settings."""
 
@@ -639,6 +685,13 @@ class MainWindow(QMainWindow):
             if splitter is None:
                 continue
             self._layout_settings.setValue(key, splitter.sizes())
+        self._layout_settings.sync()
+
+    def _save_window_geometry(self) -> None:
+        """Persist window size/position to settings."""
+
+        geometry = self.saveGeometry()
+        self._layout_settings.setValue("windowGeometry", geometry)
         self._layout_settings.sync()
 
     def _load_prompts(self, search_text: str = "") -> None:
@@ -1442,6 +1495,14 @@ class MainWindow(QMainWindow):
         if not text or len(text.strip()) >= 2:
             self._load_prompts(text)
 
+    def _on_prompt_double_clicked(self, index: QModelIndex) -> None:
+        """Open the edit dialog when a prompt is double-clicked."""
+
+        if not index.isValid():
+            return
+        self._list_view.setCurrentIndex(index)
+        self._on_edit_clicked()
+
     def _on_refresh_clicked(self) -> None:
         """Reload prompts from storage, respecting current search text."""
 
@@ -1780,6 +1841,7 @@ class MainWindow(QMainWindow):
         dialog.exec()
 
     def closeEvent(self, event) -> None:  # type: ignore[override]
+        self._save_window_geometry()
         self._save_splitter_state()
         if hasattr(self, "_notification_bridge"):
             self._notification_bridge.close()
