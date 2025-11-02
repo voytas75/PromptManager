@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.14.6 - 2025-11-16 - Stack workspace vertically so result tabs consume remaining height.
 Updates: v0.14.5 - 2025-11-02 - Persist main window geometry across sessions.
 Updates: v0.14.4 - 2025-11-02 - Enable double-click editing for prompts in the list view.
 Updates: v0.14.3 - 2025-11-02 - Stabilise query workspace layout by fixing editor height and wrapping detection hints.
@@ -539,22 +540,23 @@ class MainWindow(QMainWindow):
         workspace_layout = QVBoxLayout(workspace_panel)
         workspace_layout.setContentsMargins(0, 0, 0, 0)
 
-        self._workspace_splitter = QSplitter(Qt.Horizontal, workspace_panel)
+        self._workspace_splitter = None
 
-        query_panel = QWidget(self._workspace_splitter)
+        query_panel = QWidget(workspace_panel)
+        query_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         query_panel_layout = QVBoxLayout(query_panel)
+        query_panel_layout.setSizeConstraint(QLayout.SetMinimumSize)
         query_panel_layout.setContentsMargins(0, 0, 0, 0)
         query_panel_layout.setSpacing(8)
         query_panel_layout.addWidget(self._query_input)
 
-        query_panel_layout.addLayout(language_layout)
         query_panel_layout.addLayout(actions_layout)
+        query_panel_layout.addLayout(language_layout)
 
         query_panel_layout.addWidget(self._intent_hint)
-        query_panel_layout.addStretch(1)
-        self._workspace_splitter.addWidget(query_panel)
+        workspace_layout.addWidget(query_panel)
 
-        output_panel = QWidget(self._workspace_splitter)
+        output_panel = QWidget(workspace_panel)
         output_layout = QVBoxLayout(output_panel)
         output_layout.setContentsMargins(0, 0, 0, 0)
         output_layout.setSpacing(8)
@@ -583,12 +585,7 @@ class MainWindow(QMainWindow):
         output_layout.addWidget(self._result_label)
         output_layout.addWidget(self._result_meta)
         output_layout.addWidget(self._result_tabs, 1)
-        self._workspace_splitter.addWidget(output_panel)
-
-        self._workspace_splitter.setStretchFactor(0, 2)
-        self._workspace_splitter.setStretchFactor(1, 3)
-
-        workspace_layout.addWidget(self._workspace_splitter)
+        workspace_layout.addWidget(output_panel, 1)
         self._main_splitter.addWidget(workspace_panel)
         self._main_splitter.setStretchFactor(0, 3)
         self._main_splitter.setStretchFactor(1, 2)
