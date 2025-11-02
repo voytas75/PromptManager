@@ -51,6 +51,7 @@ from .notifications import (
     notification_center,
 )
 from .prompt_engineering import PromptEngineer, PromptEngineeringError, PromptRefinement
+from models.prompt_model import TaskTemplate
 
 __all__ = [
     "PromptManager",
@@ -65,6 +66,7 @@ __all__ = [
     "PromptRepository",
     "RepositoryError",
     "RepositoryNotFoundError",
+    "TaskTemplate",
     "build_prompt_manager",
     "import_prompt_catalog",
     "load_prompt_catalog",

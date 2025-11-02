@@ -1,5 +1,6 @@
 """High-level CRUD manager for prompt records backed by SQLite, ChromaDB, and Redis.
 
+Updates: v0.13.2 - 2025-11-16 - Add task template CRUD APIs and apply workflow.
 Updates: v0.12.0 - 2025-11-15 - Add LiteLLM-backed prompt engineering workflow.
 Updates: v0.11.0 - 2025-11-12 - Add multi-turn chat execution with conversation history logging.
 Updates: v0.10.0 - 2025-11-11 - Emit notifications for managed LLM and embedding tasks.
@@ -84,7 +85,7 @@ except ImportError:  # pragma: no cover - redis optional during development
     redis = None  # type: ignore
     RedisError = Exception  # type: ignore[misc,assignment]
 
-from models.prompt_model import Prompt, PromptExecution, UserProfile
+from models.prompt_model import Prompt, PromptExecution, TaskTemplate, UserProfile
 
 from .embedding import EmbeddingGenerationError, EmbeddingProvider, EmbeddingSyncWorker
 from .execution import CodexExecutionResult, CodexExecutor, ExecutionError
@@ -270,6 +271,13 @@ class PromptManager:
         result: CodexExecutionResult
         history_entry: Optional[PromptExecution]
         conversation: List[Dict[str, str]]
+
+    @dataclass(slots=True)
+    class TemplateApplication:
+        """Result returned when applying a task template."""
+
+        template: TaskTemplate
+        prompts: List[Prompt]
 
     @property
     def collection(self) -> Collection:
@@ -906,6 +914,78 @@ class PromptManager:
                 "Prompt deleted but cache eviction failed",
                 extra={"prompt_id": str(prompt_id)},
             )
+
+    # Template management ------------------------------------------------ #
+
+    def list_templates(self, *, include_inactive: bool = False) -> List[TaskTemplate]:
+        """Return available task templates."""
+
+        try:
+            return self._repository.list_templates(include_inactive=include_inactive)
+        except RepositoryError as exc:
+            raise PromptStorageError("Unable to list task templates") from exc
+
+    def get_template(self, template_id: uuid.UUID) -> TaskTemplate:
+        """Return a single task template."""
+
+        try:
+            return self._repository.get_template(template_id)
+        except RepositoryNotFoundError as exc:
+            raise PromptNotFoundError(str(exc)) from exc
+        except RepositoryError as exc:
+            raise PromptStorageError(f"Unable to load template {template_id}") from exc
+
+    def create_template(self, template: TaskTemplate) -> TaskTemplate:
+        """Persist a new task template."""
+
+        template.touch()
+        try:
+            stored = self._repository.add_template(template)
+        except RepositoryError as exc:
+            raise PromptStorageError(f"Failed to persist template {template.id}") from exc
+        return stored
+
+    def update_template(self, template: TaskTemplate) -> TaskTemplate:
+        """Persist updates to an existing task template."""
+
+        template.touch()
+        try:
+            updated = self._repository.update_template(template)
+        except RepositoryNotFoundError as exc:
+            raise PromptNotFoundError(str(exc)) from exc
+        except RepositoryError as exc:
+            raise PromptStorageError(f"Failed to update template {template.id}") from exc
+        return updated
+
+    def delete_template(self, template_id: uuid.UUID) -> None:
+        """Delete a task template."""
+
+        try:
+            self._repository.delete_template(template_id)
+        except RepositoryNotFoundError as exc:
+            raise PromptNotFoundError(str(exc)) from exc
+        except RepositoryError as exc:
+            raise PromptStorageError(f"Failed to delete template {template_id}") from exc
+
+    def apply_template(self, template_id: uuid.UUID) -> "PromptManager.TemplateApplication":
+        """Return template metadata and associated prompts for task workflows."""
+
+        template = self.get_template(template_id)
+        try:
+            prompts = self._repository.get_prompts_for_ids(template.prompt_ids)
+        except RepositoryError as exc:
+            raise PromptStorageError("Unable to load prompts for template") from exc
+        missing = len(template.prompt_ids) - len(prompts)
+        if missing > 0:
+            logger.warning(
+                "Template references missing prompts",
+                extra={
+                    "template_id": str(template.id),
+                    "expected": len(template.prompt_ids),
+                    "resolved": len(prompts),
+                },
+            )
+        return PromptManager.TemplateApplication(template=template, prompts=prompts)
 
     def search_prompts(
         self,

@@ -88,11 +88,17 @@ from core import (
 )
 from core.prompt_engineering import PromptRefinement
 from core.notifications import Notification, NotificationStatus
-from models.prompt_model import Prompt
+from models.prompt_model import Prompt, TaskTemplate
 
 from .command_palette import CommandPaletteDialog, QuickAction, rank_prompts_for_action
 from .code_highlighter import CodeHighlighter
-from .dialogs import CatalogPreviewDialog, MarkdownPreviewDialog, PromptDialog, SaveResultDialog
+from .dialogs import (
+    CatalogPreviewDialog,
+    MarkdownPreviewDialog,
+    PromptDialog,
+    SaveResultDialog,
+    TemplateDialog,
+)
 from .history_panel import HistoryPanel
 from .settings_dialog import SettingsDialog, persist_settings_to_config
 from .diff_utils import build_diff_preview
@@ -320,6 +326,14 @@ class MainWindow(QMainWindow):
         self._last_prompt_name: Optional[str] = None
         self._chat_conversation: List[Dict[str, str]] = []
         self._chat_prompt_id: Optional[uuid.UUID] = None
+        self._templates: List[TaskTemplate] = []
+        self._selected_template_id: Optional[uuid.UUID] = None
+        self._template_combo: Optional[QComboBox] = None
+        self._template_apply_button: Optional[QPushButton] = None
+        self._template_new_button: Optional[QPushButton] = None
+        self._template_edit_button: Optional[QPushButton] = None
+        self._template_delete_button: Optional[QPushButton] = None
+        self._template_clear_button: Optional[QPushButton] = None
         self._history_limit = 50
         self._runtime_settings = self._initial_runtime_settings(settings)
         self._usage_logger = IntentUsageLogger()
@@ -351,6 +365,7 @@ class MainWindow(QMainWindow):
         self._update_notification_indicator()
         self._register_quick_shortcuts()
         self._load_prompts()
+        self._load_templates()
 
     def _build_ui(self) -> None:
         """Create the main layout with list/search/detail panes."""
@@ -548,6 +563,38 @@ class MainWindow(QMainWindow):
         query_panel_layout.setSizeConstraint(QLayout.SetMinimumSize)
         query_panel_layout.setContentsMargins(0, 0, 0, 0)
         query_panel_layout.setSpacing(8)
+
+        template_layout = QHBoxLayout()
+        template_layout.setContentsMargins(0, 0, 0, 0)
+        template_layout.setSpacing(6)
+        template_label = QLabel("Task template:", self)
+        self._template_combo = QComboBox(self)
+        self._template_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self._template_combo.addItem("Select template…", None)
+        self._template_combo.currentIndexChanged.connect(self._on_template_selection_changed)  # type: ignore[arg-type]
+        self._template_apply_button = QPushButton("Apply", self)
+        self._template_apply_button.setEnabled(False)
+        self._template_apply_button.clicked.connect(self._on_template_apply_clicked)  # type: ignore[arg-type]
+        self._template_new_button = QPushButton("New", self)
+        self._template_new_button.clicked.connect(self._on_template_new_clicked)  # type: ignore[arg-type]
+        self._template_edit_button = QPushButton("Edit", self)
+        self._template_edit_button.setEnabled(False)
+        self._template_edit_button.clicked.connect(self._on_template_edit_clicked)  # type: ignore[arg-type]
+        self._template_delete_button = QPushButton("Delete", self)
+        self._template_delete_button.setEnabled(False)
+        self._template_delete_button.clicked.connect(self._on_template_delete_clicked)  # type: ignore[arg-type]
+        self._template_clear_button = QPushButton("Clear", self)
+        self._template_clear_button.setEnabled(False)
+        self._template_clear_button.clicked.connect(self._on_template_clear_clicked)  # type: ignore[arg-type]
+        template_layout.addWidget(template_label)
+        template_layout.addWidget(self._template_combo, 1)
+        template_layout.addWidget(self._template_apply_button)
+        template_layout.addWidget(self._template_new_button)
+        template_layout.addWidget(self._template_edit_button)
+        template_layout.addWidget(self._template_delete_button)
+        template_layout.addWidget(self._template_clear_button)
+        query_panel_layout.addLayout(template_layout)
+
         query_panel_layout.addWidget(self._query_input)
 
         query_panel_layout.addLayout(actions_layout)
@@ -691,8 +738,265 @@ class MainWindow(QMainWindow):
         self._layout_settings.setValue("windowGeometry", geometry)
         self._layout_settings.sync()
 
+    # Template helpers --------------------------------------------------- #
+
+    def _update_template_buttons(self) -> None:
+        """Update button states for template controls."""
+
+        combo_value = None
+        if self._template_combo is not None:
+            combo_value = self._template_combo.currentData()
+        has_selection = bool(combo_value)
+        has_templates = bool(self._templates)
+        has_prompts = bool(self._all_prompts)
+
+        if self._template_apply_button is not None:
+            self._template_apply_button.setEnabled(has_selection)
+        if self._template_new_button is not None:
+            self._template_new_button.setEnabled(has_prompts)
+        if self._template_edit_button is not None:
+            self._template_edit_button.setEnabled(has_selection)
+        if self._template_delete_button is not None:
+            self._template_delete_button.setEnabled(has_selection)
+        if self._template_clear_button is not None:
+            self._template_clear_button.setEnabled(self._selected_template_id is not None)
+        if self._template_combo is not None:
+            self._template_combo.setEnabled(has_templates or has_prompts)
+
+    def _reset_template_selection(self) -> None:
+        """Reset combo selection without altering prompt lists."""
+
+        if self._template_combo is not None and self._template_combo.currentIndex() != 0:
+            self._template_combo.blockSignals(True)
+            self._template_combo.setCurrentIndex(0)
+            self._template_combo.blockSignals(False)
+
+    def _load_templates(self) -> None:
+        """Load task templates from the manager and refresh controls."""
+
+        try:
+            templates = self._manager.list_templates()
+        except PromptManagerError as exc:
+            self._show_error("Unable to load templates", str(exc))
+            templates = []
+        self._templates = list(templates)
+        combo = self._template_combo
+        if combo is not None:
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItem("Select template…", None)
+            for template in self._templates:
+                combo.addItem(template.name, str(template.id))
+                index = combo.count() - 1
+                combo.setItemData(index, template.description, Qt.ToolTipRole)
+            combo.blockSignals(False)
+        if self._selected_template_id:
+            try:
+                self._apply_template(self._selected_template_id, silent=True)
+            except PromptManagerError:
+                self._selected_template_id = None
+                self._reset_template_selection()
+        self._update_template_buttons()
+
+    def _on_template_selection_changed(self, _: int) -> None:
+        """Refresh button states when the template combo changes."""
+
+        self._update_template_buttons()
+
+    def _on_template_apply_clicked(self) -> None:
+        """Apply the currently selected template."""
+
+        if self._template_combo is None:
+            return
+        raw_id = self._template_combo.currentData()
+        if not raw_id:
+            self._clear_template()
+            return
+        try:
+            template_id = uuid.UUID(str(raw_id))
+        except (TypeError, ValueError):
+            self._show_error("Template selection error", "Selected template identifier is invalid.")
+            return
+        self._apply_template(template_id)
+
+    def _on_template_new_clicked(self) -> None:
+        """Create a new task template."""
+
+        dialog = TemplateDialog(self, template=None, prompts=self._all_prompts)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        result = dialog.result_template
+        if result is None:
+            return
+        try:
+            created = self._manager.create_template(result)
+        except PromptManagerError as exc:
+            self._show_error("Unable to create template", str(exc))
+            return
+        self._selected_template_id = created.id
+        self._load_templates()
+        self._apply_template(created.id)
+
+    def _on_template_edit_clicked(self) -> None:
+        """Edit the currently selected template."""
+
+        template_id = self._selected_template_id
+        if template_id is None and self._template_combo is not None:
+            raw_id = self._template_combo.currentData()
+            if raw_id:
+                try:
+                    template_id = uuid.UUID(str(raw_id))
+                except (TypeError, ValueError):
+                    template_id = None
+        if template_id is None:
+            QMessageBox.information(self, "Edit template", "Select a template before editing.")
+            return
+        try:
+            template = self._manager.get_template(template_id)
+        except PromptManagerError as exc:
+            self._show_error("Unable to load template", str(exc))
+            return
+        dialog = TemplateDialog(self, template=template, prompts=self._all_prompts)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        updated = dialog.result_template
+        if updated is None:
+            return
+        try:
+            stored = self._manager.update_template(updated)
+        except PromptManagerError as exc:
+            self._show_error("Unable to update template", str(exc))
+            return
+        self._selected_template_id = stored.id
+        self._load_templates()
+        self._apply_template(stored.id, silent=True)
+        self.statusBar().showMessage(f"Template '{stored.name}' updated.", 4000)
+
+    def _on_template_delete_clicked(self) -> None:
+        """Delete the selected task template."""
+
+        if self._template_combo is None:
+            return
+        raw_id = self._template_combo.currentData()
+        if not raw_id:
+            QMessageBox.information(self, "Delete template", "Select a template before deleting.")
+            return
+        try:
+            template_id = uuid.UUID(str(raw_id))
+        except (TypeError, ValueError):
+            self._show_error("Template selection error", "Selected template identifier is invalid.")
+            return
+        template_name = next((template.name for template in self._templates if template.id == template_id), "template")
+        confirmation = QMessageBox.question(
+            self,
+            "Delete template",
+            f"Delete template '{template_name}'?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if confirmation != QMessageBox.Yes:
+            return
+        try:
+            self._manager.delete_template(template_id)
+        except PromptManagerError as exc:
+            self._show_error("Unable to delete template", str(exc))
+            return
+        self._selected_template_id = None
+        self._load_templates()
+        self._clear_template(update_combo=True, silent=True)
+        self.statusBar().showMessage(f"Template '{template_name}' deleted.", 4000)
+
+    def _on_template_clear_clicked(self) -> None:
+        """Clear the active template."""
+
+        self._clear_template()
+
+    def _clear_template(self, *, update_combo: bool = True, silent: bool = False) -> None:
+        """Clear template selection and restore the full prompt list when appropriate."""
+
+        had_template = self._selected_template_id is not None
+        self._selected_template_id = None
+        if update_combo:
+            self._reset_template_selection()
+        if had_template and self._suggestions is None:
+            self._current_prompts = list(self._all_prompts)
+            filtered = self._apply_filters(self._current_prompts)
+            self._model.set_prompts(filtered)
+            self._list_view.clearSelection()
+            if filtered:
+                self._update_intent_hint(filtered)
+            else:
+                self._detail_widget.clear()
+        if self._template_clear_button is not None:
+            self._template_clear_button.setEnabled(False)
+        self._update_template_buttons()
+        if had_template and not silent:
+            self.statusBar().showMessage("Template cleared.", 3000)
+
+    def _apply_template(self, template_id: uuid.UUID, *, silent: bool = False) -> None:
+        """Apply a template and refresh the workspace."""
+
+        try:
+            application = self._manager.apply_template(template_id)
+        except PromptNotFoundError as exc:
+            self._show_error("Template unavailable", str(exc))
+            self._clear_template(silent=True)
+            return
+        except PromptManagerError as exc:
+            self._show_error("Unable to apply template", str(exc))
+            return
+
+        template = application.template
+        prompts = list(application.prompts)
+        self._selected_template_id = template.id
+        if self._template_combo is not None:
+            index = self._template_combo.findData(str(template.id))
+            if index >= 0:
+                self._template_combo.blockSignals(True)
+                self._template_combo.setCurrentIndex(index)
+                self._template_combo.blockSignals(False)
+        self._suggestions = None
+        if self._search_input is not None:
+            self._search_input.blockSignals(True)
+            self._search_input.clear()
+            self._search_input.blockSignals(False)
+        if template.default_input:
+            self._query_input.setPlainText(template.default_input)
+            cursor = self._query_input.textCursor()
+            cursor.movePosition(QTextCursor.End)
+            self._query_input.setTextCursor(cursor)
+        base_prompts = prompts if prompts else self._all_prompts
+        self._current_prompts = list(base_prompts)
+        filtered = self._apply_filters(self._current_prompts)
+        self._model.set_prompts(filtered)
+        self._list_view.clearSelection()
+        if filtered:
+            self._select_prompt(filtered[0].id)
+        else:
+            self._detail_widget.clear()
+        self._update_intent_hint(filtered)
+        if self._template_clear_button is not None:
+            self._template_clear_button.setEnabled(True)
+        self._update_template_buttons()
+        self._usage_logger.log_template_apply(
+            template_name=template.name,
+            prompt_count=len(prompts),
+        )
+        if not silent:
+            message = f"Applied template: {template.name}"
+            if not prompts:
+                message += " (no linked prompts found)"
+            self.statusBar().showMessage(message, 5000)
+
     def _load_prompts(self, search_text: str = "") -> None:
         """Populate the list model from the repository or semantic search."""
+
+        stripped = search_text.strip()
+        if stripped:
+            self._selected_template_id = None
+            self._reset_template_selection()
+            if self._template_clear_button is not None:
+                self._template_clear_button.setEnabled(False)
 
         try:
             self._all_prompts = self._manager.repository.list()
@@ -702,7 +1006,6 @@ class MainWindow(QMainWindow):
 
         self._populate_filters(self._all_prompts)
 
-        stripped = search_text.strip()
         if stripped:
             try:
                 suggestions = self._manager.suggest_prompts(stripped, limit=50)
@@ -721,6 +1024,10 @@ class MainWindow(QMainWindow):
         if not filtered:
             self._detail_widget.clear()
         self._update_intent_hint(filtered)
+        if self._selected_template_id:
+            self._apply_template(self._selected_template_id, silent=True)
+        else:
+            self._update_template_buttons()
 
     def _populate_filters(self, prompts: Sequence[Prompt]) -> None:
         """Refresh category and tag filters based on available prompts."""
@@ -1467,6 +1774,10 @@ class MainWindow(QMainWindow):
     def _apply_suggestions(self, suggestions: PromptManager.IntentSuggestions) -> None:
         """Apply intent suggestions to the list view and update filters."""
 
+        self._selected_template_id = None
+        self._reset_template_selection()
+        if self._template_clear_button is not None:
+            self._template_clear_button.setEnabled(False)
         self._suggestions = suggestions
         self._current_prompts = list(suggestions.prompts)
         filtered = self._apply_filters(self._current_prompts)
@@ -1477,6 +1788,7 @@ class MainWindow(QMainWindow):
         else:
             self._detail_widget.clear()
         self._update_intent_hint(filtered)
+        self._update_template_buttons()
 
     def _current_prompt(self) -> Optional[Prompt]:
         """Return the prompt currently selected in the list."""

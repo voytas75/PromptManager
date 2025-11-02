@@ -15,6 +15,7 @@ Prompt Manager is a desktop-focused application for cataloguing, searching, and 
 - LiteLLM-backed prompt execution with automatic history logging and a GUI result pane for reviewing and copying model output.
 - Result pane includes a Render Output button that previews LLM responses as rendered Markdown in a dedicated window.
 - Prompt engineering workflow that analyses stored prompts against the meta-guidelines and proposes a refined prompt body directly in the editor.
+- Task templates bundle prompts with starter input and surface in the GUI for quick apply/edit/delete workflows.
 
 ## Getting Started
 
@@ -98,6 +99,7 @@ Further modules (session history, execution pipeline) will be introduced in subs
 - As you type, the workspace auto-detects the language (Python, PowerShell, Bash, Markdown, JSON, YAML, or plain text) and applies lightweight syntax highlighting so prompts stay readable.
 - Press `Ctrl+K` (or `Ctrl+Shift+P`) to open the command palette for quick actions, or use dedicated shortcuts (`Ctrl+1`…`Ctrl+4`) to jump straight to explain/fix/document/enhance workflows.
 - Tailor the palette in **Settings → Quick actions** by pasting a JSON array of additional actions (identifier, title, description, optional `category_hint`, `tag_hints`, `template`, `prompt_id`, `shortcut`). `prompt_id` can reference a prompt by UUID or name; custom entries override defaults when identifiers collide.
+- Task template controls sit above the workspace: pick an existing template to pre-fill the query area and surface linked prompts, or use **New**, **Edit**, **Delete**, and **Clear** to manage templates without leaving the app.
 
 - Use the category, tag, and minimum-quality filters above the list to narrow results as your catalogue grows.
 

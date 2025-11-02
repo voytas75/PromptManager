@@ -6,6 +6,7 @@ Updates: v0.1.0 - 2025-10-31 - Introduce repository and manager storage integrat
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import uuid
 from typing import Any, Dict, Optional
 
@@ -17,7 +18,7 @@ from core import (
     RepositoryError,
     RepositoryNotFoundError,
 )
-from models.prompt_model import Prompt, UserProfile
+from models.prompt_model import Prompt, TaskTemplate, UserProfile
 
 
 def _make_prompt(name: str = "Sample Prompt") -> Prompt:
@@ -36,6 +37,26 @@ def _make_prompt(name: str = "Sample Prompt") -> Prompt:
         version="1.0",
         is_active=True,
         source="tests",
+    )
+
+
+def _make_template(prompt: Prompt, name: str = "Sample Template") -> TaskTemplate:
+    """Return a populated TaskTemplate referencing the provided prompt."""
+
+    now = datetime.now(timezone.utc)
+    return TaskTemplate(
+        id=uuid.uuid4(),
+        name=name,
+        description="Template description",
+        prompt_ids=[prompt.id],
+        default_input="Analyse this snippet for issues.",
+        category="workflow",
+        tags=["tests", "workflow"],
+        notes="Remember to review edge cases.",
+        is_active=True,
+        version="1.0",
+        created_at=now,
+        last_modified=now,
     )
 
 
@@ -219,6 +240,47 @@ def test_repository_roundtrip(tmp_path) -> None:
         repository.get(prompt.id)
 
 
+def test_repository_template_roundtrip(tmp_path) -> None:
+    """Ensure task templates persist correctly via the repository."""
+
+    repo = PromptRepository(str(tmp_path / "templates.db"))
+    prompt = _make_prompt("Template Prompt")
+    repo.add(prompt)
+
+    template = _make_template(prompt)
+    repo.add_template(template)
+
+    templates = repo.list_templates()
+    assert templates and templates[0].name == template.name
+
+    loaded = repo.get_template(template.id)
+    assert loaded.name == template.name
+    assert loaded.prompt_ids == [prompt.id]
+
+    template.name = "Updated Template"
+    template.touch()
+    repo.update_template(template)
+
+    refreshed = repo.get_template(template.id)
+    assert refreshed.name == "Updated Template"
+
+    prompt_results = repo.get_prompts_for_ids([prompt.id])
+    assert prompt_results and prompt_results[0].id == prompt.id
+
+    inactive = _make_template(prompt, name="Inactive Template")
+    inactive.is_active = False
+    repo.add_template(inactive)
+
+    active_only = repo.list_templates()
+    assert all(template.is_active for template in active_only)
+    all_templates = repo.list_templates(include_inactive=True)
+    names = {template.name for template in all_templates}
+    assert "Inactive Template" in names
+
+    repo.delete_template(template.id)
+    with pytest.raises(RepositoryNotFoundError):
+        repo.get_template(template.id)
+
 def test_prompt_manager_coordinates_sqlite_and_chromadb(tmp_path) -> None:
     """Validate manager persistence across SQLite, ChromaDB, and cache facade."""
     chroma_dir = tmp_path / "chroma"
@@ -253,6 +315,40 @@ def test_prompt_manager_coordinates_sqlite_and_chromadb(tmp_path) -> None:
         manager.repository.get(prompt.id)
     chroma_result = manager.collection.get(ids=[str(prompt.id)])
     assert not chroma_result.get("ids"), "ChromaDB entry should be removed"
+    manager.close()
+
+
+def test_prompt_manager_template_workflow(tmp_path) -> None:
+    """Validate template CRUD and application via the manager."""
+
+    chroma_dir = tmp_path / "chroma"
+    db_path = tmp_path / "prompt_manager.db"
+    manager = PromptManager(
+        chroma_path=str(chroma_dir),
+        db_path=str(db_path),
+    )
+
+    prompt = _make_prompt("Template Driven Prompt")
+    manager.create_prompt(prompt)
+
+    template = _make_template(prompt)
+    manager.create_template(template)
+
+    templates = manager.list_templates()
+    assert templates and templates[0].id == template.id
+
+    application = manager.apply_template(template.id)
+    assert application.template.id == template.id
+    assert application.prompts and application.prompts[0].id == prompt.id
+
+    template.name = "Renamed Template"
+    manager.update_template(template)
+    refreshed = manager.get_template(template.id)
+    assert refreshed.name == "Renamed Template"
+
+    manager.delete_template(template.id)
+    assert not manager.list_templates()
+
     manager.close()
 
 

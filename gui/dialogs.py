@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.8.0 - 2025-11-16 - Add task template editor dialog.
 Updates: v0.7.2 - 2025-11-02 - Collapse example sections when empty and expand on demand.
 Updates: v0.7.1 - 2025-11-02 - Increase default prompt dialog size for edit and creation workflows.
 Updates: v0.7.0 - 2025-11-16 - Add markdown preview dialog for rendered execution output.
@@ -23,11 +24,15 @@ from typing import Callable, Optional, Sequence
 
 from PySide6.QtCore import Qt, QEvent, Signal
 from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
     QHBoxLayout,
+    QListWidget,
+    QListWidgetItem,
     QLabel,
     QLineEdit,
     QMessageBox,
@@ -47,7 +52,7 @@ from core import (
     PromptEngineeringUnavailable,
 )
 from core.prompt_engineering import PromptEngineeringError, PromptRefinement
-from models.prompt_model import Prompt
+from models.prompt_model import Prompt, TaskTemplate
 
 
 logger = logging.getLogger("prompt_manager.gui.dialogs")
@@ -514,6 +519,197 @@ class PromptDialog(QDialog):
         )
 
 
+class TemplateDialog(QDialog):
+    """Modal dialog for creating or editing task templates."""
+
+    def __init__(
+        self,
+        parent: Optional[QWidget] = None,
+        *,
+        template: Optional[TaskTemplate] = None,
+        prompts: Sequence[Prompt] = (),
+    ) -> None:
+        super().__init__(parent)
+        self._source_template = template
+        self._result_template: Optional[TaskTemplate] = None
+        self._prompts = list(prompts)
+        self._missing_prompt_ids: list[str] = []
+        self.setWindowTitle("New Task Template" if template is None else "Edit Task Template")
+        self.resize(720, 640)
+        self._build_ui()
+        if template is not None:
+            self._populate(template)
+
+    @property
+    def result_template(self) -> Optional[TaskTemplate]:
+        """Return the resulting template after dialog acceptance."""
+
+        return self._result_template
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self)
+
+        form = QFormLayout()
+
+        self._name_input = QLineEdit(self)
+        form.addRow("Name*", self._name_input)
+
+        self._description_input = QPlainTextEdit(self)
+        self._description_input.setPlaceholderText("Short description shown alongside the template…")
+        self._description_input.setFixedHeight(80)
+        form.addRow("Description*", self._description_input)
+
+        self._category_input = QLineEdit(self)
+        self._category_input.setPlaceholderText("Optional category label (e.g. Code Analysis)")
+        form.addRow("Category", self._category_input)
+
+        self._tags_input = QLineEdit(self)
+        self._tags_input.setPlaceholderText("Comma-separated tags (analysis, refactor, …)")
+        form.addRow("Tags", self._tags_input)
+
+        self._version_input = QLineEdit(self)
+        self._version_input.setPlaceholderText("1.0")
+        form.addRow("Version", self._version_input)
+
+        self._is_active_checkbox = QCheckBox("Template is active", self)
+        self._is_active_checkbox.setChecked(True)
+        form.addRow("", self._is_active_checkbox)
+
+        layout.addLayout(form)
+
+        layout.addWidget(QLabel("Default input", self))
+        self._default_input_editor = QPlainTextEdit(self)
+        self._default_input_editor.setPlaceholderText(
+            "Optional starter input pasted into the workspace when the template is applied…"
+        )
+        self._default_input_editor.setFixedHeight(100)
+        layout.addWidget(self._default_input_editor)
+
+        layout.addWidget(QLabel("Notes", self))
+        self._notes_input = QPlainTextEdit(self)
+        self._notes_input.setPlaceholderText("Optional guidance or checklist shown after applying the template…")
+        self._notes_input.setFixedHeight(80)
+        layout.addWidget(self._notes_input)
+
+        prompt_label = QLabel("Select prompts to include*", self)
+        layout.addWidget(prompt_label)
+
+        self._prompt_list = QListWidget(self)
+        self._prompt_list.setSelectionMode(QAbstractItemView.MultiSelection)
+        self._prompt_list.setAlternatingRowColors(True)
+        for prompt in self._prompts:
+            label = prompt.name
+            if prompt.category:
+                label += f" — {prompt.category}"
+            item = QListWidgetItem(label, self._prompt_list)
+            item.setData(Qt.UserRole, str(prompt.id))
+            item.setToolTip(prompt.description)
+        layout.addWidget(self._prompt_list, stretch=1)
+
+        self._missing_label = QLabel("", self)
+        self._missing_label.setWordWrap(True)
+        self._missing_label.setStyleSheet("color: #d97706;")
+        self._missing_label.setVisible(False)
+        layout.addWidget(self._missing_label)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        buttons.accepted.connect(self._on_accept)  # type: ignore[arg-type]
+        buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
+        layout.addWidget(buttons)
+
+    def _populate(self, template: TaskTemplate) -> None:
+        self._name_input.setText(template.name)
+        self._description_input.setPlainText(template.description)
+        self._category_input.setText(template.category or "")
+        self._tags_input.setText(", ".join(template.tags))
+        self._version_input.setText(template.version)
+        self._is_active_checkbox.setChecked(template.is_active)
+        if template.default_input:
+            self._default_input_editor.setPlainText(template.default_input)
+        if template.notes:
+            self._notes_input.setPlainText(template.notes)
+
+        selected_ids = {str(pid) for pid in template.prompt_ids}
+        available_ids = set()
+        for index in range(self._prompt_list.count()):
+            item = self._prompt_list.item(index)
+            prompt_id = item.data(Qt.UserRole)
+            available_ids.add(prompt_id)
+            if prompt_id in selected_ids:
+                item.setSelected(True)
+        missing_ids = sorted(selected_ids - available_ids)
+        if missing_ids:
+            self._missing_prompt_ids = missing_ids
+            self._missing_label.setText(
+                "Some prompts referenced by this template are unavailable: "
+                + ", ".join(missing_ids)
+            )
+            self._missing_label.setVisible(True)
+        else:
+            self._missing_label.setVisible(False)
+
+    def _on_accept(self) -> None:
+        name = self._name_input.text().strip()
+        if not name:
+            QMessageBox.warning(self, "Invalid template", "Provide a template name.")
+            return
+        description = self._description_input.toPlainText().strip()
+        if not description:
+            QMessageBox.warning(self, "Invalid template", "Provide a description for the template.")
+            return
+
+        selected_ids: list[uuid.UUID] = []
+        for item in self._prompt_list.selectedItems():
+            raw = item.data(Qt.UserRole)
+            try:
+                selected_ids.append(uuid.UUID(str(raw)))
+            except (TypeError, ValueError):
+                continue
+        if not selected_ids and not self._missing_prompt_ids:
+            QMessageBox.warning(
+                self,
+                "Invalid template",
+                "Select at least one prompt to include in the template.",
+            )
+            return
+
+        category = self._category_input.text().strip() or None
+        tags = [tag.strip() for tag in self._tags_input.text().split(",") if tag.strip()]
+        default_input = self._default_input_editor.toPlainText().strip() or None
+        notes = self._notes_input.toPlainText().strip() or None
+        version = self._version_input.text().strip() or (
+            self._source_template.version if self._source_template else "1.0"
+        )
+        is_active = self._is_active_checkbox.isChecked()
+
+        template_id = self._source_template.id if self._source_template else uuid.uuid4()
+        created_at = self._source_template.created_at if self._source_template else datetime.now(timezone.utc)
+        ext1 = self._source_template.ext1 if self._source_template else None
+        ext2 = self._source_template.ext2 if self._source_template else None
+        ext3 = self._source_template.ext3 if self._source_template else None
+
+        prompt_ids = selected_ids or [uuid.UUID(value) for value in self._missing_prompt_ids]
+
+        self._result_template = TaskTemplate(
+            id=template_id,
+            name=name,
+            description=description,
+            prompt_ids=prompt_ids,
+            default_input=default_input,
+            category=category,
+            tags=tags,
+            notes=notes,
+            is_active=is_active,
+            version=version,
+            created_at=created_at,
+            last_modified=datetime.now(timezone.utc),
+            ext1=ext1,
+            ext2=ext2,
+            ext3=ext3,
+        )
+        self.accept()
+
+
 class SaveResultDialog(QDialog):
     """Collect optional notes before persisting or updating a prompt execution."""
 
@@ -699,6 +895,7 @@ __all__ = [
     "MarkdownPreviewDialog",
     "PromptDialog",
     "SaveResultDialog",
+    "TemplateDialog",
     "fallback_suggest_prompt_name",
     "fallback_generate_description",
 ]
