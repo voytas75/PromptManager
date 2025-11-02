@@ -40,6 +40,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QTabWidget,
     QToolButton,
     QTextBrowser,
     QVBoxLayout,
@@ -653,34 +654,52 @@ class PromptMaintenanceDialog(QDialog):
         self._manager = manager
         self._category_generator = category_generator
         self._tags_generator = tags_generator
+        self._log_view: QPlainTextEdit
+        self._redis_status_label: QLabel
+        self._redis_connection_label: QLabel
+        self._redis_stats_view: QPlainTextEdit
+        self._redis_refresh_button: QPushButton
+        self._tab_widget: QTabWidget
+        self._chroma_status_label: QLabel
+        self._chroma_path_label: QLabel
+        self._chroma_stats_view: QPlainTextEdit
+        self._chroma_refresh_button: QPushButton
         self.setWindowTitle("Prompt Maintenance")
         self.resize(640, 420)
         self._build_ui()
+        self._refresh_redis_info()
+        self._refresh_chroma_info()
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
 
+        self._tab_widget = QTabWidget(self)
+        layout.addWidget(self._tab_widget, stretch=1)
+
+        metadata_tab = QWidget(self)
+        metadata_layout = QVBoxLayout(metadata_tab)
+
         description = QLabel(
             "Run maintenance tasks to enrich prompt metadata. Only prompts missing the "
             "selected metadata are updated.",
-            self,
+            metadata_tab,
         )
         description.setWordWrap(True)
-        layout.addWidget(description)
+        metadata_layout.addWidget(description)
 
-        button_container = QWidget(self)
+        button_container = QWidget(metadata_tab)
         button_layout = QHBoxLayout(button_container)
         button_layout.setContentsMargins(0, 0, 0, 0)
         button_layout.setSpacing(12)
 
-        self._categories_button = QPushButton("Generate Missing Categories", self)
+        self._categories_button = QPushButton("Generate Missing Categories", metadata_tab)
         self._categories_button.clicked.connect(self._on_generate_categories_clicked)  # type: ignore[arg-type]
         self._categories_button.setEnabled(self._category_generator is not None)
         if self._category_generator is None:
             self._categories_button.setToolTip("Category suggestions are unavailable.")
         button_layout.addWidget(self._categories_button)
 
-        self._tags_button = QPushButton("Generate Missing Tags", self)
+        self._tags_button = QPushButton("Generate Missing Tags", metadata_tab)
         self._tags_button.clicked.connect(self._on_generate_tags_clicked)  # type: ignore[arg-type]
         self._tags_button.setEnabled(self._tags_generator is not None)
         if self._tags_generator is None:
@@ -688,11 +707,79 @@ class PromptMaintenanceDialog(QDialog):
         button_layout.addWidget(self._tags_button)
 
         button_layout.addStretch(1)
-        layout.addWidget(button_container)
+        metadata_layout.addWidget(button_container)
 
-        self._log_view = QPlainTextEdit(self)
+        self._log_view = QPlainTextEdit(metadata_tab)
         self._log_view.setReadOnly(True)
-        layout.addWidget(self._log_view, stretch=1)
+        metadata_layout.addWidget(self._log_view, stretch=1)
+
+        self._tab_widget.addTab(metadata_tab, "Metadata")
+
+        redis_tab = QWidget(self)
+        redis_layout = QVBoxLayout(redis_tab)
+
+        redis_description = QLabel(
+            "Inspect the Redis cache used for prompt caching.", redis_tab
+        )
+        redis_description.setWordWrap(True)
+        redis_layout.addWidget(redis_description)
+
+        status_container = QWidget(redis_tab)
+        status_layout = QHBoxLayout(status_container)
+        status_layout.setContentsMargins(0, 0, 0, 0)
+        status_layout.setSpacing(12)
+
+        self._redis_status_label = QLabel("Checking…", status_container)
+        status_layout.addWidget(self._redis_status_label)
+
+        self._redis_connection_label = QLabel("", status_container)
+        self._redis_connection_label.setWordWrap(True)
+        status_layout.addWidget(self._redis_connection_label, stretch=1)
+
+        self._redis_refresh_button = QPushButton("Refresh", status_container)
+        self._redis_refresh_button.clicked.connect(self._refresh_redis_info)  # type: ignore[arg-type]
+        status_layout.addWidget(self._redis_refresh_button)
+
+        redis_layout.addWidget(status_container)
+
+        self._redis_stats_view = QPlainTextEdit(redis_tab)
+        self._redis_stats_view.setReadOnly(True)
+        redis_layout.addWidget(self._redis_stats_view, stretch=1)
+
+        self._tab_widget.addTab(redis_tab, "Redis")
+
+        chroma_tab = QWidget(self)
+        chroma_layout = QVBoxLayout(chroma_tab)
+
+        chroma_description = QLabel(
+            "Review the ChromaDB vector store used for semantic search.", chroma_tab
+        )
+        chroma_description.setWordWrap(True)
+        chroma_layout.addWidget(chroma_description)
+
+        chroma_status_container = QWidget(chroma_tab)
+        chroma_status_layout = QHBoxLayout(chroma_status_container)
+        chroma_status_layout.setContentsMargins(0, 0, 0, 0)
+        chroma_status_layout.setSpacing(12)
+
+        self._chroma_status_label = QLabel("Checking…", chroma_status_container)
+        chroma_status_layout.addWidget(self._chroma_status_label)
+
+        self._chroma_path_label = QLabel("", chroma_status_container)
+        self._chroma_path_label.setWordWrap(True)
+        chroma_status_layout.addWidget(self._chroma_path_label, stretch=1)
+
+        self._chroma_refresh_button = QPushButton("Refresh", chroma_status_container)
+        self._chroma_refresh_button.clicked.connect(self._refresh_chroma_info)  # type: ignore[arg-type]
+        chroma_status_layout.addWidget(self._chroma_refresh_button)
+
+        chroma_layout.addWidget(chroma_status_container)
+
+        self._chroma_stats_view = QPlainTextEdit(chroma_tab)
+        self._chroma_stats_view.setReadOnly(True)
+        chroma_layout.addWidget(self._chroma_stats_view, stretch=1)
+
+        self._tab_widget.addTab(chroma_tab, "ChromaDB")
 
         self._buttons = QDialogButtonBox(QDialogButtonBox.Close, self)
         self._buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
@@ -722,7 +809,8 @@ class PromptMaintenanceDialog(QDialog):
             return
         updated = 0
         for prompt in prompts:
-            if (prompt.category or "").strip():
+            category_value = (prompt.category or "").strip()
+            if category_value and category_value.lower() != "general":
                 continue
             context = self._prompt_context(prompt)
             if not context:
@@ -789,6 +877,100 @@ class PromptMaintenanceDialog(QDialog):
         if updated:
             self.maintenance_applied.emit(f"Generated tags for {updated} prompt(s).")
 
+    def _refresh_redis_info(self) -> None:
+        """Update the Redis tab with the latest cache status."""
+
+        details = self._manager.get_redis_details()
+        enabled = details.get("enabled", False)
+        if not enabled:
+            self._redis_status_label.setText("Redis caching is disabled.")
+            self._redis_connection_label.setText("")
+            self._redis_stats_view.setPlainText("")
+            self._redis_refresh_button.setEnabled(False)
+            return
+
+        self._redis_refresh_button.setEnabled(True)
+
+        status = details.get("status", "unknown").capitalize()
+        if details.get("error"):
+            status = f"Error: {details['error']}"
+        self._redis_status_label.setText(f"Status: {status}")
+
+        connection = details.get("connection", {})
+        connection_parts = []
+        if connection.get("host"):
+            host = connection["host"]
+            port = connection.get("port")
+            if port is not None:
+                connection_parts.append(f"{host}:{port}")
+            else:
+                connection_parts.append(str(host))
+        if connection.get("database") is not None:
+            connection_parts.append(f"DB {connection['database']}")
+        if connection.get("ssl"):
+            connection_parts.append("SSL")
+        if not connection_parts:
+            self._redis_connection_label.setText("")
+        else:
+            self._redis_connection_label.setText("Connection: " + ", ".join(connection_parts))
+
+        stats = details.get("stats", {})
+        lines: List[str] = []
+        for key, label in (
+            ("keys", "Keys"),
+            ("used_memory_human", "Used memory"),
+            ("used_memory_peak_human", "Peak memory"),
+            ("maxmemory_human", "Configured max memory"),
+            ("hits", "Keyspace hits"),
+            ("misses", "Keyspace misses"),
+            ("hit_rate", "Hit rate (%)"),
+        ):
+            if stats.get(key) is not None:
+                lines.append(f"{label}: {stats[key]}")
+        if not lines and details.get("error"):
+            lines.append(details["error"])
+        elif not lines and stats.get("info_error"):
+            lines.append(f"Unable to fetch stats: {stats['info_error']}")
+        self._redis_stats_view.setPlainText("\n".join(lines) if lines else "No Redis statistics available.")
+
+    def _refresh_chroma_info(self) -> None:
+        """Update the ChromaDB tab with vector store information."""
+
+        details = self._manager.get_chroma_details()
+        enabled = details.get("enabled", False)
+        path = details.get("path") or ""
+        collection = details.get("collection") or ""
+        if not enabled:
+            self._chroma_status_label.setText("ChromaDB is not initialised.")
+            self._chroma_path_label.setText(f"Path: {path}" if path else "")
+            self._chroma_stats_view.setPlainText("")
+            self._chroma_refresh_button.setEnabled(False)
+            return
+
+        self._chroma_refresh_button.setEnabled(True)
+
+        status = details.get("status", "unknown").capitalize()
+        if details.get("error"):
+            status = f"Error: {details['error']}"
+        self._chroma_status_label.setText(f"Status: {status}")
+
+        path_parts = []
+        if path:
+            path_parts.append(f"Path: {path}")
+        if collection:
+            path_parts.append(f"Collection: {collection}")
+        self._chroma_path_label.setText(" | ".join(path_parts))
+
+        stats = details.get("stats", {})
+        lines: List[str] = []
+        for key, label in (
+            ("documents", "Documents"),
+            ("disk_usage_bytes", "Disk usage (bytes)"),
+        ):
+            value = stats.get(key)
+            if value is not None:
+                lines.append(f"{label}: {value}")
+        self._chroma_stats_view.setPlainText("\n".join(lines) if lines else "No ChromaDB statistics available.")
 
 class TemplateDialog(QDialog):
     """Modal dialog for creating or editing task templates."""

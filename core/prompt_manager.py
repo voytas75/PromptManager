@@ -193,6 +193,8 @@ class PromptManager:
         self._collection: Any = cast(Any, None)
         resolved_db_path = Path(db_path).expanduser() if db_path is not None else None
         resolved_chroma_path = Path(chroma_path).expanduser()
+        self._chroma_path = str(resolved_chroma_path)
+        self._collection_name = collection_name
         try:
             self._repository = repository or PromptRepository(str(resolved_db_path))
         except RepositoryError as exc:
@@ -334,6 +336,99 @@ class PromptManager:
         """Return the configured prompt engineering helper, if any."""
 
         return self._prompt_engineer
+
+    def get_redis_details(self) -> Dict[str, Any]:
+        """Return connection and usage details for the configured Redis cache."""
+
+        details: Dict[str, Any] = {"enabled": self._redis_client is not None}
+        client = self._redis_client
+        if client is None:
+            return details
+        try:
+            ping_ok = bool(client.ping())
+        except RedisError as exc:
+            details.update({"enabled": True, "status": "error", "error": str(exc)})
+            return details
+        details["status"] = "online" if ping_ok else "offline"
+
+        connection: Dict[str, Any] = {}
+        pool = getattr(client, "connection_pool", None)
+        if pool is not None:
+            kwargs = getattr(pool, "connection_kwargs", {}) or {}
+            host = kwargs.get("host") or kwargs.get("unix_socket_path")
+            if host:
+                connection["host"] = host
+            if kwargs.get("port") is not None:
+                connection["port"] = kwargs.get("port")
+            if kwargs.get("db") is not None:
+                connection["database"] = kwargs.get("db")
+            if kwargs.get("username"):
+                connection["username"] = kwargs.get("username")
+            if kwargs.get("ssl"):
+                connection["ssl"] = bool(kwargs.get("ssl"))
+        if connection:
+            details["connection"] = connection
+
+        try:
+            dbsize = client.dbsize()
+        except RedisError:
+            dbsize = None
+        if dbsize is not None:
+            details.setdefault("stats", {})["keys"] = int(dbsize)
+
+        try:
+            info = client.info()
+        except RedisError as exc:
+            details.setdefault("stats", {})["info_error"] = str(exc)
+        else:
+            stats = details.setdefault("stats", {})
+            for key in ("used_memory_human", "used_memory_peak_human", "maxmemory_human"):
+                if info.get(key) is not None:
+                    stats[key] = info[key]
+            hits = info.get("keyspace_hits")
+            misses = info.get("keyspace_misses")
+            if hits is not None:
+                stats["hits"] = hits
+            if misses is not None:
+                stats["misses"] = misses
+        if hits and misses is not None:
+            total = hits + misses
+            if total:
+                stats["hit_rate"] = round((hits / total) * 100, 2)
+        if "role" in info:
+            details["role"] = info["role"]
+        return details
+
+    def get_chroma_details(self) -> Dict[str, Any]:
+        """Return filesystem and collection metrics for the configured Chroma store."""
+
+        details: Dict[str, Any] = {"enabled": self._collection is not None}
+        details["path"] = self._chroma_path
+        details["collection"] = self._collection_name
+        collection = self._collection
+        if collection is None:
+            return details
+        try:
+            count = collection.count()
+        except ChromaError as exc:
+            details["status"] = "error"
+            details["error"] = str(exc)
+        else:
+            details["status"] = "online"
+            details.setdefault("stats", {})["documents"] = count
+        # Estimate on-disk size
+        try:
+            path_obj = Path(self._chroma_path)
+            if path_obj.exists():
+                size_bytes = sum(
+                    entry.stat().st_size
+                    for entry in path_obj.rglob("*")
+                    if entry.is_file()
+                )
+                details.setdefault("stats", {})["disk_usage_bytes"] = size_bytes
+        except (OSError, ValueError):
+            pass
+        return details
 
     def refresh_user_profile(self) -> Optional[UserProfile]:
         """Reload the persisted profile from the repository."""
