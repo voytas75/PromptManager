@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.8.1 - 2025-11-16 - Add destructive delete control to the prompt dialog.
 Updates: v0.8.0 - 2025-11-16 - Add task template editor dialog.
 Updates: v0.7.2 - 2025-11-02 - Collapse example sections when empty and expand on demand.
 Updates: v0.7.1 - 2025-11-02 - Increase default prompt dialog size for edit and creation workflows.
@@ -193,6 +194,8 @@ class PromptDialog(QDialog):
         self._name_generator = name_generator
         self._description_generator = description_generator
         self._prompt_engineer = prompt_engineer
+        self._delete_requested = False
+        self._delete_button: Optional[QPushButton] = None
         self.setWindowTitle("Create Prompt" if prompt is None else "Edit Prompt")
         self.setMinimumWidth(760)
         self.resize(960, 700)
@@ -205,6 +208,18 @@ class PromptDialog(QDialog):
         """Return the prompt produced by the dialog after acceptance."""
 
         return self._result_prompt
+
+    @property
+    def delete_requested(self) -> bool:
+        """Return True when the user chose to delete the prompt instead of saving."""
+
+        return self._delete_requested
+
+    @property
+    def source_prompt(self) -> Optional[Prompt]:
+        """Expose the prompt supplied to the dialog for convenience."""
+
+        return self._source_prompt
 
     def _build_ui(self) -> None:
         """Construct the dialog layout and wire interactions."""
@@ -266,6 +281,13 @@ class PromptDialog(QDialog):
         self._buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, parent=self)
         self._buttons.accepted.connect(self._on_accept)  # type: ignore[arg-type]
         self._buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
+        if self._source_prompt is not None:
+            self._delete_button = self._buttons.addButton(
+                "Delete",
+                QDialogButtonBox.DestructiveRole,
+            )
+            self._delete_button.setToolTip("Delete this prompt from the catalogue.")
+            self._delete_button.clicked.connect(self._on_delete_clicked)  # type: ignore[arg-type]
         main_layout.addWidget(self._buttons)
         self._context_input.textChanged.connect(self._on_context_changed)  # type: ignore[arg-type]
 
@@ -288,6 +310,26 @@ class PromptDialog(QDialog):
         if prompt is None:
             return
         self._result_prompt = prompt
+        self.accept()
+
+    def _on_delete_clicked(self) -> None:
+        """Handle delete requests issued from the dialog."""
+
+        if self._source_prompt is None:
+            return
+        current_name = self._name_input.text().strip()
+        name = current_name or self._source_prompt.name or "this prompt"
+        confirmation = QMessageBox.question(
+            self,
+            "Delete prompt",
+            f"Are you sure you want to delete '{name}'?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if confirmation != QMessageBox.Yes:
+            return
+        self._delete_requested = True
+        self._result_prompt = None
         self.accept()
 
     def _on_generate_name_clicked(self) -> None:

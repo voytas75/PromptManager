@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.14.7 - 2025-11-16 - Move prompt edit/delete controls into the detail pane.
 Updates: v0.14.6 - 2025-11-16 - Stack workspace vertically so result tabs consume remaining height.
 Updates: v0.14.5 - 2025-11-02 - Persist main window geometry across sessions.
 Updates: v0.14.4 - 2025-11-02 - Enable double-click editing for prompts in the list view.
@@ -36,6 +37,7 @@ from typing import Any, Deque, Dict, Iterable, List, Optional, Sequence
 from PySide6.QtCore import (
     QAbstractListModel,
     QByteArray,
+    Signal,
     QModelIndex,
     QPoint,
     QRect,
@@ -154,6 +156,9 @@ class PromptListModel(QAbstractListModel):
 class PromptDetailWidget(QWidget):
     """Panel that summarises the currently selected prompt."""
 
+    delete_requested = Signal()
+    edit_requested = Signal()
+
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         layout = QVBoxLayout(self)
@@ -187,6 +192,25 @@ class PromptDetailWidget(QWidget):
         content_layout.addWidget(self._context)
         content_layout.addSpacing(8)
         content_layout.addWidget(self._examples)
+        content_layout.addSpacing(12)
+
+        actions_layout = QHBoxLayout()
+        actions_layout.setContentsMargins(0, 0, 0, 0)
+        actions_layout.addStretch(1)
+
+        self._edit_button = QPushButton("Edit Prompt", content)
+        self._edit_button.setObjectName("editPromptButton")
+        self._edit_button.setEnabled(False)
+        self._edit_button.clicked.connect(self.edit_requested.emit)  # type: ignore[arg-type]
+        actions_layout.addWidget(self._edit_button)
+
+        self._delete_button = QPushButton("Delete Prompt", content)
+        self._delete_button.setObjectName("deletePromptButton")
+        self._delete_button.setEnabled(False)
+        self._delete_button.clicked.connect(self.delete_requested.emit)  # type: ignore[arg-type]
+        actions_layout.addWidget(self._delete_button)
+
+        content_layout.addLayout(actions_layout)
         content_layout.addStretch(1)
 
         self._scroll_area.setWidget(content)
@@ -212,6 +236,8 @@ class PromptDetailWidget(QWidget):
         if prompt.example_output:
             example_lines.append(f"Example output:\n{prompt.example_output}")
         self._examples.setText("\n\n".join(example_lines) or "")
+        self._edit_button.setEnabled(True)
+        self._delete_button.setEnabled(True)
 
     def clear(self) -> None:
         """Reset the panel to its empty state."""
@@ -221,6 +247,8 @@ class PromptDetailWidget(QWidget):
         self._description.clear()
         self._context.clear()
         self._examples.clear()
+        self._edit_button.setEnabled(False)
+        self._delete_button.setEnabled(False)
 
 
 class FlowLayout(QLayout):
@@ -319,6 +347,8 @@ class MainWindow(QMainWindow):
         self._settings = settings
         self._model = PromptListModel(parent=self)
         self._detail_widget = PromptDetailWidget(self)
+        self._detail_widget.delete_requested.connect(self._on_delete_clicked)  # type: ignore[arg-type]
+        self._detail_widget.edit_requested.connect(self._on_edit_clicked)  # type: ignore[arg-type]
         self._all_prompts: List[Prompt] = []
         self._current_prompts: List[Prompt] = []
         self._suggestions: Optional[PromptManager.IntentSuggestions] = None
@@ -404,14 +434,6 @@ class MainWindow(QMainWindow):
         self._add_button = QPushButton("Add", self)
         self._add_button.clicked.connect(self._on_add_clicked)  # type: ignore[arg-type]
         controls_layout.addWidget(self._add_button)
-
-        self._edit_button = QPushButton("Edit", self)
-        self._edit_button.clicked.connect(self._on_edit_clicked)  # type: ignore[arg-type]
-        controls_layout.addWidget(self._edit_button)
-
-        self._delete_button = QPushButton("Delete", self)
-        self._delete_button.clicked.connect(self._on_delete_clicked)  # type: ignore[arg-type]
-        controls_layout.addWidget(self._delete_button)
 
         self._import_button = QPushButton("Import", self)
         self._import_button.clicked.connect(self._on_import_clicked)  # type: ignore[arg-type]
@@ -1858,6 +1880,9 @@ class MainWindow(QMainWindow):
         )
         if dialog.exec() != QDialog.Accepted:
             return
+        if dialog.delete_requested:
+            self._delete_prompt(prompt, skip_confirmation=True)
+            return
         updated = dialog.result_prompt
         if updated is None:
             return
@@ -1879,15 +1904,21 @@ class MainWindow(QMainWindow):
         prompt = self._current_prompt()
         if prompt is None:
             return
-        confirmation = QMessageBox.question(
-            self,
-            "Delete prompt",
-            f"Are you sure you want to delete '{prompt.name}'?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
-        )
-        if confirmation != QMessageBox.Yes:
-            return
+        self._delete_prompt(prompt)
+
+    def _delete_prompt(self, prompt: Prompt, *, skip_confirmation: bool = False) -> None:
+        """Delete the provided prompt and refresh listings."""
+
+        if not skip_confirmation:
+            confirmation = QMessageBox.question(
+                self,
+                "Delete prompt",
+                f"Are you sure you want to delete '{prompt.name}'?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if confirmation != QMessageBox.Yes:
+                return
         try:
             self._manager.delete_prompt(prompt.id)
         except PromptNotFoundError:
@@ -1895,6 +1926,7 @@ class MainWindow(QMainWindow):
         except PromptStorageError as exc:
             self._show_error("Unable to delete prompt", str(exc))
             return
+        self._detail_widget.clear()
         self._load_prompts(self._search_input.text())
 
     def _on_import_clicked(self) -> None:
