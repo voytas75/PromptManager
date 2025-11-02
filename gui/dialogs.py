@@ -82,6 +82,8 @@ class CollapsibleTextSection(QWidget):
 
         self._editor.textChanged.connect(self._on_text_changed)  # type: ignore[arg-type]
         self._editor.installEventFilter(self)
+        self._collapsed_height = 0
+        self._expanded_height = 100
 
     def setPlaceholderText(self, text: str) -> None:
         self._editor.setPlaceholderText(text)
@@ -121,6 +123,10 @@ class CollapsibleTextSection(QWidget):
         self._toggle.blockSignals(False)
         self._toggle.setArrowType(Qt.DownArrow if expanded else Qt.RightArrow)
         self._editor.setVisible(expanded)
+        if expanded:
+            self._editor.setFixedHeight(self._expanded_height)
+        else:
+            self._editor.setFixedHeight(self._collapsed_height)
         if expanded and focus:
             self._editor.setFocus(Qt.OtherFocusReason)
 
