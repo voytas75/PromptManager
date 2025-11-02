@@ -1,5 +1,8 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.14.2 - 2025-11-02 - Persist splitter sizes so panel layout is restored between sessions.
+Updates: v0.14.1 - 2025-11-02 - Allow action toolbar buttons to wrap on resize for responsive layouts.
+Updates: v0.14.0 - 2025-11-02 - Rework layout to align query editor with output and expand prompt browsing area.
 Updates: v0.13.1 - 2025-11-16 - Add palette-aware border styling to the primary window frame.
 Updates: v0.13.0 - 2025-11-16 - Add rendered markdown preview for prompt execution output.
 Updates: v0.12.0 - 2025-11-15 - Wire prompt engineering refinement into prompt editor dialogs.
@@ -26,7 +29,7 @@ from collections import deque
 from pathlib import Path
 from typing import Any, Deque, Dict, Iterable, List, Optional, Sequence
 
-from PySide6.QtCore import QAbstractListModel, QModelIndex, Qt
+from PySide6.QtCore import QAbstractListModel, QModelIndex, QPoint, QRect, QSize, Qt, QSettings
 from PySide6.QtGui import QColor, QGuiApplication, QKeySequence, QPalette, QTextCursor, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -35,7 +38,9 @@ from PySide6.QtWidgets import (
     QDialog,
     QDoubleSpinBox,
     QFrame,
+    QLayout,
     QHBoxLayout,
+    QLayoutItem,
     QLabel,
     QLineEdit,
     QListView,
@@ -48,6 +53,7 @@ from PySide6.QtWidgets import (
     QTabWidget,
     QVBoxLayout,
     QWidget,
+    QWidgetItem,
 )
 
 from config import PromptManagerSettings
@@ -197,6 +203,88 @@ class PromptDetailWidget(QWidget):
         self._examples.clear()
 
 
+class FlowLayout(QLayout):
+    """Layout that arranges widgets left-to-right and wraps on overflow."""
+
+    def __init__(self, parent: Optional[QWidget] = None, *, margin: int = 0, spacing: int = -1) -> None:
+        super().__init__(parent)
+        if parent is not None:
+            self.setContentsMargins(margin, margin, margin, margin)
+        self._item_list: List[QLayoutItem] = []
+        default_spacing = spacing if spacing >= 0 else self.spacing()
+        self.setSpacing(default_spacing if default_spacing >= 0 else 0)
+
+    def addItem(self, item: QLayoutItem) -> None:
+        self._item_list.append(item)
+
+    def addWidget(self, widget: QWidget) -> None:
+        self.addChildWidget(widget)
+        self.addItem(QWidgetItem(widget))
+
+    def count(self) -> int:
+        return len(self._item_list)
+
+    def itemAt(self, index: int) -> Optional[QLayoutItem]:
+        if 0 <= index < len(self._item_list):
+            return self._item_list[index]
+        return None
+
+    def takeAt(self, index: int) -> Optional[QLayoutItem]:
+        if 0 <= index < len(self._item_list):
+            return self._item_list.pop(index)
+        return None
+
+    def expandingDirections(self) -> Qt.Orientations:
+        return Qt.Orientation(0)
+
+    def hasHeightForWidth(self) -> bool:
+        return True
+
+    def heightForWidth(self, width: int) -> int:
+        return self._do_layout(QRect(0, 0, width, 0), test_only=True)
+
+    def setGeometry(self, rect: QRect) -> None:
+        super().setGeometry(rect)
+        self._do_layout(rect, test_only=False)
+
+    def sizeHint(self) -> QSize:
+        return self.minimumSize()
+
+    def minimumSize(self) -> QSize:
+        size = QSize()
+        for item in self._item_list:
+            size = size.expandedTo(item.minimumSize())
+        left, top, right, bottom = self.getContentsMargins()
+        size += QSize(left + right, top + bottom)
+        return size
+
+    def _do_layout(self, rect: QRect, *, test_only: bool) -> int:
+        left, top, right, bottom = self.getContentsMargins()
+        effective_rect = rect.adjusted(left, top, -right, -bottom)
+        x = effective_rect.x()
+        y = effective_rect.y()
+        line_height = 0
+        space_x = self.spacing()
+        space_y = self.spacing()
+
+        for item in self._item_list:
+            widget = item.widget()
+            if widget is None or not widget.isVisible():
+                continue
+            next_x = x + item.sizeHint().width() + space_x
+            if next_x - space_x > effective_rect.right() and line_height > 0:
+                x = effective_rect.x()
+                y = y + line_height + space_y
+                next_x = x + item.sizeHint().width() + space_x
+                line_height = 0
+            if not test_only:
+                item.setGeometry(QRect(QPoint(x, y), item.sizeHint()))
+            x = next_x
+            line_height = max(line_height, item.sizeHint().height())
+
+        return y + line_height - rect.y() + bottom
+
+
 class MainWindow(QMainWindow):
     """Primary window exposing prompt CRUD operations."""
 
@@ -226,6 +314,10 @@ class MainWindow(QMainWindow):
             self._runtime_settings.get("quick_actions")
         )
         self._quick_shortcuts: List[QShortcut] = []
+        self._layout_settings = QSettings("PromptManager", "MainWindow")
+        self._main_splitter: Optional[QSplitter] = None
+        self._list_splitter: Optional[QSplitter] = None
+        self._workspace_splitter: Optional[QSplitter] = None
         self._notification_history: Deque[Notification] = deque(maxlen=200)
         self._active_notifications: Dict[str, Notification] = {}
         for note in self._manager.notification_center.history():
@@ -240,6 +332,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Prompt Manager")
         self.resize(1024, 640)
         self._build_ui()
+        self._restore_splitter_state()
         self.statusBar().addPermanentWidget(self._notification_indicator)
         self._update_notification_indicator()
         self._register_quick_shortcuts()
@@ -313,24 +406,14 @@ class MainWindow(QMainWindow):
 
         layout.addLayout(controls_layout)
 
-        self._query_input = QPlainTextEdit(self)
-        self._query_input.setPlaceholderText("Paste code or text to analyse and suggest prompts…")
-        self._query_input.setMinimumHeight(120)
-        self._query_input.textChanged.connect(self._on_query_text_changed)
-        self._highlighter = CodeHighlighter(self._query_input.document())
-        layout.addWidget(self._query_input)
-
         language_layout = QHBoxLayout()
         language_layout.setContentsMargins(0, 0, 0, 0)
         self._language_label = QLabel(self)
         self._language_label.setObjectName("detectedLanguageLabel")
         language_layout.addWidget(self._language_label)
         language_layout.addStretch(1)
-        layout.addLayout(language_layout)
-        self._update_detected_language(self._query_input.toPlainText(), force=True)
 
-        actions_layout = QHBoxLayout()
-        actions_layout.setSpacing(8)
+        actions_layout = FlowLayout(spacing=8)
 
         self._quick_actions_button = QPushButton("Quick Actions", self)
         self._quick_actions_button.clicked.connect(self._show_command_palette)  # type: ignore[arg-type]
@@ -373,14 +456,10 @@ class MainWindow(QMainWindow):
         self._render_markdown_button.clicked.connect(self._on_render_markdown_clicked)  # type: ignore[arg-type]
         actions_layout.addWidget(self._render_markdown_button)
 
-        actions_layout.addStretch(1)
-        layout.addLayout(actions_layout)
-
         self._intent_hint = QLabel("", self)
         self._intent_hint.setObjectName("intentHintLabel")
         self._intent_hint.setStyleSheet("color: #5b5b5b; font-style: italic;")
         self._intent_hint.setVisible(False)
-        layout.addWidget(self._intent_hint)
 
         filter_layout = QHBoxLayout()
         filter_layout.setSpacing(8)
@@ -409,6 +488,12 @@ class MainWindow(QMainWindow):
 
         layout.addLayout(filter_layout)
 
+        self._query_input = QPlainTextEdit(self)
+        self._query_input.setPlaceholderText("Paste code or text to analyse and suggest prompts…")
+        self._query_input.setMinimumHeight(120)
+        self._query_input.textChanged.connect(self._on_query_text_changed)
+        self._highlighter = CodeHighlighter(self._query_input.document())
+
         self._tab_widget = QTabWidget(self)
         self._tab_widget.currentChanged.connect(self._on_tab_changed)  # type: ignore[arg-type]
 
@@ -416,21 +501,44 @@ class MainWindow(QMainWindow):
         result_tab_layout = QVBoxLayout(result_tab)
         result_tab_layout.setContentsMargins(0, 0, 0, 0)
 
-        splitter = QSplitter(Qt.Horizontal, result_tab)
+        self._main_splitter = QSplitter(Qt.Horizontal, result_tab)
 
-        self._list_view = QListView(splitter)
+        self._list_splitter = QSplitter(Qt.Vertical, self._main_splitter)
+
+        self._list_view = QListView(self._list_splitter)
         self._list_view.setModel(self._model)
         self._list_view.setSelectionMode(QAbstractItemView.SingleSelection)
         self._list_view.selectionModel().selectionChanged.connect(self._on_selection_changed)  # type: ignore[arg-type]
-        splitter.addWidget(self._list_view)
+        self._list_splitter.addWidget(self._list_view)
 
-        splitter.addWidget(self._detail_widget)
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 2)
-        result_tab_layout.addWidget(splitter, stretch=1)
+        self._list_splitter.addWidget(self._detail_widget)
+        self._list_splitter.setStretchFactor(0, 5)
+        self._list_splitter.setStretchFactor(1, 2)
+        self._main_splitter.addWidget(self._list_splitter)
 
-        result_info_layout = QVBoxLayout()
-        result_info_layout.setContentsMargins(0, 12, 0, 0)
+        workspace_panel = QWidget(self._main_splitter)
+        workspace_layout = QVBoxLayout(workspace_panel)
+        workspace_layout.setContentsMargins(0, 0, 0, 0)
+
+        self._workspace_splitter = QSplitter(Qt.Horizontal, workspace_panel)
+
+        query_panel = QWidget(self._workspace_splitter)
+        query_panel_layout = QVBoxLayout(query_panel)
+        query_panel_layout.setContentsMargins(0, 0, 0, 0)
+        query_panel_layout.setSpacing(8)
+        query_panel_layout.addWidget(self._query_input)
+
+        query_panel_layout.addLayout(language_layout)
+        query_panel_layout.addLayout(actions_layout)
+
+        query_panel_layout.addWidget(self._intent_hint)
+        query_panel_layout.addStretch(1)
+        self._workspace_splitter.addWidget(query_panel)
+
+        output_panel = QWidget(self._workspace_splitter)
+        output_layout = QVBoxLayout(output_panel)
+        output_layout.setContentsMargins(0, 0, 0, 0)
+        output_layout.setSpacing(8)
 
         self._result_label = QLabel("No prompt executed yet", self)
         self._result_label.setObjectName("resultTitle")
@@ -453,10 +561,20 @@ class MainWindow(QMainWindow):
         self._chat_history_view.setPlaceholderText("Run a prompt to start chatting.")
         self._result_tabs.addTab(self._chat_history_view, "Chat")
 
-        result_info_layout.addWidget(self._result_label)
-        result_info_layout.addWidget(self._result_meta)
-        result_info_layout.addWidget(self._result_tabs, 1)
-        result_tab_layout.addLayout(result_info_layout)
+        output_layout.addWidget(self._result_label)
+        output_layout.addWidget(self._result_meta)
+        output_layout.addWidget(self._result_tabs, 1)
+        self._workspace_splitter.addWidget(output_panel)
+
+        self._workspace_splitter.setStretchFactor(0, 2)
+        self._workspace_splitter.setStretchFactor(1, 3)
+
+        workspace_layout.addWidget(self._workspace_splitter)
+        self._main_splitter.addWidget(workspace_panel)
+        self._main_splitter.setStretchFactor(0, 3)
+        self._main_splitter.setStretchFactor(1, 2)
+
+        result_tab_layout.addWidget(self._main_splitter)
 
         self._history_panel = HistoryPanel(
             self._manager,
@@ -471,6 +589,8 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(self._tab_widget, stretch=1)
 
+        self._update_detected_language(self._query_input.toPlainText(), force=True)
+
         self.setCentralWidget(container)
 
         has_executor = self._manager.executor is not None
@@ -480,6 +600,46 @@ class MainWindow(QMainWindow):
         self._continue_chat_button.setEnabled(False)
         self._end_chat_button.setEnabled(False)
         self._history_button.setEnabled(True)
+
+    def _restore_splitter_state(self) -> None:
+        """Restore splitter sizes from persisted settings."""
+
+        entries = (
+            ("mainSplitter", self._main_splitter),
+            ("listSplitter", self._list_splitter),
+            ("workspaceSplitter", self._workspace_splitter),
+        )
+        for key, splitter in entries:
+            if splitter is None:
+                continue
+            stored = self._layout_settings.value(key)
+            if stored is None:
+                continue
+            if isinstance(stored, str):
+                parts = [segment for segment in stored.split(",") if segment]
+            else:
+                parts = list(stored) if isinstance(stored, (list, tuple)) else []
+            try:
+                sizes = [int(part) for part in parts]
+            except (TypeError, ValueError):
+                continue
+            if len(sizes) != splitter.count() or not sizes or sum(sizes) <= 0:
+                continue
+            splitter.setSizes(sizes)
+
+    def _save_splitter_state(self) -> None:
+        """Persist splitter sizes for future sessions."""
+
+        entries = (
+            ("mainSplitter", self._main_splitter),
+            ("listSplitter", self._list_splitter),
+            ("workspaceSplitter", self._workspace_splitter),
+        )
+        for key, splitter in entries:
+            if splitter is None:
+                continue
+            self._layout_settings.setValue(key, splitter.sizes())
+        self._layout_settings.sync()
 
     def _load_prompts(self, search_text: str = "") -> None:
         """Populate the list model from the repository or semantic search."""
@@ -1620,6 +1780,7 @@ class MainWindow(QMainWindow):
         dialog.exec()
 
     def closeEvent(self, event) -> None:  # type: ignore[override]
+        self._save_splitter_state()
         if hasattr(self, "_notification_bridge"):
             self._notification_bridge.close()
         super().closeEvent(event)
