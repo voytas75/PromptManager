@@ -1,6 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
-Updates: v0.8.1 - 2025-11-16 - Add destructive delete control to the prompt dialog.
+Updates: v0.8.1 - 2025-11-16 - Add destructive delete control and metadata suggestion helpers to the prompt dialog.
 Updates: v0.8.0 - 2025-11-16 - Add task template editor dialog.
 Updates: v0.7.2 - 2025-11-02 - Collapse example sections when empty and expand on demand.
 Updates: v0.7.1 - 2025-11-02 - Increase default prompt dialog size for edit and creation workflows.
@@ -20,8 +20,9 @@ import re
 import textwrap
 import uuid
 from copy import deepcopy
+from dataclasses import replace
 from datetime import datetime, timezone
-from typing import Callable, Optional, Sequence
+from typing import Callable, Optional, Sequence, List
 
 from PySide6.QtCore import Qt, QEvent, Signal
 from PySide6.QtWidgets import (
@@ -51,6 +52,9 @@ from core import (
     NameGenerationError,
     DescriptionGenerationError,
     PromptEngineeringUnavailable,
+    PromptManager,
+    PromptManagerError,
+    RepositoryError,
 )
 from core.prompt_engineering import PromptEngineeringError, PromptRefinement
 from models.prompt_model import Prompt, TaskTemplate
@@ -186,6 +190,8 @@ class PromptDialog(QDialog):
         prompt: Optional[Prompt] = None,
         name_generator: Optional[Callable[[str], str]] = None,
         description_generator: Optional[Callable[[str], str]] = None,
+        category_generator: Optional[Callable[[str], str]] = None,
+        tags_generator: Optional[Callable[[str], Sequence[str]]] = None,
         prompt_engineer: Optional[Callable[..., PromptRefinement]] = None,
     ) -> None:
         super().__init__(parent)
@@ -194,8 +200,12 @@ class PromptDialog(QDialog):
         self._name_generator = name_generator
         self._description_generator = description_generator
         self._prompt_engineer = prompt_engineer
+        self._category_generator = category_generator
+        self._tags_generator = tags_generator
         self._delete_requested = False
         self._delete_button: Optional[QPushButton] = None
+        self._generate_category_button: Optional[QPushButton] = None
+        self._generate_tags_button: Optional[QPushButton] = None
         self.setWindowTitle("Create Prompt" if prompt is None else "Edit Prompt")
         self.setMinimumWidth(760)
         self.resize(960, 700)
@@ -254,9 +264,33 @@ class PromptDialog(QDialog):
         self._language_input.setPlaceholderText("en")
         self._tags_input.setPlaceholderText("tag-a, tag-b")
 
-        form_layout.addRow("Category", self._category_input)
+        category_container = QWidget(self)
+        category_container_layout = QHBoxLayout(category_container)
+        category_container_layout.setContentsMargins(0, 0, 0, 0)
+        category_container_layout.setSpacing(6)
+        category_container_layout.addWidget(self._category_input)
+        self._generate_category_button = QPushButton("Suggest", self)
+        self._generate_category_button.setToolTip("Suggest a category based on the prompt body.")
+        self._generate_category_button.clicked.connect(self._on_generate_category_clicked)  # type: ignore[arg-type]
+        if self._category_generator is None:
+            self._generate_category_button.setEnabled(False)
+            self._generate_category_button.setToolTip("Category suggestions require the main application context.")
+        category_container_layout.addWidget(self._generate_category_button)
+        form_layout.addRow("Category", category_container)
         form_layout.addRow("Language", self._language_input)
-        form_layout.addRow("Tags", self._tags_input)
+        tags_container = QWidget(self)
+        tags_container_layout = QHBoxLayout(tags_container)
+        tags_container_layout.setContentsMargins(0, 0, 0, 0)
+        tags_container_layout.setSpacing(6)
+        tags_container_layout.addWidget(self._tags_input)
+        self._generate_tags_button = QPushButton("Suggest", self)
+        self._generate_tags_button.setToolTip("Suggest tags based on the prompt body.")
+        self._generate_tags_button.clicked.connect(self._on_generate_tags_clicked)  # type: ignore[arg-type]
+        if self._tags_generator is None:
+            self._generate_tags_button.setEnabled(False)
+            self._generate_tags_button.setToolTip("Tag suggestions require the main application context.")
+        tags_container_layout.addWidget(self._generate_tags_button)
+        form_layout.addRow("Tags", tags_container)
         form_layout.addRow("Prompt Body", self._context_input)
         self._refine_button = QPushButton("Refine", self)
         self._refine_button.setToolTip(
@@ -342,6 +376,47 @@ class PromptDialog(QDialog):
             return
         if suggestion:
             self._name_input.setText(suggestion)
+
+    def _on_generate_category_clicked(self) -> None:
+        """Generate a category suggestion based on the prompt body."""
+
+        if self._category_generator is None:
+            return
+        context = self._context_input.toPlainText()
+        try:
+            suggestion = (self._category_generator(context) or "").strip()
+        except Exception as exc:  # noqa: BLE001 - surface generator failures to the user
+            QMessageBox.warning(self, "Category suggestion failed", str(exc))
+            return
+        if suggestion:
+            self._category_input.setText(suggestion)
+        else:
+            QMessageBox.information(
+                self,
+                "No suggestion available",
+                "The assistant could not determine a suitable category.",
+            )
+
+    def _on_generate_tags_clicked(self) -> None:
+        """Generate tag suggestions based on the prompt body."""
+
+        if self._tags_generator is None:
+            return
+        context = self._context_input.toPlainText()
+        try:
+            suggestions = self._tags_generator(context) or []
+        except Exception as exc:  # noqa: BLE001 - surface generator failures to the user
+            QMessageBox.warning(self, "Tag suggestion failed", str(exc))
+            return
+        tags = [tag.strip() for tag in suggestions if str(tag).strip()]
+        if tags:
+            self._tags_input.setText(", ".join(tags))
+        else:
+            QMessageBox.information(
+                self,
+                "No suggestion available",
+                "The assistant could not determine relevant tags.",
+            )
 
     def _on_context_changed(self) -> None:
         """Auto-suggest a prompt name when none has been supplied."""
@@ -559,6 +634,160 @@ class PromptDialog(QDialog):
             ext4=list(base.ext4) if base.ext4 is not None else None,
             ext5=ext5_copy,
         )
+
+
+class PromptMaintenanceDialog(QDialog):
+    """Expose bulk metadata maintenance utilities."""
+
+    maintenance_applied = Signal(str)
+
+    def __init__(
+        self,
+        parent: QWidget,
+        manager: PromptManager,
+        *,
+        category_generator: Optional[Callable[[str], str]] = None,
+        tags_generator: Optional[Callable[[str], Sequence[str]]] = None,
+    ) -> None:
+        super().__init__(parent)
+        self._manager = manager
+        self._category_generator = category_generator
+        self._tags_generator = tags_generator
+        self.setWindowTitle("Prompt Maintenance")
+        self.resize(640, 420)
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self)
+
+        description = QLabel(
+            "Run maintenance tasks to enrich prompt metadata. Only prompts missing the "
+            "selected metadata are updated.",
+            self,
+        )
+        description.setWordWrap(True)
+        layout.addWidget(description)
+
+        button_container = QWidget(self)
+        button_layout = QHBoxLayout(button_container)
+        button_layout.setContentsMargins(0, 0, 0, 0)
+        button_layout.setSpacing(12)
+
+        self._categories_button = QPushButton("Generate Missing Categories", self)
+        self._categories_button.clicked.connect(self._on_generate_categories_clicked)  # type: ignore[arg-type]
+        self._categories_button.setEnabled(self._category_generator is not None)
+        if self._category_generator is None:
+            self._categories_button.setToolTip("Category suggestions are unavailable.")
+        button_layout.addWidget(self._categories_button)
+
+        self._tags_button = QPushButton("Generate Missing Tags", self)
+        self._tags_button.clicked.connect(self._on_generate_tags_clicked)  # type: ignore[arg-type]
+        self._tags_button.setEnabled(self._tags_generator is not None)
+        if self._tags_generator is None:
+            self._tags_button.setToolTip("Tag suggestions are unavailable.")
+        button_layout.addWidget(self._tags_button)
+
+        button_layout.addStretch(1)
+        layout.addWidget(button_container)
+
+        self._log_view = QPlainTextEdit(self)
+        self._log_view.setReadOnly(True)
+        layout.addWidget(self._log_view, stretch=1)
+
+        self._buttons = QDialogButtonBox(QDialogButtonBox.Close, self)
+        self._buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
+        layout.addWidget(self._buttons)
+
+    def _append_log(self, message: str) -> None:
+        timestamp = datetime.now(timezone.utc).strftime("%H:%M:%S")
+        self._log_view.appendPlainText(f"[{timestamp}] {message}")
+
+    def _collect_prompts(self) -> List[Prompt]:
+        try:
+            return self._manager.repository.list()
+        except RepositoryError as exc:
+            self._append_log(f"Unable to load prompts: {exc}")
+            return []
+
+    @staticmethod
+    def _prompt_context(prompt: Prompt) -> str:
+        return (prompt.context or prompt.description or prompt.example_input or "").strip()
+
+    def _on_generate_categories_clicked(self) -> None:
+        if self._category_generator is None:
+            self._append_log("Category generator is unavailable.")
+            return
+        prompts = self._collect_prompts()
+        if not prompts:
+            return
+        updated = 0
+        for prompt in prompts:
+            if (prompt.category or "").strip():
+                continue
+            context = self._prompt_context(prompt)
+            if not context:
+                continue
+            try:
+                suggestion = (self._category_generator(context) or "").strip()
+            except Exception as exc:  # noqa: BLE001
+                self._append_log(f"Failed to suggest category for '{prompt.name}': {exc}")
+                continue
+            if not suggestion:
+                continue
+            updated_prompt = replace(
+                prompt,
+                category=suggestion,
+                last_modified=datetime.now(timezone.utc),
+            )
+            try:
+                self._manager.update_prompt(updated_prompt)
+            except PromptManagerError as exc:
+                self._append_log(f"Unable to update '{prompt.name}': {exc}")
+                continue
+            updated += 1
+            self._append_log(f"Set category '{suggestion}' for '{prompt.name}'.")
+        self._append_log(f"Category task completed. Updated {updated} prompt(s).")
+        if updated:
+            self.maintenance_applied.emit(f"Generated categories for {updated} prompt(s).")
+
+    def _on_generate_tags_clicked(self) -> None:
+        if self._tags_generator is None:
+            self._append_log("Tag generator is unavailable.")
+            return
+        prompts = self._collect_prompts()
+        if not prompts:
+            return
+        updated = 0
+        for prompt in prompts:
+            existing_tags = [tag.strip() for tag in (prompt.tags or []) if tag.strip()]
+            if existing_tags:
+                continue
+            context = self._prompt_context(prompt)
+            if not context:
+                continue
+            try:
+                suggestions = self._tags_generator(context) or []
+            except Exception as exc:  # noqa: BLE001
+                self._append_log(f"Failed to suggest tags for '{prompt.name}': {exc}")
+                continue
+            tags = [tag.strip() for tag in suggestions if str(tag).strip()]
+            if not tags:
+                continue
+            updated_prompt = replace(
+                prompt,
+                tags=tags,
+                last_modified=datetime.now(timezone.utc),
+            )
+            try:
+                self._manager.update_prompt(updated_prompt)
+            except PromptManagerError as exc:
+                self._append_log(f"Unable to update '{prompt.name}': {exc}")
+                continue
+            updated += 1
+            self._append_log(f"Assigned tags {tags} to '{prompt.name}'.")
+        self._append_log(f"Tag task completed. Updated {updated} prompt(s).")
+        if updated:
+            self.maintenance_applied.emit(f"Generated tags for {updated} prompt(s).")
 
 
 class TemplateDialog(QDialog):
@@ -936,6 +1165,7 @@ __all__ = [
     "CatalogPreviewDialog",
     "MarkdownPreviewDialog",
     "PromptDialog",
+    "PromptMaintenanceDialog",
     "SaveResultDialog",
     "TemplateDialog",
     "fallback_suggest_prompt_name",

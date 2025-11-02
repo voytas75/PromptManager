@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.14.8 - 2025-11-16 - Add maintenance dialog for batch metadata suggestions.
 Updates: v0.14.7 - 2025-11-16 - Move prompt edit/delete controls into the detail pane.
 Updates: v0.14.6 - 2025-11-16 - Stack workspace vertically so result tabs consume remaining height.
 Updates: v0.14.5 - 2025-11-02 - Persist main window geometry across sessions.
@@ -98,6 +99,7 @@ from .dialogs import (
     CatalogPreviewDialog,
     MarkdownPreviewDialog,
     PromptDialog,
+    PromptMaintenanceDialog,
     SaveResultDialog,
     TemplateDialog,
 )
@@ -442,6 +444,10 @@ class MainWindow(QMainWindow):
         self._export_button = QPushButton("Export", self)
         self._export_button.clicked.connect(self._on_export_clicked)  # type: ignore[arg-type]
         controls_layout.addWidget(self._export_button)
+
+        self._maintenance_button = QPushButton("Maintenance", self)
+        self._maintenance_button.clicked.connect(self._on_maintenance_clicked)  # type: ignore[arg-type]
+        controls_layout.addWidget(self._maintenance_button)
 
         self._history_button = QPushButton("History", self)
         self._history_button.clicked.connect(self._on_history_clicked)  # type: ignore[arg-type]
@@ -1470,6 +1476,99 @@ class MainWindow(QMainWindow):
             return ""
         return self._manager.generate_prompt_description(context)
 
+    def _generate_prompt_category(self, context: str) -> str:
+        """Suggest a category using the intent classifier when available."""
+
+        text = (context or "").strip()
+        if not text:
+            return ""
+        classifier = self._manager.intent_classifier
+        prediction = None
+        if classifier is not None:
+            prediction = classifier.classify(text)
+            if prediction.category_hints:
+                return prediction.category_hints[0]
+            default_map = {
+                IntentLabel.ANALYSIS: "Code Analysis",
+                IntentLabel.DEBUG: "Reasoning / Debugging",
+                IntentLabel.REFACTOR: "Refactoring",
+                IntentLabel.ENHANCEMENT: "Enhancement",
+                IntentLabel.DOCUMENTATION: "Documentation",
+                IntentLabel.REPORTING: "Reporting",
+                IntentLabel.GENERAL: "General",
+            }
+            fallback_category = default_map.get(prediction.label)
+            if fallback_category:
+                return fallback_category
+        lowered = text.lower()
+        keyword_categories = (
+            ("bug", "Reasoning / Debugging"),
+            ("error", "Reasoning / Debugging"),
+            ("refactor", "Refactoring"),
+            ("optimize", "Enhancement"),
+            ("optimiz", "Enhancement"),
+            ("document", "Documentation"),
+            ("summary", "Reporting"),
+            ("report", "Reporting"),
+        )
+        for keyword, category in keyword_categories:
+            if keyword in lowered:
+                return category
+        return "General"
+
+    def _generate_prompt_tags(self, context: str) -> List[str]:
+        """Suggest tags using the intent classifier and language heuristics."""
+
+        text = (context or "").strip()
+        if not text:
+            return []
+        tags: List[str] = []
+        classifier = self._manager.intent_classifier
+        if classifier is not None:
+            prediction = classifier.classify(text)
+            tags.extend(prediction.tag_hints)
+            tags.extend(prediction.language_hints)
+            default_tag_map = {
+                IntentLabel.ANALYSIS: "analysis",
+                IntentLabel.DEBUG: "debugging",
+                IntentLabel.REFACTOR: "refactor",
+                IntentLabel.ENHANCEMENT: "enhancement",
+                IntentLabel.DOCUMENTATION: "documentation",
+                IntentLabel.REPORTING: "reporting",
+                IntentLabel.GENERAL: "general",
+            }
+            default_tag = default_tag_map.get(prediction.label)
+            if default_tag:
+                tags.append(default_tag)
+        detected = detect_language(text)
+        if detected.code and detected.code not in {"", "plain"}:
+            tags.append(detected.code)
+        lowered = text.lower()
+        keyword_tags = {
+            "security": "security",
+            "performance": "performance",
+            "optimize": "optimization",
+            "refactor": "refactor",
+            "document": "documentation",
+            "explain": "explanation",
+            "bug": "bugfix",
+        }
+        for keyword, tag in keyword_tags.items():
+            if keyword in lowered:
+                tags.append(tag)
+        unique: List[str] = []
+        seen: set[str] = set()
+        for tag in tags:
+            normalized = tag.strip()
+            if not normalized:
+                continue
+            key = normalized.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            unique.append(normalized)
+        return unique[:8]
+
     def _refine_prompt_body(
         self,
         prompt_text: str,
@@ -1846,6 +1945,8 @@ class MainWindow(QMainWindow):
             self,
             name_generator=self._generate_prompt_name,
             description_generator=self._generate_prompt_description,
+            category_generator=self._generate_prompt_category,
+            tags_generator=self._generate_prompt_tags,
             prompt_engineer=(
                 self._refine_prompt_body if self._manager.prompt_engineer is not None else None
             ),
@@ -1874,6 +1975,8 @@ class MainWindow(QMainWindow):
             prompt,
             name_generator=self._generate_prompt_name,
             description_generator=self._generate_prompt_description,
+            category_generator=self._generate_prompt_category,
+            tags_generator=self._generate_prompt_tags,
             prompt_engineer=(
                 self._refine_prompt_body if self._manager.prompt_engineer is not None else None
             ),
@@ -1999,6 +2102,30 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Export failed", str(exc))
             return
         self.statusBar().showMessage(f"Catalogue exported to {resolved}", 5000)
+
+    def _on_maintenance_clicked(self) -> None:
+        """Open the maintenance dialog for batch metadata helpers."""
+
+        dialog = PromptMaintenanceDialog(
+            self,
+            self._manager,
+            category_generator=self._generate_prompt_category,
+            tags_generator=self._generate_prompt_tags,
+        )
+        dialog.maintenance_applied.connect(self._on_maintenance_applied)  # type: ignore[arg-type]
+        dialog.exec()
+
+    def _on_maintenance_applied(self, message: str) -> None:
+        """Refresh listings after maintenance tasks run."""
+
+        selected = self._current_prompt()
+        selected_id = selected.id if selected else None
+        self._load_prompts(self._search_input.text())
+        if selected_id is not None:
+            self._select_prompt(selected_id)
+        if message:
+            self.statusBar().showMessage(message, 5000)
+
     def _on_settings_clicked(self) -> None:
         """Open configuration dialog and apply updates."""
 
