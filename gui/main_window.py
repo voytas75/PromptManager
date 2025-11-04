@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.5 - 2025-11-20 - Add prompt sorting controls with alphabetical default ordering.
 Updates: v0.15.4 - 2025-11-19 - Add scenario generation controls and display to prompt workflows.
 Updates: v0.15.3 - 2025-11-18 - Rename the workspace tab from Result to Prompts for clarity.
 Updates: v0.15.2 - 2025-11-18 - Reflect selected quick action in the toolbar button label and refresh the workspace template when switching actions.
@@ -38,6 +39,7 @@ import json
 import logging
 import uuid
 from collections import deque
+from enum import Enum
 from pathlib import Path
 from typing import Any, Deque, Dict, Iterable, List, Optional, Sequence
 
@@ -482,8 +484,24 @@ class FlowLayout(QLayout):
         return y + line_height - rect.y() + bottom
 
 
+class PromptSortOrder(Enum):
+    """Supported sorting orders for the prompt list view."""
+
+    NAME_ASC = "name_asc"
+    NAME_DESC = "name_desc"
+    QUALITY_DESC = "quality_desc"
+    MODIFIED_DESC = "modified_desc"
+
+
 class MainWindow(QMainWindow):
     """Primary window exposing prompt CRUD operations."""
+
+    _SORT_OPTIONS: Sequence[tuple[str, PromptSortOrder]] = (
+        ("Name (A-Z)", PromptSortOrder.NAME_ASC),
+        ("Name (Z-A)", PromptSortOrder.NAME_DESC),
+        ("Quality (high-low)", PromptSortOrder.QUALITY_DESC),
+        ("Last modified (newest)", PromptSortOrder.MODIFIED_DESC),
+    )
 
     def __init__(
         self,
@@ -513,6 +531,8 @@ class MainWindow(QMainWindow):
         self._template_edit_button: Optional[QPushButton] = None
         self._template_delete_button: Optional[QPushButton] = None
         self._template_clear_button: Optional[QPushButton] = None
+        self._sort_combo: Optional[QComboBox] = None
+        self._sort_order = PromptSortOrder.NAME_ASC
         self._history_limit = 50
         self._runtime_settings = self._initial_runtime_settings(settings)
         self._usage_logger = IntentUsageLogger()
@@ -699,6 +719,17 @@ class MainWindow(QMainWindow):
         filter_layout.addWidget(self._tag_filter)
         filter_layout.addWidget(QLabel("Quality ≥", self))
         filter_layout.addWidget(self._quality_filter)
+        filter_layout.addWidget(QLabel("Sort:", self))
+        self._sort_combo = QComboBox(self)
+        for label, order in self._SORT_OPTIONS:
+            self._sort_combo.addItem(label, order.value)
+        default_sort_index = next(
+            (index for index, (_, option) in enumerate(self._SORT_OPTIONS) if option is self._sort_order),
+            0,
+        )
+        self._sort_combo.setCurrentIndex(default_sort_index)
+        self._sort_combo.currentIndexChanged.connect(self._on_sort_changed)  # type: ignore[arg-type]
+        filter_layout.addWidget(self._sort_combo)
         filter_layout.addStretch(1)
 
         layout.addLayout(filter_layout)
@@ -1169,10 +1200,11 @@ class MainWindow(QMainWindow):
         if had_template and self._suggestions is None:
             self._current_prompts = list(self._all_prompts)
             filtered = self._apply_filters(self._current_prompts)
-            self._model.set_prompts(filtered)
+            sorted_prompts = self._sort_prompts(filtered)
+            self._model.set_prompts(sorted_prompts)
             self._list_view.clearSelection()
-            if filtered:
-                self._update_intent_hint(filtered)
+            if sorted_prompts:
+                self._update_intent_hint(sorted_prompts)
             else:
                 self._detail_widget.clear()
         if self._template_clear_button is not None:
@@ -1216,13 +1248,14 @@ class MainWindow(QMainWindow):
         base_prompts = prompts if prompts else self._all_prompts
         self._current_prompts = list(base_prompts)
         filtered = self._apply_filters(self._current_prompts)
-        self._model.set_prompts(filtered)
+        sorted_prompts = self._sort_prompts(filtered)
+        self._model.set_prompts(sorted_prompts)
         self._list_view.clearSelection()
-        if filtered:
-            self._select_prompt(filtered[0].id)
+        if sorted_prompts:
+            self._select_prompt(sorted_prompts[0].id)
         else:
             self._detail_widget.clear()
-        self._update_intent_hint(filtered)
+        self._update_intent_hint(sorted_prompts)
         if self._template_clear_button is not None:
             self._template_clear_button.setEnabled(True)
         self._update_template_buttons()
@@ -1267,11 +1300,12 @@ class MainWindow(QMainWindow):
         self._current_prompts = list(self._all_prompts)
 
         filtered = self._apply_filters(self._current_prompts)
-        self._model.set_prompts(filtered)
+        sorted_prompts = self._sort_prompts(filtered)
+        self._model.set_prompts(sorted_prompts)
         self._list_view.clearSelection()
-        if not filtered:
+        if not sorted_prompts:
             self._detail_widget.clear()
-        self._update_intent_hint(filtered)
+        self._update_intent_hint(sorted_prompts)
         if self._selected_template_id:
             self._apply_template(self._selected_template_id, silent=True)
         else:
@@ -1322,18 +1356,76 @@ class MainWindow(QMainWindow):
             filtered.append(prompt)
         return filtered
 
+    def _sort_prompts(self, prompts: Sequence[Prompt]) -> List[Prompt]:
+        """Return prompts sorted according to the active sort order."""
+
+        if not prompts:
+            return []
+
+        order = self._sort_order
+        if order is PromptSortOrder.NAME_ASC:
+            return sorted(prompts, key=lambda prompt: (prompt.name.casefold(), str(prompt.id)))
+        if order is PromptSortOrder.NAME_DESC:
+            return sorted(
+                prompts,
+                key=lambda prompt: (prompt.name.casefold(), str(prompt.id)),
+                reverse=True,
+            )
+        if order is PromptSortOrder.QUALITY_DESC:
+
+            def quality_key(prompt: Prompt) -> tuple[float, str, str]:
+                quality = prompt.quality_score if prompt.quality_score is not None else float("-inf")
+                return (-quality, prompt.name.casefold(), str(prompt.id))
+
+            return sorted(prompts, key=quality_key)
+        if order is PromptSortOrder.MODIFIED_DESC:
+
+            def modified_key(prompt: Prompt) -> tuple[float, str, str]:
+                timestamp = prompt.last_modified.timestamp() if prompt.last_modified else 0.0
+                return (-timestamp, prompt.name.casefold(), str(prompt.id))
+
+            return sorted(prompts, key=modified_key)
+        return list(prompts)
+
     def _on_filters_changed(self, *_: object) -> None:
         """Refresh the prompt list when filter widgets change."""
 
         self._refresh_filtered_view()
 
+    def _on_sort_changed(self, index: int) -> None:
+        """Re-sort the prompt list when the sort selection changes."""
+
+        if self._sort_combo is None or index < 0:
+            return
+        raw_order = self._sort_combo.itemData(index)
+        try:
+            sort_order = PromptSortOrder(str(raw_order))
+        except ValueError:
+            logger.warning("Unknown sort order selection: %s", raw_order)
+            return
+        if sort_order is self._sort_order:
+            return
+        selected_prompt = self._current_prompt()
+        self._sort_order = sort_order
+        filtered = self._apply_filters(self._current_prompts)
+        sorted_prompts = self._sort_prompts(filtered)
+        self._model.set_prompts(sorted_prompts)
+        if selected_prompt and any(prompt.id == selected_prompt.id for prompt in sorted_prompts):
+            self._select_prompt(selected_prompt.id)
+        elif sorted_prompts:
+            self._select_prompt(sorted_prompts[0].id)
+        else:
+            self._detail_widget.clear()
+        self._update_intent_hint(sorted_prompts)
+
     def _refresh_filtered_view(self) -> None:
         filtered = self._apply_filters(self._current_prompts)
-        self._model.set_prompts(filtered)
+        sorted_prompts = self._sort_prompts(filtered)
+        self._model.set_prompts(sorted_prompts)
         self._list_view.clearSelection()
-        if not filtered:
+        if not sorted_prompts:
             self._detail_widget.clear()
-        self._update_intent_hint(filtered)
+        self._update_intent_hint(sorted_prompts)
 
     @staticmethod
     def _replace_prompt_in_collection(collection: List[Prompt], updated: Prompt) -> bool:
@@ -1369,15 +1461,16 @@ class MainWindow(QMainWindow):
             return
 
         filtered = self._apply_filters(self._current_prompts)
-        self._model.set_prompts(filtered)
-        if filtered:
-            self._update_intent_hint(filtered)
+        sorted_prompts = self._sort_prompts(filtered)
+        self._model.set_prompts(sorted_prompts)
+        if sorted_prompts:
+            self._update_intent_hint(sorted_prompts)
         else:
             self._detail_widget.clear()
             self._intent_hint.clear()
             self._intent_hint.setVisible(False)
 
-        if any(prompt.id == prompt_id for prompt in filtered):
+        if any(prompt.id == prompt_id for prompt in sorted_prompts):
             self._select_prompt(prompt_id)
             self._detail_widget.display_prompt(updated_prompt)
 
@@ -1567,7 +1660,8 @@ class MainWindow(QMainWindow):
         self._populate_filters(prompts)
         self._current_prompts = list(prompts)
         filtered = self._apply_filters(self._current_prompts)
-        self._model.set_prompts(filtered)
+        sorted_prompts = self._sort_prompts(filtered)
+        self._model.set_prompts(sorted_prompts)
         self._select_prompt(selected_prompt.id)
         self._detail_widget.display_prompt(selected_prompt)
         self._apply_quick_action_template(action)
@@ -2181,13 +2275,14 @@ class MainWindow(QMainWindow):
         self._suggestions = suggestions
         self._current_prompts = list(suggestions.prompts)
         filtered = self._apply_filters(self._current_prompts)
-        self._model.set_prompts(filtered)
+        sorted_prompts = self._sort_prompts(filtered)
+        self._model.set_prompts(sorted_prompts)
         self._list_view.clearSelection()
-        if filtered:
-            self._select_prompt(filtered[0].id)
+        if sorted_prompts:
+            self._select_prompt(sorted_prompts[0].id)
         else:
             self._detail_widget.clear()
-        self._update_intent_hint(filtered)
+        self._update_intent_hint(sorted_prompts)
         self._update_template_buttons()
 
     def _current_prompt(self) -> Optional[Prompt]:
