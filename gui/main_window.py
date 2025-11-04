@@ -2331,6 +2331,7 @@ class MainWindow(QMainWindow):
             litellm_api_key=self._runtime_settings.get("litellm_api_key"),
             litellm_api_base=self._runtime_settings.get("litellm_api_base"),
             litellm_api_version=self._runtime_settings.get("litellm_api_version"),
+            litellm_drop_params=self._runtime_settings.get("litellm_drop_params"),
             litellm_reasoning_effort=self._runtime_settings.get("litellm_reasoning_effort"),
             quick_actions=self._runtime_settings.get("quick_actions"),
         )
