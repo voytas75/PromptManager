@@ -1,5 +1,6 @@
 """High-level CRUD manager for prompt records backed by SQLite, ChromaDB, and Redis.
 
+Updates: v0.13.3 - 2025-11-19 - Add prompt scenario generation workflow and GUI integration.
 Updates: v0.13.2 - 2025-11-16 - Add task template CRUD APIs and apply workflow.
 Updates: v0.12.0 - 2025-11-15 - Add LiteLLM-backed prompt engineering workflow.
 Updates: v0.11.0 - 2025-11-12 - Add multi-turn chat execution with conversation history logging.
@@ -97,6 +98,7 @@ from .name_generation import (
     DescriptionGenerationError,
     NameGenerationError,
 )
+from .scenario_generation import LiteLLMScenarioGenerator, ScenarioGenerationError
 from .prompt_engineering import PromptEngineer, PromptEngineeringError, PromptRefinement
 from .repository import PromptRepository, RepositoryError, RepositoryNotFoundError
 from .notifications import (
@@ -158,6 +160,7 @@ class PromptManager:
         enable_background_sync: bool = True,
         name_generator: Optional[LiteLLMNameGenerator] = None,
         description_generator: Optional[LiteLLMDescriptionGenerator] = None,
+        scenario_generator: Optional[LiteLLMScenarioGenerator] = None,
         prompt_engineer: Optional[PromptEngineer] = None,
         intent_classifier: Optional[IntentClassifier] = None,
         notification_center: Optional[NotificationCenter] = None,
@@ -245,10 +248,11 @@ class PromptManager:
             self._embedding_worker = embedding_worker or _NullEmbeddingWorker()
         self._name_generator = name_generator
         self._description_generator = description_generator
+        self._scenario_generator = scenario_generator
         self._prompt_engineer = prompt_engineer
         self._litellm_drop_params: Optional[Sequence[str]] = None
         self._litellm_reasoning_effort: Optional[str] = None
-        for candidate in (name_generator, prompt_engineer, executor):
+        for candidate in (name_generator, scenario_generator, prompt_engineer, executor):
             if candidate is not None and getattr(candidate, "drop_params", None):
                 params = getattr(candidate, "drop_params")
                 self._litellm_drop_params = tuple(params)  # type: ignore[arg-type]
@@ -500,6 +504,36 @@ class PromptManager:
             except Exception as exc:
                 raise DescriptionGenerationError(str(exc)) from exc
         return summary
+
+    def generate_prompt_scenarios(self, context: str, *, max_scenarios: int = 3) -> List[str]:
+        """Return usage scenarios for a prompt via the configured LiteLLM helper."""
+
+        if self._scenario_generator is None:
+            raise ScenarioGenerationError(
+                "LiteLLM scenario generator is not configured. Set PROMPT_MANAGER_LITELLM_MODEL."
+            )
+        task_id = f"scenario-gen:{uuid.uuid4()}"
+        metadata = {
+            "context_length": len(context or ""),
+            "max_scenarios": max(0, int(max_scenarios)),
+        }
+        with self._notification_center.track_task(
+            title="Prompt scenario generation",
+            task_id=task_id,
+            start_message="Generating scenarios via LiteLLM…",
+            success_message="Prompt scenarios generated.",
+            failure_message="Prompt scenario generation failed",
+            metadata=metadata,
+            level=NotificationLevel.INFO,
+        ):
+            try:
+                scenarios = self._scenario_generator.generate(
+                    context,
+                    max_scenarios=max_scenarios,
+                )
+            except Exception as exc:
+                raise ScenarioGenerationError(str(exc)) from exc
+        return scenarios
 
     def refine_prompt_text(
         self,

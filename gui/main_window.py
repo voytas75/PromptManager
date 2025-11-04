@@ -1,6 +1,8 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
-Updates: v0.15.2 - 2025-11-18 - Reflect selected quick action in the toolbar button label.
+Updates: v0.15.4 - 2025-11-19 - Add scenario generation controls and display to prompt workflows.
+Updates: v0.15.3 - 2025-11-18 - Rename the workspace tab from Result to Prompts for clarity.
+Updates: v0.15.2 - 2025-11-18 - Reflect selected quick action in the toolbar button label and refresh the workspace template when switching actions.
 Updates: v0.15.1 - 2025-11-04 - Add close affordance and toggle behaviour for prompt metadata panel.
 Updates: v0.15.0 - 2025-11-04 - Keep prompt browser width fixed when resizing the main window.
 Updates: v0.14.9 - 2025-11-17 - Add basic/all metadata buttons to reveal prompt details on demand.
@@ -196,6 +198,8 @@ class PromptDetailWidget(QWidget):
 
         self._context = QLabel("", content)
         self._context.setWordWrap(True)
+        self._scenarios = QLabel("", content)
+        self._scenarios.setWordWrap(True)
         self._examples = QLabel("", content)
         self._examples.setWordWrap(True)
 
@@ -206,6 +210,8 @@ class PromptDetailWidget(QWidget):
         content_layout.addWidget(self._description)
         content_layout.addSpacing(8)
         content_layout.addWidget(self._context)
+        content_layout.addSpacing(8)
+        content_layout.addWidget(self._scenarios)
         content_layout.addSpacing(8)
         content_layout.addWidget(self._examples)
         content_layout.addSpacing(12)
@@ -298,6 +304,11 @@ class PromptDetailWidget(QWidget):
         self._description.setText(prompt.description)
         context_text = prompt.context or "No prompt text provided."
         self._context.setText(f"Prompt Body:\n{context_text}")
+        if prompt.scenarios:
+            scenario_lines = "\n".join(f"• {scenario}" for scenario in prompt.scenarios)
+            self._scenarios.setText(f"Scenarios:\n{scenario_lines}")
+        else:
+            self._scenarios.setText("Scenarios: none provided.")
         example_lines = []
         if prompt.example_input:
             example_lines.append(f"Example input:\n{prompt.example_input}")
@@ -338,6 +349,7 @@ class PromptDetailWidget(QWidget):
         self._rating_label.setText("Rating: n/a")
         self._description.clear()
         self._context.clear()
+        self._scenarios.clear()
         self._examples.clear()
         self._basic_metadata_button.setEnabled(False)
         self._all_metadata_button.setEnabled(False)
@@ -509,6 +521,8 @@ class MainWindow(QMainWindow):
             self._runtime_settings.get("quick_actions")
         )
         self._active_quick_action_id: Optional[str] = None
+        self._query_seeded_by_quick_action: Optional[str] = None
+        self._suppress_query_signal = False
         self._quick_shortcuts: List[QShortcut] = []
         self._layout_settings = QSettings("PromptManager", "MainWindow")
         self._main_splitter: Optional[QSplitter] = None
@@ -818,7 +832,7 @@ class MainWindow(QMainWindow):
             on_export=self._handle_history_export,
         )
 
-        self._tab_widget.addTab(result_tab, "Result")
+        self._tab_widget.addTab(result_tab, "Prompts")
         self._tab_widget.addTab(self._history_panel, "History")
 
         layout.addWidget(self._tab_widget, stretch=1)
@@ -1504,6 +1518,9 @@ class MainWindow(QMainWindow):
 
         text = self._query_input.toPlainText()
         self._update_detected_language(text)
+        if self._suppress_query_signal:
+            return
+        self._query_seeded_by_quick_action = None
 
     def _update_detected_language(self, text: str, *, force: bool = False) -> None:
         """Detect the language for `text` and refresh UI elements when it changes."""
@@ -1553,11 +1570,7 @@ class MainWindow(QMainWindow):
         self._model.set_prompts(filtered)
         self._select_prompt(selected_prompt.id)
         self._detail_widget.display_prompt(selected_prompt)
-        if action.template and not self._query_input.toPlainText().strip():
-            self._query_input.setPlainText(action.template)
-            cursor = self._query_input.textCursor()
-            cursor.movePosition(QTextCursor.End)
-            self._query_input.setTextCursor(cursor)
+        self._apply_quick_action_template(action)
         self._query_input.setFocus(Qt.ShortcutFocusReason)
         self._set_active_quick_action(action)
         self.statusBar().showMessage(f"Quick action applied: {action.title}", 4000)
@@ -1587,6 +1600,7 @@ class MainWindow(QMainWindow):
             self._active_quick_action_id = None
             self._quick_actions_button.setText(self._quick_actions_button_default_text)
             self._quick_actions_button.setToolTip(self._quick_actions_button_default_tooltip)
+            self._query_seeded_by_quick_action = None
             return
 
         self._active_quick_action_id = action.identifier
@@ -1608,6 +1622,27 @@ class MainWindow(QMainWindow):
                 self._set_active_quick_action(action)
                 return
         self._set_active_quick_action(None)
+
+    def _apply_quick_action_template(self, action: QuickAction) -> None:
+        """Populate the workspace with the action template when appropriate."""
+
+        template = action.template
+        if not template:
+            return
+
+        current_text = self._query_input.toPlainText()
+        if current_text.strip() and self._query_seeded_by_quick_action is None:
+            return
+
+        self._suppress_query_signal = True
+        try:
+            self._query_input.setPlainText(template)
+            cursor = self._query_input.textCursor()
+            cursor.movePosition(QTextCursor.End)
+            self._query_input.setTextCursor(cursor)
+        finally:
+            self._suppress_query_signal = False
+        self._query_seeded_by_quick_action = action.identifier
 
     def _default_quick_actions(self) -> List[QuickAction]:
         return [
@@ -1711,6 +1746,14 @@ class MainWindow(QMainWindow):
         if not context.strip():
             return ""
         return self._manager.generate_prompt_description(context)
+
+    def _generate_prompt_scenarios(self, context: str) -> List[str]:
+        """Delegate scenario generation to PromptManager."""
+
+        text = (context or "").strip()
+        if not text:
+            return []
+        return list(self._manager.generate_prompt_scenarios(text))
 
     def _generate_prompt_category(self, context: str) -> str:
         """Suggest a category using the intent classifier when available."""
@@ -2183,6 +2226,7 @@ class MainWindow(QMainWindow):
             description_generator=self._generate_prompt_description,
             category_generator=self._generate_prompt_category,
             tags_generator=self._generate_prompt_tags,
+            scenario_generator=self._generate_prompt_scenarios,
             prompt_engineer=(
                 self._refine_prompt_body if self._manager.prompt_engineer is not None else None
             ),
@@ -2213,6 +2257,7 @@ class MainWindow(QMainWindow):
             description_generator=self._generate_prompt_description,
             category_generator=self._generate_prompt_category,
             tags_generator=self._generate_prompt_tags,
+            scenario_generator=self._generate_prompt_scenarios,
             prompt_engineer=(
                 self._refine_prompt_body if self._manager.prompt_engineer is not None else None
             ),

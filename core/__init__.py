@@ -39,6 +39,7 @@ from .prompt_manager import (
     PromptStorageError,
 )
 from .name_generation import NameGenerationError, DescriptionGenerationError, LiteLLMDescriptionGenerator
+from .scenario_generation import LiteLLMScenarioGenerator, ScenarioGenerationError
 from .repository import PromptRepository, RepositoryError, RepositoryNotFoundError
 from .embedding import create_embedding_function
 from .execution import CodexExecutor, CodexExecutionResult, ExecutionError
@@ -85,12 +86,14 @@ __all__ = [
     "IntentLabel",
     "create_embedding_function",
     "LiteLLMDescriptionGenerator",
+    "LiteLLMScenarioGenerator",
     "CodexExecutor",
     "CodexExecutionResult",
     "ExecutionError",
     "PromptEngineer",
     "PromptEngineeringError",
     "PromptRefinement",
+    "ScenarioGenerationError",
     "HistoryTracker",
     "HistoryTrackerError",
     "Notification",

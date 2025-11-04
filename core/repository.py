@@ -1,5 +1,6 @@
 """SQLite-backed repository for persistent prompt storage.
 
+Updates: v0.5.1 - 2025-11-19 - Persist prompt usage scenarios alongside prompt records.
 Updates: v0.5.0 - 2025-11-16 - Add task template persistence and lookups.
 Updates: v0.4.0 - 2025-11-11 - Persist single-user profile preferences alongside prompts.
 Updates: v0.3.0 - 2025-11-09 - Add rating aggregation columns and execution rating support.
@@ -109,6 +110,7 @@ class PromptRepository:
         "context",
         "example_input",
         "example_output",
+        "scenarios",
         "last_modified",
         "version",
         "author",
@@ -413,6 +415,7 @@ class PromptRepository:
             "context": prompt.context,
             "example_input": prompt.example_input,
             "example_output": prompt.example_output,
+            "scenarios": _json_dumps(prompt.scenarios),
             "last_modified": prompt.last_modified.isoformat(),
             "version": prompt.version,
             "author": prompt.author,
@@ -445,6 +448,7 @@ class PromptRepository:
             "context": row["context"],
             "example_input": row["example_input"],
             "example_output": row["example_output"],
+            "scenarios": _json_loads_list(row["scenarios"]),
             "last_modified": row["last_modified"],
             "version": row["version"],
             "author": row["author"],
@@ -539,6 +543,7 @@ class PromptRepository:
                 context TEXT,
                 example_input TEXT,
                 example_output TEXT,
+                scenarios TEXT,
                 last_modified TEXT NOT NULL,
                 version TEXT NOT NULL,
                 author TEXT,
@@ -617,6 +622,8 @@ class PromptRepository:
         prompt_columns = {
             row["name"] for row in conn.execute("PRAGMA table_info(prompts);")
         }
+        if "scenarios" not in prompt_columns:
+            conn.execute("ALTER TABLE prompts ADD COLUMN scenarios TEXT;")
         if "rating_count" not in prompt_columns:
             conn.execute("ALTER TABLE prompts ADD COLUMN rating_count INTEGER NOT NULL DEFAULT 0;")
         if "rating_sum" not in prompt_columns:

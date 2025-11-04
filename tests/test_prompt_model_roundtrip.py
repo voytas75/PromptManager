@@ -61,6 +61,7 @@ def test_prompt_roundtrip_metadata_and_record() -> None:
         context="Sample context",
         example_input="input",
         example_output="output",
+        scenarios=["Use for quick summaries", "Share with onboarding teammates"],
         version="2.0",
         author="tester",
         quality_score=9.0,
@@ -80,15 +81,21 @@ def test_prompt_roundtrip_metadata_and_record() -> None:
 
     record = prompt.to_record()
     assert record["ext4"] == [0.1, 0.2]
+    assert record["scenarios"] == ["Use for quick summaries", "Share with onboarding teammates"]
 
     record["ext2"] = json.dumps(record["ext2"])
     record["ext4"] = json.dumps(record["ext4"])
     record["ext5"] = json.dumps(record["ext5"])
+    record["scenarios"] = json.dumps(record["scenarios"])
 
     reconstructed = Prompt.from_record(record)
     assert reconstructed.id == prompt.id
     assert reconstructed.ext2 == {"nested": True}
     assert reconstructed.ext4 == [0.1, 0.2]
+    assert reconstructed.scenarios == [
+        "Use for quick summaries",
+        "Share with onboarding teammates",
+    ]
     assert reconstructed.rating_count == 3
     assert reconstructed.rating_sum == pytest.approx(27.0)
 

@@ -2,6 +2,12 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.13.4] - 2025-11-19
+
+- Added scenario generation to the prompt editor, including a LiteLLM-backed generator with heuristic fallback when AI assistance is disabled.
+- Persist usage scenarios in SQLite and surface them alongside the prompt body in the detail pane.
+- Updated the GUI to display saved scenarios beneath each prompt body and refreshed documentation to describe the workflow.
+
 ## [0.13.3] - 2025-11-02
 
 - Stop forwarding LiteLLM `drop_params` directives to Azure/OpenAI providers; configured keys are now stripped locally before requests, preventing `Unknown parameter: 'drop_params'` failures during prompt execution.

@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.8.3 - 2025-11-19 - Add scenario generation controls and persistence to the prompt dialog.
 Updates: v0.8.2 - 2025-11-17 - Add Apply workflow so prompt edits can be persisted without closing the dialog.
 Updates: v0.8.1 - 2025-11-16 - Add destructive delete control and metadata suggestion helpers to the prompt dialog.
 Updates: v0.8.0 - 2025-11-16 - Add task template editor dialog.
@@ -54,6 +55,7 @@ from core import (
     CatalogDiffEntry,
     NameGenerationError,
     DescriptionGenerationError,
+    ScenarioGenerationError,
     PromptEngineeringUnavailable,
     PromptManager,
     PromptManagerError,
@@ -184,6 +186,40 @@ def fallback_generate_description(context: str, *, max_length: int = 240) -> str
     return trimmed.rstrip(".") + "…"
 
 
+def fallback_generate_scenarios(context: str, *, max_items: int = 3) -> List[str]:
+    """Provide heuristic usage scenarios when LLM support is unavailable."""
+
+    cleaned = context.strip()
+    if not cleaned:
+        return []
+
+    # Prefer full sentences; fall back to newline segments when punctuation is sparse.
+    sentence_pattern = re.compile(r"(?<=[.!?])\s+|\n")
+    segments = [segment.strip() for segment in sentence_pattern.split(cleaned) if segment.strip()]
+    if not segments:
+        segments = [cleaned]
+
+    scenarios: List[str] = []
+    seen: set[str] = set()
+    for segment in segments:
+        clause = segment.rstrip(".!?")
+        if not clause:
+            continue
+        lowered = clause[0].lower() + clause[1:] if len(clause) > 1 else clause.lower()
+        scenario = f"Use when you need to {lowered}"
+        if not scenario.endswith('.'):
+            scenario += "."
+        normalised = textwrap.shorten(scenario, width=140, placeholder="…")
+        key = normalised.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        scenarios.append(normalised)
+        if len(scenarios) >= max_items:
+            break
+    return scenarios
+
+
 class PromptDialog(QDialog):
     """Modal dialog used for creating or editing prompt records."""
 
@@ -197,6 +233,7 @@ class PromptDialog(QDialog):
         description_generator: Optional[Callable[[str], str]] = None,
         category_generator: Optional[Callable[[str], str]] = None,
         tags_generator: Optional[Callable[[str], Sequence[str]]] = None,
+        scenario_generator: Optional[Callable[[str], Sequence[str]]] = None,
         prompt_engineer: Optional[Callable[..., PromptRefinement]] = None,
     ) -> None:
         super().__init__(parent)
@@ -207,11 +244,13 @@ class PromptDialog(QDialog):
         self._prompt_engineer = prompt_engineer
         self._category_generator = category_generator
         self._tags_generator = tags_generator
+        self._scenario_generator = scenario_generator
         self._delete_requested = False
         self._delete_button: Optional[QPushButton] = None
         self._apply_button: Optional[QPushButton] = None
         self._generate_category_button: Optional[QPushButton] = None
         self._generate_tags_button: Optional[QPushButton] = None
+        self._generate_scenarios_button: Optional[QPushButton] = None
         self.setWindowTitle("Create Prompt" if prompt is None else "Edit Prompt")
         self.setMinimumWidth(760)
         self.resize(960, 700)
@@ -313,6 +352,25 @@ class PromptDialog(QDialog):
             )
         form_layout.addRow("", self._refine_button)
         form_layout.addRow("Description", self._description_input)
+        self._scenarios_input = QPlainTextEdit(self)
+        self._scenarios_input.setPlaceholderText("One scenario per line…")
+        self._scenarios_input.setFixedHeight(90)
+        scenarios_container = QWidget(self)
+        scenarios_layout = QVBoxLayout(scenarios_container)
+        scenarios_layout.setContentsMargins(0, 0, 0, 0)
+        scenarios_layout.setSpacing(4)
+        scenarios_layout.addWidget(self._scenarios_input)
+        self._generate_scenarios_button = QPushButton("Generate Scenarios", self)
+        self._generate_scenarios_button.setToolTip(
+            "Analyse the prompt body to suggest practical usage scenarios."
+        )
+        self._generate_scenarios_button.clicked.connect(self._on_generate_scenarios_clicked)  # type: ignore[arg-type]
+        if self._scenario_generator is None:
+            self._generate_scenarios_button.setToolTip(
+                "Generate heuristic scenarios based on the prompt body. Configure LiteLLM for AI assistance."
+            )
+        scenarios_layout.addWidget(self._generate_scenarios_button, alignment=Qt.AlignRight)
+        form_layout.addRow("Scenarios", scenarios_container)
         form_layout.addRow(self._example_input)
         form_layout.addRow(self._example_output)
 
@@ -345,6 +403,7 @@ class PromptDialog(QDialog):
         self._description_input.setPlainText(prompt.description)
         self._example_input.setPlainText(prompt.example_input or "")
         self._example_output.setPlainText(prompt.example_output or "")
+        self._scenarios_input.setPlainText("\n".join(prompt.scenarios))
 
     def _on_accept(self) -> None:
         """Validate inputs, build the prompt, and close the dialog."""
@@ -435,6 +494,86 @@ class PromptDialog(QDialog):
                 "No suggestion available",
                 "The assistant could not determine relevant tags.",
             )
+
+    def _collect_scenarios(self) -> List[str]:
+        """Return the current scenarios listed in the dialog."""
+
+        scenarios: List[str] = []
+        seen: set[str] = set()
+        for line in self._scenarios_input.toPlainText().splitlines():
+            text = line.strip()
+            if not text:
+                continue
+            key = text.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            scenarios.append(text)
+        return scenarios
+
+    def _set_scenarios(self, scenarios: Sequence[str]) -> None:
+        """Populate the scenarios editor with the provided entries."""
+
+        sanitized = [str(item).strip() for item in scenarios if str(item).strip()]
+        unique: List[str] = []
+        seen: set[str] = set()
+        for scenario in sanitized:
+            key = scenario.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            unique.append(scenario)
+        self._scenarios_input.setPlainText("\n".join(unique))
+
+    def _generate_scenarios(self, context: str) -> List[str]:
+        """Generate scenarios using configured helpers with heuristic fallback."""
+
+        context_text = context.strip()
+        if not context_text:
+            return []
+
+        if self._scenario_generator is not None:
+            try:
+                generated = self._scenario_generator(context_text) or []
+            except ScenarioGenerationError as exc:
+                logger.warning("Scenario generation failed: %s", exc, exc_info=True)
+                fallback = fallback_generate_scenarios(context_text)
+                if fallback:
+                    return fallback
+                raise
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning("Scenario generator raised unexpected error: %s", exc, exc_info=True)
+                generated = []
+            else:
+                scenarios = [str(item).strip() for item in generated if str(item).strip()]
+                if scenarios:
+                    return scenarios
+        return fallback_generate_scenarios(context_text)
+
+    def _on_generate_scenarios_clicked(self) -> None:
+        """Populate the scenarios field using analysis of the prompt body."""
+
+        context = self._context_input.toPlainText()
+        if not context.strip():
+            QMessageBox.information(
+                self,
+                "Prompt required",
+                "Provide a prompt body before generating scenarios.",
+            )
+            return
+        try:
+            scenarios = self._generate_scenarios(context)
+        except ScenarioGenerationError as exc:
+            QMessageBox.warning(self, "Scenario generation failed", str(exc))
+            return
+        if not scenarios:
+            QMessageBox.information(
+                self,
+                "No scenarios available",
+                "The assistant could not derive example scenarios for this prompt.",
+            )
+            return
+        self._set_scenarios(scenarios)
 
     def _on_context_changed(self) -> None:
         """Auto-suggest a prompt name when none has been supplied."""
@@ -604,6 +743,7 @@ class PromptDialog(QDialog):
         context = context_text or None
         example_input = self._example_input.toPlainText().strip() or None
         example_output = self._example_output.toPlainText().strip() or None
+        scenarios = self._collect_scenarios()
 
         if self._source_prompt is None:
             now = datetime.now(timezone.utc)
@@ -617,6 +757,7 @@ class PromptDialog(QDialog):
                 context=context,
                 example_input=example_input,
                 example_output=example_output,
+                scenarios=scenarios,
                 created_at=now,
                 last_modified=now,
                 version="1.0",
@@ -635,6 +776,7 @@ class PromptDialog(QDialog):
             context=context,
             example_input=example_input,
             example_output=example_output,
+            scenarios=scenarios,
             last_modified=datetime.now(timezone.utc),
             version=base.version,
             author=base.author,
@@ -1459,4 +1601,5 @@ __all__ = [
     "TemplateDialog",
     "fallback_suggest_prompt_name",
     "fallback_generate_description",
+    "fallback_generate_scenarios",
 ]

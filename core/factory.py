@@ -1,5 +1,6 @@
 """Factories for constructing PromptManager instances from validated settings.
 
+Updates: v0.7.1 - 2025-11-19 - Configure LiteLLM scenario generator for prompt metadata enrichment.
 Updates: v0.7.0 - 2025-11-15 - Wire prompt engineer construction into manager factory.
 Updates: v0.6.1 - 2025-11-07 - Add configurable embedding backends via settings.
 Updates: v0.6.0 - 2025-11-06 - Wire intent classifier for hybrid retrieval suggestions.
@@ -23,6 +24,7 @@ from .name_generation import (
     LiteLLMNameGenerator,
     NameGenerationError,
 )
+from .scenario_generation import LiteLLMScenarioGenerator
 from .prompt_engineering import PromptEngineer
 from .repository import PromptRepository
 from .notifications import NotificationCenter, notification_center as default_notification_center
@@ -99,6 +101,7 @@ def build_prompt_manager(
     )
     name_generator = None
     description_generator = None
+    scenario_generator = None
     resolved_prompt_engineer = prompt_engineer
     if settings.litellm_model:
         try:
@@ -110,6 +113,13 @@ def build_prompt_manager(
                 drop_params=settings.litellm_drop_params,
             )
             description_generator = LiteLLMDescriptionGenerator(
+                model=settings.litellm_model,
+                api_key=settings.litellm_api_key,
+                api_base=settings.litellm_api_base,
+                api_version=settings.litellm_api_version,
+                drop_params=settings.litellm_drop_params,
+            )
+            scenario_generator = LiteLLMScenarioGenerator(
                 model=settings.litellm_model,
                 api_key=settings.litellm_api_key,
                 api_base=settings.litellm_api_base,
@@ -163,6 +173,8 @@ def build_prompt_manager(
         "intent_classifier": intent_classifier,
         "notification_center": notification_center or default_notification_center,
     }
+    if scenario_generator is not None:
+        manager_kwargs["scenario_generator"] = scenario_generator
     if resolved_prompt_engineer is not None:
         manager_kwargs["prompt_engineer"] = resolved_prompt_engineer
     if executor is not None:

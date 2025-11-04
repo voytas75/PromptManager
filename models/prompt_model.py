@@ -1,5 +1,6 @@
 """Prompt data model definitions.
 
+Updates: v0.5.1 - 2025-11-19 - Add persisted usage scenarios metadata for prompts.
 Updates: v0.5.0 - 2025-11-16 - Introduce task template dataclass for multi-prompt workflows.
 Updates: v0.4.0 - 2025-11-11 - Add single-user profile dataclass with preference helpers.
 Updates: v0.3.0 - 2025-11-09 - Add rating aggregates and execution rating support.
@@ -49,6 +50,23 @@ def _serialize_list(items: Optional[Iterable[Any]]) -> List[Any]:
     if isinstance(items, str):
         return [items]
     return list(items)
+
+
+def _sanitize_scenarios(items: Optional[Iterable[Any]]) -> List[str]:
+    """Return a deduplicated, trimmed list of scenario strings."""
+
+    scenarios: List[str] = []
+    seen: set[str] = set()
+    for raw in _serialize_list(items):
+        text = str(raw).strip()
+        if not text:
+            continue
+        key = text.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        scenarios.append(text)
+    return scenarios
 
 
 def _serialize_metadata(value: Optional[Any]) -> Optional[str]:
@@ -116,6 +134,7 @@ class Prompt:
     context: Optional[str] = None
     example_input: Optional[str] = None
     example_output: Optional[str] = None
+    scenarios: List[str] = field(default_factory=list)
     last_modified: datetime = field(default_factory=_utc_now)
     version: str = "1.1"
     author: Optional[str] = None
@@ -135,6 +154,37 @@ class Prompt:
     ext4: Optional[Sequence[float]] = None
     ext5: Optional[MutableMapping[str, Any]] = None
 
+    def __post_init__(self) -> None:
+        """Normalise stored scenarios and mirror them into ext5 metadata."""
+
+        ext5_mapping: Optional[MutableMapping[str, Any]]
+        if isinstance(self.ext5, MutableMapping):
+            ext5_mapping = self.ext5
+        elif isinstance(self.ext5, Mapping):
+            ext5_mapping = dict(self.ext5)
+        else:
+            ext5_mapping = None
+
+        combined_sources: List[Any] = []
+        if self.scenarios:
+            combined_sources.extend(self.scenarios)
+        if ext5_mapping is not None and "scenarios" in ext5_mapping:
+            combined_sources.extend(_serialize_list(ext5_mapping.get("scenarios")))
+
+        normalised = _sanitize_scenarios(combined_sources)
+        self.scenarios = normalised
+
+        if normalised:
+            if ext5_mapping is None:
+                ext5_mapping = {}
+            ext5_mapping["scenarios"] = list(normalised)
+        elif ext5_mapping is not None and "scenarios" in ext5_mapping:
+            ext5_mapping.pop("scenarios", None)
+            if not ext5_mapping:
+                ext5_mapping = None
+
+        self.ext5 = ext5_mapping
+
     @property
     def document(self) -> str:
         """Return a text representation suitable for vector embedding."""
@@ -146,6 +196,11 @@ class Prompt:
             f"Context: {self.context}" if self.context else "",
             f"Example Input: {self.example_input}" if self.example_input else "",
             f"Example Output: {self.example_output}" if self.example_output else "",
+            (
+                "Scenarios:\n" + "\n".join(f"- {scenario}" for scenario in self.scenarios)
+            )
+            if self.scenarios
+            else "",
         ]
         return "\n".join(filter(None, sections))
 
@@ -160,6 +215,7 @@ class Prompt:
             "context": self.context,
             "example_input": self.example_input,
             "example_output": self.example_output,
+            "scenarios": json.dumps(self.scenarios, ensure_ascii=False),
             "version": self.version,
             "author": self.author,
             "quality_score": self.quality_score,
@@ -193,6 +249,7 @@ class Prompt:
             "context": self.context,
             "example_input": self.example_input,
             "example_output": self.example_output,
+            "scenarios": self.scenarios,
             "last_modified": self.last_modified.isoformat(),
             "version": self.version,
             "author": self.author,
@@ -227,6 +284,7 @@ class Prompt:
             context=data.get("context"),
             example_input=data.get("example_input"),
             example_output=data.get("example_output"),
+            scenarios=_deserialize_list(data.get("scenarios")),
             last_modified=_ensure_datetime(data.get("last_modified")),
             version=str(data.get("version") or "1.1"),
             author=data.get("author"),
@@ -263,6 +321,7 @@ class Prompt:
             "context": metadata.get("context"),
             "example_input": metadata.get("example_input"),
             "example_output": metadata.get("example_output"),
+            "scenarios": _deserialize_list(metadata.get("scenarios")),
             "last_modified": metadata.get("last_modified"),
             "version": metadata.get("version"),
             "author": metadata.get("author"),
