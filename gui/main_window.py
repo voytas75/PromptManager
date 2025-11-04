@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.8 - 2025-11-26 - Add prompt list context menu with edit/copy/description actions.
 Updates: v0.15.7 - 2025-11-24 - Add copy-to-text-window action for prompt output.
 Updates: v0.15.6 - 2025-11-04 - Prevent spin box arrows from obscuring the quality filter entry on Windows.
 Updates: v0.15.5 - 2025-11-20 - Add prompt sorting controls with alphabetical default ordering.
@@ -81,6 +82,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListView,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QPlainTextEdit,
     QScrollArea,
@@ -772,6 +774,8 @@ class MainWindow(QMainWindow):
         self._list_view.setSelectionMode(QAbstractItemView.SingleSelection)
         self._list_view.selectionModel().selectionChanged.connect(self._on_selection_changed)  # type: ignore[arg-type]
         self._list_view.doubleClicked.connect(self._on_prompt_double_clicked)  # type: ignore[arg-type]
+        self._list_view.setContextMenuPolicy(Qt.CustomContextMenu)
+        self._list_view.customContextMenuRequested.connect(self._on_prompt_context_menu)
         self._list_splitter.addWidget(self._list_view)
 
         self._list_splitter.addWidget(self._detail_widget)
@@ -2231,6 +2235,11 @@ class MainWindow(QMainWindow):
         if prompt is None:
             self.statusBar().showMessage("Select a prompt to copy first.", 3000)
             return
+        self._copy_prompt_to_clipboard(prompt)
+
+    def _copy_prompt_to_clipboard(self, prompt: Prompt) -> None:
+        """Copy a prompt's primary text to the clipboard with status feedback."""
+
         payload = prompt.context or prompt.description
         if not payload:
             self.statusBar().showMessage("Selected prompt does not include a body to copy.", 3000)
@@ -2239,6 +2248,23 @@ class MainWindow(QMainWindow):
         clipboard.setText(payload)
         self.statusBar().showMessage(f"Copied '{prompt.name}' to the clipboard.", 4000)
         self._usage_logger.log_copy(prompt_name=prompt.name, prompt_has_body=bool(prompt.context))
+
+    def _show_prompt_description(self, prompt: Prompt) -> None:
+        """Display the prompt description in a dialog for quick reference."""
+
+        description = (prompt.description or "").strip()
+        if not description:
+            QMessageBox.information(
+                self,
+                "No description available",
+                "The selected prompt does not have a description yet.",
+            )
+            return
+        QMessageBox.information(
+            self,
+            f"{prompt.name} — Description",
+            description,
+        )
 
     def _on_render_markdown_clicked(self) -> None:
         """Open a rendered markdown preview for the latest execution result."""
@@ -2338,6 +2364,42 @@ class MainWindow(QMainWindow):
             return
         self._list_view.setCurrentIndex(index)
         self._on_edit_clicked()
+
+    def _on_prompt_context_menu(self, point: QPoint) -> None:
+        """Show a context menu with prompt-specific actions."""
+
+        index = self._list_view.indexAt(point)
+        prompt: Optional[Prompt] = None
+        if index.isValid():
+            self._list_view.setCurrentIndex(index)
+            prompt = self._model.prompt_at(index.row())
+        else:
+            prompt = self._current_prompt()
+
+        menu = QMenu(self)
+        edit_action = menu.addAction("Edit Prompt")
+        copy_action = menu.addAction("Copy Prompt Text")
+        description_action = menu.addAction("Show Description")
+
+        if prompt is None:
+            edit_action.setEnabled(False)
+            copy_action.setEnabled(False)
+            description_action.setEnabled(False)
+        else:
+            if not (prompt.context or prompt.description):
+                copy_action.setEnabled(False)
+            if not (prompt.description and prompt.description.strip()):
+                description_action.setEnabled(False)
+
+        selected_action = menu.exec(self._list_view.viewport().mapToGlobal(point))
+        if selected_action is None:
+            return
+        if selected_action is edit_action:
+            self._on_edit_clicked()
+        elif selected_action is copy_action and prompt is not None:
+            self._copy_prompt_to_clipboard(prompt)
+        elif selected_action is description_action and prompt is not None:
+            self._show_prompt_description(prompt)
 
     def _on_refresh_clicked(self) -> None:
         """Reload prompts from storage, respecting current search text."""
