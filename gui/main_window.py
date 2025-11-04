@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.1 - 2025-11-04 - Add close affordance and toggle behaviour for prompt metadata panel.
 Updates: v0.15.0 - 2025-11-04 - Keep prompt browser width fixed when resizing the main window.
 Updates: v0.14.9 - 2025-11-17 - Add basic/all metadata buttons to reveal prompt details on demand.
 Updates: v0.14.8 - 2025-11-16 - Add maintenance dialog for batch metadata suggestions.
@@ -78,6 +79,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSplitter,
     QTabWidget,
+    QToolButton,
     QVBoxLayout,
     QWidget,
     QWidgetItem,
@@ -226,10 +228,27 @@ class PromptDetailWidget(QWidget):
         metadata_buttons.addStretch(1)
         content_layout.addLayout(metadata_buttons)
 
+        metadata_header = QHBoxLayout()
+        metadata_header.setContentsMargins(0, 0, 0, 0)
+        metadata_header.setSpacing(4)
+
         self._metadata_label = QLabel("Metadata", content)
         self._metadata_label.setObjectName("promptMetadataTitle")
         self._metadata_label.setVisible(False)
-        content_layout.addWidget(self._metadata_label)
+        metadata_header.addWidget(self._metadata_label)
+        metadata_header.addStretch(1)
+
+        self._metadata_close_button = QToolButton(content)
+        self._metadata_close_button.setText("x")
+        self._metadata_close_button.setObjectName("hideMetadataButton")
+        self._metadata_close_button.setVisible(False)
+        self._metadata_close_button.setCursor(Qt.PointingHandCursor)
+        self._metadata_close_button.setAutoRaise(True)
+        self._metadata_close_button.setToolTip("Close metadata")
+        self._metadata_close_button.clicked.connect(self._hide_metadata)  # type: ignore[arg-type]
+        metadata_header.addWidget(self._metadata_close_button)
+
+        content_layout.addLayout(metadata_header)
 
         self._metadata_view = QPlainTextEdit(content)
         self._metadata_view.setReadOnly(True)
@@ -305,9 +324,7 @@ class PromptDetailWidget(QWidget):
             indent=2,
         )
         self._current_prompt = prompt
-        self._metadata_label.setVisible(False)
-        self._metadata_view.setVisible(False)
-        self._metadata_view.clear()
+        self._hide_metadata()
         self._basic_metadata_button.setEnabled(True)
         self._all_metadata_button.setEnabled(True)
         self._edit_button.setEnabled(True)
@@ -323,9 +340,7 @@ class PromptDetailWidget(QWidget):
         self._examples.clear()
         self._basic_metadata_button.setEnabled(False)
         self._all_metadata_button.setEnabled(False)
-        self._metadata_label.setVisible(False)
-        self._metadata_view.clear()
-        self._metadata_view.setVisible(False)
+        self._hide_metadata()
         self._full_metadata_text = ""
         self._basic_metadata_text = ""
         self._current_prompt = None
@@ -340,21 +355,36 @@ class PromptDetailWidget(QWidget):
         self._metadata_label.setText(title)
         self._metadata_view.setPlainText(payload)
         self._metadata_label.setVisible(True)
+        self._metadata_close_button.setVisible(True)
         self._metadata_view.setVisible(True)
+
+    def _toggle_metadata(self, title: str, payload: str) -> None:
+        """Toggle metadata panel visibility for the requested payload."""
+
+        if not payload:
+            return
+        if self._metadata_view.isVisible() and self._metadata_label.text() == title:
+            self._hide_metadata()
+            return
+        self._ensure_metadata_visible(title, payload)
+
+    def _hide_metadata(self) -> None:
+        """Hide metadata panel and clear its contents."""
+
+        self._metadata_label.setVisible(False)
+        self._metadata_close_button.setVisible(False)
+        self._metadata_view.clear()
+        self._metadata_view.setVisible(False)
 
     def _show_basic_metadata(self) -> None:
         """Display the basic prompt metadata subset."""
 
-        if not self._basic_metadata_text:
-            return
-        self._ensure_metadata_visible("Metadata (Basic)", self._basic_metadata_text)
+        self._toggle_metadata("Metadata (Basic)", self._basic_metadata_text)
 
     def _show_all_metadata(self) -> None:
         """Display the full prompt metadata payload."""
 
-        if not self._full_metadata_text:
-            return
-        self._ensure_metadata_visible("Metadata (All)", self._full_metadata_text)
+        self._toggle_metadata("Metadata (All)", self._full_metadata_text)
 
 
 class FlowLayout(QLayout):
