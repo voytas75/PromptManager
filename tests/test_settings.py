@@ -144,6 +144,18 @@ def test_litellm_settings_accept_azure_aliases(monkeypatch, tmp_path) -> None:
     assert settings.litellm_drop_params is None
 
 
+def test_litellm_drop_params_from_json_not_overridden_by_empty_env(monkeypatch, tmp_path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps({"litellm_drop_params": ["max_tokens"]}), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
+    monkeypatch.setenv("PROMPT_MANAGER_LITELLM_DROP_PARAMS", " ")
+
+    settings = load_settings()
+
+    assert settings.litellm_drop_params == ["max_tokens"]
+
+
 def test_embedding_backend_defaults_to_deterministic() -> None:
     settings = load_settings()
     assert settings.embedding_backend == "deterministic"

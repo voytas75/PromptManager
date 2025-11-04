@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.0 - 2025-11-04 - Keep prompt browser width fixed when resizing the main window.
 Updates: v0.14.9 - 2025-11-17 - Add basic/all metadata buttons to reveal prompt details on demand.
 Updates: v0.14.8 - 2025-11-16 - Add maintenance dialog for batch metadata suggestions.
 Updates: v0.14.7 - 2025-11-16 - Move prompt edit/delete controls into the detail pane.
@@ -47,7 +48,16 @@ from PySide6.QtCore import (
     Qt,
     QSettings,
 )
-from PySide6.QtGui import QColor, QGuiApplication, QKeySequence, QPalette, QTextCursor, QShortcut
+from PySide6.QtGui import (
+    QColor,
+    QGuiApplication,
+    QKeySequence,
+    QPalette,
+    QTextCursor,
+    QShortcut,
+    QResizeEvent,
+    QShowEvent,
+)
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -472,6 +482,8 @@ class MainWindow(QMainWindow):
         self._main_splitter: Optional[QSplitter] = None
         self._list_splitter: Optional[QSplitter] = None
         self._workspace_splitter: Optional[QSplitter] = None
+        self._main_splitter_left_width: Optional[int] = None
+        self._suppress_main_splitter_sync = False
         self._notification_history: Deque[Notification] = deque(maxlen=200)
         self._active_notifications: Dict[str, Notification] = {}
         for note in self._manager.notification_center.history():
@@ -487,6 +499,7 @@ class MainWindow(QMainWindow):
         self._restore_window_geometry()
         self._build_ui()
         self._restore_splitter_state()
+        self._capture_main_splitter_left_width()
         self.statusBar().addPermanentWidget(self._notification_indicator)
         self._update_notification_indicator()
         self._register_quick_shortcuts()
@@ -658,6 +671,7 @@ class MainWindow(QMainWindow):
         result_tab_layout.setContentsMargins(0, 0, 0, 0)
 
         self._main_splitter = QSplitter(Qt.Horizontal, result_tab)
+        self._main_splitter.splitterMoved.connect(self._on_main_splitter_moved)  # type: ignore[arg-type]
 
         self._list_splitter = QSplitter(Qt.Vertical, self._main_splitter)
 
@@ -756,8 +770,8 @@ class MainWindow(QMainWindow):
         output_layout.addWidget(self._result_tabs, 1)
         workspace_layout.addWidget(output_panel, 1)
         self._main_splitter.addWidget(workspace_panel)
-        self._main_splitter.setStretchFactor(0, 3)
-        self._main_splitter.setStretchFactor(1, 2)
+        self._main_splitter.setStretchFactor(0, 0)
+        self._main_splitter.setStretchFactor(1, 1)
 
         result_tab_layout.addWidget(self._main_splitter)
 
@@ -839,6 +853,57 @@ class MainWindow(QMainWindow):
                 continue
             splitter.setSizes(sizes)
 
+    def _capture_main_splitter_left_width(self) -> None:
+        """Record the current width of the left pane for resize management."""
+
+        if self._main_splitter is None:
+            return
+        sizes = self._main_splitter.sizes()
+        if len(sizes) < 2:
+            return
+        self._main_splitter_left_width = max(sizes[0], 0)
+
+    def _enforce_main_splitter_left_width(self) -> None:
+        """Ensure left pane width stays constant when the window is resized."""
+
+        if self._main_splitter is None:
+            return
+        if self._main_splitter_left_width is None:
+            self._capture_main_splitter_left_width()
+            return
+        sizes = self._main_splitter.sizes()
+        if len(sizes) < 2:
+            return
+        total = sum(sizes)
+        if total <= 0:
+            return
+        minimum_right = 1 if total > 1 else 0
+        locked_width = min(self._main_splitter_left_width, total - minimum_right)
+        locked_width = max(locked_width, 0)
+        right_width = total - locked_width
+        if right_width < minimum_right:
+            right_width = minimum_right
+            locked_width = total - right_width
+        if locked_width == sizes[0]:
+            self._main_splitter_left_width = locked_width
+            return
+        self._suppress_main_splitter_sync = True
+        try:
+            self._main_splitter.setSizes([locked_width, right_width])
+        finally:
+            self._suppress_main_splitter_sync = False
+        self._main_splitter_left_width = locked_width
+
+    def _on_main_splitter_moved(self, _position: int, _index: int) -> None:
+        """Update stored left pane width when the splitter is dragged."""
+
+        if self._suppress_main_splitter_sync or self._main_splitter is None:
+            return
+        sizes = self._main_splitter.sizes()
+        if len(sizes) < 2:
+            return
+        self._main_splitter_left_width = max(sizes[0], 0)
+
     def _save_splitter_state(self) -> None:
         """Persist splitter sizes for future sessions."""
 
@@ -858,7 +923,19 @@ class MainWindow(QMainWindow):
 
         geometry = self.saveGeometry()
         self._layout_settings.setValue("windowGeometry", geometry)
-        self._layout_settings.sync()
+
+    def showEvent(self, event: QShowEvent) -> None:  # type: ignore[override]
+        """Ensure splitter state is captured once the window is visible."""
+
+        super().showEvent(event)
+        self._capture_main_splitter_left_width()
+        self._enforce_main_splitter_left_width()
+
+    def resizeEvent(self, event: QResizeEvent) -> None:  # type: ignore[override]
+        """Keep splitter stable when the window resizes."""
+
+        super().resizeEvent(event)
+        self._enforce_main_splitter_left_width()
 
     # Template helpers --------------------------------------------------- #
 

@@ -272,6 +272,8 @@ class PromptManagerSettings(BaseSettings):
                     if val is None and key.isupper():
                         val = os.getenv(key)
                     if val is not None:
+                        if isinstance(val, str) and not val.strip():
+                            continue
                         # Map to canonical field keys accepted by the model
                         if field in {"db_path", "chroma_path"}:
                             data[field] = str(val)
