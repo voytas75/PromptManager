@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.2 - 2025-11-18 - Reflect selected quick action in the toolbar button label.
 Updates: v0.15.1 - 2025-11-04 - Add close affordance and toggle behaviour for prompt metadata panel.
 Updates: v0.15.0 - 2025-11-04 - Keep prompt browser width fixed when resizing the main window.
 Updates: v0.14.9 - 2025-11-17 - Add basic/all metadata buttons to reveal prompt details on demand.
@@ -507,6 +508,7 @@ class MainWindow(QMainWindow):
         self._quick_actions: List[QuickAction] = self._build_quick_actions(
             self._runtime_settings.get("quick_actions")
         )
+        self._active_quick_action_id: Optional[str] = None
         self._quick_shortcuts: List[QShortcut] = []
         self._layout_settings = QSettings("PromptManager", "MainWindow")
         self._main_splitter: Optional[QSplitter] = None
@@ -611,6 +613,9 @@ class MainWindow(QMainWindow):
 
         self._quick_actions_button = QPushButton("Quick Actions", self)
         self._quick_actions_button.clicked.connect(self._show_command_palette)  # type: ignore[arg-type]
+        self._quick_actions_button_default_text = self._quick_actions_button.text()
+        self._quick_actions_button_default_tooltip = "Open the command palette for quick actions."
+        self._quick_actions_button.setToolTip(self._quick_actions_button_default_tooltip)
         actions_layout.addWidget(self._quick_actions_button)
 
         self._detect_button = QPushButton("Detect Need", self)
@@ -1554,6 +1559,7 @@ class MainWindow(QMainWindow):
             cursor.movePosition(QTextCursor.End)
             self._query_input.setTextCursor(cursor)
         self._query_input.setFocus(Qt.ShortcutFocusReason)
+        self._set_active_quick_action(action)
         self.statusBar().showMessage(f"Quick action applied: {action.title}", 4000)
 
     def _register_quick_shortcuts(self) -> None:
@@ -1573,6 +1579,35 @@ class MainWindow(QMainWindow):
             shortcut = QShortcut(QKeySequence(action.shortcut), self)
             shortcut.activated.connect(lambda a=action: self._execute_quick_action(a))  # type: ignore[arg-type]
             self._quick_shortcuts.append(shortcut)
+
+    def _set_active_quick_action(self, action: Optional[QuickAction]) -> None:
+        """Update the quick actions button label to mirror the chosen action."""
+
+        if action is None:
+            self._active_quick_action_id = None
+            self._quick_actions_button.setText(self._quick_actions_button_default_text)
+            self._quick_actions_button.setToolTip(self._quick_actions_button_default_tooltip)
+            return
+
+        self._active_quick_action_id = action.identifier
+        label = action.title
+        if action.shortcut:
+            label = f"{label} ({action.shortcut})"
+        self._quick_actions_button.setText(label)
+        self._quick_actions_button.setToolTip(action.description or action.title)
+
+    def _sync_active_quick_action_button(self) -> None:
+        """Ensure the button reflects the stored active quick action identifier."""
+
+        if not self._active_quick_action_id:
+            self._set_active_quick_action(None)
+            return
+
+        for action in self._quick_actions:
+            if action.identifier == self._active_quick_action_id:
+                self._set_active_quick_action(action)
+                return
+        self._set_active_quick_action(None)
 
     def _default_quick_actions(self) -> List[QuickAction]:
         return [
@@ -2417,6 +2452,7 @@ class MainWindow(QMainWindow):
 
         self._quick_actions = self._build_quick_actions(self._runtime_settings.get("quick_actions"))
         self._register_quick_shortcuts()
+        self._sync_active_quick_action_button()
 
         try:
             self._manager.set_name_generator(
