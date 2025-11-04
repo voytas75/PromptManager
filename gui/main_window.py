@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.6 - 2025-11-04 - Prevent spin box arrows from obscuring the quality filter entry on Windows.
 Updates: v0.15.5 - 2025-11-20 - Add prompt sorting controls with alphabetical default ordering.
 Updates: v0.15.4 - 2025-11-19 - Add scenario generation controls and display to prompt workflows.
 Updates: v0.15.3 - 2025-11-18 - Rename the workspace tab from Result to Prompts for clarity.
@@ -66,6 +67,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QAbstractSpinBox,
     QComboBox,
     QFileDialog,
     QDialog,
@@ -711,6 +713,11 @@ class MainWindow(QMainWindow):
         self._quality_filter.setRange(0.0, 10.0)
         self._quality_filter.setDecimals(1)
         self._quality_filter.setSingleStep(0.1)
+        self._quality_filter.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self._quality_filter.setAlignment(Qt.AlignRight)
+        self._quality_filter.setMinimumWidth(
+            self._quality_filter.fontMetrics().horizontalAdvance("10.0") + 32
+        )
         self._quality_filter.valueChanged.connect(self._on_filters_changed)
 
         filter_layout.addWidget(QLabel("Category:", self))
