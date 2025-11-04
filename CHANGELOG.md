@@ -2,6 +2,11 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.13.6] - 2025-11-25
+
+- Added a prompt catalogue overview on the Maintenance tab with live counts for prompts, categories, tags, stale entries, and recent updates, plus a manual refresh control.
+- Exposed prompt catalogue statistics via `PromptManager.get_prompt_catalogue_stats` so other tooling can reuse the aggregated metrics.
+
 ## [0.13.5] - 2025-11-24
 
 - Added a **Copy to Text Window** control in the GUI result pane that rehydrates the latest output into the workspace editor for rapid follow-up prompts without manual copying.

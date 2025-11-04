@@ -1,5 +1,6 @@
 """SQLite-backed repository for persistent prompt storage.
 
+Updates: v0.6.0 - 2025-11-25 - Add prompt catalogue statistics accessor for maintenance UI.
 Updates: v0.5.1 - 2025-11-19 - Persist prompt usage scenarios alongside prompt records.
 Updates: v0.5.0 - 2025-11-16 - Add task template persistence and lookups.
 Updates: v0.4.0 - 2025-11-11 - Persist single-user profile preferences alongside prompts.
@@ -10,12 +11,13 @@ Updates: v0.1.0 - 2025-10-31 - Introduce PromptRepository syncing Prompt datacla
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import json
 import sqlite3
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Set
 
 from models.prompt_model import (
     DEFAULT_PROFILE_ID,
@@ -24,6 +26,22 @@ from models.prompt_model import (
     TaskTemplate,
     UserProfile,
 )
+
+
+@dataclass(slots=True, frozen=True)
+class PromptCatalogueStats:
+    """Aggregate prompt metadata metrics for maintenance views."""
+
+    total_prompts: int
+    active_prompts: int
+    inactive_prompts: int
+    distinct_categories: int
+    distinct_tags: int
+    prompts_without_category: int
+    prompts_without_tags: int
+    average_tags_per_prompt: float
+    stale_prompts: int
+    last_modified_at: Optional[datetime]
 
 
 class RepositoryError(Exception):
@@ -95,6 +113,25 @@ def _json_loads_dict(value: Optional[str]) -> Dict[str, Any]:
     if isinstance(parsed, dict):
         return {str(key): parsed[key] for key in parsed}
     return {}
+
+
+def _parse_optional_datetime(value: Any) -> Optional[datetime]:
+    """Return a timezone-aware datetime parsed from SQLite rows when possible."""
+
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            parsed = datetime.fromisoformat(text)
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed
+    return None
 
 
 class PromptRepository:
@@ -186,6 +223,70 @@ class PromptRepository:
                 self._ensure_schema(conn)
         except sqlite3.Error as exc:  # pragma: no cover - defensive
             raise RepositoryError("Failed to initialise SQLite schema") from exc
+
+    def get_prompt_catalogue_stats(self) -> PromptCatalogueStats:
+        """Return aggregate prompt statistics for maintenance workflows."""
+
+        total = 0
+        active = 0
+        categories: Set[str] = set()
+        tags: Set[str] = set()
+        missing_category = 0
+        missing_tags = 0
+        tag_total = 0
+        stale_count = 0
+        latest_modified: Optional[datetime] = None
+        now = datetime.now(timezone.utc)
+        stale_cutoff = now - timedelta(days=30)
+
+        try:
+            with _connect(self._db_path) as conn:
+                cursor = conn.execute(
+                    "SELECT category, tags, is_active, last_modified FROM prompts;"
+                )
+                for row in cursor:
+                    total += 1
+                    if bool(row["is_active"]):
+                        active += 1
+
+                    category = (row["category"] or "").strip()
+                    if category:
+                        categories.add(category)
+                    else:
+                        missing_category += 1
+
+                    raw_tags = _json_loads_list(row["tags"])
+                    cleaned_tags = [tag.strip() for tag in raw_tags if tag and tag.strip()]
+                    if cleaned_tags:
+                        tags.update(cleaned_tags)
+                        tag_total += len(cleaned_tags)
+                    else:
+                        missing_tags += 1
+
+                    timestamp = _parse_optional_datetime(row["last_modified"])
+                    if timestamp is not None:
+                        if latest_modified is None or timestamp > latest_modified:
+                            latest_modified = timestamp
+                        if timestamp < stale_cutoff:
+                            stale_count += 1
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to compute prompt statistics") from exc
+
+        inactive = max(total - active, 0)
+        average_tags = round(tag_total / total, 2) if total else 0.0
+
+        return PromptCatalogueStats(
+            total_prompts=total,
+            active_prompts=active,
+            inactive_prompts=inactive,
+            distinct_categories=len(categories),
+            distinct_tags=len(tags),
+            prompts_without_category=missing_category,
+            prompts_without_tags=missing_tags,
+            average_tags_per_prompt=average_tags,
+            stale_prompts=stale_count,
+            last_modified_at=latest_modified,
+        )
 
     def add(self, prompt: Prompt) -> Prompt:
         """Insert a new prompt record."""

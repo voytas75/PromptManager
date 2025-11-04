@@ -1,5 +1,6 @@
 """High-level CRUD manager for prompt records backed by SQLite, ChromaDB, and Redis.
 
+Updates: v0.13.4 - 2025-11-25 - Expose prompt catalogue statistics for maintenance surfaces.
 Updates: v0.13.3 - 2025-11-19 - Add prompt scenario generation workflow and GUI integration.
 Updates: v0.13.2 - 2025-11-16 - Add task template CRUD APIs and apply workflow.
 Updates: v0.12.0 - 2025-11-15 - Add LiteLLM-backed prompt engineering workflow.
@@ -100,7 +101,12 @@ from .name_generation import (
 )
 from .scenario_generation import LiteLLMScenarioGenerator, ScenarioGenerationError
 from .prompt_engineering import PromptEngineer, PromptEngineeringError, PromptRefinement
-from .repository import PromptRepository, RepositoryError, RepositoryNotFoundError
+from .repository import (
+    PromptCatalogueStats,
+    PromptRepository,
+    RepositoryError,
+    RepositoryNotFoundError,
+)
 from .notifications import (
     NotificationCenter,
     NotificationLevel,
@@ -448,6 +454,14 @@ class PromptManager:
         except (OSError, ValueError):
             pass
         return details
+
+    def get_prompt_catalogue_stats(self) -> PromptCatalogueStats:
+        """Return aggregate prompt statistics for maintenance workflows."""
+
+        try:
+            return self._repository.get_prompt_catalogue_stats()
+        except RepositoryError as exc:
+            raise PromptStorageError("Unable to compute prompt catalogue statistics") from exc
 
     def refresh_user_profile(self) -> Optional[UserProfile]:
         """Reload the persisted profile from the repository."""

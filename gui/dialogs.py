@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.8.4 - 2025-11-25 - Add prompt maintenance overview stats panel.
 Updates: v0.8.3 - 2025-11-19 - Add scenario generation controls and persistence to the prompt dialog.
 Updates: v0.8.2 - 2025-11-17 - Add Apply workflow so prompt edits can be persisted without closing the dialog.
 Updates: v0.8.1 - 2025-11-16 - Add destructive delete control and metadata suggestion helpers to the prompt dialog.
@@ -24,7 +25,7 @@ import uuid
 from copy import deepcopy
 from dataclasses import replace
 from datetime import datetime, timezone
-from typing import Callable, Optional, Sequence, List
+from typing import Callable, Dict, Optional, Sequence, List
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QEvent, Signal
@@ -34,6 +35,8 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QGridLayout,
+    QGroupBox,
     QFormLayout,
     QHBoxLayout,
     QListWidget,
@@ -819,6 +822,7 @@ class PromptMaintenanceDialog(QDialog):
         self._manager = manager
         self._category_generator = category_generator
         self._tags_generator = tags_generator
+        self._stats_labels: Dict[str, QLabel] = {}
         self._log_view: QPlainTextEdit
         self._redis_status_label: QLabel
         self._redis_connection_label: QLabel
@@ -833,9 +837,11 @@ class PromptMaintenanceDialog(QDialog):
         self._storage_path_label: QLabel
         self._storage_stats_view: QPlainTextEdit
         self._storage_refresh_button: QPushButton
+        self._stats_refresh_button: QPushButton
         self.setWindowTitle("Prompt Maintenance")
         self.resize(640, 420)
         self._build_ui()
+        self._refresh_catalogue_stats()
         self._refresh_redis_info()
         self._refresh_chroma_info()
         self._refresh_storage_info()
@@ -848,6 +854,56 @@ class PromptMaintenanceDialog(QDialog):
 
         metadata_tab = QWidget(self)
         metadata_layout = QVBoxLayout(metadata_tab)
+
+        stats_group = QGroupBox("Prompt Catalogue Overview", metadata_tab)
+        stats_layout = QGridLayout(stats_group)
+        stats_layout.setContentsMargins(12, 12, 12, 12)
+        stats_layout.setHorizontalSpacing(16)
+        stats_layout.setVerticalSpacing(6)
+
+        stat_rows = [
+            ("total_prompts", "Total prompts"),
+            ("active_prompts", "Active prompts"),
+            ("inactive_prompts", "Inactive prompts"),
+            ("distinct_categories", "Distinct categories"),
+            ("prompts_without_category", "Prompts without category"),
+            ("distinct_tags", "Distinct tags"),
+            ("prompts_without_tags", "Prompts without tags"),
+            ("average_tags_per_prompt", "Average tags per prompt"),
+            ("stale_prompts", "Stale prompts (> 4 weeks)"),
+            ("last_modified_at", "Last prompt update"),
+        ]
+
+        for row_index, (key, label_text) in enumerate(stat_rows):
+            label_widget = QLabel(label_text, stats_group)
+            value_widget = QLabel("—", stats_group)
+            value_widget.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            stats_layout.addWidget(label_widget, row_index, 0)
+            stats_layout.addWidget(value_widget, row_index, 1)
+            self._stats_labels[key] = value_widget
+
+        stats_layout.setColumnStretch(0, 1)
+        stats_layout.setColumnStretch(1, 0)
+
+        self._stats_refresh_button = QPushButton("Refresh Overview", stats_group)
+        self._stats_refresh_button.clicked.connect(self._refresh_catalogue_stats)  # type: ignore[arg-type]
+        stats_layout.addWidget(
+            self._stats_refresh_button,
+            len(stat_rows),
+            0,
+            1,
+            2,
+            alignment=Qt.AlignRight,
+        )
+
+        helper_label = QLabel(
+            "Stale prompts have not been updated in the last 30 days.",
+            stats_group,
+        )
+        helper_label.setWordWrap(True)
+        stats_layout.addWidget(helper_label, len(stat_rows) + 1, 0, 1, 2)
+
+        metadata_layout.addWidget(stats_group)
 
         description = QLabel(
             "Run maintenance tasks to enrich prompt metadata. Only prompts missing the "
@@ -987,6 +1043,44 @@ class PromptMaintenanceDialog(QDialog):
         self._buttons = QDialogButtonBox(QDialogButtonBox.Close, self)
         self._buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(self._buttons)
+
+    def _set_stat_value(self, key: str, value: str) -> None:
+        label = self._stats_labels.get(key)
+        if label is not None:
+            label.setText(value)
+
+    @staticmethod
+    def _format_timestamp(value: Optional[datetime]) -> str:
+        if value is None:
+            return "—"
+        return value.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+    def _refresh_catalogue_stats(self) -> None:
+        try:
+            stats = self._manager.get_prompt_catalogue_stats()
+        except PromptManagerError as exc:
+            logger.warning("Prompt catalogue stats refresh failed", exc_info=True)
+            self._append_log(f"Failed to load prompt statistics: {exc}")
+            for label in self._stats_labels.values():
+                label.setText("—")
+            return
+
+        self._set_stat_value("total_prompts", str(stats.total_prompts))
+        self._set_stat_value("active_prompts", str(stats.active_prompts))
+        self._set_stat_value("inactive_prompts", str(stats.inactive_prompts))
+        self._set_stat_value("distinct_categories", str(stats.distinct_categories))
+        self._set_stat_value("prompts_without_category", str(stats.prompts_without_category))
+        self._set_stat_value("distinct_tags", str(stats.distinct_tags))
+        self._set_stat_value("prompts_without_tags", str(stats.prompts_without_tags))
+        self._set_stat_value(
+            "average_tags_per_prompt",
+            f"{stats.average_tags_per_prompt:.2f}",
+        )
+        self._set_stat_value("stale_prompts", str(stats.stale_prompts))
+        self._set_stat_value(
+            "last_modified_at",
+            self._format_timestamp(stats.last_modified_at),
+        )
 
     def _append_log(self, message: str) -> None:
         timestamp = datetime.now(timezone.utc).strftime("%H:%M:%S")
