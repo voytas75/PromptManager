@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.7 - 2025-11-24 - Add copy-to-text-window action for prompt output.
 Updates: v0.15.6 - 2025-11-04 - Prevent spin box arrows from obscuring the quality filter entry on Windows.
 Updates: v0.15.5 - 2025-11-20 - Add prompt sorting controls with alphabetical default ordering.
 Updates: v0.15.4 - 2025-11-19 - Add scenario generation controls and display to prompt workflows.
@@ -686,6 +687,10 @@ class MainWindow(QMainWindow):
         self._copy_result_button.clicked.connect(self._on_copy_result_clicked)  # type: ignore[arg-type]
         actions_layout.addWidget(self._copy_result_button)
 
+        self._copy_result_to_text_window_button = QPushButton("Copy to Text Window", self)
+        self._copy_result_to_text_window_button.clicked.connect(self._on_copy_result_to_text_window_clicked)  # type: ignore[arg-type]
+        actions_layout.addWidget(self._copy_result_to_text_window_button)
+
         self._render_markdown_button = QPushButton("Render Output", self)
         self._render_markdown_button.setEnabled(False)
         self._render_markdown_button.clicked.connect(self._on_render_markdown_clicked)  # type: ignore[arg-type]
@@ -882,6 +887,7 @@ class MainWindow(QMainWindow):
         has_executor = self._manager.executor is not None
         self._run_button.setEnabled(has_executor)
         self._copy_result_button.setEnabled(False)
+        self._copy_result_to_text_window_button.setEnabled(False)
         self._save_button.setEnabled(False)
         self._continue_chat_button.setEnabled(False)
         self._end_chat_button.setEnabled(False)
@@ -1545,6 +1551,7 @@ class MainWindow(QMainWindow):
         self._render_markdown_button.setEnabled(bool(response_text.strip()))
         self._result_tabs.setCurrentIndex(0)
         self._copy_result_button.setEnabled(bool(outcome.result.response_text))
+        self._copy_result_to_text_window_button.setEnabled(bool(outcome.result.response_text))
         self._save_button.setEnabled(True)
         self._continue_chat_button.setEnabled(True)
         self._end_chat_button.setEnabled(True)
@@ -1564,6 +1571,7 @@ class MainWindow(QMainWindow):
         self._diff_view.setPlaceholderText("Run a prompt to compare input and output.")
         self._render_markdown_button.setEnabled(False)
         self._copy_result_button.setEnabled(False)
+        self._copy_result_to_text_window_button.setEnabled(False)
         self._save_button.setEnabled(False)
         self._reset_chat_session()
 
@@ -2271,6 +2279,23 @@ class MainWindow(QMainWindow):
         clipboard = QGuiApplication.clipboard()
         clipboard.setText(response)
         self.statusBar().showMessage("Prompt result copied to the clipboard.", 4000)
+
+    def _on_copy_result_to_text_window_clicked(self) -> None:
+        """Populate the workspace text window with the latest execution result."""
+
+        if self._last_execution is None:
+            self.statusBar().showMessage("Run a prompt to generate a result first.", 3000)
+            return
+        response = self._last_execution.result.response_text
+        if not response:
+            self.statusBar().showMessage("Latest result is empty; nothing to copy.", 3000)
+            return
+        self._query_input.setPlainText(response)
+        cursor = self._query_input.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        self._query_input.setTextCursor(cursor)
+        self._query_input.setFocus(Qt.ShortcutFocusReason)
+        self.statusBar().showMessage("Prompt result copied to the text window.", 4000)
 
     def _apply_suggestions(self, suggestions: PromptManager.IntentSuggestions) -> None:
         """Apply intent suggestions to the list view and update filters."""

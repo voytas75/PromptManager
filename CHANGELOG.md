@@ -2,6 +2,11 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.13.5] - 2025-11-24
+
+- Added a **Copy to Text Window** control in the GUI result pane that rehydrates the latest output into the workspace editor for rapid follow-up prompts without manual copying.
+- Updated documentation to reference the new control and clarify the result workflow sequence.
+
 ## [0.13.4] - 2025-11-19
 
 - Added scenario generation to the prompt editor, including a LiteLLM-backed generator with heuristic fallback when AI assistance is disabled.
