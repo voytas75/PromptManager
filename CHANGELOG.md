@@ -2,6 +2,10 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.13.8] - 2025-11-27
+
+- Added a Duplicate Prompt action to the prompt list context menu that opens a pre-filled editor for cloning existing entries before saving.
+
 ## [0.13.7] - 2025-11-26
 
 - Added an Info dialog to the GUI toolbar that links to the author's GitHub profile and surfaces system CPU/architecture details alongside the project's open source license summary.

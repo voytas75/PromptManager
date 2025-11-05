@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.11 - 2025-11-27 - Add prompt duplication to the context menu.
 Updates: v0.15.10 - 2025-11-26 - Add context menu execution action for prompts.
 Updates: v0.15.9 - 2025-11-26 - Add application info dialog accessible from the toolbar.
 Updates: v0.15.8 - 2025-11-26 - Add prompt list context menu with edit/copy/description actions.
@@ -2412,12 +2413,14 @@ class MainWindow(QMainWindow):
 
         menu = QMenu(self)
         edit_action = menu.addAction("Edit Prompt")
+        duplicate_action = menu.addAction("Duplicate Prompt")
         execute_action = menu.addAction("Execute Prompt")
         copy_action = menu.addAction("Copy Prompt Text")
         description_action = menu.addAction("Show Description")
 
         if prompt is None:
             edit_action.setEnabled(False)
+            duplicate_action.setEnabled(False)
             execute_action.setEnabled(False)
             copy_action.setEnabled(False)
             description_action.setEnabled(False)
@@ -2434,6 +2437,8 @@ class MainWindow(QMainWindow):
             return
         if selected_action is edit_action:
             self._on_edit_clicked()
+        elif selected_action is duplicate_action and prompt is not None:
+            self._duplicate_prompt(prompt)
         elif selected_action is execute_action and prompt is not None:
             self._execute_prompt_from_context_menu(prompt)
         elif selected_action is copy_action and prompt is not None:
@@ -2463,6 +2468,35 @@ class MainWindow(QMainWindow):
             empty_text_message="Selected prompt does not include any text to execute.",
             keep_text_after=True,
         )
+
+    def _duplicate_prompt(self, prompt: Prompt) -> None:
+        """Open a creation dialog with the selected prompt pre-filled and persist the copy."""
+
+        dialog = PromptDialog(
+            self,
+            name_generator=self._generate_prompt_name,
+            description_generator=self._generate_prompt_description,
+            category_generator=self._generate_prompt_category,
+            tags_generator=self._generate_prompt_tags,
+            scenario_generator=self._generate_prompt_scenarios,
+            prompt_engineer=(
+                self._refine_prompt_body if self._manager.prompt_engineer is not None else None
+            ),
+        )
+        dialog.prefill_from_prompt(prompt)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        duplicate = dialog.result_prompt
+        if duplicate is None:
+            return
+        try:
+            created = self._manager.create_prompt(duplicate)
+        except PromptStorageError as exc:
+            self._show_error("Unable to duplicate prompt", str(exc))
+            return
+        self._load_prompts(self._search_input.text())
+        self._select_prompt(created.id)
+        self.statusBar().showMessage("Prompt duplicated.", 4000)
 
     def _on_refresh_clicked(self) -> None:
         """Reload prompts from storage, respecting current search text."""

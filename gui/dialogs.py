@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.8.6 - 2025-11-27 - Support pre-filling prompts when duplicating entries.
 Updates: v0.8.5 - 2025-11-26 - Add application info dialog.
 Updates: v0.8.4 - 2025-11-25 - Add prompt maintenance overview stats panel.
 Updates: v0.8.3 - 2025-11-19 - Add scenario generation controls and persistence to the prompt dialog.
@@ -446,6 +447,13 @@ class PromptDialog(QDialog):
             self._delete_button.clicked.connect(self._on_delete_clicked)  # type: ignore[arg-type]
         main_layout.addWidget(self._buttons)
         self._context_input.textChanged.connect(self._on_context_changed)  # type: ignore[arg-type]
+
+    def prefill_from_prompt(self, prompt: Prompt) -> None:
+        """Populate inputs from an existing prompt while staying in creation mode."""
+
+        self._populate(prompt)
+        self._result_prompt = None
+        self._delete_requested = False
 
     def _populate(self, prompt: Prompt) -> None:
         """Fill inputs with the existing prompt values for editing."""
