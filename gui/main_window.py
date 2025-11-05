@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.17 - 2025-12-01 - Pass LiteLLM streaming flag into settings dialog so checkbox reflects configuration.
 Updates: v0.15.16 - 2025-11-30 - Keep catalogue import controls while CLI command is removed.
 Updates: v0.15.15 - 2025-11-30 - Remove catalogue import controls from the toolbar.
 Updates: v0.15.14 - 2025-11-28 - Add exit toolbar icon and shortcut for graceful shutdown.
@@ -2857,6 +2858,7 @@ class MainWindow(QMainWindow):
             litellm_api_version=self._runtime_settings.get("litellm_api_version"),
             litellm_drop_params=self._runtime_settings.get("litellm_drop_params"),
             litellm_reasoning_effort=self._runtime_settings.get("litellm_reasoning_effort"),
+            litellm_stream=self._runtime_settings.get("litellm_stream"),
             quick_actions=self._runtime_settings.get("quick_actions"),
         )
         if dialog.exec() != QDialog.Accepted:
