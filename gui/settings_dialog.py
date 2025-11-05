@@ -1,5 +1,6 @@
 """Settings dialog for configuring Prompt Manager runtime options.
 
+Updates: v0.2.6 - 2025-11-05 - Add theme mode toggle to the appearance settings.
 Updates: v0.2.5 - 2025-11-05 - Add chat appearance controls to settings dialog.
 Updates: v0.2.4 - 2025-11-05 - Add LiteLLM routing matrix for fast vs inference models.
 Updates: v0.2.3 - 2025-11-05 - Introduce LiteLLM inference model field and tabbed layout.
@@ -21,6 +22,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFormLayout,
     QGridLayout,
+    QComboBox,
     QLabel,
     QLineEdit,
     QFrame,
@@ -56,6 +58,7 @@ class SettingsDialog(QDialog):
         litellm_workflow_models: Optional[Mapping[str, str]] = None,
         quick_actions: Optional[list[dict[str, object]]] = None,
         chat_user_bubble_color: Optional[str] = None,
+        theme_mode: Optional[str] = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Prompt Manager Settings")
@@ -90,6 +93,8 @@ class SettingsDialog(QDialog):
         self._chat_user_bubble_color = QColor(initial_chat_color).name().lower()
         self._chat_color_input: Optional[QLineEdit] = None
         self._chat_color_preview: Optional[QLabel] = None
+        self._theme_mode = "dark" if (theme_mode or "").strip().lower() == "dark" else "light"
+        self._theme_combo: Optional[QComboBox] = None
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -216,6 +221,13 @@ class SettingsDialog(QDialog):
         appearance_form = QFormLayout(appearance_tab)
         appearance_form.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
 
+        theme_combo = QComboBox(appearance_tab)
+        theme_combo.addItems(["Light", "Dark"])
+        theme_combo.setCurrentIndex(1 if self._theme_mode == "dark" else 0)
+        theme_combo.currentIndexChanged.connect(self._on_theme_mode_changed)  # type: ignore[arg-type]
+        self._theme_combo = theme_combo
+        appearance_form.addRow("Theme", theme_combo)
+
         chat_color_input = QLineEdit(self._chat_user_bubble_color, appearance_tab)
         chat_color_input.setPlaceholderText(self._default_chat_color)
         chat_color_input.textChanged.connect(self._update_chat_color_preview)  # type: ignore[arg-type]
@@ -255,6 +267,13 @@ class SettingsDialog(QDialog):
         button_box.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(button_box)
 
+    def _on_theme_mode_changed(self, index: int) -> None:
+        """Synchronise the selected theme mode with internal state."""
+
+        self._theme_mode = "dark" if index == 1 else "light"
+        if self._chat_color_input is not None:
+            self._update_chat_color_preview(self._chat_color_input.text())
+
     def _update_chat_color_preview(self, value: str) -> None:
         """Refresh the preview bubble based on the current colour entry."""
 
@@ -271,9 +290,12 @@ class SettingsDialog(QDialog):
             return
         normalized = color.name().lower()
         border = QColor(normalized).darker(115).name()
+        r, g, b, _ = color.getRgb()
+        luminance = (0.299 * r) + (0.587 * g) + (0.114 * b)
+        text_color = "#1f2933" if luminance >= 150 else "#f9fafc"
         self._chat_color_preview.setStyleSheet(
             f"background-color: {normalized}; border: 1px solid {border}; "
-            "border-radius: 8px; padding: 8px; color: #1f2933;"
+            f"border-radius: 8px; padding: 8px; color: {text_color};"
         )
         self._chat_color_preview.setText("You: Example message")
 
@@ -318,6 +340,9 @@ class SettingsDialog(QDialog):
         else:
             self._chat_user_bubble_color = self._default_chat_color
 
+        if self._theme_combo is not None:
+            self._theme_mode = "dark" if self._theme_combo.currentIndex() == 1 else "light"
+
         super().accept()
 
     def result_settings(self) -> dict[str, Optional[object]]:
@@ -351,6 +376,7 @@ class SettingsDialog(QDialog):
             "litellm_workflow_models": workflow_models or None,
             "quick_actions": self._quick_actions_value,
             "chat_user_bubble_color": self._chat_user_bubble_color,
+            "theme_mode": self._theme_mode,
         }
 
 

@@ -1,5 +1,7 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.23 - 2025-12-02 - Pass theme mode to settings dialog so selection persists.
+Updates: v0.15.22 - 2025-11-05 - Add light/dark theme runtime toggle with palette updates.
 Updates: v0.15.21 - 2025-11-05 - Honour configurable chat bubble colour from settings.
 Updates: v0.15.20 - 2025-11-05 - Highlight user chat messages with tinted transcript rows.
 Updates: v0.15.19 - 2025-11-05 - Run Prompt falls back to Execute Prompt when the workspace is empty.
@@ -111,7 +113,7 @@ from PySide6.QtWidgets import (
     QTextEdit,
 )
 
-from config import DEFAULT_CHAT_USER_BUBBLE_COLOR, PromptManagerSettings
+from config import DEFAULT_CHAT_USER_BUBBLE_COLOR, DEFAULT_THEME_MODE, PromptManagerSettings
 from core import (
     IntentLabel,
     NameGenerationError,
@@ -570,6 +572,7 @@ class MainWindow(QMainWindow):
         self._suppress_query_signal = False
         self._quick_shortcuts: List[QShortcut] = []
         self._layout_settings = QSettings("PromptManager", "MainWindow")
+        self._main_container: Optional[QFrame] = None
         self._main_splitter: Optional[QSplitter] = None
         self._list_splitter: Optional[QSplitter] = None
         self._workspace_splitter: Optional[QSplitter] = None
@@ -589,6 +592,8 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Prompt Manager")
         self._restore_window_geometry()
         self._build_ui()
+        self._refresh_theme_styles()
+        self._apply_theme()
         self._restore_splitter_state()
         self._capture_main_splitter_left_width()
         self.statusBar().addPermanentWidget(self._notification_indicator)
@@ -600,22 +605,9 @@ class MainWindow(QMainWindow):
     def _build_ui(self) -> None:
         """Create the main layout with list/search/detail panes."""
 
-        palette = self.palette()
-        window_color = palette.color(QPalette.Window)
-        border_color = QColor(
-            255 - window_color.red(),
-            255 - window_color.green(),
-            255 - window_color.blue(),
-        )
-        border_color.setAlpha(255)
-
         container = QFrame(self)
         container.setObjectName("mainContainer")
-        container.setStyleSheet(
-            "#mainContainer { "
-            f"border: 1px solid {border_color.name()}; "
-            "border-radius: 6px; background-color: palette(base); }"
-        )
+        self._main_container = container
         layout = QVBoxLayout(container)
         layout.setContentsMargins(12, 12, 12, 12)
 
@@ -1749,6 +1741,71 @@ class MainWindow(QMainWindow):
             if candidate.isValid():
                 return candidate.name().lower()
         return DEFAULT_CHAT_USER_BUBBLE_COLOR
+
+    def _apply_theme(self, mode: Optional[str] = None) -> None:
+        """Apply the configured theme palette across the application."""
+
+        app = QGuiApplication.instance()
+        if app is None:
+            return
+
+        theme = (mode or self._runtime_settings.get("theme_mode") or DEFAULT_THEME_MODE).strip().lower()
+        if theme not in {"light", "dark"}:
+            theme = DEFAULT_THEME_MODE
+
+        if theme == "dark":
+            palette = QPalette()
+            palette.setColor(QPalette.Window, QColor(31, 41, 51))
+            palette.setColor(QPalette.WindowText, Qt.white)
+            palette.setColor(QPalette.Base, QColor(24, 31, 41))
+            palette.setColor(QPalette.AlternateBase, QColor(37, 46, 59))
+            palette.setColor(QPalette.ToolTipBase, QColor(45, 55, 68))
+            palette.setColor(QPalette.ToolTipText, Qt.white)
+            palette.setColor(QPalette.Text, QColor(232, 235, 244))
+            palette.setColor(QPalette.Button, QColor(45, 55, 68))
+            palette.setColor(QPalette.ButtonText, Qt.white)
+            palette.setColor(QPalette.BrightText, QColor(255, 107, 107))
+            palette.setColor(QPalette.Link, QColor(140, 180, 255))
+            palette.setColor(QPalette.Highlight, QColor(99, 102, 241))
+            palette.setColor(QPalette.HighlightedText, Qt.white)
+            palette.setColor(QPalette.PlaceholderText, QColor(156, 163, 175))
+            palette.setColor(QPalette.Disabled, QPalette.Text, QColor(110, 115, 125))
+            palette.setColor(QPalette.Disabled, QPalette.ButtonText, QColor(110, 115, 125))
+            app.setPalette(palette)
+            app.setStyleSheet(
+                "QToolTip { color: #f9fafc; background-color: #1f2933; border: 1px solid #3b4252; }"
+            )
+        else:
+            palette = app.style().standardPalette()
+            app.setPalette(palette)
+            app.setStyleSheet("")
+            theme = "light"
+
+        self.setPalette(app.palette())
+        self._runtime_settings["theme_mode"] = theme
+        self._refresh_theme_styles()
+
+    def _refresh_theme_styles(self) -> None:
+        """Update widgets styled using palette-derived colours."""
+
+        container = self._main_container
+        if container is None:
+            return
+
+        app = QGuiApplication.instance()
+        palette = app.palette() if app is not None else self.palette()
+        window_color = palette.color(QPalette.Window)
+        border_color = QColor(
+            255 - window_color.red(),
+            255 - window_color.green(),
+            255 - window_color.blue(),
+        )
+        border_color.setAlpha(255)
+        container.setStyleSheet(
+            "#mainContainer { "
+            f"border: 1px solid {border_color.name()}; "
+            "border-radius: 6px; background-color: palette(base); }"
+        )
 
     def _update_diff_view(self, original: str, generated: str) -> None:
         """Render a unified diff comparing the request text with the response."""
@@ -2899,6 +2956,7 @@ class MainWindow(QMainWindow):
             litellm_workflow_models=self._runtime_settings.get("litellm_workflow_models"),
             quick_actions=self._runtime_settings.get("quick_actions"),
             chat_user_bubble_color=self._runtime_settings.get("chat_user_bubble_color"),
+            theme_mode=self._runtime_settings.get("theme_mode"),
         )
         if dialog.exec() != QDialog.Accepted:
             return
@@ -2960,6 +3018,16 @@ class MainWindow(QMainWindow):
         else:
             chat_colour = DEFAULT_CHAT_USER_BUBBLE_COLOR
         self._runtime_settings["chat_user_bubble_color"] = chat_colour
+        theme_value = updates.get("theme_mode")
+        if isinstance(theme_value, str):
+            theme_choice = theme_value.strip().lower()
+            if theme_choice not in {"light", "dark"}:
+                theme_choice = self._runtime_settings.get("theme_mode", DEFAULT_THEME_MODE)
+        else:
+            theme_choice = self._runtime_settings.get("theme_mode", DEFAULT_THEME_MODE)
+        if theme_choice not in {"light", "dark"}:
+            theme_choice = DEFAULT_THEME_MODE
+        self._runtime_settings["theme_mode"] = theme_choice
         persist_settings_to_config(
             {
                 "litellm_model": self._runtime_settings.get("litellm_model"),
@@ -2973,6 +3041,7 @@ class MainWindow(QMainWindow):
                 "litellm_stream": self._runtime_settings.get("litellm_stream"),
                 "litellm_api_key": self._runtime_settings.get("litellm_api_key"),
                 "chat_user_bubble_color": self._runtime_settings.get("chat_user_bubble_color"),
+                "theme_mode": self._runtime_settings.get("theme_mode"),
             }
         )
 
@@ -2988,10 +3057,12 @@ class MainWindow(QMainWindow):
             self._settings.litellm_drop_params = cleaned_drop_params
             self._settings.litellm_stream = stream_flag
             self._settings.chat_user_bubble_color = chat_colour
+            self._settings.theme_mode = theme_choice
 
         self._quick_actions = self._build_quick_actions(self._runtime_settings.get("quick_actions"))
         self._register_quick_shortcuts()
         self._sync_active_quick_action_button()
+        self._apply_theme(theme_choice)
         self._refresh_chat_history_view()
 
         try:
@@ -3040,6 +3111,7 @@ class MainWindow(QMainWindow):
             "chat_user_bubble_color": (
                 settings.chat_user_bubble_color if settings else DEFAULT_CHAT_USER_BUBBLE_COLOR
             ),
+            "theme_mode": settings.theme_mode if settings else DEFAULT_THEME_MODE,
         }
 
         config_path = Path("config/config.json")
@@ -3093,6 +3165,9 @@ class MainWindow(QMainWindow):
                 color_value = data.get("chat_user_bubble_color")
                 if isinstance(color_value, str) and color_value.strip():
                     runtime["chat_user_bubble_color"] = color_value.strip()
+                theme_value = data.get("theme_mode")
+                if isinstance(theme_value, str) and theme_value.strip():
+                    runtime["theme_mode"] = theme_value.strip()
         raw_colour = runtime.get("chat_user_bubble_color")
         if isinstance(raw_colour, str):
             candidate_colour = QColor(raw_colour)
@@ -3101,6 +3176,14 @@ class MainWindow(QMainWindow):
             )
         else:
             runtime["chat_user_bubble_color"] = DEFAULT_CHAT_USER_BUBBLE_COLOR
+        theme_value = runtime.get("theme_mode")
+        if isinstance(theme_value, str):
+            theme_choice = theme_value.strip().lower()
+            runtime["theme_mode"] = (
+                theme_choice if theme_choice in {"light", "dark"} else DEFAULT_THEME_MODE
+            )
+        else:
+            runtime["theme_mode"] = DEFAULT_THEME_MODE
         return runtime
 
     def _on_selection_changed(self, *_: object) -> None:

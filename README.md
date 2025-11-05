@@ -23,6 +23,7 @@ Prompt Manager is a desktop-focused application for cataloguing, searching, and 
 - Windows desktop builds ship with a bundled Prompt Manager icon so the taskbar, window chrome, and installers display consistent branding.
 - Info dialog now showcases the application icon and credits Icons8 as the asset source.
 - Chat transcripts highlight user turns with a tinted background that you can customise from the settings dialog for clearer session context.
+- Appearance settings let you toggle between light and dark themes so the UI matches your workspace.
 
 ## Getting Started
 

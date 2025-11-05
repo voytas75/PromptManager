@@ -1,5 +1,6 @@
 """Helpers for persisting runtime configuration without Qt dependencies.
 
+Updates: v0.2.3 - 2025-11-05 - Persist theme mode and chat appearance overrides.
 Updates: v0.2.2 - 2025-11-05 - Persist chat appearance overrides.
 Updates: v0.2.1 - 2025-11-05 - Persist LiteLLM workflow routing selections.
 """
@@ -51,6 +52,15 @@ def persist_settings_to_config(updates: dict[str, Optional[object]]) -> None:
             continue
         if key == "litellm_drop_params":
             value = _normalise_drop_params(value)
+        if key == "theme_mode":
+            if isinstance(value, str):
+                choice = value.strip().lower()
+                if choice not in {"light", "dark"} or choice == "light":
+                    value = None
+                else:
+                    value = choice
+            else:
+                value = None
         if key == "litellm_workflow_models" and isinstance(value, dict):
             cleaned: dict[str, str] = {}
             for route_key, route_value in value.items():

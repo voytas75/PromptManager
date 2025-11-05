@@ -1,5 +1,6 @@
 """Settings management for Prompt Manager configuration.
 
+Updates: v0.4.7 - 2025-11-05 - Add theme mode configuration options.
 Updates: v0.4.6 - 2025-11-05 - Add chat appearance configuration options.
 Updates: v0.4.5 - 2025-11-05 - Add LiteLLM workflow routing configuration.
 Updates: v0.4.4 - 2025-11-05 - Introduce LiteLLM inference model configuration.
@@ -43,9 +44,11 @@ LITELLM_ROUTED_WORKFLOWS: "OrderedDict[str, str]" = OrderedDict(
 
 LITELLM_ROUTING_OPTIONS: Tuple[str, str] = ("fast", "inference")
 
+DEFAULT_THEME_MODE = "light"
 DEFAULT_CHAT_USER_BUBBLE_COLOR = "#e6f0ff"
 
 _CHAT_COLOR_PATTERN = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
+_THEME_CHOICES = {"light", "dark"}
 
 
 class SettingsError(Exception):
@@ -93,6 +96,10 @@ class PromptManagerSettings(BaseSettings):
         default=None,
         description="Optional list of custom quick action definitions for the command palette.",
     )
+    theme_mode: Literal["light", "dark"] = Field(
+        default=DEFAULT_THEME_MODE,
+        description="Preferred UI theme mode (light or dark).",
+    )
     chat_user_bubble_color: str = Field(
         default=DEFAULT_CHAT_USER_BUBBLE_COLOR,
         description="Hex colour used when rendering user chat messages within the transcript tab.",
@@ -138,6 +145,7 @@ class PromptManagerSettings(BaseSettings):
                 "embedding_model": ["EMBEDDING_MODEL", "embedding_model"],
                 "embedding_device": ["EMBEDDING_DEVICE", "embedding_device"],
                 "quick_actions": ["QUICK_ACTIONS", "quick_actions"],
+                "theme_mode": ["THEME_MODE", "theme_mode"],
                 "chat_user_bubble_color": ["CHAT_USER_BUBBLE_COLOR", "chat_user_bubble_color"],
             },
         },
@@ -194,6 +202,15 @@ class PromptManagerSettings(BaseSettings):
         if backend in {"sentence-transformers", "sentence_transformers", "st"}:
             return "sentence-transformers"
         raise ValueError(f"Unsupported embedding backend '{value}'")
+
+    @field_validator("theme_mode", mode="before")
+    def _normalise_theme_mode(cls, value: Optional[str]) -> str:
+        if value is None:
+            return DEFAULT_THEME_MODE
+        text = str(value).strip().lower()
+        if text not in _THEME_CHOICES:
+            return DEFAULT_THEME_MODE
+        return text
 
     @field_validator("chat_user_bubble_color", mode="before")
     def _normalise_chat_colour(cls, value: Optional[str]) -> str:
