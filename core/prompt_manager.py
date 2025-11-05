@@ -1,5 +1,6 @@
 """High-level CRUD manager for prompt records backed by SQLite, ChromaDB, and Redis.
 
+Updates: v0.13.10 - 2025-11-05 - Add SQLite repository maintenance helpers.
 Updates: v0.13.9 - 2025-11-05 - Add ChromaDB integrity verification helper.
 Updates: v0.13.8 - 2025-11-05 - Add ChromaDB persistence maintenance helpers.
 Updates: v0.13.7 - 2025-11-30 - Add data reset helpers for maintenance workflows.
@@ -316,6 +317,21 @@ class PromptManager:
         except Exception:  # noqa: BLE001
             logger.warning("Unable to flush Chroma client persistence state", exc_info=True)
 
+    def _resolve_repository_path(self) -> Path:
+        """Return the path to the SQLite repository, ensuring it exists."""
+
+        candidate = self._db_path or getattr(self._repository, "_db_path", None)
+        if candidate is None:
+            raise PromptStorageError("SQLite repository path is not configured.")
+        if isinstance(candidate, Path):
+            path = candidate
+        else:
+            path = Path(str(candidate))
+        path = path.expanduser()
+        if not path.exists():
+            raise PromptStorageError(f"SQLite repository missing at {path}.")
+        return path
+
     @dataclass(slots=True)
     class IntentSuggestions:
         """Intent-aware search recommendations returned to callers."""
@@ -615,6 +631,71 @@ class PromptManager:
 
         summary = "\n".join(diagnostics)
         logger.info("Chroma vector store verification completed successfully: %s", summary.replace("\n", " | "))
+        return summary
+
+    def compact_repository(self) -> None:
+        """Vacuum the SQLite prompt repository to reclaim disk space."""
+
+        db_path = self._resolve_repository_path()
+        try:
+            with sqlite3.connect(str(db_path), timeout=60.0) as connection:
+                connection.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+                connection.execute("VACUUM;")
+        except sqlite3.Error as exc:
+            raise PromptStorageError("Unable to compact SQLite repository") from exc
+        logger.info("SQLite repository VACUUM completed at %s", db_path)
+
+    def optimize_repository(self) -> None:
+        """Refresh SQLite statistics for the prompt repository."""
+
+        db_path = self._resolve_repository_path()
+        try:
+            with sqlite3.connect(str(db_path), timeout=60.0) as connection:
+                connection.execute("ANALYZE;")
+                try:
+                    connection.execute("PRAGMA optimize;")
+                except sqlite3.Error as pragma_error:
+                    logger.debug(
+                        "Repository PRAGMA optimize not supported by current SQLite build: %s",
+                        pragma_error,
+                    )
+        except sqlite3.Error as exc:
+            raise PromptStorageError("Unable to optimize SQLite repository") from exc
+        logger.info("SQLite repository optimization completed at %s", db_path)
+
+    def verify_repository(self) -> str:
+        """Run integrity checks against the SQLite prompt repository."""
+
+        db_path = self._resolve_repository_path()
+        diagnostics: List[str] = []
+        try:
+            with sqlite3.connect(str(db_path), timeout=60.0) as connection:
+                integrity_rows = connection.execute("PRAGMA integrity_check;").fetchall()
+                integrity_failures = [str(row[0]) for row in integrity_rows if str(row[0]).lower() != "ok"]
+                if integrity_failures:
+                    message = "; ".join(integrity_failures)
+                    raise PromptStorageError(f"SQLite integrity check failed: {message}")
+                diagnostics.append("SQLite integrity_check: ok")
+
+                quick_rows = connection.execute("PRAGMA quick_check;").fetchall()
+                quick_failures = [str(row[0]) for row in quick_rows if str(row[0]).lower() != "ok"]
+                if quick_failures:
+                    message = "; ".join(quick_failures)
+                    raise PromptStorageError(f"SQLite quick_check failed: {message}")
+                diagnostics.append("SQLite quick_check: ok")
+
+                prompt_count = connection.execute("SELECT COUNT(*) FROM prompts;").fetchone()
+                template_count = connection.execute("SELECT COUNT(*) FROM templates;").fetchone()
+        except sqlite3.Error as exc:
+            raise PromptStorageError("Unable to verify SQLite repository") from exc
+
+        prompts_total = int(prompt_count[0]) if prompt_count else 0
+        templates_total = int(template_count[0]) if template_count else 0
+        diagnostics.append(f"Prompts: {prompts_total}")
+        diagnostics.append(f"Templates: {templates_total}")
+
+        summary = "\n".join(diagnostics)
+        logger.info("SQLite repository verification completed successfully: %s", summary.replace("\n", " | "))
         return summary
 
     def clear_usage_logs(self, logs_path: Optional[Union[str, Path]] = None) -> None:

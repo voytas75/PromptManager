@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.8.11 - 2025-11-05 - Add SQLite repository maintenance actions to maintenance dialog.
 Updates: v0.8.10 - 2025-11-05 - Add ChromaDB integrity verification action to maintenance dialog.
 Updates: v0.8.9 - 2025-11-05 - Add ChromaDB maintenance actions to the maintenance dialog.
 Updates: v0.8.8 - 2025-11-30 - Restore catalogue preview dialog for GUI import workflows.
@@ -903,6 +904,9 @@ class PromptMaintenanceDialog(QDialog):
         self._storage_path_label: QLabel
         self._storage_stats_view: QPlainTextEdit
         self._storage_refresh_button: QPushButton
+        self._sqlite_compact_button: QPushButton
+        self._sqlite_optimize_button: QPushButton
+        self._sqlite_verify_button: QPushButton
         self._stats_refresh_button: QPushButton
         self._reset_log_view: QPlainTextEdit
         self.setWindowTitle("Prompt Maintenance")
@@ -1128,6 +1132,30 @@ class PromptMaintenanceDialog(QDialog):
         self._storage_stats_view = QPlainTextEdit(storage_tab)
         self._storage_stats_view.setReadOnly(True)
         storage_layout.addWidget(self._storage_stats_view, stretch=1)
+
+        storage_actions_container = QWidget(storage_tab)
+        storage_actions_layout = QHBoxLayout(storage_actions_container)
+        storage_actions_layout.setContentsMargins(0, 0, 0, 0)
+        storage_actions_layout.setSpacing(12)
+
+        self._sqlite_compact_button = QPushButton("Compact Database", storage_actions_container)
+        self._sqlite_compact_button.setToolTip("Run VACUUM on the prompt database to reclaim space.")
+        self._sqlite_compact_button.clicked.connect(self._on_sqlite_compact_clicked)  # type: ignore[arg-type]
+        storage_actions_layout.addWidget(self._sqlite_compact_button)
+
+        self._sqlite_optimize_button = QPushButton("Optimize Database", storage_actions_container)
+        self._sqlite_optimize_button.setToolTip("Refresh SQLite statistics for prompt lookups.")
+        self._sqlite_optimize_button.clicked.connect(self._on_sqlite_optimize_clicked)  # type: ignore[arg-type]
+        storage_actions_layout.addWidget(self._sqlite_optimize_button)
+
+        self._sqlite_verify_button = QPushButton("Verify Index Integrity", storage_actions_container)
+        self._sqlite_verify_button.setToolTip("Run integrity checks against the prompt database indexes.")
+        self._sqlite_verify_button.clicked.connect(self._on_sqlite_verify_clicked)  # type: ignore[arg-type]
+        storage_actions_layout.addWidget(self._sqlite_verify_button)
+
+        storage_actions_layout.addStretch(1)
+
+        storage_layout.addWidget(storage_actions_container)
 
         self._tab_widget.addTab(storage_tab, "SQLite")
 
@@ -1435,6 +1463,70 @@ class PromptMaintenanceDialog(QDialog):
         finally:
             self._refresh_chroma_info()
 
+    def _set_storage_actions_busy(self, busy: bool) -> None:
+        """Disable SQLite maintenance buttons while a task is running."""
+
+        if not busy:
+            return
+        for button in (
+            self._storage_refresh_button,
+            self._sqlite_compact_button,
+            self._sqlite_optimize_button,
+            self._sqlite_verify_button,
+        ):
+            button.setEnabled(False)
+
+    def _on_sqlite_compact_clicked(self) -> None:
+        """Run VACUUM on the prompt repository."""
+
+        self._set_storage_actions_busy(True)
+        try:
+            self._manager.compact_repository()
+        except PromptManagerError as exc:
+            QMessageBox.critical(self, "Compaction failed", str(exc))
+            return
+        else:
+            QMessageBox.information(
+                self,
+                "Prompt database compacted",
+                "The SQLite repository has been vacuumed and reclaimed space.",
+            )
+        finally:
+            self._refresh_storage_info()
+
+    def _on_sqlite_optimize_clicked(self) -> None:
+        """Refresh SQLite statistics for the prompt repository."""
+
+        self._set_storage_actions_busy(True)
+        try:
+            self._manager.optimize_repository()
+        except PromptManagerError as exc:
+            QMessageBox.critical(self, "Optimization failed", str(exc))
+            return
+        else:
+            QMessageBox.information(
+                self,
+                "Prompt database optimized",
+                "SQLite statistics have been refreshed for prompt lookups.",
+            )
+        finally:
+            self._refresh_storage_info()
+
+    def _on_sqlite_verify_clicked(self) -> None:
+        """Verify integrity of the prompt repository."""
+
+        self._set_storage_actions_busy(True)
+        try:
+            summary = self._manager.verify_repository()
+        except PromptManagerError as exc:
+            QMessageBox.critical(self, "Verification failed", str(exc))
+            return
+        else:
+            message = summary or "SQLite repository integrity verified successfully."
+            QMessageBox.information(self, "Prompt database verified", message)
+        finally:
+            self._refresh_storage_info()
+
     def _on_reset_application_clicked(self) -> None:
         """Clear prompts, embeddings, and usage logs."""
 
@@ -1573,6 +1665,10 @@ class PromptMaintenanceDialog(QDialog):
             db_path = str(db_path_obj) if db_path_obj is not None else ""
 
         self._storage_path_label.setText(f"Path: {db_path}" if db_path else "Path: unknown")
+        self._storage_refresh_button.setEnabled(True)
+
+        stats_lines: List[str] = []
+        healthy = True
 
         size_bytes = None
         if db_path:
@@ -1580,10 +1676,15 @@ class PromptMaintenanceDialog(QDialog):
                 path_obj = Path(db_path)
                 if path_obj.exists():
                     size_bytes = path_obj.stat().st_size
-            except OSError:
-                size_bytes = None
+                else:
+                    healthy = False
+                    stats_lines.append("Database file not found.")
+            except OSError as exc:
+                healthy = False
+                stats_lines.append(f"File size: error ({exc})")
+        else:
+            healthy = False
 
-        stats_lines: List[str] = []
         if size_bytes is not None:
             stats_lines.append(f"File size: {size_bytes} bytes")
 
@@ -1591,22 +1692,33 @@ class PromptMaintenanceDialog(QDialog):
             prompt_count = len(repository.list())
             stats_lines.append(f"Prompts: {prompt_count}")
         except RepositoryError as exc:
+            healthy = False
             stats_lines.append(f"Prompts: error ({exc})")
 
         try:
             template_count = len(repository.list_templates())
             stats_lines.append(f"Templates: {template_count}")
         except RepositoryError as exc:
+            healthy = False
             stats_lines.append(f"Templates: error ({exc})")
 
         try:
             execution_count = len(repository.list_executions())
             stats_lines.append(f"Executions: {execution_count}")
         except RepositoryError as exc:
+            healthy = False
             stats_lines.append(f"Executions: error ({exc})")
 
-        self._storage_stats_view.setPlainText("\n".join(stats_lines))
-        self._storage_status_label.setText("Status: ready")
+        self._storage_stats_view.setPlainText("\n".join(stats_lines) if stats_lines else "No SQLite statistics available.")
+
+        if healthy:
+            self._storage_status_label.setText("Status: ready")
+        else:
+            self._storage_status_label.setText("Status: unavailable")
+
+        self._sqlite_compact_button.setEnabled(healthy)
+        self._sqlite_optimize_button.setEnabled(healthy)
+        self._sqlite_verify_button.setEnabled(healthy)
 
 class TemplateDialog(QDialog):
     """Modal dialog for creating or editing task templates."""
