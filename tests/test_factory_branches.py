@@ -23,6 +23,7 @@ def _make_settings(**overrides: object) -> SimpleNamespace:
         "litellm_api_base": None,
         "litellm_drop_params": None,
         "litellm_reasoning_effort": None,
+        "litellm_stream": False,
         "embedding_backend": "deterministic",
         "embedding_model": None,
         "embedding_device": None,

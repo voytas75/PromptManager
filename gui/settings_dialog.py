@@ -1,5 +1,6 @@
 """Settings dialog for configuring Prompt Manager runtime options.
 
+Updates: v0.2.2 - 2025-11-26 - Add LiteLLM streaming toggle to runtime settings UI.
 Updates: v0.2.1 - 2025-11-17 - Remove catalogue path configuration; imports now require explicit selection.
 Updates: v0.2.0 - 2025-11-16 - Apply palette-aware border styling to match main window chrome.
 Updates: v0.1.1 - 2025-11-15 - Avoid persisting LiteLLM API secrets to disk.
@@ -21,6 +22,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QMessageBox,
     QPlainTextEdit,
+    QCheckBox,
     QVBoxLayout,
 )
 
@@ -40,6 +42,7 @@ class SettingsDialog(QDialog):
         litellm_api_version: Optional[str] = None,
         litellm_drop_params: Optional[Sequence[str]] = None,
         litellm_reasoning_effort: Optional[str] = None,
+        litellm_stream: Optional[bool] = None,
         quick_actions: Optional[list[dict[str, object]]] = None,
     ) -> None:
         super().__init__(parent)
@@ -51,6 +54,7 @@ class SettingsDialog(QDialog):
         self._litellm_api_version = litellm_api_version or ""
         self._litellm_drop_params = ", ".join(litellm_drop_params) if litellm_drop_params else ""
         self._litellm_reasoning_effort = (litellm_reasoning_effort or "").strip()
+        self._litellm_stream = bool(litellm_stream)
         original_actions = [dict(entry) for entry in (quick_actions or []) if isinstance(entry, dict)]
         self._original_quick_actions = original_actions
         self._quick_actions_value: Optional[list[dict[str, object]]] = original_actions or None
@@ -101,6 +105,10 @@ class SettingsDialog(QDialog):
         self._reasoning_effort_input.setPlaceholderText("minimal / medium / high")
         form.addRow("LiteLLM reasoning effort", self._reasoning_effort_input)
 
+        self._stream_checkbox = QCheckBox("Enable streaming responses", self)
+        self._stream_checkbox.setChecked(self._litellm_stream)
+        form.addRow("LiteLLM streaming", self._stream_checkbox)
+
         layout.addLayout(form)
 
         self._quick_actions_input = QPlainTextEdit(self)
@@ -150,7 +158,7 @@ class SettingsDialog(QDialog):
             self._quick_actions_value = None
         super().accept()
 
-    def result_settings(self) -> dict[str, Optional[str | list[dict[str, object]]]]:
+    def result_settings(self) -> dict[str, Optional[object]]:
         """Return cleaned settings data."""
 
         def _clean(value: str) -> Optional[str]:
@@ -167,6 +175,7 @@ class SettingsDialog(QDialog):
             "litellm_api_version": _clean(self._api_version_input.text()),
             "litellm_drop_params": drop_params,
             "litellm_reasoning_effort": _clean(self._reasoning_effort_input.text()),
+            "litellm_stream": self._stream_checkbox.isChecked(),
             "quick_actions": self._quick_actions_value,
         }
 

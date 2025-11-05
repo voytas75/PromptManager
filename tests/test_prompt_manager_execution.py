@@ -67,6 +67,7 @@ class _StubExecutor:
     def __init__(self) -> None:
         self.called_with: Optional[str] = None
         self.conversation_length: int = 0
+        self.stream_flag: Optional[bool] = None
 
     def execute(  # type: ignore[override]
         self,
@@ -74,10 +75,13 @@ class _StubExecutor:
         request_text: str,
         *,
         conversation=None,
+        stream: Optional[bool] = None,
+        on_stream=None,
     ) -> CodexExecutionResult:
         self.called_with = request_text
         if conversation is not None:
             self.conversation_length = len(list(conversation))
+        self.stream_flag = stream
         return CodexExecutionResult(
             prompt_id=prompt.id,
             request_text=request_text,
@@ -95,6 +99,8 @@ class _FailingExecutor:
         request_text: str,
         *,
         conversation=None,
+        stream: Optional[bool] = None,
+        on_stream=None,
     ) -> CodexExecutionResult:
         raise ExecutionError("model timeout")
 
@@ -161,6 +167,7 @@ def test_execute_prompt_returns_outcome_and_logs_history(tmp_path: Path) -> None
 
     updated_prompt = manager.repository.get(prompt.id)
     assert updated_prompt.usage_count >= 1
+    assert executor.stream_flag is None
     manager.close()
 
 
@@ -202,6 +209,52 @@ def test_execute_prompt_supports_conversation(tmp_path: Path) -> None:
     assert follow_up.history_entry is not None
     assert follow_up.history_entry.metadata is not None
     assert follow_up.history_entry.metadata["conversation"] == follow_up.conversation
+    assert executor.stream_flag is None
+    manager.close()
+
+
+def test_execute_prompt_streams_to_callback(tmp_path: Path) -> None:
+    class _StreamingExecutor:
+        def __init__(self) -> None:
+            self.stream_flag: Optional[bool] = None
+
+        def execute(  # type: ignore[override]
+            self,
+            prompt: Prompt,
+            request_text: str,
+            *,
+            conversation=None,
+            stream: Optional[bool] = None,
+            on_stream=None,
+        ) -> CodexExecutionResult:
+            self.stream_flag = stream
+            if on_stream:
+                on_stream("partial ")
+                on_stream("output")
+            return CodexExecutionResult(
+                prompt_id=prompt.id,
+                request_text=request_text,
+                response_text="partial output",
+                duration_ms=12,
+                usage={},
+                raw_response={"choices": [{"message": {"content": "partial output"}}]},
+            )
+
+    executor = _StreamingExecutor()
+    manager, prompt, tracker = _manager_with_dependencies(tmp_path, executor)
+    chunks: list[str] = []
+
+    outcome = manager.execute_prompt(
+        prompt.id,
+        "print('hello')",
+        stream=True,
+        on_stream=chunks.append,
+    )
+
+    assert executor.stream_flag is True
+    assert chunks == ["partial ", "output"]
+    assert outcome.result.response_text == "partial output"
+    assert outcome.history_entry is not None
     manager.close()
 
 

@@ -2,6 +2,12 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.13.10] - 2025-11-26
+
+- Added a LiteLLM streaming execution mode with optional token callbacks so prompt runs can surface incremental output while histories persist aggregated responses.
+- Introduced a `litellm_stream` configuration flag, surfaced it via the CLI settings summary, and extended documentation with environment variable guidance.
+- Added a GUI toggle for LiteLLM streaming and live output updates in the workspace result pane.
+
 ## [0.13.9] - 2025-11-05
 
 - Removed explicit LiteLLM timeouts across prompt execution, engineering, metadata generation, and embedding calls so long-running requests rely on provider defaults instead of failing after fixed client deadlines.

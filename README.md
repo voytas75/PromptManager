@@ -190,6 +190,7 @@ These commands reuse the same validation and merge logic as the GUI; pass an exp
     "chroma_path": "data/chromadb",
     "redis_dsn": "redis://localhost:6379/0",
     "cache_ttl_seconds": 600,
+    "litellm_stream": false,
     "litellm_drop_params": ["max_tokens", "max_output_tokens", "temperature", "timeout"],
     "litellm_reasoning_effort": null,
     "embedding_model": "text-embedding-3-large"
@@ -198,6 +199,7 @@ These commands reuse the same validation and merge logic as the GUI; pass an exp
 
 - Prompt Manager strips any `litellm_drop_params` entries from outgoing LiteLLM requests locally, ensuring providers such as Azure OpenAI never receive unsupported fields like `drop_params`.
 - Configure `litellm_reasoning_effort` with `minimal`, `medium`, or `high` to enable OpenAI reasoning behaviour on `gpt-4.1`, `o3`, or `gpt-5` model families.
+- Set `litellm_stream` to `true` to request streaming chat completions; streaming deltas are forwarded to registered callbacks while histories persist the fully aggregated response.
 - Supplying `embedding_model` automatically switches the embedding backend to LiteLLM so semantic sync runs against your chosen OpenAI embedding model.
 
 - Environment variables (override JSON when set):
@@ -214,6 +216,7 @@ These commands reuse the same validation and merge logic as the GUI; pass an exp
   | `PROMPT_MANAGER_LITELLM_API_BASE` | Optional LiteLLM API base override | `https://proxy.example.com` |
   | `PROMPT_MANAGER_LITELLM_DROP_PARAMS` | Comma/JSON list of LiteLLM parameters to drop before sending requests | `max_tokens,temperature` |
   | `PROMPT_MANAGER_LITELLM_REASONING_EFFORT` | Reasoning effort level for OpenAI reasoning models (`minimal`, `medium`, `high`) | `medium` |
+  | `PROMPT_MANAGER_LITELLM_STREAM` | Enable streaming chat completions (`true`/`false`) | `true` |
   | `PROMPT_MANAGER_EMBEDDING_MODEL` | Embedding model identifier; enables LiteLLM embeddings automatically | `text-embedding-3-large` |
   | `AZURE_OPENAI_API_KEY` | Alias for LiteLLM API key (Azure) | `azure-key` |
   | `AZURE_OPENAI_ENDPOINT` | Alias for LiteLLM API base (Azure) | `https://<resource>.openai.azure.com` |

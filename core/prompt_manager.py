@@ -1,5 +1,7 @@
 """High-level CRUD manager for prompt records backed by SQLite, ChromaDB, and Redis.
 
+Updates: v0.13.6 - 2025-11-26 - Track LiteLLM streaming configuration and expose runtime toggle.
+Updates: v0.13.5 - 2025-11-26 - Support LiteLLM streaming execution with optional callbacks.
 Updates: v0.13.4 - 2025-11-25 - Expose prompt catalogue statistics for maintenance surfaces.
 Updates: v0.13.3 - 2025-11-19 - Add prompt scenario generation workflow and GUI integration.
 Updates: v0.13.2 - 2025-11-16 - Add task template CRUD APIs and apply workflow.
@@ -23,7 +25,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Union, cast
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Union, cast
 
 import json
 import logging
@@ -256,6 +258,7 @@ class PromptManager:
         self._description_generator = description_generator
         self._scenario_generator = scenario_generator
         self._prompt_engineer = prompt_engineer
+        self._litellm_stream: bool = False
         self._litellm_drop_params: Optional[Sequence[str]] = None
         self._litellm_reasoning_effort: Optional[str] = None
         for candidate in (name_generator, scenario_generator, prompt_engineer, executor):
@@ -263,6 +266,11 @@ class PromptManager:
                 params = getattr(candidate, "drop_params")
                 self._litellm_drop_params = tuple(params)  # type: ignore[arg-type]
                 break
+        for candidate in (executor, name_generator, scenario_generator, prompt_engineer):
+            if candidate is not None and hasattr(candidate, "stream"):
+                self._litellm_stream = bool(getattr(candidate, "stream", False))
+                if self._litellm_stream:
+                    break
         if executor is not None and getattr(executor, "reasoning_effort", None):
             effort = getattr(executor, "reasoning_effort")
             self._litellm_reasoning_effort = str(effort) if effort else None
@@ -273,6 +281,7 @@ class PromptManager:
                 self._executor.drop_params = list(self._litellm_drop_params)
             if self._litellm_reasoning_effort:
                 self._executor.reasoning_effort = self._litellm_reasoning_effort
+            self._executor.stream = self._litellm_stream
         self._history_tracker = history_tracker
         if user_profile is not None:
             self._user_profile: Optional[UserProfile] = user_profile
@@ -602,6 +611,8 @@ class PromptManager:
         request_text: str,
         *,
         conversation: Optional[Sequence[Mapping[str, str]]] = None,
+        stream: Optional[bool] = None,
+        on_stream: Optional[Callable[[str], None]] = None,
     ) -> "PromptManager.ExecutionOutcome":
         """Execute a prompt via LiteLLM and persist the outcome when configured."""
 
@@ -634,6 +645,8 @@ class PromptManager:
                     prompt,
                     request_text,
                     conversation=conversation_history,
+                    stream=stream,
+                    on_stream=on_stream,
                 )
             except ExecutionError as exc:
                 failed_messages = list(conversation_history)
@@ -792,6 +805,7 @@ class PromptManager:
         *,
         drop_params: Optional[Sequence[str]] = None,
         reasoning_effort: Optional[str] = None,
+        stream: Optional[bool] = None,
     ) -> None:
         """Configure the LiteLLM name generator at runtime."""
         if not model:
@@ -801,7 +815,10 @@ class PromptManager:
             self._litellm_drop_params = None
             self._litellm_reasoning_effort = None
             self._executor = None
+            self._litellm_stream = False
             return
+        if stream is not None:
+            self._litellm_stream = bool(stream)
         try:
             self._name_generator = LiteLLMNameGenerator(
                 model=model,
@@ -833,6 +850,7 @@ class PromptManager:
                 api_version=api_version,
                 drop_params=drop_params,
                 reasoning_effort=reasoning_effort,
+                stream=self._litellm_stream,
             )
         except RuntimeError as exc:
             raise NameGenerationError(str(exc)) from exc
@@ -841,6 +859,7 @@ class PromptManager:
                 self._executor.drop_params = list(self._litellm_drop_params)
             if self._litellm_reasoning_effort:
                 self._executor.reasoning_effort = self._litellm_reasoning_effort
+            self._executor.stream = self._litellm_stream
         if self._intent_classifier is not None and model:
             # Name generation and intent classification may share LiteLLM routing;
             # future integrations can configure richer classification when desired.

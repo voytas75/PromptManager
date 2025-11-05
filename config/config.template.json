@@ -5,6 +5,7 @@
   "cache_ttl_seconds": 600,
   "litellm_model": "azure/gpt-4o-mini",
   "litellm_api_version": "2025-04-01-preview",
+  "litellm_stream": false,
   "litellm_drop_params": ["max_tokens", "max_output_tokens", "temperature", "timeout"],
   "litellm_reasoning_effort": null,
   "embedding_model": "text-embedding-3-large"

@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.12 - 2025-11-26 - Add LiteLLM streaming toggle with incremental output updates.
 Updates: v0.15.11 - 2025-11-27 - Add prompt duplication to the context menu.
 Updates: v0.15.10 - 2025-11-26 - Add context menu execution action for prompts.
 Updates: v0.15.9 - 2025-11-26 - Add application info dialog accessible from the toolbar.
@@ -551,6 +552,10 @@ class MainWindow(QMainWindow):
         )
         self._active_quick_action_id: Optional[str] = None
         self._query_seeded_by_quick_action: Optional[str] = None
+        self._streaming_in_progress = False
+        self._streaming_buffer: List[str] = []
+        self._stream_prompt_id: Optional[uuid.UUID] = None
+        self._stream_control_state: Dict[str, bool] = {}
         self._suppress_query_signal = False
         self._quick_shortcuts: List[QShortcut] = []
         self._layout_settings = QSettings("PromptManager", "MainWindow")
@@ -1538,6 +1543,77 @@ class MainWindow(QMainWindow):
         self._intent_hint.setText(message)
         self._intent_hint.setVisible(True)
 
+    def _is_streaming_enabled(self) -> bool:
+        """Return whether streaming responses are enabled in runtime settings."""
+
+        value = self._runtime_settings.get("litellm_stream")
+        if value is None and self._settings is not None:
+            return bool(getattr(self._settings, "litellm_stream", False))
+        return bool(value)
+
+    def _begin_streaming_run(self, prompt: Prompt) -> None:
+        """Prepare UI state for an in-flight streaming execution."""
+
+        self._streaming_in_progress = True
+        self._stream_prompt_id = prompt.id
+        self._streaming_buffer = []
+        self._stream_control_state = {
+            "render": self._render_markdown_button.isEnabled(),
+            "copy": self._copy_result_button.isEnabled(),
+            "copy_window": self._copy_result_to_text_window_button.isEnabled(),
+            "save": self._save_button.isEnabled(),
+            "continue": self._continue_chat_button.isEnabled(),
+            "end": self._end_chat_button.isEnabled(),
+        }
+        self._result_label.setText(f"Streaming — {prompt.name}")
+        self._result_meta.setText("Receiving response…")
+        self._result_text.clear()
+        self._render_markdown_button.setEnabled(False)
+        self._copy_result_button.setEnabled(False)
+        self._copy_result_to_text_window_button.setEnabled(False)
+        self._save_button.setEnabled(False)
+        self._continue_chat_button.setEnabled(False)
+        self._end_chat_button.setEnabled(False)
+        self.statusBar().showMessage(f"Streaming '{prompt.name}'…", 0)
+
+    def _handle_stream_chunk(self, chunk: str) -> None:
+        """Append a streaming chunk to the output pane as it arrives."""
+
+        if not self._streaming_in_progress or not chunk:
+            return
+        cursor = self._result_text.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        cursor.insertText(chunk)
+        self._result_text.setTextCursor(cursor)
+        self._streaming_buffer.append(chunk)
+        QGuiApplication.processEvents()
+
+    def _end_streaming_run(self) -> None:
+        """Reset streaming state after execution completes or fails."""
+
+        self._streaming_in_progress = False
+        self._stream_prompt_id = None
+        self._streaming_buffer = []
+        if self._stream_control_state:
+            self._render_markdown_button.setEnabled(self._stream_control_state.get("render", False))
+            self._copy_result_button.setEnabled(self._stream_control_state.get("copy", False))
+            self._copy_result_to_text_window_button.setEnabled(
+                self._stream_control_state.get("copy_window", False)
+            )
+            self._save_button.setEnabled(self._stream_control_state.get("save", False))
+            self._continue_chat_button.setEnabled(self._stream_control_state.get("continue", False))
+            self._end_chat_button.setEnabled(self._stream_control_state.get("end", False))
+        else:
+            has_result = bool(self._last_execution and self._last_execution.result.response_text)
+            self._render_markdown_button.setEnabled(has_result)
+            self._copy_result_button.setEnabled(has_result)
+            self._copy_result_to_text_window_button.setEnabled(has_result)
+            self._save_button.setEnabled(self._last_execution is not None)
+            self._continue_chat_button.setEnabled(self._last_execution is not None)
+            self._end_chat_button.setEnabled(bool(self._chat_conversation))
+        self._stream_control_state = {}
+        self.statusBar().clearMessage()
+
     def _display_execution_result(
         self,
         prompt: Prompt,
@@ -2127,13 +2203,21 @@ class MainWindow(QMainWindow):
             self._reset_chat_session()
             return
 
+        streaming_enabled = self._is_streaming_enabled()
+        callback = self._handle_stream_chunk if streaming_enabled else None
+        if streaming_enabled:
+            self._begin_streaming_run(prompt)
         try:
             outcome = self._manager.execute_prompt(
                 prompt.id,
                 follow_up,
                 conversation=self._chat_conversation,
+                stream=streaming_enabled,
+                on_stream=callback,
             )
         except PromptExecutionUnavailable as exc:
+            if streaming_enabled:
+                self._end_streaming_run()
             self._continue_chat_button.setEnabled(False)
             self._usage_logger.log_execute(
                 prompt_name=prompt.name,
@@ -2144,6 +2228,8 @@ class MainWindow(QMainWindow):
             self._show_error("Prompt execution unavailable", str(exc))
             return
         except (PromptExecutionError, PromptManagerError) as exc:
+            if streaming_enabled:
+                self._end_streaming_run()
             self._usage_logger.log_execute(
                 prompt_name=prompt.name,
                 success=False,
@@ -2152,6 +2238,9 @@ class MainWindow(QMainWindow):
             )
             self._show_error("Continue chat failed", str(exc))
             return
+        finally:
+            if streaming_enabled and self._streaming_in_progress:
+                self._end_streaming_run()
 
         self._display_execution_result(prompt, outcome)
         self._usage_logger.log_execute(
@@ -2191,9 +2280,20 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(empty_text_message, 4000)
             return
 
+        streaming_enabled = self._is_streaming_enabled()
+        callback = self._handle_stream_chunk if streaming_enabled else None
+        if streaming_enabled:
+            self._begin_streaming_run(prompt)
         try:
-            outcome = self._manager.execute_prompt(prompt.id, trimmed)
+            outcome = self._manager.execute_prompt(
+                prompt.id,
+                trimmed,
+                stream=streaming_enabled,
+                on_stream=callback,
+            )
         except PromptExecutionUnavailable as exc:
+            if streaming_enabled:
+                self._end_streaming_run()
             self._run_button.setEnabled(False)
             self._usage_logger.log_execute(
                 prompt_name=prompt.name,
@@ -2204,6 +2304,8 @@ class MainWindow(QMainWindow):
             self._show_error("Prompt execution unavailable", str(exc))
             return
         except (PromptExecutionError, PromptManagerError) as exc:
+            if streaming_enabled:
+                self._end_streaming_run()
             self._usage_logger.log_execute(
                 prompt_name=prompt.name,
                 success=False,
@@ -2212,6 +2314,9 @@ class MainWindow(QMainWindow):
             )
             self._show_error("Prompt execution failed", str(exc))
             return
+        finally:
+            if streaming_enabled and self._streaming_in_progress:
+                self._end_streaming_run()
 
         self._display_execution_result(prompt, outcome)
         if keep_text_after:
@@ -2758,6 +2863,9 @@ class MainWindow(QMainWindow):
         else:
             cleaned_drop_params = None
         self._runtime_settings["litellm_drop_params"] = cleaned_drop_params
+        stream_value = updates.get("litellm_stream")
+        stream_flag = bool(stream_value)
+        self._runtime_settings["litellm_stream"] = stream_flag
         quick_actions_value = updates.get("quick_actions")
         if isinstance(quick_actions_value, list):
             cleaned_quick_actions = [
@@ -2774,6 +2882,7 @@ class MainWindow(QMainWindow):
                 "litellm_reasoning_effort": self._runtime_settings.get("litellm_reasoning_effort"),
                 "quick_actions": self._runtime_settings.get("quick_actions"),
                 "litellm_drop_params": self._runtime_settings.get("litellm_drop_params"),
+                "litellm_stream": self._runtime_settings.get("litellm_stream"),
                 "litellm_api_key": self._runtime_settings.get("litellm_api_key"),
             }
         )
@@ -2786,6 +2895,7 @@ class MainWindow(QMainWindow):
             self._settings.litellm_reasoning_effort = updates.get("litellm_reasoning_effort")
             self._settings.quick_actions = cleaned_quick_actions
             self._settings.litellm_drop_params = cleaned_drop_params
+            self._settings.litellm_stream = stream_flag
 
         self._quick_actions = self._build_quick_actions(self._runtime_settings.get("quick_actions"))
         self._register_quick_shortcuts()
@@ -2799,6 +2909,7 @@ class MainWindow(QMainWindow):
                 self._runtime_settings.get("litellm_api_version"),
                 drop_params=self._runtime_settings.get("litellm_drop_params"),
                 reasoning_effort=self._runtime_settings.get("litellm_reasoning_effort"),
+                stream=self._runtime_settings.get("litellm_stream"),
             )
         except NameGenerationError as exc:
             QMessageBox.warning(self, "LiteLLM configuration", str(exc))
@@ -2825,6 +2936,7 @@ class MainWindow(QMainWindow):
             if settings and settings.litellm_drop_params
             else None,
             "litellm_reasoning_effort": settings.litellm_reasoning_effort if settings else None,
+            "litellm_stream": settings.litellm_stream if settings is not None else None,
             "quick_actions": derived_quick_actions,
         }
 
@@ -2853,6 +2965,16 @@ class MainWindow(QMainWindow):
                     elif isinstance(drop_value, str):
                         parsed = [part.strip() for part in drop_value.split(",") if part.strip()]
                         runtime["litellm_drop_params"] = parsed or None
+                if runtime.get("litellm_stream") is None:
+                    stream_value = data.get("litellm_stream")
+                    if isinstance(stream_value, bool):
+                        runtime["litellm_stream"] = stream_value
+                    elif isinstance(stream_value, str):
+                        lowered = stream_value.strip().lower()
+                        if lowered in {"true", "1", "yes", "on"}:
+                            runtime["litellm_stream"] = True
+                        elif lowered in {"false", "0", "no", "off"}:
+                            runtime["litellm_stream"] = False
                 if runtime["quick_actions"] is None and isinstance(data.get("quick_actions"), list):
                     runtime["quick_actions"] = [
                         dict(entry) for entry in data["quick_actions"] if isinstance(entry, dict)

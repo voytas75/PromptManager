@@ -1,5 +1,6 @@
 """Settings management for Prompt Manager configuration.
 
+Updates: v0.4.3 - 2025-11-26 - Add LiteLLM streaming configuration flag.
 Updates: v0.4.2 - 2025-11-15 - Ignore LiteLLM API secrets in JSON configuration files with warnings.
 Updates: v0.4.1 - 2025-11-14 - Load LiteLLM API key from JSON configuration files.
 Updates: v0.4.0 - 2025-11-07 - Add configurable embedding backend options.
@@ -51,6 +52,10 @@ class PromptManagerSettings(BaseSettings):
         default=None,
         description="Optional reasoning effort level for OpenAI reasoning models (minimal, medium, high).",
     )
+    litellm_stream: bool = Field(
+        default=False,
+        description="Enable streaming responses when executing prompts via LiteLLM.",
+    )
     quick_actions: Optional[list[dict[str, object]]] = Field(
         default=None,
         description="Optional list of custom quick action definitions for the command palette.",
@@ -89,6 +94,7 @@ class PromptManagerSettings(BaseSettings):
                 "litellm_api_version": ["LITELLM_API_VERSION", "litellm_api_version", "AZURE_OPENAI_API_VERSION"],
                 "litellm_drop_params": ["LITELLM_DROP_PARAMS", "litellm_drop_params"],
                 "litellm_reasoning_effort": ["LITELLM_REASONING_EFFORT", "litellm_reasoning_effort"],
+                "litellm_stream": ["LITELLM_STREAM", "litellm_stream"],
                 "embedding_backend": ["EMBEDDING_BACKEND", "embedding_backend"],
                 "embedding_model": ["EMBEDDING_MODEL", "embedding_model"],
                 "embedding_device": ["EMBEDDING_DEVICE", "embedding_device"],
@@ -263,6 +269,7 @@ class PromptManagerSettings(BaseSettings):
                 "embedding_device": ["EMBEDDING_DEVICE", "embedding_device"],
                 "quick_actions": ["QUICK_ACTIONS", "quick_actions"],
                 "litellm_reasoning_effort": ["LITELLM_REASONING_EFFORT", "litellm_reasoning_effort"],
+                "litellm_stream": ["LITELLM_STREAM", "litellm_stream"],
             }
             for field, keys in mapping.items():
                 for key in keys:
@@ -350,6 +357,7 @@ class PromptManagerSettings(BaseSettings):
                     "litellm_api_version",
                     "litellm_drop_params",
                     "litellm_reasoning_effort",
+                    "litellm_stream",
                     "embedding_backend",
                     "embedding_model",
                     "embedding_device",

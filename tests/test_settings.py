@@ -102,6 +102,7 @@ def test_litellm_settings_from_env(monkeypatch, tmp_path) -> None:
     assert settings.litellm_api_key == "secret-key"
     assert settings.litellm_api_base == "https://proxy.example.com"
     assert settings.litellm_drop_params is None
+    assert settings.litellm_stream is False
 
 
 def test_reasoning_effort_normalised(monkeypatch, tmp_path) -> None:
@@ -154,6 +155,17 @@ def test_litellm_drop_params_from_json_not_overridden_by_empty_env(monkeypatch, 
     settings = load_settings()
 
     assert settings.litellm_drop_params == ["max_tokens"]
+
+
+def test_litellm_stream_flag_from_env(monkeypatch, tmp_path) -> None:
+    tmp_config = tmp_path / "config.json"
+    tmp_config.write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(tmp_config))
+    monkeypatch.setenv("PROMPT_MANAGER_LITELLM_STREAM", "true")
+
+    settings = load_settings()
+
+    assert settings.litellm_stream is True
 
 
 def test_embedding_backend_defaults_to_deterministic() -> None:

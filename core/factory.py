@@ -1,5 +1,6 @@
 """Factories for constructing PromptManager instances from validated settings.
 
+Updates: v0.7.2 - 2025-11-26 - Wire LiteLLM streaming flag into executor construction.
 Updates: v0.7.1 - 2025-11-19 - Configure LiteLLM scenario generator for prompt metadata enrichment.
 Updates: v0.7.0 - 2025-11-15 - Wire prompt engineer construction into manager factory.
 Updates: v0.6.1 - 2025-11-07 - Add configurable embedding backends via settings.
@@ -155,6 +156,7 @@ def build_prompt_manager(
             api_version=settings.litellm_api_version,
             drop_params=settings.litellm_drop_params,
             reasoning_effort=settings.litellm_reasoning_effort,
+            stream=settings.litellm_stream,
         )
 
     manager_kwargs: Dict[str, Any] = {

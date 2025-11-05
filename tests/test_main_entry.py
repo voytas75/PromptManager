@@ -32,6 +32,7 @@ class _DummySettings(SimpleNamespace):
             litellm_api_version=None,
             litellm_drop_params=None,
             litellm_reasoning_effort=None,
+            litellm_stream=False,
             embedding_backend="deterministic",
             embedding_model=None,
         )
@@ -77,6 +78,7 @@ def test_main_print_settings_logs_and_exits(
     captured = capsys.readouterr()
     assert "Prompt Manager configuration summary" in captured.out
     assert "LiteLLM API key: not set" in captured.out
+    assert "Streaming enabled:" in captured.out
 
 
 def test_main_print_settings_masks_api_key(

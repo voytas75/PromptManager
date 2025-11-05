@@ -1,5 +1,6 @@
 """Application entry point for Prompt Manager.
 
+Updates: v0.7.4 - 2025-11-26 - Surface LiteLLM streaming configuration in CLI summaries.
 Updates: v0.7.3 - 2025-11-17 - Require explicit catalogue paths; skip built-in seeding on startup.
 Updates: v0.7.2 - 2025-11-15 - Extend --print-settings with health checks and masked secret output.
 Updates: v0.7.1 - 2025-11-14 - Simplify GUI dependency guidance for unified installs.
@@ -83,6 +84,7 @@ def _print_settings_summary(settings: PromptManagerSettings) -> None:
     litellm_api_base = getattr(settings, "litellm_api_base", None)
     litellm_api_version = getattr(settings, "litellm_api_version", None)
     litellm_reasoning_effort = getattr(settings, "litellm_reasoning_effort", None)
+    litellm_stream = getattr(settings, "litellm_stream", False)
     embedding_backend = getattr(settings, "embedding_backend", None)
     embedding_model = getattr(settings, "embedding_model", None)
 
@@ -101,6 +103,7 @@ def _print_settings_summary(settings: PromptManagerSettings) -> None:
         f"LiteLLM API base: {litellm_api_base or 'not set'}",
         f"LiteLLM API version: {litellm_api_version or 'not set'}",
         f"Reasoning effort: {litellm_reasoning_effort or 'not set'}",
+        f"Streaming enabled: {'yes' if litellm_stream else 'no'}",
         "",
         "Embedding configuration",
         "-----------------------",
