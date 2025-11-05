@@ -1,5 +1,7 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.8.10 - 2025-11-05 - Add ChromaDB integrity verification action to maintenance dialog.
+Updates: v0.8.9 - 2025-11-05 - Add ChromaDB maintenance actions to the maintenance dialog.
 Updates: v0.8.8 - 2025-11-30 - Restore catalogue preview dialog for GUI import workflows.
 Updates: v0.8.7 - 2025-11-30 - Remove catalogue preview dialog after retiring import workflow.
 Updates: v0.8.6 - 2025-11-27 - Support pre-filling prompts when duplicating entries.
@@ -894,6 +896,9 @@ class PromptMaintenanceDialog(QDialog):
         self._chroma_path_label: QLabel
         self._chroma_stats_view: QPlainTextEdit
         self._chroma_refresh_button: QPushButton
+        self._chroma_compact_button: QPushButton
+        self._chroma_optimize_button: QPushButton
+        self._chroma_verify_button: QPushButton
         self._storage_status_label: QLabel
         self._storage_path_label: QLabel
         self._storage_stats_view: QPlainTextEdit
@@ -1066,6 +1071,30 @@ class PromptMaintenanceDialog(QDialog):
         self._chroma_stats_view = QPlainTextEdit(chroma_tab)
         self._chroma_stats_view.setReadOnly(True)
         chroma_layout.addWidget(self._chroma_stats_view, stretch=1)
+
+        chroma_actions_container = QWidget(chroma_tab)
+        chroma_actions_layout = QHBoxLayout(chroma_actions_container)
+        chroma_actions_layout.setContentsMargins(0, 0, 0, 0)
+        chroma_actions_layout.setSpacing(12)
+
+        self._chroma_compact_button = QPushButton("Compact Persistent Store", chroma_actions_container)
+        self._chroma_compact_button.setToolTip("Reclaim disk space by vacuuming the Chroma SQLite store.")
+        self._chroma_compact_button.clicked.connect(self._on_chroma_compact_clicked)  # type: ignore[arg-type]
+        chroma_actions_layout.addWidget(self._chroma_compact_button)
+
+        self._chroma_optimize_button = QPushButton("Optimize Persistent Store", chroma_actions_container)
+        self._chroma_optimize_button.setToolTip("Refresh query statistics to improve Chroma performance.")
+        self._chroma_optimize_button.clicked.connect(self._on_chroma_optimize_clicked)  # type: ignore[arg-type]
+        chroma_actions_layout.addWidget(self._chroma_optimize_button)
+
+        self._chroma_verify_button = QPushButton("Verify Index Integrity", chroma_actions_container)
+        self._chroma_verify_button.setToolTip("Run integrity checks against the Chroma index files.")
+        self._chroma_verify_button.clicked.connect(self._on_chroma_verify_clicked)  # type: ignore[arg-type]
+        chroma_actions_layout.addWidget(self._chroma_verify_button)
+
+        chroma_actions_layout.addStretch(1)
+
+        chroma_layout.addWidget(chroma_actions_container)
 
         self._tab_widget.addTab(chroma_tab, "ChromaDB")
 
@@ -1342,6 +1371,70 @@ class PromptMaintenanceDialog(QDialog):
         self._refresh_chroma_info()
         self.maintenance_applied.emit("Embedding store cleared.")
 
+    def _set_chroma_actions_busy(self, busy: bool) -> None:
+        """Disable Chroma maintenance buttons while a task is running."""
+
+        if not busy:
+            return
+        for button in (
+            self._chroma_refresh_button,
+            self._chroma_compact_button,
+            self._chroma_optimize_button,
+            self._chroma_verify_button,
+        ):
+            button.setEnabled(False)
+
+    def _on_chroma_compact_clicked(self) -> None:
+        """Run VACUUM maintenance on the Chroma persistent store."""
+
+        self._set_chroma_actions_busy(True)
+        try:
+            self._manager.compact_vector_store()
+        except PromptManagerError as exc:
+            QMessageBox.critical(self, "Compaction failed", str(exc))
+            return
+        else:
+            QMessageBox.information(
+                self,
+                "Chroma store compacted",
+                "The persistent Chroma store has been vacuumed and reclaimed space.",
+            )
+        finally:
+            self._refresh_chroma_info()
+
+    def _on_chroma_optimize_clicked(self) -> None:
+        """Refresh query statistics for the Chroma persistent store."""
+
+        self._set_chroma_actions_busy(True)
+        try:
+            self._manager.optimize_vector_store()
+        except PromptManagerError as exc:
+            QMessageBox.critical(self, "Optimization failed", str(exc))
+            return
+        else:
+            QMessageBox.information(
+                self,
+                "Chroma store optimized",
+                "Chroma query statistics have been refreshed for better performance.",
+            )
+        finally:
+            self._refresh_chroma_info()
+
+    def _on_chroma_verify_clicked(self) -> None:
+        """Verify integrity of the Chroma persistent store."""
+
+        self._set_chroma_actions_busy(True)
+        try:
+            summary = self._manager.verify_vector_store()
+        except PromptManagerError as exc:
+            QMessageBox.critical(self, "Verification failed", str(exc))
+            return
+        else:
+            message = summary or "Chroma store integrity verified successfully."
+            QMessageBox.information(self, "Chroma store verified", message)
+        finally:
+            self._refresh_chroma_info()
+
     def _on_reset_application_clicked(self) -> None:
         """Clear prompts, embeddings, and usage logs."""
 
@@ -1434,6 +1527,9 @@ class PromptMaintenanceDialog(QDialog):
             self._chroma_path_label.setText(f"Path: {path}" if path else "")
             self._chroma_stats_view.setPlainText("")
             self._chroma_refresh_button.setEnabled(False)
+            self._chroma_compact_button.setEnabled(False)
+            self._chroma_optimize_button.setEnabled(False)
+            self._chroma_verify_button.setEnabled(False)
             return
 
         self._chroma_refresh_button.setEnabled(True)
@@ -1442,6 +1538,11 @@ class PromptMaintenanceDialog(QDialog):
         if details.get("error"):
             status = f"Error: {details['error']}"
         self._chroma_status_label.setText(f"Status: {status}")
+
+        has_error = bool(details.get("error"))
+        self._chroma_compact_button.setEnabled(not has_error)
+        self._chroma_optimize_button.setEnabled(not has_error)
+        self._chroma_verify_button.setEnabled(not has_error)
 
         path_parts = []
         if path:

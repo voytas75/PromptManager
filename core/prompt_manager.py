@@ -1,5 +1,7 @@
 """High-level CRUD manager for prompt records backed by SQLite, ChromaDB, and Redis.
 
+Updates: v0.13.9 - 2025-11-05 - Add ChromaDB integrity verification helper.
+Updates: v0.13.8 - 2025-11-05 - Add ChromaDB persistence maintenance helpers.
 Updates: v0.13.7 - 2025-11-30 - Add data reset helpers for maintenance workflows.
 Updates: v0.13.6 - 2025-11-26 - Track LiteLLM streaming configuration and expose runtime toggle.
 Updates: v0.13.5 - 2025-11-26 - Support LiteLLM streaming execution with optional callbacks.
@@ -31,8 +33,9 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Union
 import json
 import logging
 import os
-import uuid
 import shutil
+import sqlite3
+import uuid
 
 import chromadb
 from chromadb.api import ClientAPI
@@ -302,6 +305,17 @@ class PromptManager:
         except ChromaError as exc:
             raise PromptStorageError("Unable to initialise ChromaDB collection") from exc
 
+    def _persist_chroma_client(self) -> None:
+        """Flush the Chroma client to disk when supported."""
+
+        persist = getattr(self._chroma_client, "persist", None)
+        if not callable(persist):
+            return
+        try:
+            persist()
+        except Exception:  # noqa: BLE001
+            logger.warning("Unable to flush Chroma client persistence state", exc_info=True)
+
     @dataclass(slots=True)
     class IntentSuggestions:
         """Intent-aware search recommendations returned to callers."""
@@ -520,6 +534,88 @@ class PromptManager:
         except Exception as exc:  # noqa: BLE001
             raise PromptStorageError("Unable to reset Chroma vector store") from exc
         logger.info("Chroma vector store reset completed.")
+
+    def compact_vector_store(self) -> None:
+        """Vacuum and truncate the persistent Chroma SQLite store."""
+
+        db_path = Path(self._chroma_path) / "chroma.sqlite3"
+        if not db_path.exists():
+            raise PromptStorageError(f"Chroma persistence database missing at {db_path}.")
+        self._persist_chroma_client()
+        try:
+            with sqlite3.connect(str(db_path), timeout=60.0) as connection:
+                connection.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+                connection.execute("VACUUM;")
+        except sqlite3.Error as exc:
+            raise PromptStorageError("Unable to compact Chroma vector store") from exc
+        logger.info("Chroma vector store VACUUM completed at %s", db_path)
+
+    def optimize_vector_store(self) -> None:
+        """Refresh SQLite statistics to optimize Chroma query planning."""
+
+        db_path = Path(self._chroma_path) / "chroma.sqlite3"
+        if not db_path.exists():
+            raise PromptStorageError(f"Chroma persistence database missing at {db_path}.")
+        self._persist_chroma_client()
+        try:
+            with sqlite3.connect(str(db_path), timeout=60.0) as connection:
+                connection.execute("ANALYZE;")
+                try:
+                    connection.execute("PRAGMA optimize;")
+                except sqlite3.Error as pragma_error:
+                    logger.debug(
+                        "PRAGMA optimize not supported by current SQLite build: %s",
+                        pragma_error,
+                    )
+        except sqlite3.Error as exc:
+            raise PromptStorageError("Unable to optimize Chroma vector store") from exc
+        logger.info("Chroma vector store optimization completed at %s", db_path)
+
+    def verify_vector_store(self) -> str:
+        """Run integrity checks against the persistent Chroma store."""
+
+        db_path = Path(self._chroma_path) / "chroma.sqlite3"
+        if not db_path.exists():
+            raise PromptStorageError(f"Chroma persistence database missing at {db_path}.")
+
+        diagnostics: List[str] = []
+        self._persist_chroma_client()
+        try:
+            with sqlite3.connect(str(db_path), timeout=60.0) as connection:
+                integrity_rows = connection.execute("PRAGMA integrity_check;").fetchall()
+                integrity_failures = [str(row[0]) for row in integrity_rows if str(row[0]).lower() != "ok"]
+                if integrity_failures:
+                    message = "; ".join(integrity_failures)
+                    raise PromptStorageError(f"Chroma integrity check failed: {message}")
+                diagnostics.append("SQLite integrity_check: ok")
+
+                quick_rows = connection.execute("PRAGMA quick_check;").fetchall()
+                quick_failures = [str(row[0]) for row in quick_rows if str(row[0]).lower() != "ok"]
+                if quick_failures:
+                    message = "; ".join(quick_failures)
+                    raise PromptStorageError(f"Chroma quick_check failed: {message}")
+                diagnostics.append("SQLite quick_check: ok")
+        except sqlite3.Error as exc:
+            raise PromptStorageError("Unable to verify Chroma vector store") from exc
+
+        if self._collection is None:
+            self._initialise_chroma_collection()
+
+        collection = self._collection
+        if collection is None:
+            raise PromptStorageError("Chroma collection could not be initialised for verification.")
+
+        try:
+            count = int(collection.count())
+            diagnostics.append(f"Collection count: {count}")
+            collection.peek(limit=min(count or 1, 10))
+            diagnostics.append("Collection peek: ok")
+        except ChromaError as exc:
+            raise PromptStorageError("Unable to query Chroma collection during verification") from exc
+
+        summary = "\n".join(diagnostics)
+        logger.info("Chroma vector store verification completed successfully: %s", summary.replace("\n", " | "))
+        return summary
 
     def clear_usage_logs(self, logs_path: Optional[Union[str, Path]] = None) -> None:
         """Remove persisted usage analytics logs while keeping settings intact."""
