@@ -1,5 +1,7 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.15 - 2025-11-30 - Remove catalogue import controls from the toolbar.
+Updates: v0.15.14 - 2025-11-28 - Add exit toolbar icon and shortcut for graceful shutdown.
 Updates: v0.15.12 - 2025-11-26 - Add LiteLLM streaming toggle with incremental output updates.
 Updates: v0.15.11 - 2025-11-27 - Add prompt duplication to the context menu.
 Updates: v0.15.10 - 2025-11-26 - Add context menu execution action for prompts.
@@ -92,6 +94,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QPushButton,
     QSplitter,
+    QStyle,
     QTabWidget,
     QToolButton,
     QVBoxLayout,
@@ -112,9 +115,7 @@ from core import (
     PromptNotFoundError,
     PromptStorageError,
     RepositoryError,
-    diff_prompt_catalog,
     export_prompt_catalog,
-    import_prompt_catalog,
 )
 from core.prompt_engineering import PromptRefinement
 from core.notifications import Notification, NotificationStatus
@@ -123,7 +124,6 @@ from models.prompt_model import Prompt, TaskTemplate
 from .command_palette import CommandPaletteDialog, QuickAction, rank_prompts_for_action
 from .code_highlighter import CodeHighlighter
 from .dialogs import (
-    CatalogPreviewDialog,
     InfoDialog,
     MarkdownPreviewDialog,
     PromptDialog,
@@ -624,10 +624,6 @@ class MainWindow(QMainWindow):
         self._add_button.clicked.connect(self._on_add_clicked)  # type: ignore[arg-type]
         controls_layout.addWidget(self._add_button)
 
-        self._import_button = QPushButton("Import", self)
-        self._import_button.clicked.connect(self._on_import_clicked)  # type: ignore[arg-type]
-        controls_layout.addWidget(self._import_button)
-
         self._export_button = QPushButton("Export", self)
         self._export_button.clicked.connect(self._on_export_clicked)  # type: ignore[arg-type]
         controls_layout.addWidget(self._export_button)
@@ -651,6 +647,15 @@ class MainWindow(QMainWindow):
         self._settings_button = QPushButton("Settings", self)
         self._settings_button.clicked.connect(self._on_settings_clicked)  # type: ignore[arg-type]
         controls_layout.addWidget(self._settings_button)
+
+        self._exit_button = QToolButton(self)
+        self._exit_button.setIcon(self.style().standardIcon(QStyle.SP_TitleBarCloseButton))
+        self._exit_button.setToolTip("Exit Prompt Manager")
+        self._exit_button.setAccessibleName("Exit Prompt Manager")
+        self._exit_button.setAutoRaise(True)
+        self._exit_button.setCursor(Qt.PointingHandCursor)
+        self._exit_button.clicked.connect(self._on_exit_clicked)  # type: ignore[arg-type]
+        controls_layout.addWidget(self._exit_button)
 
         layout.addLayout(controls_layout)
 
@@ -1783,6 +1788,10 @@ class MainWindow(QMainWindow):
             shortcut.activated.connect(self._show_command_palette)  # type: ignore[arg-type]
             self._quick_shortcuts.append(shortcut)
 
+        exit_shortcut = QShortcut(QKeySequence("Ctrl+Q"), self)
+        exit_shortcut.activated.connect(self._on_exit_clicked)  # type: ignore[arg-type]
+        self._quick_shortcuts.append(exit_shortcut)
+
         for action in self._quick_actions:
             if not action.shortcut:
                 continue
@@ -2729,52 +2738,6 @@ class MainWindow(QMainWindow):
         self._detail_widget.clear()
         self._load_prompts(self._search_input.text())
 
-    def _on_import_clicked(self) -> None:
-        """Preview catalogue diff and optionally apply updates."""
-
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Select catalogue file",
-            "",
-            "JSON Files (*.json);;All Files (*)",
-        )
-        catalog_path: Optional[Path]
-        if file_path:
-            catalog_path = Path(file_path)
-        else:
-            directory = QFileDialog.getExistingDirectory(self, "Select catalogue directory", "")
-            if not directory:
-                return
-            catalog_path = Path(directory)
-
-        catalog_path = catalog_path.expanduser()
-
-        try:
-            preview = diff_prompt_catalog(self._manager, catalog_path)
-        except Exception as exc:
-            QMessageBox.warning(self, "Catalogue preview failed", str(exc))
-            return
-
-        dialog = CatalogPreviewDialog(preview, self)
-        if dialog.exec() != QDialog.Accepted or not dialog.apply_requested:
-            return
-
-        try:
-            result = import_prompt_catalog(self._manager, catalog_path)
-        except Exception as exc:
-            QMessageBox.critical(self, "Catalogue import failed", str(exc))
-            return
-
-        message = (
-            f"Catalogue applied (added {result.added}, updated {result.updated}, "
-            f"skipped {result.skipped}, errors {result.errors})"
-        )
-        if result.errors:
-            QMessageBox.warning(self, "Catalogue applied with errors", message)
-        else:
-            self.statusBar().showMessage(message, 5000)
-        self._load_prompts(self._search_input.text())
-
     def _on_export_clicked(self) -> None:
         """Export current prompts to JSON or YAML."""
 
@@ -2846,6 +2809,13 @@ class MainWindow(QMainWindow):
             return
         updates = dialog.result_settings()
         self._apply_settings(updates)
+
+    def _on_exit_clicked(self) -> None:
+        """Close the application via the toolbar exit control."""
+
+        logger.info("Exit control activated; closing Prompt Manager.")
+        self.statusBar().showMessage("Closing Prompt Manager…", 2000)
+        self.close()
 
     def _apply_settings(self, updates: dict[str, Optional[str | list[dict[str, object]]]]) -> None:
         """Persist settings, refresh catalogue, and update name generator."""

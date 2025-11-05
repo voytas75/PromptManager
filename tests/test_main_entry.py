@@ -1,5 +1,6 @@
 """Lightweight integration checks for main module.
 
+Updates: v0.4.0 - 2025-11-30 - Remove catalogue import command coverage.
 Updates: v0.3.0 - 2025-11-15 - Cover enhanced --print-settings summary and masked API keys.
 Updates: v0.2.0 - 2025-11-05 - Add coverage for GUI dependency fallback.
 """
@@ -55,14 +56,6 @@ class _DummyManager:
         return self.suggestion_response
 
 
-class _CatalogResult:
-    def __init__(self) -> None:
-        self.added = 0
-        self.updated = 0
-        self.skipped = 0
-        self.errors = 0
-
-
 def test_main_print_settings_logs_and_exits(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -70,7 +63,6 @@ def test_main_print_settings_logs_and_exits(
     monkeypatch.setattr(main, "load_settings", lambda: _DummySettings())
     manager = _DummyManager()
     monkeypatch.setattr(main, "build_prompt_manager", lambda settings: manager)
-    monkeypatch.setattr(main, "import_prompt_catalog", lambda *_: _CatalogResult())
 
     exit_code = main.main()
 
@@ -138,7 +130,6 @@ def test_main_logs_ready_message_on_success(
     monkeypatch.setattr(main, "load_settings", lambda: _DummySettings())
     manager = _DummyManager()
     monkeypatch.setattr(main, "build_prompt_manager", lambda settings: manager)
-    monkeypatch.setattr(main, "import_prompt_catalog", lambda *_: _CatalogResult())
 
     exit_code = main.main()
 
@@ -154,7 +145,6 @@ def test_main_launches_gui_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     dummy_manager = _DummyManager()
     monkeypatch.setattr(main, "load_settings", lambda: _DummySettings())
     monkeypatch.setattr(main, "build_prompt_manager", lambda settings: dummy_manager)
-    monkeypatch.setattr(main, "import_prompt_catalog", lambda *_: _CatalogResult())
 
     called = {}
 
@@ -181,7 +171,6 @@ def test_main_returns_error_when_gui_dependency_missing(
     manager = _DummyManager()
     monkeypatch.setattr(main, "load_settings", lambda: _DummySettings())
     monkeypatch.setattr(main, "build_prompt_manager", lambda settings: manager)
-    monkeypatch.setattr(main, "import_prompt_catalog", lambda *_: _CatalogResult())
 
     class _GuiError(RuntimeError):
         pass
@@ -265,10 +254,7 @@ def test_main_entrypoint_guard_executes(
     core_stub = types.ModuleType("core")
     dummy_manager = _DummyManager()
     core_stub.build_prompt_manager = lambda settings: dummy_manager
-    core_stub.CatalogDiff = main.CatalogDiff
-    core_stub.diff_prompt_catalog = lambda *args, **kwargs: core_stub.CatalogDiff()
     core_stub.export_prompt_catalog = lambda *args, **kwargs: Path("export.json")
-    core_stub.import_prompt_catalog = lambda *args, **kwargs: _CatalogResult()
 
     monkeypatch.setitem(sys.modules, "config", config_stub)
     monkeypatch.setitem(sys.modules, "core", core_stub)
@@ -277,7 +263,6 @@ def test_main_entrypoint_guard_executes(
         GuiDependencyError=RuntimeError,
     )
     monkeypatch.setitem(sys.modules, "gui", gui_stub)
-    monkeypatch.setattr(main, "import_prompt_catalog", lambda *_: _CatalogResult())
 
     main_path = Path(main.__file__)
     code = compile(main_path.read_text(encoding="utf-8"), str(main_path), "exec")
@@ -289,36 +274,6 @@ def test_main_entrypoint_guard_executes(
     output = capsys.readouterr().out
     assert "ChromaDB at" in output
     assert dummy_manager.closed is True
-
-
-def test_catalog_import_dry_run(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
-    monkeypatch.setattr(
-        "sys.argv",
-        ["prompt-manager", "catalog-import", "catalog.json", "--dry-run"],
-    )
-    manager = _DummyManager()
-    monkeypatch.setattr(main, "load_settings", lambda: _DummySettings())
-    monkeypatch.setattr(main, "build_prompt_manager", lambda settings: manager)
-
-    diff = main.CatalogDiff(added=1)
-    monkeypatch.setattr(main, "diff_prompt_catalog", lambda *_, **__: diff)
-
-    applied = {}
-
-    def _import_stub(*_: object, **__: object) -> _CatalogResult:
-        applied["called"] = True
-        return _CatalogResult()
-
-    monkeypatch.setattr(main, "import_prompt_catalog", _import_stub)
-
-    exit_code = main.main()
-
-    assert exit_code == 0
-    output = capsys.readouterr().out
-    assert "Catalogue preview" in output
-    assert "Dry-run complete" in output
-    assert "called" not in applied
-    assert manager.closed is True
 
 
 def test_usage_report_command(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
@@ -351,7 +306,6 @@ def test_usage_report_command(monkeypatch: pytest.MonkeyPatch, capsys: pytest.Ca
     monkeypatch.setattr(main, "load_settings", lambda: _DummySettings())
     manager = _DummyManager()
     monkeypatch.setattr(main, "build_prompt_manager", lambda settings: manager)
-    monkeypatch.setattr(main, "import_prompt_catalog", lambda *_: _CatalogResult())
 
     exit_code = main.main()
 

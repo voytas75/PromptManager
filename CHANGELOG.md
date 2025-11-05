@@ -2,6 +2,15 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.13.12] - 2025-11-30
+
+- Removed the `catalog-import` CLI command and associated GUI controls; catalogue entries are now added manually or via external tooling while the built-in export command remains available.
+- Simplified documentation to reflect the export-only workflow and removed remaining references to automatic catalogue seeding.
+
+## [0.13.11] - 2025-11-28
+
+- Added an exit toolbar icon (and `Ctrl+Q` shortcut) that closes the GUI gracefully by running shutdown hooks before quitting.
+
 ## [0.13.10] - 2025-11-26
 
 - Added a LiteLLM streaming execution mode with optional token callbacks so prompt runs can surface incremental output while histories persist aggregated responses.

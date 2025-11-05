@@ -102,6 +102,7 @@ Further modules (session history, execution pipeline) will be introduced in subs
 - Use the workspace beneath the toolbar to paste text, run **Detect Need**, request **Suggest Prompt**, and copy the top-ranked prompt directly to the clipboard.
 - As you type, the workspace auto-detects the language (Python, PowerShell, Bash, Markdown, JSON, YAML, or plain text) and applies lightweight syntax highlighting so prompts stay readable.
 - Press `Ctrl+K` (or `Ctrl+Shift+P`) to open the command palette for quick actions, or use dedicated shortcuts (`Ctrl+1`…`Ctrl+4`) to jump straight to explain/fix/document/enhance workflows.
+- Click the exit icon in the toolbar (or press `Ctrl+Q`) to close the application gracefully and flush background services.
 - Tailor the palette in **Settings → Quick actions** by pasting a JSON array of additional actions (identifier, title, description, optional `category_hint`, `tag_hints`, `template`, `prompt_id`, `shortcut`). `prompt_id` can reference a prompt by UUID or name; custom entries override defaults when identifiers collide.
 - Task template controls sit above the workspace: pick an existing template to pre-fill the query area and surface linked prompts, or use **New**, **Edit**, **Delete**, and **Clear** to manage templates without leaving the app.
 
@@ -110,10 +111,10 @@ Further modules (session history, execution pipeline) will be introduced in subs
 - Dialogs validate required fields and surface backend errors with actionable messaging while keeping data in sync across SQLite, Redis, and ChromaDB.
 - When adding prompts the dialog can generate a name from the context field via the **Generate** button. Configure LiteLLM (model + API key) so this suggestion comes from your chosen LLM; otherwise the UI falls back to a heuristic title.
 - The **Prompt Body** field is where you paste the actual prompt text that will be sent to the model—it's displayed prominently in the detail pane.
-- Use the **Settings** button to update the catalogue path or LiteLLM routing options (model/base/version) at runtime; these values persist to `config/config.json` while API keys entered in the dialog stay in-memory only. Set `PROMPT_MANAGER_LITELLM_API_KEY` in your environment to reuse the key across sessions.
+- Use the **Settings** button to adjust LiteLLM routing options (model/base/version), streaming preferences, and quick actions; these values persist to `config/config.json` while API keys entered in the dialog stay in-memory only. Set `PROMPT_MANAGER_LITELLM_API_KEY` in your environment to reuse the key across sessions.
 - Intent detection appears beneath the workspace and search bar once you start typing or analysing text, highlighting the inferred category (Debugging, Refactoring, Documentation, etc.), language hints, and the top-matching prompts.
 - When LiteLLM is configured, leaving the **Name** and **Description** fields blank will automatically populate them from the prompt body, speeding up catalogue entry for new prompts.
-- Import or export catalogues directly from the toolbar: **Import** previews a diff and applies updates, while **Export** writes the current state to JSON or YAML.
+- Use the **Export** button to write the current catalogue to JSON or YAML for backups or sharing.
 - The **History** button opens a read-only view of recent prompt executions, including request/response excerpts, durations, and any captured errors.
 
 ## Executing Prompts
@@ -127,22 +128,20 @@ Further modules (session history, execution pipeline) will be introduced in subs
 - Failures are logged with status `failed` and surfaced in the GUI. Successful runs increment `usage_count` for the prompt so catalogue analytics remain accurate.
 - Use the **History** tab to filter by status/prompt, search across notes, edit saved entries, and export the current view to CSV—changes flow straight into SQLite via the history APIs.
 
-## CLI Catalogue Utilities
+## CLI Utilities
 
-Prompt Manager now ships dedicated catalogue tooling alongside the GUI:
+Prompt Manager ships CLI helpers alongside the GUI:
 
-- `python -m main catalog-import <path>` renders a diff preview (added/updated/skipped prompts) and, unless `--dry-run` is passed, applies the changes to SQLite/ChromaDB. Use `--no-overwrite` to keep existing prompts untouched.
 - `python -m main catalog-export <path>` writes the current repository to JSON or YAML (auto-detected from the extension or forced with `--format`). A YAML export requires `PyYAML`, which is bundled in `requirements.txt`.
 - `python -m main suggest "your query"` runs the configured semantic retrieval stack and prints the top matching prompts with detected intent details—useful for validating LiteLLM or sentence-transformer embeddings.
 - `python -m main usage-report` summarises the anonymised GUI workspace analytics (counts per action, top intents, top recommended prompts). Pass `--path` to point at a different JSONL log file.
 
-These commands reuse the same validation and merge logic as the GUI; pass an explicit path each time you import or export.
+These commands reuse the same validation logic as the GUI; pass an explicit path each time you export.
 
 ## Prompt Catalogue
 
-- Prompt Manager no longer seeds default prompts. Configure a catalogue path if you want prompts pre-loaded during startup or via the CLI import command.
-- Provide a JSON file (or directory of JSON files) when prompted to import via the GUI or `catalog-import` CLI command. Entries with matching names update existing prompts; new names are inserted automatically.
-- Both the CLI (`catalog-import`) and the GUI **Import** button show a diff preview before any data changes, making it easy to confirm adds/updates.
+- Prompt Manager no longer seeds default prompts. Add entries directly through the GUI (**Add** button) or import them via your own scripts before launching the application.
+- Use the **Export** button or the `catalog-export` CLI command to back up prompts once you are happy with the catalogue.
 - Minimum JSON structure:
 
   ```json
@@ -160,7 +159,7 @@ These commands reuse the same validation and merge logic as the GUI; pass an exp
 
 - Optional fields (`language`, `related_prompts`, `created_at`, `last_modified`, `usage_count`, `source`, and extension slots) map directly to the `Prompt` dataclass. Missing values fall back to sensible defaults and invalid entries are logged during import.
 - Populate `category`, `tags`, and `quality_score` to get the most value from the GUI filters and semantic search.
-- For LLM-based prompt naming, set `PROMPT_MANAGER_LITELLM_MODEL` and `PROMPT_MANAGER_LITELLM_API_KEY`. The catalogue importer itself does not call LiteLLM; the Generate button does when invoked.
+- For LLM-based prompt naming, set `PROMPT_MANAGER_LITELLM_MODEL` and `PROMPT_MANAGER_LITELLM_API_KEY`. The Generate button uses LiteLLM when invoked; exports simply serialise stored prompts.
 
 ## Telemetry
 

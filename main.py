@@ -1,11 +1,11 @@
 """Application entry point for Prompt Manager.
 
+Updates: v0.7.5 - 2025-11-30 - Remove catalogue import command and startup messaging.
 Updates: v0.7.4 - 2025-11-26 - Surface LiteLLM streaming configuration in CLI summaries.
 Updates: v0.7.3 - 2025-11-17 - Require explicit catalogue paths; skip built-in seeding on startup.
 Updates: v0.7.2 - 2025-11-15 - Extend --print-settings with health checks and masked secret output.
 Updates: v0.7.1 - 2025-11-14 - Simplify GUI dependency guidance for unified installs.
 Updates: v0.7.0 - 2025-11-07 - Add semantic suggestion CLI to verify embedding backends.
-Updates: v0.6.0 - 2025-11-06 - Add CLI catalogue import/export commands with diff previews.
 Updates: v0.4.1 - 2025-11-05 - Launch GUI by default and add --no-gui flag.
 Updates: v0.4.0 - 2025-11-05 - Ensure manager shutdown occurs on exit and update GUI guidance.
 Updates: v0.3.0 - 2025-11-05 - Gracefully handle missing GUI dependencies.
@@ -26,13 +26,7 @@ from pathlib import Path
 from typing import Callable, Optional, cast
 
 from config import PromptManagerSettings, load_settings
-from core import (
-    CatalogDiff,
-    build_prompt_manager,
-    diff_prompt_catalog,
-    export_prompt_catalog,
-    import_prompt_catalog,
-)
+from core import build_prompt_manager, export_prompt_catalog
 
 
 def _mask_secret(value: Optional[str]) -> str:
@@ -128,21 +122,6 @@ def _setup_logging(logging_conf_path: Optional[Path]) -> None:
     )
 
 
-def _print_catalog_preview(diff: CatalogDiff) -> None:
-    header = (
-        f"Catalogue preview ({diff.source or 'builtin'}): "
-        f"added={diff.added} updated={diff.updated} "
-        f"skipped={diff.skipped} unchanged={diff.unchanged}"
-    )
-    print(header)
-    for entry in diff.entries:
-        print(f"\n[{entry.change_type.value.upper()}] {entry.name} ({entry.prompt_id})")
-        if entry.diff:
-            print(textwrap.indent(entry.diff, "  "))
-        else:
-            print("  (no diff)")
-
-
 def _resolve_export_format(path: Path, explicit_format: Optional[str]) -> str:
     if explicit_format:
         return explicit_format.lower()
@@ -150,32 +129,6 @@ def _resolve_export_format(path: Path, explicit_format: Optional[str]) -> str:
     if suffix in {".yaml", ".yml"}:
         return "yaml"
     return "json"
-
-
-def _run_catalog_import(manager, args: argparse.Namespace, logger: logging.Logger) -> int:
-    catalog_path = Path(args.path).expanduser()
-    overwrite = not getattr(args, "no_overwrite", False)
-    try:
-        preview = diff_prompt_catalog(manager, catalog_path, overwrite=overwrite)
-    except Exception as exc:
-        logger.error("Unable to preview catalogue: %s", exc)
-        return 5
-    _print_catalog_preview(preview)
-    if getattr(args, "dry_run", False):
-        logger.info("Dry-run complete. No changes applied.")
-        return 0
-    if not preview.has_changes():
-        logger.info("No catalogue changes detected; nothing to apply.")
-        return 0
-    result = import_prompt_catalog(manager, catalog_path, overwrite=overwrite)
-    logger.info(
-        "Catalogue import applied: added=%d updated=%d skipped=%d errors=%d",
-        result.added,
-        result.updated,
-        result.skipped,
-        result.errors,
-    )
-    return 0 if result.errors == 0 else 5
 
 
 def _run_catalog_export(manager, args: argparse.Namespace, logger: logging.Logger) -> int:
@@ -321,22 +274,6 @@ def parse_args() -> argparse.Namespace:
 
     subparsers = parser.add_subparsers(dest="command")
 
-    import_parser = subparsers.add_parser(
-        "catalog-import",
-        help="Import prompts from a JSON file or directory, showing a diff preview first.",
-    )
-    import_parser.add_argument("path", type=Path, help="Path to a catalogue JSON file or directory")
-    import_parser.add_argument(
-        "--no-overwrite",
-        action="store_true",
-        help="Skip updates for existing prompts (new prompts will still be added).",
-    )
-    import_parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Preview catalogue changes without applying them.",
-    )
-
     export_parser = subparsers.add_parser(
         "catalog-export",
         help="Export the current prompt catalogue to JSON or YAML.",
@@ -408,9 +345,6 @@ def main() -> int:
 
     command = getattr(args, "command", None)
     try:
-        if command == "catalog-import":
-            return _run_catalog_import(manager, args, logger)
-
         if command == "catalog-export":
             return _run_catalog_export(manager, args, logger)
 
@@ -427,8 +361,6 @@ def main() -> int:
             finally:
                 manager.close()
             return result
-
-        logger.info("Skipping automatic catalogue import; provide a path via the GUI or catalog-import command when needed.")
 
         # Minimal interactive stub to verify bootstrap until GUI arrives
         logger.info("Prompt Manager ready. Database at %s", settings.db_path)
