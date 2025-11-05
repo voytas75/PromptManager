@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.19 - 2025-11-05 - Run Prompt falls back to Execute Prompt when the workspace is empty.
 Updates: v0.15.18 - 2025-11-05 - Persist LiteLLM routing selections and forward them to runtime configuration.
 Updates: v0.15.17 - 2025-12-01 - Pass LiteLLM streaming flag into settings dialog so checkbox reflects configuration.
 Updates: v0.15.16 - 2025-11-30 - Keep catalogue import controls while CLI command is removed.
@@ -2356,7 +2357,7 @@ class MainWindow(QMainWindow):
         )
 
     def _on_run_prompt_clicked(self) -> None:
-        """Execute the selected prompt via the manager."""
+        """Execute the selected prompt, seeding from the workspace or the prompt body."""
 
         prompt = self._current_prompt()
         if prompt is None:
@@ -2366,6 +2367,9 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Select a prompt to execute first.", 4000)
             return
         request_text = self._query_input.toPlainText()
+        if not request_text.strip():
+            self._execute_prompt_from_context_menu(prompt)
+            return
         self._execute_prompt_with_text(
             prompt,
             request_text,
