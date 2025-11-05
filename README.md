@@ -162,6 +162,11 @@ These commands reuse the same validation logic as the GUI; pass an explicit path
 - Populate `category`, `tags`, and `quality_score` to get the most value from the GUI filters and semantic search.
 - For LLM-based prompt naming, set `PROMPT_MANAGER_LITELLM_MODEL` and `PROMPT_MANAGER_LITELLM_API_KEY`. The Generate button uses LiteLLM when invoked; exports simply serialise stored prompts.
 
+## Maintenance & Reset
+
+- The **Maintenance** dialog exposes a new **Data Reset** tab with one-click actions to clear the prompt database, wipe the ChromaDB embedding store, or reset all application data (including usage logs) while leaving settings unchanged.
+- Each destructive action includes a confirmation prompt and logs the outcome inside the dialog so operators can audit what was removed.
+
 ## Telemetry
 
 - ChromaDB anonymized telemetry is disabled by default. Prompt Manager initialises the Chroma client with `anonymized_telemetry=False` to avoid sending usage data and to reduce noisy PostHog-related logs in restricted environments.

@@ -1,5 +1,6 @@
 """High-level CRUD manager for prompt records backed by SQLite, ChromaDB, and Redis.
 
+Updates: v0.13.7 - 2025-11-30 - Add data reset helpers for maintenance workflows.
 Updates: v0.13.6 - 2025-11-26 - Track LiteLLM streaming configuration and expose runtime toggle.
 Updates: v0.13.5 - 2025-11-26 - Support LiteLLM streaming execution with optional callbacks.
 Updates: v0.13.4 - 2025-11-25 - Expose prompt catalogue statistics for maintenance surfaces.
@@ -31,6 +32,7 @@ import json
 import logging
 import os
 import uuid
+import shutil
 
 import chromadb
 from chromadb.api import ClientAPI
@@ -204,8 +206,11 @@ class PromptManager:
         self._collection: Any = cast(Any, None)
         resolved_db_path = Path(db_path).expanduser() if db_path is not None else None
         resolved_chroma_path = Path(chroma_path).expanduser()
+        self._db_path = resolved_db_path
         self._chroma_path = str(resolved_chroma_path)
         self._collection_name = collection_name
+        self._embedding_function = embedding_function
+        self._logs_path = Path("data") / "logs"
         try:
             self._repository = repository or PromptRepository(str(resolved_db_path))
         except RepositoryError as exc:
@@ -230,15 +235,7 @@ class PromptManager:
                 )
         else:
             self._chroma_client = cast(Any, chroma_client)
-        try:
-            collection = self._chroma_client.get_or_create_collection(
-                name=collection_name,
-                metadata={"hnsw:space": "cosine"},
-                embedding_function=embedding_function,
-            )
-            self._collection = cast(Any, collection)
-        except ChromaError as exc:
-            raise PromptStorageError("Unable to initialiase ChromaDB collection") from exc
+        self._initialise_chroma_collection()
 
         self._notification_center = notification_center or default_notification_center
 
@@ -292,6 +289,19 @@ class PromptManager:
                 logger.warning("Unable to load persisted user profile", exc_info=True)
                 self._user_profile = None
 
+    def _initialise_chroma_collection(self) -> None:
+        """Create or refresh the Chroma collection backing prompt embeddings."""
+
+        try:
+            collection = self._chroma_client.get_or_create_collection(
+                name=self._collection_name,
+                metadata={"hnsw:space": "cosine"},
+                embedding_function=self._embedding_function,
+            )
+            self._collection = cast(Any, collection)
+        except ChromaError as exc:
+            raise PromptStorageError("Unable to initialise ChromaDB collection") from exc
+
     @dataclass(slots=True)
     class IntentSuggestions:
         """Intent-aware search recommendations returned to callers."""
@@ -324,6 +334,24 @@ class PromptManager:
     def repository(self) -> PromptRepository:
         """Expose the SQLite repository."""
         return self._repository
+
+    @property
+    def db_path(self) -> Optional[Path]:
+        """Return the configured SQLite database path."""
+
+        return self._db_path
+
+    @property
+    def chroma_path(self) -> Path:
+        """Return the filesystem path backing the Chroma vector store."""
+
+        return Path(self._chroma_path)
+
+    @property
+    def logs_path(self) -> Path:
+        """Return the directory where application logs are written."""
+
+        return self._logs_path
 
     @property
     def intent_classifier(self) -> Optional[IntentClassifier]:
@@ -463,6 +491,63 @@ class PromptManager:
         except (OSError, ValueError):
             pass
         return details
+
+    def reset_prompt_repository(self) -> None:
+        """Clear all prompts, templates, executions, and profiles from SQLite storage."""
+
+        reset_func = getattr(self._repository, "reset_all_data", None)
+        if not callable(reset_func):
+            raise PromptManagerError("Repository reset is unavailable.")
+        try:
+            reset_func()
+        except RepositoryError as exc:
+            raise PromptStorageError("Unable to reset prompt repository") from exc
+        logger.info("Prompt repository reset completed.")
+        self.refresh_user_profile()
+
+    def reset_vector_store(self) -> None:
+        """Remove all embeddings from the Chroma vector store."""
+
+        if self._collection is None:
+            return
+        try:
+            delete_collection = getattr(self._chroma_client, "delete_collection", None)
+            if callable(delete_collection):
+                delete_collection(name=self._collection_name)
+                self._initialise_chroma_collection()
+            else:
+                self._collection.delete(where={})
+        except Exception as exc:  # noqa: BLE001
+            raise PromptStorageError("Unable to reset Chroma vector store") from exc
+        logger.info("Chroma vector store reset completed.")
+
+    def clear_usage_logs(self, logs_path: Optional[Union[str, Path]] = None) -> None:
+        """Remove persisted usage analytics logs while keeping settings intact."""
+
+        path = Path(logs_path) if logs_path is not None else self._logs_path
+        path = path.expanduser()
+        if not path.exists():
+            path.mkdir(parents=True, exist_ok=True)
+            logger.info("Usage log directory created at %s", path)
+            return
+        try:
+            for entry in path.iterdir():
+                if entry.is_file() or entry.is_symlink():
+                    entry.unlink()
+                elif entry.is_dir():
+                    shutil.rmtree(entry)
+        except OSError as exc:
+            raise PromptManagerError(f"Unable to clear usage logs: {exc}") from exc
+        path.mkdir(parents=True, exist_ok=True)
+        logger.info("Usage logs cleared at %s", path)
+
+    def reset_application_data(self, *, clear_logs: bool = True) -> None:
+        """Reset prompt data, embeddings, and optional usage logs."""
+
+        self.reset_prompt_repository()
+        self.reset_vector_store()
+        if clear_logs:
+            self.clear_usage_logs()
 
     def get_prompt_catalogue_stats(self) -> PromptCatalogueStats:
         """Return aggregate prompt statistics for maintenance workflows."""

@@ -899,6 +899,7 @@ class PromptMaintenanceDialog(QDialog):
         self._storage_stats_view: QPlainTextEdit
         self._storage_refresh_button: QPushButton
         self._stats_refresh_button: QPushButton
+        self._reset_log_view: QPlainTextEdit
         self.setWindowTitle("Prompt Maintenance")
         self.resize(640, 420)
         self._build_ui()
@@ -1101,6 +1102,53 @@ class PromptMaintenanceDialog(QDialog):
 
         self._tab_widget.addTab(storage_tab, "SQLite")
 
+        reset_tab = QWidget(self)
+        reset_layout = QVBoxLayout(reset_tab)
+
+        reset_intro = QLabel(
+            "Use these actions to clear application data while leaving configuration and settings untouched.",
+            reset_tab,
+        )
+        reset_intro.setWordWrap(True)
+        reset_layout.addWidget(reset_intro)
+
+        reset_warning = QLabel(
+            "<b>Warning:</b> these operations permanently delete existing prompts, histories, and embeddings.",
+            reset_tab,
+        )
+        reset_warning.setWordWrap(True)
+        reset_layout.addWidget(reset_warning)
+
+        reset_buttons_container = QWidget(reset_tab)
+        reset_buttons_layout = QVBoxLayout(reset_buttons_container)
+        reset_buttons_layout.setContentsMargins(0, 0, 0, 0)
+        reset_buttons_layout.setSpacing(8)
+
+        reset_sqlite_button = QPushButton("Clear Prompt Database", reset_buttons_container)
+        reset_sqlite_button.setToolTip("Delete all prompts, templates, and execution history from SQLite.")
+        reset_sqlite_button.clicked.connect(self._on_reset_prompts_clicked)  # type: ignore[arg-type]
+        reset_buttons_layout.addWidget(reset_sqlite_button)
+
+        reset_chroma_button = QPushButton("Clear Embedding Store", reset_buttons_container)
+        reset_chroma_button.setToolTip("Remove all vectors from the ChromaDB collection used for semantic search.")
+        reset_chroma_button.clicked.connect(self._on_reset_chroma_clicked)  # type: ignore[arg-type]
+        reset_buttons_layout.addWidget(reset_chroma_button)
+
+        reset_all_button = QPushButton("Reset Application Data", reset_buttons_container)
+        reset_all_button.setToolTip(
+            "Clear prompts, histories, embeddings, and usage logs in one step. Settings remain unchanged."
+        )
+        reset_all_button.clicked.connect(self._on_reset_application_clicked)  # type: ignore[arg-type]
+        reset_buttons_layout.addWidget(reset_all_button)
+
+        reset_layout.addWidget(reset_buttons_container)
+
+        self._reset_log_view = QPlainTextEdit(reset_tab)
+        self._reset_log_view.setReadOnly(True)
+        reset_layout.addWidget(self._reset_log_view, stretch=1)
+
+        self._tab_widget.addTab(reset_tab, "Data Reset")
+
         self._buttons = QDialogButtonBox(QDialogButtonBox.Close, self)
         self._buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(self._buttons)
@@ -1146,6 +1194,20 @@ class PromptMaintenanceDialog(QDialog):
     def _append_log(self, message: str) -> None:
         timestamp = datetime.now(timezone.utc).strftime("%H:%M:%S")
         self._log_view.appendPlainText(f"[{timestamp}] {message}")
+
+    def _append_reset_log(self, message: str) -> None:
+        timestamp = datetime.now(timezone.utc).strftime("%H:%M:%S")
+        self._reset_log_view.appendPlainText(f"[{timestamp}] {message}")
+
+    def _confirm_destructive_action(self, prompt: str) -> bool:
+        result = QMessageBox.question(
+            self,
+            "Confirm Data Reset",
+            f"{prompt}\n\nThis action cannot be undone. Continue?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        return result == QMessageBox.Yes
 
     def _collect_prompts(self) -> List[Prompt]:
         try:
@@ -1234,6 +1296,75 @@ class PromptMaintenanceDialog(QDialog):
         self._append_log(f"Tag task completed. Updated {updated} prompt(s).")
         if updated:
             self.maintenance_applied.emit(f"Generated tags for {updated} prompt(s).")
+
+    def _on_reset_prompts_clicked(self) -> None:
+        """Clear the SQLite prompt repository."""
+
+        if not self._confirm_destructive_action(
+            "Clear the prompt database, templates, and execution history?"
+        ):
+            return
+        try:
+            self._manager.reset_prompt_repository()
+        except PromptManagerError as exc:
+            QMessageBox.critical(self, "Reset failed", str(exc))
+            self._append_reset_log(f"Prompt database reset failed: {exc}")
+            return
+        self._append_reset_log("Prompt database cleared.")
+        QMessageBox.information(
+            self,
+            "Prompt database cleared",
+            "All prompts, templates, and execution history have been removed.",
+        )
+        self._refresh_catalogue_stats()
+        self._refresh_storage_info()
+        self.maintenance_applied.emit("Prompt database cleared.")
+
+    def _on_reset_chroma_clicked(self) -> None:
+        """Clear the ChromaDB vector store."""
+
+        if not self._confirm_destructive_action(
+            "Remove all embeddings from the ChromaDB vector store?"
+        ):
+            return
+        try:
+            self._manager.reset_vector_store()
+        except PromptManagerError as exc:
+            QMessageBox.critical(self, "Reset failed", str(exc))
+            self._append_reset_log(f"Embedding store reset failed: {exc}")
+            return
+        self._append_reset_log("Chroma vector store cleared.")
+        QMessageBox.information(
+            self,
+            "Embedding store cleared",
+            "All stored embeddings have been removed.",
+        )
+        self._refresh_chroma_info()
+        self.maintenance_applied.emit("Embedding store cleared.")
+
+    def _on_reset_application_clicked(self) -> None:
+        """Clear prompts, embeddings, and usage logs."""
+
+        if not self._confirm_destructive_action(
+            "Reset all application data (prompts, history, embeddings, and logs)?"
+        ):
+            return
+        try:
+            self._manager.reset_application_data(clear_logs=True)
+        except PromptManagerError as exc:
+            QMessageBox.critical(self, "Reset failed", str(exc))
+            self._append_reset_log(f"Application reset failed: {exc}")
+            return
+        self._append_reset_log("Application data reset completed.")
+        QMessageBox.information(
+            self,
+            "Application data reset",
+            "Prompt data, embeddings, and usage logs have been cleared.",
+        )
+        self._refresh_catalogue_stats()
+        self._refresh_storage_info()
+        self._refresh_chroma_info()
+        self.maintenance_applied.emit("Application data reset.")
 
     def _refresh_redis_info(self) -> None:
         """Update the Redis tab with the latest cache status."""

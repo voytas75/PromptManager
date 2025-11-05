@@ -6,6 +6,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 - Removed the `catalog-import` CLI command while keeping the GUI import workflow; catalogue entries can still be applied from JSON via the Import button, with export remaining available via CLI and GUI.
 - Simplified documentation to reflect the GUI-focused import flow and removed references to automatic catalogue seeding.
+- Added a Data Reset tab to the maintenance dialog with guarded actions to clear the SQLite prompt database, wipe Chroma embeddings, or reset all application data without touching settings.
 
 ## [0.13.11] - 2025-11-28
 

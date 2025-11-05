@@ -1,5 +1,6 @@
 """SQLite-backed repository for persistent prompt storage.
 
+Updates: v0.6.1 - 2025-11-30 - Add repository reset helper for maintenance workflows.
 Updates: v0.6.0 - 2025-11-25 - Add prompt catalogue statistics accessor for maintenance UI.
 Updates: v0.5.1 - 2025-11-19 - Persist prompt usage scenarios alongside prompt records.
 Updates: v0.5.0 - 2025-11-16 - Add task template persistence and lookups.
@@ -772,6 +773,22 @@ class PromptRepository:
                 "INSERT INTO user_profile (id, username, updated_at) VALUES (?, ?, ?);",
                 (str(DEFAULT_PROFILE_ID), "default", datetime.now(timezone.utc).isoformat()),
             )
+
+    def reset_all_data(self) -> None:
+        """Clear all persisted prompts, templates, executions, and user profile data."""
+
+        try:
+            with _connect(self._db_path) as conn:
+                conn.execute("DELETE FROM prompt_executions;")
+                conn.execute("DELETE FROM templates;")
+                conn.execute("DELETE FROM prompts;")
+                conn.execute("DELETE FROM user_profile;")
+                conn.execute(
+                    "INSERT INTO user_profile (id, username, updated_at) VALUES (?, ?, ?);",
+                    (str(DEFAULT_PROFILE_ID), "default", datetime.now(timezone.utc).isoformat()),
+                )
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to reset repository data") from exc
 
     # User profile helpers ------------------------------------------------- #
 
