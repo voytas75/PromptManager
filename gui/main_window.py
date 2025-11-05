@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.10 - 2025-11-26 - Add context menu execution action for prompts.
 Updates: v0.15.9 - 2025-11-26 - Add application info dialog accessible from the toolbar.
 Updates: v0.15.8 - 2025-11-26 - Add prompt list context menu with edit/copy/description actions.
 Updates: v0.15.7 - 2025-11-24 - Add copy-to-text-window action for prompt output.
@@ -2173,23 +2174,24 @@ class MainWindow(QMainWindow):
         self._end_chat_button.setEnabled(False)
         self.statusBar().showMessage("Chat session ended. Conversation preserved in history.", 5000)
 
-    def _on_run_prompt_clicked(self) -> None:
-        """Execute the selected prompt via the manager."""
+    def _execute_prompt_with_text(
+        self,
+        prompt: Prompt,
+        request_text: str,
+        *,
+        status_prefix: str,
+        empty_text_message: str,
+        keep_text_after: bool,
+    ) -> None:
+        """Execute a prompt with the supplied request payload and handle outcomes."""
 
-        request_text = self._query_input.toPlainText().strip()
-        if not request_text:
-            self.statusBar().showMessage("Paste some text or code before executing a prompt.", 4000)
-            return
-        prompt = self._current_prompt()
-        if prompt is None:
-            prompts = self._model.prompts()
-            prompt = prompts[0] if prompts else None
-        if prompt is None:
-            self.statusBar().showMessage("Select a prompt to execute first.", 4000)
+        trimmed = request_text.strip()
+        if not trimmed:
+            self.statusBar().showMessage(empty_text_message, 4000)
             return
 
         try:
-            outcome = self._manager.execute_prompt(prompt.id, request_text)
+            outcome = self._manager.execute_prompt(prompt.id, trimmed)
         except PromptExecutionUnavailable as exc:
             self._run_button.setEnabled(False)
             self._usage_logger.log_execute(
@@ -2211,14 +2213,40 @@ class MainWindow(QMainWindow):
             return
 
         self._display_execution_result(prompt, outcome)
+        if keep_text_after:
+            self._query_input.setPlainText(request_text)
+            cursor = self._query_input.textCursor()
+            cursor.movePosition(QTextCursor.End)
+            self._query_input.setTextCursor(cursor)
+            self._query_input.setFocus(Qt.ShortcutFocusReason)
+
         self._usage_logger.log_execute(
             prompt_name=prompt.name,
             success=True,
             duration_ms=outcome.result.duration_ms,
         )
         self.statusBar().showMessage(
-            f"Executed '{prompt.name}' in {outcome.result.duration_ms} ms.",
+            f"{status_prefix} '{prompt.name}' in {outcome.result.duration_ms} ms.",
             5000,
+        )
+
+    def _on_run_prompt_clicked(self) -> None:
+        """Execute the selected prompt via the manager."""
+
+        prompt = self._current_prompt()
+        if prompt is None:
+            prompts = self._model.prompts()
+            prompt = prompts[0] if prompts else None
+        if prompt is None:
+            self.statusBar().showMessage("Select a prompt to execute first.", 4000)
+            return
+        request_text = self._query_input.toPlainText()
+        self._execute_prompt_with_text(
+            prompt,
+            request_text,
+            status_prefix="Executed",
+            empty_text_message="Paste some text or code before executing a prompt.",
+            keep_text_after=False,
         )
 
     def _handle_note_update(self, execution_id: uuid.UUID, note: str) -> None:
@@ -2384,14 +2412,18 @@ class MainWindow(QMainWindow):
 
         menu = QMenu(self)
         edit_action = menu.addAction("Edit Prompt")
+        execute_action = menu.addAction("Execute Prompt")
         copy_action = menu.addAction("Copy Prompt Text")
         description_action = menu.addAction("Show Description")
 
         if prompt is None:
             edit_action.setEnabled(False)
+            execute_action.setEnabled(False)
             copy_action.setEnabled(False)
             description_action.setEnabled(False)
         else:
+            can_execute = bool((prompt.context or prompt.description) and self._manager.executor)
+            execute_action.setEnabled(can_execute)
             if not (prompt.context or prompt.description):
                 copy_action.setEnabled(False)
             if not (prompt.description and prompt.description.strip()):
@@ -2402,10 +2434,35 @@ class MainWindow(QMainWindow):
             return
         if selected_action is edit_action:
             self._on_edit_clicked()
+        elif selected_action is execute_action and prompt is not None:
+            self._execute_prompt_from_context_menu(prompt)
         elif selected_action is copy_action and prompt is not None:
             self._copy_prompt_to_clipboard(prompt)
         elif selected_action is description_action and prompt is not None:
             self._show_prompt_description(prompt)
+
+    def _execute_prompt_from_context_menu(self, prompt: Prompt) -> None:
+        """Populate the workspace with the prompt body and execute immediately."""
+
+        raw_payload = prompt.context or prompt.description or ""
+        if not raw_payload.strip():
+            self.statusBar().showMessage(
+                "Selected prompt does not include any text to execute.",
+                4000,
+            )
+            return
+        self._query_input.setPlainText(raw_payload)
+        cursor = self._query_input.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        self._query_input.setTextCursor(cursor)
+        self._query_input.setFocus(Qt.ShortcutFocusReason)
+        self._execute_prompt_with_text(
+            prompt,
+            raw_payload,
+            status_prefix="Executed",
+            empty_text_message="Selected prompt does not include any text to execute.",
+            keep_text_after=True,
+        )
 
     def _on_refresh_clicked(self) -> None:
         """Reload prompts from storage, respecting current search text."""

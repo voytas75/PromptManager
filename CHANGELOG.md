@@ -5,6 +5,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 ## [0.13.7] - 2025-11-26
 
 - Added an Info dialog to the GUI toolbar that links to the author's GitHub profile and surfaces system CPU/architecture details alongside the project's open source license summary.
+- Added an Execute Prompt action to the prompt list context menu that populates the workspace text window and runs the selection immediately via the configured AI backend.
 
 ## [0.13.6] - 2025-11-25
 

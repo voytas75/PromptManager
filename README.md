@@ -19,6 +19,7 @@ Prompt Manager is a desktop-focused application for cataloguing, searching, and 
 - Prompt dialog can analyse a prompt body to suggest reusable usage scenarios, which are stored with each prompt and rendered in the detail pane.
 - Task templates bundle prompts with starter input and surface in the GUI for quick apply/edit/delete workflows.
 - Toolbar Info dialog links to the project's author profile and displays the current system's CPU/architecture details alongside the open source licensing summary.
+- Prompt list context menu now provides an Execute action that opens the prompt body in the text workspace and immediately runs it through the configured AI backend.
 
 ## Getting Started
 
