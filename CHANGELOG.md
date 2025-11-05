@@ -6,6 +6,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 - Packaged a default Prompt Manager icon and set it as the Qt application/window icon so Windows builds display branded taskbar and shell visuals out of the box.
 - Styled chat transcripts with a tinted background on user turns to improve visual separation during ongoing conversations.
+- Updated the Info dialog to show the application icon and credit Icons8 as the icon source.
 
 ## [0.13.13] - 2025-11-05
 

@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.8.12 - 2025-11-05 - Display application icon and credit source in info dialog.
 Updates: v0.8.11 - 2025-11-05 - Add SQLite repository maintenance actions to maintenance dialog.
 Updates: v0.8.10 - 2025-11-05 - Add ChromaDB integrity verification action to maintenance dialog.
 Updates: v0.8.9 - 2025-11-05 - Add ChromaDB maintenance actions to the maintenance dialog.
@@ -61,6 +62,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from .resources import load_application_icon
 
 from core import (
     CatalogDiff,
@@ -2040,8 +2043,19 @@ class InfoDialog(QDialog):
         self.setWindowTitle("About Prompt Manager")
         self.setModal(True)
         self.setMinimumWidth(420)
+        icon = load_application_icon()
+        if icon is not None:
+            self.setWindowIcon(icon)
 
         layout = QVBoxLayout(self)
+
+        if icon is not None:
+            pixmap = icon.pixmap(96, 96)
+            if not pixmap.isNull():
+                icon_label = QLabel(self)
+                icon_label.setAlignment(Qt.AlignHCenter)
+                icon_label.setPixmap(pixmap)
+                layout.addWidget(icon_label)
 
         title_label = QLabel("<b>Prompt Manager</b>", self)
         title_label.setTextFormat(Qt.RichText)
@@ -2078,6 +2092,12 @@ class InfoDialog(QDialog):
         license_label = QLabel("opensource", self)
         license_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         form.addRow("License:", license_label)
+
+        icon_source_label = QLabel('<a href="https://icons8.com/">Icons8</a>', self)
+        icon_source_label.setTextFormat(Qt.RichText)
+        icon_source_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        icon_source_label.setOpenExternalLinks(True)
+        form.addRow("Icon source:", icon_source_label)
 
         layout.addLayout(form)
 
