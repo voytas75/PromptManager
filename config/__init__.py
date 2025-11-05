@@ -6,6 +6,7 @@ Updates: v0.1.0 - 2025-10-30 - Package scaffold.
 """
 
 from .settings import (
+    DEFAULT_CHAT_USER_BUBBLE_COLOR,
     LITELLM_ROUTED_WORKFLOWS,
     PromptManagerSettings,
     SettingsError,
@@ -13,6 +14,7 @@ from .settings import (
 )
 
 __all__ = [
+    "DEFAULT_CHAT_USER_BUBBLE_COLOR",
     "PromptManagerSettings",
     "SettingsError",
     "load_settings",

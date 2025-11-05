@@ -1,5 +1,6 @@
 """Settings dialog for configuring Prompt Manager runtime options.
 
+Updates: v0.2.5 - 2025-11-05 - Add chat appearance controls to settings dialog.
 Updates: v0.2.4 - 2025-11-05 - Add LiteLLM routing matrix for fast vs inference models.
 Updates: v0.2.3 - 2025-11-05 - Introduce LiteLLM inference model field and tabbed layout.
 Updates: v0.2.2 - 2025-11-26 - Add LiteLLM streaming toggle to runtime settings UI.
@@ -34,7 +35,7 @@ from PySide6.QtWidgets import (
 )
 
 from config.persistence import persist_settings_to_config
-from config import LITELLM_ROUTED_WORKFLOWS
+from config import DEFAULT_CHAT_USER_BUBBLE_COLOR, LITELLM_ROUTED_WORKFLOWS
 
 
 class SettingsDialog(QDialog):
@@ -54,6 +55,7 @@ class SettingsDialog(QDialog):
         litellm_stream: Optional[bool] = None,
         litellm_workflow_models: Optional[Mapping[str, str]] = None,
         quick_actions: Optional[list[dict[str, object]]] = None,
+        chat_user_bubble_color: Optional[str] = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Prompt Manager Settings")
@@ -81,6 +83,13 @@ class SettingsDialog(QDialog):
                 if choice == "inference":
                     self._workflow_models[key_str] = "inference"
         self._workflow_groups: dict[str, QButtonGroup] = {}
+        self._default_chat_color = DEFAULT_CHAT_USER_BUBBLE_COLOR
+        initial_chat_color = (chat_user_bubble_color or "").strip() or self._default_chat_color
+        if not QColor(initial_chat_color).isValid():
+            initial_chat_color = self._default_chat_color
+        self._chat_user_bubble_color = QColor(initial_chat_color).name().lower()
+        self._chat_color_input: Optional[QLineEdit] = None
+        self._chat_color_preview: Optional[QLabel] = None
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -203,6 +212,24 @@ class SettingsDialog(QDialog):
 
         tab_widget.addTab(routing_tab, "Routing")
 
+        appearance_tab = QWidget(self)
+        appearance_form = QFormLayout(appearance_tab)
+        appearance_form.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
+
+        chat_color_input = QLineEdit(self._chat_user_bubble_color, appearance_tab)
+        chat_color_input.setPlaceholderText(self._default_chat_color)
+        chat_color_input.textChanged.connect(self._update_chat_color_preview)  # type: ignore[arg-type]
+        self._chat_color_input = chat_color_input
+        appearance_form.addRow("User chat colour", chat_color_input)
+
+        preview_label = QLabel("You: Example message", appearance_tab)
+        preview_label.setWordWrap(True)
+        self._chat_color_preview = preview_label
+        appearance_form.addRow("Preview", preview_label)
+        self._update_chat_color_preview(self._chat_user_bubble_color)
+
+        tab_widget.addTab(appearance_tab, "Appearance")
+
         quick_tab = QWidget(self)
         quick_layout = QVBoxLayout(quick_tab)
         quick_layout.setContentsMargins(0, 0, 0, 0)
@@ -227,6 +254,28 @@ class SettingsDialog(QDialog):
         button_box.accepted.connect(self.accept)  # type: ignore[arg-type]
         button_box.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(button_box)
+
+    def _update_chat_color_preview(self, value: str) -> None:
+        """Refresh the preview bubble based on the current colour entry."""
+
+        if self._chat_color_preview is None:
+            return
+        text = (value or "").strip()
+        color = QColor(text) if text else QColor(self._default_chat_color)
+        if not color.isValid():
+            self._chat_color_preview.setStyleSheet(
+                "background-color: #fff5f5; border: 1px solid #d14343; "
+                "border-radius: 8px; padding: 8px; color: #d14343;"
+            )
+            self._chat_color_preview.setText("Invalid colour")
+            return
+        normalized = color.name().lower()
+        border = QColor(normalized).darker(115).name()
+        self._chat_color_preview.setStyleSheet(
+            f"background-color: {normalized}; border: 1px solid {border}; "
+            "border-radius: 8px; padding: 8px; color: #1f2933;"
+        )
+        self._chat_color_preview.setText("You: Example message")
 
     def accept(self) -> None:
         text = self._quick_actions_input.toPlainText().strip()
@@ -254,6 +303,21 @@ class SettingsDialog(QDialog):
             self._quick_actions_value = data
         else:
             self._quick_actions_value = None
+
+        color_text = self._chat_color_input.text().strip() if self._chat_color_input else ""
+        if color_text:
+            candidate = QColor(color_text)
+            if not candidate.isValid():
+                QMessageBox.critical(
+                    self,
+                    "Invalid chat colour",
+                    "Enter a valid colour value (e.g. #e6f0ff) or leave the field blank.",
+                )
+                return
+            self._chat_user_bubble_color = candidate.name().lower()
+        else:
+            self._chat_user_bubble_color = self._default_chat_color
+
         super().accept()
 
     def result_settings(self) -> dict[str, Optional[object]]:
@@ -286,6 +350,7 @@ class SettingsDialog(QDialog):
             "litellm_stream": self._stream_checkbox.isChecked(),
             "litellm_workflow_models": workflow_models or None,
             "quick_actions": self._quick_actions_value,
+            "chat_user_bubble_color": self._chat_user_bubble_color,
         }
 
 

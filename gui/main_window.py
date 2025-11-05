@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.21 - 2025-11-05 - Honour configurable chat bubble colour from settings.
 Updates: v0.15.20 - 2025-11-05 - Highlight user chat messages with tinted transcript rows.
 Updates: v0.15.19 - 2025-11-05 - Run Prompt falls back to Execute Prompt when the workspace is empty.
 Updates: v0.15.18 - 2025-11-05 - Persist LiteLLM routing selections and forward them to runtime configuration.
@@ -110,7 +111,7 @@ from PySide6.QtWidgets import (
     QTextEdit,
 )
 
-from config import PromptManagerSettings
+from config import DEFAULT_CHAT_USER_BUBBLE_COLOR, PromptManagerSettings
 from core import (
     IntentLabel,
     NameGenerationError,
@@ -1704,18 +1705,19 @@ class MainWindow(QMainWindow):
         formatted = self._format_chat_history(self._chat_conversation)
         self._chat_history_view.setHtml(formatted)
 
-    @staticmethod
-    def _format_chat_history(conversation: Sequence[Dict[str, str]]) -> str:
+    def _format_chat_history(self, conversation: Sequence[Dict[str, str]]) -> str:
         """Return a readable transcript for the chat history tab."""
 
         blocks: List[str] = []
+        user_colour = self._chat_user_colour()
+        user_border = QColor(user_colour).darker(115).name()
         for message in conversation:
             role = message.get("role", "").strip().lower()
             content = message.get("content", "")
             if role == "user":
                 speaker = "You"
                 bubble_style = (
-                    "background-color: #e6f0ff; border: 1px solid #cdd9f7; "
+                    f"background-color: {user_colour}; border: 1px solid {user_border}; "
                     "border-radius: 8px; padding: 8px;"
                 )
             elif role == "assistant":
@@ -1737,6 +1739,16 @@ class MainWindow(QMainWindow):
             )
             blocks.append(block)
         return "<div>" + "".join(blocks) + "</div>"
+
+    def _chat_user_colour(self) -> str:
+        """Return the configured chat colour, falling back to the default."""
+
+        value = self._runtime_settings.get("chat_user_bubble_color")
+        if isinstance(value, str):
+            candidate = QColor(value)
+            if candidate.isValid():
+                return candidate.name().lower()
+        return DEFAULT_CHAT_USER_BUBBLE_COLOR
 
     def _update_diff_view(self, original: str, generated: str) -> None:
         """Render a unified diff comparing the request text with the response."""
@@ -2886,6 +2898,7 @@ class MainWindow(QMainWindow):
             litellm_stream=self._runtime_settings.get("litellm_stream"),
             litellm_workflow_models=self._runtime_settings.get("litellm_workflow_models"),
             quick_actions=self._runtime_settings.get("quick_actions"),
+            chat_user_bubble_color=self._runtime_settings.get("chat_user_bubble_color"),
         )
         if dialog.exec() != QDialog.Accepted:
             return
@@ -2937,6 +2950,16 @@ class MainWindow(QMainWindow):
         else:
             cleaned_quick_actions = None
         self._runtime_settings["quick_actions"] = cleaned_quick_actions
+        color_value = updates.get("chat_user_bubble_color")
+        if isinstance(color_value, str):
+            candidate_color = QColor(color_value)
+            if candidate_color.isValid():
+                chat_colour = candidate_color.name().lower()
+            else:
+                chat_colour = DEFAULT_CHAT_USER_BUBBLE_COLOR
+        else:
+            chat_colour = DEFAULT_CHAT_USER_BUBBLE_COLOR
+        self._runtime_settings["chat_user_bubble_color"] = chat_colour
         persist_settings_to_config(
             {
                 "litellm_model": self._runtime_settings.get("litellm_model"),
@@ -2949,6 +2972,7 @@ class MainWindow(QMainWindow):
                 "litellm_drop_params": self._runtime_settings.get("litellm_drop_params"),
                 "litellm_stream": self._runtime_settings.get("litellm_stream"),
                 "litellm_api_key": self._runtime_settings.get("litellm_api_key"),
+                "chat_user_bubble_color": self._runtime_settings.get("chat_user_bubble_color"),
             }
         )
 
@@ -2963,10 +2987,12 @@ class MainWindow(QMainWindow):
             self._settings.quick_actions = cleaned_quick_actions
             self._settings.litellm_drop_params = cleaned_drop_params
             self._settings.litellm_stream = stream_flag
+            self._settings.chat_user_bubble_color = chat_colour
 
         self._quick_actions = self._build_quick_actions(self._runtime_settings.get("quick_actions"))
         self._register_quick_shortcuts()
         self._sync_active_quick_action_button()
+        self._refresh_chat_history_view()
 
         try:
             self._manager.set_name_generator(
@@ -3011,6 +3037,9 @@ class MainWindow(QMainWindow):
             if settings and settings.litellm_workflow_models
             else None,
             "quick_actions": derived_quick_actions,
+            "chat_user_bubble_color": (
+                settings.chat_user_bubble_color if settings else DEFAULT_CHAT_USER_BUBBLE_COLOR
+            ),
         }
 
         config_path = Path("config/config.json")
@@ -3061,6 +3090,17 @@ class MainWindow(QMainWindow):
                     runtime["quick_actions"] = [
                         dict(entry) for entry in data["quick_actions"] if isinstance(entry, dict)
                     ]
+                color_value = data.get("chat_user_bubble_color")
+                if isinstance(color_value, str) and color_value.strip():
+                    runtime["chat_user_bubble_color"] = color_value.strip()
+        raw_colour = runtime.get("chat_user_bubble_color")
+        if isinstance(raw_colour, str):
+            candidate_colour = QColor(raw_colour)
+            runtime["chat_user_bubble_color"] = (
+                candidate_colour.name().lower() if candidate_colour.isValid() else DEFAULT_CHAT_USER_BUBBLE_COLOR
+            )
+        else:
+            runtime["chat_user_bubble_color"] = DEFAULT_CHAT_USER_BUBBLE_COLOR
         return runtime
 
     def _on_selection_changed(self, *_: object) -> None:

@@ -22,7 +22,7 @@ Prompt Manager is a desktop-focused application for cataloguing, searching, and 
 - Prompt list context menu includes Duplicate, Execute, Copy, and description shortcuts so stored prompts can be cloned or run without opening the full editor.
 - Windows desktop builds ship with a bundled Prompt Manager icon so the taskbar, window chrome, and installers display consistent branding.
 - Info dialog now showcases the application icon and credits Icons8 as the asset source.
-- Chat transcripts highlight user turns with a tinted background so ongoing conversations are easier to scan.
+- Chat transcripts highlight user turns with a tinted background that you can customise from the settings dialog for clearer session context.
 
 ## Getting Started
 
