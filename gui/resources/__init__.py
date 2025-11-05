@@ -1,5 +1,6 @@
 """Helpers for accessing bundled GUI resources.
 
+Updates: v0.1.1 - 2025-11-05 - Ship stylised Prompt Manager icon and expose loader.
 Updates: v0.1.0 - 2025-11-05 - Provide accessor for packaged application icon.
 """
 

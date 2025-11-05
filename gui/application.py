@@ -62,7 +62,7 @@ def launch_prompt_manager(
         app.setWindowIcon(icon)
 
     window = MainWindow(prompt_manager, settings=settings)
-    if icon is not None and not window.windowIcon().cacheKey():
+    if icon is not None:
         window.setWindowIcon(icon)
     window.show()
     return app.exec()

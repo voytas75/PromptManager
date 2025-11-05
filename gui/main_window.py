@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.20 - 2025-11-05 - Highlight user chat messages with tinted transcript rows.
 Updates: v0.15.19 - 2025-11-05 - Run Prompt falls back to Execute Prompt when the workspace is empty.
 Updates: v0.15.18 - 2025-11-05 - Persist LiteLLM routing selections and forward them to runtime configuration.
 Updates: v0.15.17 - 2025-12-01 - Pass LiteLLM streaming flag into settings dialog so checkbox reflects configuration.
@@ -52,6 +53,7 @@ import json
 import logging
 import uuid
 from collections import deque
+from html import escape
 from enum import Enum
 from pathlib import Path
 from typing import Any, Deque, Dict, Iterable, List, Optional, Sequence
@@ -105,6 +107,7 @@ from PySide6.QtWidgets import (
     QWidget,
     QWidgetItem,
     QSizePolicy,
+    QTextEdit,
 )
 
 from config import PromptManagerSettings
@@ -885,8 +888,9 @@ class MainWindow(QMainWindow):
         self._diff_view.setPlaceholderText("Run a prompt to compare input and output.")
         self._result_tabs.addTab(self._diff_view, "Diff")
 
-        self._chat_history_view = QPlainTextEdit(self)
+        self._chat_history_view = QTextEdit(self)
         self._chat_history_view.setReadOnly(True)
+        self._chat_history_view.setAcceptRichText(True)
         self._chat_history_view.setPlaceholderText("Run a prompt to start chatting.")
         self._result_tabs.addTab(self._chat_history_view, "Chat")
 
@@ -1698,26 +1702,41 @@ class MainWindow(QMainWindow):
             self._chat_history_view.setPlaceholderText("Run a prompt to start chatting.")
             return
         formatted = self._format_chat_history(self._chat_conversation)
-        self._chat_history_view.setPlainText(formatted)
+        self._chat_history_view.setHtml(formatted)
 
     @staticmethod
     def _format_chat_history(conversation: Sequence[Dict[str, str]]) -> str:
         """Return a readable transcript for the chat history tab."""
 
-        lines: List[str] = []
+        blocks: List[str] = []
         for message in conversation:
             role = message.get("role", "").strip().lower()
             content = message.get("content", "")
             if role == "user":
                 speaker = "You"
+                bubble_style = (
+                    "background-color: #e6f0ff; border: 1px solid #cdd9f7; "
+                    "border-radius: 8px; padding: 8px;"
+                )
             elif role == "assistant":
                 speaker = "Assistant"
+                bubble_style = "background-color: #f6f7fb; border-radius: 8px; padding: 8px;"
             elif role == "system":
                 speaker = "System"
+                bubble_style = "background-color: #f0f4f8; border-radius: 8px; padding: 8px;"
             else:
                 speaker = message.get("role", "Message")
-            lines.append(f"{speaker}:\n{content}")
-        return "\n\n".join(lines)
+                bubble_style = "background-color: #f6f7fb; border-radius: 8px; padding: 8px;"
+
+            escaped_content = escape(content).replace("\n", "<br>")
+            block = (
+                '<div style="margin-bottom: 12px;">'
+                f'<div style="font-weight: 600; color: #1f2933; margin-bottom: 4px;">{escape(speaker)}:</div>'
+                f'<div style="{bubble_style} white-space: pre-wrap; line-height: 1.45;">{escaped_content}</div>'
+                "</div>"
+            )
+            blocks.append(block)
+        return "<div>" + "".join(blocks) + "</div>"
 
     def _update_diff_view(self, original: str, generated: str) -> None:
         """Render a unified diff comparing the request text with the response."""
