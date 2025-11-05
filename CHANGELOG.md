@@ -6,6 +6,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 - Added a dedicated LiteLLM inference model configuration alongside the existing fast model so future workflows can route tasks to latency-appropriate endpoints.
 - Updated the settings dialog with tabbed navigation and dual model inputs while keeping secret handling unchanged.
+- Introduced a LiteLLM routing matrix so each workflow can target the fast or inference tier independently from the settings dialog or JSON configuration.
 
 ## [0.13.12] - 2025-11-30
 

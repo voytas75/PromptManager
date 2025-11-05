@@ -1,5 +1,6 @@
 """Factories for constructing PromptManager instances from validated settings.
 
+Updates: v0.7.3 - 2025-11-05 - Support LiteLLM workflow routing across fast/inference models.
 Updates: v0.7.2 - 2025-11-26 - Wire LiteLLM streaming flag into executor construction.
 Updates: v0.7.1 - 2025-11-19 - Configure LiteLLM scenario generator for prompt metadata enrichment.
 Updates: v0.7.0 - 2025-11-15 - Wire prompt engineer construction into manager factory.
@@ -104,41 +105,40 @@ def build_prompt_manager(
     description_generator = None
     scenario_generator = None
     resolved_prompt_engineer = prompt_engineer
-    if settings.litellm_model:
+
+    workflow_routing = getattr(settings, "litellm_workflow_models", None) or {}
+    fast_model = getattr(settings, "litellm_model", None)
+    inference_model = getattr(settings, "litellm_inference_model", None)
+
+    def _select_model(workflow: str) -> Optional[str]:
+        selection = workflow_routing.get(workflow, "fast")
+        if selection == "inference":
+            return inference_model or fast_model
+        return fast_model or inference_model
+
+    def _construct(factory: Callable[..., Any], workflow: str, **extra: Any) -> Optional[Any]:
+        model_name = _select_model(workflow)
+        if not model_name:
+            return None
         try:
-            name_generator = LiteLLMNameGenerator(
-                model=settings.litellm_model,
+            return factory(
+                model=model_name,
                 api_key=settings.litellm_api_key,
                 api_base=settings.litellm_api_base,
                 api_version=settings.litellm_api_version,
                 drop_params=settings.litellm_drop_params,
+                **extra,
             )
-            description_generator = LiteLLMDescriptionGenerator(
-                model=settings.litellm_model,
-                api_key=settings.litellm_api_key,
-                api_base=settings.litellm_api_base,
-                api_version=settings.litellm_api_version,
-                drop_params=settings.litellm_drop_params,
-            )
-            scenario_generator = LiteLLMScenarioGenerator(
-                model=settings.litellm_model,
-                api_key=settings.litellm_api_key,
-                api_base=settings.litellm_api_base,
-                api_version=settings.litellm_api_version,
-                drop_params=settings.litellm_drop_params,
-            )
-            if resolved_prompt_engineer is None:
-                resolved_prompt_engineer = PromptEngineer(
-                    model=settings.litellm_model,
-                    api_key=settings.litellm_api_key,
-                    api_base=settings.litellm_api_base,
-                    api_version=settings.litellm_api_version,
-                    drop_params=settings.litellm_drop_params,
-                )
         except RuntimeError as exc:
             raise NameGenerationError(
-                "LiteLLM is required for prompt name generation. Install litellm and configure credentials."
+                "LiteLLM is required for configured prompt workflows. Install litellm and configure credentials."
             ) from exc
+
+    name_generator = _construct(LiteLLMNameGenerator, "name_generation")
+    description_generator = _construct(LiteLLMDescriptionGenerator, "description_generation")
+    scenario_generator = _construct(LiteLLMScenarioGenerator, "scenario_generation")
+    if resolved_prompt_engineer is None:
+        resolved_prompt_engineer = _construct(PromptEngineer, "prompt_engineering")
     intent_classifier = IntentClassifier()
 
     repository_instance = repository or PromptRepository(str(settings.db_path))
@@ -147,17 +147,12 @@ def build_prompt_manager(
         if isinstance(repository_instance, PromptRepository)
         else None
     )
-    executor = None
-    if settings.litellm_model:
-        executor = CodexExecutor(
-            model=settings.litellm_model,
-            api_key=settings.litellm_api_key,
-            api_base=settings.litellm_api_base,
-            api_version=settings.litellm_api_version,
-            drop_params=settings.litellm_drop_params,
-            reasoning_effort=settings.litellm_reasoning_effort,
-            stream=settings.litellm_stream,
-        )
+    executor = _construct(
+        CodexExecutor,
+        "prompt_execution",
+        reasoning_effort=settings.litellm_reasoning_effort,
+        stream=settings.litellm_stream,
+    )
 
     manager_kwargs: Dict[str, Any] = {
         "chroma_path": str(settings.chroma_path),
@@ -172,6 +167,9 @@ def build_prompt_manager(
         "enable_background_sync": enable_background_sync,
         "name_generator": name_generator,
         "description_generator": description_generator,
+        "fast_model": fast_model,
+        "inference_model": inference_model,
+        "workflow_models": workflow_routing if workflow_routing else None,
         "intent_classifier": intent_classifier,
         "notification_center": notification_center or default_notification_center,
     }

@@ -200,6 +200,7 @@ These commands reuse the same validation logic as the GUI; pass an explicit path
     "litellm_stream": false,
     "litellm_drop_params": ["max_tokens", "max_output_tokens", "temperature", "timeout"],
     "litellm_reasoning_effort": null,
+    "litellm_workflow_models": {"prompt_execution": "inference"},
     "embedding_model": "text-embedding-3-large"
   }
   ```
@@ -208,6 +209,7 @@ These commands reuse the same validation logic as the GUI; pass an explicit path
 - Configure `litellm_reasoning_effort` with `minimal`, `medium`, or `high` to enable OpenAI reasoning behaviour on `gpt-4.1`, `o3`, or `gpt-5` model families.
 - Set `litellm_stream` to `true` to request streaming chat completions; streaming deltas are forwarded to registered callbacks while histories persist the fully aggregated response.
 - Provide both a fast LiteLLM model (`PROMPT_MANAGER_LITELLM_MODEL`) and an optional inference model (`PROMPT_MANAGER_LITELLM_INFERENCE_MODEL`) to separate low-latency interactions from slower high-quality generations.
+- Use the settings dialog's **Routing** tab (or `PROMPT_MANAGER_LITELLM_WORKFLOW_MODELS`) to assign each workflow to the fast or inference model without editing code.
 - Supplying `embedding_model` automatically switches the embedding backend to LiteLLM so semantic sync runs against your chosen OpenAI embedding model.
 
 - Environment variables (override JSON when set):
@@ -221,6 +223,7 @@ These commands reuse the same validation logic as the GUI; pass an explicit path
   | `PROMPT_MANAGER_CONFIG_JSON` | Path to JSON config used as base | `config/config.json` |
   | `PROMPT_MANAGER_LITELLM_MODEL` | LiteLLM model used for name generation | `gpt-4o-mini` |
   | `PROMPT_MANAGER_LITELLM_INFERENCE_MODEL` | LiteLLM inference model for slower, higher-quality tasks | `gpt-4.1` |
+  | `PROMPT_MANAGER_LITELLM_WORKFLOW_MODELS` | JSON map of workflows to `fast`/`inference` (e.g. `{"prompt_execution": "inference"}`) | `{"prompt_execution": "inference"}` |
   | `PROMPT_MANAGER_LITELLM_API_KEY` | LiteLLM API key (environment only) | `sk-…` |
   | `PROMPT_MANAGER_LITELLM_API_BASE` | Optional LiteLLM API base override | `https://proxy.example.com` |
   | `PROMPT_MANAGER_LITELLM_DROP_PARAMS` | Comma/JSON list of LiteLLM parameters to drop before sending requests | `max_tokens,temperature` |

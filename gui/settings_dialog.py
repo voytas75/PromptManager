@@ -1,5 +1,6 @@
 """Settings dialog for configuring Prompt Manager runtime options.
 
+Updates: v0.2.4 - 2025-11-05 - Add LiteLLM routing matrix for fast vs inference models.
 Updates: v0.2.3 - 2025-11-05 - Introduce LiteLLM inference model field and tabbed layout.
 Updates: v0.2.2 - 2025-11-26 - Add LiteLLM streaming toggle to runtime settings UI.
 Updates: v0.2.1 - 2025-11-17 - Remove catalogue path configuration; imports now require explicit selection.
@@ -11,13 +12,14 @@ Updates: v0.1.0 - 2025-11-04 - Initial settings dialog implementation.
 from __future__ import annotations
 
 import json
-from typing import Optional, Sequence
+from typing import Mapping, Optional, Sequence
 
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QGridLayout,
     QLabel,
     QLineEdit,
     QFrame,
@@ -26,10 +28,13 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QVBoxLayout,
     QTabWidget,
+    QButtonGroup,
+    QRadioButton,
     QWidget,
 )
 
 from config.persistence import persist_settings_to_config
+from config import LITELLM_ROUTED_WORKFLOWS
 
 
 class SettingsDialog(QDialog):
@@ -47,6 +52,7 @@ class SettingsDialog(QDialog):
         litellm_drop_params: Optional[Sequence[str]] = None,
         litellm_reasoning_effort: Optional[str] = None,
         litellm_stream: Optional[bool] = None,
+        litellm_workflow_models: Optional[Mapping[str, str]] = None,
         quick_actions: Optional[list[dict[str, object]]] = None,
     ) -> None:
         super().__init__(parent)
@@ -63,6 +69,18 @@ class SettingsDialog(QDialog):
         original_actions = [dict(entry) for entry in (quick_actions or []) if isinstance(entry, dict)]
         self._original_quick_actions = original_actions
         self._quick_actions_value: Optional[list[dict[str, object]]] = original_actions or None
+        self._workflow_models: dict[str, str] = {}
+        if litellm_workflow_models:
+            for key, value in litellm_workflow_models.items():
+                key_str = str(key).strip()
+                if key_str not in LITELLM_ROUTED_WORKFLOWS:
+                    continue
+                if value is None:
+                    continue
+                choice = str(value).strip().lower()
+                if choice == "inference":
+                    self._workflow_models[key_str] = "inference"
+        self._workflow_groups: dict[str, QButtonGroup] = {}
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -124,6 +142,66 @@ class SettingsDialog(QDialog):
         litellm_form.addRow("LiteLLM streaming", self._stream_checkbox)
 
         tab_widget.addTab(litellm_tab, "LiteLLM")
+
+        routing_tab = QWidget(self)
+        routing_layout = QVBoxLayout(routing_tab)
+        routing_layout.setContentsMargins(0, 0, 0, 0)
+        routing_hint = QLabel(
+            "Assign each workflow to the fast LiteLLM model or the inference model.",
+            routing_tab,
+        )
+        routing_hint.setWordWrap(True)
+        routing_layout.addWidget(routing_hint)
+
+        matrix_layout = QGridLayout()
+        matrix_layout.setContentsMargins(0, 8, 0, 0)
+        matrix_layout.setHorizontalSpacing(16)
+        matrix_layout.setVerticalSpacing(6)
+
+        header_workflow = QLabel("Workflow", routing_tab)
+        header_fast = QLabel("Fast model", routing_tab)
+        header_inference = QLabel("Inference model", routing_tab)
+        header_workflow.setObjectName("routingHeaderWorkflow")
+        header_fast.setObjectName("routingHeaderFast")
+        header_inference.setObjectName("routingHeaderInference")
+        matrix_layout.addWidget(header_workflow, 0, 0)
+        matrix_layout.addWidget(header_fast, 0, 1)
+        matrix_layout.addWidget(header_inference, 0, 2)
+
+        for row_index, (workflow_key, workflow_label) in enumerate(
+            LITELLM_ROUTED_WORKFLOWS.items(), start=1
+        ):
+            label = QLabel(workflow_label, routing_tab)
+            matrix_layout.addWidget(label, row_index, 0)
+
+            fast_button = QRadioButton("Fast", routing_tab)
+            fast_button.setProperty("routeChoice", "fast")
+            inference_button = QRadioButton("Inference", routing_tab)
+            inference_button.setProperty("routeChoice", "inference")
+
+            group = QButtonGroup(self)
+            group.setExclusive(True)
+            group.addButton(fast_button)
+            group.addButton(inference_button)
+            self._workflow_groups[workflow_key] = group
+
+            selected_choice = self._workflow_models.get(workflow_key, "fast")
+            if selected_choice == "inference":
+                inference_button.setChecked(True)
+            else:
+                fast_button.setChecked(True)
+
+            matrix_layout.addWidget(fast_button, row_index, 1)
+            matrix_layout.addWidget(inference_button, row_index, 2)
+
+        matrix_layout.setColumnStretch(0, 2)
+        matrix_layout.setColumnStretch(1, 1)
+        matrix_layout.setColumnStretch(2, 1)
+
+        routing_layout.addLayout(matrix_layout)
+        routing_layout.addStretch(1)
+
+        tab_widget.addTab(routing_tab, "Routing")
 
         quick_tab = QWidget(self)
         quick_layout = QVBoxLayout(quick_tab)
@@ -188,6 +266,15 @@ class SettingsDialog(QDialog):
         drop_text = self._drop_params_input.text().strip()
         drop_params = [item.strip() for item in drop_text.split(",") if item.strip()] if drop_text else None
 
+        workflow_models: dict[str, str] = {}
+        for key, group in self._workflow_groups.items():
+            button = group.checkedButton()
+            if button is None:
+                continue
+            choice = str(button.property("routeChoice") or "").strip().lower()
+            if choice == "inference":
+                workflow_models[key] = "inference"
+
         return {
             "litellm_model": _clean(self._model_input.text()),
             "litellm_inference_model": _clean(self._inference_model_input.text()),
@@ -197,6 +284,7 @@ class SettingsDialog(QDialog):
             "litellm_drop_params": drop_params,
             "litellm_reasoning_effort": _clean(self._reasoning_effort_input.text()),
             "litellm_stream": self._stream_checkbox.isChecked(),
+            "litellm_workflow_models": workflow_models or None,
             "quick_actions": self._quick_actions_value,
         }
 

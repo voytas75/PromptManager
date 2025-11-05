@@ -1,5 +1,6 @@
 """High-level CRUD manager for prompt records backed by SQLite, ChromaDB, and Redis.
 
+Updates: v0.13.11 - 2025-11-05 - Support LiteLLM workflow routing between fast and inference models.
 Updates: v0.13.10 - 2025-11-05 - Add SQLite repository maintenance helpers.
 Updates: v0.13.9 - 2025-11-05 - Add ChromaDB integrity verification helper.
 Updates: v0.13.8 - 2025-11-05 - Add ChromaDB persistence maintenance helpers.
@@ -37,6 +38,8 @@ import os
 import shutil
 import sqlite3
 import uuid
+
+from config import LITELLM_ROUTED_WORKFLOWS
 
 import chromadb
 from chromadb.api import ClientAPI
@@ -176,6 +179,9 @@ class PromptManager:
         description_generator: Optional[LiteLLMDescriptionGenerator] = None,
         scenario_generator: Optional[LiteLLMScenarioGenerator] = None,
         prompt_engineer: Optional[PromptEngineer] = None,
+        fast_model: Optional[str] = None,
+        inference_model: Optional[str] = None,
+        workflow_models: Optional[Mapping[str, str]] = None,
         intent_classifier: Optional[IntentClassifier] = None,
         notification_center: Optional[NotificationCenter] = None,
         executor: Optional[CodexExecutor] = None,
@@ -193,6 +199,9 @@ class PromptManager:
             chroma_client: Optional preconfigured Chroma client.
             embedding_function: Optional embedding function for Chroma.
             repository: Optional preconfigured repository instance (e.g. for testing).
+            fast_model: LiteLLM fast-tier model identifier configured for workflows.
+            inference_model: LiteLLM inference-tier model identifier configured for workflows.
+            workflow_models: Mapping of workflow identifiers to routing tiers.
             notification_center: Optional NotificationCenter override for task events.
             executor: Optional CodexExecutor responsible for running prompts.
             history_tracker: Optional execution history tracker for persistence.
@@ -259,6 +268,21 @@ class PromptManager:
         self._description_generator = description_generator
         self._scenario_generator = scenario_generator
         self._prompt_engineer = prompt_engineer
+        self._litellm_fast_model: Optional[str] = self._normalise_model_identifier(fast_model)
+        if self._litellm_fast_model is None and getattr(name_generator, "model", None):
+            self._litellm_fast_model = self._normalise_model_identifier(getattr(name_generator, "model"))
+        self._litellm_inference_model: Optional[str] = self._normalise_model_identifier(inference_model)
+        self._litellm_workflow_models: Dict[str, str] = {}
+        if workflow_models:
+            for key, value in workflow_models.items():
+                key_str = str(key).strip()
+                if key_str not in LITELLM_ROUTED_WORKFLOWS:
+                    continue
+                if value is None:
+                    continue
+                choice = str(value).strip().lower()
+                if choice == "inference":
+                    self._litellm_workflow_models[key_str] = "inference"
         self._litellm_stream: bool = False
         self._litellm_drop_params: Optional[Sequence[str]] = None
         self._litellm_reasoning_effort: Optional[str] = None
@@ -292,6 +316,15 @@ class PromptManager:
             except RepositoryError:
                 logger.warning("Unable to load persisted user profile", exc_info=True)
                 self._user_profile = None
+
+    @staticmethod
+    def _normalise_model_identifier(value: Optional[str]) -> Optional[str]:
+        """Return a stripped model identifier when provided."""
+
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text or None
 
     def _initialise_chroma_collection(self) -> None:
         """Create or refresh the Chroma collection backing prompt embeddings."""
@@ -1065,66 +1098,102 @@ class PromptManager:
         api_base: Optional[str],
         api_version: Optional[str],
         *,
+        inference_model: Optional[str] = None,
+        workflow_models: Optional[Mapping[str, str]] = None,
         drop_params: Optional[Sequence[str]] = None,
         reasoning_effort: Optional[str] = None,
         stream: Optional[bool] = None,
     ) -> None:
-        """Configure the LiteLLM name generator at runtime."""
-        if not model:
-            self._name_generator = None
-            self._description_generator = None
-            self._prompt_engineer = None
+        """Configure LiteLLM-backed workflows at runtime."""
+
+        self._litellm_fast_model = self._normalise_model_identifier(model)
+        self._litellm_inference_model = self._normalise_model_identifier(inference_model)
+        routing: Dict[str, str] = {}
+        if workflow_models:
+            for key, value in workflow_models.items():
+                workflow_key = str(key).strip()
+                if workflow_key not in LITELLM_ROUTED_WORKFLOWS:
+                    continue
+                if value is None:
+                    continue
+                choice = str(value).strip().lower()
+                if choice == "inference":
+                    routing[workflow_key] = "inference"
+        self._litellm_workflow_models = routing
+
+        if drop_params is not None:
+            cleaned_params = [str(item).strip() for item in drop_params if str(item).strip()]
+            self._litellm_drop_params = tuple(cleaned_params) if cleaned_params else None
+        else:
             self._litellm_drop_params = None
-            self._litellm_reasoning_effort = None
-            self._executor = None
-            self._litellm_stream = False
-            return
+
+        self._litellm_reasoning_effort = reasoning_effort
         if stream is not None:
             self._litellm_stream = bool(stream)
+
+        # Reset existing helpers before rebuilding.
+        self._name_generator = None
+        self._description_generator = None
+        self._prompt_engineer = None
+        self._scenario_generator = None
+        self._executor = None
+
+        if not (self._litellm_fast_model or self._litellm_inference_model):
+            self._litellm_reasoning_effort = None
+            self._litellm_stream = False
+            return
+
+        drop_params_payload = (
+            list(self._litellm_drop_params) if self._litellm_drop_params else None
+        )
+
+        def _select_model(workflow: str) -> Optional[str]:
+            selection = self._litellm_workflow_models.get(workflow, "fast")
+            if selection == "inference":
+                return self._litellm_inference_model or self._litellm_fast_model
+            return self._litellm_fast_model or self._litellm_inference_model
+
+        def _construct(factory: Callable[..., Any], workflow: str, **extra: Any) -> Optional[Any]:
+            selected_model = _select_model(workflow)
+            if not selected_model:
+                return None
+            return factory(
+                model=selected_model,
+                api_key=api_key,
+                api_base=api_base,
+                api_version=api_version,
+                drop_params=drop_params_payload,
+                **extra,
+            )
+
         try:
-            self._name_generator = LiteLLMNameGenerator(
-                model=model,
-                api_key=api_key,
-                api_base=api_base,
-                api_version=api_version,
-                drop_params=drop_params,
+            self._name_generator = _construct(LiteLLMNameGenerator, "name_generation")
+            self._description_generator = _construct(
+                LiteLLMDescriptionGenerator, "description_generation"
             )
-            self._description_generator = LiteLLMDescriptionGenerator(
-                model=model,
-                api_key=api_key,
-                api_base=api_base,
-                api_version=api_version,
-                drop_params=drop_params,
+            self._prompt_engineer = _construct(PromptEngineer, "prompt_engineering")
+            self._scenario_generator = _construct(
+                LiteLLMScenarioGenerator, "scenario_generation"
             )
-            self._prompt_engineer = PromptEngineer(
-                model=model,
-                api_key=api_key,
-                api_base=api_base,
-                api_version=api_version,
-                drop_params=drop_params,
-            )
-            self._litellm_drop_params = tuple(drop_params) if drop_params else None
-            self._litellm_reasoning_effort = reasoning_effort
-            self._executor = CodexExecutor(
-                model=model,
-                api_key=api_key,
-                api_base=api_base,
-                api_version=api_version,
-                drop_params=drop_params,
-                reasoning_effort=reasoning_effort,
+            self._executor = _construct(
+                CodexExecutor,
+                "prompt_execution",
+                reasoning_effort=self._litellm_reasoning_effort,
                 stream=self._litellm_stream,
             )
         except RuntimeError as exc:
             raise NameGenerationError(str(exc)) from exc
+
         if self._executor is not None:
             if self._litellm_drop_params:
                 self._executor.drop_params = list(self._litellm_drop_params)
             if self._litellm_reasoning_effort:
                 self._executor.reasoning_effort = self._litellm_reasoning_effort
             self._executor.stream = self._litellm_stream
-        if self._intent_classifier is not None and model:
-            # Name generation and intent classification may share LiteLLM routing;
-            # future integrations can configure richer classification when desired.
+
+        if self._intent_classifier is not None and (
+            self._litellm_fast_model or self._litellm_inference_model
+        ):
             logger.debug("LiteLLM powered features enabled for intent classifier")
 
     def _log_execution_success(

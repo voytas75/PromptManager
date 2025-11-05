@@ -99,6 +99,10 @@ def test_litellm_settings_from_env(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("PROMPT_MANAGER_LITELLM_INFERENCE_MODEL", "gpt-4.1")
     monkeypatch.setenv("PROMPT_MANAGER_LITELLM_API_KEY", "secret-key")
     monkeypatch.setenv("PROMPT_MANAGER_LITELLM_API_BASE", "https://proxy.example.com")
+    monkeypatch.setenv(
+        "PROMPT_MANAGER_LITELLM_WORKFLOW_MODELS",
+        json.dumps({"prompt_execution": "inference"}),
+    )
 
     settings = load_settings()
 
@@ -108,11 +112,20 @@ def test_litellm_settings_from_env(monkeypatch, tmp_path) -> None:
     assert settings.litellm_api_base == "https://proxy.example.com"
     assert settings.litellm_drop_params is None
     assert settings.litellm_stream is False
+    assert settings.litellm_workflow_models == {"prompt_execution": "inference"}
 
 
 def test_litellm_inference_model_from_json(monkeypatch, tmp_path) -> None:
     config_path = tmp_path / "config.json"
-    config_path.write_text(json.dumps({"litellm_inference_model": "gpt-4.1"}), encoding="utf-8")
+    config_path.write_text(
+        json.dumps(
+            {
+                "litellm_inference_model": "gpt-4.1",
+                "litellm_workflow_models": {"prompt_engineering": "inference"},
+            }
+        ),
+        encoding="utf-8",
+    )
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
 
@@ -120,6 +133,29 @@ def test_litellm_inference_model_from_json(monkeypatch, tmp_path) -> None:
 
     assert settings.litellm_inference_model == "gpt-4.1"
     assert settings.litellm_model is None
+    assert settings.litellm_workflow_models == {"prompt_engineering": "inference"}
+
+
+def test_litellm_workflow_models_strip_fast_entries(monkeypatch, tmp_path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "litellm_model": "gpt-4o-mini",
+                "litellm_workflow_models": {
+                    "prompt_execution": "fast",
+                    "scenario_generation": "inference",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
+
+    settings = load_settings()
+
+    assert settings.litellm_workflow_models == {"scenario_generation": "inference"}
 
 
 def test_reasoning_effort_normalised(monkeypatch, tmp_path) -> None:

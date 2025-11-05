@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.18 - 2025-11-05 - Persist LiteLLM routing selections and forward them to runtime configuration.
 Updates: v0.15.17 - 2025-12-01 - Pass LiteLLM streaming flag into settings dialog so checkbox reflects configuration.
 Updates: v0.15.16 - 2025-11-30 - Keep catalogue import controls while CLI command is removed.
 Updates: v0.15.15 - 2025-11-30 - Remove catalogue import controls from the toolbar.
@@ -2860,6 +2861,7 @@ class MainWindow(QMainWindow):
             litellm_drop_params=self._runtime_settings.get("litellm_drop_params"),
             litellm_reasoning_effort=self._runtime_settings.get("litellm_reasoning_effort"),
             litellm_stream=self._runtime_settings.get("litellm_stream"),
+            litellm_workflow_models=self._runtime_settings.get("litellm_workflow_models"),
             quick_actions=self._runtime_settings.get("quick_actions"),
         )
         if dialog.exec() != QDialog.Accepted:
@@ -2894,6 +2896,16 @@ class MainWindow(QMainWindow):
         stream_value = updates.get("litellm_stream")
         stream_flag = bool(stream_value)
         self._runtime_settings["litellm_stream"] = stream_flag
+        workflow_models_value = updates.get("litellm_workflow_models")
+        if isinstance(workflow_models_value, dict):
+            cleaned_workflow_models = {
+                str(key): "inference"
+                for key, value in workflow_models_value.items()
+                if isinstance(value, str) and value.strip().lower() == "inference"
+            }
+        else:
+            cleaned_workflow_models = None
+        self._runtime_settings["litellm_workflow_models"] = cleaned_workflow_models
         quick_actions_value = updates.get("quick_actions")
         if isinstance(quick_actions_value, list):
             cleaned_quick_actions = [
@@ -2909,6 +2921,7 @@ class MainWindow(QMainWindow):
                 "litellm_api_base": self._runtime_settings.get("litellm_api_base"),
                 "litellm_api_version": self._runtime_settings.get("litellm_api_version"),
                 "litellm_reasoning_effort": self._runtime_settings.get("litellm_reasoning_effort"),
+                "litellm_workflow_models": self._runtime_settings.get("litellm_workflow_models"),
                 "quick_actions": self._runtime_settings.get("quick_actions"),
                 "litellm_drop_params": self._runtime_settings.get("litellm_drop_params"),
                 "litellm_stream": self._runtime_settings.get("litellm_stream"),
@@ -2923,6 +2936,7 @@ class MainWindow(QMainWindow):
             self._settings.litellm_api_base = updates.get("litellm_api_base")
             self._settings.litellm_api_version = updates.get("litellm_api_version")
             self._settings.litellm_reasoning_effort = updates.get("litellm_reasoning_effort")
+            self._settings.litellm_workflow_models = cleaned_workflow_models
             self._settings.quick_actions = cleaned_quick_actions
             self._settings.litellm_drop_params = cleaned_drop_params
             self._settings.litellm_stream = stream_flag
@@ -2937,6 +2951,8 @@ class MainWindow(QMainWindow):
                 self._runtime_settings.get("litellm_api_key"),
                 self._runtime_settings.get("litellm_api_base"),
                 self._runtime_settings.get("litellm_api_version"),
+                inference_model=self._runtime_settings.get("litellm_inference_model"),
+                workflow_models=self._runtime_settings.get("litellm_workflow_models"),
                 drop_params=self._runtime_settings.get("litellm_drop_params"),
                 reasoning_effort=self._runtime_settings.get("litellm_reasoning_effort"),
                 stream=self._runtime_settings.get("litellm_stream"),
@@ -2968,6 +2984,9 @@ class MainWindow(QMainWindow):
             else None,
             "litellm_reasoning_effort": settings.litellm_reasoning_effort if settings else None,
             "litellm_stream": settings.litellm_stream if settings is not None else None,
+            "litellm_workflow_models": dict(settings.litellm_workflow_models)
+            if settings and settings.litellm_workflow_models
+            else None,
             "quick_actions": derived_quick_actions,
         }
 
@@ -3007,6 +3026,14 @@ class MainWindow(QMainWindow):
                             runtime["litellm_stream"] = True
                         elif lowered in {"false", "0", "no", "off"}:
                             runtime["litellm_stream"] = False
+                if runtime.get("litellm_workflow_models") is None:
+                    routing_value = data.get("litellm_workflow_models")
+                    if isinstance(routing_value, dict):
+                        runtime["litellm_workflow_models"] = {
+                            str(key): "inference"
+                            for key, value in routing_value.items()
+                            if isinstance(value, str) and value.strip().lower() == "inference"
+                        }
                 if runtime["quick_actions"] is None and isinstance(data.get("quick_actions"), list):
                     runtime["quick_actions"] = [
                         dict(entry) for entry in data["quick_actions"] if isinstance(entry, dict)

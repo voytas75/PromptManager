@@ -1,4 +1,7 @@
-"""Helpers for persisting runtime configuration without Qt dependencies."""
+"""Helpers for persisting runtime configuration without Qt dependencies.
+
+Updates: v0.2.1 - 2025-11-05 - Persist LiteLLM workflow routing selections.
+"""
 
 from __future__ import annotations
 
@@ -27,7 +30,9 @@ def persist_settings_to_config(updates: dict[str, Optional[object]]) -> None:
     """Persist selected settings to ``config/config.json``.
 
     Secrets (e.g. API keys) are never written to disk. ``litellm_drop_params`` values
-    are normalised to de-duplicated lists so changes survive across restarts.
+    are normalised to de-duplicated lists so changes survive across restarts. Workflow
+    routing entries set to ``fast`` are omitted so only explicit ``inference``
+    selections persist.
     """
 
     config_path = Path("config/config.json")
@@ -45,6 +50,13 @@ def persist_settings_to_config(updates: dict[str, Optional[object]]) -> None:
             continue
         if key == "litellm_drop_params":
             value = _normalise_drop_params(value)
+        if key == "litellm_workflow_models" and isinstance(value, dict):
+            cleaned: dict[str, str] = {}
+            for route_key, route_value in value.items():
+                choice = str(route_value).strip().lower()
+                if choice == "inference":
+                    cleaned[str(route_key)] = "inference"
+            value = cleaned or None
         if value is not None:
             config_data[key] = value
         else:

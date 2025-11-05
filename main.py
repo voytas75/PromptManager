@@ -1,5 +1,6 @@
 """Application entry point for Prompt Manager.
 
+Updates: v0.7.7 - 2025-11-05 - Surface LiteLLM workflow routing details in CLI summaries.
 Updates: v0.7.6 - 2025-11-05 - Expand CLI settings summary to list fast and inference LiteLLM models.
 Updates: v0.7.5 - 2025-11-30 - Remove catalogue import command and startup messaging.
 Updates: v0.7.4 - 2025-11-26 - Surface LiteLLM streaming configuration in CLI summaries.
@@ -26,7 +27,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Callable, Optional, cast
 
-from config import PromptManagerSettings, load_settings
+from config import LITELLM_ROUTED_WORKFLOWS, PromptManagerSettings, load_settings
 from core import build_prompt_manager, export_prompt_catalog
 
 
@@ -81,8 +82,12 @@ def _print_settings_summary(settings: PromptManagerSettings) -> None:
     litellm_api_version = getattr(settings, "litellm_api_version", None)
     litellm_reasoning_effort = getattr(settings, "litellm_reasoning_effort", None)
     litellm_stream = getattr(settings, "litellm_stream", False)
+    litellm_workflow_models = getattr(settings, "litellm_workflow_models", None) or {}
     embedding_backend = getattr(settings, "embedding_backend", None)
     embedding_model = getattr(settings, "embedding_model", None)
+
+    def _format_tier(value: str) -> str:
+        return "Inference" if value == "inference" else "Fast"
 
     lines = [
         "Prompt Manager configuration summary",
@@ -102,11 +107,23 @@ def _print_settings_summary(settings: PromptManagerSettings) -> None:
         f"Reasoning effort: {litellm_reasoning_effort or 'not set'}",
         f"Streaming enabled: {'yes' if litellm_stream else 'no'}",
         "",
+        "LiteLLM routing",
+        "----------------",
+    ]
+
+    for workflow_key, workflow_label in LITELLM_ROUTED_WORKFLOWS.items():
+        tier = litellm_workflow_models.get(workflow_key, "fast")
+        lines.append(f"{workflow_label}: {_format_tier(tier)}")
+
+    lines.extend(
+        [
+        "",
         "Embedding configuration",
         "-----------------------",
         f"Backend: {embedding_backend or 'deterministic'}",
         f"Model: {embedding_model or ('(auto)' if embedding_backend == 'litellm' and litellm_model else 'not set')}",
-    ]
+        ]
+    )
     print("\n".join(lines))
 
 

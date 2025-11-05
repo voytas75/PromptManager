@@ -87,7 +87,7 @@ def test_main_print_settings_masks_api_key(
     assert exit_code == 0
     output = capsys.readouterr().out
     assert "LiteLLM API key: set (sk-1...abcd)" in output
-    assert "Model: azure/gpt-4o" in output
+    assert "Fast model: azure/gpt-4o" in output
 
 
 def test_main_returns_error_when_settings_fail(
@@ -251,6 +251,7 @@ def test_main_entrypoint_guard_executes(
     config_stub = types.ModuleType("config")
     config_stub.load_settings = lambda: _DummySettings()
     config_stub.PromptManagerSettings = type("PromptManagerSettings", (), {})
+    config_stub.LITELLM_ROUTED_WORKFLOWS = {"prompt_execution": "Prompt execution"}
     core_stub = types.ModuleType("core")
     dummy_manager = _DummyManager()
     core_stub.build_prompt_manager = lambda settings: dummy_manager

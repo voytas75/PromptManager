@@ -1,5 +1,6 @@
 """Settings management for Prompt Manager configuration.
 
+Updates: v0.4.5 - 2025-11-05 - Add LiteLLM workflow routing configuration.
 Updates: v0.4.4 - 2025-11-05 - Introduce LiteLLM inference model configuration.
 Updates: v0.4.3 - 2025-11-26 - Add LiteLLM streaming configuration flag.
 Updates: v0.4.2 - 2025-11-15 - Ignore LiteLLM API secrets in JSON configuration files with warnings.
@@ -16,8 +17,9 @@ from __future__ import annotations
 import json
 import os
 import logging
+from collections import OrderedDict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type, cast
+from typing import Any, Dict, List, Optional, Tuple, Type, cast, Literal
 
 from pydantic import Field, ValidationError, field_validator, model_validator
 from pydantic_settings import (
@@ -25,6 +27,19 @@ from pydantic_settings import (
     PydanticBaseSettingsSource,
     SettingsConfigDict,
 )
+
+
+LITELLM_ROUTED_WORKFLOWS: "OrderedDict[str, str]" = OrderedDict(
+    [
+        ("name_generation", "Prompt name suggestions"),
+        ("description_generation", "Prompt description synthesis"),
+        ("scenario_generation", "Scenario drafting"),
+        ("prompt_engineering", "Prompt refinement"),
+        ("prompt_execution", "Prompt execution"),
+    ]
+)
+
+LITELLM_ROUTING_OPTIONS: Tuple[str, str] = ("fast", "inference")
 
 
 class SettingsError(Exception):
@@ -63,6 +78,10 @@ class PromptManagerSettings(BaseSettings):
     litellm_stream: bool = Field(
         default=False,
         description="Enable streaming responses when executing prompts via LiteLLM.",
+    )
+    litellm_workflow_models: Optional[Dict[str, Literal["fast", "inference"]]] = Field(
+        default=None,
+        description="Workflow-specific LiteLLM routing overrides mapping identifiers to 'fast' or 'inference'.",
     )
     quick_actions: Optional[list[dict[str, object]]] = Field(
         default=None,
@@ -104,6 +123,7 @@ class PromptManagerSettings(BaseSettings):
                 "litellm_drop_params": ["LITELLM_DROP_PARAMS", "litellm_drop_params"],
                 "litellm_reasoning_effort": ["LITELLM_REASONING_EFFORT", "litellm_reasoning_effort"],
                 "litellm_stream": ["LITELLM_STREAM", "litellm_stream"],
+                "litellm_workflow_models": ["LITELLM_WORKFLOW_MODELS", "litellm_workflow_models"],
                 "embedding_backend": ["EMBEDDING_BACKEND", "embedding_backend"],
                 "embedding_model": ["EMBEDDING_MODEL", "embedding_model"],
                 "embedding_device": ["EMBEDDING_DEVICE", "embedding_device"],
@@ -237,6 +257,41 @@ class PromptManagerSettings(BaseSettings):
             raise ValueError("litellm_reasoning_effort must be one of: minimal, medium, high")
         return effort
 
+    @field_validator("litellm_workflow_models", mode="before")
+    def _normalise_workflow_models(
+        cls, value: object
+    ) -> Optional[Dict[str, Literal["fast", "inference"]]]:
+        if value in (None, "", {}, ()):  # type: ignore[comparison-overlap]
+            return None
+        if isinstance(value, str):
+            payload = value.strip()
+            if not payload:
+                return None
+            try:
+                value = json.loads(payload)
+            except json.JSONDecodeError as exc:  # pragma: no cover - invalid configuration
+                raise ValueError(
+                    "litellm_workflow_models must be a JSON object mapping workflow to model tier"
+                ) from exc
+        if not isinstance(value, dict):
+            raise ValueError("litellm_workflow_models must be a mapping of workflow names to model tiers")
+        cleaned: Dict[str, Literal["fast", "inference"]] = {}
+        for raw_key, raw_value in value.items():
+            key = str(raw_key).strip()
+            if key not in LITELLM_ROUTED_WORKFLOWS:
+                raise ValueError(f"Unsupported LiteLLM workflow '{key}'")
+            if raw_value is None:
+                continue
+            choice = str(raw_value).strip().lower()
+            if choice not in LITELLM_ROUTING_OPTIONS:
+                raise ValueError(
+                    "Workflow routing must be set to 'fast' or 'inference' when provided"
+                )
+            if choice == "fast":
+                continue
+            cleaned[key] = cast(Literal["fast", "inference"], choice)
+        return cleaned or None
+
     @classmethod
     def settings_customise_sources(
         cls,
@@ -275,6 +330,7 @@ class PromptManagerSettings(BaseSettings):
                 "litellm_api_key": ["LITELLM_API_KEY", "litellm_api_key", "AZURE_OPENAI_API_KEY"],
                 "litellm_api_base": ["LITELLM_API_BASE", "litellm_api_base", "AZURE_OPENAI_ENDPOINT"],
                 "litellm_api_version": ["LITELLM_API_VERSION", "litellm_api_version", "AZURE_OPENAI_API_VERSION"],
+                "litellm_workflow_models": ["LITELLM_WORKFLOW_MODELS", "litellm_workflow_models"],
                 "embedding_backend": ["EMBEDDING_BACKEND", "embedding_backend"],
                 "embedding_model": ["EMBEDDING_MODEL", "embedding_model"],
                 "embedding_device": ["EMBEDDING_DEVICE", "embedding_device"],
@@ -370,6 +426,7 @@ class PromptManagerSettings(BaseSettings):
                     "litellm_drop_params",
                     "litellm_reasoning_effort",
                     "litellm_stream",
+                    "litellm_workflow_models",
                     "embedding_backend",
                     "embedding_model",
                     "embedding_device",
