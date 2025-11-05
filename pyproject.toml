@@ -36,6 +36,9 @@ dev = ["pytest==8.2.0", "pytest-cov==4.1.0"]
 include = ["config*", "core*", "gui*", "models*"]
 exclude = ["tests*", "data*", "PromptManagerBlueprint.txt", "AGENTS.md"]
 
+[tool.setuptools.package-data]
+"gui.resources" = ["*.ico"]
+
 [tool.black]
 line-length = 100
 target-version = ["py311"]

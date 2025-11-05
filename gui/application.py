@@ -1,5 +1,6 @@
 """Qt application helpers for Prompt Manager GUI.
 
+Updates: v0.1.2 - 2025-11-05 - Apply packaged application icon for desktop builds.
 Updates: v0.1.1 - 2025-11-05 - Detect display server before forcing offscreen backend.
 Updates: v0.1.0 - 2025-11-04 - Provide QApplication factory and launch routine.
 """
@@ -17,6 +18,7 @@ from core import PromptManager
 from config import PromptManagerSettings
 
 from .main_window import MainWindow
+from .resources import load_application_icon
 
 
 _DISPLAY_ENV_VARS = ("DISPLAY", "WAYLAND_DISPLAY", "MIR_SOCKET")
@@ -55,7 +57,13 @@ def launch_prompt_manager(
     """Create the Qt event loop, show the main window, and enter the GUI."""
 
     app = create_qapplication()
+    icon = load_application_icon()
+    if icon is not None:
+        app.setWindowIcon(icon)
+
     window = MainWindow(prompt_manager, settings=settings)
+    if icon is not None and not window.windowIcon().cacheKey():
+        window.setWindowIcon(icon)
     window.show()
     return app.exec()
 

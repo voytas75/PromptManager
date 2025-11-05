@@ -2,6 +2,10 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.13.14] - 2025-11-05
+
+- Packaged a default Prompt Manager icon and set it as the Qt application/window icon so Windows builds display branded taskbar and shell visuals out of the box.
+
 ## [0.13.13] - 2025-11-05
 
 - Added a dedicated LiteLLM inference model configuration alongside the existing fast model so future workflows can route tasks to latency-appropriate endpoints.
