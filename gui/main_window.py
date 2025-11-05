@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.9 - 2025-11-26 - Add application info dialog accessible from the toolbar.
 Updates: v0.15.8 - 2025-11-26 - Add prompt list context menu with edit/copy/description actions.
 Updates: v0.15.7 - 2025-11-24 - Add copy-to-text-window action for prompt output.
 Updates: v0.15.6 - 2025-11-04 - Prevent spin box arrows from obscuring the quality filter entry on Windows.
@@ -120,6 +121,7 @@ from .command_palette import CommandPaletteDialog, QuickAction, rank_prompts_for
 from .code_highlighter import CodeHighlighter
 from .dialogs import (
     CatalogPreviewDialog,
+    InfoDialog,
     MarkdownPreviewDialog,
     PromptDialog,
     PromptMaintenanceDialog,
@@ -634,6 +636,10 @@ class MainWindow(QMainWindow):
         self._notifications_button = QPushButton("Notifications", self)
         self._notifications_button.clicked.connect(self._on_notifications_clicked)  # type: ignore[arg-type]
         controls_layout.addWidget(self._notifications_button)
+
+        self._info_button = QPushButton("Info", self)
+        self._info_button.clicked.connect(self._on_info_clicked)  # type: ignore[arg-type]
+        controls_layout.addWidget(self._info_button)
 
         self._settings_button = QPushButton("Settings", self)
         self._settings_button.clicked.connect(self._on_settings_clicked)  # type: ignore[arg-type]
@@ -2620,6 +2626,12 @@ class MainWindow(QMainWindow):
             self._select_prompt(selected_id)
         if message:
             self.statusBar().showMessage(message, 5000)
+
+    def _on_info_clicked(self) -> None:
+        """Display application metadata and system characteristics."""
+
+        dialog = InfoDialog(self)
+        dialog.exec()
 
     def _on_settings_clicked(self) -> None:
         """Open configuration dialog and apply updates."""

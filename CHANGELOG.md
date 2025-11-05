@@ -2,6 +2,10 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.13.7] - 2025-11-26
+
+- Added an Info dialog to the GUI toolbar that links to the author's GitHub profile and surfaces system CPU/architecture details alongside the project's open source license summary.
+
 ## [0.13.6] - 2025-11-25
 
 - Added a prompt catalogue overview on the Maintenance tab with live counts for prompts, categories, tags, stale entries, and recent updates, plus a manual refresh control.

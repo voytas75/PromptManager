@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.8.5 - 2025-11-26 - Add application info dialog.
 Updates: v0.8.4 - 2025-11-25 - Add prompt maintenance overview stats panel.
 Updates: v0.8.3 - 2025-11-19 - Add scenario generation controls and persistence to the prompt dialog.
 Updates: v0.8.2 - 2025-11-17 - Add Apply workflow so prompt edits can be persisted without closing the dialog.
@@ -19,14 +20,16 @@ Updates: v0.1.0 - 2025-11-04 - Implement create/edit prompt dialog backed by Pro
 from __future__ import annotations
 
 import logging
+import os
+import platform
 import re
 import textwrap
 import uuid
 from copy import deepcopy
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
-from typing import Callable, Dict, Optional, Sequence, List
 from pathlib import Path
+from typing import Callable, Dict, List, Optional, Sequence
 
 from PySide6.QtCore import Qt, QEvent, Signal
 from PySide6.QtWidgets import (
@@ -71,6 +74,55 @@ from models.prompt_model import Prompt, TaskTemplate
 logger = logging.getLogger("prompt_manager.gui.dialogs")
 
 _WORD_PATTERN = re.compile(r"[A-Za-z0-9]+")
+
+
+@dataclass(frozen=True)
+class SystemInfo:
+    """Container describing runtime platform characteristics for display."""
+
+    cpu: str
+    architecture: str
+    platform_family: str
+    os_label: str
+
+
+def _classify_platform_family(system_name: str) -> str:
+    """Return a high-level platform family string based on the system identifier."""
+
+    name = system_name.lower()
+    if name.startswith("win"):
+        return "Windows"
+    if name.startswith(("darwin", "mac")):
+        return "macOS"
+    if name.startswith(("linux", "freebsd", "openbsd", "netbsd", "aix", "hp-ux", "sunos")):
+        return "Unix-like"
+    if not system_name:
+        return "Unknown"
+    return system_name
+
+
+def _collect_system_info() -> SystemInfo:
+    """Gather CPU and platform metadata for the info dialog."""
+
+    uname = platform.uname()
+
+    raw_cpu = platform.processor() or uname.processor
+    if not raw_cpu:
+        cpu_count = os.cpu_count()
+        raw_cpu = f"{cpu_count} logical cores" if cpu_count else "Unknown"
+
+    architecture = platform.machine() or uname.machine or "Unknown"
+
+    system_name = platform.system() or uname.system or "Unknown"
+    release = platform.release() or uname.release
+    os_label = f"{system_name} {release}".strip() if release else system_name
+
+    return SystemInfo(
+        cpu=raw_cpu,
+        architecture=architecture,
+        platform_family=_classify_platform_family(system_name),
+        os_label=os_label or "Unknown",
+    )
 
 
 class CollapsibleTextSection(QWidget):
@@ -1625,6 +1677,63 @@ class MarkdownPreviewDialog(QDialog):
         layout.addWidget(buttons)
 
 
+class InfoDialog(QDialog):
+    """Dialog summarising application metadata and runtime system details."""
+
+    _TAGLINE = "Catalog, execute, and track AI prompts from a single desktop workspace."
+
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("About Prompt Manager")
+        self.setModal(True)
+        self.setMinimumWidth(420)
+
+        layout = QVBoxLayout(self)
+
+        title_label = QLabel("<b>Prompt Manager</b>", self)
+        title_label.setTextFormat(Qt.RichText)
+        layout.addWidget(title_label)
+
+        info = _collect_system_info()
+
+        form = QFormLayout()
+        form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+
+        author_label = QLabel('<a href="https://github.com/voytas75">voytas75</a>', self)
+        author_label.setTextFormat(Qt.RichText)
+        author_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        author_label.setOpenExternalLinks(True)
+        form.addRow("Author:", author_label)
+
+        tagline_label = QLabel(self._TAGLINE, self)
+        tagline_label.setWordWrap(True)
+        tagline_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        form.addRow("Tagline:", tagline_label)
+
+        cpu_label = QLabel(info.cpu, self)
+        cpu_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        form.addRow("CPU:", cpu_label)
+
+        platform_label = QLabel(f"{info.platform_family} ({info.os_label})", self)
+        platform_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        form.addRow("Platform:", platform_label)
+
+        architecture_label = QLabel(info.architecture, self)
+        architecture_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        form.addRow("Architecture:", architecture_label)
+
+        license_label = QLabel("opensource", self)
+        license_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        form.addRow("License:", license_label)
+
+        layout.addLayout(form)
+
+        buttons = QDialogButtonBox(parent=self)
+        close_button = buttons.addButton("Close", QDialogButtonBox.AcceptRole)
+        close_button.clicked.connect(self.accept)  # type: ignore[arg-type]
+        layout.addWidget(buttons)
+
+
 def _diff_entry_to_text(entry: CatalogDiffEntry) -> str:
     header = f"[{entry.change_type.value.upper()}] {entry.name} ({entry.prompt_id})"
     if entry.diff:
@@ -1688,6 +1797,7 @@ class CatalogPreviewDialog(QDialog):
 
 __all__ = [
     "CatalogPreviewDialog",
+    "InfoDialog",
     "MarkdownPreviewDialog",
     "PromptDialog",
     "PromptMaintenanceDialog",
