@@ -1,6 +1,6 @@
 """Core service layer for Prompt Manager.
 
-Updates: v0.7.0 - 2025-11-30 - Remove catalogue import helpers from public API.
+Updates: v0.7.1 - 2025-11-30 - Restore catalogue import helpers for GUI workflows.
 Updates: v0.6.0 - 2025-11-15 - Export prompt engineering helpers alongside manager API.
 Updates: v0.5.0 - 2025-11-07 - Export embedding factory helper for external use.
 Updates: v0.4.0 - 2025-11-06 - Export intent classifier utilities for GUI integration.
@@ -9,7 +9,17 @@ Updates: v0.2.0 - 2025-10-31 - Surface PromptRepository alongside PromptManager.
 Updates: v0.1.0 - 2025-10-30 - Expose PromptManager API.
 """
 
-from .catalog_importer import export_prompt_catalog
+from .catalog_importer import (
+    CatalogChangePlan,
+    CatalogChangeType,
+    CatalogDiff,
+    CatalogDiffEntry,
+    CatalogImportResult,
+    diff_prompt_catalog,
+    export_prompt_catalog,
+    import_prompt_catalog,
+    load_prompt_catalog,
+)
 from .factory import build_prompt_manager
 from .intent_classifier import (
     IntentClassifier,
@@ -60,7 +70,15 @@ __all__ = [
     "RepositoryNotFoundError",
     "TaskTemplate",
     "build_prompt_manager",
+    "import_prompt_catalog",
+    "load_prompt_catalog",
+    "diff_prompt_catalog",
     "export_prompt_catalog",
+    "CatalogImportResult",
+    "CatalogDiff",
+    "CatalogDiffEntry",
+    "CatalogChangeType",
+    "CatalogChangePlan",
     "NameGenerationError",
     "DescriptionGenerationError",
     "IntentClassifier",

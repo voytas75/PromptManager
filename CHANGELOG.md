@@ -4,8 +4,8 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ## [0.13.12] - 2025-11-30
 
-- Removed the `catalog-import` CLI command and associated GUI controls; catalogue entries are now added manually or via external tooling while the built-in export command remains available.
-- Simplified documentation to reflect the export-only workflow and removed remaining references to automatic catalogue seeding.
+- Removed the `catalog-import` CLI command while keeping the GUI import workflow; catalogue entries can still be applied from JSON via the Import button, with export remaining available via CLI and GUI.
+- Simplified documentation to reflect the GUI-focused import flow and removed references to automatic catalogue seeding.
 
 ## [0.13.11] - 2025-11-28
 

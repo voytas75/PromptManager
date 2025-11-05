@@ -114,6 +114,7 @@ Further modules (session history, execution pipeline) will be introduced in subs
 - Use the **Settings** button to adjust LiteLLM routing options (model/base/version), streaming preferences, and quick actions; these values persist to `config/config.json` while API keys entered in the dialog stay in-memory only. Set `PROMPT_MANAGER_LITELLM_API_KEY` in your environment to reuse the key across sessions.
 - Intent detection appears beneath the workspace and search bar once you start typing or analysing text, highlighting the inferred category (Debugging, Refactoring, Documentation, etc.), language hints, and the top-matching prompts.
 - When LiteLLM is configured, leaving the **Name** and **Description** fields blank will automatically populate them from the prompt body, speeding up catalogue entry for new prompts.
+- Use the **Import** button to bring prompts in from JSON files or directories—each import shows a diff preview before changes are applied.
 - Use the **Export** button to write the current catalogue to JSON or YAML for backups or sharing.
 - The **History** button opens a read-only view of recent prompt executions, including request/response excerpts, durations, and any captured errors.
 
@@ -140,8 +141,8 @@ These commands reuse the same validation logic as the GUI; pass an explicit path
 
 ## Prompt Catalogue
 
-- Prompt Manager no longer seeds default prompts. Add entries directly through the GUI (**Add** button) or import them via your own scripts before launching the application.
-- Use the **Export** button or the `catalog-export` CLI command to back up prompts once you are happy with the catalogue.
+- Prompt Manager no longer seeds default prompts. Add entries through the GUI (**Add** button) or import them via the **Import** button when you have JSON files prepared.
+- Use the **Import** button or your own tooling to populate prompts, and the **Export** button or the `catalog-export` CLI command to back up prompts once you are happy with the catalogue.
 - Minimum JSON structure:
 
   ```json

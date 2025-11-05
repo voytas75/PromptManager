@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.16 - 2025-11-30 - Keep catalogue import controls while CLI command is removed.
 Updates: v0.15.15 - 2025-11-30 - Remove catalogue import controls from the toolbar.
 Updates: v0.15.14 - 2025-11-28 - Add exit toolbar icon and shortcut for graceful shutdown.
 Updates: v0.15.12 - 2025-11-26 - Add LiteLLM streaming toggle with incremental output updates.
@@ -115,7 +116,9 @@ from core import (
     PromptNotFoundError,
     PromptStorageError,
     RepositoryError,
+    diff_prompt_catalog,
     export_prompt_catalog,
+    import_prompt_catalog,
 )
 from core.prompt_engineering import PromptRefinement
 from core.notifications import Notification, NotificationStatus
@@ -124,6 +127,7 @@ from models.prompt_model import Prompt, TaskTemplate
 from .command_palette import CommandPaletteDialog, QuickAction, rank_prompts_for_action
 from .code_highlighter import CodeHighlighter
 from .dialogs import (
+    CatalogPreviewDialog,
     InfoDialog,
     MarkdownPreviewDialog,
     PromptDialog,
@@ -623,6 +627,10 @@ class MainWindow(QMainWindow):
         self._add_button = QPushButton("Add", self)
         self._add_button.clicked.connect(self._on_add_clicked)  # type: ignore[arg-type]
         controls_layout.addWidget(self._add_button)
+
+        self._import_button = QPushButton("Import", self)
+        self._import_button.clicked.connect(self._on_import_clicked)  # type: ignore[arg-type]
+        controls_layout.addWidget(self._import_button)
 
         self._export_button = QPushButton("Export", self)
         self._export_button.clicked.connect(self._on_export_clicked)  # type: ignore[arg-type]
@@ -2736,6 +2744,52 @@ class MainWindow(QMainWindow):
             self._show_error("Unable to delete prompt", str(exc))
             return
         self._detail_widget.clear()
+        self._load_prompts(self._search_input.text())
+
+    def _on_import_clicked(self) -> None:
+        """Preview catalogue diff and optionally apply updates."""
+
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select catalogue file",
+            "",
+            "JSON Files (*.json);;All Files (*)",
+        )
+        catalog_path: Optional[Path]
+        if file_path:
+            catalog_path = Path(file_path)
+        else:
+            directory = QFileDialog.getExistingDirectory(self, "Select catalogue directory", "")
+            if not directory:
+                return
+            catalog_path = Path(directory)
+
+        catalog_path = catalog_path.expanduser()
+
+        try:
+            preview = diff_prompt_catalog(self._manager, catalog_path)
+        except Exception as exc:
+            QMessageBox.warning(self, "Catalogue preview failed", str(exc))
+            return
+
+        dialog = CatalogPreviewDialog(preview, self)
+        if dialog.exec() != QDialog.Accepted or not dialog.apply_requested:
+            return
+
+        try:
+            result = import_prompt_catalog(self._manager, catalog_path)
+        except Exception as exc:
+            QMessageBox.critical(self, "Catalogue import failed", str(exc))
+            return
+
+        message = (
+            f"Catalogue applied (added {result.added}, updated {result.updated}, "
+            f"skipped {result.skipped}, errors {result.errors})"
+        )
+        if result.errors:
+            QMessageBox.warning(self, "Catalogue applied with errors", message)
+        else:
+            self.statusBar().showMessage(message, 5000)
         self._load_prompts(self._search_input.text())
 
     def _on_export_clicked(self) -> None:
