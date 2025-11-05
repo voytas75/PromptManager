@@ -1,5 +1,6 @@
 """LiteLLM-backed prompt metadata generation utilities.
 
+Updates: v0.7.4 - 2025-11-05 - Remove explicit LiteLLM timeout to avoid premature cancellation errors.
 Updates: v0.7.3 - 2025-11-02 - Strip configured drop parameters before calling LiteLLM.
 Updates: v0.7.2 - 2025-11-17 - Retry without unsupported LiteLLM parameters when models reject them.
 Updates: v0.7.1 - 2025-11-11 - Summarise LiteLLM errors for friendlier GUI fallbacks.
@@ -37,7 +38,7 @@ class LiteLLMNameGenerator:
     model: str
     api_key: Optional[str] = None
     api_base: Optional[str] = None
-    timeout_seconds: float = 10.0
+    timeout_seconds: Optional[float] = None
     api_version: Optional[str] = None
     drop_params: Optional[Sequence[str]] = None
 
@@ -63,8 +64,9 @@ class LiteLLMNameGenerator:
             ],
             "temperature": 0.2,
             "max_tokens": 16,
-            "timeout": self.timeout_seconds,
         }
+        if self.timeout_seconds is not None:
+            request["timeout"] = self.timeout_seconds
         if self.api_key:
             request["api_key"] = self.api_key
         if self.api_base:
@@ -109,7 +111,7 @@ class LiteLLMDescriptionGenerator:
     model: str
     api_key: Optional[str] = None
     api_base: Optional[str] = None
-    timeout_seconds: float = 12.0
+    timeout_seconds: Optional[float] = None
     api_version: Optional[str] = None
     drop_params: Optional[Sequence[str]] = None
 
@@ -138,8 +140,9 @@ class LiteLLMDescriptionGenerator:
             ],
             "temperature": 0.3,
             "max_tokens": 120,
-            "timeout": self.timeout_seconds,
         }
+        if self.timeout_seconds is not None:
+            request["timeout"] = self.timeout_seconds
         if self.api_key:
             request["api_key"] = self.api_key
         if self.api_base:

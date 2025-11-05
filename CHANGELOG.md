@@ -2,6 +2,10 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.13.9] - 2025-11-05
+
+- Removed explicit LiteLLM timeouts across prompt execution, engineering, metadata generation, and embedding calls so long-running requests rely on provider defaults instead of failing after fixed client deadlines.
+
 ## [0.13.8] - 2025-11-27
 
 - Added a Duplicate Prompt action to the prompt list context menu that opens a pre-filled editor for cloning existing entries before saving.

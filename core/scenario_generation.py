@@ -1,5 +1,6 @@
 """LiteLLM-backed prompt scenario generation utilities.
 
+Updates: v0.1.1 - 2025-11-05 - Remove explicit LiteLLM timeout to rely on provider defaults.
 Updates: v0.1.0 - 2025-11-19 - Introduce scenario generator for prompt usage guidance.
 """
 
@@ -71,7 +72,7 @@ class LiteLLMScenarioGenerator:
     model: str
     api_key: Optional[str] = None
     api_base: Optional[str] = None
-    timeout_seconds: float = 12.0
+    timeout_seconds: Optional[float] = None
     api_version: Optional[str] = None
     drop_params: Optional[Sequence[str]] = None
     default_max_scenarios: int = 3
@@ -107,8 +108,9 @@ class LiteLLMScenarioGenerator:
             ],
             "temperature": 0.4,
             "max_tokens": 256,
-            "timeout": self.timeout_seconds,
         }
+        if self.timeout_seconds is not None:
+            request["timeout"] = self.timeout_seconds
         if self.api_key:
             request["api_key"] = self.api_key
         if self.api_base:

@@ -1,5 +1,6 @@
 """LiteLLM-backed prompt engineering utilities for refining prompts.
 
+Updates: v0.1.2 - 2025-11-05 - Stop forwarding LiteLLM timeout parameter to avoid premature failures.
 Updates: v0.1.1 - 2025-11-02 - Drop configured LiteLLM parameters locally before refinement calls.
 Updates: v0.1.0 - 2025-11-15 - Introduce prompt refinement helper using meta-prompt rules.
 """
@@ -70,7 +71,7 @@ class PromptEngineer:
     api_version: Optional[str] = None
     temperature: float = 0.25
     top_p: float = 0.9
-    timeout_seconds: float = 25.0
+    timeout_seconds: Optional[float] = None
     max_tokens: int = 1200
     drop_params: Optional[Sequence[str]] = None
 
@@ -151,8 +152,9 @@ class PromptEngineer:
             "temperature": self.temperature,
             "top_p": self.top_p,
             "max_tokens": self.max_tokens,
-            "timeout": self.timeout_seconds,
         }
+        if self.timeout_seconds is not None:
+            request["timeout"] = self.timeout_seconds
         if self.api_key:
             request["api_key"] = self.api_key
         if self.api_base:

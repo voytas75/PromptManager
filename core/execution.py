@@ -1,5 +1,6 @@
 """LiteLLM-backed prompt execution helpers.
 
+Updates: v0.3.1 - 2025-11-05 - Rely on provider defaults instead of forcing LiteLLM timeouts.
 Updates: v0.3.0 - 2025-11-02 - Support reasoning-effort configuration and max_output_tokens for new OpenAI model families.
 Updates: v0.2.1 - 2025-11-14 - Surface missing LiteLLM dependency as ExecutionError.
 Updates: v0.2.0 - 2025-11-12 - Support multi-turn conversation payloads for LiteLLM execution.
@@ -53,7 +54,7 @@ class CodexExecutor:
     api_key: Optional[str] = None
     api_base: Optional[str] = None
     api_version: Optional[str] = None
-    timeout_seconds: float = 30.0
+    timeout_seconds: Optional[float] = None
     max_output_tokens: int = 1024
     temperature: float = 0.2
     drop_params: Optional[Sequence[str]] = None
@@ -102,8 +103,9 @@ class CodexExecutor:
             "temperature": self.temperature,
             "max_tokens": self.max_output_tokens,
             "max_output_tokens": self.max_output_tokens,
-            "timeout": self.timeout_seconds,
         }
+        if self.timeout_seconds is not None:
+            request["timeout"] = self.timeout_seconds
         if self.api_key:
             request["api_key"] = self.api_key
         if self.api_base:

@@ -1,5 +1,6 @@
 """Embedding provider and background synchronisation helpers for Prompt Manager.
 
+Updates: v0.7.1 - 2025-11-05 - Stop forwarding LiteLLM embedding timeouts by default.
 Updates: v0.7.0 - 2025-11-11 - Publish notifications for background embedding sync progress.
 Updates: v0.6.0 - 2025-11-07 - Add configurable LiteLLM and sentence-transformer backends.
 Updates: v0.1.0 - 2025-11-05 - Introduce embedding provider with retry logic and sync worker.
@@ -63,7 +64,7 @@ class LiteLLMEmbeddingFunction:
         model: str,
         api_key: Optional[str],
         api_base: Optional[str],
-        timeout_seconds: float = 10.0,
+        timeout_seconds: Optional[float] = None,
     ) -> None:
         if not model:
             raise ValueError("LiteLLM embedding backend requires a model name.")
@@ -80,8 +81,9 @@ class LiteLLMEmbeddingFunction:
         request = {
             "model": self._model,
             "input": inputs,
-            "timeout": self._timeout_seconds,
         }
+        if self._timeout_seconds is not None:
+            request["timeout"] = self._timeout_seconds
         if self._api_key:
             request["api_key"] = self._api_key
         if self._api_base:
@@ -150,7 +152,7 @@ def create_embedding_function(
     api_key: Optional[str],
     api_base: Optional[str],
     device: Optional[str] = None,
-    timeout_seconds: float = 10.0,
+    timeout_seconds: Optional[float] = None,
 ) -> Optional[EmbeddingFunction]:
     """Return an embedding function for the configured backend or None for the default."""
 
