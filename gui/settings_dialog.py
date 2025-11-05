@@ -1,5 +1,6 @@
 """Settings dialog for configuring Prompt Manager runtime options.
 
+Updates: v0.2.3 - 2025-11-05 - Introduce LiteLLM inference model field and tabbed layout.
 Updates: v0.2.2 - 2025-11-26 - Add LiteLLM streaming toggle to runtime settings UI.
 Updates: v0.2.1 - 2025-11-17 - Remove catalogue path configuration; imports now require explicit selection.
 Updates: v0.2.0 - 2025-11-16 - Apply palette-aware border styling to match main window chrome.
@@ -24,6 +25,8 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QCheckBox,
     QVBoxLayout,
+    QTabWidget,
+    QWidget,
 )
 
 from config.persistence import persist_settings_to_config
@@ -37,6 +40,7 @@ class SettingsDialog(QDialog):
         parent=None,
         *,
         litellm_model: Optional[str] = None,
+        litellm_inference_model: Optional[str] = None,
         litellm_api_key: Optional[str] = None,
         litellm_api_base: Optional[str] = None,
         litellm_api_version: Optional[str] = None,
@@ -49,6 +53,7 @@ class SettingsDialog(QDialog):
         self.setWindowTitle("Prompt Manager Settings")
         self.setMinimumWidth(860)
         self._litellm_model = litellm_model or ""
+        self._litellm_inference_model = litellm_inference_model or ""
         self._litellm_api_key = litellm_api_key or ""
         self._litellm_api_base = litellm_api_base or ""
         self._litellm_api_version = litellm_api_version or ""
@@ -82,36 +87,51 @@ class SettingsDialog(QDialog):
         layout.setContentsMargins(12, 12, 12, 12)
         outer_layout.addWidget(container)
 
-        form = QFormLayout()
+        tab_widget = QTabWidget(self)
+        tab_widget.setObjectName("settingsTabs")
+        layout.addWidget(tab_widget)
 
-        self._model_input = QLineEdit(self._litellm_model, self)
-        form.addRow("LiteLLM model", self._model_input)
+        litellm_tab = QWidget(self)
+        litellm_form = QFormLayout(litellm_tab)
+        litellm_form.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
 
-        self._api_key_input = QLineEdit(self._litellm_api_key, self)
+        self._model_input = QLineEdit(self._litellm_model, litellm_tab)
+        litellm_form.addRow("LiteLLM fast model", self._model_input)
+
+        self._inference_model_input = QLineEdit(self._litellm_inference_model, litellm_tab)
+        litellm_form.addRow("LiteLLM inference model", self._inference_model_input)
+
+        self._api_key_input = QLineEdit(self._litellm_api_key, litellm_tab)
         self._api_key_input.setEchoMode(QLineEdit.Password)
-        form.addRow("LiteLLM API key", self._api_key_input)
+        litellm_form.addRow("LiteLLM API key", self._api_key_input)
 
-        self._api_base_input = QLineEdit(self._litellm_api_base, self)
-        form.addRow("LiteLLM API base", self._api_base_input)
+        self._api_base_input = QLineEdit(self._litellm_api_base, litellm_tab)
+        litellm_form.addRow("LiteLLM API base", self._api_base_input)
 
-        self._api_version_input = QLineEdit(self._litellm_api_version, self)
-        form.addRow("LiteLLM API version", self._api_version_input)
+        self._api_version_input = QLineEdit(self._litellm_api_version, litellm_tab)
+        litellm_form.addRow("LiteLLM API version", self._api_version_input)
 
-        self._drop_params_input = QLineEdit(self._litellm_drop_params, self)
+        self._drop_params_input = QLineEdit(self._litellm_drop_params, litellm_tab)
         self._drop_params_input.setPlaceholderText("max_tokens, temperature")
-        form.addRow("LiteLLM drop params", self._drop_params_input)
+        litellm_form.addRow("LiteLLM drop params", self._drop_params_input)
 
-        self._reasoning_effort_input = QLineEdit(self._litellm_reasoning_effort, self)
+        self._reasoning_effort_input = QLineEdit(self._litellm_reasoning_effort, litellm_tab)
         self._reasoning_effort_input.setPlaceholderText("minimal / medium / high")
-        form.addRow("LiteLLM reasoning effort", self._reasoning_effort_input)
+        litellm_form.addRow("LiteLLM reasoning effort", self._reasoning_effort_input)
 
-        self._stream_checkbox = QCheckBox("Enable streaming responses", self)
+        self._stream_checkbox = QCheckBox("Enable streaming responses", litellm_tab)
         self._stream_checkbox.setChecked(self._litellm_stream)
-        form.addRow("LiteLLM streaming", self._stream_checkbox)
+        litellm_form.addRow("LiteLLM streaming", self._stream_checkbox)
 
-        layout.addLayout(form)
+        tab_widget.addTab(litellm_tab, "LiteLLM")
 
-        self._quick_actions_input = QPlainTextEdit(self)
+        quick_tab = QWidget(self)
+        quick_layout = QVBoxLayout(quick_tab)
+        quick_layout.setContentsMargins(0, 0, 0, 0)
+        quick_actions_label = QLabel("Quick actions (JSON)", quick_tab)
+        quick_layout.addWidget(quick_actions_label)
+
+        self._quick_actions_input = QPlainTextEdit(quick_tab)
         self._quick_actions_input.setPlaceholderText(
             "Paste JSON array of quick action definitions (identifier, title, description, optional hints)."
         )
@@ -121,9 +141,9 @@ class SettingsDialog(QDialog):
             except TypeError:
                 pretty = ""
             self._quick_actions_input.setPlainText(pretty)
-        quick_actions_label = QLabel("Quick actions (JSON)", self)
-        layout.addWidget(quick_actions_label)
-        layout.addWidget(self._quick_actions_input)
+        quick_layout.addWidget(self._quick_actions_input)
+
+        tab_widget.addTab(quick_tab, "Quick Actions")
 
         button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
         button_box.accepted.connect(self.accept)  # type: ignore[arg-type]
@@ -170,6 +190,7 @@ class SettingsDialog(QDialog):
 
         return {
             "litellm_model": _clean(self._model_input.text()),
+            "litellm_inference_model": _clean(self._inference_model_input.text()),
             "litellm_api_key": _clean(self._api_key_input.text()),
             "litellm_api_base": _clean(self._api_base_input.text()),
             "litellm_api_version": _clean(self._api_version_input.text()),

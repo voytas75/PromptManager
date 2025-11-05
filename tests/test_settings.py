@@ -1,5 +1,6 @@
 """Tests for configuration loading and validation logic.
 
+Updates: v0.1.4 - 2025-11-05 - Cover LiteLLM inference model configuration.
 Updates: v0.1.3 - 2025-11-15 - Warn and ignore LiteLLM API secrets supplied via JSON configuration.
 Updates: v0.1.2 - 2025-11-14 - Cover LiteLLM API key loading from JSON configuration.
 Updates: v0.1.1 - 2025-11-03 - Add precedence test using example template.
@@ -40,6 +41,7 @@ def test_load_settings_reads_json_and_env(monkeypatch, tmp_path) -> None:
     assert settings.cache_ttl_seconds == 900
     assert settings.redis_dsn == "redis://localhost:6379/1"
     assert settings.litellm_model is None
+    assert settings.litellm_inference_model is None
     assert settings.litellm_drop_params is None
 
 
@@ -82,6 +84,7 @@ def test_json_with_litellm_api_key_is_ignored(monkeypatch, tmp_path, caplog) -> 
         settings = load_settings()
 
     assert settings.litellm_model == "azure/gpt-4o"
+    assert settings.litellm_inference_model is None
     assert settings.litellm_api_key is None
     assert settings.litellm_api_base == "https://azure.example.com"
     assert settings.litellm_drop_params is None
@@ -93,16 +96,30 @@ def test_litellm_settings_from_env(monkeypatch, tmp_path) -> None:
     tmp_config.write_text("{}", encoding="utf-8")
     monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(tmp_config))
     monkeypatch.setenv("PROMPT_MANAGER_LITELLM_MODEL", "gpt-4o-mini")
+    monkeypatch.setenv("PROMPT_MANAGER_LITELLM_INFERENCE_MODEL", "gpt-4.1")
     monkeypatch.setenv("PROMPT_MANAGER_LITELLM_API_KEY", "secret-key")
     monkeypatch.setenv("PROMPT_MANAGER_LITELLM_API_BASE", "https://proxy.example.com")
 
     settings = load_settings()
 
     assert settings.litellm_model == "gpt-4o-mini"
+    assert settings.litellm_inference_model == "gpt-4.1"
     assert settings.litellm_api_key == "secret-key"
     assert settings.litellm_api_base == "https://proxy.example.com"
     assert settings.litellm_drop_params is None
     assert settings.litellm_stream is False
+
+
+def test_litellm_inference_model_from_json(monkeypatch, tmp_path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps({"litellm_inference_model": "gpt-4.1"}), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
+
+    settings = load_settings()
+
+    assert settings.litellm_inference_model == "gpt-4.1"
+    assert settings.litellm_model is None
 
 
 def test_reasoning_effort_normalised(monkeypatch, tmp_path) -> None:

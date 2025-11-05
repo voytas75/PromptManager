@@ -1,5 +1,6 @@
 """Settings management for Prompt Manager configuration.
 
+Updates: v0.4.4 - 2025-11-05 - Introduce LiteLLM inference model configuration.
 Updates: v0.4.3 - 2025-11-26 - Add LiteLLM streaming configuration flag.
 Updates: v0.4.2 - 2025-11-15 - Ignore LiteLLM API secrets in JSON configuration files with warnings.
 Updates: v0.4.1 - 2025-11-14 - Load LiteLLM API key from JSON configuration files.
@@ -37,7 +38,14 @@ class PromptManagerSettings(BaseSettings):
     chroma_path: Path = Field(default=Path("data") / "chromadb")
     redis_dsn: Optional[str] = None
     cache_ttl_seconds: int = Field(default=300)
-    litellm_model: Optional[str] = Field(default=None, description="LiteLLM model name for prompt name generation.")
+    litellm_model: Optional[str] = Field(
+        default=None,
+        description="LiteLLM fast model name for prompt name generation and other latency-sensitive tasks.",
+    )
+    litellm_inference_model: Optional[str] = Field(
+        default=None,
+        description="LiteLLM inference model for higher-quality, slower operations (configured separately from the fast model).",
+    )
     litellm_api_key: Optional[str] = Field(default=None, description="LiteLLM API key.", repr=False)
     litellm_api_base: Optional[str] = Field(default=None, description="Optional LiteLLM API base URL override.")
     litellm_api_version: Optional[str] = Field(
@@ -89,6 +97,7 @@ class PromptManagerSettings(BaseSettings):
                 "redis_dsn": ["REDIS_DSN", "redis_dsn"],
                 "cache_ttl_seconds": ["CACHE_TTL_SECONDS", "cache_ttl_seconds"],
                 "litellm_model": ["LITELLM_MODEL", "litellm_model"],
+                "litellm_inference_model": ["LITELLM_INFERENCE_MODEL", "litellm_inference_model"],
                 "litellm_api_key": ["LITELLM_API_KEY", "litellm_api_key", "AZURE_OPENAI_API_KEY"],
                 "litellm_api_base": ["LITELLM_API_BASE", "litellm_api_base", "AZURE_OPENAI_ENDPOINT"],
                 "litellm_api_version": ["LITELLM_API_VERSION", "litellm_api_version", "AZURE_OPENAI_API_VERSION"],
@@ -129,6 +138,7 @@ class PromptManagerSettings(BaseSettings):
 
     @field_validator(
         "litellm_model",
+        "litellm_inference_model",
         "litellm_api_key",
         "litellm_api_base",
         "embedding_model",
@@ -261,6 +271,7 @@ class PromptManagerSettings(BaseSettings):
                 "redis_dsn": ["REDIS_DSN", "redis_dsn"],
                 "cache_ttl_seconds": ["CACHE_TTL_SECONDS", "cache_ttl_seconds"],
                 "litellm_model": ["LITELLM_MODEL", "litellm_model"],
+                "litellm_inference_model": ["LITELLM_INFERENCE_MODEL", "litellm_inference_model"],
                 "litellm_api_key": ["LITELLM_API_KEY", "litellm_api_key", "AZURE_OPENAI_API_KEY"],
                 "litellm_api_base": ["LITELLM_API_BASE", "litellm_api_base", "AZURE_OPENAI_ENDPOINT"],
                 "litellm_api_version": ["LITELLM_API_VERSION", "litellm_api_version", "AZURE_OPENAI_API_VERSION"],
@@ -353,6 +364,7 @@ class PromptManagerSettings(BaseSettings):
                     "redis_dsn",
                     "cache_ttl_seconds",
                     "litellm_model",
+                    "litellm_inference_model",
                     "litellm_api_base",
                     "litellm_api_version",
                     "litellm_drop_params",

@@ -1,5 +1,6 @@
 """Application entry point for Prompt Manager.
 
+Updates: v0.7.6 - 2025-11-05 - Expand CLI settings summary to list fast and inference LiteLLM models.
 Updates: v0.7.5 - 2025-11-30 - Remove catalogue import command and startup messaging.
 Updates: v0.7.4 - 2025-11-26 - Surface LiteLLM streaming configuration in CLI summaries.
 Updates: v0.7.3 - 2025-11-17 - Require explicit catalogue paths; skip built-in seeding on startup.
@@ -74,6 +75,7 @@ def _print_settings_summary(settings: PromptManagerSettings) -> None:
 
     redis_dsn = getattr(settings, "redis_dsn", None)
     litellm_model = getattr(settings, "litellm_model", None)
+    litellm_inference_model = getattr(settings, "litellm_inference_model", None)
     litellm_api_key = getattr(settings, "litellm_api_key", None)
     litellm_api_base = getattr(settings, "litellm_api_base", None)
     litellm_api_version = getattr(settings, "litellm_api_version", None)
@@ -92,7 +94,8 @@ def _print_settings_summary(settings: PromptManagerSettings) -> None:
         "",
         "LiteLLM configuration",
         "---------------------",
-        f"Model: {litellm_model or 'not set'}",
+        f"Fast model: {litellm_model or 'not set'}",
+        f"Inference model: {litellm_inference_model or 'not set'}",
         f"LiteLLM API key: {_mask_secret(litellm_api_key)}",
         f"LiteLLM API base: {litellm_api_base or 'not set'}",
         f"LiteLLM API version: {litellm_api_version or 'not set'}",

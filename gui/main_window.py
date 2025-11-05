@@ -2853,6 +2853,7 @@ class MainWindow(QMainWindow):
         dialog = SettingsDialog(
             self,
             litellm_model=self._runtime_settings.get("litellm_model"),
+            litellm_inference_model=self._runtime_settings.get("litellm_inference_model"),
             litellm_api_key=self._runtime_settings.get("litellm_api_key"),
             litellm_api_base=self._runtime_settings.get("litellm_api_base"),
             litellm_api_version=self._runtime_settings.get("litellm_api_version"),
@@ -2877,6 +2878,7 @@ class MainWindow(QMainWindow):
         """Persist settings, refresh catalogue, and update name generator."""
 
         self._runtime_settings["litellm_model"] = updates.get("litellm_model")
+        self._runtime_settings["litellm_inference_model"] = updates.get("litellm_inference_model")
         self._runtime_settings["litellm_api_key"] = updates.get("litellm_api_key")
         self._runtime_settings["litellm_api_base"] = updates.get("litellm_api_base")
         self._runtime_settings["litellm_api_version"] = updates.get("litellm_api_version")
@@ -2903,6 +2905,7 @@ class MainWindow(QMainWindow):
         persist_settings_to_config(
             {
                 "litellm_model": self._runtime_settings.get("litellm_model"),
+                "litellm_inference_model": self._runtime_settings.get("litellm_inference_model"),
                 "litellm_api_base": self._runtime_settings.get("litellm_api_base"),
                 "litellm_api_version": self._runtime_settings.get("litellm_api_version"),
                 "litellm_reasoning_effort": self._runtime_settings.get("litellm_reasoning_effort"),
@@ -2915,6 +2918,7 @@ class MainWindow(QMainWindow):
 
         if self._settings is not None:
             self._settings.litellm_model = updates.get("litellm_model")
+            self._settings.litellm_inference_model = updates.get("litellm_inference_model")
             self._settings.litellm_api_key = updates.get("litellm_api_key")
             self._settings.litellm_api_base = updates.get("litellm_api_base")
             self._settings.litellm_api_version = updates.get("litellm_api_version")
@@ -2955,6 +2959,7 @@ class MainWindow(QMainWindow):
 
         runtime = {
             "litellm_model": settings.litellm_model if settings else None,
+            "litellm_inference_model": settings.litellm_inference_model if settings else None,
             "litellm_api_key": settings.litellm_api_key if settings else None,
             "litellm_api_base": settings.litellm_api_base if settings else None,
             "litellm_api_version": settings.litellm_api_version if settings else None,
@@ -2975,6 +2980,7 @@ class MainWindow(QMainWindow):
             else:
                 for key in (
                     "litellm_model",
+                    "litellm_inference_model",
                     "litellm_api_key",
                     "litellm_api_base",
                     "litellm_api_version",

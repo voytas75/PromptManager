@@ -2,6 +2,11 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.13.13] - 2025-11-05
+
+- Added a dedicated LiteLLM inference model configuration alongside the existing fast model so future workflows can route tasks to latency-appropriate endpoints.
+- Updated the settings dialog with tabbed navigation and dual model inputs while keeping secret handling unchanged.
+
 ## [0.13.12] - 2025-11-30
 
 - Removed the `catalog-import` CLI command while keeping the GUI import workflow; catalogue entries can still be applied from JSON via the Import button, with export remaining available via CLI and GUI.
