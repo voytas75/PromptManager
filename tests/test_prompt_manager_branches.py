@@ -322,7 +322,7 @@ def test_create_prompt_rolls_back_when_chroma_add_fails() -> None:
             raise RepositoryError("cleanup failed")
 
     repository = _RepoWithDeleteError()
-    collection = _StubCollection(add_exception=ChromaError("nope"))
+    collection = _StubCollection(upsert_exception=ChromaError("nope"))
     chroma_client = _StubChromaClient(collection)
     manager = PromptManager(
         chroma_path="/tmp/chroma",

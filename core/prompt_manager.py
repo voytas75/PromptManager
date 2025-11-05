@@ -1555,10 +1555,7 @@ class PromptManager:
             "embeddings": [list(embedding)],
         }
         try:
-            if is_new:
-                self._collection.add(**payload)
-            else:
-                self._collection.upsert(**payload)
+            self._collection.upsert(**payload)
         except ChromaError as exc:
             raise PromptStorageError(f"Failed to persist embedding for prompt {prompt.id}") from exc
         try:
