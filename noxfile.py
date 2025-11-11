@@ -1,24 +1,23 @@
 """
 noxfile.py - Nox sessions for Prompt Manager
 
+Updates: v0.2.2 - 2025-11-11 - Switch type checker session from mypy to pyright.
 Updates: v0.2.1 - 2025-11-07 - Document dev extra prerequisite for automation sessions.
 Updates: v0.2.0 - 2025-10-30 - Switch sessions to host interpreter and add tool detection
 Updates: v0.1.0 - 2025-10-30 - Initial scaffold of fmt/lint/tests/type-check sessions
 
-Install the project with `pip install .[dev]` to provide pytest/mypy/black before
+Install the project with `pip install .[dev]` to provide pytest/pyright/black before
 running these sessions. This file defines automation sessions:
 - fmt: format code with black
 - lint: lint and check style with ruff (and black --check)
 - tests: run pytest with coverage
-- type_check: run mypy in strict mode over core modules
+- type_check: run pyright in strict mode over core modules
 
 Adjust tool versions/args as needed. Sessions run directly in the host Python
 environment (no isolated venv) so ensure required tools are installed locally.
 """
 
 from __future__ import annotations
-
-from typing import Iterable
 
 import nox
 
@@ -89,29 +88,12 @@ def tests(session: nox.Session) -> None:
 
 @nox.session(venv_backend="none")
 def type_check(session: nox.Session) -> None:
-    """Run mypy in strict mode against core modules.
+    """Run pyright in strict mode against core modules.
 
     Usage: `nox -s type_check`
     """
-    _ensure_tool(session, "mypy")
+    _ensure_tool(session, "pyright")
 
-    # Prefer a local mypy.ini/pyproject config if present; otherwise default to strict.
-    mypy_args: list[str] = [
-        "--strict",
-        "--python-version",
-        "3.11",
-        "--show-error-codes",
-        "--pretty",
-    ]
-
-    # Respect project config if found; mypy will auto-discover, so no extra flags needed.
-    targets: Iterable[str] = (
-        "main.py",
-        "core",
-        "config",
-        "gui",
-        "models",
-        "tests",
-    )
-
-    session.run("mypy", *mypy_args, *targets, external=True)
+    # Pyright discovers configuration from pyproject.toml (tool.pyright section).
+    # Keeping the invocation simple ensures the config remains the source of truth.
+    session.run("pyright", external=True)

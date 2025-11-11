@@ -68,17 +68,17 @@ Prompt Manager is a desktop-focused application for cataloguing, searching, and 
 5. (Optional) Install developer tooling and run the automated tests:
 
    ```bash
-   pip install pytest pytest-cov
+   pip install pytest pytest-cov pyright
    pytest
    ```
 
-6. (Optional) Run static type checks with mypy in strict mode for core modules:
+6. (Optional) Run static type checks with pyright in strict mode for core modules:
 
    ```bash
-   mypy
+   pyright
    ```
 
-   The configuration in `mypy.ini` enforces strict typing for `core`, `config`, and `models` while allowing tests to stay flexible. Please add annotations and narrow types when extending these packages.
+   The `[tool.pyright]` section in `pyproject.toml` enforces strict typing for `core`, `config`, `gui`, and `models` while allowing tests to stay flexible. Please add annotations and narrow types when extending these packages.
 
 Further modules (session history, execution pipeline) will be introduced in subsequent milestones in line with the blueprint.
 

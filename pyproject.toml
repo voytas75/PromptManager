@@ -30,7 +30,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest==8.2.0", "pytest-cov==4.1.0"]
+dev = ["pytest==8.2.0", "pytest-cov==4.1.0", "pyright==1.1.386"]
 
 [tool.setuptools.packages.find]
 include = ["config*", "core*", "gui*", "models*"]
@@ -62,13 +62,14 @@ combine-as-imports = true
 addopts = "-q"
 testpaths = ["tests"]
 
-[tool.mypy]
-python_version = "3.11"
-strict = true
-ignore_missing_imports = true
-warn_unused_configs = true
-show_error_codes = true
-pretty = true
+[tool.pyright]
+include = ["main.py", "core", "config", "gui", "models", "tests"]
+exclude = ["data"]
+pythonVersion = "3.11"
+typeCheckingMode = "strict"
+reportMissingImports = "warning"
+reportMissingTypeStubs = "warning"
+useLibraryCodeForTypes = true
 
 [build-system]
 requires = ["setuptools", "wheel"]
