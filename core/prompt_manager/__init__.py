@@ -1858,6 +1858,10 @@ __all__ = [
     # Execution facade
     "PromptExecutor",
     "ExecutionResult",
+    # Engineering facade
+    "PromptEngineerFacade",
+    "PromptEngineeringError",
+    "PromptRefinement",
 ]
 
 # Re‑export storage façade for external use
@@ -1867,4 +1871,11 @@ from .storage import PromptStorage  # noqa: E402  (after __all__)
 from .execution import (  # noqa: E402
     PromptExecutor,
     ExecutionResult,
+)
+
+# Engineering facade re‑exports
+from .engineering import (  # noqa: E402
+    PromptEngineerFacade,
+    PromptEngineeringError,
+    PromptRefinement,
 )
