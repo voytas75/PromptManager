@@ -100,10 +100,16 @@ class LiteLLMScenarioGenerator:
                 {"role": "system", "content": self._SYSTEM_PROMPT},
                 {
                     "role": "user",
+                    # NOTE: Using an f-string avoids ``str.format`` parsing braces that may
+                    # legitimately appear inside *context*.  ``str.format`` would treat any
+                    # ``{`` / ``}`` pairs in the prompt body as replacement fields and raise
+                    # a ``ValueError`` like "expected ':' after conversion specifier".  An
+                    # f‑string is evaluated prior to concatenation, so braces inside
+                    # *context* remain intact.
                     "content": (
-                        "Return up to {limit} scenarios describing when this prompt should be used.\n\n"
+                        f"Return up to {limit} scenarios describing when this prompt should be used.\n\n"
                         f"Prompt:\n{context.strip()}"
-                    ).format(limit=limit),
+                    ),
                 },
             ],
             "temperature": 0.4,
