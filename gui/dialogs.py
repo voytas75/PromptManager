@@ -2086,6 +2086,29 @@ class InfoDialog(QDialog):
         tagline_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         form.addRow("Tagline:", tagline_label)
 
+        # -------------------------------
+        # Application version (pyproject)
+        # -------------------------------
+        try:
+            from importlib.metadata import version, PackageNotFoundError  # type: ignore
+
+            try:
+                app_version = version("prompt-manager")
+            except PackageNotFoundError:
+                # Fallback to runtime attribute injected by pyproject or CI.
+                from importlib import import_module
+
+                try:
+                    app_version = getattr(import_module("core"), "__version__", "dev")
+                except Exception:
+                    app_version = "dev"
+        except Exception:  # pragma: no cover – safety net
+            app_version = "dev"
+
+        version_label = QLabel(app_version, self)
+        version_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        form.addRow("Version:", version_label)
+
         cpu_label = QLabel(info.cpu, self)
         cpu_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         form.addRow("CPU:", cpu_label)
