@@ -2,6 +2,29 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.14.0] - 2025-11-18
+
+### Added
+
+- Introduced *internal modularisation* of the **core.prompt_manager** component.
+  - Converted former monolithic `core/prompt_manager.py` into a package.
+  - Added `core/exceptions.py` centralising shared exception classes.
+  - Added facades:
+    - `core/prompt_manager/storage.PromptStorage` (persistence wrapper).
+    - `core/prompt_manager/execution.PromptExecutor` (LLM execution wrapper).
+    - `core/prompt_manager/engineering.PromptEngineerFacade` (prompt refinement wrapper).
+
+### Changed
+
+- Updated `core/prompt_manager/__init__.py` to re‑export new facades and
+  maintain backward compatibility for existing imports.
+- Bumped project version to **0.14.0** in `pyproject.toml`.
+
+### Fixed
+
+- Resolved test collection error in `gui/dialogs.py` when imported outside the
+  `gui` package by adding a fallback import path.
+
 ## [0.13.14] - 2025-11-05
 
 - Packaged a default Prompt Manager icon and set it as the Qt application/window icon so Windows builds display branded taskbar and shell visuals out of the box.
