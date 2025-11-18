@@ -1,0 +1,55 @@
+"""Common exception classes for core package.
+
+This module centralises shared exception definitions to reduce duplication
+across the **core** package and to unblock incremental modularisation work.
+
+The initial set has been extracted from the former monolithic
+`core/prompt_manager.py`.  Additional core‑level exceptions should be added
+here rather than redefining them in individual modules.
+
+All exceptions ultimately inherit from :class:`PromptManagerError`, allowing
+callers to catch a single base class for any manager‑related failure while
+still distinguishing individual error categories when needed.
+
+Updates: v0.14.0 – 2025‑11‑18 – Created module; migrated existing classes.
+"""
+
+from __future__ import annotations
+
+
+class PromptManagerError(Exception):
+    """Base exception for Prompt Manager failures."""
+
+
+# ---------------------------------------------------------------------------
+# Prompt‑specific errors (extracted from the former core.prompt_manager module)
+# ---------------------------------------------------------------------------
+
+
+class PromptNotFoundError(PromptManagerError):
+    """Raised when a prompt cannot be located in the backing store."""
+
+
+class PromptExecutionUnavailable(PromptManagerError):
+    """Raised when prompt execution is not configured for the manager."""
+
+
+class PromptExecutionError(PromptManagerError):
+    """Raised when executing a prompt via an LLM fails."""
+
+
+class PromptHistoryError(PromptManagerError):
+    """Raised when manual history operations fail."""
+
+
+class PromptStorageError(PromptManagerError):
+    """Raised when interactions with persistent backends fail."""
+
+
+class PromptCacheError(PromptManagerError):
+    """Raised when Redis cache lookups or writes fail."""
+
+
+class PromptEngineeringUnavailable(PromptManagerError):
+    """Raised when prompt refinement is requested without an engineer configured."""
+

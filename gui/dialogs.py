@@ -63,7 +63,16 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .resources import load_application_icon
+# When imported via `importlib` as a stand‑alone module (common in tests), the
+# usual *package* context is absent, causing the standard relative import to
+# fail.  Fallback to an absolute import so the module remains usable both as a
+# package sub‑module (``prompt_manager.gui.dialogs``) and as an ad‑hoc loaded
+# file (``dialogs``).
+
+try:
+    from .resources import load_application_icon  # type: ignore
+except ImportError:  # pragma: no cover – fallback for direct execution
+    from gui.resources import load_application_icon  # type: ignore
 
 from core import (
     CatalogDiff,

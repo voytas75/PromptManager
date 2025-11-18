@@ -1,4 +1,4 @@
-"""High-level CRUD manager for prompt records backed by SQLite, ChromaDB, and Redis.
+"""Prompt Manager package façade and orchestration layer.
 
 Updates: v0.13.11 - 2025-11-05 - Support LiteLLM workflow routing between fast and inference models.
 Updates: v0.13.10 - 2025-11-05 - Add SQLite repository maintenance helpers.
@@ -38,6 +38,16 @@ import os
 import shutil
 import sqlite3
 import uuid
+
+# ---------------------------------------------------------------------------
+# NOTE: Transitional refactor
+# ---------------------------
+# This module is in the process of being split into a dedicated package
+# `core.prompt_manager` as part of the ongoing modularisation effort
+# (see AGENTS.md guidelines – KISS, DRY, maintainability).  Common exception
+# classes have been migrated to ``core.exceptions`` so that they can be shared
+# across sub‑modules once the split is complete.
+# ---------------------------------------------------------------------------
 
 from config import LITELLM_ROUTED_WORKFLOWS
 
@@ -100,63 +110,64 @@ except ImportError:  # pragma: no cover - redis optional during development
 
 from models.prompt_model import Prompt, PromptExecution, TaskTemplate, UserProfile
 
-from .embedding import EmbeddingGenerationError, EmbeddingProvider, EmbeddingSyncWorker
-from .execution import CodexExecutionResult, CodexExecutor, ExecutionError
-from .history_tracker import HistoryTracker, HistoryTrackerError
-from .intent_classifier import IntentClassifier, IntentPrediction, rank_by_hints
-from .name_generation import (
+from ..embedding import EmbeddingGenerationError, EmbeddingProvider, EmbeddingSyncWorker
+from ..execution import CodexExecutionResult, CodexExecutor, ExecutionError
+from ..history_tracker import HistoryTracker, HistoryTrackerError
+from ..intent_classifier import IntentClassifier, IntentPrediction, rank_by_hints
+from ..name_generation import (
     LiteLLMDescriptionGenerator,
     LiteLLMNameGenerator,
     DescriptionGenerationError,
     NameGenerationError,
 )
-from .scenario_generation import LiteLLMScenarioGenerator, ScenarioGenerationError
-from .prompt_engineering import PromptEngineer, PromptEngineeringError, PromptRefinement
-from .repository import (
+from ..scenario_generation import LiteLLMScenarioGenerator, ScenarioGenerationError
+from ..prompt_engineering import (
+    PromptEngineer,
+    PromptEngineeringError,
+    PromptRefinement,
+)
+from ..repository import (
     PromptCatalogueStats,
     PromptRepository,
     RepositoryError,
     RepositoryNotFoundError,
 )
-from .notifications import (
+from ..notifications import (
     NotificationCenter,
     NotificationLevel,
     notification_center as default_notification_center,
 )
 
+# Re‑export shared exception classes from centralised module to preserve the
+# original import path ``core.prompt_manager.PromptManagerError`` etc. during
+# the deprecation window.
+from ..exceptions import (  # noqa: F401 – re‑export for backward compatibility
+    PromptManagerError,
+    PromptNotFoundError,
+    PromptExecutionUnavailable,
+    PromptExecutionError,
+    PromptHistoryError,
+    PromptStorageError,
+    PromptCacheError,
+    PromptEngineeringUnavailable,
+)
+
+
 logger = logging.getLogger(__name__)
 
-
-class PromptManagerError(Exception):
-    """Base exception for PromptManager failures."""
-
-
-class PromptNotFoundError(PromptManagerError):
-    """Raised when a prompt cannot be located in the backing store."""
-
-
-class PromptExecutionUnavailable(PromptManagerError):
-    """Raised when prompt execution is not configured for the manager."""
-
-
-class PromptExecutionError(PromptManagerError):
-    """Raised when executing a prompt via LiteLLM fails."""
-
-
-class PromptHistoryError(PromptManagerError):
-    """Raised when manual history operations fail."""
-
-
-class PromptStorageError(PromptManagerError):
-    """Raised when interactions with persistent backends fail."""
-
-
-class PromptCacheError(PromptManagerError):
-    """Raised when Redis cache lookups or writes fail."""
-
-
-class PromptEngineeringUnavailable(PromptManagerError):
-    """Raised when prompt refinement is requested without an engineer configured."""
+# Public exports of this module (until full split is finished)
+__all__ = [
+    # Exceptions
+    "PromptManagerError",
+    "PromptNotFoundError",
+    "PromptExecutionUnavailable",
+    "PromptExecutionError",
+    "PromptHistoryError",
+    "PromptStorageError",
+    "PromptCacheError",
+    "PromptEngineeringUnavailable",
+    # Main class will be added later when moved.
+]
 
 
 class PromptManager:
@@ -1842,4 +1853,18 @@ __all__ = [
     "PromptExecutionUnavailable",
     "PromptExecutionError",
     "PromptEngineeringUnavailable",
+    # New storage façade
+    "PromptStorage",
+    # Execution facade
+    "PromptExecutor",
+    "ExecutionResult",
 ]
+
+# Re‑export storage façade for external use
+from .storage import PromptStorage  # noqa: E402  (after __all__)
+
+# Execution facade re‑exports
+from .execution import (  # noqa: E402
+    PromptExecutor,
+    ExecutionResult,
+)
