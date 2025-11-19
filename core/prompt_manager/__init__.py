@@ -1567,8 +1567,9 @@ class PromptManager:
         ids = cast(List[str], results.get("ids", [[]])[0])
         documents = cast(List[str], results.get("documents", [[]])[0])
         metadatas = cast(List[Dict[str, Any]], results.get("metadatas", [[]])[0])
+        distances = cast(List[float], results.get("distances", [[]])[0] if "distances" in results else [None] * len(ids))
 
-        for prompt_id, document, metadata in zip(ids, documents, metadatas):
+        for prompt_id, document, metadata, distance in zip(ids, documents, metadatas, distances):
             try:
                 prompt_uuid = uuid.UUID(prompt_id)
             except ValueError:
@@ -1586,7 +1587,20 @@ class PromptManager:
                 raise PromptStorageError(
                     f"Failed to hydrate prompt {prompt_id} from SQLite"
                 ) from exc
+            # Attach similarity score (1 - cosine distance) when distance is provided
+            try:
+                if distance is not None:
+                    similarity = 1.0 - float(distance)
+                    setattr(prompt_record, "_similarity", similarity)
+            except Exception:  # pragma: no cover – defensive
+                pass
+
             prompts.append(prompt_record)
+
+        # Ensure prompts are ordered by descending similarity if available
+        if any(hasattr(p, "_similarity") for p in prompts):
+            prompts.sort(key=lambda p: getattr(p, "_similarity", 0.0), reverse=True)
+
         return prompts
 
     def suggest_prompts(self, query_text: str, *, limit: int = 5) -> "PromptManager.IntentSuggestions":

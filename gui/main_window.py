@@ -173,7 +173,14 @@ class PromptListModel(QAbstractListModel):
         prompt = self._prompts[index.row()]
         if role in {Qt.DisplayRole, Qt.EditRole}:
             category = f" ({prompt.category})" if prompt.category else ""
-            return f"{prompt.name}{category}"
+            similarity_suffix = ""
+            if hasattr(prompt, "_similarity"):
+                try:
+                    similarity = float(getattr(prompt, "_similarity"))
+                    similarity_suffix = f" [{similarity:.4f}]"
+                except (TypeError, ValueError):
+                    similarity_suffix = ""
+            return f"{prompt.name}{category}{similarity_suffix}"
         return None
 
     def prompt_at(self, row: int) -> Optional[Prompt]:
@@ -1338,11 +1345,25 @@ class MainWindow(QMainWindow):
 
         if stripped:
             try:
-                suggestions = self._manager.suggest_prompts(stripped, limit=50)
+                search_results = self._manager.search_prompts(stripped, limit=50)
             except PromptManagerError as exc:
                 self._show_error("Unable to search prompts", str(exc))
             else:
-                self._apply_suggestions(suggestions)
+                # Directly display semantic search results; they already include
+                # similarity scores and are sorted by best match.
+                self._suggestions = None
+                self._current_prompts = list(search_results)
+
+                filtered = self._apply_filters(self._current_prompts)
+                # Do **not** apply additional sorting – relevance order matters.
+                self._model.set_prompts(filtered)
+                self._list_view.clearSelection()
+                if filtered:
+                    self._select_prompt(filtered[0].id)
+                else:
+                    self._detail_widget.clear()
+                self._update_intent_hint(filtered)
+                self._update_template_buttons()
                 return
 
         self._suggestions = None
