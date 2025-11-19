@@ -46,9 +46,9 @@ class DefaultEmbeddingFunction:
 
     _VECTOR_LENGTH = 32
 
-    def __call__(self, texts: Sequence[str]) -> List[List[float]]:
+    def __call__(self, input: Sequence[str]) -> List[List[float]]:
         results: List[List[float]] = []
-        for text in texts:
+        for text in input:
             digest = hashlib.blake2b(text.encode("utf-8"), digest_size=self._VECTOR_LENGTH).digest()
             vector = [byte / 255.0 for byte in digest]
             results.append(vector)
@@ -73,9 +73,9 @@ class LiteLLMEmbeddingFunction:
         self._api_base = api_base
         self._timeout_seconds = timeout_seconds
 
-    def __call__(self, texts: Sequence[str]) -> List[List[float]]:
+    def __call__(self, input: Sequence[str]) -> List[List[float]]:
         embedding_fn, LiteLLMException = get_embedding()
-        inputs = list(texts)
+        inputs = list(input)
         if not inputs:
             return []
         request = {
@@ -131,8 +131,8 @@ class SentenceTransformersEmbeddingFunction:
             raise RuntimeError("sentence-transformers is not installed") from exc
         return SentenceTransformer(self._model_name, device=self._device)
 
-    def __call__(self, texts: Sequence[str]) -> List[List[float]]:
-        inputs = list(texts)
+    def __call__(self, input: Sequence[str]) -> List[List[float]]:
+        inputs = list(input)
         if not inputs:
             return []
         embeddings = self._model.encode(
