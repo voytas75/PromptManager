@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.8.14 - 2025-12-06 - Auto-generate required response style fields from a pasted phrase.
 Updates: v0.8.13 - 2025-12-05 - Add ResponseStyle editor dialog for CRUD workflows.
 Updates: v0.8.12 - 2025-11-05 - Display application icon and credit source in info dialog.
 Updates: v0.8.11 - 2025-11-05 - Add SQLite repository maintenance actions to maintenance dialog.
@@ -2068,6 +2069,14 @@ class ResponseStyleDialog(QDialog):
 
         layout.addLayout(form)
 
+        layout.addWidget(QLabel("Response phrase*", self))
+        self._phrase_input = QPlainTextEdit(self)
+        self._phrase_input.setPlaceholderText(
+            "Paste the response snippet or format instructions you want to reuse…"
+        )
+        self._phrase_input.setFixedHeight(100)
+        layout.addWidget(self._phrase_input)
+
         layout.addWidget(QLabel("Description*", self))
         self._description_input = QPlainTextEdit(self)
         self._description_input.setPlaceholderText("Explain the target tone, audience, or behaviour.")
@@ -2102,6 +2111,7 @@ class ResponseStyleDialog(QDialog):
 
         self._name_input.setText(style.name)
         self._description_input.setPlainText(style.description)
+        self._phrase_input.setPlainText(style.format_instructions or style.description)
         self._tone_input.setText(style.tone or "")
         self._voice_input.setText(style.voice or "")
         self._format_input.setPlainText(style.format_instructions or "")
@@ -2114,16 +2124,16 @@ class ResponseStyleDialog(QDialog):
     def _on_accept(self) -> None:
         """Validate user input and produce a ResponseStyle instance."""
 
-        name = self._name_input.text().strip()
-        description = self._description_input.toPlainText().strip()
-        if not name or not description:
-            QMessageBox.warning(self, "Missing fields", "Name and description are required.")
+        phrase = self._phrase_input.toPlainText().strip()
+        if not phrase:
+            QMessageBox.warning(self, "Missing phrase", "Paste a response phrase before saving the style.")
             return
 
         tone = self._tone_input.text().strip() or None
         voice = self._voice_input.text().strip() or None
-        format_instructions = self._format_input.toPlainText().strip() or None
+        format_instructions = self._format_input.toPlainText().strip() or phrase
         guidelines = self._guidelines_input.toPlainText().strip() or None
+        description = self._description_input.toPlainText().strip() or phrase
 
         tags = [tag.strip() for tag in self._tags_input.text().split(",") if tag.strip()]
         examples = [
@@ -2131,8 +2141,11 @@ class ResponseStyleDialog(QDialog):
             for line in self._examples_input.toPlainText().splitlines()
             if line.strip()
         ]
+        if not examples:
+            examples = [phrase]
         version = self._version_input.text().strip() or "1.0"
         is_active = self._is_active_checkbox.isChecked()
+        name = self._name_input.text().strip() or self._auto_generate_name(phrase)
 
         payload = {
             "name": name,
@@ -2154,6 +2167,18 @@ class ResponseStyleDialog(QDialog):
 
         self._result_style = style
         self.accept()
+
+    @staticmethod
+    def _auto_generate_name(phrase: str, *, max_words: int = 3) -> str:
+        """Derive a friendly style name from the pasted phrase."""
+
+        tokens = [token.strip(".,!?") for token in phrase.split() if token.strip(".,!?")]
+        if tokens:
+            snippet = " ".join(tokens[:max_words]).title()
+            if snippet:
+                return f"{snippet} Style"
+        timestamp = datetime.now(timezone.utc).strftime("%H%M%S")
+        return f"Response Style {timestamp}"
 
 
 class MarkdownPreviewDialog(QDialog):
