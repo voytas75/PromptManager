@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from config.settings import DEFAULT_EMBEDDING_BACKEND, DEFAULT_EMBEDDING_MODEL
 from core.factory import PromptCacheError, _resolve_redis_client, build_prompt_manager
 
 
@@ -24,8 +25,8 @@ def _make_settings(**overrides: object) -> SimpleNamespace:
         "litellm_drop_params": None,
         "litellm_reasoning_effort": None,
         "litellm_stream": False,
-        "embedding_backend": "deterministic",
-        "embedding_model": None,
+        "embedding_backend": DEFAULT_EMBEDDING_BACKEND,
+        "embedding_model": DEFAULT_EMBEDDING_MODEL,
         "embedding_device": None,
     }
     defaults.update(overrides)

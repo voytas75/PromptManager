@@ -1,5 +1,6 @@
 """Settings dialog for configuring Prompt Manager runtime options.
 
+Updates: v0.2.7 - 2025-12-06 - Surface LiteLLM embedding model configuration.
 Updates: v0.2.6 - 2025-11-05 - Add theme mode toggle to the appearance settings.
 Updates: v0.2.5 - 2025-11-05 - Add chat appearance controls to settings dialog.
 Updates: v0.2.4 - 2025-11-05 - Add LiteLLM routing matrix for fast vs inference models.
@@ -62,6 +63,7 @@ class SettingsDialog(QDialog):
         litellm_reasoning_effort: Optional[str] = None,
         litellm_stream: Optional[bool] = None,
         litellm_workflow_models: Optional[Mapping[str, str]] = None,
+        embedding_model: Optional[str] = None,
         quick_actions: Optional[list[dict[str, object]]] = None,
         chat_user_bubble_color: Optional[str] = None,
         theme_mode: Optional[str] = None,
@@ -75,6 +77,7 @@ class SettingsDialog(QDialog):
         self._litellm_api_key = litellm_api_key or ""
         self._litellm_api_base = litellm_api_base or ""
         self._litellm_api_version = litellm_api_version or ""
+        self._embedding_model = embedding_model or ""
         self._litellm_drop_params = ", ".join(litellm_drop_params) if litellm_drop_params else ""
         self._litellm_reasoning_effort = (litellm_reasoning_effort or "").strip()
         self._litellm_stream = bool(litellm_stream)
@@ -146,6 +149,10 @@ class SettingsDialog(QDialog):
 
         self._inference_model_input = QLineEdit(self._litellm_inference_model, litellm_tab)
         litellm_form.addRow("LiteLLM inference model", self._inference_model_input)
+
+        self._embedding_model_input = QLineEdit(self._embedding_model, litellm_tab)
+        self._embedding_model_input.setPlaceholderText("text-embedding-3-large")
+        litellm_form.addRow("LiteLLM embedding model", self._embedding_model_input)
 
         self._api_key_input = QLineEdit(self._litellm_api_key, litellm_tab)
         self._api_key_input.setEchoMode(QLineEdit.Password)
@@ -428,6 +435,8 @@ class SettingsDialog(QDialog):
         return {
             "litellm_model": _clean(self._model_input.text()),
             "litellm_inference_model": _clean(self._inference_model_input.text()),
+            "embedding_model": _clean(self._embedding_model_input.text()),
+            "embedding_backend": "litellm",
             "litellm_api_key": _clean(self._api_key_input.text()),
             "litellm_api_base": _clean(self._api_base_input.text()),
             "litellm_api_version": _clean(self._api_version_input.text()),

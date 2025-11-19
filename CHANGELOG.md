@@ -2,6 +2,16 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.15.2] - 2025-12-06
+
+### Added
+
+- Surfaced a dedicated LiteLLM embedding model field in the settings dialog and configuration persistence so semantic search can target any provider-supported embedding endpoint without editing JSON manually.
+
+### Changed
+
+- Switched the default embedding backend to LiteLLM, wiring the Prompt Manager to generate real embeddings (via `text-embedding-3-large` by default) instead of the deterministic hash stub, and updated documentation/templates to reflect the new requirement.
+
 ## [0.15.1] - 2025-11-19
 
 ### Changed

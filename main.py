@@ -27,7 +27,13 @@ from collections import Counter
 from pathlib import Path
 from typing import Callable, Optional, cast
 
-from config import LITELLM_ROUTED_WORKFLOWS, PromptManagerSettings, load_settings
+from config import (
+    DEFAULT_EMBEDDING_BACKEND,
+    DEFAULT_EMBEDDING_MODEL,
+    LITELLM_ROUTED_WORKFLOWS,
+    PromptManagerSettings,
+    load_settings,
+)
 from core import build_prompt_manager, export_prompt_catalog
 
 
@@ -120,8 +126,8 @@ def _print_settings_summary(settings: PromptManagerSettings) -> None:
         "",
         "Embedding configuration",
         "-----------------------",
-        f"Backend: {embedding_backend or 'deterministic'}",
-        f"Model: {embedding_model or ('(auto)' if embedding_backend == 'litellm' and litellm_model else 'not set')}",
+        f"Backend: {embedding_backend or DEFAULT_EMBEDDING_BACKEND}",
+        f"Model: {embedding_model or ('(auto)' if embedding_backend == 'litellm' and litellm_model else DEFAULT_EMBEDDING_MODEL)}",
         ]
     )
     print("\n".join(lines))

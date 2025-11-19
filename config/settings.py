@@ -1,5 +1,6 @@
 """Settings management for Prompt Manager configuration.
 
+Updates: v0.4.9 - 2025-12-06 - Require LiteLLM-backed embeddings with configurable model fields in the UI.
 Updates: v0.4.8 - 2025-12-03 - Persist chat colour palette overrides, including assistant bubble styling.
 Updates: v0.4.7 - 2025-11-05 - Add theme mode configuration options.
 Updates: v0.4.6 - 2025-11-05 - Add chat appearance configuration options.
@@ -48,6 +49,8 @@ LITELLM_ROUTING_OPTIONS: Tuple[str, str] = ("fast", "inference")
 DEFAULT_THEME_MODE = "light"
 DEFAULT_CHAT_USER_BUBBLE_COLOR = "#e6f0ff"
 DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR = "#f5f5f5"
+DEFAULT_EMBEDDING_BACKEND = "litellm"
+DEFAULT_EMBEDDING_MODEL = "text-embedding-3-large"
 
 
 class ChatColors(BaseSettings):
@@ -131,7 +134,7 @@ class PromptManagerSettings(BaseSettings):
 
     chat_colors: ChatColors = Field(default_factory=ChatColors, description="Colour palette for chat bubbles.")
     embedding_backend: str = Field(
-        default="deterministic",
+        default=DEFAULT_EMBEDDING_BACKEND,
         description="Embedding backend to use (deterministic, litellm, sentence-transformers).",
     )
     embedding_model: Optional[str] = Field(
@@ -219,7 +222,7 @@ class PromptManagerSettings(BaseSettings):
     @field_validator("embedding_backend", mode="before")
     def _normalise_embedding_backend(cls, value: Optional[str]) -> str:
         if value is None:
-            return "deterministic"
+            return DEFAULT_EMBEDDING_BACKEND
         backend = str(value).strip().lower()
         if backend in {"", "default", "deterministic"}:
             return "deterministic"
@@ -258,13 +261,14 @@ class PromptManagerSettings(BaseSettings):
         backend = self.embedding_backend
         model = self.embedding_model
 
-        if model and backend == "deterministic":
-            backend = "litellm"
-            object.__setattr__(self, "embedding_backend", backend)
+        if backend == "litellm" and not model:
+            fallback_model = self.litellm_model or DEFAULT_EMBEDDING_MODEL
+            model = fallback_model
+            object.__setattr__(self, "embedding_model", fallback_model)
 
-        if backend == "litellm" and not model and self.litellm_model:
-            model = self.litellm_model
-            object.__setattr__(self, "embedding_model", model)
+        if backend == "deterministic" and model:
+            object.__setattr__(self, "embedding_model", None)
+            return self
 
         if backend != "deterministic" and not model:
             raise ValueError(

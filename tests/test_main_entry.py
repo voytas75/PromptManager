@@ -17,6 +17,7 @@ from types import SimpleNamespace
 import pytest
 
 import main
+from config.settings import DEFAULT_EMBEDDING_BACKEND, DEFAULT_EMBEDDING_MODEL
 from core.intent_classifier import IntentLabel, IntentPrediction
 
 
@@ -34,8 +35,8 @@ class _DummySettings(SimpleNamespace):
             litellm_drop_params=None,
             litellm_reasoning_effort=None,
             litellm_stream=False,
-            embedding_backend="deterministic",
-            embedding_model=None,
+            embedding_backend=DEFAULT_EMBEDDING_BACKEND,
+            embedding_model=DEFAULT_EMBEDDING_MODEL,
         )
 
 
@@ -252,6 +253,8 @@ def test_main_entrypoint_guard_executes(
     config_stub.load_settings = lambda: _DummySettings()
     config_stub.PromptManagerSettings = type("PromptManagerSettings", (), {})
     config_stub.LITELLM_ROUTED_WORKFLOWS = {"prompt_execution": "Prompt execution"}
+    config_stub.DEFAULT_EMBEDDING_BACKEND = DEFAULT_EMBEDDING_BACKEND
+    config_stub.DEFAULT_EMBEDDING_MODEL = DEFAULT_EMBEDDING_MODEL
     core_stub = types.ModuleType("core")
     dummy_manager = _DummyManager()
     core_stub.build_prompt_manager = lambda settings: dummy_manager

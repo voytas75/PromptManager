@@ -12,5 +12,6 @@
   "litellm_workflow_models": {
     "prompt_execution": "inference"
   },
+  "embedding_backend": "litellm",
   "embedding_model": "text-embedding-3-large"
 }

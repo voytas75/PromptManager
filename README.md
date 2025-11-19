@@ -44,8 +44,8 @@ Prompt Manager is a desktop-focused application for cataloguing, searching, and 
    - `REDIS_DSN` – optional Redis connection string e.g. `redis://localhost:6379/0`.
    - `CACHE_TTL_SECONDS` – positive integer TTL for cached prompts (default `300`).
    - `LITELLM_MODEL` – optional LiteLLM model identifier used for name generation and execution.
-   - `EMBEDDING_BACKEND` – one of `deterministic`, `litellm`, or `sentence-transformers` (default `deterministic`).
-   - `EMBEDDING_MODEL` – embedding model identifier used by LiteLLM or sentence-transformers backends.
+   - `EMBEDDING_BACKEND` – one of `deterministic`, `litellm`, or `sentence-transformers` (default `litellm`).
+   - `EMBEDDING_MODEL` – embedding model identifier used by LiteLLM or sentence-transformers backends (default `text-embedding-3-large`).
    - `EMBEDDING_DEVICE` – optional device string (e.g. `cpu`, `cuda`) for local sentence-transformers models.
    - `LITELLM_API_VERSION` / `AZURE_OPENAI_API_VERSION` – optional API version (required for Azure OpenAI deployments).
 
@@ -233,6 +233,7 @@ These commands reuse the same validation logic as the GUI; pass an explicit path
     "litellm_drop_params": ["max_tokens", "max_output_tokens", "temperature", "timeout"],
     "litellm_reasoning_effort": null,
     "litellm_workflow_models": {"prompt_execution": "inference"},
+    "embedding_backend": "litellm",
     "embedding_model": "text-embedding-3-large"
   }
   ```
@@ -242,7 +243,7 @@ These commands reuse the same validation logic as the GUI; pass an explicit path
 - Set `litellm_stream` to `true` to request streaming chat completions; streaming deltas are forwarded to registered callbacks while histories persist the fully aggregated response.
 - Provide both a fast LiteLLM model (`PROMPT_MANAGER_LITELLM_MODEL`) and an optional inference model (`PROMPT_MANAGER_LITELLM_INFERENCE_MODEL`) to separate low-latency interactions from slower high-quality generations.
 - Use the settings dialog's **Routing** tab (or `PROMPT_MANAGER_LITELLM_WORKFLOW_MODELS`) to assign each workflow to the fast or inference model without editing code.
-- Supplying `embedding_model` automatically switches the embedding backend to LiteLLM so semantic sync runs against your chosen OpenAI embedding model.
+- The settings dialog now includes a dedicated LiteLLM **Embedding model** field so you can control which embedding endpoint powers semantic search (defaults to `text-embedding-3-large`).
 
 - Environment variables (override JSON when set):
 
@@ -261,14 +262,13 @@ These commands reuse the same validation logic as the GUI; pass an explicit path
   | `PROMPT_MANAGER_LITELLM_DROP_PARAMS` | Comma/JSON list of LiteLLM parameters to drop before sending requests | `max_tokens,temperature` |
   | `PROMPT_MANAGER_LITELLM_REASONING_EFFORT` | Reasoning effort level for OpenAI reasoning models (`minimal`, `medium`, `high`) | `medium` |
   | `PROMPT_MANAGER_LITELLM_STREAM` | Enable streaming chat completions (`true`/`false`) | `true` |
-  | `PROMPT_MANAGER_EMBEDDING_MODEL` | Embedding model identifier; enables LiteLLM embeddings automatically | `text-embedding-3-large` |
+  | `PROMPT_MANAGER_EMBEDDING_MODEL` | LiteLLM embedding model identifier used for semantic search | `text-embedding-3-large` |
   | `AZURE_OPENAI_API_KEY` | Alias for LiteLLM API key (Azure) | `azure-key` |
   | `AZURE_OPENAI_ENDPOINT` | Alias for LiteLLM API base (Azure) | `https://<resource>.openai.azure.com` |
-  | `PROMPT_MANAGER_EMBEDDING_BACKEND` | Embedding backend (`deterministic`, `litellm`, `sentence-transformers`) | `sentence-transformers` |
-  | `PROMPT_MANAGER_EMBEDDING_MODEL` | Embedding model identifier (required when backend ≠ deterministic) | `all-MiniLM-L6-v2` |
+  | `PROMPT_MANAGER_EMBEDDING_BACKEND` | Embedding backend (`litellm`, `sentence-transformers`, `deterministic`) | `sentence-transformers` |
   | `PROMPT_MANAGER_EMBEDDING_DEVICE` | Device override for local embedding models | `cuda` |
 
 Notes:
 - Paths expand `~` and are resolved to absolute paths.
 - Invalid values raise `config.SettingsError` with details.
-- When `EMBEDDING_BACKEND` is left at `deterministic`, Prompt Manager uses a reproducible hash-based embedding. Set the backend to `litellm` or `sentence-transformers` with an `EMBEDDING_MODEL` to enable high-quality semantic search. If `EMBEDDING_BACKEND=litellm` and no embedding model is provided, the value from `PROMPT_MANAGER_LITELLM_MODEL` is reused automatically.
+- Prompt Manager now defaults to LiteLLM embeddings to keep semantic search aligned with production quality. Override `EMBEDDING_BACKEND=deterministic` if you need the legacy hash-based vectors, or switch to `sentence-transformers` with `PROMPT_MANAGER_EMBEDDING_MODEL` + `PROMPT_MANAGER_EMBEDDING_DEVICE` for local embeddings. When using LiteLLM, the settings dialog exposes a dedicated **Embedding model** field so you can point at any provider-supported embedding endpoint.

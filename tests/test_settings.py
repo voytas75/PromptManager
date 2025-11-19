@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 
 from config import PromptManagerSettings, SettingsError, load_settings
+from config.settings import DEFAULT_EMBEDDING_BACKEND, DEFAULT_EMBEDDING_MODEL
 
 
 def test_load_settings_reads_json_and_env(monkeypatch, tmp_path) -> None:
@@ -221,10 +222,14 @@ def test_litellm_stream_flag_from_env(monkeypatch, tmp_path) -> None:
     assert settings.litellm_stream is True
 
 
-def test_embedding_backend_defaults_to_deterministic() -> None:
+def test_embedding_backend_defaults_to_litellm(monkeypatch, tmp_path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
+    monkeypatch.delenv("PROMPT_MANAGER_LITELLM_MODEL", raising=False)
     settings = load_settings()
-    assert settings.embedding_backend == "deterministic"
-    assert settings.embedding_model is None
+    assert settings.embedding_backend == DEFAULT_EMBEDDING_BACKEND
+    assert settings.embedding_model == DEFAULT_EMBEDDING_MODEL
 
 
 def test_embedding_backend_requires_model(monkeypatch) -> None:

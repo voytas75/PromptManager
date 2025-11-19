@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.30 - 2025-12-06 - Surface LiteLLM embedding configuration in the settings dialog and runtime state.
 Updates: v0.15.29 - 2025-11-19 - Preserve semantic search ordering when filters update live results.
 Updates: v0.15.28 - 2025-11-19 - Remove the Diff tab and supporting preview logic from the result pane.
 Updates: v0.15.27 - 2025-12-06 - Move Response Styles into dedicated tab with full CRUD preview/export actions.
@@ -123,6 +124,8 @@ from config import (
     ChatColors,
     DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR,
     DEFAULT_CHAT_USER_BUBBLE_COLOR,
+    DEFAULT_EMBEDDING_BACKEND,
+    DEFAULT_EMBEDDING_MODEL,
     DEFAULT_THEME_MODE,
     PromptManagerSettings,
 )
@@ -3072,6 +3075,7 @@ class MainWindow(QMainWindow):
             litellm_reasoning_effort=self._runtime_settings.get("litellm_reasoning_effort"),
             litellm_stream=self._runtime_settings.get("litellm_stream"),
             litellm_workflow_models=self._runtime_settings.get("litellm_workflow_models"),
+            embedding_model=self._runtime_settings.get("embedding_model"),
             quick_actions=self._runtime_settings.get("quick_actions"),
             chat_user_bubble_color=self._runtime_settings.get("chat_user_bubble_color"),
             theme_mode=self._runtime_settings.get("theme_mode"),
@@ -3098,6 +3102,10 @@ class MainWindow(QMainWindow):
         self._runtime_settings["litellm_api_base"] = updates.get("litellm_api_base")
         self._runtime_settings["litellm_api_version"] = updates.get("litellm_api_version")
         self._runtime_settings["litellm_reasoning_effort"] = updates.get("litellm_reasoning_effort")
+        embedding_model_value = updates.get("embedding_model")
+        embedding_backend_value = updates.get("embedding_backend") or DEFAULT_EMBEDDING_BACKEND
+        self._runtime_settings["embedding_backend"] = embedding_backend_value
+        self._runtime_settings["embedding_model"] = embedding_model_value or DEFAULT_EMBEDDING_MODEL
         drop_params_value = updates.get("litellm_drop_params")
         if isinstance(drop_params_value, list):
             cleaned_drop_params = [str(item).strip() for item in drop_params_value if str(item).strip()]
@@ -3168,6 +3176,8 @@ class MainWindow(QMainWindow):
                 "litellm_drop_params": self._runtime_settings.get("litellm_drop_params"),
                 "litellm_stream": self._runtime_settings.get("litellm_stream"),
                 "litellm_api_key": self._runtime_settings.get("litellm_api_key"),
+                "embedding_backend": self._runtime_settings.get("embedding_backend"),
+                "embedding_model": self._runtime_settings.get("embedding_model"),
                 "chat_user_bubble_color": self._runtime_settings.get("chat_user_bubble_color"),
                 "chat_colors": (
                     self._runtime_settings.get("chat_colors")
@@ -3189,6 +3199,8 @@ class MainWindow(QMainWindow):
             self._settings.quick_actions = cleaned_quick_actions
             self._settings.litellm_drop_params = cleaned_drop_params
             self._settings.litellm_stream = stream_flag
+            self._settings.embedding_backend = embedding_backend_value
+            self._settings.embedding_model = self._runtime_settings.get("embedding_model")
             self._settings.chat_user_bubble_color = chat_colour
             self._settings.theme_mode = theme_choice
             if cleaned_palette:
@@ -3248,6 +3260,8 @@ class MainWindow(QMainWindow):
             "litellm_workflow_models": dict(settings.litellm_workflow_models)
             if settings and settings.litellm_workflow_models
             else None,
+            "embedding_backend": settings.embedding_backend if settings else DEFAULT_EMBEDDING_BACKEND,
+            "embedding_model": settings.embedding_model if settings else DEFAULT_EMBEDDING_MODEL,
             "quick_actions": derived_quick_actions,
             "chat_user_bubble_color": (
                 settings.chat_user_bubble_color if settings else DEFAULT_CHAT_USER_BUBBLE_COLOR
@@ -3277,6 +3291,8 @@ class MainWindow(QMainWindow):
                     "litellm_api_base",
                     "litellm_api_version",
                     "litellm_reasoning_effort",
+                    "embedding_backend",
+                    "embedding_model",
                 ):
                     if runtime.get(key) is None and isinstance(data.get(key), str):
                         runtime[key] = data[key]

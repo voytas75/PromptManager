@@ -57,7 +57,7 @@ examples/
 .clinerules
 .roo/
 *.lock
-AGENTS.md
+AGENTS*.md
 PromptManagerBlueprint.txt
 .coverage
 .mypy_cache/
