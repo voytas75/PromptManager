@@ -1295,14 +1295,16 @@ class MainWindow(QMainWindow):
         base_prompts = prompts if prompts else self._all_prompts
         self._current_prompts = list(base_prompts)
         filtered = self._apply_filters(self._current_prompts)
-        sorted_prompts = self._sort_prompts(filtered)
-        self._model.set_prompts(sorted_prompts)
+        # Preserve the relevance ranking returned by semantic search; do not
+        # apply the user‑selected sort order while a search query is active.
+        prompts_to_show = filtered  # already in best‑match order
+        self._model.set_prompts(prompts_to_show)
         self._list_view.clearSelection()
-        if sorted_prompts:
-            self._select_prompt(sorted_prompts[0].id)
+        if prompts_to_show:
+            self._select_prompt(prompts_to_show[0].id)
         else:
             self._detail_widget.clear()
-        self._update_intent_hint(sorted_prompts)
+        self._update_intent_hint(prompts_to_show)
         if self._template_clear_button is not None:
             self._template_clear_button.setEnabled(True)
         self._update_template_buttons()
@@ -2609,7 +2611,15 @@ class MainWindow(QMainWindow):
     def _on_search_changed(self, text: str) -> None:
         """Trigger prompt search with debounce-friendly minimum length."""
 
-        if not text or len(text.strip()) >= 2:
+        stripped = text.strip()
+
+        # When a search query is active disable the sort combo so the user sees
+        # results strictly ordered by relevance.  Re‑enable it once the query
+        # field is cleared so manual sorting becomes available again.
+        if self._sort_combo is not None:
+            self._sort_combo.setEnabled(not bool(stripped))
+
+        if not text or len(stripped) >= 2:
             self._load_prompts(text)
 
     def _on_prompt_double_clicked(self, index: QModelIndex) -> None:
