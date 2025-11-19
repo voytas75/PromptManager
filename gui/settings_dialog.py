@@ -65,6 +65,7 @@ class SettingsDialog(QDialog):
         quick_actions: Optional[list[dict[str, object]]] = None,
         chat_user_bubble_color: Optional[str] = None,
         theme_mode: Optional[str] = None,
+        chat_colors: Optional[dict[str, str]] = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Prompt Manager Settings")
@@ -93,10 +94,16 @@ class SettingsDialog(QDialog):
                     self._workflow_models[key_str] = "inference"
         self._workflow_groups: dict[str, QButtonGroup] = {}
         self._default_chat_color = DEFAULT_CHAT_USER_BUBBLE_COLOR
-        initial_chat_color = (chat_user_bubble_color or "").strip() or self._default_chat_color
-        if not QColor(initial_chat_color).isValid():
-            initial_chat_color = self._default_chat_color
-        self._chat_user_bubble_color = QColor(initial_chat_color).name().lower()
+        palette_dict = chat_colors or {}
+        user_initial = palette_dict.get("user", chat_user_bubble_color) or self._default_chat_color
+        if not QColor(user_initial).isValid():
+            user_initial = self._default_chat_color
+        self._chat_user_bubble_color = QColor(user_initial).name().lower()
+
+        assistant_initial = palette_dict.get("assistant", DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR)
+        if not QColor(assistant_initial).isValid():
+            assistant_initial = DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR
+        self._assistant_bubble_color = QColor(assistant_initial).name().lower()
         self._chat_color_input: Optional[QLineEdit] = None
         self._chat_color_preview: Optional[QLabel] = None
         self._chat_colors_value: Optional[dict[str, str]] = None
@@ -277,7 +284,7 @@ class SettingsDialog(QDialog):
             self._color_buttons[key] = btn
 
         _make_color_row("user", "User bubble", self._chat_user_bubble_color)
-        _make_color_row("assistant", "Assistant bubble", DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR)
+        _make_color_row("assistant", "Assistant bubble", self._assistant_bubble_color)
 
         tab_widget.addTab(colors_tab, "Colors")
 

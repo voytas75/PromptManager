@@ -2992,6 +2992,7 @@ class MainWindow(QMainWindow):
             quick_actions=self._runtime_settings.get("quick_actions"),
             chat_user_bubble_color=self._runtime_settings.get("chat_user_bubble_color"),
             theme_mode=self._runtime_settings.get("theme_mode"),
+            chat_colors=self._runtime_settings.get("chat_colors"),
         )
         if dialog.exec() != QDialog.Accepted:
             return
@@ -3053,6 +3054,22 @@ class MainWindow(QMainWindow):
         else:
             chat_colour = DEFAULT_CHAT_USER_BUBBLE_COLOR
         self._runtime_settings["chat_user_bubble_color"] = chat_colour
+
+        # --------------------------------------------------
+        # Chat colour palette (dict with user/assistant keys)
+        # --------------------------------------------------
+        chat_colors_value = updates.get("chat_colors")
+        if isinstance(chat_colors_value, dict):
+            cleaned_palette: dict[str, str] = {}
+            for key, hex_value in chat_colors_value.items():
+                if key not in {"user", "assistant"}:
+                    continue
+                candidate = QColor(str(hex_value))
+                if candidate.isValid():
+                    cleaned_palette[key] = candidate.name().lower()
+            if cleaned_palette:
+                self._runtime_settings["chat_colors"] = cleaned_palette
+
         theme_value = updates.get("theme_mode")
         if isinstance(theme_value, str):
             theme_choice = theme_value.strip().lower()
@@ -3076,6 +3093,7 @@ class MainWindow(QMainWindow):
                 "litellm_stream": self._runtime_settings.get("litellm_stream"),
                 "litellm_api_key": self._runtime_settings.get("litellm_api_key"),
                 "chat_user_bubble_color": self._runtime_settings.get("chat_user_bubble_color"),
+                "chat_colors": self._runtime_settings.get("chat_colors"),
                 "theme_mode": self._runtime_settings.get("theme_mode"),
             }
         )

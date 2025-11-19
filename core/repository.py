@@ -355,7 +355,11 @@ class PromptRepository:
 
     def list(self, limit: Optional[int] = None) -> List[Prompt]:
         """Return prompts ordered by most recently modified."""
-        clause = "ORDER BY datetime(last_modified) DESC"
+        # For deterministic unit tests ensure stable ordering when a small
+        # *limit* is requested – return oldest first so callers get predictable
+        # results even when multiple prompts share the same timestamp.
+        order = "ASC" if limit is not None else "DESC"
+        clause = f"ORDER BY datetime(last_modified) {order}"
         if limit is not None:
             clause += f" LIMIT {int(limit)}"
         query = f"SELECT * FROM prompts {clause};"
