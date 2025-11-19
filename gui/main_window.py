@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.24 - 2025-12-03 - Apply assistant chat bubble colour from settings in the transcript view.
 Updates: v0.15.23 - 2025-12-02 - Pass theme mode to settings dialog so selection persists.
 Updates: v0.15.22 - 2025-11-05 - Add light/dark theme runtime toggle with palette updates.
 Updates: v0.15.21 - 2025-11-05 - Honour configurable chat bubble colour from settings.
@@ -56,6 +57,7 @@ import json
 import logging
 import uuid
 from collections import deque
+from collections.abc import Mapping
 from html import escape
 from enum import Enum
 from pathlib import Path
@@ -113,7 +115,13 @@ from PySide6.QtWidgets import (
     QTextEdit,
 )
 
-from config import DEFAULT_CHAT_USER_BUBBLE_COLOR, DEFAULT_THEME_MODE, PromptManagerSettings
+from config import (
+    ChatColors,
+    DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR,
+    DEFAULT_CHAT_USER_BUBBLE_COLOR,
+    DEFAULT_THEME_MODE,
+    PromptManagerSettings,
+)
 from core import (
     IntentLabel,
     NameGenerationError,
@@ -153,6 +161,48 @@ from .notifications import QtNotificationBridge, NotificationHistoryDialog
 
 
 logger = logging.getLogger(__name__)
+
+_CHAT_PALETTE_KEYS = {"user", "assistant"}
+
+
+def _default_chat_palette() -> dict[str, str]:
+    return {
+        "user": QColor(DEFAULT_CHAT_USER_BUBBLE_COLOR).name().lower(),
+        "assistant": QColor(DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR).name().lower(),
+    }
+
+
+def normalise_chat_palette(palette: Optional[Mapping[str, object]]) -> dict[str, str]:
+    """Return a validated chat palette containing user/assistant colours.
+
+    Invalid entries, unsupported roles, and malformed colour values are ignored.
+    Hex codes are normalised to lowercase ``#rrggbb`` strings for consistency.
+    """
+
+    cleaned: dict[str, str] = {}
+    if not palette:
+        return cleaned
+    for role, value in palette.items():
+        if role not in _CHAT_PALETTE_KEYS:
+            continue
+        text = str(value).strip()
+        if not text:
+            continue
+        candidate = QColor(text)
+        if candidate.isValid():
+            cleaned[role] = candidate.name().lower()
+    return cleaned
+
+
+def palette_differs_from_defaults(palette: Optional[Mapping[str, str]]) -> bool:
+    if not palette:
+        return False
+    defaults = _default_chat_palette()
+    for role, default_hex in defaults.items():
+        value = palette.get(role)
+        if value is not None and value != default_hex:
+            return True
+    return False
 
 
 class PromptListModel(QAbstractListModel):
@@ -1741,7 +1791,12 @@ class MainWindow(QMainWindow):
                 )
             elif role == "assistant":
                 speaker = "Assistant"
-                bubble_style = "background-color: #f6f7fb; border-radius: 8px; padding: 8px;"
+                assistant_colour = self._chat_assistant_colour()
+                assistant_border = QColor(assistant_colour).darker(115).name()
+                bubble_style = (
+                    f"background-color: {assistant_colour}; border: 1px solid {assistant_border}; "
+                    "border-radius: 8px; padding: 8px;"
+                )
             elif role == "system":
                 speaker = "System"
                 bubble_style = "background-color: #f0f4f8; border-radius: 8px; padding: 8px;"
@@ -1762,12 +1817,31 @@ class MainWindow(QMainWindow):
     def _chat_user_colour(self) -> str:
         """Return the configured chat colour, falling back to the default."""
 
+        fallback = DEFAULT_CHAT_USER_BUBBLE_COLOR
         value = self._runtime_settings.get("chat_user_bubble_color")
         if isinstance(value, str):
             candidate = QColor(value)
             if candidate.isValid():
-                return candidate.name().lower()
-        return DEFAULT_CHAT_USER_BUBBLE_COLOR
+                fallback = candidate.name().lower()
+        return self._chat_palette_colour("user", fallback)
+
+    def _chat_assistant_colour(self) -> str:
+        """Return the assistant chat bubble colour from the configured palette."""
+
+        return self._chat_palette_colour("assistant", DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR)
+
+    def _chat_palette_colour(self, role: str, fallback: str) -> str:
+        """Look up ``role`` in the configured palette with sane fallbacks."""
+
+        palette_value = self._runtime_settings.get("chat_colors")
+        if isinstance(palette_value, dict):
+            candidate_value = palette_value.get(role)
+            if isinstance(candidate_value, str):
+                candidate = QColor(candidate_value)
+                if candidate.isValid():
+                    return candidate.name().lower()
+        fallback_colour = QColor(fallback)
+        return fallback_colour.name().lower() if fallback_colour.isValid() else fallback
 
     def _apply_theme(self, mode: Optional[str] = None) -> None:
         """Apply the configured theme palette across the application."""
@@ -3059,16 +3133,9 @@ class MainWindow(QMainWindow):
         # Chat colour palette (dict with user/assistant keys)
         # --------------------------------------------------
         chat_colors_value = updates.get("chat_colors")
-        if isinstance(chat_colors_value, dict):
-            cleaned_palette: dict[str, str] = {}
-            for key, hex_value in chat_colors_value.items():
-                if key not in {"user", "assistant"}:
-                    continue
-                candidate = QColor(str(hex_value))
-                if candidate.isValid():
-                    cleaned_palette[key] = candidate.name().lower()
-            if cleaned_palette:
-                self._runtime_settings["chat_colors"] = cleaned_palette
+        palette_input = chat_colors_value if isinstance(chat_colors_value, dict) else None
+        cleaned_palette = normalise_chat_palette(palette_input)
+        self._runtime_settings["chat_colors"] = cleaned_palette or None
 
         theme_value = updates.get("theme_mode")
         if isinstance(theme_value, str):
@@ -3093,7 +3160,11 @@ class MainWindow(QMainWindow):
                 "litellm_stream": self._runtime_settings.get("litellm_stream"),
                 "litellm_api_key": self._runtime_settings.get("litellm_api_key"),
                 "chat_user_bubble_color": self._runtime_settings.get("chat_user_bubble_color"),
-                "chat_colors": self._runtime_settings.get("chat_colors"),
+                "chat_colors": (
+                    self._runtime_settings.get("chat_colors")
+                    if palette_differs_from_defaults(self._runtime_settings.get("chat_colors"))
+                    else None
+                ),
                 "theme_mode": self._runtime_settings.get("theme_mode"),
             }
         )
@@ -3111,6 +3182,14 @@ class MainWindow(QMainWindow):
             self._settings.litellm_stream = stream_flag
             self._settings.chat_user_bubble_color = chat_colour
             self._settings.theme_mode = theme_choice
+            if cleaned_palette:
+                palette_model = getattr(self._settings, "chat_colors", None)
+                if isinstance(palette_model, ChatColors):
+                    self._settings.chat_colors = palette_model.model_copy(update=cleaned_palette)
+                else:
+                    self._settings.chat_colors = ChatColors(**cleaned_palette)
+            else:
+                self._settings.chat_colors = ChatColors()
 
         self._quick_actions = self._build_quick_actions(self._runtime_settings.get("quick_actions"))
         self._register_quick_shortcuts()
@@ -3165,6 +3244,14 @@ class MainWindow(QMainWindow):
                 settings.chat_user_bubble_color if settings else DEFAULT_CHAT_USER_BUBBLE_COLOR
             ),
             "theme_mode": settings.theme_mode if settings else DEFAULT_THEME_MODE,
+            "chat_colors": (
+                {
+                    "user": settings.chat_colors.user,
+                    "assistant": settings.chat_colors.assistant,
+                }
+                if settings
+                else None
+            ),
         }
 
         config_path = Path("config/config.json")
@@ -3218,6 +3305,10 @@ class MainWindow(QMainWindow):
                 color_value = data.get("chat_user_bubble_color")
                 if isinstance(color_value, str) and color_value.strip():
                     runtime["chat_user_bubble_color"] = color_value.strip()
+                palette_value = data.get("chat_colors")
+                palette = normalise_chat_palette(palette_value if isinstance(palette_value, dict) else None)
+                if palette:
+                    runtime["chat_colors"] = palette
                 theme_value = data.get("theme_mode")
                 if isinstance(theme_value, str) and theme_value.strip():
                     runtime["theme_mode"] = theme_value.strip()

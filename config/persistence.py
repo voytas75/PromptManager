@@ -1,5 +1,6 @@
 """Helpers for persisting runtime configuration without Qt dependencies.
 
+Updates: v0.2.4 - 2025-12-03 - Normalise chat palette overrides and skip default colours.
 Updates: v0.2.3 - 2025-11-05 - Persist theme mode and chat appearance overrides.
 Updates: v0.2.2 - 2025-11-05 - Persist chat appearance overrides.
 Updates: v0.2.1 - 2025-11-05 - Persist LiteLLM workflow routing selections.
@@ -8,8 +9,11 @@ Updates: v0.2.1 - 2025-11-05 - Persist LiteLLM workflow routing selections.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
-from typing import Optional
+from typing import Mapping, Optional
+
+from config.settings import DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR, DEFAULT_CHAT_USER_BUBBLE_COLOR
 
 
 def _normalise_drop_params(value: Optional[object]) -> Optional[list[str]]:
@@ -26,6 +30,45 @@ def _normalise_drop_params(value: Optional[object]) -> Optional[list[str]]:
         if text and text not in cleaned:
             cleaned.append(text)
     return cleaned or None
+
+
+_CHAT_PALETTE_KEYS = {"user", "assistant"}
+_CHAT_COLOR_PATTERN = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
+
+
+def _normalise_chat_palette(value: Optional[object]) -> Optional[dict[str, str]]:
+    if value is None:
+        return None
+    mapping: Optional[Mapping[str, object]]
+    if isinstance(value, Mapping):
+        mapping = value
+    else:
+        return None
+    cleaned: dict[str, str] = {}
+    for role, colour in mapping.items():
+        if role not in _CHAT_PALETTE_KEYS or not isinstance(colour, str):
+            continue
+        normalised = colour.strip().lower()
+        if not _CHAT_COLOR_PATTERN.match(normalised):
+            continue
+        cleaned[role] = normalised
+    return cleaned or None
+
+
+def _is_default_chat_palette(palette: Optional[Mapping[str, str]]) -> bool:
+    if not palette:
+        return True
+    defaults = {
+        "user": DEFAULT_CHAT_USER_BUBBLE_COLOR.lower(),
+        "assistant": DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR.lower(),
+    }
+    for role, default_hex in defaults.items():
+        current = palette.get(role)
+        if current is None:
+            continue
+        if current != default_hex:
+            return False
+    return True
 
 
 def persist_settings_to_config(updates: dict[str, Optional[object]]) -> None:
@@ -61,6 +104,9 @@ def persist_settings_to_config(updates: dict[str, Optional[object]]) -> None:
                     value = choice
             else:
                 value = None
+        if key == "chat_colors":
+            palette = _normalise_chat_palette(value)
+            value = None if _is_default_chat_palette(palette) else palette
         if key == "litellm_workflow_models" and isinstance(value, dict):
             cleaned: dict[str, str] = {}
             for route_key, route_value in value.items():

@@ -1,5 +1,6 @@
 """Settings management for Prompt Manager configuration.
 
+Updates: v0.4.8 - 2025-12-03 - Persist chat colour palette overrides, including assistant bubble styling.
 Updates: v0.4.7 - 2025-11-05 - Add theme mode configuration options.
 Updates: v0.4.6 - 2025-11-05 - Add chat appearance configuration options.
 Updates: v0.4.5 - 2025-11-05 - Add LiteLLM workflow routing configuration.
@@ -499,6 +500,9 @@ class PromptManagerSettings(BaseSettings):
                     "embedding_model",
                     "embedding_device",
                     "quick_actions",
+                    "chat_user_bubble_color",
+                    "chat_colors",
+                    "theme_mode",
                 ):
                     if key in data:
                         mapped[key] = data[key]
