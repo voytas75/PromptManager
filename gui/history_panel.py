@@ -99,6 +99,7 @@ class HistoryPanel(QWidget):
 
         self._search_input = QLineEdit(self)
         self._search_input.setPlaceholderText("Search text...")
+        self._search_input.setClearButtonEnabled(True)
         self._search_input.returnPressed.connect(self.refresh)  # type: ignore[arg-type]
         filter_layout.addWidget(QLabel("Search:", self))
         filter_layout.addWidget(self._search_input)

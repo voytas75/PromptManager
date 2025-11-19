@@ -105,6 +105,7 @@ class CommandPaletteDialog(QDialog):
         search_label = QLabel("Search:", self)
         self._search_input = QLineEdit(self)
         self._search_input.setPlaceholderText("Type to filter quick actions…")
+        self._search_input.setClearButtonEnabled(True)
         self._search_input.textChanged.connect(self._on_search_changed)  # type: ignore[arg-type]
         search_layout.addWidget(search_label)
         search_layout.addWidget(self._search_input, 1)

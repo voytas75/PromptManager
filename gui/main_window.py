@@ -616,6 +616,10 @@ class MainWindow(QMainWindow):
 
         self._search_input = QLineEdit(self)
         self._search_input.setPlaceholderText("Search prompts…")
+        # Display an in‑field “✕” icon that clears the current text when clicked.
+        # Qt provides this built‑in via the *clearButtonEnabled* property so we
+        # do not have to manage an extra button or custom stylesheet.
+        self._search_input.setClearButtonEnabled(True)
         self._search_input.textChanged.connect(self._on_search_changed)  # type: ignore[arg-type]
         controls_layout.addWidget(self._search_input)
 
