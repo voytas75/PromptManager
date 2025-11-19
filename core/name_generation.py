@@ -169,14 +169,27 @@ class LiteLLMDescriptionGenerator:
         except Exception as exc:  # pragma: no cover - defensive
             raise DescriptionGenerationError("Unexpected error while calling LiteLLM") from exc
 
+        # Defensive extraction of the assistant message returned by LiteLLM.  The
+        # payload structure **should** be
+        # ``{"choices": [{"message": {"content": "..."}}]}`` but we have seen
+        # third‑party gateways occasionally return ``null`` or other non‑string
+        # values for *content*.  Instead of leaking an AttributeError (which
+        # bubbles up as ``'NoneType' object has no attribute 'strip'`` and gives
+        # users no actionable clue), convert any structural irregularity into a
+        # predictable ``DescriptionGenerationError`` with a concise message.
+
         try:
-            message = response["choices"][0]["message"]["content"]
-        except (KeyError, IndexError, TypeError) as exc:  # pragma: no cover - defensive
-            raise DescriptionGenerationError("LiteLLM returned an unexpected payload") from exc
+            message = response["choices"][0]["message"].get("content")  # type: ignore[index]
+        except (KeyError, IndexError, TypeError, AttributeError) as exc:  # pragma: no cover - defensive
+            raise DescriptionGenerationError("LiteLLM returned an unexpected payload structure") from exc
+
+        if not isinstance(message, str):
+            raise DescriptionGenerationError("LiteLLM returned a non‑text description.")
 
         summary = message.strip()
         if not summary:
             raise DescriptionGenerationError("LiteLLM returned an empty description.")
+
         return summary
 
 
