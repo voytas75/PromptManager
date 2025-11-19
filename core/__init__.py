@@ -1,6 +1,6 @@
 """Core service layer for Prompt Manager.
 
-Updates: v0.8.0 - 2025-12-05 - Export ResponseStyle models and exception helpers.
+Updates: v0.9.0 - 2025-12-06 - Export PromptNote models and exception helpers.
 Updates: v0.7.1 - 2025-11-30 - Restore catalogue import helpers for GUI workflows.
 Updates: v0.6.0 - 2025-11-15 - Export prompt engineering helpers alongside manager API.
 Updates: v0.5.0 - 2025-11-07 - Export embedding factory helper for external use.
@@ -42,6 +42,9 @@ from .prompt_manager import (
     ResponseStyleError,
     ResponseStyleNotFoundError,
     ResponseStyleStorageError,
+    PromptNoteError,
+    PromptNoteNotFoundError,
+    PromptNoteStorageError,
 )
 from .name_generation import NameGenerationError, DescriptionGenerationError, LiteLLMDescriptionGenerator
 from .scenario_generation import LiteLLMScenarioGenerator, ScenarioGenerationError
@@ -59,6 +62,7 @@ from .notifications import (
 from .prompt_engineering import PromptEngineer, PromptEngineeringError, PromptRefinement
 from models.prompt_model import TaskTemplate
 from models.response_style import ResponseStyle
+from models.prompt_note import PromptNote
 
 __all__ = [
     "PromptManager",
@@ -73,11 +77,15 @@ __all__ = [
     "ResponseStyleError",
     "ResponseStyleNotFoundError",
     "ResponseStyleStorageError",
+    "PromptNoteError",
+    "PromptNoteNotFoundError",
+    "PromptNoteStorageError",
     "PromptRepository",
     "RepositoryError",
     "RepositoryNotFoundError",
     "TaskTemplate",
     "ResponseStyle",
+    "PromptNote",
     "build_prompt_manager",
     "import_prompt_catalog",
     "load_prompt_catalog",

@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.8.15 - 2025-12-06 - Add PromptNote dialog and auto-generated note metadata.
 Updates: v0.8.14 - 2025-12-06 - Auto-generate required response style fields from a pasted phrase.
 Updates: v0.8.13 - 2025-12-05 - Add ResponseStyle editor dialog for CRUD workflows.
 Updates: v0.8.12 - 2025-11-05 - Display application icon and credit source in info dialog.
@@ -90,6 +91,7 @@ from core import (
 from core.prompt_engineering import PromptEngineeringError, PromptRefinement
 from models.prompt_model import Prompt, TaskTemplate
 from models.response_style import ResponseStyle
+from models.prompt_note import PromptNote
 
 
 logger = logging.getLogger("prompt_manager.gui.dialogs")
@@ -2181,6 +2183,51 @@ class ResponseStyleDialog(QDialog):
         return f"Response Style {timestamp}"
 
 
+class PromptNoteDialog(QDialog):
+    """Modal dialog for creating or editing prompt notes."""
+
+    def __init__(self, parent: Optional[QWidget] = None, *, note: Optional[PromptNote] = None) -> None:
+        super().__init__(parent)
+        self._source_note = note
+        self._result_note: Optional[PromptNote] = None
+        self.setWindowTitle("New Note" if note is None else "Edit Note")
+        self.resize(520, 320)
+        self._build_ui()
+        if note is not None:
+            self._note_input.setPlainText(note.note)
+
+    @property
+    def result_note(self) -> Optional[PromptNote]:
+        """Return the resulting note after dialog acceptance."""
+
+        return self._result_note
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self)
+        self._note_input = QPlainTextEdit(self)
+        self._note_input.setPlaceholderText("Write your prompt note here…")
+        self._note_input.setMinimumHeight(200)
+        layout.addWidget(self._note_input)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        buttons.accepted.connect(self._on_accept)  # type: ignore[arg-type]
+        buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
+        layout.addWidget(buttons)
+
+    def _on_accept(self) -> None:
+        text = self._note_input.toPlainText().strip()
+        if not text:
+            QMessageBox.warning(self, "Missing note", "Enter note text before saving.")
+            return
+        if self._source_note is None:
+            self._result_note = PromptNote(id=uuid.uuid4(), note=text)
+        else:
+            updated = replace(self._source_note, note=text)
+            updated.touch()
+            self._result_note = updated
+        self.accept()
+
+
 class MarkdownPreviewDialog(QDialog):
     """Display markdown content rendered in a read-only viewer."""
 
@@ -2375,6 +2422,7 @@ __all__ = [
     "PromptDialog",
     "PromptMaintenanceDialog",
     "ResponseStyleDialog",
+    "PromptNoteDialog",
     "SaveResultDialog",
     "TemplateDialog",
     "fallback_suggest_prompt_name",

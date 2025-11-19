@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.26 - 2025-12-06 - Add Notes tab with single-field prompt notes CRUD.
 Updates: v0.15.25 - 2025-12-05 - Add Response Style management row with CRUD workflow hooks.
 Updates: v0.15.24 - 2025-12-03 - Apply assistant chat bubble colour from settings in the transcript view.
 Updates: v0.15.23 - 2025-12-02 - Pass theme mode to settings dialog so selection persists.
@@ -159,6 +160,7 @@ from .dialogs import (
     TemplateDialog,
 )
 from .history_panel import HistoryPanel
+from .notes_panel import NotesPanel
 from .settings_dialog import SettingsDialog, persist_settings_to_config
 from .diff_utils import build_diff_preview
 from .language_tools import DetectedLanguage, detect_language
@@ -1012,8 +1014,15 @@ class MainWindow(QMainWindow):
             on_export=self._handle_history_export,
         )
 
+        self._notes_panel = NotesPanel(
+            self._manager,
+            self,
+            status_callback=self._show_status_message,
+        )
+
         self._tab_widget.addTab(result_tab, "Prompts")
         self._tab_widget.addTab(self._history_panel, "History")
+        self._tab_widget.addTab(self._notes_panel, "Notes")
 
         layout.addWidget(self._tab_widget, stretch=1)
 
@@ -3637,6 +3646,11 @@ class MainWindow(QMainWindow):
 
         QMessageBox.critical(self, title, message)
         self.statusBar().showMessage(message, 5000)
+
+    def _show_status_message(self, message: str, duration_ms: int = 3000) -> None:
+        """Show a transient status bar message."""
+
+        self.statusBar().showMessage(message, duration_ms)
 
 
 __all__ = ["MainWindow", "PromptListModel", "PromptDetailWidget"]

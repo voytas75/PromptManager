@@ -1,5 +1,6 @@
 """Prompt Manager package façade and orchestration layer.
 
+Updates: v0.13.13 - 2025-12-06 - Add PromptNote CRUD APIs and Notes GUI wiring.
 Updates: v0.13.12 - 2025-12-05 - Add ResponseStyle persistence and CRUD APIs.
 Updates: v0.13.11 - 2025-11-05 - Support LiteLLM workflow routing between fast and inference models.
 Updates: v0.13.10 - 2025-11-05 - Add SQLite repository maintenance helpers.
@@ -111,6 +112,7 @@ except ImportError:  # pragma: no cover - redis optional during development
 
 from models.prompt_model import Prompt, PromptExecution, TaskTemplate, UserProfile
 from models.response_style import ResponseStyle
+from models.prompt_note import PromptNote
 
 from ..embedding import EmbeddingGenerationError, EmbeddingProvider, EmbeddingSyncWorker
 from ..execution import CodexExecutionResult, CodexExecutor, ExecutionError
@@ -155,6 +157,9 @@ from ..exceptions import (  # noqa: F401 – re‑export for backward compatibil
     ResponseStyleError,
     ResponseStyleNotFoundError,
     ResponseStyleStorageError,
+    PromptNoteError,
+    PromptNoteNotFoundError,
+    PromptNoteStorageError,
 )
 
 
@@ -174,6 +179,9 @@ __all__ = [
     "ResponseStyleError",
     "ResponseStyleNotFoundError",
     "ResponseStyleStorageError",
+    "PromptNoteError",
+    "PromptNoteNotFoundError",
+    "PromptNoteStorageError",
     # Main class will be added later when moved.
 ]
 
@@ -1595,6 +1603,56 @@ class PromptManager:
             raise ResponseStyleNotFoundError(str(exc)) from exc
         except RepositoryError as exc:
             raise ResponseStyleStorageError(f"Failed to delete response style {style_id}") from exc
+
+    # Prompt note management ------------------------------------------- #
+
+    def list_prompt_notes(self) -> List[PromptNote]:
+        """Return stored prompt notes ordered by recency."""
+
+        try:
+            return self._repository.list_prompt_notes()
+        except RepositoryError as exc:
+            raise PromptNoteStorageError("Unable to list prompt notes") from exc
+
+    def get_prompt_note(self, note_id: uuid.UUID) -> PromptNote:
+        """Return a single prompt note by identifier."""
+
+        try:
+            return self._repository.get_prompt_note(note_id)
+        except RepositoryNotFoundError as exc:
+            raise PromptNoteNotFoundError(str(exc)) from exc
+        except RepositoryError as exc:
+            raise PromptNoteStorageError(f"Unable to load prompt note {note_id}") from exc
+
+    def create_prompt_note(self, note: PromptNote) -> PromptNote:
+        """Persist a new prompt note."""
+
+        note.touch()
+        try:
+            return self._repository.add_prompt_note(note)
+        except RepositoryError as exc:
+            raise PromptNoteStorageError(f"Failed to persist prompt note {note.id}") from exc
+
+    def update_prompt_note(self, note: PromptNote) -> PromptNote:
+        """Update an existing prompt note."""
+
+        note.touch()
+        try:
+            return self._repository.update_prompt_note(note)
+        except RepositoryNotFoundError as exc:
+            raise PromptNoteNotFoundError(str(exc)) from exc
+        except RepositoryError as exc:
+            raise PromptNoteStorageError(f"Failed to update prompt note {note.id}") from exc
+
+    def delete_prompt_note(self, note_id: uuid.UUID) -> None:
+        """Delete a prompt note."""
+
+        try:
+            self._repository.delete_prompt_note(note_id)
+        except RepositoryNotFoundError as exc:
+            raise PromptNoteNotFoundError(str(exc)) from exc
+        except RepositoryError as exc:
+            raise PromptNoteStorageError(f"Failed to delete prompt note {note_id}") from exc
 
     def search_prompts(
         self,

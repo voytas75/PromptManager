@@ -21,6 +21,7 @@ from core import (
 )
 from models.prompt_model import Prompt, TaskTemplate, UserProfile
 from models.response_style import ResponseStyle
+from models.prompt_note import PromptNote
 
 
 def _make_prompt(name: str = "Sample Prompt") -> Prompt:
@@ -80,6 +81,11 @@ def _make_response_style(name: str = "Concise Summary") -> ResponseStyle:
         created_at=now,
         last_modified=now,
     )
+
+
+def _make_prompt_note(text: str = "Investigate latency spike") -> PromptNote:
+    now = datetime.now(timezone.utc)
+    return PromptNote(id=uuid.uuid4(), note=text, created_at=now, last_modified=now)
 
 
 class _FakeRedis:
@@ -400,6 +406,36 @@ def test_prompt_manager_response_style_workflow(tmp_path) -> None:
 
     manager.delete_response_style(style.id)
     assert not manager.list_response_styles()
+
+    manager.close()
+
+
+def test_prompt_manager_prompt_note_workflow(tmp_path) -> None:
+    """Ensure prompt note CRUD is exposed via the manager."""
+
+    chroma_dir = tmp_path / "chroma"
+    db_path = tmp_path / "prompt_manager.db"
+    manager = PromptManager(
+        chroma_path=str(chroma_dir),
+        db_path=str(db_path),
+    )
+
+    note = _make_prompt_note()
+    manager.create_prompt_note(note)
+
+    notes = manager.list_prompt_notes()
+    assert notes and notes[0].id == note.id
+
+    fetched = manager.get_prompt_note(note.id)
+    assert fetched.note == note.note
+
+    note.note = "Update onboarding docs"
+    manager.update_prompt_note(note)
+    refreshed = manager.get_prompt_note(note.id)
+    assert refreshed.note.startswith("Update")
+
+    manager.delete_prompt_note(note.id)
+    assert not manager.list_prompt_notes()
 
     manager.close()
 

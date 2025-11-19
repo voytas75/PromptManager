@@ -1,5 +1,6 @@
 """SQLite-backed repository for persistent prompt storage.
 
+Updates: v0.8.0 - 2025-12-06 - Add PromptNote persistence with CRUD helpers.
 Updates: v0.7.0 - 2025-12-05 - Add ResponseStyle persistence with CRUD helpers.
 Updates: v0.6.1 - 2025-11-30 - Add repository reset helper for maintenance workflows.
 Updates: v0.6.0 - 2025-11-25 - Add prompt catalogue statistics accessor for maintenance UI.
@@ -29,6 +30,7 @@ from models.prompt_model import (
     UserProfile,
 )
 from models.response_style import ResponseStyle
+from models.prompt_note import PromptNote
 
 
 @dataclass(slots=True, frozen=True)
@@ -235,6 +237,13 @@ class PromptRepository:
         "ext1",
         "ext2",
         "ext3",
+    )
+
+    _NOTE_COLUMNS: Sequence[str] = (
+        "id",
+        "note",
+        "created_at",
+        "last_modified",
     )
 
     def __init__(self, db_path: str) -> None:
@@ -774,6 +783,16 @@ class PromptRepository:
             "CREATE INDEX IF NOT EXISTS idx_response_styles_name "
             "ON response_styles(name);"
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS prompt_notes (
+                id TEXT PRIMARY KEY,
+                note TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                last_modified TEXT NOT NULL
+            );
+            """
+        )
         prompt_columns = {
             row["name"] for row in conn.execute("PRAGMA table_info(prompts);")
         }
@@ -835,6 +854,7 @@ class PromptRepository:
                 conn.execute("DELETE FROM prompt_executions;")
                 conn.execute("DELETE FROM templates;")
                 conn.execute("DELETE FROM response_styles;")
+                conn.execute("DELETE FROM prompt_notes;")
                 conn.execute("DELETE FROM prompts;")
                 conn.execute("DELETE FROM user_profile;")
                 conn.execute(
@@ -962,6 +982,23 @@ class PromptRepository:
         payload["ext3"] = _json_loads_optional(row["ext3"])
         payload["is_active"] = row["is_active"]
         return ResponseStyle.from_record(payload)
+
+    def _note_to_row(self, note: PromptNote) -> Dict[str, Any]:
+        """Serialise PromptNote to SQLite mapping."""
+
+        record = note.to_record()
+        return {
+            "id": record["id"],
+            "note": record["note"],
+            "created_at": record["created_at"],
+            "last_modified": record["last_modified"],
+        }
+
+    def _row_to_note(self, row: sqlite3.Row) -> PromptNote:
+        """Hydrate PromptNote from SQLite row."""
+
+        payload: Dict[str, Any] = {column: row[column] for column in row.keys()}
+        return PromptNote.from_record(payload)
 
     def add_template(self, template: TaskTemplate) -> TaskTemplate:
         """Insert a new task template."""
@@ -1139,6 +1176,82 @@ class PromptRepository:
             raise RepositoryError(f"Failed to delete response style {style_id}") from exc
         if deleted == 0:
             raise RepositoryNotFoundError(f"Response style {style_id} not found")
+
+    # Prompt note helpers ------------------------------------------------- #
+
+    def add_prompt_note(self, note: PromptNote) -> PromptNote:
+        """Insert a new prompt note."""
+
+        payload = self._note_to_row(note)
+        placeholders = ", ".join(f":{column}" for column in self._NOTE_COLUMNS)
+        query = f"INSERT INTO prompt_notes ({', '.join(self._NOTE_COLUMNS)}) VALUES ({placeholders});"
+        try:
+            with _connect(self._db_path) as conn:
+                conn.execute(query, payload)
+        except sqlite3.IntegrityError as exc:
+            raise RepositoryError(f"Prompt note {note.id} already exists") from exc
+        except sqlite3.Error as exc:
+            raise RepositoryError(f"Failed to insert prompt note {note.id}") from exc
+        return note
+
+    def update_prompt_note(self, note: PromptNote) -> PromptNote:
+        """Update an existing prompt note."""
+
+        payload = self._note_to_row(note)
+        assignments = ", ".join(
+            f"{column} = :{column}" for column in self._NOTE_COLUMNS if column != "id"
+        )
+        query = f"UPDATE prompt_notes SET {assignments} WHERE id = :id;"
+        try:
+            with _connect(self._db_path) as conn:
+                updated = conn.execute(query, payload).rowcount
+        except sqlite3.Error as exc:
+            raise RepositoryError(f"Failed to update prompt note {note.id}") from exc
+        if updated == 0:
+            raise RepositoryNotFoundError(f"Prompt note {note.id} not found")
+        return note
+
+    def get_prompt_note(self, note_id: uuid.UUID) -> PromptNote:
+        """Return a prompt note by identifier."""
+
+        try:
+            with _connect(self._db_path) as conn:
+                cursor = conn.execute(
+                    "SELECT * FROM prompt_notes WHERE id = ?;",
+                    (str(note_id),),
+                )
+                row = cursor.fetchone()
+        except sqlite3.Error as exc:
+            raise RepositoryError(f"Failed to load prompt note {note_id}") from exc
+        if row is None:
+            raise RepositoryNotFoundError(f"Prompt note {note_id} not found")
+        return self._row_to_note(row)
+
+    def list_prompt_notes(self) -> List[PromptNote]:
+        """Return stored prompt notes ordered by modification time."""
+
+        try:
+            with _connect(self._db_path) as conn:
+                rows = conn.execute(
+                    "SELECT * FROM prompt_notes ORDER BY last_modified DESC;"
+                ).fetchall()
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to list prompt notes") from exc
+        return [self._row_to_note(row) for row in rows]
+
+    def delete_prompt_note(self, note_id: uuid.UUID) -> None:
+        """Delete a prompt note."""
+
+        try:
+            with _connect(self._db_path) as conn:
+                deleted = conn.execute(
+                    "DELETE FROM prompt_notes WHERE id = ?;",
+                    (str(note_id),),
+                ).rowcount
+        except sqlite3.Error as exc:
+            raise RepositoryError(f"Failed to delete prompt note {note_id}") from exc
+        if deleted == 0:
+            raise RepositoryNotFoundError(f"Prompt note {note_id} not found")
 
     def get_prompts_for_ids(self, prompt_ids: Sequence[uuid.UUID]) -> List[Prompt]:
         """Return prompts that match provided identifiers in input order."""

@@ -11,6 +11,7 @@ All exceptions ultimately inherit from :class:`PromptManagerError`, allowing
 callers to catch a single base class for any manager‑related failure while
 still distinguishing individual error categories when needed.
 
+Updates: v0.16.0 – 2025‑12‑06 – Add PromptNote exception hierarchy.
 Updates: v0.15.0 – 2025‑12‑05 – Add ResponseStyle exception hierarchy.
 Updates: v0.14.0 – 2025‑11‑18 – Created module; migrated existing classes.
 """
@@ -65,3 +66,15 @@ class ResponseStyleNotFoundError(ResponseStyleError):
 
 class ResponseStyleStorageError(ResponseStyleError):
     """Raised when response style persistence fails."""
+
+
+class PromptNoteError(PromptManagerError):
+    """Base class for prompt note workflow failures."""
+
+
+class PromptNoteNotFoundError(PromptNoteError):
+    """Raised when a prompt note cannot be found."""
+
+
+class PromptNoteStorageError(PromptNoteError):
+    """Raised when persistence for prompt notes fails."""
