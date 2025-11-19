@@ -31,7 +31,7 @@ from core import (
 )
 from models.prompt_note import PromptNote
 
-from .dialogs import PromptNoteDialog
+from .dialogs import PromptNoteDialog, MarkdownPreviewDialog
 
 
 class NotesPanel(QWidget):
@@ -70,6 +70,9 @@ class NotesPanel(QWidget):
         self._copy_button = QPushButton("Copy", self)
         self._copy_button.setEnabled(False)
         self._copy_button.clicked.connect(self._on_copy_clicked)  # type: ignore[arg-type]
+        self._markdown_button = QPushButton("Markdown", self)
+        self._markdown_button.setEnabled(False)
+        self._markdown_button.clicked.connect(self._on_markdown_clicked)  # type: ignore[arg-type]
         self._export_button = QPushButton("Export", self)
         self._export_button.clicked.connect(self._on_export_clicked)  # type: ignore[arg-type]
         self._refresh_button = QPushButton("Refresh", self)
@@ -78,6 +81,7 @@ class NotesPanel(QWidget):
         controls.addWidget(self._edit_button)
         controls.addWidget(self._delete_button)
         controls.addWidget(self._copy_button)
+        controls.addWidget(self._markdown_button)
         controls.addWidget(self._export_button)
         controls.addStretch(1)
         controls.addWidget(self._refresh_button)
@@ -103,6 +107,7 @@ class NotesPanel(QWidget):
         self._edit_button.setEnabled(False)
         self._delete_button.setEnabled(False)
         self._copy_button.setEnabled(False)
+        self._markdown_button.setEnabled(False)
         if self._notes:
             self._list.setCurrentRow(0)
 
@@ -128,6 +133,7 @@ class NotesPanel(QWidget):
         self._edit_button.setEnabled(note is not None)
         self._delete_button.setEnabled(note is not None)
         self._copy_button.setEnabled(note is not None)
+        self._markdown_button.setEnabled(note is not None)
         self._note_view.setPlainText(note.note if note else "")
 
     def _on_add_clicked(self) -> None:
@@ -222,6 +228,17 @@ class NotesPanel(QWidget):
             QMessageBox.critical(self, "Export failed", str(exc))
             return
         self._show_status(f"Exported {len(self._notes)} notes.")
+
+    def _on_markdown_clicked(self) -> None:
+        note = self._selected_note()
+        if note is None:
+            QMessageBox.information(self, "Markdown preview", "Select a note first.")
+            return
+        if not note.note.strip():
+            QMessageBox.information(self, "Markdown preview", "The selected note is empty.")
+            return
+        dialog = MarkdownPreviewDialog(note.note, self, title="Note Preview")
+        dialog.exec()
 
     def _show_status(self, message: str, duration_ms: int = 3000) -> None:
         if self._status_callback is not None:

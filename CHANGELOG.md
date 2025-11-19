@@ -9,7 +9,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 - Introduced **Response Style** data model with SQLite persistence, CRUD APIs, and repository/manger tests covering happy-path and failure handling.
 - Added Response Style combo row in the GUI workspace with New/Edit/Delete workflows and a live summary panel that highlights tone, voice, and formatting guidelines for the selected preset.
 - Response Style dialog now accepts a single pasted phrase and auto-generates required metadata (name, description, format instructions, initial example) on save for rapid capture.
-- Added a **Notes** tab beside Prompts/History that stores one-field prompt notes with create/edit/delete actions, clipboard copy, and export-to-file support powered by the new PromptNote model.
+- Added a **Notes** tab beside Prompts/History that stores one-field prompt notes with create/edit/delete actions, clipboard copy, Markdown preview, and export-to-file support powered by the new PromptNote model.
 
 ### Changed
 
