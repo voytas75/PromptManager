@@ -98,6 +98,16 @@ These parts are concatenated into a single string by `models.prompt_model.Prompt
 
 When a user enters a search phrase the application embeds **the entire phrase** as one vector and asks ChromaDB for the nearest neighbours.  The database returns prompt IDs already **ranked by cosine similarity**, and the order is preserved—no additional sorting logic is applied.  Consequently, search relevance reflects how semantically close the prompt’s combined text is to the full query, not whether individual words overlap.
 
+### UI – Relevance Scores
+
+The prompt list now displays a cosine‑similarity score in square brackets when a search is active, e.g.:
+
+```
+Refactor Function (refactoring) [0.9123]
+```
+
+Scores are computed as `1 − distance` returned by ChromaDB and indicate how strongly each prompt matches the query.  The *Sort* combo is disabled during searches so results remain ordered by similarity.
+
 ## Running the GUI
 
 - Launch the desktop interface. The GUI opens by default:
