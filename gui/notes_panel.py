@@ -89,6 +89,7 @@ class NotesPanel(QWidget):
 
         self._list.setAlternatingRowColors(True)
         self._list.itemSelectionChanged.connect(self._on_selection_changed)  # type: ignore[arg-type]
+        self._list.itemDoubleClicked.connect(lambda _: self._on_edit_clicked())  # type: ignore[arg-type]
         layout.addWidget(self._list, 2)
         layout.addWidget(self._note_view, 3)
 
