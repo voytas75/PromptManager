@@ -11,6 +11,7 @@ from typing import Callable, List, Optional
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QHBoxLayout,
+    QFileDialog,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
@@ -20,6 +21,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from PySide6.QtGui import QGuiApplication
 
 from core import (
     PromptManager,
@@ -65,11 +67,18 @@ class NotesPanel(QWidget):
         self._delete_button = QPushButton("Delete", self)
         self._delete_button.setEnabled(False)
         self._delete_button.clicked.connect(self._on_delete_clicked)  # type: ignore[arg-type]
+        self._copy_button = QPushButton("Copy", self)
+        self._copy_button.setEnabled(False)
+        self._copy_button.clicked.connect(self._on_copy_clicked)  # type: ignore[arg-type]
+        self._export_button = QPushButton("Export", self)
+        self._export_button.clicked.connect(self._on_export_clicked)  # type: ignore[arg-type]
         self._refresh_button = QPushButton("Refresh", self)
         self._refresh_button.clicked.connect(self._load_notes)  # type: ignore[arg-type]
         controls.addWidget(self._add_button)
         controls.addWidget(self._edit_button)
         controls.addWidget(self._delete_button)
+        controls.addWidget(self._copy_button)
+        controls.addWidget(self._export_button)
         controls.addStretch(1)
         controls.addWidget(self._refresh_button)
         layout.addLayout(controls)
@@ -93,6 +102,7 @@ class NotesPanel(QWidget):
         self._note_view.clear()
         self._edit_button.setEnabled(False)
         self._delete_button.setEnabled(False)
+        self._copy_button.setEnabled(False)
         if self._notes:
             self._list.setCurrentRow(0)
 
@@ -117,6 +127,7 @@ class NotesPanel(QWidget):
         note = self._selected_note()
         self._edit_button.setEnabled(note is not None)
         self._delete_button.setEnabled(note is not None)
+        self._copy_button.setEnabled(note is not None)
         self._note_view.setPlainText(note.note if note else "")
 
     def _on_add_clicked(self) -> None:
@@ -174,6 +185,43 @@ class NotesPanel(QWidget):
             return
         self._load_notes()
         self._show_status("Note deleted.")
+
+    def _on_copy_clicked(self) -> None:
+        note = self._selected_note()
+        if note is None:
+            QMessageBox.information(self, "Copy note", "Select a note first.")
+            return
+        clipboard = QGuiApplication.clipboard()
+        clipboard.setText(note.note)
+        self._show_status("Note copied to clipboard.")
+
+    def _on_export_clicked(self) -> None:
+        if not self._notes:
+            QMessageBox.information(self, "Export notes", "There are no notes to export yet.")
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export notes",
+            "prompt_notes.txt",
+            "Text Files (*.txt);;All Files (*.*)",
+        )
+        if not path:
+            return
+        lines = []
+        for note in self._notes:
+            lines.append("---")
+            lines.append(f"Created: {note.created_at.isoformat()}")
+            lines.append(f"Last modified: {note.last_modified.isoformat()}")
+            lines.append("Note:")
+            lines.append(note.note)
+            lines.append("")
+        try:
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write("\n".join(lines).strip() + "\n")
+        except OSError as exc:
+            QMessageBox.critical(self, "Export failed", str(exc))
+            return
+        self._show_status(f"Exported {len(self._notes)} notes.")
 
     def _show_status(self, message: str, duration_ms: int = 3000) -> None:
         if self._status_callback is not None:
