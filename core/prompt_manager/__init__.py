@@ -1558,7 +1558,10 @@ class PromptManager:
                     query_embeddings=[query_embedding] if query_embedding is not None else None,
                     n_results=limit,
                     where=where,
-                    include=["ids", "documents", "metadatas", "distances"],
+                    # Request fields compatible with older Chroma versions –
+                    # "ids" are always returned so we omit it to avoid a
+                    # validation error when the client lists supported names.
+                    include=["documents", "metadatas", "distances"],
                 ),
             )
         except ChromaError as exc:
