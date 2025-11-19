@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.28 - 2025-11-19 - Remove the Diff tab and supporting preview logic from the result pane.
 Updates: v0.15.27 - 2025-12-06 - Move Response Styles into dedicated tab with full CRUD preview/export actions.
 Updates: v0.15.26 - 2025-12-06 - Add Notes tab with single-field prompt notes CRUD.
 Updates: v0.15.24 - 2025-12-03 - Apply assistant chat bubble colour from settings in the transcript view.
@@ -158,7 +159,6 @@ from .history_panel import HistoryPanel
 from .notes_panel import NotesPanel
 from .response_styles_panel import ResponseStylesPanel
 from .settings_dialog import SettingsDialog, persist_settings_to_config
-from .diff_utils import build_diff_preview
 from .language_tools import DetectedLanguage, detect_language
 from .usage_logger import IntentUsageLogger
 from .notifications import QtNotificationBridge, NotificationHistoryDialog
@@ -940,11 +940,6 @@ class MainWindow(QMainWindow):
         self._result_text.setReadOnly(True)
         self._result_text.setPlaceholderText("Run a prompt to see output here.")
         self._result_tabs.addTab(self._result_text, "Output")
-
-        self._diff_view = QPlainTextEdit(self)
-        self._diff_view.setReadOnly(True)
-        self._diff_view.setPlaceholderText("Run a prompt to compare input and output.")
-        self._result_tabs.addTab(self._diff_view, "Diff")
 
         self._chat_history_view = QTextEdit(self)
         self._chat_history_view.setReadOnly(True)
@@ -1742,9 +1737,7 @@ class MainWindow(QMainWindow):
             meta_parts.append(f"Logged: {executed_at.strftime('%Y-%m-%d %H:%M:%S %Z')}")
         self._result_meta.setText(" | ".join(meta_parts))
         response_text = outcome.result.response_text or ""
-        request_text = outcome.result.request_text or ""
         self._result_text.setPlainText(response_text)
-        self._update_diff_view(request_text, response_text)
         self._render_markdown_button.setEnabled(bool(response_text.strip()))
         self._result_tabs.setCurrentIndex(0)
         self._copy_result_button.setEnabled(bool(outcome.result.response_text))
@@ -1764,8 +1757,6 @@ class MainWindow(QMainWindow):
         self._result_label.setText("No prompt executed yet")
         self._result_meta.clear()
         self._result_text.clear()
-        self._diff_view.clear()
-        self._diff_view.setPlaceholderText("Run a prompt to compare input and output.")
         self._render_markdown_button.setEnabled(False)
         self._copy_result_button.setEnabled(False)
         self._copy_result_to_text_window_button.setEnabled(False)
@@ -1926,12 +1917,6 @@ class MainWindow(QMainWindow):
             f"border: 1px solid {border_color.name()}; "
             "border-radius: 6px; background-color: palette(base); }"
         )
-
-    def _update_diff_view(self, original: str, generated: str) -> None:
-        """Render a unified diff comparing the request text with the response."""
-
-        diff_text = build_diff_preview(original, generated)
-        self._diff_view.setPlainText(diff_text)
 
     def _on_query_text_changed(self) -> None:
         """Update language detection and syntax highlighting as the user types."""

@@ -2,6 +2,12 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.15.1] - 2025-11-19
+
+### Changed
+
+- Removed the Diff tab from the GUI result pane, dropped the supporting diff preview utility/tests, and refreshed documentation so executions now focus on the Output and Chat views.
+
 ## [0.15.0] - 2025-12-05
 
 ### Added
