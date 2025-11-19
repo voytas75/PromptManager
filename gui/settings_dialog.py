@@ -99,6 +99,7 @@ class SettingsDialog(QDialog):
         self._chat_user_bubble_color = QColor(initial_chat_color).name().lower()
         self._chat_color_input: Optional[QLineEdit] = None
         self._chat_color_preview: Optional[QLabel] = None
+        self._chat_colors_value: Optional[dict[str, str]] = None
         self._theme_mode = "dark" if (theme_mode or "").strip().lower() == "dark" else "light"
         self._theme_combo: Optional[QComboBox] = None
         self._build_ui()
@@ -383,6 +384,21 @@ class SettingsDialog(QDialog):
 
         super().accept()
 
+        # ------------------------------------------------------------------
+        # Persist chosen colours – extract hex codes from swatch buttons
+        # ------------------------------------------------------------------
+
+        def _btn_hex(key: str, default_hex: str) -> str:
+            btn = self._color_buttons.get(key)
+            if btn is None:
+                return default_hex
+            return btn.palette().button().color().name().lower()
+
+        self._chat_colors_value = {
+            "user": _btn_hex("user", DEFAULT_CHAT_USER_BUBBLE_COLOR),
+            "assistant": _btn_hex("assistant", DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR),
+        }
+
     def result_settings(self) -> dict[str, Optional[object]]:
         """Return cleaned settings data."""
 
@@ -414,6 +430,7 @@ class SettingsDialog(QDialog):
             "litellm_workflow_models": workflow_models or None,
             "quick_actions": self._quick_actions_value,
             "chat_user_bubble_color": self._chat_user_bubble_color,
+            "chat_colors": self._chat_colors_value,
             "theme_mode": self._theme_mode,
         }
 
