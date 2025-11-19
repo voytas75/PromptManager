@@ -23,12 +23,14 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QGridLayout,
     QComboBox,
+    QColorDialog,
     QLabel,
     QLineEdit,
     QFrame,
     QMessageBox,
     QPlainTextEdit,
     QCheckBox,
+    QPushButton,
     QVBoxLayout,
     QTabWidget,
     QButtonGroup,
@@ -37,7 +39,11 @@ from PySide6.QtWidgets import (
 )
 
 from config.persistence import persist_settings_to_config
-from config import DEFAULT_CHAT_USER_BUBBLE_COLOR, LITELLM_ROUTED_WORKFLOWS
+from config import LITELLM_ROUTED_WORKFLOWS
+from config.settings import (
+    DEFAULT_CHAT_USER_BUBBLE_COLOR,
+    DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR,
+)
 
 
 class SettingsDialog(QDialog):
@@ -269,9 +275,8 @@ class SettingsDialog(QDialog):
             colors_form.addRow(label, btn)
             self._color_buttons[key] = btn
 
-        settings_colors = self._settings.chat_colors
-        _make_color_row("user", "User bubble", settings_colors.user)
-        _make_color_row("assistant", "Assistant bubble", settings_colors.assistant)
+        _make_color_row("user", "User bubble", self._chat_user_bubble_color)
+        _make_color_row("assistant", "Assistant bubble", DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR)
 
         tab_widget.addTab(colors_tab, "Colors")
 
