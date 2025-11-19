@@ -174,9 +174,9 @@ class PromptListModel(QAbstractListModel):
         if role in {Qt.DisplayRole, Qt.EditRole}:
             category = f" ({prompt.category})" if prompt.category else ""
             similarity_suffix = ""
-            if hasattr(prompt, "_similarity"):
+            if getattr(prompt, "similarity", None) is not None:
                 try:
-                    similarity = float(getattr(prompt, "_similarity"))
+                    similarity = float(prompt.similarity)
                     similarity_suffix = f" [{similarity:.4f}]"
                 except (TypeError, ValueError):
                     similarity_suffix = ""

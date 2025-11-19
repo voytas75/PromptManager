@@ -154,6 +154,10 @@ class Prompt:
     ext4: Optional[Sequence[float]] = None
     ext5: Optional[MutableMapping[str, Any]] = None
 
+    # Transient search-only attribute populated at runtime; excluded from
+    # persistence and comparisons.
+    similarity: Optional[float] = field(default=None, compare=False, repr=False)
+
     def __post_init__(self) -> None:
         """Normalise stored scenarios and mirror them into ext5 metadata."""
 

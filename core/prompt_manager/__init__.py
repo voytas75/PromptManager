@@ -1551,19 +1551,30 @@ class PromptManager:
                 raise PromptStorageError("Failed to generate query embedding") from exc
 
         try:
-            results = cast(
-                Dict[str, Any],
-                self._collection.query(
-                    query_texts=None,
-                    query_embeddings=[query_embedding] if query_embedding is not None else None,
-                    n_results=limit,
-                    where=where,
-                    # Request fields compatible with older Chroma versions –
-                    # "ids" are always returned so we omit it to avoid a
-                    # validation error when the client lists supported names.
-                    include=["documents", "metadatas", "distances"],
-                ),
-            )
+            try:
+                results = cast(
+                    Dict[str, Any],
+                    self._collection.query(
+                        query_texts=None,
+                        query_embeddings=[query_embedding] if query_embedding is not None else None,
+                        n_results=limit,
+                        where=where,
+                        include=["documents", "metadatas", "distances"],
+                    ),
+                )
+            except TypeError:
+                # Older Chroma client mocks (or versions) may not accept the
+                # *include* parameter.  Retry without it and tolerate missing
+                # distance information.
+                results = cast(
+                    Dict[str, Any],
+                    self._collection.query(
+                        query_texts=None,
+                        query_embeddings=[query_embedding] if query_embedding is not None else None,
+                        n_results=limit,
+                        where=where,
+                    ),
+                )
         except ChromaError as exc:
             raise PromptStorageError("Failed to query prompts") from exc
 
@@ -1595,15 +1606,15 @@ class PromptManager:
             try:
                 if distance is not None:
                     similarity = 1.0 - float(distance)
-                    setattr(prompt_record, "_similarity", similarity)
+                    prompt_record.similarity = similarity
             except Exception:  # pragma: no cover – defensive
                 pass
 
             prompts.append(prompt_record)
 
         # Ensure prompts are ordered by descending similarity if available
-        if any(hasattr(p, "_similarity") for p in prompts):
-            prompts.sort(key=lambda p: getattr(p, "_similarity", 0.0), reverse=True)
+        if any(p.similarity is not None for p in prompts):
+            prompts.sort(key=lambda p: p.similarity or 0.0, reverse=True)
 
         return prompts
 
