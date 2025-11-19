@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.29 - 2025-11-19 - Preserve semantic search ordering when filters update live results.
 Updates: v0.15.28 - 2025-11-19 - Remove the Diff tab and supporting preview logic from the result pane.
 Updates: v0.15.27 - 2025-12-06 - Move Response Styles into dedicated tab with full CRUD preview/export actions.
 Updates: v0.15.26 - 2025-12-06 - Add Notes tab with single-field prompt notes CRUD.
@@ -602,6 +603,7 @@ class MainWindow(QMainWindow):
         self._detail_widget.edit_requested.connect(self._on_edit_clicked)  # type: ignore[arg-type]
         self._all_prompts: List[Prompt] = []
         self._current_prompts: List[Prompt] = []
+        self._preserve_search_order: bool = False
         self._suggestions: Optional[PromptManager.IntentSuggestions] = None
         self._last_execution: Optional[PromptManager.ExecutionOutcome] = None
         self._last_prompt_name: Optional[str] = None
@@ -1393,6 +1395,7 @@ class MainWindow(QMainWindow):
         """Populate the list model from the repository or semantic search."""
 
         stripped = search_text.strip()
+        self._preserve_search_order = False
         if stripped:
             self._selected_template_id = None
             self._reset_template_selection()
@@ -1417,6 +1420,7 @@ class MainWindow(QMainWindow):
                 # similarity scores and are sorted by best match.
                 self._suggestions = None
                 self._current_prompts = list(search_results)
+                self._preserve_search_order = True
 
                 filtered = self._apply_filters(self._current_prompts)
                 # Do **not** apply additional sorting – relevance order matters.
@@ -1524,7 +1528,7 @@ class MainWindow(QMainWindow):
     def _on_filters_changed(self, *_: object) -> None:
         """Refresh the prompt list when filter widgets change."""
 
-        self._refresh_filtered_view()
+        self._refresh_filtered_view(preserve_order=self._preserve_search_order)
 
     def _on_sort_changed(self, index: int) -> None:
         """Re-sort the prompt list when the sort selection changes."""
@@ -1552,14 +1556,14 @@ class MainWindow(QMainWindow):
             self._detail_widget.clear()
         self._update_intent_hint(sorted_prompts)
 
-    def _refresh_filtered_view(self) -> None:
+    def _refresh_filtered_view(self, *, preserve_order: bool = False) -> None:
         filtered = self._apply_filters(self._current_prompts)
-        sorted_prompts = self._sort_prompts(filtered)
-        self._model.set_prompts(sorted_prompts)
+        prompts_to_show = filtered if preserve_order else self._sort_prompts(filtered)
+        self._model.set_prompts(prompts_to_show)
         self._list_view.clearSelection()
-        if not sorted_prompts:
+        if not prompts_to_show:
             self._detail_widget.clear()
-        self._update_intent_hint(sorted_prompts)
+        self._update_intent_hint(prompts_to_show)
 
     @staticmethod
     def _replace_prompt_in_collection(collection: List[Prompt], updated: Prompt) -> bool:
