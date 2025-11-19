@@ -82,6 +82,22 @@ Prompt Manager is a desktop-focused application for cataloguing, searching, and 
 
 Further modules (session history, execution pipeline) will be introduced in subsequent milestones in line with the blueprint.
 
+## Embedding & Search Behaviour
+
+Prompt Manager performs **semantic search** using vector embeddings stored in ChromaDB.  The text that is embedded for every prompt is the union of several descriptive fields so that queries can match on more than just the raw body:
+
+- **Name** – the human‑readable title of the prompt.
+- **Description** – the short summary sentence.
+- **Category** – high‑level grouping (e.g. *bug‑fix*, *refactor*).
+- **Tags** – comma‑separated keywords.
+- **Context** – optional background text the prompt relies on.
+- **Example Input / Example Output** – illustrative snippets, when provided.
+- **Scenarios** – usage scenarios captured from the dialog.
+
+These parts are concatenated into a single string by `models.prompt_model.Prompt.document`, embedded with the configured provider (`deterministic`, LiteLLM, or Sentence‑Transformers), and the resulting vector is stored in ChromaDB.
+
+When a user enters a search phrase the application embeds **the entire phrase** as one vector and asks ChromaDB for the nearest neighbours.  The database returns prompt IDs already **ranked by cosine similarity**, and the order is preserved—no additional sorting logic is applied.  Consequently, search relevance reflects how semantically close the prompt’s combined text is to the full query, not whether individual words overlap.
+
 ## Running the GUI
 
 - Launch the desktop interface. The GUI opens by default:
