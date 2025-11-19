@@ -92,6 +92,8 @@ class NotesPanel(QWidget):
         self._note_view.clear()
         self._edit_button.setEnabled(False)
         self._delete_button.setEnabled(False)
+        if self._notes:
+            self._list.setCurrentRow(0)
 
     def _selected_note(self) -> Optional[PromptNote]:
         item = self._list.currentItem()
