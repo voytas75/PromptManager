@@ -242,6 +242,39 @@ class SettingsDialog(QDialog):
 
         tab_widget.addTab(appearance_tab, "Appearance")
 
+        # -------------------------------------------------------------
+        # Colours tab – chat bubble customisation
+        # -------------------------------------------------------------
+        colors_tab = QWidget(self)
+        colors_form = QFormLayout(colors_tab)
+        colors_form.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
+
+        self._color_buttons: Dict[str, QPushButton] = {}
+
+        def _make_color_row(key: str, label: str, default_hex: str) -> None:
+            btn = QPushButton(colors_tab)
+            btn.setText(" ")  # placeholder for minimum size
+            btn.setFixedWidth(48)
+            btn.setStyleSheet(f"background-color: {default_hex}; border: 1px solid #888;")
+
+            def choose_color() -> None:  # pragma: no cover – GUI interaction
+                current = QColor(btn.palette().button().color())
+                chosen = QColorDialog.getColor(current, self, f"Select {label} colour")
+                if not chosen.isValid():
+                    return
+                btn.setStyleSheet(f"background-color: {chosen.name()}; border: 1px solid #888;")
+                self._color_buttons[key] = btn  # ensure stored
+
+            btn.clicked.connect(choose_color)  # type: ignore[arg-type]
+            colors_form.addRow(label, btn)
+            self._color_buttons[key] = btn
+
+        settings_colors = self._settings.chat_colors
+        _make_color_row("user", "User bubble", settings_colors.user)
+        _make_color_row("assistant", "Assistant bubble", settings_colors.assistant)
+
+        tab_widget.addTab(colors_tab, "Colors")
+
         quick_tab = QWidget(self)
         quick_layout = QVBoxLayout(quick_tab)
         quick_layout.setContentsMargins(0, 0, 0, 0)

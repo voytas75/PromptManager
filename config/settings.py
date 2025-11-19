@@ -46,6 +46,29 @@ LITELLM_ROUTING_OPTIONS: Tuple[str, str] = ("fast", "inference")
 
 DEFAULT_THEME_MODE = "light"
 DEFAULT_CHAT_USER_BUBBLE_COLOR = "#e6f0ff"
+DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR = "#f5f5f5"
+
+
+class ChatColors(BaseSettings):
+    """Sub‑model storing UI colour customisation options."""
+
+    user: str = Field(default=DEFAULT_CHAT_USER_BUBBLE_COLOR, description="User chat bubble colour (hex)")
+    assistant: str = Field(
+        default=DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR,
+        description="Assistant chat bubble colour (hex)",
+    )
+
+    model_config = cast(
+        SettingsConfigDict,
+        {
+            "env_prefix": "PROMPT_MANAGER_CHAT_",
+            "case_sensitive": False,
+            "env": {
+                "user": ["CHAT_USER_BUBBLE_COLOR", "chat_user_bubble_color"],
+                "assistant": ["CHAT_ASSISTANT_BUBBLE_COLOR", "chat_assistant_bubble_color"],
+            },
+        },
+    )
 
 _CHAT_COLOR_PATTERN = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
 _THEME_CHOICES = {"light", "dark"}
@@ -104,6 +127,8 @@ class PromptManagerSettings(BaseSettings):
         default=DEFAULT_CHAT_USER_BUBBLE_COLOR,
         description="Hex colour used when rendering user chat messages within the transcript tab.",
     )
+
+    chat_colors: ChatColors = Field(default_factory=ChatColors, description="Colour palette for chat bubbles.")
     embedding_backend: str = Field(
         default="deterministic",
         description="Embedding backend to use (deterministic, litellm, sentence-transformers).",
