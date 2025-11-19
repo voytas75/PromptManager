@@ -120,7 +120,7 @@ class NotesPanel(QWidget):
 
     def _on_add_clicked(self) -> None:
         dialog = PromptNoteDialog(self)
-        if dialog.exec() != dialog.Accepted:
+        if dialog.exec() != QDialog.Accepted:
             return
         result = dialog.result_note
         if result is None:
@@ -139,7 +139,7 @@ class NotesPanel(QWidget):
             QMessageBox.information(self, "Edit note", "Select a note first.")
             return
         dialog = PromptNoteDialog(self, note=note)
-        if dialog.exec() != dialog.Accepted:
+        if dialog.exec() != QDialog.Accepted:
             return
         result = dialog.result_note
         if result is None:
