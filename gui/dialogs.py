@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.8.13 - 2025-12-05 - Add ResponseStyle editor dialog for CRUD workflows.
 Updates: v0.8.12 - 2025-11-05 - Display application icon and credit source in info dialog.
 Updates: v0.8.11 - 2025-11-05 - Add SQLite repository maintenance actions to maintenance dialog.
 Updates: v0.8.10 - 2025-11-05 - Add ChromaDB integrity verification action to maintenance dialog.
@@ -87,6 +88,7 @@ from core import (
 )
 from core.prompt_engineering import PromptEngineeringError, PromptRefinement
 from models.prompt_model import Prompt, TaskTemplate
+from models.response_style import ResponseStyle
 
 
 logger = logging.getLogger("prompt_manager.gui.dialogs")
@@ -2013,6 +2015,147 @@ class SaveResultDialog(QDialog):
         self.accept()
 
 
+class ResponseStyleDialog(QDialog):
+    """Modal dialog for creating or editing response styles."""
+
+    def __init__(
+        self,
+        parent: Optional[QWidget] = None,
+        *,
+        style: Optional[ResponseStyle] = None,
+    ) -> None:
+        super().__init__(parent)
+        self._source_style = style
+        self._result_style: Optional[ResponseStyle] = None
+        self.setWindowTitle("New Response Style" if style is None else "Edit Response Style")
+        self.resize(640, 620)
+        self._build_ui()
+        if style is not None:
+            self._populate(style)
+
+    @property
+    def result_style(self) -> Optional[ResponseStyle]:
+        """Return the resulting response style."""
+
+        return self._result_style
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self)
+
+        form = QFormLayout()
+        self._name_input = QLineEdit(self)
+        form.addRow("Name*", self._name_input)
+
+        self._tone_input = QLineEdit(self)
+        self._tone_input.setPlaceholderText("Friendly, formal, analytical…")
+        form.addRow("Tone", self._tone_input)
+
+        self._voice_input = QLineEdit(self)
+        self._voice_input.setPlaceholderText("Mentor, reviewer, analyst…")
+        form.addRow("Voice", self._voice_input)
+
+        self._tags_input = QLineEdit(self)
+        self._tags_input.setPlaceholderText("Comma-separated tags (concise, markdown, …)")
+        form.addRow("Tags", self._tags_input)
+
+        self._version_input = QLineEdit(self)
+        self._version_input.setPlaceholderText("1.0")
+        form.addRow("Version", self._version_input)
+
+        self._is_active_checkbox = QCheckBox("Style is active", self)
+        self._is_active_checkbox.setChecked(True)
+        form.addRow("", self._is_active_checkbox)
+
+        layout.addLayout(form)
+
+        layout.addWidget(QLabel("Description*", self))
+        self._description_input = QPlainTextEdit(self)
+        self._description_input.setPlaceholderText("Explain the target tone, audience, or behaviour.")
+        self._description_input.setFixedHeight(80)
+        layout.addWidget(self._description_input)
+
+        layout.addWidget(QLabel("Format instructions", self))
+        self._format_input = QPlainTextEdit(self)
+        self._format_input.setPlaceholderText("Outline formatting requirements such as bullet lists or tables.")
+        self._format_input.setFixedHeight(80)
+        layout.addWidget(self._format_input)
+
+        layout.addWidget(QLabel("Guidelines", self))
+        self._guidelines_input = QPlainTextEdit(self)
+        self._guidelines_input.setPlaceholderText("Document any do/don't lists or review steps.")
+        self._guidelines_input.setFixedHeight(80)
+        layout.addWidget(self._guidelines_input)
+
+        layout.addWidget(QLabel("Examples (one per line)", self))
+        self._examples_input = QPlainTextEdit(self)
+        self._examples_input.setPlaceholderText("Provide sample outputs or outline templates.")
+        self._examples_input.setFixedHeight(80)
+        layout.addWidget(self._examples_input)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        buttons.accepted.connect(self._on_accept)  # type: ignore[arg-type]
+        buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
+        layout.addWidget(buttons)
+
+    def _populate(self, style: ResponseStyle) -> None:
+        """Populate dialog fields from an existing response style."""
+
+        self._name_input.setText(style.name)
+        self._description_input.setPlainText(style.description)
+        self._tone_input.setText(style.tone or "")
+        self._voice_input.setText(style.voice or "")
+        self._format_input.setPlainText(style.format_instructions or "")
+        self._guidelines_input.setPlainText(style.guidelines or "")
+        self._tags_input.setText(", ".join(style.tags))
+        self._examples_input.setPlainText("\n".join(style.examples))
+        self._version_input.setText(style.version)
+        self._is_active_checkbox.setChecked(style.is_active)
+
+    def _on_accept(self) -> None:
+        """Validate user input and produce a ResponseStyle instance."""
+
+        name = self._name_input.text().strip()
+        description = self._description_input.toPlainText().strip()
+        if not name or not description:
+            QMessageBox.warning(self, "Missing fields", "Name and description are required.")
+            return
+
+        tone = self._tone_input.text().strip() or None
+        voice = self._voice_input.text().strip() or None
+        format_instructions = self._format_input.toPlainText().strip() or None
+        guidelines = self._guidelines_input.toPlainText().strip() or None
+
+        tags = [tag.strip() for tag in self._tags_input.text().split(",") if tag.strip()]
+        examples = [
+            line.strip()
+            for line in self._examples_input.toPlainText().splitlines()
+            if line.strip()
+        ]
+        version = self._version_input.text().strip() or "1.0"
+        is_active = self._is_active_checkbox.isChecked()
+
+        payload = {
+            "name": name,
+            "description": description,
+            "tone": tone,
+            "voice": voice,
+            "format_instructions": format_instructions,
+            "guidelines": guidelines,
+            "tags": tags,
+            "examples": examples,
+            "version": version,
+            "is_active": is_active,
+        }
+
+        if self._source_style is None:
+            style = ResponseStyle(id=uuid.uuid4(), metadata=None, **payload)
+        else:
+            style = replace(self._source_style, **payload)
+
+        self._result_style = style
+        self.accept()
+
+
 class MarkdownPreviewDialog(QDialog):
     """Display markdown content rendered in a read-only viewer."""
 
@@ -2206,6 +2349,7 @@ __all__ = [
     "MarkdownPreviewDialog",
     "PromptDialog",
     "PromptMaintenanceDialog",
+    "ResponseStyleDialog",
     "SaveResultDialog",
     "TemplateDialog",
     "fallback_suggest_prompt_name",

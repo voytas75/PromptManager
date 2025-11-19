@@ -2,6 +2,18 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.15.0] - 2025-12-05
+
+### Added
+
+- Introduced **Response Style** data model with SQLite persistence, CRUD APIs, and repository/manger tests covering happy-path and failure handling.
+- Added Response Style combo row in the GUI workspace with New/Edit/Delete workflows and a live summary panel that highlights tone, voice, and formatting guidelines for the selected preset.
+
+### Changed
+
+- Updated dialogs module to include a dedicated Response Style editor that mirrors the task template UX, ensuring reusable formatting guidance can be authored without touching the database.
+- Refreshed README to document the Response Style registry feature.
+
 ## [0.14.0] - 2025-11-18
 
 ### Added

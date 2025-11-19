@@ -1,5 +1,6 @@
 """Tests covering storage coordination across SQLite, ChromaDB, and Redis facades.
 
+Updates: v0.1.2 - 2025-12-05 - Add response style repository and manager coverage.
 Updates: v0.1.1 - 2025-11-02 - Added regression tests for cache usage and search fallback paths.
 Updates: v0.1.0 - 2025-10-31 - Introduce repository and manager storage integration tests.
 """
@@ -19,6 +20,7 @@ from core import (
     RepositoryNotFoundError,
 )
 from models.prompt_model import Prompt, TaskTemplate, UserProfile
+from models.response_style import ResponseStyle
 
 
 def _make_prompt(name: str = "Sample Prompt") -> Prompt:
@@ -54,6 +56,26 @@ def _make_template(prompt: Prompt, name: str = "Sample Template") -> TaskTemplat
         tags=["tests", "workflow"],
         notes="Remember to review edge cases.",
         is_active=True,
+        version="1.0",
+        created_at=now,
+        last_modified=now,
+    )
+
+
+def _make_response_style(name: str = "Concise Summary") -> ResponseStyle:
+    """Return a populated ResponseStyle instance for manager tests."""
+
+    now = datetime.now(timezone.utc)
+    return ResponseStyle(
+        id=uuid.uuid4(),
+        name=name,
+        description="Produce concise summaries with actionable next steps.",
+        tone="concise",
+        voice="mentor",
+        format_instructions="Use bullet lists followed by a short paragraph.",
+        guidelines="Avoid speculation, cite assumptions explicitly.",
+        tags=["concise", "summary"],
+        examples=["Summary:\n- Finding\n- Next step"],
         version="1.0",
         created_at=now,
         last_modified=now,
@@ -348,6 +370,36 @@ def test_prompt_manager_template_workflow(tmp_path) -> None:
 
     manager.delete_template(template.id)
     assert not manager.list_templates()
+
+    manager.close()
+
+
+def test_prompt_manager_response_style_workflow(tmp_path) -> None:
+    """Ensure response style CRUD is wired through the manager."""
+
+    chroma_dir = tmp_path / "chroma"
+    db_path = tmp_path / "prompt_manager.db"
+    manager = PromptManager(
+        chroma_path=str(chroma_dir),
+        db_path=str(db_path),
+    )
+
+    style = _make_response_style()
+    manager.create_response_style(style)
+
+    styles = manager.list_response_styles()
+    assert styles and styles[0].id == style.id
+
+    fetched = manager.get_response_style(style.id)
+    assert fetched.name == style.name
+
+    style.description = "Updated summary instructions"
+    manager.update_response_style(style)
+    refreshed = manager.get_response_style(style.id)
+    assert refreshed.description == "Updated summary instructions"
+
+    manager.delete_response_style(style.id)
+    assert not manager.list_response_styles()
 
     manager.close()
 

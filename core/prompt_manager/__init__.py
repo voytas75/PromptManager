@@ -1,5 +1,6 @@
 """Prompt Manager package façade and orchestration layer.
 
+Updates: v0.13.12 - 2025-12-05 - Add ResponseStyle persistence and CRUD APIs.
 Updates: v0.13.11 - 2025-11-05 - Support LiteLLM workflow routing between fast and inference models.
 Updates: v0.13.10 - 2025-11-05 - Add SQLite repository maintenance helpers.
 Updates: v0.13.9 - 2025-11-05 - Add ChromaDB integrity verification helper.
@@ -109,6 +110,7 @@ except ImportError:  # pragma: no cover - redis optional during development
     RedisError = Exception  # type: ignore[misc,assignment]
 
 from models.prompt_model import Prompt, PromptExecution, TaskTemplate, UserProfile
+from models.response_style import ResponseStyle
 
 from ..embedding import EmbeddingGenerationError, EmbeddingProvider, EmbeddingSyncWorker
 from ..execution import CodexExecutionResult, CodexExecutor, ExecutionError
@@ -150,6 +152,9 @@ from ..exceptions import (  # noqa: F401 – re‑export for backward compatibil
     PromptStorageError,
     PromptCacheError,
     PromptEngineeringUnavailable,
+    ResponseStyleError,
+    ResponseStyleNotFoundError,
+    ResponseStyleStorageError,
 )
 
 
@@ -166,6 +171,9 @@ __all__ = [
     "PromptStorageError",
     "PromptCacheError",
     "PromptEngineeringUnavailable",
+    "ResponseStyleError",
+    "ResponseStyleNotFoundError",
+    "ResponseStyleStorageError",
     # Main class will be added later when moved.
 ]
 
@@ -1529,6 +1537,64 @@ class PromptManager:
                 },
             )
         return PromptManager.TemplateApplication(template=template, prompts=prompts)
+
+    # Response style management ----------------------------------------- #
+
+    def list_response_styles(
+        self,
+        *,
+        include_inactive: bool = False,
+        search: Optional[str] = None,
+    ) -> List[ResponseStyle]:
+        """Return stored response styles ordered by name."""
+
+        try:
+            return self._repository.list_response_styles(
+                include_inactive=include_inactive,
+                search=search,
+            )
+        except RepositoryError as exc:
+            raise ResponseStyleStorageError("Unable to list response styles") from exc
+
+    def get_response_style(self, style_id: uuid.UUID) -> ResponseStyle:
+        """Return a single response style by identifier."""
+
+        try:
+            return self._repository.get_response_style(style_id)
+        except RepositoryNotFoundError as exc:
+            raise ResponseStyleNotFoundError(str(exc)) from exc
+        except RepositoryError as exc:
+            raise ResponseStyleStorageError(f"Unable to load response style {style_id}") from exc
+
+    def create_response_style(self, style: ResponseStyle) -> ResponseStyle:
+        """Persist a new response style record."""
+
+        style.touch()
+        try:
+            return self._repository.add_response_style(style)
+        except RepositoryError as exc:
+            raise ResponseStyleStorageError(f"Failed to persist response style {style.id}") from exc
+
+    def update_response_style(self, style: ResponseStyle) -> ResponseStyle:
+        """Update an existing response style record."""
+
+        style.touch()
+        try:
+            return self._repository.update_response_style(style)
+        except RepositoryNotFoundError as exc:
+            raise ResponseStyleNotFoundError(str(exc)) from exc
+        except RepositoryError as exc:
+            raise ResponseStyleStorageError(f"Failed to update response style {style.id}") from exc
+
+    def delete_response_style(self, style_id: uuid.UUID) -> None:
+        """Delete a stored response style."""
+
+        try:
+            self._repository.delete_response_style(style_id)
+        except RepositoryNotFoundError as exc:
+            raise ResponseStyleNotFoundError(str(exc)) from exc
+        except RepositoryError as exc:
+            raise ResponseStyleStorageError(f"Failed to delete response style {style_id}") from exc
 
     def search_prompts(
         self,

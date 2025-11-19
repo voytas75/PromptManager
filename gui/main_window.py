@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.25 - 2025-12-05 - Add Response Style management row with CRUD workflow hooks.
 Updates: v0.15.24 - 2025-12-03 - Apply assistant chat bubble colour from settings in the transcript view.
 Updates: v0.15.23 - 2025-12-02 - Pass theme mode to settings dialog so selection persists.
 Updates: v0.15.22 - 2025-11-05 - Add light/dark theme runtime toggle with palette updates.
@@ -132,6 +133,9 @@ from core import (
     PromptHistoryError,
     PromptNotFoundError,
     PromptStorageError,
+    ResponseStyleError,
+    ResponseStyleNotFoundError,
+    ResponseStyleStorageError,
     RepositoryError,
     diff_prompt_catalog,
     export_prompt_catalog,
@@ -140,6 +144,7 @@ from core import (
 from core.prompt_engineering import PromptRefinement
 from core.notifications import Notification, NotificationStatus
 from models.prompt_model import Prompt, TaskTemplate
+from models.response_style import ResponseStyle
 
 from .command_palette import CommandPaletteDialog, QuickAction, rank_prompts_for_action
 from .code_highlighter import CodeHighlighter
@@ -149,6 +154,7 @@ from .dialogs import (
     MarkdownPreviewDialog,
     PromptDialog,
     PromptMaintenanceDialog,
+    ResponseStyleDialog,
     SaveResultDialog,
     TemplateDialog,
 )
@@ -611,6 +617,13 @@ class MainWindow(QMainWindow):
         self._template_edit_button: Optional[QPushButton] = None
         self._template_delete_button: Optional[QPushButton] = None
         self._template_clear_button: Optional[QPushButton] = None
+        self._response_styles: List[ResponseStyle] = []
+        self._selected_response_style_id: Optional[uuid.UUID] = None
+        self._response_style_combo: Optional[QComboBox] = None
+        self._response_style_new_button: Optional[QPushButton] = None
+        self._response_style_edit_button: Optional[QPushButton] = None
+        self._response_style_delete_button: Optional[QPushButton] = None
+        self._response_style_summary_label: Optional[QLabel] = None
         self._sort_combo: Optional[QComboBox] = None
         self._sort_order = PromptSortOrder.NAME_ASC
         self._history_limit = 50
@@ -658,6 +671,7 @@ class MainWindow(QMainWindow):
         self._register_quick_shortcuts()
         self._load_prompts()
         self._load_templates()
+        self._load_response_styles()
 
     def _build_ui(self) -> None:
         """Create the main layout with list/search/detail panes."""
@@ -912,6 +926,38 @@ class MainWindow(QMainWindow):
         template_layout.addWidget(self._template_delete_button)
         template_layout.addWidget(self._template_clear_button)
         query_panel_layout.addLayout(template_layout)
+
+        response_style_layout = QHBoxLayout()
+        response_style_layout.setContentsMargins(0, 0, 0, 0)
+        response_style_layout.setSpacing(6)
+        response_style_label = QLabel("Response style:", self)
+        self._response_style_combo = QComboBox(self)
+        self._response_style_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self._response_style_combo.addItem("Select response style…", None)
+        self._response_style_combo.currentIndexChanged.connect(self._on_response_style_selection_changed)  # type: ignore[arg-type]
+        self._response_style_new_button = QPushButton("New", self)
+        self._response_style_new_button.clicked.connect(self._on_response_style_new_clicked)  # type: ignore[arg-type]
+        self._response_style_edit_button = QPushButton("Edit", self)
+        self._response_style_edit_button.setEnabled(False)
+        self._response_style_edit_button.clicked.connect(self._on_response_style_edit_clicked)  # type: ignore[arg-type]
+        self._response_style_delete_button = QPushButton("Delete", self)
+        self._response_style_delete_button.setEnabled(False)
+        self._response_style_delete_button.clicked.connect(self._on_response_style_delete_clicked)  # type: ignore[arg-type]
+        response_style_layout.addWidget(response_style_label)
+        response_style_layout.addWidget(self._response_style_combo, 1)
+        response_style_layout.addWidget(self._response_style_new_button)
+        response_style_layout.addWidget(self._response_style_edit_button)
+        response_style_layout.addWidget(self._response_style_delete_button)
+        query_panel_layout.addLayout(response_style_layout)
+
+        self._response_style_summary_label = QLabel(
+            "Select a response style to preview its tone and formatting guidance.",
+            self,
+        )
+        self._response_style_summary_label.setWordWrap(True)
+        self._response_style_summary_label.setObjectName("responseStyleSummary")
+        self._response_style_summary_label.setStyleSheet("color: #5f6368; font-style: italic;")
+        query_panel_layout.addWidget(self._response_style_summary_label)
 
         query_panel_layout.addWidget(self._query_input)
 
@@ -1374,6 +1420,182 @@ class MainWindow(QMainWindow):
             if not prompts:
                 message += " (no linked prompts found)"
             self.statusBar().showMessage(message, 5000)
+
+    def _load_response_styles(self) -> None:
+        """Load response styles from storage and refresh combo controls."""
+
+        combo = self._response_style_combo
+        try:
+            styles = self._manager.list_response_styles()
+        except ResponseStyleStorageError as exc:
+            self._show_error("Unable to load response styles", str(exc))
+            styles = []
+        self._response_styles = list(styles)
+        if combo is None:
+            return
+
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItem("Select response style…", None)
+        for style in self._response_styles:
+            combo.addItem(style.name, str(style.id))
+            combo.setItemData(combo.count() - 1, style.description, Qt.ToolTipRole)
+        combo.blockSignals(False)
+
+        if self._selected_response_style_id not in {style.id for style in self._response_styles}:
+            self._selected_response_style_id = None
+            combo.setCurrentIndex(0)
+            self._update_response_style_summary(None)
+        else:
+            self._select_response_style(self._selected_response_style_id)
+        self._update_response_style_buttons()
+
+    def _update_response_style_buttons(self) -> None:
+        """Enable or disable response style controls based on selection."""
+
+        has_selection = self._selected_response_style_id is not None
+        if self._response_style_edit_button is not None:
+            self._response_style_edit_button.setEnabled(has_selection)
+        if self._response_style_delete_button is not None:
+            self._response_style_delete_button.setEnabled(has_selection)
+
+    def _update_response_style_summary(self, style: Optional[ResponseStyle]) -> None:
+        """Render the response style description under the combo row."""
+
+        if self._response_style_summary_label is None:
+            return
+        if style is None:
+            self._response_style_summary_label.setText(
+                "Select a response style to preview its tone and formatting guidelines."
+            )
+            return
+
+        lines = [style.description.strip()]
+        meta: List[str] = []
+        if style.tone:
+            meta.append(f"Tone: {style.tone}")
+        if style.voice:
+            meta.append(f"Voice: {style.voice}")
+        if meta:
+            lines.append(" • ".join(meta))
+        if style.format_instructions:
+            lines.append(f"Format: {self._truncate_text(style.format_instructions)}")
+        if style.guidelines:
+            lines.append(f"Guidelines: {self._truncate_text(style.guidelines)}")
+        if style.examples:
+            preview = ", ".join(style.examples[:2])
+            if len(style.examples) > 2:
+                preview += "…"
+            lines.append(f"Examples: {preview}")
+        self._response_style_summary_label.setText("\n".join(lines))
+
+    def _find_response_style(self, style_id: Optional[uuid.UUID]) -> Optional[ResponseStyle]:
+        """Return the cached response style for the given identifier."""
+
+        if style_id is None:
+            return None
+        for style in self._response_styles:
+            if style.id == style_id:
+                return style
+        return None
+
+    def _select_response_style(self, style_id: Optional[uuid.UUID]) -> None:
+        """Select the provided response style in the combo box."""
+
+        if style_id is None or self._response_style_combo is None:
+            return
+        for index in range(self._response_style_combo.count()):
+            if self._response_style_combo.itemData(index) == str(style_id):
+                self._response_style_combo.blockSignals(True)
+                self._response_style_combo.setCurrentIndex(index)
+                self._response_style_combo.blockSignals(False)
+                self._selected_response_style_id = style_id
+                self._update_response_style_summary(self._find_response_style(style_id))
+                self._update_response_style_buttons()
+                return
+
+    def _on_response_style_selection_changed(self, _: int) -> None:
+        """Handle changes to the response style combo selection."""
+
+        if self._response_style_combo is None:
+            return
+        raw_id = self._response_style_combo.currentData()
+        style: Optional[ResponseStyle] = None
+        if raw_id:
+            try:
+                self._selected_response_style_id = uuid.UUID(str(raw_id))
+            except (TypeError, ValueError):
+                self._selected_response_style_id = None
+            style = self._find_response_style(self._selected_response_style_id)
+        else:
+            self._selected_response_style_id = None
+        self._update_response_style_summary(style)
+        self._update_response_style_buttons()
+
+    def _on_response_style_new_clicked(self) -> None:
+        """Open the response style dialog to create a new entry."""
+
+        dialog = ResponseStyleDialog(self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        result = dialog.result_style
+        if result is None:
+            return
+        try:
+            created = self._manager.create_response_style(result)
+        except ResponseStyleError as exc:
+            self._show_error("Unable to create response style", str(exc))
+            return
+        self._selected_response_style_id = created.id
+        self._load_response_styles()
+        self.statusBar().showMessage(f"Response style '{created.name}' created.", 4000)
+
+    def _on_response_style_edit_clicked(self) -> None:
+        """Edit the currently selected response style."""
+
+        style = self._find_response_style(self._selected_response_style_id)
+        if style is None:
+            QMessageBox.information(self, "Edit response style", "Select a response style before editing.")
+            return
+        dialog = ResponseStyleDialog(self, style=style)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        updated = dialog.result_style
+        if updated is None:
+            return
+        try:
+            stored = self._manager.update_response_style(updated)
+        except ResponseStyleError as exc:
+            self._show_error("Unable to update response style", str(exc))
+            return
+        self._selected_response_style_id = stored.id
+        self._load_response_styles()
+        self.statusBar().showMessage(f"Response style '{stored.name}' updated.", 4000)
+
+    def _on_response_style_delete_clicked(self) -> None:
+        """Delete the selected response style."""
+
+        style = self._find_response_style(self._selected_response_style_id)
+        if style is None:
+            QMessageBox.information(self, "Delete response style", "Select a response style before deleting.")
+            return
+        confirmation = QMessageBox.question(
+            self,
+            "Delete response style",
+            f"Delete response style '{style.name}'?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if confirmation != QMessageBox.Yes:
+            return
+        try:
+            self._manager.delete_response_style(style.id)
+        except ResponseStyleError as exc:
+            self._show_error("Unable to delete response style", str(exc))
+            return
+        self._selected_response_style_id = None
+        self._load_response_styles()
+        self.statusBar().showMessage(f"Response style '{style.name}' deleted.", 4000)
 
     def _load_prompts(self, search_text: str = "") -> None:
         """Populate the list model from the repository or semantic search."""
@@ -2824,9 +3046,11 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Prompt duplicated.", 4000)
 
     def _on_refresh_clicked(self) -> None:
-        """Reload prompts from storage, respecting current search text."""
+        """Reload catalogue data, respecting the current search text."""
 
         self._load_prompts(self._search_input.text())
+        self._load_templates()
+        self._load_response_styles()
 
     def _on_add_clicked(self) -> None:
         """Open the creation dialog and persist a new prompt."""
@@ -3398,6 +3622,15 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_notification_bridge"):
             self._notification_bridge.close()
         super().closeEvent(event)
+
+    @staticmethod
+    def _truncate_text(value: str, limit: int = 160) -> str:
+        """Return the provided text truncated with an ellipsis if needed."""
+
+        text = value.strip()
+        if len(text) <= limit:
+            return text
+        return f"{text[: limit - 1].rstrip()}…"
 
     def _show_error(self, title: str, message: str) -> None:
         """Display an error dialog and log to status bar."""
