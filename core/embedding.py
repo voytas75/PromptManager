@@ -1,5 +1,6 @@
 """Embedding provider and background synchronisation helpers for Prompt Manager.
 
+Updates: v0.7.2 - 2025-12-06 - Align embedding function signatures with updated Chroma client expectations.
 Updates: v0.7.1 - 2025-11-05 - Stop forwarding LiteLLM embedding timeouts by default.
 Updates: v0.7.0 - 2025-11-11 - Publish notifications for background embedding sync progress.
 Updates: v0.6.0 - 2025-11-07 - Add configurable LiteLLM and sentence-transformer backends.
@@ -14,7 +15,7 @@ import queue
 import threading
 import time
 import uuid
-from typing import Callable, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple
 
 from models.prompt_model import Prompt
 
@@ -90,14 +91,14 @@ class LiteLLMEmbeddingFunction:
             request["api_base"] = self._api_base
         try:
             response = embedding_fn(**request)  # type: ignore[arg-type]
+            if isinstance(response, dict) and "data" in response:
+                data = response["data"]
+            else:
+                data = response
         except LiteLLMException as exc:  # type: ignore[misc]
             raise EmbeddingGenerationError(f"LiteLLM embedding request failed: {exc}") from exc
         except Exception as exc:  # pragma: no cover - defensive
             raise EmbeddingGenerationError("LiteLLM embedding request failed unexpectedly") from exc
-        try:
-            data = response["data"]  # type: ignore[index]
-        except (KeyError, TypeError) as exc:  # pragma: no cover - defensive
-            raise EmbeddingGenerationError("LiteLLM returned an unexpected embedding payload") from exc
         vectors: List[List[float]] = []
         for index, item in enumerate(data):
             raw_vector = getattr(item, "get", lambda key, default=None: None)("embedding")

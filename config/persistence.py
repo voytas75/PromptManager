@@ -1,5 +1,6 @@
 """Helpers for persisting runtime configuration without Qt dependencies.
 
+Updates: v0.2.5 - 2025-12-06 - Persist embedding backend/model selections and drop defaults.
 Updates: v0.2.4 - 2025-12-03 - Normalise chat palette overrides and skip default colours.
 Updates: v0.2.3 - 2025-11-05 - Persist theme mode and chat appearance overrides.
 Updates: v0.2.2 - 2025-11-05 - Persist chat appearance overrides.

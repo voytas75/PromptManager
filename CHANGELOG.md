@@ -11,6 +11,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 ### Changed
 
 - Switched the default embedding backend to LiteLLM, wiring the Prompt Manager to generate real embeddings (via `text-embedding-3-large` by default) instead of the deterministic hash stub, and updated documentation/templates to reflect the new requirement.
+- LiteLLM embeddings no longer fall back to the conversational fast model when no embedding model is configured, preventing accidental 400s from completion-only deployments and keeping semantic search aligned with the configured embedding endpoint.
 
 ## [0.15.1] - 2025-11-19
 

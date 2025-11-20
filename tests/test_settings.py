@@ -238,12 +238,23 @@ def test_embedding_backend_requires_model(monkeypatch) -> None:
         load_settings()
 
 
-def test_embedding_backend_reuses_litellm_model(monkeypatch, tmp_path) -> None:
+def test_embedding_backend_defaults_to_configured_constant_when_missing(monkeypatch, tmp_path) -> None:
     tmp_config = tmp_path / "config.json"
     tmp_config.write_text("{}", encoding="utf-8")
     monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(tmp_config))
-    monkeypatch.setenv("PROMPT_MANAGER_LITELLM_MODEL", "text-embedding-3-small")
+    monkeypatch.setenv("PROMPT_MANAGER_LITELLM_MODEL", "azure/gpt-4.1")
     monkeypatch.setenv("PROMPT_MANAGER_EMBEDDING_BACKEND", "litellm")
+    settings = load_settings()
+    assert settings.embedding_backend == "litellm"
+    assert settings.embedding_model == DEFAULT_EMBEDDING_MODEL
+
+
+def test_embedding_backend_respects_explicit_embedding_model(monkeypatch, tmp_path) -> None:
+    tmp_config = tmp_path / "config.json"
+    tmp_config.write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(tmp_config))
+    monkeypatch.setenv("PROMPT_MANAGER_EMBEDDING_BACKEND", "litellm")
+    monkeypatch.setenv("PROMPT_MANAGER_EMBEDDING_MODEL", "text-embedding-3-small")
     settings = load_settings()
     assert settings.embedding_backend == "litellm"
     assert settings.embedding_model == "text-embedding-3-small"
