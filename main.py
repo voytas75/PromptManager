@@ -1,5 +1,6 @@
 """Application entry point for Prompt Manager.
 
+Updates: v0.7.8 - 2025-12-07 - Add CLI command to rebuild embeddings from scratch.
 Updates: v0.7.7 - 2025-11-05 - Surface LiteLLM workflow routing details in CLI summaries.
 Updates: v0.7.6 - 2025-11-05 - Expand CLI settings summary to list fast and inference LiteLLM models.
 Updates: v0.7.5 - 2025-11-30 - Remove catalogue import command and startup messaging.
@@ -34,7 +35,7 @@ from config import (
     PromptManagerSettings,
     load_settings,
 )
-from core import build_prompt_manager, export_prompt_catalog
+from core import PromptManagerError, build_prompt_manager, export_prompt_catalog
 
 
 def _mask_secret(value: Optional[str]) -> str:
@@ -232,6 +233,23 @@ def _run_usage_report(args: argparse.Namespace, logger: logging.Logger) -> int:
     return 0
 
 
+def _run_reembed(manager, logger: logging.Logger) -> int:
+    """Reset the Chroma vector store and regenerate embeddings for all prompts."""
+
+    try:
+        successes, failures = manager.rebuild_embeddings(reset_store=True)
+    except PromptManagerError as exc:
+        logger.error("Failed to rebuild embeddings: %s", exc)
+        return 7
+
+    if failures:
+        logger.error("Embedding rebuild skipped %s prompt(s).", failures)
+        return 7
+
+    logger.info("Rebuilt embeddings for %s prompt(s).", successes)
+    return 0
+
+
 def _run_suggest(manager, args: argparse.Namespace, logger: logging.Logger) -> int:
     """Render semantic suggestions for manual verification."""
 
@@ -344,6 +362,11 @@ def parse_args() -> argparse.Namespace:
         help="Path to the usage log (defaults to data/logs/intent_usage.jsonl).",
     )
 
+    subparsers.add_parser(
+        "reembed",
+        help="Delete the current ChromaDB directory and regenerate embeddings for all prompts.",
+    )
+
     return parser.parse_args()
 
 
@@ -384,6 +407,13 @@ def main() -> int:
         if command == "usage-report":
             try:
                 result = _run_usage_report(args, logger)
+            finally:
+                manager.close()
+            return result
+
+        if command == "reembed":
+            try:
+                result = _run_reembed(manager, logger)
             finally:
                 manager.close()
             return result

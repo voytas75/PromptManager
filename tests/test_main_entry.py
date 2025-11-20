@@ -19,6 +19,7 @@ import pytest
 import main
 from config.settings import DEFAULT_EMBEDDING_BACKEND, DEFAULT_EMBEDDING_MODEL
 from core.intent_classifier import IntentLabel, IntentPrediction
+from core.prompt_manager import PromptManagerError
 
 
 class _DummySettings(SimpleNamespace):
@@ -44,6 +45,10 @@ class _DummyManager:
     def __init__(self) -> None:
         self.closed = False
         self.suggestion_response: object | None = None
+        self.reembed_result: tuple[int, int] = (0, 0)
+        self.reembed_error: Exception | None = None
+        self.reembed_called = False
+        self.reembed_reset = False
 
     def close(self) -> None:
         self.closed = True
@@ -55,6 +60,13 @@ class _DummyManager:
         if self.suggestion_response is None:
             raise AssertionError("suggest_prompts called unexpectedly")
         return self.suggestion_response
+
+    def rebuild_embeddings(self, *, reset_store: bool = False) -> tuple[int, int]:
+        self.reembed_called = True
+        self.reembed_reset = reset_store
+        if self.reembed_error is not None:
+            raise self.reembed_error
+        return self.reembed_result
 
 
 def test_main_print_settings_logs_and_exits(
@@ -259,6 +271,7 @@ def test_main_entrypoint_guard_executes(
     dummy_manager = _DummyManager()
     core_stub.build_prompt_manager = lambda settings: dummy_manager
     core_stub.export_prompt_catalog = lambda *args, **kwargs: Path("export.json")
+    core_stub.PromptManagerError = RuntimeError
 
     monkeypatch.setitem(sys.modules, "config", config_stub)
     monkeypatch.setitem(sys.modules, "core", core_stub)
@@ -344,3 +357,53 @@ def test_catalog_export_command(monkeypatch: pytest.MonkeyPatch, capsys: pytest.
     assert "exported" in output
     assert manager.closed is True
     assert exported
+
+
+def test_reembed_command_succeeds(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "reembed"])
+    manager = _DummyManager()
+    manager.reembed_result = (4, 0)
+    monkeypatch.setattr(main, "load_settings", lambda: _DummySettings())
+    monkeypatch.setattr(main, "build_prompt_manager", lambda _: manager)
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    assert manager.reembed_called is True
+    assert manager.reembed_reset is True
+    assert "Rebuilt embeddings for 4 prompt(s)." in capsys.readouterr().out
+
+
+def test_reembed_command_reports_failures(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "reembed"])
+    manager = _DummyManager()
+    manager.reembed_result = (2, 1)
+    monkeypatch.setattr(main, "load_settings", lambda: _DummySettings())
+    monkeypatch.setattr(main, "build_prompt_manager", lambda _: manager)
+
+    exit_code = main.main()
+
+    assert exit_code == 7
+    assert manager.reembed_called is True
+    output = capsys.readouterr().out
+    assert "Embedding rebuild skipped 1 prompt(s)." in output
+
+
+def test_reembed_command_handles_manager_errors(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "reembed"])
+    manager = _DummyManager()
+    manager.reembed_error = PromptManagerError("failed")
+    monkeypatch.setattr(main, "load_settings", lambda: _DummySettings())
+    monkeypatch.setattr(main, "build_prompt_manager", lambda _: manager)
+
+    exit_code = main.main()
+
+    assert exit_code == 7
+    output = capsys.readouterr().out
+    assert "Failed to rebuild embeddings" in output

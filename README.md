@@ -168,6 +168,7 @@ Prompt Manager ships CLI helpers alongside the GUI:
 - `python -m main catalog-export <path>` writes the current repository to JSON or YAML (auto-detected from the extension or forced with `--format`). A YAML export requires `PyYAML`, which is bundled in `requirements.txt`.
 - `python -m main suggest "your query"` runs the configured semantic retrieval stack and prints the top matching prompts with detected intent details—useful for validating LiteLLM or sentence-transformer embeddings.
 - `python -m main usage-report` summarises the anonymised GUI workspace analytics (counts per action, top intents, top recommended prompts). Pass `--path` to point at a different JSONL log file.
+- `python -m main reembed` deletes the current ChromaDB directory and regenerates embeddings for every stored prompt—run this after changing embedding backends or when the vector store is corrupted.
 
 These commands reuse the same validation logic as the GUI; pass an explicit path each time you export.
 

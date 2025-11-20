@@ -8,6 +8,7 @@ from typing import Any, Dict, Optional
 
 import pytest
 
+from core.embedding import EmbeddingGenerationError
 from core.prompt_manager import PromptManager
 from core.repository import PromptRepository
 from models.prompt_model import Prompt, PromptExecution, TaskTemplate, UserProfile
@@ -47,9 +48,13 @@ def _make_execution(prompt_id: uuid.UUID) -> PromptExecution:
 class _StubCollection:
     def __init__(self) -> None:
         self.deleted_where: Optional[Dict[str, Any]] = None
+        self.upserts: list[Dict[str, Any]] = []
 
     def delete(self, where: Optional[Dict[str, Any]] = None, **kwargs: Any) -> None:
         self.deleted_where = where or kwargs or {}
+
+    def upsert(self, **payload: Any) -> None:
+        self.upserts.append(payload)
 
 
 class _StubChromaClient:
@@ -185,3 +190,60 @@ def test_clear_usage_logs_handles_missing_directory(tmp_path: Path) -> None:
     manager.clear_usage_logs(custom_logs)
     assert custom_logs.exists()
     assert list(custom_logs.iterdir()) == []
+
+
+def test_rebuild_embeddings_resets_store_and_regenerates_vectors(tmp_path: Path) -> None:
+    db_path = tmp_path / "prompt_manager.db"
+    repo = PromptRepository(str(db_path))
+    prompt_one = _make_prompt("Alpha")
+    prompt_two = _make_prompt("Beta")
+    repo.add(prompt_one)
+    repo.add(prompt_two)
+
+    collection = _StubCollection()
+    client = _StubChromaClient(collection)
+
+    manager = PromptManager(
+        chroma_path=str(tmp_path / "chroma"),
+        db_path=str(db_path),
+        chroma_client=client,
+        repository=repo,
+        enable_background_sync=False,
+    )
+
+    successes, failures = manager.rebuild_embeddings(reset_store=True)
+
+    assert successes == 2
+    assert failures == 0
+    assert client.deleted is True
+    assert len(collection.upserts) == 2
+    stored_prompt = repo.get(prompt_one.id)
+    assert stored_prompt.ext4 is not None
+
+
+def test_rebuild_embeddings_counts_generation_failures(tmp_path: Path) -> None:
+    db_path = tmp_path / "prompt_manager.db"
+    repo = PromptRepository(str(db_path))
+    repo.add(_make_prompt())
+
+    class _FailingProvider:
+        def embed(self, _: str) -> list[float]:
+            raise EmbeddingGenerationError("boom")
+
+    collection = _StubCollection()
+    client = _StubChromaClient(collection)
+
+    manager = PromptManager(
+        chroma_path=str(tmp_path / "chroma"),
+        db_path=str(db_path),
+        chroma_client=client,
+        repository=repo,
+        embedding_provider=_FailingProvider(),  # type: ignore[arg-type]
+        enable_background_sync=False,
+    )
+
+    successes, failures = manager.rebuild_embeddings()
+
+    assert successes == 0
+    assert failures == 1
+    assert collection.upserts == []

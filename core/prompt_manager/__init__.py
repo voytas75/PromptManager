@@ -1,5 +1,6 @@
 """Prompt Manager package façade and orchestration layer.
 
+Updates: v0.13.14 - 2025-12-07 - Add embedding rebuild helper for CLI workflows.
 Updates: v0.13.13 - 2025-12-06 - Add PromptNote CRUD APIs and Notes GUI wiring.
 Updates: v0.13.12 - 2025-12-05 - Add ResponseStyle persistence and CRUD APIs.
 Updates: v0.13.11 - 2025-11-05 - Support LiteLLM workflow routing between fast and inference models.
@@ -32,7 +33,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Union, cast
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple, Union, cast
 
 import json
 import logging
@@ -610,6 +611,68 @@ class PromptManager:
         except Exception as exc:  # noqa: BLE001
             raise PromptStorageError("Unable to reset Chroma vector store") from exc
         logger.info("Chroma vector store reset completed.")
+
+    def rebuild_embeddings(self, *, reset_store: bool = False) -> Tuple[int, int]:
+        """Regenerate embeddings for all prompts and persist them to Chroma.
+
+        Args:
+            reset_store: When True the existing vector store is deleted before
+                regeneration so the collection is recreated from scratch.
+
+        Returns:
+            Tuple of (successful_embeddings, failed_embeddings).
+        """
+
+        if reset_store:
+            self.reset_vector_store()
+
+        try:
+            prompts = self._repository.list()
+        except RepositoryError as exc:
+            raise PromptStorageError("Unable to load prompts for embedding rebuild") from exc
+
+        if not prompts:
+            logger.info("No prompts available for embedding rebuild.")
+            return 0, 0
+
+        successes = 0
+        failures = 0
+        for prompt in prompts:
+            try:
+                vector = self._embedding_provider.embed(prompt.document)
+            except EmbeddingGenerationError as exc:
+                failures += 1
+                logger.warning(
+                    "Embedding generation failed during rebuild",
+                    extra={"prompt_id": str(prompt.id)},
+                    exc_info=exc,
+                )
+                continue
+
+            prompt.ext4 = list(vector)
+            try:
+                self._repository.update(prompt)
+            except RepositoryNotFoundError:
+                failures += 1
+                logger.warning(
+                    "Prompt disappeared during rebuild",
+                    extra={"prompt_id": str(prompt.id)},
+                )
+                continue
+            except RepositoryError as exc:
+                raise PromptStorageError(
+                    f"Failed to persist regenerated embedding for prompt {prompt.id}"
+                ) from exc
+
+            self._persist_embedding(prompt, vector, is_new=reset_store)
+            successes += 1
+
+        logger.info(
+            "Embedding rebuild finished: %s succeeded, %s failed.",
+            successes,
+            failures,
+        )
+        return successes, failures
 
     def compact_vector_store(self) -> None:
         """Vacuum and truncate the persistent Chroma SQLite store."""
