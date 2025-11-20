@@ -15,7 +15,7 @@ import queue
 import threading
 import time
 import uuid
-from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from models.prompt_model import Prompt
 
@@ -101,7 +101,12 @@ class LiteLLMEmbeddingFunction:
             raise EmbeddingGenerationError("LiteLLM embedding request failed unexpectedly") from exc
         vectors: List[List[float]] = []
         for index, item in enumerate(data):
-            raw_vector = getattr(item, "get", lambda key, default=None: None)("embedding")
+            if isinstance(item, (list, tuple)):
+                raw_vector = item
+            elif isinstance(item, Mapping):
+                raw_vector = item.get("embedding")
+            else:
+                raw_vector = getattr(item, "embedding", None)
             if raw_vector is None:
                 raise EmbeddingGenerationError(f"LiteLLM response missing embedding at index {index}")
             if not isinstance(raw_vector, (list, tuple)):
