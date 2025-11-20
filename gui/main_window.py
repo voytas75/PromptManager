@@ -689,6 +689,11 @@ class MainWindow(QMainWindow):
         self._search_input.textChanged.connect(self._on_search_changed)  # type: ignore[arg-type]
         controls_layout.addWidget(self._search_input)
 
+        self._search_button = QPushButton("Search", self)
+        self._search_button.setToolTip("Search prompts with the current query")
+        self._search_button.clicked.connect(self._on_search_button_clicked)  # type: ignore[arg-type]
+        controls_layout.addWidget(self._search_button)
+
         self._refresh_button = QPushButton("Refresh", self)
         self._refresh_button.clicked.connect(self._on_refresh_clicked)  # type: ignore[arg-type]
         controls_layout.addWidget(self._refresh_button)
@@ -2720,13 +2725,19 @@ class MainWindow(QMainWindow):
         stripped = text.strip()
 
         # When a search query is active disable the sort combo so the user sees
-        # results strictly ordered by relevance.  Re‑enable it once the query
+        # results strictly ordered by relevance.  Re-enable it once the query
         # field is cleared so manual sorting becomes available again.
         if self._sort_combo is not None:
             self._sort_combo.setEnabled(not bool(stripped))
 
         if not text or len(stripped) >= 2:
             self._load_prompts(text)
+
+    def _on_search_button_clicked(self) -> None:
+        """Run the prompt search explicitly via the Search button."""
+
+        text = self._search_input.text() if self._search_input is not None else ""
+        self._on_search_changed(text)
 
     def _on_prompt_double_clicked(self, index: QModelIndex) -> None:
         """Open the edit dialog when a prompt is double-clicked."""
