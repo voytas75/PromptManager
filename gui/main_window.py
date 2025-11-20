@@ -686,7 +686,6 @@ class MainWindow(QMainWindow):
         # Qt provides this built‑in via the *clearButtonEnabled* property so we
         # do not have to manage an extra button or custom stylesheet.
         self._search_input.setClearButtonEnabled(True)
-        self._search_input.textChanged.connect(self._on_search_changed)  # type: ignore[arg-type]
         controls_layout.addWidget(self._search_input)
 
         self._search_button = QPushButton("Search", self)
@@ -2720,7 +2719,7 @@ class MainWindow(QMainWindow):
         return self._model.prompt_at(index.row())
 
     def _on_search_changed(self, text: str) -> None:
-        """Trigger prompt search with debounce-friendly minimum length."""
+        """Run prompt search on demand via the Search button."""
 
         stripped = text.strip()
 
