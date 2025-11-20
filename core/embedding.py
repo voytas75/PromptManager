@@ -111,7 +111,10 @@ class LiteLLMEmbeddingFunction:
                 raise EmbeddingGenerationError(f"LiteLLM response missing embedding at index {index}")
             if not isinstance(raw_vector, (list, tuple)):
                 raise EmbeddingGenerationError("LiteLLM embedding payload is not a vector.")
-            vectors.append([float(value) for value in raw_vector])
+            try:
+                vectors.append([float(value) for value in raw_vector])
+            except (TypeError, ValueError) as exc:  # pragma: no cover - defensive
+                raise EmbeddingGenerationError("LiteLLM embedding payload contains non-numeric values") from exc
         if len(vectors) == 1 and len(inputs) > 1:
             # Some providers return a single vector even for batched input.
             vectors = vectors * len(inputs)
