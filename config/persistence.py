@@ -13,7 +13,12 @@ import re
 from pathlib import Path
 from typing import Mapping, Optional
 
-from config.settings import DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR, DEFAULT_CHAT_USER_BUBBLE_COLOR
+from config.settings import (
+    DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR,
+    DEFAULT_CHAT_USER_BUBBLE_COLOR,
+    DEFAULT_EMBEDDING_BACKEND,
+    DEFAULT_EMBEDDING_MODEL,
+)
 
 
 def _normalise_drop_params(value: Optional[object]) -> Optional[list[str]]:
@@ -103,6 +108,12 @@ def persist_settings_to_config(updates: dict[str, Optional[object]]) -> None:
                 else:
                     value = choice
             else:
+                value = None
+        if key == "embedding_backend":
+            if value == DEFAULT_EMBEDDING_BACKEND:
+                value = None
+        if key == "embedding_model":
+            if value == DEFAULT_EMBEDDING_MODEL:
                 value = None
         if key == "chat_colors":
             palette = _normalise_chat_palette(value)

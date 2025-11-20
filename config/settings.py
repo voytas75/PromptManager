@@ -261,10 +261,10 @@ class PromptManagerSettings(BaseSettings):
         backend = self.embedding_backend
         model = self.embedding_model
 
-        if backend == "litellm" and not model:
-            fallback_model = self.litellm_model or DEFAULT_EMBEDDING_MODEL
-            model = fallback_model
-            object.__setattr__(self, "embedding_model", fallback_model)
+        if backend == "litellm":
+            resolved_model = model or DEFAULT_EMBEDDING_MODEL
+            object.__setattr__(self, "embedding_model", resolved_model)
+            model = resolved_model
 
         if backend == "deterministic" and model:
             object.__setattr__(self, "embedding_model", None)
