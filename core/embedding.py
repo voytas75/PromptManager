@@ -91,26 +91,15 @@ class LiteLLMEmbeddingFunction:
             request["api_base"] = self._api_base
         try:
             response = embedding_fn(**request)  # type: ignore[arg-type]
-            if isinstance(response, dict) and "data" in response:
-                data = response["data"]
-            else:
-                data = response
+            payload = self._extract_payload(response)
+            data = self._extract_data_array(payload)
         except LiteLLMException as exc:  # type: ignore[misc]
             raise EmbeddingGenerationError(f"LiteLLM embedding request failed: {exc}") from exc
         except Exception as exc:  # pragma: no cover - defensive
             raise EmbeddingGenerationError("LiteLLM embedding request failed unexpectedly") from exc
         vectors: List[List[float]] = []
         for index, item in enumerate(data):
-            if isinstance(item, (list, tuple)):
-                raw_vector = item
-            elif isinstance(item, Mapping):
-                raw_vector = item.get("embedding")
-            else:
-                raw_vector = getattr(item, "embedding", None)
-            if raw_vector is None:
-                raise EmbeddingGenerationError(f"LiteLLM response missing embedding at index {index}")
-            if not isinstance(raw_vector, (list, tuple)):
-                raise EmbeddingGenerationError("LiteLLM embedding payload is not a vector.")
+            raw_vector = self._extract_embedding_vector(item, index)
             try:
                 vectors.append([float(value) for value in raw_vector])
             except (TypeError, ValueError) as exc:  # pragma: no cover - defensive
@@ -121,6 +110,62 @@ class LiteLLMEmbeddingFunction:
         if len(vectors) != len(inputs):
             raise EmbeddingGenerationError("LiteLLM embedding response length mismatch.")
         return vectors
+
+    @staticmethod
+    def _extract_payload(response: Any) -> Any:
+        """Return a JSON-like payload from LiteLLM responses."""
+
+        for attr in ("model_dump", "dict", "json"):
+            if hasattr(response, attr):
+                attr_func = getattr(response, attr)
+                if callable(attr_func):
+                    try:
+                        return attr_func()
+                    except Exception:  # noqa: BLE001 - fall back to original payload
+                        continue
+        return response
+
+    @staticmethod
+    def _extract_data_array(payload: Any) -> Sequence[Any]:
+        """Extract the embedding data array from LiteLLM responses."""
+
+        if isinstance(payload, Mapping) and "data" in payload:
+            data = payload["data"]
+        elif hasattr(payload, "data"):
+            data = getattr(payload, "data")
+        else:
+            data = payload
+        if not isinstance(data, Sequence) or isinstance(data, (str, bytes)):
+            raise EmbeddingGenerationError("LiteLLM embedding response missing data array.")
+        return data
+
+    @staticmethod
+    def _extract_embedding_vector(item: Any, index: int) -> Sequence[Any]:
+        """Return the embedding vector sequence from a data entry."""
+
+        candidate: Any
+        if isinstance(item, Mapping):
+            candidate = item.get("embedding")
+        elif hasattr(item, "embedding"):
+            candidate = getattr(item, "embedding")
+        elif hasattr(item, "model_dump"):
+            try:
+                dumped = item.model_dump()
+            except Exception:  # noqa: BLE001 - fallback when model_dump fails
+                dumped = None
+            candidate = dumped.get("embedding") if isinstance(dumped, Mapping) else None
+        else:
+            candidate = item
+
+        if candidate is None:
+            raise EmbeddingGenerationError(
+                f"LiteLLM response missing embedding at index {index}"
+            )
+        if isinstance(candidate, Mapping):
+            candidate = candidate.get("embedding")
+        if not isinstance(candidate, Sequence) or isinstance(candidate, (str, bytes)):
+            raise EmbeddingGenerationError("LiteLLM embedding payload is not a vector.")
+        return candidate
 
 
 class SentenceTransformersEmbeddingFunction:

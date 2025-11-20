@@ -191,3 +191,45 @@ def test_sentence_transformers_embedding_function_encodes(monkeypatch: pytest.Mo
     assert isinstance(func, SentenceTransformersEmbeddingFunction)
     vectors = func(["hello", "world!"])
     assert vectors == [[5.0], [6.0]]
+
+
+def test_litellm_embedding_function_accepts_object_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _DataEntry:
+        def __init__(self) -> None:
+            self.embedding = [0.4, 0.5]
+
+    class _ModelResponse:
+        def __init__(self) -> None:
+            self.data = [_DataEntry()]
+
+    def _fake_get_embedding():
+        class _FakeException(Exception):
+            pass
+
+        def _fake_embedding(**_: object) -> object:
+            return _ModelResponse()
+
+        return _fake_embedding, _FakeException
+
+    monkeypatch.setattr("core.embedding.get_embedding", _fake_get_embedding)
+    func = create_embedding_function("litellm", model="test", api_key=None, api_base=None)
+    assert func(["input"]) == [[0.4, 0.5]]
+
+
+def test_litellm_embedding_function_uses_model_dump(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _DumpOnly:
+        def model_dump(self) -> dict[str, object]:
+            return {"data": [{"embedding": [0.9, 1.1]}]}
+
+    def _fake_get_embedding():
+        class _FakeException(Exception):
+            pass
+
+        def _fake_embedding(**_: object) -> object:
+            return _DumpOnly()
+
+        return _fake_embedding, _FakeException
+
+    monkeypatch.setattr("core.embedding.get_embedding", _fake_get_embedding)
+    func = create_embedding_function("litellm", model="test", api_key=None, api_base=None)
+    assert func(["payload"]) == [[0.9, 1.1]]
