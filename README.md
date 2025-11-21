@@ -17,7 +17,7 @@ Prompt Manager is a desktop-focused application for cataloguing, searching, and 
 - Result pane includes a Render Output button that previews LLM responses as rendered Markdown in a dedicated window, alongside a Copy to Text Window action that sends the raw response back into the workspace editor for follow-up editing.
 - Prompt engineering workflow that analyses stored prompts against the meta-guidelines and proposes a refined prompt body directly in the editor.
 - Prompt dialog can analyse a prompt body to suggest reusable usage scenarios, which are stored with each prompt and rendered in the detail pane.
-- Task templates bundle prompts with starter input and surface in the GUI for quick apply/edit/delete workflows.
+- Quick action palette entries bundle helpful starter text so the workspace can be seeded for explain/fix/document/enhance workflows or any custom action configured in settings.
 - Response Style tab keeps tone/formatting presets with inline CRUD controls so operators can define reusable answer guidelines directly from the GUI; paste any response phrase and the dialog auto-generates the remaining metadata, copy/export/markdown preview included.
 - Notes tab (next to Prompts/History) keeps lightweight prompt notes with single-field CRUD, copy-to-clipboard, Markdown preview, and export-to-file controls for quick reminders.
 - Toolbar Info dialog links to the project's author profile and displays the current system's CPU/architecture details alongside the open source licensing summary.
@@ -136,7 +136,7 @@ Scores are computed as `1 − distance` returned by ChromaDB and indicate how 
 - Press `Ctrl+K` (or `Ctrl+Shift+P`) to open the command palette for quick actions, or use dedicated shortcuts (`Ctrl+1`…`Ctrl+4`) to jump straight to explain/fix/document/enhance workflows.
 - Click the exit icon in the toolbar (or press `Ctrl+Q`) to close the application gracefully and flush background services.
 - Tailor the palette in **Settings → Quick actions** by pasting a JSON array of additional actions (identifier, title, description, optional `category_hint`, `tag_hints`, `template`, `prompt_id`, `shortcut`). `prompt_id` can reference a prompt by UUID or name; custom entries override defaults when identifiers collide.
-- Task template controls sit above the workspace: pick an existing template to pre-fill the query area and surface linked prompts, or use **New**, **Edit**, **Delete**, and **Clear** to manage templates without leaving the app.
+- The workspace toolbar focuses on detection/suggestion/execution flows; quick actions (via the palette or shortcuts) remain the primary way to insert starter text without touching stored prompts.
 
 - Use the category, tag, and minimum-quality filters above the list to narrow results as your catalogue grows.
 

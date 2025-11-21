@@ -2,6 +2,12 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.16.0] - 2025-12-08
+
+### Removed
+
+- Retired the Task Template feature entirely: removed the dataclass, SQLite schema, repository/manager APIs, GUI controls, dialogs, telemetry events, and tests. Quick actions now serve as the single way to seed the workspace with starter text, and documentation/settings have been updated accordingly.
+
 ## [0.15.2] - 2025-12-06
 
 ### Added

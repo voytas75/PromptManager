@@ -11,7 +11,7 @@ import pytest
 from core.embedding import EmbeddingGenerationError
 from core.prompt_manager import PromptManager
 from core.repository import PromptRepository
-from models.prompt_model import Prompt, PromptExecution, TaskTemplate, UserProfile
+from models.prompt_model import Prompt, PromptExecution, UserProfile
 
 
 def _make_prompt(name: str = "Diagnostics") -> Prompt:
@@ -19,18 +19,6 @@ def _make_prompt(name: str = "Diagnostics") -> Prompt:
         id=uuid.uuid4(),
         name=name,
         description="Investigate pipeline failures.",
-        category="Debugging",
-        tags=["ci"],
-    )
-
-
-def _make_template(prompt_id: uuid.UUID) -> TaskTemplate:
-    return TaskTemplate(
-        id=uuid.uuid4(),
-        name="Daily Check",
-        description="Run diagnostics for daily builds.",
-        prompt_ids=[prompt_id],
-        default_input="Investigate latest failure logs.",
         category="Debugging",
         tags=["ci"],
     )
@@ -100,9 +88,6 @@ def test_repository_reset_all_data(tmp_path: Path) -> None:
     prompt = _make_prompt()
     repo.add(prompt)
 
-    template = _make_template(prompt.id)
-    repo.add_template(template)
-
     execution = _make_execution(prompt.id)
     repo.add_execution(execution)
 
@@ -113,7 +98,6 @@ def test_repository_reset_all_data(tmp_path: Path) -> None:
     repo.reset_all_data()
 
     assert repo.list() == []
-    assert repo.list_templates() == []
     assert repo.list_executions() == []
 
     refreshed_profile = repo.get_user_profile()
@@ -126,7 +110,6 @@ def test_prompt_manager_reset_application_data(tmp_path: Path) -> None:
     repo = PromptRepository(str(db_path))
     prompt = _make_prompt()
     repo.add(prompt)
-    repo.add_template(_make_template(prompt.id))
     repo.add_execution(_make_execution(prompt.id))
     profile = repo.get_user_profile()
     repo.save_user_profile(UserProfile(id=profile.id, username="custom"))
@@ -147,7 +130,6 @@ def test_prompt_manager_reset_application_data(tmp_path: Path) -> None:
     manager.reset_application_data(clear_logs=True)
 
     assert repo.list() == []
-    assert repo.list_templates() == []
     assert repo.list_executions() == []
     assert client.deleted is True
     assert client._create_calls >= 2  # initial + reset

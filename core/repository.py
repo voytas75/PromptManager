@@ -1,11 +1,11 @@
 """SQLite-backed repository for persistent prompt storage.
 
+Updates: v0.9.0 - 2025-12-08 - Remove task template persistence after feature retirement.
 Updates: v0.8.0 - 2025-12-06 - Add PromptNote persistence with CRUD helpers.
 Updates: v0.7.0 - 2025-12-05 - Add ResponseStyle persistence with CRUD helpers.
 Updates: v0.6.1 - 2025-11-30 - Add repository reset helper for maintenance workflows.
 Updates: v0.6.0 - 2025-11-25 - Add prompt catalogue statistics accessor for maintenance UI.
 Updates: v0.5.1 - 2025-11-19 - Persist prompt usage scenarios alongside prompt records.
-Updates: v0.5.0 - 2025-11-16 - Add task template persistence and lookups.
 Updates: v0.4.0 - 2025-11-11 - Persist single-user profile preferences alongside prompts.
 Updates: v0.3.0 - 2025-11-09 - Add rating aggregation columns and execution rating support.
 Updates: v0.2.0 - 2025-11-08 - Add prompt execution history persistence APIs.
@@ -22,13 +22,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Set
 
-from models.prompt_model import (
-    DEFAULT_PROFILE_ID,
-    Prompt,
-    PromptExecution,
-    TaskTemplate,
-    UserProfile,
-)
+from models.prompt_model import DEFAULT_PROFILE_ID, Prompt, PromptExecution, UserProfile
 from models.response_style import ResponseStyle
 from models.prompt_note import PromptNote
 
@@ -171,24 +165,6 @@ class PromptRepository:
         "ext3",
         "ext4",
         "ext5",
-    )
-
-    _TEMPLATE_COLUMNS: Sequence[str] = (
-        "id",
-        "name",
-        "description",
-        "prompt_ids",
-        "default_input",
-        "category",
-        "tags",
-        "notes",
-        "is_active",
-        "version",
-        "created_at",
-        "last_modified",
-        "ext1",
-        "ext2",
-        "ext3",
     )
 
     _EXECUTION_COLUMNS: Sequence[str] = (
@@ -708,30 +684,6 @@ class PromptRepository:
         )
         conn.execute(
             """
-            CREATE TABLE IF NOT EXISTS templates (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                description TEXT NOT NULL,
-                prompt_ids TEXT NOT NULL,
-                default_input TEXT,
-                category TEXT,
-                tags TEXT,
-                notes TEXT,
-                is_active INTEGER NOT NULL DEFAULT 1,
-                version TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                last_modified TEXT NOT NULL,
-                ext1 TEXT,
-                ext2 TEXT,
-                ext3 TEXT
-            );
-            """
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_templates_name ON templates(name);"
-        )
-        conn.execute(
-            """
             CREATE TABLE IF NOT EXISTS prompt_executions (
                 id TEXT PRIMARY KEY,
                 prompt_id TEXT NOT NULL,
@@ -847,12 +799,11 @@ class PromptRepository:
             )
 
     def reset_all_data(self) -> None:
-        """Clear all persisted prompts, templates, executions, and user profile data."""
+        """Clear all persisted prompts, executions, and user profile data."""
 
         try:
             with _connect(self._db_path) as conn:
                 conn.execute("DELETE FROM prompt_executions;")
-                conn.execute("DELETE FROM templates;")
                 conn.execute("DELETE FROM response_styles;")
                 conn.execute("DELETE FROM prompt_notes;")
                 conn.execute("DELETE FROM prompts;")
@@ -910,40 +861,6 @@ class PromptRepository:
         profile.record_prompt_usage(prompt, max_recent=max_recent)
         return self.save_user_profile(profile)
 
-    # Template helpers --------------------------------------------------- #
-
-    def _template_to_row(self, template: TaskTemplate) -> Dict[str, Any]:
-        """Serialise TaskTemplate into SQLite-compatible mapping."""
-
-        return {
-            "id": str(template.id),
-            "name": template.name,
-            "description": template.description,
-            "prompt_ids": _json_dumps([str(pid) for pid in template.prompt_ids]) or "[]",
-            "default_input": template.default_input,
-            "category": template.category,
-            "tags": _json_dumps(list(template.tags)) or "[]",
-            "notes": template.notes,
-            "is_active": 1 if template.is_active else 0,
-            "version": template.version,
-            "created_at": template.created_at.isoformat(),
-            "last_modified": template.last_modified.isoformat(),
-            "ext1": template.ext1,
-            "ext2": _json_dumps(template.ext2),
-            "ext3": _json_dumps(template.ext3),
-        }
-
-    def _row_to_template(self, row: sqlite3.Row) -> TaskTemplate:
-        """Hydrate TaskTemplate from SQLite row."""
-
-        payload: Dict[str, Any] = {column: row[column] for column in row.keys()}
-        payload["prompt_ids"] = _json_loads_list(row["prompt_ids"])
-        payload["tags"] = _json_loads_list(row["tags"])
-        payload["ext2"] = _json_loads_optional(row["ext2"])
-        payload["ext3"] = _json_loads_optional(row["ext3"])
-        payload["is_active"] = row["is_active"]
-        return TaskTemplate.from_record(payload)
-
     def _response_style_to_row(self, style: ResponseStyle) -> Dict[str, Any]:
         """Serialise ResponseStyle into SQLite-compatible mapping."""
 
@@ -999,87 +916,6 @@ class PromptRepository:
 
         payload: Dict[str, Any] = {column: row[column] for column in row.keys()}
         return PromptNote.from_record(payload)
-
-    def add_template(self, template: TaskTemplate) -> TaskTemplate:
-        """Insert a new task template."""
-
-        payload = self._template_to_row(template)
-        placeholders = ", ".join(f":{column}" for column in self._TEMPLATE_COLUMNS)
-        query = (
-            f"INSERT INTO templates ({', '.join(self._TEMPLATE_COLUMNS)}) "
-            f"VALUES ({placeholders});"
-        )
-        try:
-            with _connect(self._db_path) as conn:
-                conn.execute(query, payload)
-        except sqlite3.IntegrityError as exc:
-            raise RepositoryError(f"Template {template.id} already exists") from exc
-        except sqlite3.Error as exc:
-            raise RepositoryError(f"Failed to insert template {template.id}") from exc
-        return template
-
-    def update_template(self, template: TaskTemplate) -> TaskTemplate:
-        """Update an existing task template."""
-
-        payload = self._template_to_row(template)
-        assignments = ", ".join(
-            f"{column} = :{column}"
-            for column in self._TEMPLATE_COLUMNS
-            if column != "id"
-        )
-        query = f"UPDATE templates SET {assignments} WHERE id = :id;"
-        try:
-            with _connect(self._db_path) as conn:
-                updated = conn.execute(query, payload).rowcount
-        except sqlite3.Error as exc:
-            raise RepositoryError(f"Failed to update template {template.id}") from exc
-        if updated == 0:
-            raise RepositoryNotFoundError(f"Template {template.id} not found")
-        return template
-
-    def delete_template(self, template_id: uuid.UUID) -> None:
-        """Delete a stored task template."""
-
-        try:
-            with _connect(self._db_path) as conn:
-                deleted = conn.execute(
-                    "DELETE FROM templates WHERE id = ?;",
-                    (str(template_id),),
-                ).rowcount
-        except sqlite3.Error as exc:
-            raise RepositoryError(f"Failed to delete template {template_id}") from exc
-        if deleted == 0:
-            raise RepositoryNotFoundError(f"Template {template_id} not found")
-
-    def get_template(self, template_id: uuid.UUID) -> TaskTemplate:
-        """Return a task template by identifier."""
-
-        try:
-            with _connect(self._db_path) as conn:
-                cursor = conn.execute(
-                    "SELECT * FROM templates WHERE id = ?;",
-                    (str(template_id),),
-                )
-                row = cursor.fetchone()
-        except sqlite3.Error as exc:
-            raise RepositoryError(f"Failed to load template {template_id}") from exc
-        if row is None:
-            raise RepositoryNotFoundError(f"Template {template_id} not found")
-        return self._row_to_template(row)
-
-    def list_templates(self, include_inactive: bool = False) -> List[TaskTemplate]:
-        """Return stored task templates."""
-
-        query = "SELECT * FROM templates"
-        if not include_inactive:
-            query += " WHERE is_active = 1"
-        query += " ORDER BY name COLLATE NOCASE;"
-        try:
-            with _connect(self._db_path) as conn:
-                rows = conn.execute(query).fetchall()
-        except sqlite3.Error as exc:
-            raise RepositoryError("Failed to list templates") from exc
-        return [self._row_to_template(row) for row in rows]
 
     # Response style helpers -------------------------------------------- #
 
@@ -1265,7 +1101,7 @@ class PromptRepository:
             with _connect(self._db_path) as conn:
                 rows = conn.execute(query, tuple(ids)).fetchall()
         except sqlite3.Error as exc:
-            raise RepositoryError("Failed to load prompts for template") from exc
+            raise RepositoryError("Failed to load prompts for identifiers") from exc
         prompt_map = {row["id"]: self._row_to_prompt(row) for row in rows}
         ordered: List[Prompt] = []
         for pid in ids:

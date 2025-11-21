@@ -1,6 +1,6 @@
 """Usage logging utilities for intent workspace interactions.
 
-Updates: v0.3.0 - 2025-11-16 - Track task template application events.
+Updates: v0.3.1 - 2025-12-08 - Remove task template logging after feature retirement.
 Updates: v0.2.0 - 2025-11-09 - Record manual save ratings alongside notes.
 Updates: v0.1.0 - 2025-11-07 - Introduce JSONL logger for detect/suggest/copy events.
 """
@@ -133,17 +133,6 @@ class IntentUsageLogger:
             "event": "history_export",
             "entries": entries,
             "path": path,
-        }
-        self._append(record)
-
-    def log_template_apply(self, *, template_name: str, prompt_count: int) -> None:
-        """Log that a task template has been applied."""
-
-        record = {
-            "timestamp": _now_iso(),
-            "event": "template_apply",
-            "template_name": template_name,
-            "prompt_count": prompt_count,
         }
         self._append(record)
 

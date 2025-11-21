@@ -1,5 +1,6 @@
 """Prompt Manager package façade and orchestration layer.
 
+Updates: v0.13.15 - 2025-12-08 - Remove task template APIs and diagnostics wiring.
 Updates: v0.13.14 - 2025-12-07 - Add embedding rebuild helper for CLI workflows.
 Updates: v0.13.13 - 2025-12-06 - Add PromptNote CRUD APIs and Notes GUI wiring.
 Updates: v0.13.12 - 2025-12-05 - Add ResponseStyle persistence and CRUD APIs.
@@ -111,7 +112,7 @@ except ImportError:  # pragma: no cover - redis optional during development
     redis = None  # type: ignore
     RedisError = Exception  # type: ignore[misc,assignment]
 
-from models.prompt_model import Prompt, PromptExecution, TaskTemplate, UserProfile
+from models.prompt_model import Prompt, PromptExecution, UserProfile
 from models.response_style import ResponseStyle
 from models.prompt_note import PromptNote
 
@@ -409,13 +410,6 @@ class PromptManager:
         history_entry: Optional[PromptExecution]
         conversation: List[Dict[str, str]]
 
-    @dataclass(slots=True)
-    class TemplateApplication:
-        """Result returned when applying a task template."""
-
-        template: TaskTemplate
-        prompts: List[Prompt]
-
     @property
     def collection(self) -> Collection:
         """Expose the underlying Chroma collection."""
@@ -584,7 +578,7 @@ class PromptManager:
         return details
 
     def reset_prompt_repository(self) -> None:
-        """Clear all prompts, templates, executions, and profiles from SQLite storage."""
+        """Clear all prompts, executions, and profiles from SQLite storage."""
 
         reset_func = getattr(self._repository, "reset_all_data", None)
         if not callable(reset_func):
@@ -808,14 +802,11 @@ class PromptManager:
                 diagnostics.append("SQLite quick_check: ok")
 
                 prompt_count = connection.execute("SELECT COUNT(*) FROM prompts;").fetchone()
-                template_count = connection.execute("SELECT COUNT(*) FROM templates;").fetchone()
         except sqlite3.Error as exc:
             raise PromptStorageError("Unable to verify SQLite repository") from exc
 
         prompts_total = int(prompt_count[0]) if prompt_count else 0
-        templates_total = int(template_count[0]) if template_count else 0
         diagnostics.append(f"Prompts: {prompts_total}")
-        diagnostics.append(f"Templates: {templates_total}")
 
         summary = "\n".join(diagnostics)
         logger.info("SQLite repository verification completed successfully: %s", summary.replace("\n", " | "))
@@ -1536,78 +1527,6 @@ class PromptManager:
                 "Prompt deleted but cache eviction failed",
                 extra={"prompt_id": str(prompt_id)},
             )
-
-    # Template management ------------------------------------------------ #
-
-    def list_templates(self, *, include_inactive: bool = False) -> List[TaskTemplate]:
-        """Return available task templates."""
-
-        try:
-            return self._repository.list_templates(include_inactive=include_inactive)
-        except RepositoryError as exc:
-            raise PromptStorageError("Unable to list task templates") from exc
-
-    def get_template(self, template_id: uuid.UUID) -> TaskTemplate:
-        """Return a single task template."""
-
-        try:
-            return self._repository.get_template(template_id)
-        except RepositoryNotFoundError as exc:
-            raise PromptNotFoundError(str(exc)) from exc
-        except RepositoryError as exc:
-            raise PromptStorageError(f"Unable to load template {template_id}") from exc
-
-    def create_template(self, template: TaskTemplate) -> TaskTemplate:
-        """Persist a new task template."""
-
-        template.touch()
-        try:
-            stored = self._repository.add_template(template)
-        except RepositoryError as exc:
-            raise PromptStorageError(f"Failed to persist template {template.id}") from exc
-        return stored
-
-    def update_template(self, template: TaskTemplate) -> TaskTemplate:
-        """Persist updates to an existing task template."""
-
-        template.touch()
-        try:
-            updated = self._repository.update_template(template)
-        except RepositoryNotFoundError as exc:
-            raise PromptNotFoundError(str(exc)) from exc
-        except RepositoryError as exc:
-            raise PromptStorageError(f"Failed to update template {template.id}") from exc
-        return updated
-
-    def delete_template(self, template_id: uuid.UUID) -> None:
-        """Delete a task template."""
-
-        try:
-            self._repository.delete_template(template_id)
-        except RepositoryNotFoundError as exc:
-            raise PromptNotFoundError(str(exc)) from exc
-        except RepositoryError as exc:
-            raise PromptStorageError(f"Failed to delete template {template_id}") from exc
-
-    def apply_template(self, template_id: uuid.UUID) -> "PromptManager.TemplateApplication":
-        """Return template metadata and associated prompts for task workflows."""
-
-        template = self.get_template(template_id)
-        try:
-            prompts = self._repository.get_prompts_for_ids(template.prompt_ids)
-        except RepositoryError as exc:
-            raise PromptStorageError("Unable to load prompts for template") from exc
-        missing = len(template.prompt_ids) - len(prompts)
-        if missing > 0:
-            logger.warning(
-                "Template references missing prompts",
-                extra={
-                    "template_id": str(template.id),
-                    "expected": len(template.prompt_ids),
-                    "resolved": len(prompts),
-                },
-            )
-        return PromptManager.TemplateApplication(template=template, prompts=prompts)
 
     # Response style management ----------------------------------------- #
 

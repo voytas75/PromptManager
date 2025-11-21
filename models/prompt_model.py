@@ -1,7 +1,7 @@
 """Prompt data model definitions.
 
+Updates: v0.6.0 - 2025-12-08 - Remove deprecated task template dataclass.
 Updates: v0.5.1 - 2025-11-19 - Add persisted usage scenarios metadata for prompts.
-Updates: v0.5.0 - 2025-11-16 - Introduce task template dataclass for multi-prompt workflows.
 Updates: v0.4.0 - 2025-11-11 - Add single-user profile dataclass with preference helpers.
 Updates: v0.3.0 - 2025-11-09 - Add rating aggregates and execution rating support.
 Updates: v0.2.0 - 2025-11-08 - Add prompt execution records for history logging.
@@ -542,102 +542,10 @@ class UserProfile:
         return cls(id=DEFAULT_PROFILE_ID, username=username)
 
 
-@dataclass(slots=True)
-class TaskTemplate:
-    """Bundle prompts with starter input and hints for task-centric workflows."""
-
-    id: uuid.UUID
-    name: str
-    description: str
-    prompt_ids: List[uuid.UUID]
-    default_input: Optional[str] = None
-    category: Optional[str] = None
-    tags: List[str] = field(default_factory=list)
-    notes: Optional[str] = None
-    is_active: bool = True
-    version: str = "1.0"
-    created_at: datetime = field(default_factory=_utc_now)
-    last_modified: datetime = field(default_factory=_utc_now)
-    ext1: Optional[str] = None
-    ext2: Optional[MutableMapping[str, Any]] = None
-    ext3: Optional[Sequence[str]] = None
-
-    def to_record(self) -> Dict[str, Any]:
-        """Return a plain mapping suitable for persistence."""
-
-        return {
-            "id": str(self.id),
-            "name": self.name,
-            "description": self.description,
-            "prompt_ids": [str(pid) for pid in self.prompt_ids],
-            "default_input": self.default_input,
-            "category": self.category,
-            "tags": list(self.tags),
-            "notes": self.notes,
-            "is_active": int(self.is_active),
-            "version": self.version,
-            "created_at": self.created_at.isoformat(),
-            "last_modified": self.last_modified.isoformat(),
-            "ext1": self.ext1,
-            "ext2": dict(self.ext2) if self.ext2 else None,
-            "ext3": list(self.ext3) if self.ext3 else None,
-        }
-
-    @classmethod
-    def from_record(cls, data: Mapping[str, Any]) -> "TaskTemplate":
-        """Hydrate a task template from a stored mapping."""
-
-        prompt_ids_raw = data.get("prompt_ids") or []
-        prompt_ids: List[uuid.UUID] = []
-        if isinstance(prompt_ids_raw, str):
-            try:
-                prompt_ids_payload = json.loads(prompt_ids_raw)
-            except json.JSONDecodeError:
-                prompt_ids_payload = [prompt_ids_raw]
-        else:
-            prompt_ids_payload = prompt_ids_raw
-        for value in prompt_ids_payload or []:
-            try:
-                prompt_ids.append(_ensure_uuid(value))
-            except Exception:
-                continue
-
-        tags = _serialize_list(data.get("tags"))
-        return cls(
-            id=_ensure_uuid(data.get("id") or uuid.uuid4()),
-            name=str(data.get("name") or ""),
-            description=str(data.get("description") or ""),
-            prompt_ids=prompt_ids,
-            default_input=str(data.get("default_input") or "") or None,
-            category=str(data.get("category") or "") or None,
-            tags=[str(tag) for tag in tags],
-            notes=str(data.get("notes") or "") or None,
-            is_active=bool(int(data.get("is_active", 1))),
-            version=str(data.get("version") or "1.0"),
-            created_at=_ensure_datetime(data.get("created_at")),
-            last_modified=_ensure_datetime(data.get("last_modified")),
-            ext1=data.get("ext1"),
-            ext2=_deserialize_metadata(data.get("ext2")),
-            ext3=_deserialize_metadata(data.get("ext3")),
-        )
-
-    def replace_prompt_ids(self, prompt_ids: Iterable[uuid.UUID]) -> None:
-        """Replace prompt identifiers while updating modification timestamp."""
-
-        self.prompt_ids = [uuid.UUID(str(pid)) for pid in prompt_ids]
-        self.touch()
-
-    def touch(self) -> None:
-        """Update last_modified timestamp."""
-
-        self.last_modified = _utc_now()
-
-
 __all__ = [
     "Prompt",
     "PromptExecution",
     "ExecutionStatus",
     "UserProfile",
     "DEFAULT_PROFILE_ID",
-    "TaskTemplate",
 ]
