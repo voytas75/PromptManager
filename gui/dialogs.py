@@ -2139,8 +2139,42 @@ class InfoDialog(QDialog):
 
     @staticmethod
     def _resolve_app_version() -> str:
-        """Return the application version from metadata or pyproject during development."""
+        """Return the application version preferring the local pyproject when available."""
 
+        project_version = InfoDialog._version_from_pyproject()
+        if project_version:
+            return project_version
+
+        metadata_version = InfoDialog._version_from_metadata()
+        if metadata_version:
+            return metadata_version
+
+        module_version = InfoDialog._version_from_module()
+        if module_version:
+            return module_version
+
+        return "dev"
+
+    @staticmethod
+    def _version_from_pyproject() -> Optional[str]:
+        try:
+            import tomllib  # type: ignore[attr-defined]
+
+            project_root = Path(__file__).resolve().parents[1]
+            pyproject = project_root / "pyproject.toml"
+            if not pyproject.exists():
+                return None
+            data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+            project_section = data.get("project") or {}
+            resolved = project_section.get("version")
+            if resolved:
+                return str(resolved)
+        except Exception:
+            return None
+        return None
+
+    @staticmethod
+    def _version_from_metadata() -> Optional[str]:
         try:
             from importlib.metadata import PackageNotFoundError, version as pkg_version  # type: ignore
 
@@ -2149,10 +2183,13 @@ class InfoDialog(QDialog):
                 if resolved:
                     return resolved
             except PackageNotFoundError:
-                pass
+                return None
         except Exception:
-            pass
+            return None
+        return None
 
+    @staticmethod
+    def _version_from_module() -> Optional[str]:
         try:
             from importlib import import_module
 
@@ -2161,23 +2198,8 @@ class InfoDialog(QDialog):
             if module_version:
                 return str(module_version)
         except Exception:
-            pass
-
-        try:
-            import tomllib  # type: ignore[attr-defined]
-
-            project_root = Path(__file__).resolve().parents[1]
-            pyproject = project_root / "pyproject.toml"
-            if pyproject.exists():
-                data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
-                project_section = data.get("project") or {}
-                resolved = project_section.get("version")
-                if resolved:
-                    return str(resolved)
-        except Exception:
-            pass
-
-        return "dev"
+            return None
+        return None
 
 
 def _diff_entry_to_text(entry: CatalogDiffEntry) -> str:
