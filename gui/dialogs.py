@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.9.2 - 2025-12-08 - Resolve Info dialog version label from package metadata or pyproject.
 Updates: v0.9.1 - 2025-12-08 - Remove task template dialog and references.
 Updates: v0.9.0 - 2025-12-06 - Add PromptNote dialog and auto-generated note metadata.
 Updates: v0.8.15 - 2025-12-06 - Add PromptNote dialog and auto-generated note metadata.
@@ -2102,25 +2103,7 @@ class InfoDialog(QDialog):
         tagline_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         form.addRow("Tagline:", tagline_label)
 
-        # -------------------------------
-        # Application version (pyproject)
-        # -------------------------------
-        try:
-            from importlib.metadata import version, PackageNotFoundError  # type: ignore
-
-            try:
-                app_version = version("prompt-manager")
-            except PackageNotFoundError:
-                # Fallback to runtime attribute injected by pyproject or CI.
-                from importlib import import_module
-
-                try:
-                    app_version = getattr(import_module("core"), "__version__", "dev")
-                except Exception:
-                    app_version = "dev"
-        except Exception:  # pragma: no cover – safety net
-            app_version = "dev"
-
+        app_version = self._resolve_app_version()
         version_label = QLabel(app_version, self)
         version_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         form.addRow("Version:", version_label)
@@ -2153,6 +2136,48 @@ class InfoDialog(QDialog):
         close_button = buttons.addButton("Close", QDialogButtonBox.AcceptRole)
         close_button.clicked.connect(self.accept)  # type: ignore[arg-type]
         layout.addWidget(buttons)
+
+    @staticmethod
+    def _resolve_app_version() -> str:
+        """Return the application version from metadata or pyproject during development."""
+
+        try:
+            from importlib.metadata import PackageNotFoundError, version as pkg_version  # type: ignore
+
+            try:
+                resolved = pkg_version("prompt-manager")
+                if resolved:
+                    return resolved
+            except PackageNotFoundError:
+                pass
+        except Exception:
+            pass
+
+        try:
+            from importlib import import_module
+
+            module = import_module("core")
+            module_version = getattr(module, "__version__", None)
+            if module_version:
+                return str(module_version)
+        except Exception:
+            pass
+
+        try:
+            import tomllib  # type: ignore[attr-defined]
+
+            project_root = Path(__file__).resolve().parents[1]
+            pyproject = project_root / "pyproject.toml"
+            if pyproject.exists():
+                data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+                project_section = data.get("project") or {}
+                resolved = project_section.get("version")
+                if resolved:
+                    return str(resolved)
+        except Exception:
+            pass
+
+        return "dev"
 
 
 def _diff_entry_to_text(entry: CatalogDiffEntry) -> str:
