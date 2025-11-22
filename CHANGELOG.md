@@ -2,13 +2,13 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
-## [0.16.0] - 2025-12-08
+## [0.16.0] - 2025-11-22
 
 ### Removed
 
 - Retired the Task Template feature entirely: removed the dataclass, SQLite schema, repository/manager APIs, GUI controls, dialogs, telemetry events, and tests. Quick actions now serve as the single way to seed the workspace with starter text, and documentation/settings have been updated accordingly.
 
-## [0.15.2] - 2025-12-06
+## [0.15.2] - 2025-11-22
 
 ### Added
 
@@ -25,7 +25,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 - Removed the Diff tab from the GUI result pane, dropped the supporting diff preview utility/tests, and refreshed documentation so executions now focus on the Output and Chat views.
 
-## [0.15.0] - 2025-12-05
+## [0.15.0] - 2025-11-22
 
 ### Added
 
@@ -76,17 +76,17 @@ All notable changes to **Prompt Manager** will be documented in this file.
 - Updated the settings dialog with tabbed navigation and dual model inputs while keeping secret handling unchanged.
 - Introduced a LiteLLM routing matrix so each workflow can target the fast or inference tier independently from the settings dialog or JSON configuration.
 
-## [0.13.12] - 2025-11-30
+## [0.13.12] - 2025-11-22
 
 - Removed the `catalog-import` CLI command while keeping the GUI import workflow; catalogue entries can still be applied from JSON via the Import button, with export remaining available via CLI and GUI.
 - Simplified documentation to reflect the GUI-focused import flow and removed references to automatic catalogue seeding.
 - Added a Data Reset tab to the maintenance dialog with guarded actions to clear the SQLite prompt database, wipe Chroma embeddings, or reset all application data without touching settings.
 
-## [0.13.11] - 2025-11-28
+## [0.13.11] - 2025-11-22
 
 - Added an exit toolbar icon (and `Ctrl+Q` shortcut) that closes the GUI gracefully by running shutdown hooks before quitting.
 
-## [0.13.10] - 2025-11-26
+## [0.13.10] - 2025-11-22
 
 - Added a LiteLLM streaming execution mode with optional token callbacks so prompt runs can surface incremental output while histories persist aggregated responses.
 - Introduced a `litellm_stream` configuration flag, surfaced it via the CLI settings summary, and extended documentation with environment variable guidance.
@@ -96,21 +96,21 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 - Removed explicit LiteLLM timeouts across prompt execution, engineering, metadata generation, and embedding calls so long-running requests rely on provider defaults instead of failing after fixed client deadlines.
 
-## [0.13.8] - 2025-11-27
+## [0.13.8] - 2025-11-22
 
 - Added a Duplicate Prompt action to the prompt list context menu that opens a pre-filled editor for cloning existing entries before saving.
 
-## [0.13.7] - 2025-11-26
+## [0.13.7] - 2025-11-22
 
 - Added an Info dialog to the GUI toolbar that links to the author's GitHub profile and surfaces system CPU/architecture details alongside the project's open source license summary.
 - Added an Execute Prompt action to the prompt list context menu that populates the workspace text window and runs the selection immediately via the configured AI backend.
 
-## [0.13.6] - 2025-11-25
+## [0.13.6] - 2025-11-22
 
 - Added a prompt catalogue overview on the Maintenance tab with live counts for prompts, categories, tags, stale entries, and recent updates, plus a manual refresh control.
 - Exposed prompt catalogue statistics via `PromptManager.get_prompt_catalogue_stats` so other tooling can reuse the aggregated metrics.
 
-## [0.13.5] - 2025-11-24
+## [0.13.5] - 2025-11-22
 
 - Added a **Copy to Text Window** control in the GUI result pane that rehydrates the latest output into the workspace editor for rapid follow-up prompts without manual copying.
 - Updated documentation to reference the new control and clarify the result workflow sequence.

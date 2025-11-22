@@ -1,6 +1,6 @@
 """Prompt Manager package façade and orchestration layer.
 
-Updates: v0.13.16 - 2025-12-09 - Add prompt versioning, diffing, and forking workflows.
+Updates: v0.13.16 - 2025-11-22 - Add prompt versioning, diffing, and forking workflows.
 Updates: v0.13.15 - 2025-12-08 - Remove task template APIs and diagnostics wiring.
 Updates: v0.13.14 - 2025-12-07 - Add embedding rebuild helper for CLI workflows.
 Updates: v0.13.13 - 2025-12-06 - Add PromptNote CRUD APIs and Notes GUI wiring.

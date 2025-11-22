@@ -11,7 +11,7 @@ All exceptions ultimately inherit from :class:`PromptManagerError`, allowing
 callers to catch a single base class for any manager‑related failure while
 still distinguishing individual error categories when needed.
 
-Updates: v0.17.0 – 2025‑12‑09 – Add prompt versioning exception hierarchy.
+Updates: v0.17.0 – 2025‑11‑22 – Add prompt versioning exception hierarchy.
 Updates: v0.16.0 – 2025‑12‑06 – Add PromptNote exception hierarchy.
 Updates: v0.15.0 – 2025‑12‑05 – Add ResponseStyle exception hierarchy.
 Updates: v0.14.0 – 2025‑11‑18 – Created module; migrated existing classes.

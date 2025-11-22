@@ -1,6 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
-Updates: v0.10.0 - 2025-12-09 - Add prompt version history dialog for diffing/restoring snapshots.
+Updates: v0.10.0 - 2025-11-22 - Add prompt version history dialog for diffing/restoring snapshots.
 Updates: v0.9.2 - 2025-12-08 - Resolve Info dialog version label from package metadata or pyproject.
 Updates: v0.9.1 - 2025-12-08 - Remove task template dialog and references.
 Updates: v0.9.0 - 2025-12-06 - Add PromptNote dialog and auto-generated note metadata.

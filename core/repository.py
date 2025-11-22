@@ -1,6 +1,6 @@
 """SQLite-backed repository for persistent prompt storage.
 
-Updates: v0.10.0 - 2025-12-09 - Add prompt versioning and fork lineage persistence tables.
+Updates: v0.10.0 - 2025-11-22 - Add prompt versioning and fork lineage persistence tables.
 Updates: v0.9.0 - 2025-12-08 - Remove task template persistence after feature retirement.
 Updates: v0.8.0 - 2025-12-06 - Add PromptNote persistence with CRUD helpers.
 Updates: v0.7.0 - 2025-12-05 - Add ResponseStyle persistence with CRUD helpers.
