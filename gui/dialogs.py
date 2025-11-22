@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.10.5 - 2025-11-22 - Redesign prompt dialog layout for taller editing surface.
 Updates: v0.10.4 - 2025-11-22 - Align example section toggles with the active theme palette.
 Updates: v0.10.3 - 2025-11-22 - Add author input to prompt create/edit workflows.
 Updates: v0.10.2 - 2025-11-22 - Default prompt versions to integer labels for new entries.
@@ -73,6 +74,7 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
+    QSizePolicy,
     QWidget,
 )
 
@@ -165,6 +167,7 @@ class CollapsibleTextSection(QWidget):
     def __init__(self, title: str, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._title = title
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
         self._layout.setSpacing(4)
@@ -427,8 +430,8 @@ class PromptDialog(QDialog):
         self._generate_tags_button: Optional[QPushButton] = None
         self._generate_scenarios_button: Optional[QPushButton] = None
         self.setWindowTitle("Create Prompt" if prompt is None else "Edit Prompt")
-        self.setMinimumWidth(760)
-        self.resize(960, 700)
+        self.setMinimumSize(900, 780)
+        self.resize(1100, 880)
         self._build_ui()
         if prompt is not None:
             self._populate(prompt)
@@ -475,6 +478,7 @@ class PromptDialog(QDialog):
         self._tags_input = QLineEdit(self)
         self._context_input = QPlainTextEdit(self)
         self._context_input.setPlaceholderText("Paste the full prompt text here…")
+        self._context_input.setMinimumHeight(320)
         self._description_input = QPlainTextEdit(self)
         self._description_input.setFixedHeight(60)
         self._example_input = CollapsibleTextSection("Example Input", self)
@@ -486,7 +490,20 @@ class PromptDialog(QDialog):
         self._author_input.setPlaceholderText("Optional author name…")
         self._tags_input.setPlaceholderText("tag-a, tag-b")
 
-        category_container = QWidget(self)
+        metadata_container = QWidget(self)
+        metadata_layout = QGridLayout(metadata_container)
+        metadata_layout.setContentsMargins(0, 0, 0, 0)
+        metadata_layout.setHorizontalSpacing(12)
+        metadata_layout.setVerticalSpacing(4)
+
+        author_label = QLabel("Author", metadata_container)
+        metadata_layout.addWidget(author_label, 0, 0)
+        metadata_layout.addWidget(self._author_input, 1, 0)
+
+        category_label = QLabel("Category", metadata_container)
+        metadata_layout.addWidget(category_label, 0, 1)
+
+        category_container = QWidget(metadata_container)
         category_container_layout = QHBoxLayout(category_container)
         category_container_layout.setContentsMargins(0, 0, 0, 0)
         category_container_layout.setSpacing(6)
@@ -498,10 +515,12 @@ class PromptDialog(QDialog):
             self._generate_category_button.setEnabled(False)
             self._generate_category_button.setToolTip("Category suggestions require the main application context.")
         category_container_layout.addWidget(self._generate_category_button)
-        form_layout.addRow("Category", category_container)
-        form_layout.addRow("Language", self._language_input)
-        form_layout.addRow("Author", self._author_input)
-        tags_container = QWidget(self)
+        metadata_layout.addWidget(category_container, 1, 1)
+
+        tags_label = QLabel("Tags", metadata_container)
+        metadata_layout.addWidget(tags_label, 0, 2)
+
+        tags_container = QWidget(metadata_container)
         tags_container_layout = QHBoxLayout(tags_container)
         tags_container_layout.setContentsMargins(0, 0, 0, 0)
         tags_container_layout.setSpacing(6)
@@ -513,7 +532,13 @@ class PromptDialog(QDialog):
             self._generate_tags_button.setEnabled(False)
             self._generate_tags_button.setToolTip("Tag suggestions require the main application context.")
         tags_container_layout.addWidget(self._generate_tags_button)
-        form_layout.addRow("Tags", tags_container)
+        metadata_layout.addWidget(tags_container, 1, 2)
+        metadata_layout.setColumnStretch(0, 1)
+        metadata_layout.setColumnStretch(1, 1)
+        metadata_layout.setColumnStretch(2, 1)
+
+        form_layout.addRow("Language", self._language_input)
+        form_layout.addRow("", metadata_container)
         form_layout.addRow("Prompt Body", self._context_input)
         self._refine_button = QPushButton("Refine", self)
         self._refine_button.setToolTip(
@@ -549,8 +574,14 @@ class PromptDialog(QDialog):
             )
         scenarios_layout.addWidget(self._generate_scenarios_button, alignment=Qt.AlignRight)
         form_layout.addRow("Scenarios", scenarios_container)
-        form_layout.addRow(self._example_input)
-        form_layout.addRow(self._example_output)
+
+        examples_container = QWidget(self)
+        examples_layout = QHBoxLayout(examples_container)
+        examples_layout.setContentsMargins(0, 0, 0, 0)
+        examples_layout.setSpacing(12)
+        examples_layout.addWidget(self._example_input, 1)
+        examples_layout.addWidget(self._example_output, 1)
+        form_layout.addRow("Examples", examples_container)
 
         main_layout.addLayout(form_layout)
 
