@@ -2,6 +2,13 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.17.1] - 2025-11-22
+
+### Added
+
+- Added a **Clear** control to the workspace toolbar that immediately resets the pasted code form, Output tab, and chat transcript, ensuring users can begin a new workflow without manually clearing multiple panes.
+- Updated README guidance so the new action is documented alongside Detect/Suggest/Run workflows.
+
 ## [0.17.0] - 2025-11-22
 
 ### Added
