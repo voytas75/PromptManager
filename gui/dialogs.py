@@ -459,6 +459,7 @@ class PromptDialog(QDialog):
 
         main_layout = QVBoxLayout(self)
         form_layout = QFormLayout()
+        form_layout.setLabelAlignment(Qt.AlignLeft | Qt.AlignTop)
 
         self._name_input = QLineEdit(self)
         self._generate_name_button = QPushButton("Generate", self)
