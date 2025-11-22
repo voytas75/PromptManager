@@ -1165,10 +1165,6 @@ class PromptDialog(QDialog):
             self._execute_context_button.setToolTip(
                 "Available when editing a saved prompt with a prompt body."
             )
-        if history_available:
-            self._version_history_button.setToolTip("View previous versions and restore snapshots.")
-        else:
-            self._version_history_button.setToolTip("Version history is available after saving this prompt.")
 
     def _on_version_history_clicked(self) -> None:
         """Open the version history dialog via the provided handler."""
