@@ -236,7 +236,10 @@ These commands reuse the same validation logic as the GUI; pass an explicit path
     "litellm_stream": false,
     "litellm_drop_params": ["max_tokens", "max_output_tokens", "temperature", "timeout"],
     "litellm_reasoning_effort": null,
-    "litellm_workflow_models": {"prompt_execution": "inference"},
+    "litellm_workflow_models": {
+      "prompt_execution": "inference",
+      "prompt_structure_refinement": "inference"
+    },
     "embedding_backend": "litellm",
     "embedding_model": "text-embedding-3-large"
   }
@@ -260,7 +263,7 @@ These commands reuse the same validation logic as the GUI; pass an explicit path
   | `PROMPT_MANAGER_CONFIG_JSON` | Path to JSON config used as base | `config/config.json` |
   | `PROMPT_MANAGER_LITELLM_MODEL` | LiteLLM model used for name generation | `gpt-4o-mini` |
   | `PROMPT_MANAGER_LITELLM_INFERENCE_MODEL` | LiteLLM inference model for slower, higher-quality tasks | `gpt-4.1` |
-  | `PROMPT_MANAGER_LITELLM_WORKFLOW_MODELS` | JSON map of workflows to `fast`/`inference` (e.g. `{"prompt_execution": "inference"}`) | `{"prompt_execution": "inference"}` |
+| `PROMPT_MANAGER_LITELLM_WORKFLOW_MODELS` | JSON map of workflows to `fast`/`inference` (e.g. `{"prompt_execution": "inference", "prompt_structure_refinement": "inference"}`) | `{"prompt_execution": "inference"}` |
   | `PROMPT_MANAGER_LITELLM_API_KEY` | LiteLLM API key (environment only) | `sk-…` |
   | `PROMPT_MANAGER_LITELLM_API_BASE` | Optional LiteLLM API base override | `https://proxy.example.com` |
   | `PROMPT_MANAGER_LITELLM_DROP_PARAMS` | Comma/JSON list of LiteLLM parameters to drop before sending requests | `max_tokens,temperature` |

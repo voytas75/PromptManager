@@ -146,6 +146,7 @@ def test_litellm_workflow_models_strip_fast_entries(monkeypatch, tmp_path) -> No
                 "litellm_workflow_models": {
                     "prompt_execution": "fast",
                     "scenario_generation": "inference",
+                    "prompt_structure_refinement": "inference",
                 },
             }
         ),
@@ -156,7 +157,10 @@ def test_litellm_workflow_models_strip_fast_entries(monkeypatch, tmp_path) -> No
 
     settings = load_settings()
 
-    assert settings.litellm_workflow_models == {"scenario_generation": "inference"}
+    assert settings.litellm_workflow_models == {
+        "scenario_generation": "inference",
+        "prompt_structure_refinement": "inference",
+    }
 
 
 def test_reasoning_effort_normalised(monkeypatch, tmp_path) -> None:

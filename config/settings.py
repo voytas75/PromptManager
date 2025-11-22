@@ -1,5 +1,6 @@
 """Settings management for Prompt Manager configuration.
 
+Updates: v0.5.0 - 2025-11-22 - Add structure-only prompt refinement workflow routing.
 Updates: v0.4.9 - 2025-12-06 - Require LiteLLM-backed embeddings with configurable model fields in the UI.
 Updates: v0.4.8 - 2025-12-03 - Persist chat colour palette overrides, including assistant bubble styling.
 Updates: v0.4.7 - 2025-11-05 - Add theme mode configuration options.
@@ -40,6 +41,7 @@ LITELLM_ROUTED_WORKFLOWS: "OrderedDict[str, str]" = OrderedDict(
         ("description_generation", "Prompt description synthesis"),
         ("scenario_generation", "Scenario drafting"),
         ("prompt_engineering", "Prompt refinement"),
+        ("prompt_structure_refinement", "Prompt structure refinement"),
         ("prompt_execution", "Prompt execution"),
     ]
 )

@@ -122,7 +122,12 @@ class _StubPromptEngineer:
         )
 
 
-def _build_manager(tmp_path: Path, engineer: Optional[_StubPromptEngineer]) -> PromptManager:
+def _build_manager(
+    tmp_path: Path,
+    engineer: Optional[_StubPromptEngineer],
+    *,
+    structure_engineer: Optional[_StubPromptEngineer] = None,
+) -> PromptManager:
     db_path = tmp_path / "prompt_manager.db"
     chroma_path = tmp_path / "chroma"
     repository = PromptRepository(str(db_path))
@@ -136,6 +141,7 @@ def _build_manager(tmp_path: Path, engineer: Optional[_StubPromptEngineer]) -> P
         embedding_provider=_StubEmbeddingProvider(),
         enable_background_sync=False,
         prompt_engineer=engineer,
+        structure_prompt_engineer=structure_engineer,
     )
 
 
@@ -165,11 +171,24 @@ def test_refine_prompt_text_requires_engineer(tmp_path: Path) -> None:
 
 def test_refine_prompt_structure_uses_structure_mode(tmp_path: Path) -> None:
     engineer = _StubPromptEngineer()
-    manager = _build_manager(tmp_path, engineer)
+    structure_engineer = _StubPromptEngineer()
+    manager = _build_manager(tmp_path, engineer, structure_engineer=structure_engineer)
 
     result = manager.refine_prompt_structure("Streamline this prompt", tags=["structure"])
 
     assert result.improved_prompt.startswith("Improved")
-    assert engineer.structure_calls[0]["tags"] == ["structure"]
+    assert structure_engineer.structure_calls[0]["tags"] == ["structure"]
+    assert structure_engineer.calls[-1]["structure_only"] is True
+    assert not engineer.structure_calls
+    manager.close()
+
+
+def test_refine_prompt_structure_falls_back_to_general_engineer(tmp_path: Path) -> None:
+    engineer = _StubPromptEngineer()
+    manager = _build_manager(tmp_path, engineer)
+
+    manager.refine_prompt_structure("Reformat only")
+
+    assert engineer.structure_calls
     assert engineer.calls[-1]["structure_only"] is True
     manager.close()

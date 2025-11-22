@@ -2588,7 +2588,9 @@ class MainWindow(QMainWindow):
                 self._refine_prompt_body if self._manager.prompt_engineer is not None else None
             ),
             structure_refiner=(
-                self._refine_prompt_structure if self._manager.prompt_engineer is not None else None
+                self._refine_prompt_structure
+                if self._manager.prompt_structure_engineer is not None
+                else None
             ),
         )
         dialog.prefill_from_prompt(prompt)
@@ -2627,7 +2629,9 @@ class MainWindow(QMainWindow):
                 self._refine_prompt_body if self._manager.prompt_engineer is not None else None
             ),
             structure_refiner=(
-                self._refine_prompt_structure if self._manager.prompt_engineer is not None else None
+                self._refine_prompt_structure
+                if self._manager.prompt_structure_engineer is not None
+                else None
             ),
         )
         dialog.setWindowTitle("Edit Forked Prompt")
@@ -2660,7 +2664,9 @@ class MainWindow(QMainWindow):
                 self._refine_prompt_body if self._manager.prompt_engineer is not None else None
             ),
             structure_refiner=(
-                self._refine_prompt_structure if self._manager.prompt_engineer is not None else None
+                self._refine_prompt_structure
+                if self._manager.prompt_structure_engineer is not None
+                else None
             ),
         )
         if dialog.exec() != QDialog.Accepted:
@@ -2694,7 +2700,9 @@ class MainWindow(QMainWindow):
                 self._refine_prompt_body if self._manager.prompt_engineer is not None else None
             ),
             structure_refiner=(
-                self._refine_prompt_structure if self._manager.prompt_engineer is not None else None
+                self._refine_prompt_structure
+                if self._manager.prompt_structure_engineer is not None
+                else None
             ),
         )
         dialog.applied.connect(  # type: ignore[arg-type]

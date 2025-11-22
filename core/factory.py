@@ -105,6 +105,7 @@ def build_prompt_manager(
     description_generator = None
     scenario_generator = None
     resolved_prompt_engineer = prompt_engineer
+    structure_prompt_engineer: Optional[PromptEngineer] = None
 
     workflow_routing = getattr(settings, "litellm_workflow_models", None) or {}
     fast_model = getattr(settings, "litellm_model", None)
@@ -139,6 +140,9 @@ def build_prompt_manager(
     scenario_generator = _construct(LiteLLMScenarioGenerator, "scenario_generation")
     if resolved_prompt_engineer is None:
         resolved_prompt_engineer = _construct(PromptEngineer, "prompt_engineering")
+    structure_prompt_engineer = _construct(PromptEngineer, "prompt_structure_refinement")
+    if structure_prompt_engineer is None:
+        structure_prompt_engineer = resolved_prompt_engineer
     intent_classifier = IntentClassifier()
 
     repository_instance = repository or PromptRepository(str(settings.db_path))
@@ -177,6 +181,8 @@ def build_prompt_manager(
         manager_kwargs["scenario_generator"] = scenario_generator
     if resolved_prompt_engineer is not None:
         manager_kwargs["prompt_engineer"] = resolved_prompt_engineer
+    if structure_prompt_engineer is not None:
+        manager_kwargs["structure_prompt_engineer"] = structure_prompt_engineer
     if executor is not None:
         manager_kwargs["executor"] = executor
     if history_tracker is not None:

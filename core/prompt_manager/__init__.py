@@ -222,6 +222,7 @@ class PromptManager:
         description_generator: Optional[LiteLLMDescriptionGenerator] = None,
         scenario_generator: Optional[LiteLLMScenarioGenerator] = None,
         prompt_engineer: Optional[PromptEngineer] = None,
+        structure_prompt_engineer: Optional[PromptEngineer] = None,
         fast_model: Optional[str] = None,
         inference_model: Optional[str] = None,
         workflow_models: Optional[Mapping[str, str]] = None,
@@ -311,6 +312,7 @@ class PromptManager:
         self._description_generator = description_generator
         self._scenario_generator = scenario_generator
         self._prompt_engineer = prompt_engineer
+        self._prompt_structure_engineer = structure_prompt_engineer or prompt_engineer
         self._litellm_fast_model: Optional[str] = self._normalise_model_identifier(fast_model)
         if self._litellm_fast_model is None and getattr(name_generator, "model", None):
             self._litellm_fast_model = self._normalise_model_identifier(getattr(name_generator, "model"))
@@ -507,6 +509,12 @@ class PromptManager:
         """Return the configured prompt engineering helper, if any."""
 
         return self._prompt_engineer
+
+    @property
+    def prompt_structure_engineer(self) -> Optional[PromptEngineer]:
+        """Return the configured structure-only prompt engineering helper."""
+
+        return self._prompt_structure_engineer or self._prompt_engineer
 
     def get_redis_details(self) -> Dict[str, Any]:
         """Return connection and usage details for the configured Redis cache."""
@@ -972,7 +980,8 @@ class PromptManager:
 
         if not prompt_text.strip():
             raise PromptEngineeringError("Prompt refinement requires non-empty prompt text.")
-        if self._prompt_engineer is None:
+        engineer = self._prompt_structure_engineer or self._prompt_engineer
+        if engineer is None:
             raise PromptEngineeringUnavailable(
                 "Prompt engineering is not configured. Set PROMPT_MANAGER_LITELLM_MODEL to enable refinement."
             )
@@ -1018,7 +1027,8 @@ class PromptManager:
 
         if not prompt_text.strip():
             raise PromptEngineeringError("Prompt refinement requires non-empty prompt text.")
-        if self._prompt_engineer is None:
+        engineer = self._prompt_structure_engineer or self._prompt_engineer
+        if engineer is None:
             raise PromptEngineeringUnavailable(
                 "Prompt engineering is not configured. Set PROMPT_MANAGER_LITELLM_MODEL to enable refinement."
             )
@@ -1037,7 +1047,7 @@ class PromptManager:
             level=NotificationLevel.INFO,
         ):
             try:
-                return self._prompt_engineer.refine_structure(
+                return engineer.refine_structure(
                     prompt_text,
                     name=name,
                     description=description,
@@ -1284,6 +1294,7 @@ class PromptManager:
         self._name_generator = None
         self._description_generator = None
         self._prompt_engineer = None
+        self._prompt_structure_engineer = None
         self._scenario_generator = None
         self._executor = None
 
@@ -1321,6 +1332,8 @@ class PromptManager:
                 LiteLLMDescriptionGenerator, "description_generation"
             )
             self._prompt_engineer = _construct(PromptEngineer, "prompt_engineering")
+            structure_engineer = _construct(PromptEngineer, "prompt_structure_refinement")
+            self._prompt_structure_engineer = structure_engineer or self._prompt_engineer
             self._scenario_generator = _construct(
                 LiteLLMScenarioGenerator, "scenario_generation"
             )
