@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.34 - 2025-11-22 - Add headings to the prompt summary view and truncate body previews.
 Updates: v0.15.33 - 2025-11-22 - Add structure-only prompt refinement action to the editor dialog.
 Updates: v0.15.32 - 2025-11-22 - Ensure forked prompts edit the stored entry so saves succeed.
 Updates: v0.15.31 - 2025-12-08 - Remove deprecated task template controls; quick actions now seed the workspace exclusively.
@@ -270,6 +271,8 @@ class PromptListModel(QAbstractListModel):
 class PromptDetailWidget(QWidget):
     """Panel that summarises the currently selected prompt."""
 
+    _CONTEXT_PREVIEW_LIMIT = 300
+
     delete_requested = Signal()
     edit_requested = Signal()
     fork_requested = Signal()
@@ -288,8 +291,14 @@ class PromptDetailWidget(QWidget):
         content_layout = QVBoxLayout(content)
         content_layout.setContentsMargins(12, 12, 12, 12)
 
+        self._name_title = QLabel("Name", content)
+        self._name_title.setObjectName("promptSectionTitle")
         self._title = QLabel("Select a prompt to view details", content)
         self._title.setObjectName("promptTitle")
+        self._version_title = QLabel("Version", content)
+        self._version_title.setObjectName("promptSectionTitle")
+        self._version_value = QLabel("Not available", content)
+        self._version_value.setObjectName("promptVersion")
         self._rating_label = QLabel("Rating: n/a", content)
         self._description = QLabel("", content)
         self._description.setWordWrap(True)
@@ -306,7 +315,13 @@ class PromptDetailWidget(QWidget):
         self._examples = QLabel("", content)
         self._examples.setWordWrap(True)
 
+        content_layout.addWidget(self._name_title)
+        content_layout.addSpacing(4)
         content_layout.addWidget(self._title)
+        content_layout.addSpacing(8)
+        content_layout.addWidget(self._version_title)
+        content_layout.addSpacing(4)
+        content_layout.addWidget(self._version_value)
         content_layout.addSpacing(8)
         content_layout.addWidget(self._rating_label)
         content_layout.addSpacing(4)
@@ -320,6 +335,11 @@ class PromptDetailWidget(QWidget):
         content_layout.addSpacing(8)
         content_layout.addWidget(self._examples)
         content_layout.addSpacing(12)
+
+        self._actions_title = QLabel("Actions", content)
+        self._actions_title.setObjectName("promptSectionTitle")
+        content_layout.addWidget(self._actions_title)
+        content_layout.addSpacing(4)
 
         metadata_buttons = QHBoxLayout()
         metadata_buttons.setContentsMargins(0, 0, 0, 0)
@@ -413,14 +433,16 @@ class PromptDetailWidget(QWidget):
         language = prompt.language or "en"
         header = f"{prompt.name} — {prompt.category or 'Uncategorised'}\nLanguage: {language}\nTags: {tags}"
         self._title.setText(header)
+        version_display = prompt.version.strip() if prompt.version else "Not available"
+        self._version_value.setText(version_display or "Not available")
         if prompt.rating_count > 0 and prompt.quality_score is not None:
             rating_text = f"Rating: {prompt.quality_score:.1f}/10 ({prompt.rating_count} ratings)"
         else:
             rating_text = "Rating: not yet rated"
         self._rating_label.setText(rating_text)
         self._description.setText(prompt.description)
-        context_text = prompt.context or "No prompt text provided."
-        self._context.setText(f"Prompt Body:\n{context_text}")
+        context_text = self._format_context_preview(prompt.context)
+        self._context.setText(f"Prompt Body (preview):\n{context_text}")
         if prompt.scenarios:
             scenario_lines = "\n".join(f"• {scenario}" for scenario in prompt.scenarios)
             self._scenarios.setText(f"Scenarios:\n{scenario_lines}")
@@ -461,10 +483,21 @@ class PromptDetailWidget(QWidget):
         self._fork_button.setEnabled(True)
         self._version_history_button.setEnabled(True)
 
+    def _format_context_preview(self, context: Optional[str]) -> str:
+        """Return a truncated context preview for the prompt summary."""
+
+        if not context:
+            return "No prompt text provided."
+        if len(context) <= self._CONTEXT_PREVIEW_LIMIT:
+            return context
+        truncated = context[: self._CONTEXT_PREVIEW_LIMIT].rstrip()
+        return f"{truncated}…"
+
     def clear(self) -> None:
         """Reset the panel to its empty state."""
 
         self._title.setText("Select a prompt to view details")
+        self._version_value.setText("Not available")
         self._rating_label.setText("Rating: n/a")
         self._description.clear()
         self._context.clear()
