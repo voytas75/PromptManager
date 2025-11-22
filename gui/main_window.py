@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.38 - 2025-11-22 - Add workspace clear control to reset input, output, and chat panes.
 Updates: v0.15.37 - 2025-11-22 - Add category manager dialog and registry-backed filters.
 Updates: v0.15.36 - 2025-11-22 - Compact prompt detail view with inline italic labels and single version source.
 Updates: v0.15.35 - 2025-11-22 - Align version display with schema metadata in the prompt summary pane.
@@ -944,6 +945,11 @@ class MainWindow(QMainWindow):
         self._run_button = QPushButton("Run Prompt", self)
         self._run_button.clicked.connect(self._on_run_prompt_clicked)  # type: ignore[arg-type]
         actions_layout.addWidget(self._run_button)
+
+        self._clear_button = QPushButton("Clear", self)
+        self._clear_button.setToolTip("Clear the workspace input, output, and chat panes.")
+        self._clear_button.clicked.connect(self._on_clear_workspace_clicked)  # type: ignore[arg-type]
+        actions_layout.addWidget(self._clear_button)
 
         self._continue_chat_button = QPushButton("Continue Chat", self)
         self._continue_chat_button.clicked.connect(self._on_continue_chat_clicked)  # type: ignore[arg-type]
@@ -2526,6 +2532,19 @@ class MainWindow(QMainWindow):
             empty_text_message="Paste some text or code before executing a prompt.",
             keep_text_after=False,
         )
+
+    def _on_clear_workspace_clicked(self) -> None:
+        """Clear the workspace editor, output tab, and chat transcript."""
+
+        if self._streaming_in_progress:
+            self._end_streaming_run()
+
+        self._query_input.clear()
+        self._clear_execution_result()
+        self._result_tabs.setCurrentIndex(0)
+        self._intent_hint.clear()
+        self._intent_hint.setVisible(False)
+        self.statusBar().showMessage("Workspace cleared.", 3000)
 
     def _handle_note_update(self, execution_id: uuid.UUID, note: str) -> None:
         """Record analytics when execution notes are edited."""

@@ -135,6 +135,7 @@ Scores are computed as `1 − distance` returned by ChromaDB and indicate how 
 - When saving execution results you can apply a 1–10 rating; the average updates the prompt's quality score so filters and recommendations stay aligned with real-world usage.
 
 - Use the workspace beneath the toolbar to paste text, run **Detect Need**, request **Suggest Prompt**, and copy the top-ranked prompt directly to the clipboard.
+- Hit **Clear** whenever you want to reset the workspace editor, Output tab, and chat transcript before starting a new workflow.
 - As you type, the workspace auto-detects the language (Python, PowerShell, Bash, Markdown, JSON, YAML, or plain text) and applies lightweight syntax highlighting so prompts stay readable.
 - Press `Ctrl+K` (or `Ctrl+Shift+P`) to open the command palette for quick actions, or use dedicated shortcuts (`Ctrl+1`…`Ctrl+4`) to jump straight to explain/fix/document/enhance workflows.
 - Click the exit icon in the toolbar (or press `Ctrl+Q`) to close the application gracefully and flush background services.
