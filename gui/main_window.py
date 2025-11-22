@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.32 - 2025-11-22 - Ensure forked prompts edit the stored entry so saves succeed.
 Updates: v0.15.31 - 2025-12-08 - Remove deprecated task template controls; quick actions now seed the workspace exclusively.
 Updates: v0.15.30 - 2025-12-06 - Surface LiteLLM embedding configuration in the settings dialog and runtime state.
 Updates: v0.15.29 - 2025-11-19 - Preserve semantic search ordering when filters update live results.
@@ -2593,6 +2594,7 @@ class MainWindow(QMainWindow):
 
         dialog = PromptDialog(
             self,
+            forked,
             name_generator=self._generate_prompt_name,
             description_generator=self._generate_prompt_description,
             category_generator=self._generate_prompt_category,
@@ -2602,7 +2604,6 @@ class MainWindow(QMainWindow):
                 self._refine_prompt_body if self._manager.prompt_engineer is not None else None
             ),
         )
-        dialog.prefill_from_prompt(forked)
         dialog.setWindowTitle("Edit Forked Prompt")
         if dialog.exec() == QDialog.Accepted and dialog.result_prompt is not None:
             try:
