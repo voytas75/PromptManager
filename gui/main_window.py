@@ -155,7 +155,7 @@ from core import (
 )
 from core.prompt_engineering import PromptRefinement
 from core.notifications import Notification, NotificationStatus
-from models.category_model import slugify_category
+from models.category_model import PromptCategory, slugify_category
 from models.prompt_model import Prompt
 
 from .command_palette import CommandPaletteDialog, QuickAction, rank_prompts_for_action
@@ -189,6 +189,25 @@ def _default_chat_palette() -> dict[str, str]:
         "user": QColor(DEFAULT_CHAT_USER_BUBBLE_COLOR).name().lower(),
         "assistant": QColor(DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR).name().lower(),
     }
+
+
+def _match_category_label(text: str, categories: Sequence[PromptCategory]) -> Optional[str]:
+    """Return the stored category label matching a classifier hint."""
+
+    candidate = (text or "").strip()
+    if not candidate:
+        return None
+    lowered = candidate.lower()
+    slug = slugify_category(candidate)
+    for category in categories:
+        label_lower = category.label.lower()
+        if lowered == label_lower:
+            return category.label
+        if slug and slug == category.slug:
+            return category.label
+        if lowered in label_lower or label_lower in lowered:
+            return category.label
+    return None
 
 
 def normalise_chat_palette(palette: Optional[Mapping[str, object]]) -> dict[str, str]:
@@ -2080,9 +2099,18 @@ class MainWindow(QMainWindow):
             return ""
         classifier = self._manager.intent_classifier
         prediction = None
+        try:
+            categories = self._manager.list_categories()
+        except PromptManagerError:
+            logger.debug("Unable to load categories for suggestion", exc_info=True)
+            categories = []
         if classifier is not None:
             prediction = classifier.classify(text)
             if prediction.category_hints:
+                for hint in prediction.category_hints:
+                    matched = _match_category_label(hint, categories)
+                    if matched:
+                        return matched
                 return prediction.category_hints[0]
             default_map = {
                 IntentLabel.ANALYSIS: "Code Analysis",
@@ -2095,7 +2123,8 @@ class MainWindow(QMainWindow):
             }
             fallback_category = default_map.get(prediction.label)
             if fallback_category:
-                return fallback_category
+                resolved = _match_category_label(fallback_category, categories)
+                return resolved or fallback_category
         lowered = text.lower()
         keyword_categories = (
             ("bug", "Reasoning / Debugging"),
@@ -2109,7 +2138,8 @@ class MainWindow(QMainWindow):
         )
         for keyword, category in keyword_categories:
             if keyword in lowered:
-                return category
+                resolved = _match_category_label(category, categories)
+                return resolved or category
         return "General"
 
     def _generate_prompt_tags(self, context: str) -> List[str]:
