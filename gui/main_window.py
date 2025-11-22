@@ -270,6 +270,8 @@ class PromptDetailWidget(QWidget):
 
     delete_requested = Signal()
     edit_requested = Signal()
+    fork_requested = Signal()
+    version_history_requested = Signal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
