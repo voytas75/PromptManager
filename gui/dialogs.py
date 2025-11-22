@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.10.8 - 2025-11-22 - Surface prompt versions and quick access to history inside the edit dialog.
 Updates: v0.10.7 - 2025-11-22 - Add structure-only refinement action to the prompt dialog.
 Updates: v0.10.6 - 2025-11-22 - Add prompt body tab to version history dialog.
 Updates: v0.10.5 - 2025-11-22 - Redesign prompt dialog layout for taller editing surface.
@@ -417,6 +418,7 @@ class PromptDialog(QDialog):
         scenario_generator: Optional[Callable[[str], Sequence[str]]] = None,
         prompt_engineer: Optional[Callable[..., PromptRefinement]] = None,
         structure_refiner: Optional[Callable[..., PromptRefinement]] = None,
+        version_history_handler: Optional[Callable[[Prompt], None]] = None,
     ) -> None:
         super().__init__(parent)
         self._source_prompt = prompt
@@ -431,6 +433,9 @@ class PromptDialog(QDialog):
         self._delete_requested = False
         self._delete_button: Optional[QPushButton] = None
         self._apply_button: Optional[QPushButton] = None
+        self._version_label: Optional[QLabel] = None
+        self._version_history_button: Optional[QPushButton] = None
+        self._version_history_handler = version_history_handler
         self._generate_category_button: Optional[QPushButton] = None
         self._generate_tags_button: Optional[QPushButton] = None
         self._generate_scenarios_button: Optional[QPushButton] = None
@@ -478,6 +483,21 @@ class PromptDialog(QDialog):
         name_container_layout.addWidget(self._name_input)
         name_container_layout.addWidget(self._generate_name_button)
         form_layout.addRow("Name", name_container)
+
+        version_container = QWidget(self)
+        version_container_layout = QHBoxLayout(version_container)
+        version_container_layout.setContentsMargins(0, 0, 0, 0)
+        version_container_layout.setSpacing(8)
+        self._version_label = QLabel("Not yet saved", self)
+        self._version_label.setObjectName("promptDialogVersion")
+        version_container_layout.addWidget(self._version_label)
+        self._version_history_button = QPushButton("Version History", self)
+        self._version_history_button.setObjectName("promptDialogHistoryButton")
+        self._version_history_button.setCursor(Qt.PointingHandCursor)
+        self._version_history_button.clicked.connect(self._on_version_history_clicked)  # type: ignore[arg-type]
+        version_container_layout.addWidget(self._version_history_button)
+        version_container_layout.addStretch(1)
+        form_layout.addRow("Version", version_container)
 
         self._category_input = QLineEdit(self)
         self._language_input = QLineEdit(self)
@@ -634,6 +654,7 @@ class PromptDialog(QDialog):
             self._delete_button.clicked.connect(self._on_delete_clicked)  # type: ignore[arg-type]
         main_layout.addWidget(self._buttons)
         self._context_input.textChanged.connect(self._on_context_changed)  # type: ignore[arg-type]
+        self._update_version_controls(self._source_prompt.version if self._source_prompt else None)
 
     def prefill_from_prompt(self, prompt: Prompt) -> None:
         """Populate inputs from an existing prompt while staying in creation mode."""
@@ -655,6 +676,7 @@ class PromptDialog(QDialog):
         self._example_input.setPlainText(prompt.example_input or "")
         self._example_output.setPlainText(prompt.example_output or "")
         self._scenarios_input.setPlainText("\n".join(prompt.scenarios))
+        self._update_version_controls(prompt.version)
 
     def _on_accept(self) -> None:
         """Validate inputs, build the prompt, and close the dialog."""
@@ -1079,6 +1101,28 @@ class PromptDialog(QDialog):
 
         self._source_prompt = prompt
         self._populate(prompt)
+
+    def _update_version_controls(self, version: Optional[str]) -> None:
+        """Refresh the version label and history button state."""
+
+        if self._version_label is None or self._version_history_button is None:
+            return
+        label_text = (version or "").strip() or "Not yet saved"
+        self._version_label.setText(label_text)
+        history_available = self._source_prompt is not None and self._version_history_handler is not None
+        self._version_history_button.setVisible(history_available)
+        self._version_history_button.setEnabled(history_available)
+        if history_available:
+            self._version_history_button.setToolTip("View previous versions and restore snapshots.")
+        else:
+            self._version_history_button.setToolTip("Version history is available after saving this prompt.")
+
+    def _on_version_history_clicked(self) -> None:
+        """Open the version history dialog via the provided handler."""
+
+        if self._version_history_handler is None or self._source_prompt is None:
+            return
+        self._version_history_handler(self._source_prompt)
 
 
 class PromptMaintenanceDialog(QDialog):

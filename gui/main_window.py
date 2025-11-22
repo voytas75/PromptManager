@@ -2625,6 +2625,7 @@ class MainWindow(QMainWindow):
                 if self._manager.prompt_structure_engineer is not None
                 else None
             ),
+            version_history_handler=self._open_version_history_dialog,
         )
         dialog.prefill_from_prompt(prompt)
         if dialog.exec() != QDialog.Accepted:
@@ -2666,6 +2667,7 @@ class MainWindow(QMainWindow):
                 if self._manager.prompt_structure_engineer is not None
                 else None
             ),
+            version_history_handler=self._open_version_history_dialog,
         )
         dialog.setWindowTitle("Edit Forked Prompt")
         if dialog.exec() == QDialog.Accepted and dialog.result_prompt is not None:
@@ -2701,6 +2703,7 @@ class MainWindow(QMainWindow):
                 if self._manager.prompt_structure_engineer is not None
                 else None
             ),
+            version_history_handler=self._open_version_history_dialog,
         )
         if dialog.exec() != QDialog.Accepted:
             return
@@ -2737,6 +2740,7 @@ class MainWindow(QMainWindow):
                 if self._manager.prompt_structure_engineer is not None
                 else None
             ),
+            version_history_handler=self._open_version_history_dialog,
         )
         dialog.applied.connect(  # type: ignore[arg-type]
             lambda updated_prompt: self._on_prompt_applied(updated_prompt, dialog)
@@ -2777,10 +2781,11 @@ class MainWindow(QMainWindow):
             return
         self._delete_prompt(prompt)
 
-    def _open_version_history_dialog(self) -> None:
-        """Open the version history dialog for the selected prompt."""
+    def _open_version_history_dialog(self, prompt: Optional[Prompt] = None) -> None:
+        """Open the version history dialog for the requested or selected prompt."""
 
-        prompt = self._current_prompt()
+        if prompt is None:
+            prompt = self._current_prompt()
         if prompt is None:
             return
         dialog = PromptVersionHistoryDialog(
