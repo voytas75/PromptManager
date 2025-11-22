@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.40 - 2025-11-22 - Remember the last execute-as-context task text between runs.
 Updates: v0.15.39 - 2025-11-22 - Add execute-as-context actions for prompts in the list and editor dialogs.
 Updates: v0.15.38 - 2025-11-22 - Add workspace clear control to reset input, output, and chat panes.
 Updates: v0.15.37 - 2025-11-22 - Add category manager dialog and registry-backed filters.
@@ -836,6 +837,7 @@ class MainWindow(QMainWindow):
         self._notification_indicator.setVisible(bool(self._active_notifications))
         self._notification_bridge = QtNotificationBridge(self._manager.notification_center, self)
         self._notification_bridge.notification_received.connect(self._handle_notification)
+        self._last_execute_context_task: str = ""
         self.setWindowTitle("Prompt Manager")
         self._restore_window_geometry()
         self._build_ui()
@@ -2812,6 +2814,7 @@ class MainWindow(QMainWindow):
             parent_widget,
             "Execute as Context",
             "Describe the task to perform using this prompt's body as context:",
+            self._last_execute_context_task,
         )
         if not accepted:
             return
@@ -2819,6 +2822,7 @@ class MainWindow(QMainWindow):
         if not cleaned_task:
             QMessageBox.warning(parent_widget, "Task required", "Enter a task before executing.")
             return
+        self._last_execute_context_task = task_text
         request_payload = (
             "You will receive a task and a context block. "
             "Use the context exclusively when fulfilling the task.\n\n"
