@@ -146,3 +146,43 @@ def test_repository_filtered_execution_query(tmp_path: Path) -> None:
     search_filtered = repo.list_executions_filtered(search="important")
     assert len(search_filtered) == 1
     assert search_filtered[0].id == success_execution.id
+
+
+def test_prompt_version_roundtrip(tmp_path: Path) -> None:
+    repo = PromptRepository(str(tmp_path / "repo.db"))
+    prompt = _make_prompt("Versioned Prompt")
+    repo.add(prompt)
+
+    version_one = repo.record_prompt_version(prompt, commit_message="initial import")
+    assert version_one.version_number == 1
+    assert version_one.commit_message == "initial import"
+
+    prompt.description = "Updated description"
+    repo.update(prompt)
+    version_two = repo.record_prompt_version(prompt)
+
+    versions = repo.list_prompt_versions(prompt.id)
+    assert [entry.version_number for entry in versions][:2] == [2, 1]
+
+    fetched = repo.get_prompt_version(version_two.id)
+    assert fetched.to_prompt().description == "Updated description"
+
+    latest = repo.get_prompt_latest_version(prompt.id)
+    assert latest is not None and latest.id == version_two.id
+
+
+def test_prompt_fork_links(tmp_path: Path) -> None:
+    repo = PromptRepository(str(tmp_path / "repo.db"))
+    source = _make_prompt("Source")
+    child = _make_prompt("Child")
+    repo.add(source)
+    repo.add(child)
+
+    link = repo.record_prompt_fork(source.id, child.id)
+    assert link.source_prompt_id == source.id
+
+    parent = repo.get_prompt_parent_fork(child.id)
+    assert parent is not None and parent.child_prompt_id == child.id
+
+    children = repo.list_prompt_children(source.id)
+    assert [entry.child_prompt_id for entry in children] == [child.id]

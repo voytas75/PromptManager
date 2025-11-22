@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import pytest
@@ -23,7 +24,7 @@ from core.prompt_manager import (
     RepositoryNotFoundError,
 )
 from core.name_generation import DescriptionGenerationError
-from models.prompt_model import Prompt, UserProfile
+from models.prompt_model import Prompt, PromptForkLink, PromptVersion, UserProfile
 
 
 @dataclass
@@ -83,6 +84,11 @@ class _RecordingRepository:
         self.storage: Dict[uuid.UUID, Prompt] = {}
         self.deleted: List[uuid.UUID] = []
         self.profile = UserProfile.create_default()
+        self._versions: Dict[uuid.UUID, List[PromptVersion]] = {}
+        self._version_index: Dict[int, PromptVersion] = {}
+        self._version_counter = 0
+        self._fork_links: Dict[int, PromptForkLink] = {}
+        self._fork_counter = 0
 
     def add(self, prompt: Prompt) -> Prompt:
         self.storage[prompt.id] = prompt
@@ -115,6 +121,68 @@ class _RecordingRepository:
     def record_user_prompt_usage(self, prompt: Prompt, *, max_recent: int = 20) -> UserProfile:  # noqa: ARG002
         self.profile.record_prompt_usage(prompt)
         return self.profile
+
+    def record_prompt_version(
+        self,
+        prompt: Prompt,
+        *,
+        commit_message: Optional[str] = None,
+        parent_version_id: Optional[int] = None,
+    ) -> PromptVersion:
+        self._version_counter += 1
+        version_list = self._versions.setdefault(prompt.id, [])
+        version_number = len(version_list) + 1
+        version = PromptVersion(
+            id=self._version_counter,
+            prompt_id=prompt.id,
+            version_number=version_number,
+            created_at=datetime.now(timezone.utc),
+            parent_version_id=parent_version_id,
+            commit_message=commit_message,
+            snapshot=prompt.to_record(),
+        )
+        version_list.append(version)
+        self._version_index[version.id] = version
+        return version
+
+    def list_prompt_versions(self, prompt_id: uuid.UUID, *, limit: Optional[int] = None) -> List[PromptVersion]:
+        versions = list(self._versions.get(prompt_id, []))
+        versions.sort(key=lambda version: version.version_number, reverse=True)
+        if limit is not None:
+            versions = versions[:limit]
+        return versions
+
+    def get_prompt_version(self, version_id: int) -> PromptVersion:
+        try:
+            return self._version_index[version_id]
+        except KeyError as exc:
+            raise RepositoryNotFoundError("version missing") from exc
+
+    def get_prompt_latest_version(self, prompt_id: uuid.UUID) -> Optional[PromptVersion]:
+        versions = self._versions.get(prompt_id)
+        if not versions:
+            return None
+        return max(versions, key=lambda version: version.version_number)
+
+    def record_prompt_fork(self, source_prompt_id: uuid.UUID, child_prompt_id: uuid.UUID) -> PromptForkLink:
+        self._fork_counter += 1
+        link = PromptForkLink(
+            id=self._fork_counter,
+            source_prompt_id=source_prompt_id,
+            child_prompt_id=child_prompt_id,
+            created_at=datetime.now(timezone.utc),
+        )
+        self._fork_links[link.id] = link
+        return link
+
+    def get_prompt_parent_fork(self, prompt_id: uuid.UUID) -> Optional[PromptForkLink]:
+        for link in self._fork_links.values():
+            if link.child_prompt_id == prompt_id:
+                return link
+        return None
+
+    def list_prompt_children(self, prompt_id: uuid.UUID) -> List[PromptForkLink]:
+        return [link for link in self._fork_links.values() if link.source_prompt_id == prompt_id]
 
 
 class _RedisStub:
@@ -160,6 +228,7 @@ def _sample_prompt() -> Prompt:
         name="Demo",
         description="Sample",
         category="test",
+        context="Base context",
     )
 
 
@@ -689,3 +758,70 @@ def test_cache_and_evict_prompt_raise_prompt_cache_error() -> None:
     manager_del = _build_manager(redis_client=redis_delete_fail)
     with pytest.raises(PromptCacheError):
         manager_del._evict_cached_prompt(uuid.uuid4())
+
+
+def test_prompt_version_commit_and_restore() -> None:
+    repo = _RecordingRepository()
+    manager = _build_manager(repository=repo)
+    prompt = _sample_prompt()
+    manager.create_prompt(prompt)
+
+    prompt.description = "Updated"
+    manager.update_prompt(prompt)
+
+    versions = manager.list_prompt_versions(prompt.id)
+    assert len(versions) == 2
+    assert versions[0].version_number == 2
+
+    diff = manager.diff_prompt_versions(versions[1].id, versions[0].id)
+    assert "description" in diff.changed_fields
+    assert diff.changed_fields["description"]["to"] == "Updated"
+
+    restored = manager.restore_prompt_version(versions[1].id)
+    assert restored.description == "Sample"
+
+
+def test_prompt_merge_detects_conflicts_and_can_persist() -> None:
+    repo = _RecordingRepository()
+    manager = _build_manager(repository=repo)
+    prompt = _sample_prompt()
+    manager.create_prompt(prompt)
+
+    prompt.context = "Line 1"
+    manager.update_prompt(prompt)
+    base_version = manager.list_prompt_versions(prompt.id)[0]
+
+    prompt.context = "Line 1\nLine 2"
+    manager.update_prompt(prompt)
+    incoming_version = manager.list_prompt_versions(prompt.id)[0]
+
+    prompt.context = "Line 1\nLine 3"
+    manager.update_prompt(prompt)
+
+    merged, conflicts = manager.merge_prompt_versions(
+        prompt.id,
+        base_version_id=base_version.id,
+        incoming_version_id=incoming_version.id,
+        persist=True,
+    )
+
+    assert "Line 2" in (merged.context or "")
+    assert "context" in conflicts
+
+
+def test_prompt_fork_records_lineage() -> None:
+    repo = _RecordingRepository()
+    manager = _build_manager(repository=repo)
+    prompt = _sample_prompt()
+    manager.create_prompt(prompt)
+
+    forked = manager.fork_prompt(prompt.id, name="Experiment")
+    assert forked.name == "Experiment"
+    assert forked.source == "fork"
+
+    parent_link = manager.get_prompt_parent_fork(forked.id)
+    assert parent_link is not None
+    assert parent_link.source_prompt_id == prompt.id
+
+    children = manager.list_prompt_forks(prompt.id)
+    assert any(link.child_prompt_id == forked.id for link in children)

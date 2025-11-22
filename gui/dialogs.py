@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.10.0 - 2025-12-09 - Add prompt version history dialog for diffing/restoring snapshots.
 Updates: v0.9.2 - 2025-12-08 - Resolve Info dialog version label from package metadata or pyproject.
 Updates: v0.9.1 - 2025-12-08 - Remove task template dialog and references.
 Updates: v0.9.0 - 2025-12-06 - Add PromptNote dialog and auto-generated note metadata.
@@ -32,6 +33,7 @@ Updates: v0.1.0 - 2025-11-04 - Implement create/edit prompt dialog backed by Pro
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import platform
@@ -45,6 +47,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, NamedTuple, Optional, Sequence
 
 from PySide6.QtCore import Qt, QEvent, Signal
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -54,6 +57,7 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QFormLayout,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QMessageBox,
@@ -62,6 +66,8 @@ from PySide6.QtWidgets import (
     QTabWidget,
     QToolButton,
     QTextBrowser,
+    QTableWidget,
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -89,7 +95,7 @@ from core import (
     RepositoryError,
 )
 from core.prompt_engineering import PromptEngineeringError, PromptRefinement
-from models.prompt_model import Prompt
+from models.prompt_model import Prompt, PromptVersion
 from models.response_style import ResponseStyle
 from models.prompt_note import PromptNote
 
@@ -2210,6 +2216,178 @@ def _diff_entry_to_text(entry: CatalogDiffEntry) -> str:
     return f"{header}\n  (no diff)"
 
 
+class PromptVersionHistoryDialog(QDialog):
+    """Display committed prompt versions with diff/restore controls."""
+
+    def __init__(
+        self,
+        manager: PromptManager,
+        prompt: Prompt,
+        parent: Optional[QWidget] = None,
+        *,
+        status_callback: Optional[Callable[[str, int], None]] = None,
+        limit: int = 200,
+    ) -> None:
+        super().__init__(parent)
+        self._manager = manager
+        self._prompt = prompt
+        self._limit = max(1, limit)
+        self._status_callback = status_callback or (lambda _msg, _duration=0: None)
+        self._versions: List[PromptVersion] = []
+        self.last_restored_prompt: Optional[Prompt] = None
+        self.setWindowTitle(f"{prompt.name} – Version History")
+        self.resize(820, 520)
+        self._build_ui()
+        self._load_versions()
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self)
+        header = QLabel(
+            "Every save creates a version. Select an entry to inspect the snapshot, diff against the prior version, or restore it.",
+            self,
+        )
+        header.setWordWrap(True)
+        layout.addWidget(header)
+
+        self._table = QTableWidget(self)
+        self._table.setColumnCount(3)
+        self._table.setHorizontalHeaderLabels(["Version", "Created", "Message"])
+        self._table.setSelectionBehavior(QTableWidget.SelectRows)
+        self._table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self._table.setSelectionMode(QTableWidget.SingleSelection)
+        header_view = self._table.horizontalHeader()
+        header_view.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        header_view.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        header_view.setSectionResizeMode(2, QHeaderView.Stretch)
+        self._table.itemSelectionChanged.connect(self._on_selection_changed)  # type: ignore[arg-type]
+        layout.addWidget(self._table, stretch=1)
+
+        self._tab_widget = QTabWidget(self)
+        self._diff_view = QPlainTextEdit(self)
+        self._diff_view.setReadOnly(True)
+        self._tab_widget.addTab(self._diff_view, "Diff vs previous")
+        self._snapshot_view = QPlainTextEdit(self)
+        self._snapshot_view.setReadOnly(True)
+        self._tab_widget.addTab(self._snapshot_view, "Snapshot JSON")
+        layout.addWidget(self._tab_widget, stretch=1)
+
+        button_row = QHBoxLayout()
+        button_row.addStretch(1)
+        refresh_button = QPushButton("Refresh", self)
+        refresh_button.clicked.connect(self._load_versions)  # type: ignore[arg-type]
+        button_row.addWidget(refresh_button)
+
+        copy_button = QPushButton("Copy Snapshot", self)
+        copy_button.clicked.connect(self._copy_snapshot_to_clipboard)  # type: ignore[arg-type]
+        button_row.addWidget(copy_button)
+
+        restore_button = QPushButton("Restore Version", self)
+        restore_button.clicked.connect(self._on_restore_clicked)  # type: ignore[arg-type]
+        button_row.addWidget(restore_button)
+
+        close_button = QPushButton("Close", self)
+        close_button.clicked.connect(self.reject)  # type: ignore[arg-type]
+        button_row.addWidget(close_button)
+        layout.addLayout(button_row)
+
+    def _load_versions(self) -> None:
+        try:
+            versions = self._manager.list_prompt_versions(self._prompt.id, limit=self._limit)
+        except PromptManagerError as exc:
+            QMessageBox.critical(self, "Unable to load versions", str(exc))
+            versions = []
+        self._versions = versions
+        self._table.setRowCount(len(versions))
+        for row, version in enumerate(versions):
+            self._table.setItem(row, 0, QTableWidgetItem(f"v{version.version_number}"))
+            self._table.setItem(row, 1, QTableWidgetItem(self._format_timestamp(version.created_at)))
+            message = version.commit_message or "Auto-snapshot"
+            self._table.setItem(row, 2, QTableWidgetItem(message))
+        if versions:
+            self._table.selectRow(0)
+        else:
+            self._diff_view.setPlainText("No versions have been recorded for this prompt yet.")
+            self._snapshot_view.clear()
+
+    def _on_selection_changed(self) -> None:
+        version = self._selected_version()
+        if version is None:
+            self._diff_view.clear()
+            self._snapshot_view.clear()
+            return
+        snapshot_text = json.dumps(version.snapshot, ensure_ascii=False, indent=2)
+        self._snapshot_view.setPlainText(snapshot_text)
+
+        previous_version = self._previous_version(version)
+        if previous_version is None:
+            self._diff_view.setPlainText("No previous version available for diffing.")
+            return
+        try:
+            diff = self._manager.diff_prompt_versions(previous_version.id, version.id)
+        except PromptManagerError as exc:
+            self._diff_view.setPlainText(f"Unable to compute diff: {exc}")
+            return
+        diff_text = diff.body_diff or json.dumps(diff.changed_fields, ensure_ascii=False, indent=2)
+        if not diff_text.strip():
+            diff_text = "Snapshots are identical."
+        self._diff_view.setPlainText(diff_text)
+
+    def _selected_version(self) -> Optional[PromptVersion]:
+        selection = self._table.selectionModel()
+        if selection is None:
+            return None
+        indexes = selection.selectedRows()
+        if not indexes:
+            return None
+        row = indexes[0].row()
+        if 0 <= row < len(self._versions):
+            return self._versions[row]
+        return None
+
+    def _previous_version(self, version: PromptVersion) -> Optional[PromptVersion]:
+        try:
+            current_index = self._versions.index(version)
+        except ValueError:
+            return None
+        next_index = current_index + 1
+        if next_index < len(self._versions):
+            return self._versions[next_index]
+        return None
+
+    def _copy_snapshot_to_clipboard(self) -> None:
+        version = self._selected_version()
+        if version is None:
+            return
+        snapshot_text = json.dumps(version.snapshot, ensure_ascii=False, indent=2)
+        QGuiApplication.clipboard().setText(snapshot_text)
+        self._status_callback("Snapshot copied to clipboard", 2000)
+
+    def _on_restore_clicked(self) -> None:
+        version = self._selected_version()
+        if version is None:
+            return
+        confirm = QMessageBox.question(
+            self,
+            "Restore Version",
+            "This will replace the current prompt contents with the selected snapshot. Continue?",
+        )
+        if confirm != QMessageBox.Yes:
+            return
+        try:
+            restored = self._manager.restore_prompt_version(version.id)
+        except PromptManagerError as exc:
+            QMessageBox.critical(self, "Restore failed", str(exc))
+            return
+        self.last_restored_prompt = restored
+        self._status_callback("Prompt restored to selected version", 4000)
+        self._load_versions()
+
+    @staticmethod
+    def _format_timestamp(value: datetime) -> str:
+        timestamp = value.astimezone(timezone.utc)
+        return timestamp.strftime("%Y-%m-%d %H:%M UTC")
+
+
 class CatalogPreviewDialog(QDialog):
     """Show a diff preview before applying catalogue changes."""
 
@@ -2267,6 +2445,7 @@ __all__ = [
     "CatalogPreviewDialog",
     "InfoDialog",
     "MarkdownPreviewDialog",
+    "PromptVersionHistoryDialog",
     "PromptDialog",
     "PromptMaintenanceDialog",
     "ResponseStyleDialog",

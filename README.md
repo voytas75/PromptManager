@@ -17,11 +17,13 @@ Prompt Manager is a desktop-focused application for cataloguing, searching, and 
 - Result pane includes a Render Output button that previews LLM responses as rendered Markdown in a dedicated window, alongside a Copy to Text Window action that sends the raw response back into the workspace editor for follow-up editing.
 - Prompt engineering workflow that analyses stored prompts against the meta-guidelines and proposes a refined prompt body directly in the editor.
 - Prompt dialog can analyse a prompt body to suggest reusable usage scenarios, which are stored with each prompt and rendered in the detail pane.
+- Unified prompt versioning and forking flow tracks every save as a commit, exposes diff/restore controls, and maintains fork lineage inside the GUI.
 - Quick action palette entries bundle helpful starter text so the workspace can be seeded for explain/fix/document/enhance workflows or any custom action configured in settings.
 - Response Style tab keeps tone/formatting presets with inline CRUD controls so operators can define reusable answer guidelines directly from the GUI; paste any response phrase and the dialog auto-generates the remaining metadata, copy/export/markdown preview included.
 - Notes tab (next to Prompts/History) keeps lightweight prompt notes with single-field CRUD, copy-to-clipboard, Markdown preview, and export-to-file controls for quick reminders.
 - Toolbar Info dialog links to the project's author profile and displays the current system's CPU/architecture details alongside the open source licensing summary.
 - Prompt list context menu includes Duplicate, Execute, Copy, and description shortcuts so stored prompts can be cloned or run without opening the full editor.
+- Fork Prompt is available from the same context menu and detail pane, instantly cloning the prompt into a new branch with lineage preserved for future merges.
 - Windows desktop builds ship with a bundled Prompt Manager icon so the taskbar, window chrome, and installers display consistent branding.
 - Info dialog now showcases the application icon and credits Icons8 as the asset source.
 - Chat transcripts highlight user turns with a tinted background that you can customise from the settings dialog for clearer session context.
@@ -128,6 +130,7 @@ Scores are computed as `1 − distance` returned by ChromaDB and indicate how 
 
 - The window exposes a searchable prompt list (left), detail view (right), and toolbar actions for create/edit/delete/refresh backed by the shared `PromptManager` service.
 - The prompt detail pane is scrollable so long prompt bodies stay readable and the window remains stable when maximised on Wayland.
+- Version History button in the detail pane opens a Git-like viewer showing commit metadata, inline diffs, and a one-click restore action for any snapshot.
 - The prompt editor now includes a **Refine** button that runs the prompt engineering meta-prompt and replaces the body with an improved version plus a summary of changes.
 - When saving execution results you can apply a 1–10 rating; the average updates the prompt's quality score so filters and recommendations stay aligned with real-world usage.
 

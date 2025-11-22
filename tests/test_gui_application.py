@@ -20,6 +20,7 @@ def stub_qt(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
     qt_core = types.ModuleType("PySide6.QtCore")
     qt_widgets = types.ModuleType("PySide6.QtWidgets")
+    qt_gui = types.ModuleType("PySide6.QtGui")
 
     class _Qt:
         AA_EnableHighDpiScaling = object()
@@ -45,10 +46,18 @@ def stub_qt(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
             return 0
 
     qt_widgets.QApplication = _QApplication  # type: ignore[attr-defined]
+    qt_gui.QGuiApplication = _QApplication  # type: ignore[attr-defined]
+
+    class _QIcon:
+        def __init__(self, *_: object, **__: object) -> None:
+            return
+
+    qt_gui.QIcon = _QIcon  # type: ignore[attr-defined]
 
     monkeypatch.setitem(sys.modules, "PySide6", types.ModuleType("PySide6"))
     monkeypatch.setitem(sys.modules, "PySide6.QtCore", qt_core)
     monkeypatch.setitem(sys.modules, "PySide6.QtWidgets", qt_widgets)
+    monkeypatch.setitem(sys.modules, "PySide6.QtGui", qt_gui)
 
     stubbed_main_window = types.ModuleType("gui.main_window")
 
@@ -62,7 +71,13 @@ def stub_qt(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
     yield
 
-    for module_name in ("PySide6", "PySide6.QtCore", "PySide6.QtWidgets", "gui.main_window"):
+    for module_name in (
+        "PySide6",
+        "PySide6.QtCore",
+        "PySide6.QtWidgets",
+        "PySide6.QtGui",
+        "gui.main_window",
+    ):
         sys.modules.pop(module_name, None)
 
 

@@ -1,5 +1,6 @@
 """SQLite-backed repository for persistent prompt storage.
 
+Updates: v0.10.0 - 2025-12-09 - Add prompt versioning and fork lineage persistence tables.
 Updates: v0.9.0 - 2025-12-08 - Remove task template persistence after feature retirement.
 Updates: v0.8.0 - 2025-12-06 - Add PromptNote persistence with CRUD helpers.
 Updates: v0.7.0 - 2025-12-05 - Add ResponseStyle persistence with CRUD helpers.
@@ -22,7 +23,14 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Set
 
-from models.prompt_model import DEFAULT_PROFILE_ID, Prompt, PromptExecution, UserProfile
+from models.prompt_model import (
+    DEFAULT_PROFILE_ID,
+    Prompt,
+    PromptExecution,
+    PromptVersion,
+    PromptForkLink,
+    UserProfile,
+)
 from models.response_style import ResponseStyle
 from models.prompt_note import PromptNote
 
@@ -112,6 +120,13 @@ def _json_loads_dict(value: Optional[str]) -> Dict[str, Any]:
     if isinstance(parsed, dict):
         return {str(key): parsed[key] for key in parsed}
     return {}
+
+
+def _prompt_snapshot_json(prompt: Prompt) -> str:
+    """Return a canonical JSON payload describing the prompt state."""
+
+    record = prompt.to_record()
+    return json.dumps(record, ensure_ascii=False, sort_keys=True)
 
 
 def _parse_optional_datetime(value: Any) -> Optional[datetime]:
@@ -359,6 +374,187 @@ class PromptRepository:
             raise
         except sqlite3.Error as exc:
             raise RepositoryError(f"Failed to delete prompt {prompt_id}") from exc
+
+    # Prompt versioning ------------------------------------------------- #
+
+    def record_prompt_version(
+        self,
+        prompt: Prompt,
+        *,
+        commit_message: Optional[str] = None,
+        parent_version_id: Optional[int] = None,
+    ) -> PromptVersion:
+        """Persist a snapshot of the prompt for version history tracking."""
+
+        snapshot_json = _prompt_snapshot_json(prompt)
+        timestamp = datetime.now(timezone.utc).isoformat()
+
+        try:
+            with _connect(self._db_path) as conn:
+                parent_id = parent_version_id
+                if parent_id is None:
+                    parent_id = self._get_latest_version_id(conn, prompt.id)
+                version_number = self._next_version_number(conn, prompt.id)
+                cursor = conn.execute(
+                    """
+                    INSERT INTO prompt_versions (
+                        prompt_id,
+                        parent_version,
+                        version_number,
+                        created_at,
+                        commit_message,
+                        snapshot_json
+                    ) VALUES (?, ?, ?, ?, ?, ?);
+                    """,
+                    (
+                        str(prompt.id),
+                        parent_id,
+                        version_number,
+                        timestamp,
+                        commit_message,
+                        snapshot_json,
+                    ),
+                )
+                version_id = cursor.lastrowid
+                row = conn.execute(
+                    "SELECT version_id, prompt_id, parent_version, version_number, created_at, commit_message, snapshot_json "
+                    "FROM prompt_versions WHERE version_id = ?;",
+                    (version_id,),
+                ).fetchone()
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to record prompt version") from exc
+
+        if row is None:  # pragma: no cover - defensive
+            raise RepositoryError("Prompt version insert succeeded but row missing")
+
+        return PromptVersion.from_row(row)
+
+    def list_prompt_versions(
+        self,
+        prompt_id: uuid.UUID,
+        *,
+        limit: Optional[int] = None,
+    ) -> List[PromptVersion]:
+        """Return stored versions for a prompt ordered by newest first."""
+
+        query = (
+            "SELECT version_id, prompt_id, parent_version, version_number, created_at, commit_message, snapshot_json "
+            "FROM prompt_versions WHERE prompt_id = ? ORDER BY version_number DESC"
+        )
+        params: List[Any] = [str(prompt_id)]
+        if limit is not None:
+            query += " LIMIT ?"
+            params.append(int(limit))
+
+        try:
+            with _connect(self._db_path) as conn:
+                cursor = conn.execute(query + ";", params)
+                rows = cursor.fetchall()
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to load prompt versions") from exc
+
+        return [PromptVersion.from_row(row) for row in rows]
+
+    def get_prompt_version(self, version_id: int) -> PromptVersion:
+        """Return a specific prompt version by identifier."""
+
+        try:
+            with _connect(self._db_path) as conn:
+                row = conn.execute(
+                    "SELECT version_id, prompt_id, parent_version, version_number, created_at, commit_message, snapshot_json "
+                    "FROM prompt_versions WHERE version_id = ?;",
+                    (int(version_id),),
+                ).fetchone()
+        except sqlite3.Error as exc:
+            raise RepositoryError(f"Failed to load prompt version {version_id}") from exc
+
+        if row is None:
+            raise RepositoryNotFoundError(f"Prompt version {version_id} not found")
+
+        return PromptVersion.from_row(row)
+
+    def get_prompt_latest_version(self, prompt_id: uuid.UUID) -> Optional[PromptVersion]:
+        """Return the most recent version entry for the given prompt, if any."""
+
+        try:
+            with _connect(self._db_path) as conn:
+                row = conn.execute(
+                    "SELECT version_id, prompt_id, parent_version, version_number, created_at, commit_message, snapshot_json "
+                    "FROM prompt_versions WHERE prompt_id = ? ORDER BY version_number DESC LIMIT 1;",
+                    (str(prompt_id),),
+                ).fetchone()
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to load latest prompt version") from exc
+
+        if row is None:
+            return None
+        return PromptVersion.from_row(row)
+
+    def record_prompt_fork(
+        self,
+        source_prompt_id: uuid.UUID,
+        child_prompt_id: uuid.UUID,
+    ) -> PromptForkLink:
+        """Persist lineage information between a prompt and its fork."""
+
+        timestamp = datetime.now(timezone.utc).isoformat()
+        try:
+            with _connect(self._db_path) as conn:
+                cursor = conn.execute(
+                    """
+                    INSERT INTO prompt_forks (source_prompt_id, child_prompt_id, created_at)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(child_prompt_id) DO UPDATE SET
+                        source_prompt_id = excluded.source_prompt_id,
+                        created_at = excluded.created_at;
+                    """,
+                    (str(source_prompt_id), str(child_prompt_id), timestamp),
+                )
+                fork_id = cursor.lastrowid
+                row = conn.execute(
+                    "SELECT fork_id, source_prompt_id, child_prompt_id, created_at FROM prompt_forks WHERE child_prompt_id = ?;",
+                    (str(child_prompt_id),),
+                ).fetchone()
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to record prompt fork") from exc
+
+        if row is None:  # pragma: no cover - defensive
+            raise RepositoryError("Prompt fork insert succeeded but row missing")
+
+        return PromptForkLink.from_row(row)
+
+    def get_prompt_parent_fork(self, prompt_id: uuid.UUID) -> Optional[PromptForkLink]:
+        """Return the lineage entry that links the prompt to its source."""
+
+        try:
+            with _connect(self._db_path) as conn:
+                row = conn.execute(
+                    "SELECT fork_id, source_prompt_id, child_prompt_id, created_at FROM prompt_forks "
+                    "WHERE child_prompt_id = ? ORDER BY datetime(created_at) DESC LIMIT 1;",
+                    (str(prompt_id),),
+                ).fetchone()
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to load prompt parent fork") from exc
+
+        if row is None:
+            return None
+        return PromptForkLink.from_row(row)
+
+    def list_prompt_children(self, prompt_id: uuid.UUID) -> List[PromptForkLink]:
+        """Return lineage entries for prompts forked from the provided prompt."""
+
+        try:
+            with _connect(self._db_path) as conn:
+                cursor = conn.execute(
+                    "SELECT fork_id, source_prompt_id, child_prompt_id, created_at FROM prompt_forks "
+                    "WHERE source_prompt_id = ? ORDER BY datetime(created_at) DESC;",
+                    (str(prompt_id),),
+                )
+                rows = cursor.fetchall()
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to list prompt forks") from exc
+
+        return [PromptForkLink.from_row(row) for row in rows]
 
     def list(self, limit: Optional[int] = None) -> List[Prompt]:
         """Return prompts ordered by most recently modified."""
@@ -642,6 +838,32 @@ class PromptRepository:
         }
         return UserProfile.from_record(payload)
 
+    def _next_version_number(self, conn: sqlite3.Connection, prompt_id: uuid.UUID) -> int:
+        """Return the next version number for the given prompt."""
+
+        row = conn.execute(
+            "SELECT COALESCE(MAX(version_number), 0) AS current FROM prompt_versions WHERE prompt_id = ?;",
+            (str(prompt_id),),
+        ).fetchone()
+        current = row["current"] if row is not None else 0
+        current_value = int(current or 0)
+        return current_value + 1
+
+    def _get_latest_version_id(
+        self,
+        conn: sqlite3.Connection,
+        prompt_id: uuid.UUID,
+    ) -> Optional[int]:
+        """Return the version_id for the latest version of a prompt."""
+
+        row = conn.execute(
+            "SELECT version_id FROM prompt_versions WHERE prompt_id = ? ORDER BY version_number DESC LIMIT 1;",
+            (str(prompt_id),),
+        ).fetchone()
+        if row is None:
+            return None
+        return int(row["version_id"])
+
     def _ensure_schema(self, conn: sqlite3.Connection) -> None:
         """Create required tables if they do not exist."""
         conn.execute(
@@ -681,6 +903,42 @@ class PromptRepository:
         )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_prompts_name ON prompts(name);"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS prompt_versions (
+                version_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                prompt_id TEXT NOT NULL,
+                parent_version INTEGER,
+                version_number INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                commit_message TEXT,
+                snapshot_json TEXT NOT NULL,
+                FOREIGN KEY(prompt_id) REFERENCES prompts(id) ON DELETE CASCADE,
+                FOREIGN KEY(parent_version) REFERENCES prompt_versions(version_id) ON DELETE SET NULL
+            );
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_prompt_versions_prompt_id ON prompt_versions(prompt_id);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_prompt_versions_created_at ON prompt_versions(created_at);"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS prompt_forks (
+                fork_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_prompt_id TEXT NOT NULL,
+                child_prompt_id TEXT NOT NULL UNIQUE,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(source_prompt_id) REFERENCES prompts(id) ON DELETE CASCADE,
+                FOREIGN KEY(child_prompt_id) REFERENCES prompts(id) ON DELETE CASCADE
+            );
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_prompt_forks_source ON prompt_forks(source_prompt_id);"
         )
         conn.execute(
             """
@@ -803,6 +1061,8 @@ class PromptRepository:
 
         try:
             with _connect(self._db_path) as conn:
+                conn.execute("DELETE FROM prompt_versions;")
+                conn.execute("DELETE FROM prompt_forks;")
                 conn.execute("DELETE FROM prompt_executions;")
                 conn.execute("DELETE FROM response_styles;")
                 conn.execute("DELETE FROM prompt_notes;")

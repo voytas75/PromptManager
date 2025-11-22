@@ -1,5 +1,6 @@
 """Prompt data model definitions.
 
+Updates: v0.7.0 - 2025-11-22 - Add prompt versioning and fork lineage dataclasses.
 Updates: v0.6.0 - 2025-12-08 - Remove deprecated task template dataclass.
 Updates: v0.5.1 - 2025-11-19 - Add persisted usage scenarios metadata for prompts.
 Updates: v0.4.0 - 2025-11-11 - Add single-user profile dataclass with preference helpers.
@@ -414,6 +415,74 @@ class PromptExecution:
             metadata=_deserialize_metadata(data.get("metadata")),
         )
 
+
+@dataclass(slots=True)
+class PromptVersion:
+    """Snapshot of a prompt captured for version history tracking."""
+
+    id: int
+    prompt_id: uuid.UUID
+    version_number: int
+    created_at: datetime
+    parent_version_id: Optional[int]
+    commit_message: Optional[str]
+    snapshot: Dict[str, Any]
+
+    def to_prompt(self) -> Prompt:
+        """Hydrate the stored snapshot into a :class:`Prompt`."""
+
+        return Prompt.from_record(self.snapshot)
+
+    @classmethod
+    def from_row(cls, row: Mapping[str, Any]) -> "PromptVersion":
+        """Instantiate a version from a SQLite row payload."""
+
+        raw_snapshot = row["snapshot_json"]
+        if raw_snapshot is None:
+            raise ValueError("Prompt version snapshot is missing")
+        if isinstance(raw_snapshot, (bytes, bytearray)):
+            snapshot_text = raw_snapshot.decode("utf-8")
+        else:
+            snapshot_text = str(raw_snapshot)
+        try:
+            snapshot = json.loads(snapshot_text)
+        except json.JSONDecodeError as exc:  # pragma: no cover - defensive
+            raise ValueError("Invalid prompt snapshot payload") from exc
+
+        parent_value = row["parent_version"] if "parent_version" in row.keys() else None
+        parent_version_id = int(parent_value) if parent_value not in (None, "") else None
+
+        return cls(
+            id=int(row["version_id"]),
+            prompt_id=_ensure_uuid(row["prompt_id"]),
+            version_number=int(row["version_number"]),
+            created_at=_ensure_datetime(row["created_at"]),
+            parent_version_id=parent_version_id,
+            commit_message=row["commit_message"] if "commit_message" in row.keys() else None,
+            snapshot=snapshot,
+        )
+
+
+@dataclass(slots=True)
+class PromptForkLink:
+    """Describe lineage between a source prompt and its fork."""
+
+    id: int
+    source_prompt_id: uuid.UUID
+    child_prompt_id: uuid.UUID
+    created_at: datetime
+
+    @classmethod
+    def from_row(cls, row: Mapping[str, Any]) -> "PromptForkLink":
+        """Hydrate a fork link from a SQLite row payload."""
+
+        return cls(
+            id=int(row["fork_id"]),
+            source_prompt_id=_ensure_uuid(row["source_prompt_id"]),
+            child_prompt_id=_ensure_uuid(row["child_prompt_id"]),
+            created_at=_ensure_datetime(row["created_at"]),
+        )
+
 DEFAULT_PROFILE_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
 
@@ -545,6 +614,8 @@ class UserProfile:
 __all__ = [
     "Prompt",
     "PromptExecution",
+    "PromptVersion",
+    "PromptForkLink",
     "ExecutionStatus",
     "UserProfile",
     "DEFAULT_PROFILE_ID",

@@ -1,5 +1,6 @@
 """Prompt Manager package façade and orchestration layer.
 
+Updates: v0.13.16 - 2025-12-09 - Add prompt versioning, diffing, and forking workflows.
 Updates: v0.13.15 - 2025-12-08 - Remove task template APIs and diagnostics wiring.
 Updates: v0.13.14 - 2025-12-07 - Add embedding rebuild helper for CLI workflows.
 Updates: v0.13.13 - 2025-12-06 - Add PromptNote CRUD APIs and Notes GUI wiring.
@@ -31,17 +32,17 @@ Updates: v0.1.0 - 2025-10-30 - Initial PromptManager with CRUD and search suppor
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple, Union, cast
-
+import difflib
 import json
 import logging
 import os
 import shutil
 import sqlite3
 import uuid
+from dataclasses import dataclass, replace
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple, Union, cast
 
 # ---------------------------------------------------------------------------
 # NOTE: Transitional refactor
@@ -112,7 +113,7 @@ except ImportError:  # pragma: no cover - redis optional during development
     redis = None  # type: ignore
     RedisError = Exception  # type: ignore[misc,assignment]
 
-from models.prompt_model import Prompt, PromptExecution, UserProfile
+from models.prompt_model import Prompt, PromptExecution, PromptVersion, PromptForkLink, UserProfile
 from models.response_style import ResponseStyle
 from models.prompt_note import PromptNote
 
@@ -147,7 +148,7 @@ from ..notifications import (
 # Re‑export shared exception classes from centralised module to preserve the
 # original import path ``core.prompt_manager.PromptManagerError`` etc. during
 # the deprecation window.
-from ..exceptions import (  # noqa: F401 – re‑export for backward compatibility
+from ..exceptions import (  # noqa: F401 – re-export for backward compatibility
     PromptManagerError,
     PromptNotFoundError,
     PromptExecutionUnavailable,
@@ -156,6 +157,8 @@ from ..exceptions import (  # noqa: F401 – re‑export for backward compatibil
     PromptStorageError,
     PromptCacheError,
     PromptEngineeringUnavailable,
+    PromptVersionError,
+    PromptVersionNotFoundError,
     ResponseStyleError,
     ResponseStyleNotFoundError,
     ResponseStyleStorageError,
@@ -409,6 +412,16 @@ class PromptManager:
         result: CodexExecutionResult
         history_entry: Optional[PromptExecution]
         conversation: List[Dict[str, str]]
+
+    @dataclass(slots=True)
+    class PromptVersionDiff:
+        """Diff payload surfaced when comparing two prompt versions."""
+
+        prompt_id: uuid.UUID
+        base_version: PromptVersion
+        target_version: PromptVersion
+        changed_fields: Dict[str, Dict[str, Any]]
+        body_diff: str
 
     @property
     def collection(self) -> Collection:
@@ -1408,6 +1421,8 @@ class PromptManager:
         self,
         prompt: Prompt,
         embedding: Optional[Sequence[float]] = None,
+        *,
+        commit_message: Optional[str] = None,
     ) -> Prompt:
         """Persist a new prompt in SQLite/ChromaDB and prime the cache."""
         generated_embedding: Optional[List[float]] = None
@@ -1448,6 +1463,15 @@ class PromptManager:
                     "Prompt created but not cached",
                     extra={"prompt_id": str(prompt.id)},
                 )
+        version = self._commit_prompt_version(stored_prompt, commit_message=commit_message)
+        logger.debug(
+            "Prompt version committed",
+            extra={
+                "prompt_id": str(stored_prompt.id),
+                "version_id": version.id,
+                "version_number": version.version_number,
+            },
+        )
         return stored_prompt
 
     def get_prompt(self, prompt_id: uuid.UUID) -> Prompt:
@@ -1474,6 +1498,8 @@ class PromptManager:
         self,
         prompt: Prompt,
         embedding: Optional[Sequence[float]] = None,
+        *,
+        commit_message: Optional[str] = None,
     ) -> Prompt:
         """Update an existing prompt with new metadata."""
         generated_embedding: Optional[List[float]] = None
@@ -1506,6 +1532,15 @@ class PromptManager:
                     "Prompt updated but cache refresh failed",
                     extra={"prompt_id": str(prompt.id)},
                 )
+        version = self._commit_prompt_version(updated_prompt, commit_message=commit_message)
+        logger.debug(
+            "Prompt version committed",
+            extra={
+                "prompt_id": str(updated_prompt.id),
+                "version_id": version.id,
+                "version_number": version.version_number,
+            },
+        )
         return updated_prompt
 
     def delete_prompt(self, prompt_id: uuid.UUID) -> None:
@@ -1527,6 +1562,212 @@ class PromptManager:
                 "Prompt deleted but cache eviction failed",
                 extra={"prompt_id": str(prompt_id)},
             )
+
+    # Prompt versioning ------------------------------------------------- #
+
+    def list_prompt_versions(
+        self,
+        prompt_id: uuid.UUID,
+        *,
+        limit: Optional[int] = None,
+    ) -> List[PromptVersion]:
+        """Return committed versions for the specified prompt."""
+
+        try:
+            return self._repository.list_prompt_versions(prompt_id, limit=limit)
+        except RepositoryError as exc:
+            raise PromptVersionError("Unable to load prompt versions") from exc
+
+    def get_prompt_version(self, version_id: int) -> PromptVersion:
+        """Return a stored prompt version by identifier."""
+
+        try:
+            return self._repository.get_prompt_version(version_id)
+        except RepositoryNotFoundError as exc:
+            raise PromptVersionNotFoundError(f"Prompt version {version_id} not found") from exc
+        except RepositoryError as exc:
+            raise PromptVersionError(f"Unable to load prompt version {version_id}") from exc
+
+    def get_latest_prompt_version(self, prompt_id: uuid.UUID) -> Optional[PromptVersion]:
+        """Return the most recent version for the prompt, if one exists."""
+
+        try:
+            return self._repository.get_prompt_latest_version(prompt_id)
+        except RepositoryError as exc:
+            raise PromptVersionError("Unable to load latest prompt version") from exc
+
+    def diff_prompt_versions(
+        self,
+        base_version_id: int,
+        target_version_id: int,
+    ) -> "PromptVersionDiff":
+        """Return a structured diff between two version snapshots."""
+
+        base_version = self.get_prompt_version(base_version_id)
+        target_version = self.get_prompt_version(target_version_id)
+        if base_version.prompt_id != target_version.prompt_id:
+            raise PromptVersionError("Versions belong to different prompts")
+
+        changed_fields: Dict[str, Dict[str, Any]] = {}
+        keys = set(base_version.snapshot.keys()) | set(target_version.snapshot.keys())
+        for key in sorted(keys):
+            base_value = base_version.snapshot.get(key)
+            target_value = target_version.snapshot.get(key)
+            if base_value != target_value:
+                changed_fields[key] = {"from": base_value, "to": target_value}
+
+        base_body = str(base_version.snapshot.get("context") or "")
+        target_body = str(target_version.snapshot.get("context") or "")
+        body_diff = self._render_text_diff(
+            base_body,
+            target_body,
+            label_a=f"v{base_version.version_number}",
+            label_b=f"v{target_version.version_number}",
+        )
+
+        return self.PromptVersionDiff(
+            prompt_id=base_version.prompt_id,
+            base_version=base_version,
+            target_version=target_version,
+            changed_fields=changed_fields,
+            body_diff=body_diff,
+        )
+
+    def restore_prompt_version(
+        self,
+        version_id: int,
+        *,
+        commit_message: Optional[str] = None,
+    ) -> Prompt:
+        """Replace the live prompt with the contents of the specified version."""
+
+        version = self.get_prompt_version(version_id)
+        prompt = version.to_prompt()
+        prompt.last_modified = datetime.now(timezone.utc)
+        message = commit_message or f"Restore version {version.version_number}"
+        return self.update_prompt(prompt, commit_message=message)
+
+    def merge_prompt_versions(
+        self,
+        prompt_id: uuid.UUID,
+        *,
+        base_version_id: int,
+        incoming_version_id: int,
+        persist: bool = False,
+        commit_message: Optional[str] = None,
+    ) -> Tuple[Prompt, List[str]]:
+        """Perform a simple three-way merge and optionally persist the result."""
+
+        base_version = self.get_prompt_version(base_version_id)
+        incoming_version = self.get_prompt_version(incoming_version_id)
+        if base_version.prompt_id != prompt_id or incoming_version.prompt_id != prompt_id:
+            raise PromptVersionError("Versions do not belong to the requested prompt")
+
+        current_prompt = self.get_prompt(prompt_id)
+        merged_snapshot = dict(current_prompt.to_record())
+        base_snapshot = base_version.snapshot
+        incoming_snapshot = incoming_version.snapshot
+        conflicts: List[str] = []
+        merge_fields = {
+            "context",
+            "description",
+            "tags",
+            "category",
+            "language",
+            "example_input",
+            "example_output",
+            "scenarios",
+            "ext1",
+            "ext2",
+            "ext3",
+            "ext4",
+            "ext5",
+        }
+
+        for field in merge_fields:
+            base_value = base_snapshot.get(field)
+            incoming_value = incoming_snapshot.get(field)
+            current_value = merged_snapshot.get(field)
+            if incoming_value == base_value:
+                continue
+            if current_value == base_value:
+                merged_snapshot[field] = incoming_value
+            elif current_value == incoming_value:
+                continue
+            else:
+                merged_snapshot[field] = incoming_value
+                conflicts.append(field)
+
+        merged_prompt = Prompt.from_record(merged_snapshot)
+        merged_prompt.last_modified = datetime.now(timezone.utc)
+
+        if not persist:
+            return merged_prompt, conflicts
+
+        message = commit_message or (
+            f"Merge versions {base_version.version_number} -> {incoming_version.version_number}"
+        )
+        stored = self.update_prompt(merged_prompt, commit_message=message)
+        return stored, conflicts
+
+    def fork_prompt(
+        self,
+        prompt_id: uuid.UUID,
+        *,
+        name: Optional[str] = None,
+        commit_message: Optional[str] = None,
+    ) -> Prompt:
+        """Create a new prompt based on the referenced prompt."""
+
+        source_prompt = self.get_prompt(prompt_id)
+        now = datetime.now(timezone.utc)
+        fork_name = name or f"{source_prompt.name} (fork)"
+        related_prompts = list(source_prompt.related_prompts)
+        source_id_text = str(source_prompt.id)
+        if source_id_text not in related_prompts:
+            related_prompts.append(source_id_text)
+
+        forked_prompt = replace(
+            source_prompt,
+            id=uuid.uuid4(),
+            name=fork_name,
+            last_modified=now,
+            created_at=now,
+            usage_count=0,
+            rating_count=0,
+            rating_sum=0.0,
+            similarity=None,
+            source="fork",
+            related_prompts=related_prompts,
+        )
+        forked_prompt.quality_score = source_prompt.quality_score
+        stored = self.create_prompt(
+            forked_prompt,
+            commit_message=commit_message or f"Forked from {source_prompt.name}",
+        )
+
+        try:
+            self._repository.record_prompt_fork(source_prompt.id, stored.id)
+        except RepositoryError as exc:
+            raise PromptVersionError("Failed to record prompt fork relationship") from exc
+
+        return stored
+
+    def list_prompt_forks(self, prompt_id: uuid.UUID) -> List[PromptForkLink]:
+        """Return lineage entries for children derived from the prompt."""
+
+        try:
+            return self._repository.list_prompt_children(prompt_id)
+        except RepositoryError as exc:
+            raise PromptVersionError("Unable to load prompt forks") from exc
+
+    def get_prompt_parent_fork(self, prompt_id: uuid.UUID) -> Optional[PromptForkLink]:
+        """Return the recorded parent for a forked prompt, if any."""
+
+        try:
+            return self._repository.get_prompt_parent_fork(prompt_id)
+        except RepositoryError as exc:
+            raise PromptVersionError("Unable to load fork lineage") from exc
 
     # Response style management ----------------------------------------- #
 
@@ -1888,6 +2129,43 @@ class PromptManager:
                 extra={"prompt_id": str(prompt_id)},
                 exc_info=True,
             )
+
+    def _commit_prompt_version(
+        self,
+        prompt: Prompt,
+        *,
+        commit_message: Optional[str] = None,
+        parent_version_id: Optional[int] = None,
+    ) -> PromptVersion:
+        """Persist a version snapshot for the provided prompt."""
+
+        try:
+            return self._repository.record_prompt_version(
+                prompt,
+                commit_message=commit_message,
+                parent_version_id=parent_version_id,
+            )
+        except RepositoryError as exc:
+            raise PromptVersionError(f"Failed to record version for prompt {prompt.id}") from exc
+
+    @staticmethod
+    def _render_text_diff(
+        before: str,
+        after: str,
+        *,
+        label_a: str = "before",
+        label_b: str = "after",
+    ) -> str:
+        """Return a unified diff for the provided text blocks."""
+
+        diff = difflib.unified_diff(
+            before.splitlines(),
+            after.splitlines(),
+            fromfile=label_a,
+            tofile=label_b,
+            lineterm="",
+        )
+        return "\n".join(diff)
 
     # Cache helpers ----------------------------------------------------- #
 

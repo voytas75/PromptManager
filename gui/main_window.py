@@ -64,6 +64,7 @@ import logging
 import uuid
 from collections import deque
 from collections.abc import Mapping
+from datetime import datetime, timezone
 from html import escape
 from enum import Enum
 from pathlib import Path
@@ -140,6 +141,8 @@ from core import (
     PromptHistoryError,
     PromptNotFoundError,
     PromptStorageError,
+    PromptVersionError,
+    PromptVersionNotFoundError,
     RepositoryError,
     diff_prompt_catalog,
     export_prompt_catalog,
@@ -157,6 +160,7 @@ from .dialogs import (
     MarkdownPreviewDialog,
     PromptDialog,
     PromptMaintenanceDialog,
+    PromptVersionHistoryDialog,
     SaveResultDialog,
 )
 from .history_panel import HistoryPanel
@@ -285,6 +289,11 @@ class PromptDetailWidget(QWidget):
         self._rating_label = QLabel("Rating: n/a", content)
         self._description = QLabel("", content)
         self._description.setWordWrap(True)
+        self._lineage_label = QLabel("", content)
+        self._lineage_label.setObjectName("promptLineage")
+        self._lineage_label.setWordWrap(True)
+        self._lineage_label.setStyleSheet("color: #4b5563;")
+        self._lineage_label.setVisible(False)
 
         self._context = QLabel("", content)
         self._context.setWordWrap(True)
@@ -298,6 +307,8 @@ class PromptDetailWidget(QWidget):
         content_layout.addWidget(self._rating_label)
         content_layout.addSpacing(4)
         content_layout.addWidget(self._description)
+        content_layout.addSpacing(6)
+        content_layout.addWidget(self._lineage_label)
         content_layout.addSpacing(8)
         content_layout.addWidget(self._context)
         content_layout.addSpacing(8)
@@ -361,6 +372,18 @@ class PromptDetailWidget(QWidget):
         actions_layout = QHBoxLayout()
         actions_layout.setContentsMargins(0, 0, 0, 0)
         actions_layout.addStretch(1)
+
+        self._fork_button = QPushButton("Fork Prompt", content)
+        self._fork_button.setObjectName("forkPromptButton")
+        self._fork_button.setEnabled(False)
+        self._fork_button.clicked.connect(self.fork_requested.emit)  # type: ignore[arg-type]
+        actions_layout.addWidget(self._fork_button)
+
+        self._version_history_button = QPushButton("Version History", content)
+        self._version_history_button.setObjectName("versionHistoryButton")
+        self._version_history_button.setEnabled(False)
+        self._version_history_button.clicked.connect(self.version_history_requested.emit)  # type: ignore[arg-type]
+        actions_layout.addWidget(self._version_history_button)
 
         self._edit_button = QPushButton("Edit Prompt", content)
         self._edit_button.setObjectName("editPromptButton")
@@ -431,6 +454,8 @@ class PromptDetailWidget(QWidget):
         self._all_metadata_button.setEnabled(True)
         self._edit_button.setEnabled(True)
         self._delete_button.setEnabled(True)
+        self._fork_button.setEnabled(True)
+        self._version_history_button.setEnabled(True)
 
     def clear(self) -> None:
         """Reset the panel to its empty state."""
@@ -449,6 +474,10 @@ class PromptDetailWidget(QWidget):
         self._current_prompt = None
         self._edit_button.setEnabled(False)
         self._delete_button.setEnabled(False)
+        self._fork_button.setEnabled(False)
+        self._version_history_button.setEnabled(False)
+        self._lineage_label.clear()
+        self._lineage_label.setVisible(False)
 
     def _ensure_metadata_visible(self, title: str, payload: str) -> None:
         """Reveal the metadata widget with the provided payload."""
@@ -488,6 +517,16 @@ class PromptDetailWidget(QWidget):
         """Display the full prompt metadata payload."""
 
         self._toggle_metadata("Metadata (All)", self._full_metadata_text)
+
+    def update_lineage_summary(self, text: Optional[str]) -> None:
+        """Display lineage/version info beneath the description."""
+
+        if text:
+            self._lineage_label.setText(text)
+            self._lineage_label.setVisible(True)
+        else:
+            self._lineage_label.clear()
+            self._lineage_label.setVisible(False)
 
 
 class FlowLayout(QLayout):
@@ -604,6 +643,8 @@ class MainWindow(QMainWindow):
         self._detail_widget = PromptDetailWidget(self)
         self._detail_widget.delete_requested.connect(self._on_delete_clicked)  # type: ignore[arg-type]
         self._detail_widget.edit_requested.connect(self._on_edit_clicked)  # type: ignore[arg-type]
+        self._detail_widget.version_history_requested.connect(self._open_version_history_dialog)  # type: ignore[arg-type]
+        self._detail_widget.fork_requested.connect(self._on_fork_clicked)  # type: ignore[arg-type]
         self._all_prompts: List[Prompt] = []
         self._current_prompts: List[Prompt] = []
         self._preserve_search_order: bool = False
@@ -2450,6 +2491,7 @@ class MainWindow(QMainWindow):
         menu = QMenu(self)
         edit_action = menu.addAction("Edit Prompt")
         duplicate_action = menu.addAction("Duplicate Prompt")
+        fork_action = menu.addAction("Fork Prompt")
         execute_action = menu.addAction("Execute Prompt")
         copy_action = menu.addAction("Copy Prompt Text")
         description_action = menu.addAction("Show Description")
@@ -2457,12 +2499,14 @@ class MainWindow(QMainWindow):
         if prompt is None:
             edit_action.setEnabled(False)
             duplicate_action.setEnabled(False)
+            fork_action.setEnabled(False)
             execute_action.setEnabled(False)
             copy_action.setEnabled(False)
             description_action.setEnabled(False)
         else:
             can_execute = bool((prompt.context or prompt.description) and self._manager.executor)
             execute_action.setEnabled(can_execute)
+            fork_action.setEnabled(True)
             if not (prompt.context or prompt.description):
                 copy_action.setEnabled(False)
             if not (prompt.description and prompt.description.strip()):
@@ -2475,6 +2519,8 @@ class MainWindow(QMainWindow):
             self._on_edit_clicked()
         elif selected_action is duplicate_action and prompt is not None:
             self._duplicate_prompt(prompt)
+        elif selected_action is fork_action and prompt is not None:
+            self._fork_prompt(prompt)
         elif selected_action is execute_action and prompt is not None:
             self._execute_prompt_from_context_menu(prompt)
         elif selected_action is copy_action and prompt is not None:
@@ -2533,6 +2579,38 @@ class MainWindow(QMainWindow):
         self._load_prompts(self._search_input.text())
         self._select_prompt(created.id)
         self.statusBar().showMessage("Prompt duplicated.", 4000)
+
+    def _fork_prompt(self, prompt: Prompt) -> None:
+        """Fork the selected prompt and allow optional edits before saving."""
+
+        try:
+            forked = self._manager.fork_prompt(prompt.id)
+        except PromptManagerError as exc:
+            self._show_error("Unable to fork prompt", str(exc))
+            return
+
+        dialog = PromptDialog(
+            self,
+            name_generator=self._generate_prompt_name,
+            description_generator=self._generate_prompt_description,
+            category_generator=self._generate_prompt_category,
+            tags_generator=self._generate_prompt_tags,
+            scenario_generator=self._generate_prompt_scenarios,
+            prompt_engineer=(
+                self._refine_prompt_body if self._manager.prompt_engineer is not None else None
+            ),
+        )
+        dialog.prefill_from_prompt(forked)
+        dialog.setWindowTitle("Edit Forked Prompt")
+        if dialog.exec() == QDialog.Accepted and dialog.result_prompt is not None:
+            try:
+                forked = self._manager.update_prompt(dialog.result_prompt)
+            except PromptManagerError as exc:
+                self._show_error("Unable to save forked prompt", str(exc))
+                return
+        self._load_prompts(self._search_input.text())
+        self._select_prompt(forked.id)
+        self.statusBar().showMessage("Prompt fork created.", 4000)
 
     def _on_refresh_clicked(self) -> None:
         """Reload catalogue data, respecting the current search text."""
@@ -2607,6 +2685,14 @@ class MainWindow(QMainWindow):
         self._load_prompts(self._search_input.text())
         self._select_prompt(stored.id)
 
+    def _on_fork_clicked(self) -> None:
+        """Handle toolbar fork button taps."""
+
+        prompt = self._current_prompt()
+        if prompt is None:
+            return
+        self._fork_prompt(prompt)
+
     def _on_delete_clicked(self) -> None:
         """Remove the selected prompt after confirmation."""
 
@@ -2614,6 +2700,26 @@ class MainWindow(QMainWindow):
         if prompt is None:
             return
         self._delete_prompt(prompt)
+
+    def _open_version_history_dialog(self) -> None:
+        """Open the version history dialog for the selected prompt."""
+
+        prompt = self._current_prompt()
+        if prompt is None:
+            return
+        dialog = PromptVersionHistoryDialog(
+            self._manager,
+            prompt,
+            self,
+            status_callback=self._show_status_message,
+        )
+        dialog.exec()
+        if dialog.last_restored_prompt is not None:
+            self._load_prompts(self._search_input.text())
+            self._select_prompt(dialog.last_restored_prompt.id)
+            self.statusBar().showMessage("Prompt restored to selected version.", 4000)
+        else:
+            self._update_prompt_lineage_summary(prompt)
 
     def _on_prompt_applied(self, prompt: Prompt, dialog: PromptDialog) -> None:
         """Persist prompt edits triggered via the Apply button."""
@@ -3065,6 +3171,7 @@ class MainWindow(QMainWindow):
         if self._chat_prompt_id and prompt.id != self._chat_prompt_id:
             self._reset_chat_session()
         self._detail_widget.display_prompt(prompt)
+        self._update_prompt_lineage_summary(prompt)
 
     def _select_prompt(self, prompt_id: uuid.UUID) -> None:
         """Highlight the given prompt in the list view when present."""
@@ -3074,6 +3181,40 @@ class MainWindow(QMainWindow):
                 index = self._model.index(row, 0)
                 self._list_view.setCurrentIndex(index)
                 break
+
+    def _update_prompt_lineage_summary(self, prompt: Prompt) -> None:
+        """Fetch version/fork metadata for the detail pane."""
+
+        try:
+            latest = self._manager.get_latest_prompt_version(prompt.id)
+        except (PromptVersionError, PromptVersionNotFoundError):
+            self._detail_widget.update_lineage_summary("Version info unavailable.")
+            return
+
+        summary_parts: List[str] = []
+        if latest is not None:
+            summary_parts.append(
+                f"Latest v{latest.version_number} ({self._format_timestamp(latest.created_at)})"
+            )
+        else:
+            summary_parts.append("No versions yet")
+
+        try:
+            parent_link = self._manager.get_prompt_parent_fork(prompt.id)
+        except PromptVersionError:
+            parent_link = None
+        if parent_link is not None:
+            summary_parts.append(f"Forked from {parent_link.source_prompt_id}")
+
+        try:
+            children = self._manager.list_prompt_forks(prompt.id)
+        except PromptVersionError:
+            children = []
+        if children:
+            child_label = "fork" if len(children) == 1 else "forks"
+            summary_parts.append(f"{len(children)} {child_label}")
+
+        self._detail_widget.update_lineage_summary(" | ".join(summary_parts))
 
     def _handle_notification(self, notification: Notification) -> None:
         """React to notification updates published by the core manager."""
@@ -3131,6 +3272,12 @@ class MainWindow(QMainWindow):
         if len(text) <= limit:
             return text
         return f"{text[: limit - 1].rstrip()}…"
+
+    @staticmethod
+    def _format_timestamp(value: datetime) -> str:
+        """Return a compact UTC timestamp for lineage summaries."""
+
+        return value.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
     def _show_error(self, title: str, message: str) -> None:
         """Display an error dialog and log to status bar."""
