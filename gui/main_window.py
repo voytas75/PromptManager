@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.35 - 2025-11-22 - Align version display with schema metadata in the prompt summary pane.
 Updates: v0.15.34 - 2025-11-22 - Add headings to the prompt summary view and truncate body previews.
 Updates: v0.15.33 - 2025-11-22 - Add structure-only prompt refinement action to the editor dialog.
 Updates: v0.15.32 - 2025-11-22 - Ensure forked prompts edit the stored entry so saves succeed.
@@ -145,7 +146,6 @@ from core import (
     PromptNotFoundError,
     PromptStorageError,
     PromptVersionError,
-    PromptVersionNotFoundError,
     RepositoryError,
     diff_prompt_catalog,
     export_prompt_catalog,
@@ -3261,19 +3261,12 @@ class MainWindow(QMainWindow):
     def _update_prompt_lineage_summary(self, prompt: Prompt) -> None:
         """Fetch version/fork metadata for the detail pane."""
 
-        try:
-            latest = self._manager.get_latest_prompt_version(prompt.id)
-        except (PromptVersionError, PromptVersionNotFoundError):
-            self._detail_widget.update_lineage_summary("Version info unavailable.")
-            return
-
         summary_parts: List[str] = []
-        if latest is not None:
-            summary_parts.append(
-                f"Latest v{latest.version_number} ({self._format_timestamp(latest.created_at)})"
-            )
+        schema_version = (prompt.version or "").strip()
+        if schema_version:
+            summary_parts.append(f"Version {schema_version}")
         else:
-            summary_parts.append("No versions yet")
+            summary_parts.append("Version unknown")
 
         try:
             parent_link = self._manager.get_prompt_parent_fork(prompt.id)
