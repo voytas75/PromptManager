@@ -10,7 +10,7 @@ import json
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 import pytest
 
@@ -25,11 +25,16 @@ from core.prompt_manager import (
     RepositoryNotFoundError,
 )
 from core.name_generation import DescriptionGenerationError
+from models.category_model import PromptCategory, slugify_category
 from models.prompt_model import Prompt, PromptForkLink, PromptVersion, UserProfile
 
 
 def _clone_prompt(prompt: Prompt) -> Prompt:
     return Prompt.from_record(prompt.to_record())
+
+
+def _clone_category(category: PromptCategory) -> PromptCategory:
+    return PromptCategory.from_record(category.to_record())
 
 
 @dataclass
@@ -94,6 +99,12 @@ class _RecordingRepository:
         self._version_counter = 0
         self._fork_links: Dict[int, PromptForkLink] = {}
         self._fork_counter = 0
+        base_category = PromptCategory(
+            slug="general",
+            label="General",
+            description="General prompts",
+        )
+        self._categories: Dict[str, PromptCategory] = {base_category.slug: base_category}
 
     def add(self, prompt: Prompt) -> Prompt:
         self.storage[prompt.id] = _clone_prompt(prompt)
@@ -122,6 +133,68 @@ class _RecordingRepository:
             for prompt in self.storage.values()
         ]
         return values[:limit] if limit is not None else values
+
+    def list_categories(self, include_archived: bool = False) -> List[PromptCategory]:
+        categories = [
+            _clone_category(category)
+            for category in self._categories.values()
+            if include_archived or category.is_active
+        ]
+        categories.sort(key=lambda category: category.label.lower())
+        return categories
+
+    def create_category(self, category: PromptCategory) -> PromptCategory:
+        slug = slugify_category(category.slug)
+        if slug in self._categories:
+            raise RepositoryError(f"Category {slug} already exists")
+        stored = _clone_category(category)
+        stored.slug = slug
+        self._categories[slug] = stored
+        return _clone_category(stored)
+
+    def update_category(self, category: PromptCategory) -> PromptCategory:
+        slug = slugify_category(category.slug)
+        if slug not in self._categories:
+            raise RepositoryNotFoundError(f"Category {slug} not found")
+        stored = _clone_category(category)
+        stored.slug = slug
+        self._categories[slug] = stored
+        self.update_prompt_category_labels(slug, stored.label)
+        return _clone_category(stored)
+
+    def set_category_active(self, slug: str, is_active: bool) -> PromptCategory:
+        normalized = slugify_category(slug)
+        if normalized not in self._categories:
+            raise RepositoryNotFoundError(f"Category {slug} not found")
+        category = _clone_category(self._categories[normalized])
+        category.is_active = is_active
+        category.updated_at = datetime.now(timezone.utc)
+        self._categories[normalized] = category
+        return _clone_category(category)
+
+    def sync_category_definitions(
+        self,
+        categories: Sequence[PromptCategory],
+    ) -> List[PromptCategory]:
+        created: List[PromptCategory] = []
+        for category in categories:
+            slug = slugify_category(category.slug)
+            if slug in self._categories:
+                continue
+            stored = _clone_category(category)
+            stored.slug = slug
+            self._categories[slug] = stored
+            created.append(_clone_category(stored))
+        return created
+
+    def update_prompt_category_labels(self, slug: str, label: str) -> None:
+        normalized = slugify_category(slug)
+        for prompt in self.storage.values():
+            prompt_slug = prompt.category_slug or slugify_category(prompt.category)
+            if prompt_slug != normalized:
+                continue
+            prompt.category = label
+            prompt.category_slug = normalized
 
     def get_user_profile(self) -> UserProfile:
         return self.profile

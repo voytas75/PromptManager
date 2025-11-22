@@ -47,6 +47,9 @@ from .prompt_manager import (
     PromptNoteError,
     PromptNoteNotFoundError,
     PromptNoteStorageError,
+    CategoryError,
+    CategoryNotFoundError,
+    CategoryStorageError,
 )
 from .name_generation import NameGenerationError, DescriptionGenerationError, LiteLLMDescriptionGenerator
 from .scenario_generation import LiteLLMScenarioGenerator, ScenarioGenerationError
@@ -62,8 +65,10 @@ from .notifications import (
     notification_center,
 )
 from .prompt_engineering import PromptEngineer, PromptEngineeringError, PromptRefinement
+from .category_registry import CategoryRegistry
 from models.response_style import ResponseStyle
 from models.prompt_note import PromptNote
+from models.category_model import PromptCategory
 
 __all__ = [
     "PromptManager",
@@ -83,9 +88,14 @@ __all__ = [
     "PromptNoteError",
     "PromptNoteNotFoundError",
     "PromptNoteStorageError",
+    "CategoryError",
+    "CategoryNotFoundError",
+    "CategoryStorageError",
     "PromptRepository",
     "RepositoryError",
     "RepositoryNotFoundError",
+    "CategoryRegistry",
+    "PromptCategory",
     "ResponseStyle",
     "PromptNote",
     "build_prompt_manager",

@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.37 - 2025-11-22 - Add category manager dialog and registry-backed filters.
 Updates: v0.15.36 - 2025-11-22 - Compact prompt detail view with inline italic labels and single version source.
 Updates: v0.15.35 - 2025-11-22 - Align version display with schema metadata in the prompt summary pane.
 Updates: v0.15.34 - 2025-11-22 - Add headings to the prompt summary view and truncate body previews.
@@ -154,11 +155,13 @@ from core import (
 )
 from core.prompt_engineering import PromptRefinement
 from core.notifications import Notification, NotificationStatus
+from models.category_model import slugify_category
 from models.prompt_model import Prompt
 
 from .command_palette import CommandPaletteDialog, QuickAction, rank_prompts_for_action
 from .code_highlighter import CodeHighlighter
 from .dialogs import (
+    CategoryManagerDialog,
     CatalogPreviewDialog,
     InfoDialog,
     MarkdownPreviewDialog,
@@ -965,6 +968,10 @@ class MainWindow(QMainWindow):
         self._category_filter = QComboBox(self)
         self._category_filter.addItem("All categories", None)
         self._category_filter.currentIndexChanged.connect(self._on_filters_changed)
+        self._manage_categories_button = QToolButton(self)
+        self._manage_categories_button.setText("Manage")
+        self._manage_categories_button.setToolTip("Manage prompt categories.")
+        self._manage_categories_button.clicked.connect(self._on_manage_categories_clicked)  # type: ignore[arg-type]
 
         self._tag_filter = QComboBox(self)
         self._tag_filter.addItem("All tags", None)
@@ -983,6 +990,7 @@ class MainWindow(QMainWindow):
 
         filter_layout.addWidget(QLabel("Category:", self))
         filter_layout.addWidget(self._category_filter)
+        filter_layout.addWidget(self._manage_categories_button)
         filter_layout.addWidget(QLabel("Tag:", self))
         filter_layout.addWidget(self._tag_filter)
         filter_layout.addWidget(QLabel("Quality ≥", self))
@@ -1318,16 +1326,25 @@ class MainWindow(QMainWindow):
     def _populate_filters(self, prompts: Sequence[Prompt]) -> None:
         """Refresh category and tag filters based on available prompts."""
 
-        categories = sorted({prompt.category for prompt in prompts if prompt.category})
+        self._populate_category_filter()
+        self._populate_tag_filter(prompts)
+
+    def _populate_category_filter(self) -> None:
+        """Populate the category filter from the registry."""
+
+        categories = self._manager.list_categories()
         current_category = self._category_filter.currentData()
         self._category_filter.blockSignals(True)
         self._category_filter.clear()
         self._category_filter.addItem("All categories", None)
         for category in categories:
-            self._category_filter.addItem(category, category)
+            self._category_filter.addItem(category.label, category.slug)
         category_index = self._category_filter.findData(current_category)
         self._category_filter.setCurrentIndex(category_index if category_index != -1 else 0)
         self._category_filter.blockSignals(False)
+
+    def _populate_tag_filter(self, prompts: Sequence[Prompt]) -> None:
+        """Populate the tag filter options."""
 
         tags = sorted({tag for prompt in prompts for tag in prompt.tags})
         current_tag = self._tag_filter.currentData()
@@ -1340,6 +1357,24 @@ class MainWindow(QMainWindow):
         self._tag_filter.setCurrentIndex(tag_index if tag_index != -1 else 0)
         self._tag_filter.blockSignals(False)
 
+    def _on_manage_categories_clicked(self) -> None:
+        """Open the category management dialog."""
+
+        dialog = CategoryManagerDialog(self._manager, self)
+        dialog.exec()
+        if dialog.has_changes:
+            self._load_prompts(self._search_input.text())
+        else:
+            self._populate_category_filter()
+
+    @staticmethod
+    def _prompt_category_slug(prompt: Prompt) -> Optional[str]:
+        """Return the prompt's category slug, deriving it when missing."""
+
+        if prompt.category_slug:
+            return prompt.category_slug
+        return slugify_category(prompt.category)
+
     def _apply_filters(self, prompts: Sequence[Prompt]) -> List[Prompt]:
         """Apply category, tag, and quality filters to a prompt sequence."""
 
@@ -1349,8 +1384,10 @@ class MainWindow(QMainWindow):
 
         filtered: List[Prompt] = []
         for prompt in prompts:
-            if selected_category and prompt.category != selected_category:
-                continue
+            if selected_category:
+                prompt_slug = self._prompt_category_slug(prompt)
+                if prompt_slug != selected_category:
+                    continue
             if selected_tag and selected_tag not in prompt.tags:
                 continue
             if min_quality > 0.0:

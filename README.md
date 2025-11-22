@@ -142,6 +142,7 @@ Scores are computed as `1 − distance` returned by ChromaDB and indicate how 
 - The workspace toolbar focuses on detection/suggestion/execution flows; quick actions (via the palette or shortcuts) remain the primary way to insert starter text without touching stored prompts.
 
 - Use the category, tag, and minimum-quality filters above the list to narrow results as your catalogue grows.
+- Click **Manage** next to the category filter to open the new taxonomy dialog, where you can add, rename, or archive categories; changes immediately update stored prompts and filter options.
 
 - Dialogs validate required fields and surface backend errors with actionable messaging while keeping data in sync across SQLite, Redis, and ChromaDB.
 - When adding prompts the dialog can generate a name from the context field via the **Generate** button. Configure LiteLLM (model + API key) so this suggestion comes from your chosen LLM; otherwise the UI falls back to a heuristic title.
@@ -196,6 +197,7 @@ These commands reuse the same validation logic as the GUI; pass an explicit path
 
 - Optional fields (`language`, `related_prompts`, `created_at`, `last_modified`, `usage_count`, `source`, and extension slots) map directly to the `Prompt` dataclass. Missing values fall back to sensible defaults and invalid entries are logged during import.
 - Populate `category`, `tags`, and `quality_score` to get the most value from the GUI filters and semantic search.
+- Seed additional categories via `PROMPT_MANAGER_CATEGORIES_PATH` (path to a JSON file containing category objects) or inline JSON in `PROMPT_MANAGER_CATEGORIES`; the new **Manage** dialog can still add or rename categories at runtime and persists them to SQLite.
 - For LLM-based prompt naming, set `PROMPT_MANAGER_LITELLM_MODEL` and `PROMPT_MANAGER_LITELLM_API_KEY`. The Generate button uses LiteLLM when invoked; exports simply serialise stored prompts.
 
 ## Maintenance & Reset
@@ -261,6 +263,8 @@ These commands reuse the same validation logic as the GUI; pass an explicit path
   | `PROMPT_MANAGER_REDIS_DSN` | Redis connection string | `redis://localhost:6379/1` |
   | `PROMPT_MANAGER_CACHE_TTL_SECONDS` | Cache TTL in seconds (>0) | `300` |
   | `PROMPT_MANAGER_CONFIG_JSON` | Path to JSON config used as base | `config/config.json` |
+  | `PROMPT_MANAGER_CATEGORIES_PATH` | Path to a JSON file containing category definitions | `config/categories.json` |
+  | `PROMPT_MANAGER_CATEGORIES` | Inline JSON array of category definitions | `[{"slug": "review", "label": "Review"}]` |
   | `PROMPT_MANAGER_LITELLM_MODEL` | LiteLLM model used for name generation | `gpt-4o-mini` |
   | `PROMPT_MANAGER_LITELLM_INFERENCE_MODEL` | LiteLLM inference model for slower, higher-quality tasks | `gpt-4.1` |
 | `PROMPT_MANAGER_LITELLM_WORKFLOW_MODELS` | JSON map of workflows to `fast`/`inference` (e.g. `{"prompt_execution": "inference", "prompt_structure_refinement": "inference"}`) | `{"prompt_execution": "inference"}` |

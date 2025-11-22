@@ -11,6 +11,7 @@ All exceptions ultimately inherit from :class:`PromptManagerError`, allowing
 callers to catch a single base class for any manager‑related failure while
 still distinguishing individual error categories when needed.
 
+Updates: v0.18.0 – 2025‑11‑22 – Add category exception hierarchy.
 Updates: v0.17.0 – 2025‑11‑22 – Add prompt versioning exception hierarchy.
 Updates: v0.16.0 – 2025‑12‑06 – Add PromptNote exception hierarchy.
 Updates: v0.15.0 – 2025‑12‑05 – Add ResponseStyle exception hierarchy.
@@ -55,6 +56,18 @@ class PromptCacheError(PromptManagerError):
 
 class PromptEngineeringUnavailable(PromptManagerError):
     """Raised when prompt refinement is requested without an engineer configured."""
+
+
+class CategoryError(PromptManagerError):
+    """Base class for prompt category management failures."""
+
+
+class CategoryNotFoundError(CategoryError):
+    """Raised when a requested category does not exist."""
+
+
+class CategoryStorageError(CategoryError):
+    """Raised when persisting or loading categories fails."""
 
 
 class ResponseStyleError(PromptManagerError):

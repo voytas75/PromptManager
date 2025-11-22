@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 import pytest
 
@@ -19,6 +19,7 @@ from core import (
     RepositoryError,
     RepositoryNotFoundError,
 )
+from models.category_model import PromptCategory, slugify_category
 from models.prompt_model import Prompt, PromptVersion, UserProfile
 from models.response_style import ResponseStyle
 from models.prompt_note import PromptNote
@@ -70,6 +71,10 @@ def _make_prompt_note(text: str = "Investigate latency spike") -> PromptNote:
 
 def _clone_prompt(prompt: Prompt) -> Prompt:
     return Prompt.from_record(prompt.to_record())
+
+
+def _clone_category(category: PromptCategory) -> PromptCategory:
+    return PromptCategory.from_record(category.to_record())
 
 
 class _FakeRedis:
@@ -165,6 +170,12 @@ class _FakeRepository:
         self._profile = UserProfile.create_default()
         self._versions: Dict[uuid.UUID, List[PromptVersion]] = {}
         self._next_version_id = 1
+        base_category = PromptCategory(
+            slug="general",
+            label="General",
+            description="General prompts",
+        )
+        self._categories: Dict[str, PromptCategory] = {base_category.slug: base_category}
 
     def add(self, prompt: Prompt) -> Prompt:
         if prompt.id in self._store:
@@ -199,6 +210,66 @@ class _FakeRepository:
             del self._store[prompt_id]
         except KeyError as exc:
             raise RepositoryNotFoundError(f"Prompt {prompt_id} not found") from exc
+
+    def list_categories(self, include_archived: bool = False) -> List[PromptCategory]:
+        return [
+            _clone_category(category)
+            for category in self._categories.values()
+            if include_archived or category.is_active
+        ]
+
+    def create_category(self, category: PromptCategory) -> PromptCategory:
+        slug = slugify_category(category.slug)
+        if slug in self._categories:
+            raise RepositoryError(f"Category {slug} already exists")
+        stored = _clone_category(category)
+        stored.slug = slug
+        self._categories[slug] = stored
+        return _clone_category(stored)
+
+    def update_category(self, category: PromptCategory) -> PromptCategory:
+        slug = slugify_category(category.slug)
+        if slug not in self._categories:
+            raise RepositoryNotFoundError(f"Category {slug} not found")
+        stored = _clone_category(category)
+        stored.slug = slug
+        self._categories[slug] = stored
+        self.update_prompt_category_labels(slug, stored.label)
+        return _clone_category(stored)
+
+    def set_category_active(self, slug: str, is_active: bool) -> PromptCategory:
+        normalized = slugify_category(slug)
+        if normalized not in self._categories:
+            raise RepositoryNotFoundError(f"Category {slug} not found")
+        category = _clone_category(self._categories[normalized])
+        category.is_active = is_active
+        category.updated_at = datetime.now(timezone.utc)
+        self._categories[normalized] = category
+        return _clone_category(category)
+
+    def sync_category_definitions(
+        self,
+        categories: Sequence[PromptCategory],
+    ) -> List[PromptCategory]:
+        created: List[PromptCategory] = []
+        for category in categories:
+            slug = slugify_category(category.slug)
+            if slug in self._categories:
+                continue
+            stored = _clone_category(category)
+            stored.slug = slug
+            self._categories[slug] = stored
+            created.append(_clone_category(stored))
+        return created
+
+    def update_prompt_category_labels(self, slug: str, label: str) -> None:
+        normalized = slugify_category(slug)
+        for prompt in self._store.values():
+            prompt_slug = prompt.category_slug or slugify_category(prompt.category)
+            if prompt_slug != normalized:
+                continue
+            prompt.category = label
+            prompt.category_slug = normalized
 
     def record_prompt_version(
         self,

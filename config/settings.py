@@ -125,6 +125,14 @@ class PromptManagerSettings(BaseSettings):
         default=None,
         description="Optional list of custom quick action definitions for the command palette.",
     )
+    categories_path: Optional[Path] = Field(
+        default=None,
+        description="Optional JSON file containing additional prompt category definitions.",
+    )
+    categories: Optional[list[dict[str, object]]] = Field(
+        default=None,
+        description="Optional inline list of prompt category definitions sourced from environment variables or JSON config.",
+    )
     theme_mode: Literal["light", "dark"] = Field(
         default=DEFAULT_THEME_MODE,
         description="Preferred UI theme mode (light or dark).",
@@ -176,6 +184,8 @@ class PromptManagerSettings(BaseSettings):
                 "embedding_model": ["EMBEDDING_MODEL", "embedding_model"],
                 "embedding_device": ["EMBEDDING_DEVICE", "embedding_device"],
                 "quick_actions": ["QUICK_ACTIONS", "quick_actions"],
+                "categories_path": ["CATEGORIES_PATH", "categories_path"],
+                "categories": ["CATEGORIES", "categories"],
                 "theme_mode": ["THEME_MODE", "theme_mode"],
                 "chat_user_bubble_color": ["CHAT_USER_BUBBLE_COLOR", "chat_user_bubble_color"],
             },
@@ -204,6 +214,35 @@ class PromptManagerSettings(BaseSettings):
             return None
         stripped = value.strip()
         return stripped or None
+
+    @field_validator("categories_path", mode="before")
+    def _normalise_categories_path(cls, value: Any) -> Optional[Path]:
+        """Coerce optional category file path into a Path."""
+
+        if value in (None, ""):
+            return None
+        path = Path(str(value)).expanduser()
+        return path.resolve()
+
+    @field_validator("categories", mode="before")
+    def _parse_categories(cls, value: Any) -> Optional[list[dict[str, object]]]:
+        """Ensure inline categories are represented as a list of mappings."""
+
+        if value in (None, "", []):
+            return None
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+            except json.JSONDecodeError as exc:
+                raise ValueError("categories must be valid JSON") from exc
+            value = parsed
+        if isinstance(value, list):
+            cleaned: list[dict[str, object]] = []
+            for entry in value:
+                if isinstance(entry, dict):
+                    cleaned.append(entry)
+            return cleaned or None
+        raise ValueError("categories must be provided as a list of objects")
 
 
     @field_validator(

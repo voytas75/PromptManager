@@ -31,6 +31,7 @@ from models.prompt_model import (
     PromptForkLink,
     UserProfile,
 )
+from models.category_model import PromptCategory, slugify_category
 from models.response_style import ResponseStyle
 from models.prompt_note import PromptNote
 
@@ -156,6 +157,7 @@ class PromptRepository:
         "name",
         "description",
         "category",
+        "category_slug",
         "tags",
         "language",
         "context",
@@ -374,6 +376,168 @@ class PromptRepository:
             raise
         except sqlite3.Error as exc:
             raise RepositoryError(f"Failed to delete prompt {prompt_id}") from exc
+
+    # Category management ------------------------------------------------ #
+
+    def list_categories(self, include_archived: bool = False) -> List[PromptCategory]:
+        """Return all stored categories."""
+
+        query = "SELECT * FROM prompt_categories"
+        params: List[Any] = []
+        if not include_archived:
+            query += " WHERE is_active = 1"
+        query += " ORDER BY label COLLATE NOCASE;"
+        try:
+            with _connect(self._db_path) as conn:
+                rows = conn.execute(query, params).fetchall()
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to list categories") from exc
+        return [self._row_to_category(row) for row in rows]
+
+    def get_category(self, slug: str) -> PromptCategory:
+        """Return a category by slug."""
+
+        try:
+            with _connect(self._db_path) as conn:
+                row = conn.execute(
+                    "SELECT * FROM prompt_categories WHERE slug = ?;",
+                    (slugify_category(slug),),
+                ).fetchone()
+        except sqlite3.Error as exc:
+            raise RepositoryError(f"Failed to load category {slug}") from exc
+        if row is None:
+            raise RepositoryNotFoundError(f"Category {slug} not found")
+        return self._row_to_category(row)
+
+    def create_category(self, category: PromptCategory) -> PromptCategory:
+        """Persist a new category definition."""
+
+        payload = self._category_to_row(category)
+        try:
+            with _connect(self._db_path) as conn:
+                conn.execute(
+                    """
+                    INSERT INTO prompt_categories (
+                        slug,
+                        label,
+                        description,
+                        parent_slug,
+                        color,
+                        icon,
+                        min_quality,
+                        default_tags,
+                        is_active,
+                        created_at,
+                        updated_at
+                    ) VALUES (
+                        :slug,
+                        :label,
+                        :description,
+                        :parent_slug,
+                        :color,
+                        :icon,
+                        :min_quality,
+                        :default_tags,
+                        :is_active,
+                        :created_at,
+                        :updated_at
+                    );
+                    """,
+                    payload,
+                )
+        except sqlite3.IntegrityError as exc:
+            raise RepositoryError(f"Category {category.slug} already exists") from exc
+        except sqlite3.Error as exc:
+            raise RepositoryError(f"Failed to create category {category.slug}") from exc
+        return category
+
+    def update_category(self, category: PromptCategory) -> PromptCategory:
+        """Update an existing category definition."""
+
+        payload = self._category_to_row(category)
+        slug = payload.pop("slug")
+        try:
+            with _connect(self._db_path) as conn:
+                existing = conn.execute(
+                    "SELECT label FROM prompt_categories WHERE slug = ?;",
+                    (slug,),
+                ).fetchone()
+                if existing is None:
+                    raise RepositoryNotFoundError(f"Category {slug} not found")
+                conn.execute(
+                    """
+                    UPDATE prompt_categories
+                    SET label = :label,
+                        description = :description,
+                        parent_slug = :parent_slug,
+                        color = :color,
+                        icon = :icon,
+                        min_quality = :min_quality,
+                        default_tags = :default_tags,
+                        is_active = :is_active,
+                        updated_at = :updated_at
+                    WHERE slug = :slug;
+                    """,
+                    {**payload, "slug": slug},
+                )
+                if existing["label"] != category.label:
+                    self._update_prompt_labels_for_category(conn, slug, category.label)
+        except RepositoryNotFoundError:
+            raise
+        except sqlite3.Error as exc:
+            raise RepositoryError(f"Failed to update category {slug}") from exc
+        return category
+
+    def set_category_active(self, slug: str, is_active: bool) -> PromptCategory:
+        """Enable or disable a category."""
+
+        try:
+            with _connect(self._db_path) as conn:
+                cursor = conn.execute(
+                    """
+                    UPDATE prompt_categories
+                    SET is_active = ?, updated_at = ?
+                    WHERE slug = ?;
+                    """,
+                    (int(is_active), datetime.now(timezone.utc).isoformat(), slugify_category(slug)),
+                )
+                if cursor.rowcount == 0:
+                    raise RepositoryNotFoundError(f"Category {slug} not found")
+                row = conn.execute(
+                    "SELECT * FROM prompt_categories WHERE slug = ?;",
+                    (slugify_category(slug),),
+                ).fetchone()
+        except RepositoryNotFoundError:
+            raise
+        except sqlite3.Error as exc:
+            raise RepositoryError(f"Failed to update category {slug}") from exc
+        if row is None:  # pragma: no cover - defensive
+            raise RepositoryError(f"Failed to load category {slug} after update")
+        return self._row_to_category(row)
+
+    def sync_category_definitions(
+        self,
+        categories: Sequence[PromptCategory],
+    ) -> List[PromptCategory]:
+        """Ensure the provided categories exist; return any newly created ones."""
+
+        existing = {category.slug for category in self.list_categories(include_archived=True)}
+        created: List[PromptCategory] = []
+        for category in categories:
+            if category.slug in existing:
+                continue
+            created.append(self.create_category(category))
+            existing.add(category.slug)
+        return created
+
+    def update_prompt_category_labels(self, slug: str, label: str) -> None:
+        """Rename prompt records linked to the specified category slug."""
+
+        try:
+            with _connect(self._db_path) as conn:
+                self._update_prompt_labels_for_category(conn, slugify_category(slug), label)
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to propagate prompt category label changes") from exc
 
     # Prompt versioning ------------------------------------------------- #
 
@@ -719,6 +883,7 @@ class PromptRepository:
             "name": prompt.name,
             "description": prompt.description,
             "category": prompt.category,
+            "category_slug": prompt.category_slug,
             "tags": _json_dumps(prompt.tags),
             "language": prompt.language,
             "context": prompt.context,
@@ -752,6 +917,7 @@ class PromptRepository:
             "name": row["name"],
             "description": row["description"],
             "category": row["category"],
+            "category_slug": row["category_slug"],
             "tags": _json_loads_list(row["tags"]),
             "language": row["language"],
             "context": row["context"],
@@ -801,6 +967,54 @@ class PromptRepository:
             "metadata": row["metadata"],
         }
         return PromptExecution.from_record(payload)
+
+    def _category_to_row(self, category: PromptCategory) -> Dict[str, Any]:
+        """Serialize a PromptCategory into SQLite-friendly mapping."""
+
+        return {
+            "slug": category.slug,
+            "label": category.label,
+            "description": category.description,
+            "parent_slug": category.parent_slug,
+            "color": category.color,
+            "icon": category.icon,
+            "min_quality": category.min_quality,
+            "default_tags": _json_dumps(category.default_tags),
+            "is_active": int(category.is_active),
+            "created_at": category.created_at.isoformat(),
+            "updated_at": category.updated_at.isoformat(),
+        }
+
+    def _row_to_category(self, row: sqlite3.Row) -> PromptCategory:
+        """Hydrate PromptCategory from SQLite row."""
+
+        payload: Dict[str, Any] = {
+            "slug": row["slug"],
+            "label": row["label"],
+            "description": row["description"],
+            "parent_slug": row["parent_slug"],
+            "color": row["color"],
+            "icon": row["icon"],
+            "min_quality": row["min_quality"],
+            "default_tags": _json_loads_list(row["default_tags"]),
+            "is_active": row["is_active"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        }
+        return PromptCategory.from_record(payload)
+
+    def _update_prompt_labels_for_category(
+        self,
+        conn: sqlite3.Connection,
+        slug: str,
+        label: str,
+    ) -> None:
+        """Propagate category label updates to prompt records."""
+
+        conn.execute(
+            "UPDATE prompts SET category = ? WHERE category_slug = ?;",
+            (label, slug),
+        )
 
     def _user_profile_to_row(self, profile: UserProfile) -> Dict[str, Any]:
         """Serialize UserProfile to SQLite row mapping."""
@@ -873,6 +1087,7 @@ class PromptRepository:
                 name TEXT NOT NULL,
                 description TEXT NOT NULL,
                 category TEXT,
+                category_slug TEXT,
                 tags TEXT,
                 language TEXT,
                 context TEXT,
@@ -903,6 +1118,30 @@ class PromptRepository:
         )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_prompts_name ON prompts(name);"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS prompt_categories (
+                slug TEXT PRIMARY KEY,
+                label TEXT NOT NULL,
+                description TEXT NOT NULL,
+                parent_slug TEXT,
+                color TEXT,
+                icon TEXT,
+                min_quality REAL,
+                default_tags TEXT,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(parent_slug) REFERENCES prompt_categories(slug) ON DELETE SET NULL
+            );
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_prompt_categories_active ON prompt_categories(is_active);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_prompt_categories_parent ON prompt_categories(parent_slug);"
         )
         conn.execute(
             """
@@ -1006,12 +1245,15 @@ class PromptRepository:
         prompt_columns = {
             row["name"] for row in conn.execute("PRAGMA table_info(prompts);")
         }
+        if "category_slug" not in prompt_columns:
+            conn.execute("ALTER TABLE prompts ADD COLUMN category_slug TEXT;")
         if "scenarios" not in prompt_columns:
             conn.execute("ALTER TABLE prompts ADD COLUMN scenarios TEXT;")
         if "rating_count" not in prompt_columns:
             conn.execute("ALTER TABLE prompts ADD COLUMN rating_count INTEGER NOT NULL DEFAULT 0;")
         if "rating_sum" not in prompt_columns:
             conn.execute("ALTER TABLE prompts ADD COLUMN rating_sum REAL NOT NULL DEFAULT 0.0;")
+        self._backfill_category_slugs(conn)
         execution_columns = {
             row["name"] for row in conn.execute("PRAGMA table_info(prompt_executions);")
         }
@@ -1055,6 +1297,26 @@ class PromptRepository:
                 "INSERT INTO user_profile (id, username, updated_at) VALUES (?, ?, ?);",
                 (str(DEFAULT_PROFILE_ID), "default", datetime.now(timezone.utc).isoformat()),
             )
+
+    def _backfill_category_slugs(self, conn: sqlite3.Connection) -> None:
+        """Populate missing prompt category slugs for legacy records."""
+
+        try:
+            cursor = conn.execute(
+                "SELECT id, category FROM prompts WHERE (category_slug IS NULL OR category_slug = '') "
+                "AND category IS NOT NULL AND TRIM(category) != '';"
+            )
+            rows = cursor.fetchall()
+            for row in rows:
+                slug = slugify_category(row["category"])
+                if not slug:
+                    continue
+                conn.execute(
+                    "UPDATE prompts SET category_slug = ? WHERE id = ?;",
+                    (slug, row["id"]),
+                )
+        except sqlite3.Error:  # pragma: no cover - defensive
+            logger.warning("Unable to backfill prompt category slugs", exc_info=True)
 
     def reset_all_data(self) -> None:
         """Clear all persisted prompts, executions, and user profile data."""

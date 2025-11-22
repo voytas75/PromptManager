@@ -6,6 +6,8 @@ Updates: v0.1.0 - 2025-10-30 - Add error-path coverage for repository helpers.
 from __future__ import annotations
 
 import uuid
+from dataclasses import replace
+from datetime import datetime, timezone
 from pathlib import Path
 import sqlite3
 
@@ -19,6 +21,8 @@ from core.repository import (
     _json_loads_list,
     _json_loads_optional,
 )
+from core.category_registry import CategoryRegistry
+from models.category_model import PromptCategory
 from models.prompt_model import ExecutionStatus, Prompt, PromptExecution
 
 
@@ -186,3 +190,33 @@ def test_prompt_fork_links(tmp_path: Path) -> None:
 
     children = repo.list_prompt_children(source.id)
     assert [entry.child_prompt_id for entry in children] == [child.id]
+
+
+def test_category_update_propagates_prompt_label(tmp_path: Path) -> None:
+    repo = PromptRepository(str(tmp_path / "repo.db"))
+    category = PromptCategory(slug="tests", label="Tests", description="Testing prompts")
+    repo.create_category(category)
+
+    prompt = _make_prompt()
+    prompt.category = category.label
+    repo.add(prompt)
+
+    updated_category = replace(
+        category,
+        label="Quality Checks",
+        updated_at=datetime.now(timezone.utc),
+    )
+    repo.update_category(updated_category)
+
+    refreshed = repo.get(prompt.id)
+    assert refreshed.category == "Quality Checks"
+    assert refreshed.category_slug == category.slug
+
+
+def test_category_registry_ensure_creates_custom_entry(tmp_path: Path) -> None:
+    repo = PromptRepository(str(tmp_path / "repo.db"))
+    registry = CategoryRegistry(repo)
+    custom = registry.ensure(slug="custom-support", label="Custom Support")
+    assert custom.slug == "custom-support"
+    stored = repo.list_categories(include_archived=True)
+    assert any(entry.slug == "custom-support" for entry in stored)

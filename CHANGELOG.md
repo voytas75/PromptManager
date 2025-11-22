@@ -2,6 +2,20 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.17.0] - 2025-11-22
+
+### Added
+
+- Introduced a first-class **PromptCategory** data model with SQLite persistence, a `prompt_categories` table, and repository CRUD helpers, enabling teams to manage taxonomies without editing code.
+- Added a `CategoryRegistry` that seeds defaults, loads optional JSON overrides (`PROMPT_MANAGER_CATEGORIES_PATH`/`PROMPT_MANAGER_CATEGORIES`), and exposes manager APIs for listing/creating/updating/toggling categories.
+- Extended the GUI with a **Manage** button beside the category filter that opens the new Category Manager dialog (create/edit/archive flows plus inline validation).
+
+### Changed
+
+- Prompts now store a `category_slug` alongside the human-readable label; legacy records are backfilled automatically and prompt filters use the slug for stability.
+- Prompt creation/update flows normalise categories through the registry so renames/archives propagate instantly across the catalogue.
+- README and settings documentation now cover the taxonomy workflow and configuration hooks.
+
 ## [0.16.0] - 2025-11-22
 
 ### Removed

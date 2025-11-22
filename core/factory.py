@@ -30,6 +30,7 @@ from .scenario_generation import LiteLLMScenarioGenerator
 from .prompt_engineering import PromptEngineer
 from .repository import PromptRepository
 from .notifications import NotificationCenter, notification_center as default_notification_center
+from .category_registry import load_category_definitions
 
 try:  # pragma: no cover - redis optional dependency
     import redis
@@ -151,6 +152,10 @@ def build_prompt_manager(
         if isinstance(repository_instance, PromptRepository)
         else None
     )
+    category_definitions = load_category_definitions(
+        inline_definitions=getattr(settings, "categories", None),
+        path=getattr(settings, "categories_path", None),
+    )
     executor = _construct(
         CodexExecutor,
         "prompt_execution",
@@ -171,6 +176,7 @@ def build_prompt_manager(
         "enable_background_sync": enable_background_sync,
         "name_generator": name_generator,
         "description_generator": description_generator,
+        "category_definitions": category_definitions,
         "fast_model": fast_model,
         "inference_model": inference_model,
         "workflow_models": workflow_routing if workflow_routing else None,

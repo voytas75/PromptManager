@@ -1,5 +1,6 @@
 """Prompt data model definitions.
 
+Updates: v0.8.0 - 2025-11-22 - Persist prompt category slugs for taxonomy management.
 Updates: v0.7.1 - 2025-11-22 - Normalize prompt version labels to integer strings.
 Updates: v0.7.0 - 2025-11-22 - Add prompt versioning and fork lineage dataclasses.
 Updates: v0.6.0 - 2025-12-08 - Remove deprecated task template dataclass.
@@ -21,6 +22,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence, Tuple
+
+from .category_model import slugify_category
 
 
 def _utc_now() -> datetime:
@@ -151,6 +154,7 @@ class Prompt:
     name: str
     description: str
     category: str
+    category_slug: Optional[str] = None
     tags: List[str] = field(default_factory=list)
     language: str = "en"
     context: Optional[str] = None
@@ -210,6 +214,8 @@ class Prompt:
                 ext5_mapping = None
 
         self.ext5 = ext5_mapping
+        slug_value = slugify_category(self.category_slug or self.category)
+        self.category_slug = slug_value or None
         self.version = _normalize_version_label(self.version)
 
     @property
@@ -237,6 +243,7 @@ class Prompt:
             "name": self.name,
             "description": self.description,
             "category": self.category,
+            "category_slug": self.category_slug,
             "tags": json.dumps(self.tags, ensure_ascii=False),
             "language": self.language,
             "context": self.context,
@@ -271,6 +278,7 @@ class Prompt:
             "name": self.name,
             "description": self.description,
             "category": self.category,
+            "category_slug": self.category_slug,
             "tags": self.tags,
             "language": self.language,
             "context": self.context,
@@ -306,6 +314,7 @@ class Prompt:
             name=str(data["name"]),
             description=str(data["description"]),
             category=str(data.get("category") or ""),
+            category_slug=str(data.get("category_slug") or "").strip() or None,
             tags=_serialize_list(data.get("tags")),
             language=str(data.get("language") or "en"),
             context=data.get("context"),
@@ -343,6 +352,7 @@ class Prompt:
             "name": metadata.get("name"),
             "description": metadata.get("description"),
             "category": metadata.get("category"),
+            "category_slug": metadata.get("category_slug"),
             "tags": _deserialize_list(metadata.get("tags")),
             "language": metadata.get("language"),
             "context": metadata.get("context"),

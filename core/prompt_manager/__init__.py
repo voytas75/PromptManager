@@ -1,5 +1,6 @@
 """Prompt Manager package façade and orchestration layer.
 
+Updates: v0.14.0 - 2025-11-22 - Add category registry, CRUD APIs, and prompt slugging.
 Updates: v0.13.20 - 2025-11-22 - Keep prompt schema versions in sync with committed history numbers.
 Updates: v0.13.19 - 2025-11-22 - Add structure-only prompt refinement workflow and GUI hook.
 Updates: v0.13.18 - 2025-11-22 - Seed first prompt version when history is missing.
@@ -120,6 +121,7 @@ except ImportError:  # pragma: no cover - redis optional during development
 from models.prompt_model import Prompt, PromptExecution, PromptVersion, PromptForkLink, UserProfile
 from models.response_style import ResponseStyle
 from models.prompt_note import PromptNote
+from models.category_model import PromptCategory
 
 from ..embedding import EmbeddingGenerationError, EmbeddingProvider, EmbeddingSyncWorker
 from ..execution import CodexExecutionResult, CodexExecutor, ExecutionError
@@ -148,11 +150,15 @@ from ..notifications import (
     NotificationLevel,
     notification_center as default_notification_center,
 )
+from ..category_registry import CategoryRegistry
 
 # Re‑export shared exception classes from centralised module to preserve the
 # original import path ``core.prompt_manager.PromptManagerError`` etc. during
 # the deprecation window.
 from ..exceptions import (  # noqa: F401 – re-export for backward compatibility
+    CategoryError,
+    CategoryNotFoundError,
+    CategoryStorageError,
     PromptManagerError,
     PromptNotFoundError,
     PromptExecutionUnavailable,
@@ -177,6 +183,9 @@ logger = logging.getLogger(__name__)
 # Public exports of this module (until full split is finished)
 __all__ = [
     # Exceptions
+    "CategoryError",
+    "CategoryNotFoundError",
+    "CategoryStorageError",
     "PromptManagerError",
     "PromptNotFoundError",
     "PromptExecutionUnavailable",
@@ -216,6 +225,7 @@ class PromptManager:
         chroma_client: Optional[ClientAPI] = None,
         embedding_function: Optional[Any] = None,
         repository: Optional[PromptRepository] = None,
+        category_definitions: Optional[Sequence[PromptCategory]] = None,
         embedding_provider: Optional[EmbeddingProvider] = None,
         embedding_worker: Optional[EmbeddingSyncWorker] = None,
         enable_background_sync: bool = True,
@@ -244,6 +254,7 @@ class PromptManager:
             chroma_client: Optional preconfigured Chroma client.
             embedding_function: Optional embedding function for Chroma.
             repository: Optional preconfigured repository instance (e.g. for testing).
+            category_definitions: Optional sequence of PromptCategory defaults to seed into the repository.
             fast_model: LiteLLM fast-tier model identifier configured for workflows.
             inference_model: LiteLLM inference-tier model identifier configured for workflows.
             workflow_models: Mapping of workflow identifiers to routing tiers.
@@ -273,6 +284,7 @@ class PromptManager:
             self._repository = repository or PromptRepository(str(resolved_db_path))
         except RepositoryError as exc:
             raise PromptStorageError("Unable to initialise SQLite repository") from exc
+        self._category_registry = CategoryRegistry(self._repository, category_definitions)
         # Disable Chroma anonymized telemetry to avoid noisy PostHog errors in some environments
         # and respect privacy defaults. Use persistent client at the configured path.
         if chroma_client is None:
@@ -371,6 +383,29 @@ class PromptManager:
             return None
         text = str(value).strip()
         return text or None
+
+    def _apply_category_metadata(self, prompt: Prompt) -> Prompt:
+        """Ensure prompt categories map to registry entries."""
+
+        category_value = (prompt.category or "").strip()
+        slug_candidate = prompt.category_slug or category_value
+        if not slug_candidate:
+            prompt.category = ""
+            prompt.category_slug = None
+            return prompt
+        try:
+            category = self._category_registry.ensure(
+                slug=slug_candidate,
+                label=category_value or slug_candidate,
+                description=prompt.description,
+            )
+        except CategoryStorageError as exc:
+            raise PromptStorageError("Unable to resolve prompt category") from exc
+        except CategoryError as exc:
+            raise PromptManagerError(str(exc)) from exc
+        prompt.category = category.label
+        prompt.category_slug = category.slug
+        return prompt
 
     def _initialise_chroma_collection(self) -> None:
         """Create or refresh the Chroma collection backing prompt embeddings."""
@@ -1494,6 +1529,7 @@ class PromptManager:
         commit_message: Optional[str] = None,
     ) -> Prompt:
         """Persist a new prompt in SQLite/ChromaDB and prime the cache."""
+        prompt = self._apply_category_metadata(prompt)
         generated_embedding: Optional[List[float]] = None
         if embedding is not None:
             generated_embedding = list(embedding)
@@ -1563,6 +1599,108 @@ class PromptManager:
             )
         return prompt_obj
 
+    # Category APIs ----------------------------------------------------- #
+
+    def list_categories(self, include_archived: bool = False) -> List[PromptCategory]:
+        """Return cached categories."""
+
+        return self._category_registry.all(include_archived)
+
+    def refresh_categories(self) -> List[PromptCategory]:
+        """Reload categories from the repository."""
+
+        return self._category_registry.refresh()
+
+    def create_category(
+        self,
+        *,
+        label: str,
+        slug: Optional[str] = None,
+        description: Optional[str] = None,
+        parent_slug: Optional[str] = None,
+        color: Optional[str] = None,
+        icon: Optional[str] = None,
+        min_quality: Optional[float] = None,
+        default_tags: Optional[Sequence[str]] = None,
+        is_active: bool = True,
+    ) -> PromptCategory:
+        """Create a new category entry."""
+
+        category = PromptCategory(
+            slug=slug or label,
+            label=label,
+            description=description or label,
+            parent_slug=parent_slug,
+            color=color,
+            icon=icon,
+            min_quality=min_quality,
+            default_tags=list(default_tags or []),
+            is_active=is_active,
+        )
+        try:
+            created = self._repository.create_category(category)
+        except RepositoryError as exc:
+            raise CategoryStorageError("Unable to create category") from exc
+        self._category_registry.refresh()
+        return created
+
+    def update_category(
+        self,
+        slug: str,
+        *,
+        label: Optional[str] = None,
+        description: Optional[str] = None,
+        parent_slug: Optional[str] = None,
+        color: Optional[str] = None,
+        icon: Optional[str] = None,
+        min_quality: Optional[float] = None,
+        default_tags: Optional[Sequence[str]] = None,
+        is_active: Optional[bool] = None,
+    ) -> PromptCategory:
+        """Update the specified category."""
+
+        current = self._category_registry.require(slug)
+        updated = replace(
+            current,
+            label=label or current.label,
+            description=description or current.description,
+            parent_slug=parent_slug if parent_slug is not None else current.parent_slug,
+            color=color if color is not None else current.color,
+            icon=icon if icon is not None else current.icon,
+            min_quality=min_quality if min_quality is not None else current.min_quality,
+            default_tags=list(default_tags) if default_tags is not None else current.default_tags,
+            is_active=is_active if is_active is not None else current.is_active,
+            updated_at=datetime.now(timezone.utc),
+        )
+        try:
+            persisted = self._repository.update_category(updated)
+        except RepositoryNotFoundError as exc:
+            raise CategoryNotFoundError(str(exc)) from exc
+        except RepositoryError as exc:
+            raise CategoryStorageError("Unable to update category") from exc
+        self._category_registry.refresh()
+        return persisted
+
+    def set_category_active(self, slug: str, is_active: bool) -> PromptCategory:
+        """Toggle category visibility."""
+
+        try:
+            category = self._repository.set_category_active(slug, is_active)
+        except RepositoryNotFoundError as exc:
+            raise CategoryNotFoundError(str(exc)) from exc
+        except RepositoryError as exc:
+            raise CategoryStorageError("Unable to update category state") from exc
+        self._category_registry.refresh()
+        return category
+
+    def resolve_category_label(self, slug: Optional[str], fallback: Optional[str] = None) -> str:
+        """Return the human-readable label for a slug."""
+
+        category = self._category_registry.get(slug)
+        if category:
+            return category.label
+        return fallback or ""
+
     def update_prompt(
         self,
         prompt: Prompt,
@@ -1571,6 +1709,7 @@ class PromptManager:
         commit_message: Optional[str] = None,
     ) -> Prompt:
         """Update an existing prompt with new metadata."""
+        prompt = self._apply_category_metadata(prompt)
         try:
             previous_prompt = self._repository.get(prompt.id)
         except RepositoryNotFoundError as exc:
