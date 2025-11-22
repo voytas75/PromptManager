@@ -532,23 +532,47 @@ class PromptDetailWidget(QWidget):
         )
 
     def _label_color(self) -> str:
-        """Return a label colour with ≥4.5 contrast in light and dark themes."""
+        """Return a label colour with ≥4.5 contrast for the current palette."""
 
-        palette = self.palette()
-        background = palette.color(QPalette.Base)
-        r, g, b = (background.redF(), background.greenF(), background.blueF())
+        background = self.palette().color(QPalette.Window)
+        background_lum = self._relative_luminance(background.redF(), background.greenF(), background.blueF())
+        light_candidates = ["#0b1120", "#111827"]
+        dark_candidates = ["#f8fafc", "#e5e7eb"]
+        preferred = light_candidates if background_lum >= 0.5 else dark_candidates
+        fallback = dark_candidates if background_lum >= 0.5 else light_candidates
+        for scheme in (preferred, fallback):
+            for hex_code in scheme:
+                candidate_lum = self._relative_luminance_hex(hex_code)
+                if self._contrast_ratio(background_lum, candidate_lum) >= 4.5:
+                    return hex_code
+        return preferred[0]
 
-        def _linearize(component: float) -> float:
-            if component <= 0.04045:
-                return component / 12.92
-            return ((component + 0.055) / 1.055) ** 2.4
+    @staticmethod
+    def _relative_luminance(red: float, green: float, blue: float) -> float:
+        """Return WCAG relative luminance."""
 
-        luminance = (
-            0.2126 * _linearize(r)
-            + 0.7152 * _linearize(g)
-            + 0.0722 * _linearize(b)
+        return (
+            0.2126 * PromptDetailWidget._linearize(red)
+            + 0.7152 * PromptDetailWidget._linearize(green)
+            + 0.0722 * PromptDetailWidget._linearize(blue)
         )
-        return "#111827" if luminance >= 0.5 else "#e5e7eb"
+
+    @staticmethod
+    def _relative_luminance_hex(hex_code: str) -> float:
+        color = QColor(hex_code)
+        return PromptDetailWidget._relative_luminance(color.redF(), color.greenF(), color.blueF())
+
+    @staticmethod
+    def _linearize(component: float) -> float:
+        if component <= 0.04045:
+            return component / 12.92
+        return ((component + 0.055) / 1.055) ** 2.4
+
+    @staticmethod
+    def _contrast_ratio(lum_a: float, lum_b: float) -> float:
+        lighter = max(lum_a, lum_b)
+        darker = min(lum_a, lum_b)
+        return (lighter + 0.05) / (darker + 0.05)
 
     def clear(self) -> None:
         """Reset the panel to its empty state."""
