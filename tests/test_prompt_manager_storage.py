@@ -68,6 +68,10 @@ def _make_prompt_note(text: str = "Investigate latency spike") -> PromptNote:
     return PromptNote(id=uuid.uuid4(), note=text, created_at=now, last_modified=now)
 
 
+def _clone_prompt(prompt: Prompt) -> Prompt:
+    return Prompt.from_record(prompt.to_record())
+
+
 class _FakeRedis:
     """Minimal Redis facade storing values in-memory for assertions."""
 
@@ -165,7 +169,7 @@ class _FakeRepository:
     def add(self, prompt: Prompt) -> Prompt:
         if prompt.id in self._store:
             raise RepositoryError(f"Prompt {prompt.id} already exists")
-        self._store[prompt.id] = prompt
+        self._store[prompt.id] = _clone_prompt(prompt)
         return prompt
 
     def get(self, prompt_id: uuid.UUID) -> Prompt:
@@ -173,7 +177,7 @@ class _FakeRepository:
         if self.fail_on_get:
             raise AssertionError("Repository.get should not be invoked when cache is primed.")
         try:
-            return self._store[prompt_id]
+            return _clone_prompt(self._store[prompt_id])
         except KeyError as exc:
             raise RepositoryNotFoundError(f"Prompt {prompt_id} not found") from exc
 
@@ -187,7 +191,7 @@ class _FakeRepository:
     def update(self, prompt: Prompt) -> Prompt:
         if prompt.id not in self._store:
             raise RepositoryNotFoundError(f"Prompt {prompt.id} not found")
-        self._store[prompt.id] = prompt
+        self._store[prompt.id] = _clone_prompt(prompt)
         return prompt
 
     def delete(self, prompt_id: uuid.UUID) -> None:

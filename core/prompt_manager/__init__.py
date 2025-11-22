@@ -1,5 +1,6 @@
 """Prompt Manager package façade and orchestration layer.
 
+Updates: v0.13.17 - 2025-11-22 - Skip version bumps when prompt body is unchanged.
 Updates: v0.13.16 - 2025-11-22 - Add prompt versioning, diffing, and forking workflows.
 Updates: v0.13.15 - 2025-12-08 - Remove task template APIs and diagnostics wiring.
 Updates: v0.13.14 - 2025-12-07 - Add embedding rebuild helper for CLI workflows.
@@ -189,6 +190,14 @@ __all__ = [
     "PromptNoteStorageError",
     # Main class will be added later when moved.
 ]
+
+
+def _normalize_prompt_body(body: Optional[str]) -> str:
+    """Return canonical prompt body text for change detection comparisons."""
+
+    if body is None:
+        return ""
+    return body.replace("\r\n", "\n")
 
 
 class PromptManager:
@@ -1502,6 +1511,18 @@ class PromptManager:
         commit_message: Optional[str] = None,
     ) -> Prompt:
         """Update an existing prompt with new metadata."""
+        try:
+            previous_prompt = self._repository.get(prompt.id)
+        except RepositoryNotFoundError as exc:
+            raise PromptNotFoundError(f"Prompt {prompt.id} not found") from exc
+        except RepositoryError as exc:
+            raise PromptStorageError(
+                f"Failed to load prompt {prompt.id} for version comparison"
+            ) from exc
+
+        body_changed = _normalize_prompt_body(previous_prompt.context) != _normalize_prompt_body(
+            prompt.context
+        )
         generated_embedding: Optional[List[float]] = None
         if embedding is not None:
             generated_embedding = list(embedding)
@@ -1532,15 +1553,21 @@ class PromptManager:
                     "Prompt updated but cache refresh failed",
                     extra={"prompt_id": str(prompt.id)},
                 )
-        version = self._commit_prompt_version(updated_prompt, commit_message=commit_message)
-        logger.debug(
-            "Prompt version committed",
-            extra={
-                "prompt_id": str(updated_prompt.id),
-                "version_id": version.id,
-                "version_number": version.version_number,
-            },
-        )
+        if body_changed:
+            version = self._commit_prompt_version(updated_prompt, commit_message=commit_message)
+            logger.debug(
+                "Prompt version committed",
+                extra={
+                    "prompt_id": str(updated_prompt.id),
+                    "version_id": version.id,
+                    "version_number": version.version_number,
+                },
+            )
+        else:
+            logger.debug(
+                "Prompt body unchanged; skipping version commit",
+                extra={"prompt_id": str(updated_prompt.id)},
+            )
         return updated_prompt
 
     def delete_prompt(self, prompt_id: uuid.UUID) -> None:

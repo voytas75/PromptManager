@@ -27,6 +27,10 @@ from core.name_generation import DescriptionGenerationError
 from models.prompt_model import Prompt, PromptForkLink, PromptVersion, UserProfile
 
 
+def _clone_prompt(prompt: Prompt) -> Prompt:
+    return Prompt.from_record(prompt.to_record())
+
+
 @dataclass
 class _StubCollection:
     """Chroma collection stub with injectable behaviours."""
@@ -91,13 +95,13 @@ class _RecordingRepository:
         self._fork_counter = 0
 
     def add(self, prompt: Prompt) -> Prompt:
-        self.storage[prompt.id] = prompt
+        self.storage[prompt.id] = _clone_prompt(prompt)
         return prompt
 
     def update(self, prompt: Prompt) -> Prompt:
         if prompt.id not in self.storage:
             raise RepositoryNotFoundError("missing prompt")
-        self.storage[prompt.id] = prompt
+        self.storage[prompt.id] = _clone_prompt(prompt)
         return prompt
 
     def delete(self, prompt_id: uuid.UUID) -> None:
@@ -109,10 +113,13 @@ class _RecordingRepository:
     def get(self, prompt_id: uuid.UUID) -> Prompt:
         if prompt_id not in self.storage:
             raise RepositoryNotFoundError("missing get")
-        return self.storage[prompt_id]
+        return _clone_prompt(self.storage[prompt_id])
 
     def list(self, limit: Optional[int] = None) -> List[Prompt]:
-        values = list(self.storage.values())
+        values = [
+            _clone_prompt(prompt)
+            for prompt in self.storage.values()
+        ]
         return values[:limit] if limit is not None else values
 
     def get_user_profile(self) -> UserProfile:
@@ -640,7 +647,7 @@ def test_update_prompt_handles_repository_errors() -> None:
 
     repo = _ErrorRepo()
     prompt = _sample_prompt()
-    repo.storage[prompt.id] = prompt
+    repo.storage[prompt.id] = _clone_prompt(prompt)
     manager = _build_manager(repository=repo)
     with pytest.raises(PromptStorageError):
         manager.update_prompt(prompt)
@@ -650,7 +657,7 @@ def test_update_prompt_handles_repository_errors() -> None:
             raise RepositoryNotFoundError("missing")
 
     repo_missing = _MissingRepo()
-    repo_missing.storage[prompt.id] = prompt
+    repo_missing.storage[prompt.id] = _clone_prompt(prompt)
     manager_missing = _build_manager(repository=repo_missing)
     with pytest.raises(PromptNotFoundError):
         manager_missing.update_prompt(prompt)
@@ -661,7 +668,7 @@ def test_update_prompt_handles_chroma_and_cache_failures() -> None:
 
     prompt = _sample_prompt()
     repo = _RecordingRepository()
-    repo.storage[prompt.id] = prompt
+    repo.storage[prompt.id] = _clone_prompt(prompt)
     collection = _StubCollection(upsert_exception=ChromaError("upsert"))
     manager = _build_manager(repository=repo, collection=collection)
     with pytest.raises(PromptStorageError):
@@ -674,7 +681,7 @@ def test_update_prompt_handles_chroma_and_cache_failures() -> None:
         raise PromptCacheError("refresh")
 
     manager_ok._cache_prompt = _cache_fail  # type: ignore[assignment]
-    repo.storage[prompt.id] = prompt
+    repo.storage[prompt.id] = _clone_prompt(prompt)
     updated = manager_ok.update_prompt(prompt)
     assert updated.id == prompt.id
 
@@ -767,6 +774,7 @@ def test_prompt_version_commit_and_restore() -> None:
     manager.create_prompt(prompt)
 
     prompt.description = "Updated"
+    prompt.context = (prompt.context or "") + "\nMore detail"
     manager.update_prompt(prompt)
 
     versions = manager.list_prompt_versions(prompt.id)
@@ -779,6 +787,19 @@ def test_prompt_version_commit_and_restore() -> None:
 
     restored = manager.restore_prompt_version(versions[1].id)
     assert restored.description == "Sample"
+
+
+def test_metadata_only_update_does_not_create_prompt_version() -> None:
+    repo = _RecordingRepository()
+    manager = _build_manager(repository=repo)
+    prompt = _sample_prompt()
+    manager.create_prompt(prompt)
+
+    prompt.description = "Metadata tweak"
+    manager.update_prompt(prompt)
+
+    versions = manager.list_prompt_versions(prompt.id)
+    assert len(versions) == 1
 
 
 def test_prompt_merge_detects_conflicts_and_can_persist() -> None:
