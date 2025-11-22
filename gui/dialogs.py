@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.10.3 - 2025-11-22 - Add author input to prompt create/edit workflows.
 Updates: v0.10.2 - 2025-11-22 - Default prompt versions to integer labels for new entries.
 Updates: v0.10.1 - 2025-11-22 - Replace prompt refined alert with resizable, scrollable dialog.
 Updates: v0.10.0 - 2025-11-22 - Add prompt version history dialog for diffing/restoring snapshots.
@@ -439,6 +440,7 @@ class PromptDialog(QDialog):
 
         self._category_input = QLineEdit(self)
         self._language_input = QLineEdit(self)
+        self._author_input = QLineEdit(self)
         self._tags_input = QLineEdit(self)
         self._context_input = QPlainTextEdit(self)
         self._context_input.setPlaceholderText("Paste the full prompt text here…")
@@ -450,6 +452,7 @@ class PromptDialog(QDialog):
         self._example_output.setPlaceholderText("Optional example output…")
 
         self._language_input.setPlaceholderText("en")
+        self._author_input.setPlaceholderText("Optional author name…")
         self._tags_input.setPlaceholderText("tag-a, tag-b")
 
         category_container = QWidget(self)
@@ -466,6 +469,7 @@ class PromptDialog(QDialog):
         category_container_layout.addWidget(self._generate_category_button)
         form_layout.addRow("Category", category_container)
         form_layout.addRow("Language", self._language_input)
+        form_layout.addRow("Author", self._author_input)
         tags_container = QWidget(self)
         tags_container_layout = QHBoxLayout(tags_container)
         tags_container_layout.setContentsMargins(0, 0, 0, 0)
@@ -548,6 +552,7 @@ class PromptDialog(QDialog):
         self._name_input.setText(prompt.name)
         self._category_input.setText(prompt.category)
         self._language_input.setText(prompt.language)
+        self._author_input.setText(prompt.author or "")
         self._tags_input.setText(", ".join(prompt.tags))
         self._context_input.setPlainText(prompt.context or "")
         self._description_input.setPlainText(prompt.description)
@@ -885,6 +890,7 @@ class PromptDialog(QDialog):
                 self._description_input.setPlainText(generated_description)
 
         category = self._category_input.text().strip()
+        author = self._author_input.text().strip() or None
         if not name or not description:
             QMessageBox.warning(self, "Missing fields", "Name and description are required.")
             return None
@@ -912,6 +918,7 @@ class PromptDialog(QDialog):
                 created_at=now,
                 last_modified=now,
                 version="1",
+                author=author,
             )
 
         base = self._source_prompt
@@ -930,7 +937,7 @@ class PromptDialog(QDialog):
             scenarios=scenarios,
             last_modified=datetime.now(timezone.utc),
             version=base.version,
-            author=base.author,
+            author=author,
             quality_score=base.quality_score,
             usage_count=base.usage_count,
             related_prompts=base.related_prompts,
