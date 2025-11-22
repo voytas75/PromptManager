@@ -1,5 +1,6 @@
 """Prompt Manager package façade and orchestration layer.
 
+Updates: v0.13.18 - 2025-11-22 - Seed first prompt version when history is missing.
 Updates: v0.13.17 - 2025-11-22 - Skip version bumps when prompt body is unchanged.
 Updates: v0.13.16 - 2025-11-22 - Add prompt versioning, diffing, and forking workflows.
 Updates: v0.13.15 - 2025-12-08 - Remove task template APIs and diagnostics wiring.
@@ -1520,6 +1521,18 @@ class PromptManager:
                 f"Failed to load prompt {prompt.id} for version comparison"
             ) from exc
 
+        has_version_history = True
+        try:
+            has_version_history = (
+                self._repository.get_prompt_latest_version(prompt.id) is not None
+            )
+        except RepositoryError:
+            logger.debug(
+                "Unable to determine existing prompt versions; assuming history present",
+                extra={"prompt_id": str(prompt.id)},
+                exc_info=True,
+            )
+
         body_changed = _normalize_prompt_body(previous_prompt.context) != _normalize_prompt_body(
             prompt.context
         )
@@ -1553,7 +1566,8 @@ class PromptManager:
                     "Prompt updated but cache refresh failed",
                     extra={"prompt_id": str(prompt.id)},
                 )
-        if body_changed:
+        should_commit_version = body_changed or not has_version_history
+        if should_commit_version:
             version = self._commit_prompt_version(updated_prompt, commit_message=commit_message)
             logger.debug(
                 "Prompt version committed",
@@ -1565,7 +1579,7 @@ class PromptManager:
             )
         else:
             logger.debug(
-                "Prompt body unchanged; skipping version commit",
+                "Prompt body unchanged and version history already present; skipping version commit",
                 extra={"prompt_id": str(updated_prompt.id)},
             )
         return updated_prompt

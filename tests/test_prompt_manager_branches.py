@@ -1,5 +1,6 @@
 """Branch coverage tests for PromptManager edge cases.
 
+Updates: v0.1.1 - 2025-11-22 - Seed version history for legacy prompts without snapshots.
 Updates: v0.1.0 - 2025-10-30 - Add unit tests for error handling and caching paths.
 """
 
@@ -800,6 +801,20 @@ def test_metadata_only_update_does_not_create_prompt_version() -> None:
 
     versions = manager.list_prompt_versions(prompt.id)
     assert len(versions) == 1
+
+
+def test_metadata_only_update_creates_initial_version_when_missing_history() -> None:
+    repo = _RecordingRepository()
+    manager = _build_manager(repository=repo)
+    prompt = _sample_prompt()
+    repo.add(prompt)
+
+    prompt.description = "Legacy metadata tweak"
+    manager.update_prompt(prompt)
+
+    versions = manager.list_prompt_versions(prompt.id)
+    assert len(versions) == 1
+    assert versions[0].version_number == 1
 
 
 def test_prompt_merge_detects_conflicts_and_can_persist() -> None:
