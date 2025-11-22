@@ -527,7 +527,7 @@ class PromptDetailWidget(QWidget):
         if multiline:
             safe_value = safe_value.replace("\n", "<br/>")
         return (
-            f'<span style="font-style: italic; color: #374151;">{safe_label}:</span> '
+            f'<span style="font-style: italic; color: #cbd5f5;">{safe_label}:</span> '
             f"{safe_value}"
         )
 
