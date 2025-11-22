@@ -488,6 +488,8 @@ class PromptDialog(QDialog):
 
         self._language_input.setPlaceholderText("en")
         self._author_input.setPlaceholderText("Optional author name…")
+        self._author_input.setMaximumWidth(260)
+        self._author_input.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         self._tags_input.setPlaceholderText("tag-a, tag-b")
 
         metadata_container = QWidget(self)
@@ -534,8 +536,8 @@ class PromptDialog(QDialog):
         tags_container_layout.addWidget(self._generate_tags_button)
         metadata_layout.addWidget(tags_container, 1, 2)
         metadata_layout.setColumnStretch(0, 1)
-        metadata_layout.setColumnStretch(1, 1)
-        metadata_layout.setColumnStretch(2, 1)
+        metadata_layout.setColumnStretch(1, 2)
+        metadata_layout.setColumnStretch(2, 2)
 
         form_layout.addRow("Language", self._language_input)
         form_layout.addRow("", metadata_container)
