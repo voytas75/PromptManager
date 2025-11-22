@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.10.4 - 2025-11-22 - Align example section toggles with the active theme palette.
 Updates: v0.10.3 - 2025-11-22 - Add author input to prompt create/edit workflows.
 Updates: v0.10.2 - 2025-11-22 - Default prompt versions to integer labels for new entries.
 Updates: v0.10.1 - 2025-11-22 - Replace prompt refined alert with resizable, scrollable dialog.
@@ -50,7 +51,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, NamedTuple, Optional, Sequence
 
 from PySide6.QtCore import Qt, QEvent, Signal
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QGuiApplication, QPalette
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -176,6 +177,7 @@ class CollapsibleTextSection(QWidget):
         self._toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         self._toggle.clicked.connect(self._on_toggle_clicked)  # type: ignore[arg-type]
         self._layout.addWidget(self._toggle)
+        self._apply_toggle_style()
 
         self._editor = QPlainTextEdit(self)
         self._editor.setVisible(False)
@@ -185,6 +187,11 @@ class CollapsibleTextSection(QWidget):
         self._editor.installEventFilter(self)
         self._collapsed_height = 0
         self._expanded_height = 100
+
+    def event(self, event: QEvent) -> bool:  # noqa: D401 - Qt override, documentation inherited
+        if event.type() in {QEvent.PaletteChange, QEvent.StyleChange}:
+            self._apply_toggle_style()
+        return super().event(event)
 
     def setPlaceholderText(self, text: str) -> None:
         self._editor.setPlaceholderText(text)
@@ -215,6 +222,30 @@ class CollapsibleTextSection(QWidget):
             if not self._editor.toPlainText().strip():
                 self._set_expanded(False, focus=False)
         return super().eventFilter(obj, event)
+
+    def _apply_toggle_style(self) -> None:
+        """Align the toggle button background with the active theme palette."""
+
+        palette = self._toggle.palette()
+        button_color = palette.color(QPalette.Button).name()
+        text_color = palette.color(QPalette.ButtonText).name()
+        border_color = palette.color(QPalette.Mid).name()
+        checked_color = palette.color(QPalette.Highlight).name()
+        checked_text = palette.color(QPalette.HighlightedText).name()
+        self._toggle.setStyleSheet(
+            "QToolButton {"
+            f"background-color: {button_color};"
+            f"color: {text_color};"
+            f"border: 1px solid {border_color};"
+            "border-radius: 4px;"
+            "padding: 4px 8px;"
+            "text-align: left;"
+            "}"
+            "QToolButton:checked {"
+            f"background-color: {checked_color};"
+            f"color: {checked_text};"
+            "}"
+        )
 
     def _set_expanded(self, expanded: bool, *, focus: bool) -> None:
         if self._toggle.isChecked() == expanded and self._editor.isVisible() == expanded:
