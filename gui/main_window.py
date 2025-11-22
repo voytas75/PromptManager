@@ -518,18 +518,37 @@ class PromptDetailWidget(QWidget):
         truncated = context[: self._CONTEXT_PREVIEW_LIMIT].rstrip()
         return f"{truncated}…"
 
-    @staticmethod
-    def _format_label_value(label: str, value: str, *, multiline: bool = False) -> str:
+    def _format_label_value(self, label: str, value: str, *, multiline: bool = False) -> str:
         """Return HTML rendering with italic label and escaped value."""
 
         safe_label = escape(label)
         safe_value = escape(value)
         if multiline:
             safe_value = safe_value.replace("\n", "<br/>")
+        color = self._label_color()
         return (
-            f'<span style="font-style: italic; color: #cbd5f5;">{safe_label}:</span> '
+            f'<span style="font-style: italic; color: {color};">{safe_label}:</span> '
             f"{safe_value}"
         )
+
+    def _label_color(self) -> str:
+        """Return a label colour with ≥4.5 contrast in light and dark themes."""
+
+        palette = self.palette()
+        background = palette.color(QPalette.Base)
+        r, g, b = (background.redF(), background.greenF(), background.blueF())
+
+        def _linearize(component: float) -> float:
+            if component <= 0.04045:
+                return component / 12.92
+            return ((component + 0.055) / 1.055) ** 2.4
+
+        luminance = (
+            0.2126 * _linearize(r)
+            + 0.7152 * _linearize(g)
+            + 0.0722 * _linearize(b)
+        )
+        return "#111827" if luminance >= 0.5 else "#e5e7eb"
 
     def clear(self) -> None:
         """Reset the panel to its empty state."""
