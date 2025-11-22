@@ -1,4 +1,8 @@
-"""Tests for PromptManager prompt refinement workflow."""
+"""Tests for PromptManager prompt refinement workflow.
+
+Updates: v0.1.1 - 2025-11-22 - Cover structure-only refinement calls.
+Updates: v0.1.0 - 2025-11-18 - Initial tests for prompt refinement workflow.
+"""
 
 from __future__ import annotations
 
@@ -56,6 +60,7 @@ class _StubChromaClient:
 class _StubPromptEngineer:
     def __init__(self) -> None:
         self.calls: list[Dict[str, Any]] = []
+        self.structure_calls: list[Dict[str, Any]] = []
 
     def refine(
         self,
@@ -66,6 +71,7 @@ class _StubPromptEngineer:
         category: Optional[str] = None,
         tags: Optional[list[str]] = None,
         negative_constraints: Optional[list[str]] = None,
+        structure_only: bool = False,
     ) -> PromptRefinement:
         self.calls.append(
             {
@@ -75,6 +81,7 @@ class _StubPromptEngineer:
                 "category": category,
                 "tags": tags,
                 "negative_constraints": negative_constraints,
+                "structure_only": structure_only,
             }
         )
         return PromptRefinement(
@@ -83,6 +90,35 @@ class _StubPromptEngineer:
             checklist=["clarity"],
             warnings=[],
             confidence=0.9,
+        )
+
+    def refine_structure(
+        self,
+        prompt_text: str,
+        *,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        category: Optional[str] = None,
+        tags: Optional[list[str]] = None,
+        negative_constraints: Optional[list[str]] = None,
+    ) -> PromptRefinement:
+        payload = {
+            "prompt_text": prompt_text,
+            "name": name,
+            "description": description,
+            "category": category,
+            "tags": tags,
+            "negative_constraints": negative_constraints,
+        }
+        self.structure_calls.append(payload)
+        return self.refine(
+            prompt_text,
+            name=name,
+            description=description,
+            category=category,
+            tags=tags,
+            negative_constraints=negative_constraints,
+            structure_only=True,
         )
 
 
@@ -124,4 +160,16 @@ def test_refine_prompt_text_requires_engineer(tmp_path: Path) -> None:
 
     with pytest.raises(PromptEngineeringUnavailable):
         manager.refine_prompt_text("Missing engineer")
+    manager.close()
+
+
+def test_refine_prompt_structure_uses_structure_mode(tmp_path: Path) -> None:
+    engineer = _StubPromptEngineer()
+    manager = _build_manager(tmp_path, engineer)
+
+    result = manager.refine_prompt_structure("Streamline this prompt", tags=["structure"])
+
+    assert result.improved_prompt.startswith("Improved")
+    assert engineer.structure_calls[0]["tags"] == ["structure"]
+    assert engineer.calls[-1]["structure_only"] is True
     manager.close()

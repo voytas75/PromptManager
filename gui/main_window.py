@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.33 - 2025-11-22 - Add structure-only prompt refinement action to the editor dialog.
 Updates: v0.15.32 - 2025-11-22 - Ensure forked prompts edit the stored entry so saves succeed.
 Updates: v0.15.31 - 2025-12-08 - Remove deprecated task template controls; quick actions now seed the workspace exclusively.
 Updates: v0.15.30 - 2025-12-06 - Surface LiteLLM embedding configuration in the settings dialog and runtime state.
@@ -2027,6 +2028,25 @@ class MainWindow(QMainWindow):
             tags=tags,
         )
 
+    def _refine_prompt_structure(
+        self,
+        prompt_text: str,
+        *,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        category: Optional[str] = None,
+        tags: Optional[Sequence[str]] = None,
+    ) -> PromptRefinement:
+        """Delegate structure-only prompt refinement to PromptManager."""
+
+        return self._manager.refine_prompt_structure(
+            prompt_text,
+            name=name,
+            description=description,
+            category=category,
+            tags=tags,
+        )
+
     def _on_detect_intent_clicked(self) -> None:
         """Run intent detection on the free-form query input."""
 
@@ -2567,6 +2587,9 @@ class MainWindow(QMainWindow):
             prompt_engineer=(
                 self._refine_prompt_body if self._manager.prompt_engineer is not None else None
             ),
+            structure_refiner=(
+                self._refine_prompt_structure if self._manager.prompt_engineer is not None else None
+            ),
         )
         dialog.prefill_from_prompt(prompt)
         if dialog.exec() != QDialog.Accepted:
@@ -2603,6 +2626,9 @@ class MainWindow(QMainWindow):
             prompt_engineer=(
                 self._refine_prompt_body if self._manager.prompt_engineer is not None else None
             ),
+            structure_refiner=(
+                self._refine_prompt_structure if self._manager.prompt_engineer is not None else None
+            ),
         )
         dialog.setWindowTitle("Edit Forked Prompt")
         if dialog.exec() == QDialog.Accepted and dialog.result_prompt is not None:
@@ -2632,6 +2658,9 @@ class MainWindow(QMainWindow):
             scenario_generator=self._generate_prompt_scenarios,
             prompt_engineer=(
                 self._refine_prompt_body if self._manager.prompt_engineer is not None else None
+            ),
+            structure_refiner=(
+                self._refine_prompt_structure if self._manager.prompt_engineer is not None else None
             ),
         )
         if dialog.exec() != QDialog.Accepted:
@@ -2663,6 +2692,9 @@ class MainWindow(QMainWindow):
             scenario_generator=self._generate_prompt_scenarios,
             prompt_engineer=(
                 self._refine_prompt_body if self._manager.prompt_engineer is not None else None
+            ),
+            structure_refiner=(
+                self._refine_prompt_structure if self._manager.prompt_engineer is not None else None
             ),
         )
         dialog.applied.connect(  # type: ignore[arg-type]

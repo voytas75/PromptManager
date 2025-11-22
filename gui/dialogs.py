@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.10.7 - 2025-11-22 - Add structure-only refinement action to the prompt dialog.
 Updates: v0.10.6 - 2025-11-22 - Add prompt body tab to version history dialog.
 Updates: v0.10.5 - 2025-11-22 - Redesign prompt dialog layout for taller editing surface.
 Updates: v0.10.4 - 2025-11-22 - Align example section toggles with the active theme palette.
@@ -279,16 +280,17 @@ class CollapsibleTextSection(QWidget):
 class PromptRefinedDialog(QDialog):
     """Modal dialog presenting prompt refinement output in a resizable view."""
 
-    def __init__(self, content: str, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, content: str, parent: Optional[QWidget] = None, *, title: str = "Prompt refined") -> None:
         """Initialize the dialog with the refinement summary content.
 
         Args:
             content: Text produced by the refinement workflow.
             parent: Optional parent widget that owns the dialog.
+            title: Window title describing the refinement action.
         """
 
         super().__init__(parent)
-        self.setWindowTitle("Prompt refined")
+        self.setWindowTitle(title)
         self.setModal(True)
         self.setSizeGripEnabled(True)
 
@@ -414,6 +416,7 @@ class PromptDialog(QDialog):
         tags_generator: Optional[Callable[[str], Sequence[str]]] = None,
         scenario_generator: Optional[Callable[[str], Sequence[str]]] = None,
         prompt_engineer: Optional[Callable[..., PromptRefinement]] = None,
+        structure_refiner: Optional[Callable[..., PromptRefinement]] = None,
     ) -> None:
         super().__init__(parent)
         self._source_prompt = prompt
@@ -421,6 +424,7 @@ class PromptDialog(QDialog):
         self._name_generator = name_generator
         self._description_generator = description_generator
         self._prompt_engineer = prompt_engineer
+        self._structure_refiner = structure_refiner
         self._category_generator = category_generator
         self._tags_generator = tags_generator
         self._scenario_generator = scenario_generator
@@ -562,7 +566,26 @@ class PromptDialog(QDialog):
             self._refine_button.setToolTip(
                 "Configure LiteLLM in Settings to enable prompt engineering."
             )
-        form_layout.addRow("", self._refine_button)
+        self._structure_refine_button = QPushButton("Refine Structure", self)
+        self._structure_refine_button.setToolTip(
+            "Improve formatting and section layout without altering the prompt's intent."
+        )
+        self._structure_refine_button.clicked.connect(self._on_refine_structure_clicked)  # type: ignore[arg-type]
+        if self._structure_refiner is None:
+            try:
+                self._structure_refine_button.setEnabled(False)
+            except AttributeError:  # pragma: no cover - stubbed widgets during tests
+                pass
+            self._structure_refine_button.setToolTip(
+                "Configure LiteLLM in Settings to enable prompt engineering."
+            )
+        refine_row = QWidget(self)
+        refine_row_layout = QHBoxLayout(refine_row)
+        refine_row_layout.setContentsMargins(0, 0, 0, 0)
+        refine_row_layout.setSpacing(8)
+        refine_row_layout.addWidget(self._refine_button)
+        refine_row_layout.addWidget(self._structure_refine_button)
+        form_layout.addRow("", refine_row)
         form_layout.addRow("Description", self._description_input)
         self._scenarios_input = QPlainTextEdit(self)
         self._scenarios_input.setPlaceholderText("One scenario per line…")
@@ -877,14 +900,37 @@ class PromptDialog(QDialog):
             return fallback_generate_description(context)
 
     def _on_refine_clicked(self) -> None:
-        """Invoke the prompt engineer to refine the prompt body when available."""
+        """Invoke the general prompt refinement workflow."""
 
-        if self._prompt_engineer is None:
-            QMessageBox.information(
-                self,
-                "Prompt refinement unavailable",
-                "Configure LiteLLM in Settings to enable prompt engineering.",
-            )
+        self._run_refinement(
+            self._prompt_engineer,
+            unavailable_title="Prompt refinement unavailable",
+            unavailable_message="Configure LiteLLM in Settings to enable prompt engineering.",
+            result_title="Prompt refined",
+        )
+
+    def _on_refine_structure_clicked(self) -> None:
+        """Invoke the structure-only refinement workflow."""
+
+        self._run_refinement(
+            self._structure_refiner,
+            unavailable_title="Prompt refinement unavailable",
+            unavailable_message="Configure LiteLLM in Settings to enable prompt engineering.",
+            result_title="Prompt structure refined",
+        )
+
+    def _run_refinement(
+        self,
+        handler: Optional[Callable[..., PromptRefinement]],
+        *,
+        unavailable_title: str,
+        unavailable_message: str,
+        result_title: str,
+    ) -> None:
+        """Execute a refinement handler and surface the summary to the user."""
+
+        if handler is None:
+            QMessageBox.information(self, unavailable_title, unavailable_message)
             return
 
         prompt_text = self._context_input.toPlainText()
@@ -902,7 +948,7 @@ class PromptDialog(QDialog):
         tags = [tag.strip() for tag in self._tags_input.text().split(",") if tag.strip()]
 
         try:
-            result = self._prompt_engineer(
+            result = handler(
                 prompt_text,
                 name=name,
                 description=description,
@@ -924,6 +970,13 @@ class PromptDialog(QDialog):
             return
 
         self._context_input.setPlainText(result.improved_prompt)
+        summary = self._format_refinement_summary(result)
+        result_dialog = PromptRefinedDialog(summary, self, title=result_title)
+        result_dialog.exec()
+
+    @staticmethod
+    def _format_refinement_summary(result: PromptRefinement) -> str:
+        """Compose a human-readable summary of the refinement output."""
 
         summary_parts: list[str] = []
         if result.analysis:
@@ -934,14 +987,9 @@ class PromptDialog(QDialog):
         if result.warnings:
             warnings = "\n".join(f"• {item}" for item in result.warnings)
             summary_parts.append(f"Warnings:\n{warnings}")
-
-        message = (
-            "\n\n".join(summary_parts)
-            if summary_parts
-            else "The prompt has been updated with the refined version."
-        )
-        result_dialog = PromptRefinedDialog(message, self)
-        result_dialog.exec()
+        if summary_parts:
+            return "\n\n".join(summary_parts)
+        return "The prompt has been updated with the refined version."
 
     def _build_prompt(self) -> Optional[Prompt]:
         """Construct a Prompt object from the dialog inputs."""

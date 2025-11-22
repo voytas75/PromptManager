@@ -1,5 +1,6 @@
 """LiteLLM-backed prompt engineering utilities for refining prompts.
 
+Updates: v0.1.3 - 2025-11-22 - Add structure-only refinement mode with targeted instructions.
 Updates: v0.1.2 - 2025-11-05 - Stop forwarding LiteLLM timeout parameter to avoid premature failures.
 Updates: v0.1.1 - 2025-11-02 - Drop configured LiteLLM parameters locally before refinement calls.
 Updates: v0.1.0 - 2025-11-15 - Introduce prompt refinement helper using meta-prompt rules.
@@ -127,6 +128,7 @@ class PromptEngineer:
         category: Optional[str] = None,
         tags: Optional[Sequence[str]] = None,
         negative_constraints: Optional[Sequence[str]] = None,
+        structure_only: bool = False,
     ) -> PromptRefinement:
         """Return a refined prompt and supporting analysis via LiteLLM."""
 
@@ -142,6 +144,7 @@ class PromptEngineer:
             category=category,
             tags=tags,
             negative_constraints=negative_constraints,
+            structure_only=structure_only,
         )
         request: dict[str, Any] = {
             "model": self.model,
@@ -235,6 +238,33 @@ class PromptEngineer:
             raw_response=raw_response,
         )
 
+    def refine_structure(
+        self,
+        prompt_text: str,
+        *,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        category: Optional[str] = None,
+        tags: Optional[Sequence[str]] = None,
+        negative_constraints: Optional[Sequence[str]] = None,
+    ) -> PromptRefinement:
+        """Return a refinement focused on formatting and structural improvements."""
+
+        constraints = list(negative_constraints or [])
+        constraints.append(
+            "Do not introduce new instructions or change the prompt's semantic intent; "
+            "reorganise sections and formatting only."
+        )
+        return self.refine(
+            prompt_text,
+            name=name,
+            description=description,
+            category=category,
+            tags=tags,
+            negative_constraints=constraints,
+            structure_only=True,
+        )
+
     def _build_user_payload(
         self,
         prompt_text: str,
@@ -244,6 +274,7 @@ class PromptEngineer:
         category: Optional[str],
         tags: Optional[Sequence[str]],
         negative_constraints: Optional[Sequence[str]],
+        structure_only: bool,
     ) -> str:
         """Compose the user instruction message for LiteLLM."""
 
@@ -266,17 +297,31 @@ class PromptEngineer:
                 sections.append(f"Negative Constraints: {blocked}")
 
         sections.append("\n### Current Prompt\n" + prompt_text.strip())
-        sections.append(
-            "\n### Tasks\n"
-            "1. Identify gaps or violations of the meta-prompt rules.\n"
-            "2. Produce an improved prompt that retains the author's intent, integrates explicit"
-            " instructions, context, and guardrails, and specifies the output contract.\n"
-            "3. Note any residual risks, missing information, or follow-up questions in the warnings list."
-        )
-        sections.append(
-            "Ensure the improved prompt is ready for production use, uses deterministic language,"
-            " and includes explicit delimiters or sections where appropriate."
-        )
+        if structure_only:
+            sections.append(
+                "\n### Tasks\n"
+                "1. Reorganise the prompt into clearly labelled sections (context, instructions,"
+                " constraints, output format) using consistent headings or delimiters.\n"
+                "2. Keep the original wording and requirements intact; only adjust ordering,"
+                " grouping, and formatting for clarity.\n"
+                "3. Highlight any missing structural components (e.g., output contract) in the warnings list."
+            )
+            sections.append(
+                "Do not add new requirements or examples beyond light reformatting."
+                " If information is missing, call it out in warnings rather than inventing details."
+            )
+        else:
+            sections.append(
+                "\n### Tasks\n"
+                "1. Identify gaps or violations of the meta-prompt rules.\n"
+                "2. Produce an improved prompt that retains the author's intent, integrates explicit"
+                " instructions, context, and guardrails, and specifies the output contract.\n"
+                "3. Note any residual risks, missing information, or follow-up questions in the warnings list."
+            )
+            sections.append(
+                "Ensure the improved prompt is ready for production use, uses deterministic language,"
+                " and includes explicit delimiters or sections where appropriate."
+            )
         return "\n".join(sections)
 
     @staticmethod

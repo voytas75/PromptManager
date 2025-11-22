@@ -1,5 +1,6 @@
 """Prompt Manager package façade and orchestration layer.
 
+Updates: v0.13.19 - 2025-11-22 - Add structure-only prompt refinement workflow and GUI hook.
 Updates: v0.13.18 - 2025-11-22 - Seed first prompt version when history is missing.
 Updates: v0.13.17 - 2025-11-22 - Skip version bumps when prompt body is unchanged.
 Updates: v0.13.16 - 2025-11-22 - Add prompt versioning, diffing, and forking workflows.
@@ -998,6 +999,50 @@ class PromptManager:
                     category=category,
                     tags=tags,
                     negative_constraints=negative_constraints,
+                )
+            except PromptEngineeringError:
+                raise
+            except Exception as exc:  # pragma: no cover - defensive
+                raise PromptEngineeringError("Prompt refinement failed unexpectedly.") from exc
+
+    def refine_prompt_structure(
+        self,
+        prompt_text: str,
+        *,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        category: Optional[str] = None,
+        tags: Optional[Sequence[str]] = None,
+    ) -> PromptRefinement:
+        """Reformat a prompt to improve structure without changing intent."""
+
+        if not prompt_text.strip():
+            raise PromptEngineeringError("Prompt refinement requires non-empty prompt text.")
+        if self._prompt_engineer is None:
+            raise PromptEngineeringUnavailable(
+                "Prompt engineering is not configured. Set PROMPT_MANAGER_LITELLM_MODEL to enable refinement."
+            )
+        task_id = f"prompt-structure-refine:{uuid.uuid4()}"
+        metadata = {
+            "prompt_length": len(prompt_text or ""),
+            "mode": "structure",
+        }
+        with self._notification_center.track_task(
+            title="Prompt structure refinement",
+            task_id=task_id,
+            start_message="Reformatting prompt via LiteLLM…",
+            success_message="Prompt structure refined.",
+            failure_message="Prompt structure refinement failed",
+            metadata=metadata,
+            level=NotificationLevel.INFO,
+        ):
+            try:
+                return self._prompt_engineer.refine_structure(
+                    prompt_text,
+                    name=name,
+                    description=description,
+                    category=category,
+                    tags=tags,
                 )
             except PromptEngineeringError:
                 raise
