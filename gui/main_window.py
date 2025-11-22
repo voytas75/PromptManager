@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.41 - 2025-11-22 - Compact prompt header summary with inline metadata and shorter context preview.
 Updates: v0.15.40 - 2025-11-22 - Remember the last execute-as-context task text between runs.
 Updates: v0.15.39 - 2025-11-22 - Add execute-as-context actions for prompts in the list and editor dialogs.
 Updates: v0.15.38 - 2025-11-22 - Add workspace clear control to reset input, output, and chat panes.
@@ -318,7 +319,7 @@ class PromptListModel(QAbstractListModel):
 class PromptDetailWidget(QWidget):
     """Panel that summarises the currently selected prompt."""
 
-    _CONTEXT_PREVIEW_LIMIT = 300
+    _CONTEXT_PREVIEW_LIMIT = 200
 
     delete_requested = Signal()
     edit_requested = Signal()
@@ -346,9 +347,11 @@ class PromptDetailWidget(QWidget):
         self._version_label.setObjectName("promptVersion")
         self._version_label.setWordWrap(True)
         self._version_label.setTextFormat(Qt.RichText)
+        self._version_label.setVisible(False)
         self._rating_label = QLabel("Rating", content)
         self._rating_label.setWordWrap(True)
         self._rating_label.setTextFormat(Qt.RichText)
+        self._rating_label.setVisible(False)
         self._meta_label = QLabel("", content)
         self._meta_label.setWordWrap(True)
         self._meta_label.setTextFormat(Qt.RichText)
@@ -480,23 +483,13 @@ class PromptDetailWidget(QWidget):
         """Populate labels using the provided prompt."""
 
         tags = ", ".join(prompt.tags) if prompt.tags else "No tags"
-        language = prompt.language or "en"
-        name_value = f"{prompt.name} — {prompt.category or 'Uncategorised'}"
-        self._name_label.setText(self._format_label_value("Name", name_value))
-        version_display = prompt.version.strip() if prompt.version else "Not available"
-        self._version_label.setText(self._format_label_value("Version", version_display or "Not available"))
-        if prompt.rating_count > 0 and prompt.quality_score is not None:
-            rating_value = f"{prompt.quality_score:.1f}/10 ({prompt.rating_count} ratings)"
-        else:
-            rating_value = "Not yet rated"
-        self._rating_label.setText(self._format_label_value("Rating", rating_value))
-        meta_html = "<br/>".join(
-            (
-                self._format_label_value("Language", language),
-                self._format_label_value("Tags", tags),
-            )
-        )
-        self._meta_label.setText(meta_html)
+        header_html = self._format_prompt_header(prompt)
+        self._name_label.setText(header_html)
+        self._version_label.clear()
+        self._version_label.setVisible(False)
+        self._rating_label.clear()
+        self._rating_label.setVisible(False)
+        self._meta_label.setText(self._format_label_value("Tags", tags))
         description_value = prompt.description or "No description provided."
         self._description.setText(
             self._format_label_value("Description", description_value, multiline=True)
@@ -564,6 +557,37 @@ class PromptDetailWidget(QWidget):
         truncated = context[: self._CONTEXT_PREVIEW_LIMIT].rstrip()
         return f"{truncated}…"
 
+    def _format_prompt_header(self, prompt: Prompt) -> str:
+        """Return the combined prompt title/category/metadata header."""
+
+        title = prompt.name or "Untitled prompt"
+        category = prompt.category or "Uncategorised"
+        language = (prompt.language or "en").strip() or "en"
+        detail_parts: List[str] = [language.lower()]
+
+        version_raw = (prompt.version or "").strip()
+        if not version_raw:
+            version_label = "v1"
+        elif version_raw.lower().startswith("v"):
+            version_label = version_raw
+        else:
+            version_label = f"v{version_raw}"
+        detail_parts.append(version_label)
+
+        if prompt.rating_count > 0 and prompt.quality_score is not None:
+            detail_parts.append(f"rating {prompt.quality_score:.1f}/10")
+
+        detail_text = ", ".join(detail_parts)
+        detail_color = self._label_color()
+        safe_title = escape(title)
+        safe_category = escape(category)
+        safe_details = escape(detail_text)
+        return (
+            f'<span style="font-weight:600;">{safe_title}</span> - '
+            f"{safe_category} "
+            f'<span style="color: {detail_color};">({safe_details})</span>'
+        )
+
     def _format_label_value(self, label: str, value: str, *, multiline: bool = False) -> str:
         """Return HTML rendering with italic label and escaped value."""
 
@@ -623,11 +647,11 @@ class PromptDetailWidget(QWidget):
     def clear(self) -> None:
         """Reset the panel to its empty state."""
 
-        self._name_label.setText(
-            self._format_label_value("Name", "Select a prompt to view details")
-        )
-        self._version_label.setText(self._format_label_value("Version", "Not available"))
-        self._rating_label.setText(self._format_label_value("Rating", "n/a"))
+        self._name_label.setText("Select a prompt to view details")
+        self._version_label.clear()
+        self._version_label.setVisible(False)
+        self._rating_label.clear()
+        self._rating_label.setVisible(False)
         self._meta_label.clear()
         self._description.clear()
         self._context.clear()
