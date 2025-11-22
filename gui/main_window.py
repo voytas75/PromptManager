@@ -186,6 +186,7 @@ from .notifications import QtNotificationBridge, NotificationHistoryDialog
 logger = logging.getLogger(__name__)
 
 _CHAT_PALETTE_KEYS = {"user", "assistant"}
+_EXECUTE_CONTEXT_TASK_KEY = "lastExecuteContextTask"
 
 
 def _default_chat_palette() -> dict[str, str]:
@@ -212,6 +213,25 @@ def _match_category_label(text: str, categories: Sequence[PromptCategory]) -> Op
         if lowered in label_lower or label_lower in lowered:
             return category.label
     return None
+
+
+def _load_last_execute_context_task(settings: QSettings) -> str:
+    """Return the persisted execute-context task text."""
+
+    raw_value = settings.value(_EXECUTE_CONTEXT_TASK_KEY, "", str)
+    if raw_value is None:
+        return ""
+    return str(raw_value).strip()
+
+
+def _store_last_execute_context_task(settings: QSettings, value: str) -> None:
+    """Persist the execute-context task text for future sessions."""
+
+    settings.setValue(_EXECUTE_CONTEXT_TASK_KEY, value)
+    try:
+        settings.sync()
+    except Exception:  # pragma: no cover - sync failures depend on platform state
+        logger.warning("Unable to sync execute-context history", exc_info=True)
 
 
 def normalise_chat_palette(palette: Optional[Mapping[str, object]]) -> dict[str, str]:
@@ -820,6 +840,7 @@ class MainWindow(QMainWindow):
         self._suppress_query_signal = False
         self._quick_shortcuts: List[QShortcut] = []
         self._layout_settings = QSettings("PromptManager", "MainWindow")
+        self._last_execute_context_task: str = _load_last_execute_context_task(self._layout_settings)
         self._main_container: Optional[QFrame] = None
         self._main_splitter: Optional[QSplitter] = None
         self._list_splitter: Optional[QSplitter] = None
@@ -837,7 +858,6 @@ class MainWindow(QMainWindow):
         self._notification_indicator.setVisible(bool(self._active_notifications))
         self._notification_bridge = QtNotificationBridge(self._manager.notification_center, self)
         self._notification_bridge.notification_received.connect(self._handle_notification)
-        self._last_execute_context_task: str = ""
         self.setWindowTitle("Prompt Manager")
         self._restore_window_geometry()
         self._build_ui()
@@ -1292,6 +1312,14 @@ class MainWindow(QMainWindow):
 
         geometry = self.saveGeometry()
         self._layout_settings.setValue("windowGeometry", geometry)
+
+    def _persist_last_execute_context_task(self, task_text: str) -> None:
+        """Persist the most recent execute-context task text."""
+
+        if not task_text:
+            _store_last_execute_context_task(self._layout_settings, "")
+            return
+        _store_last_execute_context_task(self._layout_settings, task_text)
 
     def showEvent(self, event: QShowEvent) -> None:  # type: ignore[override]
         """Ensure splitter state is captured once the window is visible."""
@@ -2823,6 +2851,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(parent_widget, "Task required", "Enter a task before executing.")
             return
         self._last_execute_context_task = task_text
+        self._persist_last_execute_context_task(task_text)
         request_payload = (
             "You will receive a task and a context block. "
             "Use the context exclusively when fulfilling the task.\n\n"

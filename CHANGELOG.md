@@ -2,6 +2,12 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.17.2] - 2025-11-22
+
+### Changed
+
+- Execute-as-context now remembers the most recent task description across sessions, pre-filling the dialog with whatever the user last entered so repetitive workflows stay fast even after restarting the app.
+
 ## [0.17.1] - 2025-11-22
 
 ### Added
