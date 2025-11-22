@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.10.2 - 2025-11-22 - Default prompt versions to integer labels for new entries.
 Updates: v0.10.1 - 2025-11-22 - Replace prompt refined alert with resizable, scrollable dialog.
 Updates: v0.10.0 - 2025-11-22 - Add prompt version history dialog for diffing/restoring snapshots.
 Updates: v0.9.2 - 2025-12-08 - Resolve Info dialog version label from package metadata or pyproject.
@@ -910,7 +911,7 @@ class PromptDialog(QDialog):
                 scenarios=scenarios,
                 created_at=now,
                 last_modified=now,
-                version="1.0",
+                version="1",
             )
 
         base = self._source_prompt

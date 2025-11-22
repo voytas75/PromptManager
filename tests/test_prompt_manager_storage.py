@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import pytest
 
@@ -19,7 +19,7 @@ from core import (
     RepositoryError,
     RepositoryNotFoundError,
 )
-from models.prompt_model import Prompt, UserProfile
+from models.prompt_model import Prompt, PromptVersion, UserProfile
 from models.response_style import ResponseStyle
 from models.prompt_note import PromptNote
 
@@ -37,7 +37,7 @@ def _make_prompt(name: str = "Sample Prompt") -> Prompt:
         example_input="Input example",
         example_output="Output example",
         author="tester",
-        version="1.0",
+        version="1",
         is_active=True,
         source="tests",
     )
@@ -159,6 +159,8 @@ class _FakeRepository:
         self.get_call_count = 0
         self.fail_on_get = False
         self._profile = UserProfile.create_default()
+        self._versions: Dict[uuid.UUID, List[PromptVersion]] = {}
+        self._next_version_id = 1
 
     def add(self, prompt: Prompt) -> Prompt:
         if prompt.id in self._store:
@@ -181,6 +183,65 @@ class _FakeRepository:
     def record_user_prompt_usage(self, prompt: Prompt, *, max_recent: int = 20) -> UserProfile:  # noqa: ARG002
         self._profile.record_prompt_usage(prompt)
         return self._profile
+
+    def update(self, prompt: Prompt) -> Prompt:
+        if prompt.id not in self._store:
+            raise RepositoryNotFoundError(f"Prompt {prompt.id} not found")
+        self._store[prompt.id] = prompt
+        return prompt
+
+    def delete(self, prompt_id: uuid.UUID) -> None:
+        try:
+            del self._store[prompt_id]
+        except KeyError as exc:
+            raise RepositoryNotFoundError(f"Prompt {prompt_id} not found") from exc
+
+    def record_prompt_version(
+        self,
+        prompt: Prompt,
+        *,
+        commit_message: Optional[str] = None,
+        parent_version_id: Optional[int] = None,
+    ) -> PromptVersion:
+        history = self._versions.setdefault(prompt.id, [])
+        version_number = len(history) + 1
+        version = PromptVersion(
+            id=self._next_version_id,
+            prompt_id=prompt.id,
+            version_number=version_number,
+            created_at=datetime.now(timezone.utc),
+            parent_version_id=parent_version_id,
+            commit_message=commit_message,
+            snapshot=prompt.to_record(),
+        )
+        self._next_version_id += 1
+        history.append(version)
+        return version
+
+    def list_prompt_versions(
+        self,
+        prompt_id: uuid.UUID,
+        *,
+        limit: Optional[int] = None,
+    ) -> List[PromptVersion]:
+        versions = self._versions.get(prompt_id, [])
+        ordered = sorted(versions, key=lambda version: version.version_number, reverse=True)
+        if limit is not None:
+            return ordered[:limit]
+        return ordered
+
+    def get_prompt_version(self, version_id: int) -> PromptVersion:
+        for history in self._versions.values():
+            for version in history:
+                if version.id == version_id:
+                    return version
+        raise RepositoryNotFoundError(f"Prompt version {version_id} not found")
+
+    def get_prompt_latest_version(self, prompt_id: uuid.UUID) -> Optional[PromptVersion]:
+        versions = self._versions.get(prompt_id)
+        if not versions:
+            return None
+        return max(versions, key=lambda version: version.version_number)
 
 
 class _StubWorker:
@@ -210,18 +271,6 @@ class _StubRedis:
 
     def close(self) -> None:
         self.closed = True
-
-    def update(self, prompt: Prompt) -> Prompt:
-        if prompt.id not in self._store:
-            raise RepositoryNotFoundError(f"Prompt {prompt.id} not found")
-        self._store[prompt.id] = prompt
-        return prompt
-
-    def delete(self, prompt_id: uuid.UUID) -> None:
-        try:
-            del self._store[prompt_id]
-        except KeyError as exc:
-            raise RepositoryNotFoundError(f"Prompt {prompt_id} not found") from exc
 
 
 def test_repository_roundtrip(tmp_path) -> None:
@@ -391,7 +440,7 @@ def test_search_prompts_returns_chroma_records_when_sqlite_missing() -> None:
                 "related_prompts": '["abc"]',
                 "created_at": "2025-10-30T00:00:00+00:00",
                 "last_modified": "2025-10-30T00:00:00+00:00",
-                "version": "1.0",
+                "version": "1",
                 "usage_count": 0,
                 "is_active": True,
             }

@@ -1,5 +1,6 @@
 """Prompt data model definitions.
 
+Updates: v0.7.1 - 2025-11-22 - Normalize prompt version labels to integer strings.
 Updates: v0.7.0 - 2025-11-22 - Add prompt versioning and fork lineage dataclasses.
 Updates: v0.6.0 - 2025-12-08 - Remove deprecated task template dataclass.
 Updates: v0.5.1 - 2025-11-19 - Add persisted usage scenarios metadata for prompts.
@@ -15,6 +16,7 @@ from __future__ import annotations
 import json
 import hashlib
 import uuid
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -109,6 +111,25 @@ def _deserialize_list(value: Any) -> List[str]:
         return [str(item) for item in value]
     return [str(value)]
 
+
+def _normalize_version_label(value: Any) -> str:
+    """Return an integer-only version label derived from mixed inputs."""
+
+    if value is None:
+        return "1"
+    text = str(value).strip()
+    if not text:
+        return "1"
+    try:
+        number = int(float(text))
+        return str(number)
+    except ValueError:
+        match = re.search(r"\d+", text)
+        if match:
+            return str(int(match.group(0)))
+    return "1"
+
+
 def _hash_text(value: str) -> str:
     """Return a stable SHA-256 digest for the provided text."""
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
@@ -137,7 +158,7 @@ class Prompt:
     example_output: Optional[str] = None
     scenarios: List[str] = field(default_factory=list)
     last_modified: datetime = field(default_factory=_utc_now)
-    version: str = "1.1"
+    version: str = "1"
     author: Optional[str] = None
     quality_score: Optional[float] = None
     usage_count: int = 0
@@ -189,6 +210,7 @@ class Prompt:
                 ext5_mapping = None
 
         self.ext5 = ext5_mapping
+        self.version = _normalize_version_label(self.version)
 
     @property
     def document(self) -> str:
@@ -291,7 +313,7 @@ class Prompt:
             example_output=data.get("example_output"),
             scenarios=_deserialize_list(data.get("scenarios")),
             last_modified=_ensure_datetime(data.get("last_modified")),
-            version=str(data.get("version") or "1.1"),
+            version=str(data.get("version") or "1"),
             author=data.get("author"),
             quality_score=(
                 float(data["quality_score"]) if data.get("quality_score") is not None else None

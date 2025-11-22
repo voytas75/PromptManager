@@ -62,7 +62,7 @@ def test_prompt_roundtrip_metadata_and_record() -> None:
         example_input="input",
         example_output="output",
         scenarios=["Use for quick summaries", "Share with onboarding teammates"],
-        version="2.0",
+        version="2.5",
         author="tester",
         quality_score=9.0,
         usage_count=5,
@@ -74,6 +74,8 @@ def test_prompt_roundtrip_metadata_and_record() -> None:
         ext4=[0.1, 0.2],
         ext5={"list": [1, 2]},
     )
+
+    assert prompt.version == "2"
 
     metadata = prompt.to_metadata()
     assert metadata["related_prompts"] == json.dumps(["other"], ensure_ascii=False)
