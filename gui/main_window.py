@@ -959,26 +959,21 @@ class MainWindow(QMainWindow):
         self._end_chat_button.clicked.connect(self._on_end_chat_clicked)  # type: ignore[arg-type]
         actions_layout.addWidget(self._end_chat_button)
 
-        self._save_button = QPushButton("Save Result", self)
-        self._save_button.clicked.connect(self._on_save_result_clicked)  # type: ignore[arg-type]
-        actions_layout.addWidget(self._save_button)
-
         self._copy_button = QPushButton("Copy Prompt", self)
         self._copy_button.clicked.connect(self._on_copy_prompt_clicked)  # type: ignore[arg-type]
         actions_layout.addWidget(self._copy_button)
 
         self._copy_result_button = QPushButton("Copy Result", self)
         self._copy_result_button.clicked.connect(self._on_copy_result_clicked)  # type: ignore[arg-type]
-        actions_layout.addWidget(self._copy_result_button)
 
         self._copy_result_to_text_window_button = QPushButton("Copy to Text Window", self)
         self._copy_result_to_text_window_button.clicked.connect(self._on_copy_result_to_text_window_clicked)  # type: ignore[arg-type]
-        actions_layout.addWidget(self._copy_result_to_text_window_button)
 
         self._render_markdown_button = QPushButton("Render Output", self)
         self._render_markdown_button.setEnabled(False)
         self._render_markdown_button.clicked.connect(self._on_render_markdown_clicked)  # type: ignore[arg-type]
-        actions_layout.addWidget(self._render_markdown_button)
+        self._save_button = QPushButton("Save Result", self)
+        self._save_button.clicked.connect(self._on_save_result_clicked)  # type: ignore[arg-type]
 
         self._intent_hint = QLabel("", self)
         self._intent_hint.setObjectName("intentHintLabel")
@@ -1116,6 +1111,13 @@ class MainWindow(QMainWindow):
         output_layout.addWidget(self._result_label)
         output_layout.addWidget(self._result_meta)
         output_layout.addWidget(self._result_tabs, 1)
+
+        result_actions_layout = FlowLayout(spacing=8)
+        result_actions_layout.addWidget(self._save_button)
+        result_actions_layout.addWidget(self._copy_result_button)
+        result_actions_layout.addWidget(self._copy_result_to_text_window_button)
+        result_actions_layout.addWidget(self._render_markdown_button)
+        output_layout.addLayout(result_actions_layout)
         workspace_layout.addWidget(output_panel, 1)
         self._main_splitter.addWidget(workspace_panel)
         self._main_splitter.setStretchFactor(0, 0)
