@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.10.1 - 2025-11-22 - Replace prompt refined alert with resizable, scrollable dialog.
 Updates: v0.10.0 - 2025-11-22 - Add prompt version history dialog for diffing/restoring snapshots.
 Updates: v0.9.2 - 2025-12-08 - Resolve Info dialog version label from package metadata or pyproject.
 Updates: v0.9.1 - 2025-12-08 - Remove task template dialog and references.
@@ -236,6 +237,64 @@ class CollapsibleTextSection(QWidget):
             if not self._toggle.isChecked():
                 self._set_expanded(True, focus=False)
         self.textChanged.emit()
+
+
+class PromptRefinedDialog(QDialog):
+    """Modal dialog presenting prompt refinement output in a resizable view."""
+
+    def __init__(self, content: str, parent: Optional[QWidget] = None) -> None:
+        """Initialize the dialog with the refinement summary content.
+
+        Args:
+            content: Text produced by the refinement workflow.
+            parent: Optional parent widget that owns the dialog.
+        """
+
+        super().__init__(parent)
+        self.setWindowTitle("Prompt refined")
+        self.setModal(True)
+        self.setSizeGripEnabled(True)
+
+        layout = QVBoxLayout(self)
+        header = QLabel("Review the refinement details below.", self)
+        header.setWordWrap(True)
+        layout.addWidget(header)
+
+        self._body = QPlainTextEdit(self)
+        self._body.setReadOnly(True)
+        self._body.setPlainText(content)
+        self._body.setMinimumHeight(200)
+        layout.addWidget(self._body)
+
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok, Qt.Horizontal, self)
+        button_box.accepted.connect(self.accept)  # type: ignore[arg-type]
+        layout.addWidget(button_box)
+
+        self._apply_initial_size()
+
+    def _apply_initial_size(self) -> None:
+        """Resize the dialog to fit comfortably under the active screen size."""
+
+        screen = QGuiApplication.primaryScreen()
+        if screen is None:
+            self.resize(720, 480)
+            return
+
+        geometry = screen.availableGeometry()
+        screen_height = geometry.height()
+        screen_width = geometry.width()
+
+        height_buffer = 60
+        max_height = max(screen_height - height_buffer, int(screen_height * 0.8))
+        preferred_height = max(320, int(screen_height * 0.6))
+        height = min(preferred_height, max_height)
+
+        width_buffer = 120
+        max_width = max(screen_width - width_buffer, int(screen_width * 0.7))
+        preferred_width = max(560, int(screen_width * 0.45))
+        width = min(preferred_width, max_width)
+
+        self.resize(width, height)
 
 
 def fallback_suggest_prompt_name(context: str, *, max_words: int = 5) -> str:
@@ -802,7 +861,8 @@ class PromptDialog(QDialog):
             if summary_parts
             else "The prompt has been updated with the refined version."
         )
-        QMessageBox.information(self, "Prompt refined", message)
+        result_dialog = PromptRefinedDialog(message, self)
+        result_dialog.exec()
 
     def _build_prompt(self) -> Optional[Prompt]:
         """Construct a Prompt object from the dialog inputs."""
