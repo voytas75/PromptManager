@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.10.6 - 2025-11-22 - Add prompt body tab to version history dialog.
 Updates: v0.10.5 - 2025-11-22 - Redesign prompt dialog layout for taller editing surface.
 Updates: v0.10.4 - 2025-11-22 - Align example section toggles with the active theme palette.
 Updates: v0.10.3 - 2025-11-22 - Add author input to prompt create/edit workflows.
@@ -2359,6 +2360,9 @@ def _diff_entry_to_text(entry: CatalogDiffEntry) -> str:
 class PromptVersionHistoryDialog(QDialog):
     """Display committed prompt versions with diff/restore controls."""
 
+    _BODY_PLACEHOLDER = "Select a version to view the prompt body."
+    _EMPTY_BODY_TEXT = "Prompt body is empty."
+
     def __init__(
         self,
         manager: PromptManager,
@@ -2403,12 +2407,16 @@ class PromptVersionHistoryDialog(QDialog):
         layout.addWidget(self._table, stretch=1)
 
         self._tab_widget = QTabWidget(self)
+        self._body_view = QPlainTextEdit(self)
+        self._body_view.setReadOnly(True)
+        self._tab_widget.addTab(self._body_view, "Prompt body")
         self._diff_view = QPlainTextEdit(self)
         self._diff_view.setReadOnly(True)
         self._tab_widget.addTab(self._diff_view, "Diff vs previous")
         self._snapshot_view = QPlainTextEdit(self)
         self._snapshot_view.setReadOnly(True)
         self._tab_widget.addTab(self._snapshot_view, "Snapshot JSON")
+        self._tab_widget.setCurrentIndex(0)
         layout.addWidget(self._tab_widget, stretch=1)
 
         button_row = QHBoxLayout()
@@ -2446,17 +2454,28 @@ class PromptVersionHistoryDialog(QDialog):
         if versions:
             self._table.selectRow(0)
         else:
+            self._body_view.setPlainText(self._BODY_PLACEHOLDER)
             self._diff_view.setPlainText("No versions have been recorded for this prompt yet.")
             self._snapshot_view.clear()
 
     def _on_selection_changed(self) -> None:
         version = self._selected_version()
         if version is None:
+            self._body_view.setPlainText(self._BODY_PLACEHOLDER)
             self._diff_view.clear()
             self._snapshot_view.clear()
             return
         snapshot_text = json.dumps(version.snapshot, ensure_ascii=False, indent=2)
         self._snapshot_view.setPlainText(snapshot_text)
+
+        raw_body = version.snapshot.get("context")
+        if isinstance(raw_body, str) and raw_body.strip():
+            body_text = raw_body
+        elif raw_body:
+            body_text = str(raw_body)
+        else:
+            body_text = self._EMPTY_BODY_TEXT
+        self._body_view.setPlainText(body_text)
 
         previous_version = self._previous_version(version)
         if previous_version is None:
