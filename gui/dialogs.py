@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.11.1 - 2025-11-22 - Add execute-as-context shortcut to the prompt dialog.
 Updates: v0.11.0 - 2025-11-22 - Add prompt category management dialog with create/edit workflows.
 Updates: v0.10.8 - 2025-11-22 - Surface prompt versions and quick access to history inside the edit dialog.
 Updates: v0.10.7 - 2025-11-22 - Add structure-only refinement action to the prompt dialog.
@@ -412,6 +413,7 @@ class PromptDialog(QDialog):
     """Modal dialog used for creating or editing prompt records."""
 
     applied = Signal(Prompt)
+    execute_context_requested = Signal(Prompt, str)
 
     def __init__(
         self,
@@ -445,6 +447,7 @@ class PromptDialog(QDialog):
         self._generate_category_button: Optional[QPushButton] = None
         self._generate_tags_button: Optional[QPushButton] = None
         self._generate_scenarios_button: Optional[QPushButton] = None
+        self._execute_context_button: Optional[QPushButton] = None
         self.setWindowTitle("Create Prompt" if prompt is None else "Edit Prompt")
         self.setMinimumSize(900, 780)
         self.resize(1100, 880)
@@ -611,6 +614,12 @@ class PromptDialog(QDialog):
         refine_row_layout.setSpacing(8)
         refine_row_layout.addWidget(self._refine_button)
         refine_row_layout.addWidget(self._structure_refine_button)
+        self._execute_context_button = QPushButton("Execute as Context", self)
+        self._execute_context_button.setToolTip(
+            "Run the current prompt body as context for an ad-hoc execution."
+        )
+        self._execute_context_button.clicked.connect(self._on_execute_context_clicked)  # type: ignore[arg-type]
+        refine_row_layout.addWidget(self._execute_context_button)
         form_layout.addRow("", refine_row)
         form_layout.addRow("Description", self._description_input)
         self._scenarios_input = QPlainTextEdit(self)
@@ -661,6 +670,7 @@ class PromptDialog(QDialog):
         main_layout.addWidget(self._buttons)
         self._context_input.textChanged.connect(self._on_context_changed)  # type: ignore[arg-type]
         self._update_version_controls(self._source_prompt.version if self._source_prompt else None)
+        self._refresh_execute_context_button()
 
     def prefill_from_prompt(self, prompt: Prompt) -> None:
         """Populate inputs from an existing prompt while staying in creation mode."""
@@ -947,6 +957,26 @@ class PromptDialog(QDialog):
             result_title="Prompt structure refined",
         )
 
+    def _on_execute_context_clicked(self) -> None:
+        """Trigger the execute-as-context workflow from the dialog."""
+
+        if self._source_prompt is None:
+            QMessageBox.information(
+                self,
+                "Execute as context",
+                "Save the prompt before executing it as context.",
+            )
+            return
+        context_text = self._context_input.toPlainText().strip()
+        if not context_text:
+            QMessageBox.warning(
+                self,
+                "Prompt body required",
+                "Enter prompt text before executing as context.",
+            )
+            return
+        self.execute_context_requested.emit(self._source_prompt, context_text)
+
     def _run_refinement(
         self,
         handler: Optional[Callable[..., PromptRefinement]],
@@ -1107,6 +1137,7 @@ class PromptDialog(QDialog):
 
         self._source_prompt = prompt
         self._populate(prompt)
+        self._refresh_execute_context_button()
 
     def _update_version_controls(self, version: Optional[str]) -> None:
         """Refresh the version label and history button state."""
@@ -1118,6 +1149,22 @@ class PromptDialog(QDialog):
         history_available = self._source_prompt is not None and self._version_history_handler is not None
         self._version_history_button.setVisible(history_available)
         self._version_history_button.setEnabled(history_available)
+
+    def _refresh_execute_context_button(self) -> None:
+        """Toggle execute-context control availability based on dialog state."""
+
+        if self._execute_context_button is None:
+            return
+        has_source_prompt = self._source_prompt is not None
+        self._execute_context_button.setEnabled(has_source_prompt)
+        if has_source_prompt:
+            self._execute_context_button.setToolTip(
+                "Run the current prompt body as context without closing the editor."
+            )
+        else:
+            self._execute_context_button.setToolTip(
+                "Available when editing a saved prompt with a prompt body."
+            )
         if history_available:
             self._version_history_button.setToolTip("View previous versions and restore snapshots.")
         else:

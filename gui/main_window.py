@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.39 - 2025-11-22 - Add execute-as-context actions for prompts in the list and editor dialogs.
 Updates: v0.15.38 - 2025-11-22 - Add workspace clear control to reset input, output, and chat panes.
 Updates: v0.15.37 - 2025-11-22 - Add category manager dialog and registry-backed filters.
 Updates: v0.15.36 - 2025-11-22 - Compact prompt detail view with inline italic labels and single version source.
@@ -106,6 +107,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QDoubleSpinBox,
     QFrame,
+    QInputDialog,
     QLayout,
     QHBoxLayout,
     QLayoutItem,
@@ -2723,6 +2725,7 @@ class MainWindow(QMainWindow):
         duplicate_action = menu.addAction("Duplicate Prompt")
         fork_action = menu.addAction("Fork Prompt")
         execute_action = menu.addAction("Execute Prompt")
+        execute_context_action = menu.addAction("Execute as Context…")
         copy_action = menu.addAction("Copy Prompt Text")
         description_action = menu.addAction("Show Description")
 
@@ -2731,11 +2734,14 @@ class MainWindow(QMainWindow):
             duplicate_action.setEnabled(False)
             fork_action.setEnabled(False)
             execute_action.setEnabled(False)
+            execute_context_action.setEnabled(False)
             copy_action.setEnabled(False)
             description_action.setEnabled(False)
         else:
             can_execute = bool((prompt.context or prompt.description) and self._manager.executor)
             execute_action.setEnabled(can_execute)
+            has_context_body = bool((prompt.context or "").strip())
+            execute_context_action.setEnabled(bool(self._manager.executor) and has_context_body)
             fork_action.setEnabled(True)
             if not (prompt.context or prompt.description):
                 copy_action.setEnabled(False)
@@ -2753,6 +2759,8 @@ class MainWindow(QMainWindow):
             self._fork_prompt(prompt)
         elif selected_action is execute_action and prompt is not None:
             self._execute_prompt_from_context_menu(prompt)
+        elif selected_action is execute_context_action and prompt is not None:
+            self._execute_prompt_as_context(prompt)
         elif selected_action is copy_action and prompt is not None:
             self._copy_prompt_to_clipboard(prompt)
         elif selected_action is description_action and prompt is not None:
@@ -2781,6 +2789,50 @@ class MainWindow(QMainWindow):
             keep_text_after=True,
         )
 
+    def _execute_prompt_as_context(
+        self,
+        prompt: Prompt,
+        *,
+        parent: Optional[QWidget] = None,
+        context_override: Optional[str] = None,
+    ) -> None:
+        """Ask for a task and run the prompt using its body as contextual input."""
+
+        context_text = context_override if context_override is not None else prompt.context or ""
+        cleaned_context = context_text.strip()
+        if not cleaned_context:
+            message = "Selected prompt does not include a prompt body to use as context."
+            if parent is not None:
+                QMessageBox.information(parent, "Execute as context", message)
+            else:
+                self._show_status_message(message, 5000)
+            return
+        parent_widget = parent or self
+        task_text, accepted = QInputDialog.getMultiLineText(
+            parent_widget,
+            "Execute as Context",
+            "Describe the task to perform using this prompt's body as context:",
+        )
+        if not accepted:
+            return
+        cleaned_task = task_text.strip()
+        if not cleaned_task:
+            QMessageBox.warning(parent_widget, "Task required", "Enter a task before executing.")
+            return
+        request_payload = (
+            "You will receive a task and a context block. "
+            "Use the context exclusively when fulfilling the task.\n\n"
+            f"Task:\n{cleaned_task}\n\n"
+            f"Context:\n{cleaned_context}"
+        )
+        self._execute_prompt_with_text(
+            prompt,
+            request_payload,
+            status_prefix="Executed context",
+            empty_text_message="Provide context text before executing.",
+            keep_text_after=False,
+        )
+
     def _duplicate_prompt(self, prompt: Prompt) -> None:
         """Open a creation dialog with the selected prompt pre-filled and persist the copy."""
 
@@ -2801,6 +2853,7 @@ class MainWindow(QMainWindow):
             ),
             version_history_handler=self._open_version_history_dialog,
         )
+        self._connect_prompt_dialog_signals(dialog)
         dialog.prefill_from_prompt(prompt)
         if dialog.exec() != QDialog.Accepted:
             return
@@ -2843,6 +2896,7 @@ class MainWindow(QMainWindow):
             ),
             version_history_handler=self._open_version_history_dialog,
         )
+        self._connect_prompt_dialog_signals(dialog)
         dialog.setWindowTitle("Edit Forked Prompt")
         if dialog.exec() == QDialog.Accepted and dialog.result_prompt is not None:
             try:
@@ -2879,6 +2933,7 @@ class MainWindow(QMainWindow):
             ),
             version_history_handler=self._open_version_history_dialog,
         )
+        self._connect_prompt_dialog_signals(dialog)
         if dialog.exec() != QDialog.Accepted:
             return
         prompt = dialog.result_prompt
@@ -2916,6 +2971,7 @@ class MainWindow(QMainWindow):
             ),
             version_history_handler=self._open_version_history_dialog,
         )
+        self._connect_prompt_dialog_signals(dialog)
         dialog.applied.connect(  # type: ignore[arg-type]
             lambda updated_prompt: self._on_prompt_applied(updated_prompt, dialog)
         )
@@ -2997,6 +3053,17 @@ class MainWindow(QMainWindow):
         self._load_prompts(self._search_input.text())
         self._select_prompt(stored.id)
         self.statusBar().showMessage("Prompt changes applied.", 4000)
+
+    def _connect_prompt_dialog_signals(self, dialog: PromptDialog) -> None:
+        """Wire shared signal handlers for prompt dialogs."""
+
+        dialog.execute_context_requested.connect(  # type: ignore[arg-type]
+            lambda prompt, context_text, dlg=dialog: self._execute_prompt_as_context(
+                prompt,
+                parent=dlg,
+                context_override=context_text,
+            )
+        )
 
     def _delete_prompt(self, prompt: Prompt, *, skip_confirmation: bool = False) -> None:
         """Delete the provided prompt and refresh listings."""
