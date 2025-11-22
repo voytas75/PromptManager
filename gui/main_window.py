@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.36 - 2025-11-22 - Compact prompt detail view with inline italic labels and single version source.
 Updates: v0.15.35 - 2025-11-22 - Align version display with schema metadata in the prompt summary pane.
 Updates: v0.15.34 - 2025-11-22 - Add headings to the prompt summary view and truncate body previews.
 Updates: v0.15.33 - 2025-11-22 - Add structure-only prompt refinement action to the editor dialog.
@@ -291,55 +292,58 @@ class PromptDetailWidget(QWidget):
         content_layout = QVBoxLayout(content)
         content_layout.setContentsMargins(12, 12, 12, 12)
 
-        self._name_title = QLabel("Name", content)
-        self._name_title.setObjectName("promptSectionTitle")
-        self._title = QLabel("Select a prompt to view details", content)
-        self._title.setObjectName("promptTitle")
-        self._version_title = QLabel("Version", content)
-        self._version_title.setObjectName("promptSectionTitle")
-        self._version_value = QLabel("Not available", content)
-        self._version_value.setObjectName("promptVersion")
-        self._rating_label = QLabel("Rating: n/a", content)
+        self._name_label = QLabel("Select a prompt to view details", content)
+        self._name_label.setObjectName("promptTitle")
+        self._name_label.setWordWrap(True)
+        self._name_label.setTextFormat(Qt.RichText)
+        self._version_label = QLabel("Version unavailable", content)
+        self._version_label.setObjectName("promptVersion")
+        self._version_label.setWordWrap(True)
+        self._version_label.setTextFormat(Qt.RichText)
+        self._rating_label = QLabel("Rating", content)
+        self._rating_label.setWordWrap(True)
+        self._rating_label.setTextFormat(Qt.RichText)
+        self._meta_label = QLabel("", content)
+        self._meta_label.setWordWrap(True)
+        self._meta_label.setTextFormat(Qt.RichText)
         self._description = QLabel("", content)
         self._description.setWordWrap(True)
+        self._description.setTextFormat(Qt.RichText)
         self._lineage_label = QLabel("", content)
         self._lineage_label.setObjectName("promptLineage")
         self._lineage_label.setWordWrap(True)
         self._lineage_label.setStyleSheet("color: #4b5563;")
         self._lineage_label.setVisible(False)
+        self._lineage_label.setTextFormat(Qt.RichText)
 
         self._context = QLabel("", content)
         self._context.setWordWrap(True)
+        self._context.setTextFormat(Qt.RichText)
         self._scenarios = QLabel("", content)
         self._scenarios.setWordWrap(True)
+        self._scenarios.setTextFormat(Qt.RichText)
         self._examples = QLabel("", content)
         self._examples.setWordWrap(True)
+        self._examples.setTextFormat(Qt.RichText)
 
-        content_layout.addWidget(self._name_title)
+        content_layout.addWidget(self._name_label)
         content_layout.addSpacing(4)
-        content_layout.addWidget(self._title)
-        content_layout.addSpacing(8)
-        content_layout.addWidget(self._version_title)
+        content_layout.addWidget(self._version_label)
         content_layout.addSpacing(4)
-        content_layout.addWidget(self._version_value)
-        content_layout.addSpacing(8)
         content_layout.addWidget(self._rating_label)
         content_layout.addSpacing(4)
-        content_layout.addWidget(self._description)
-        content_layout.addSpacing(6)
-        content_layout.addWidget(self._lineage_label)
-        content_layout.addSpacing(8)
-        content_layout.addWidget(self._context)
-        content_layout.addSpacing(8)
-        content_layout.addWidget(self._scenarios)
-        content_layout.addSpacing(8)
-        content_layout.addWidget(self._examples)
-        content_layout.addSpacing(12)
-
-        self._actions_title = QLabel("Actions", content)
-        self._actions_title.setObjectName("promptSectionTitle")
-        content_layout.addWidget(self._actions_title)
+        content_layout.addWidget(self._meta_label)
         content_layout.addSpacing(4)
+        content_layout.addWidget(self._description)
+        content_layout.addSpacing(4)
+        content_layout.addWidget(self._lineage_label)
+        content_layout.addSpacing(4)
+        content_layout.addWidget(self._context)
+        content_layout.addSpacing(4)
+        content_layout.addWidget(self._scenarios)
+        content_layout.addSpacing(4)
+        content_layout.addWidget(self._examples)
+        content_layout.addSpacing(8)
 
         metadata_buttons = QHBoxLayout()
         metadata_buttons.setContentsMargins(0, 0, 0, 0)
@@ -431,29 +435,50 @@ class PromptDetailWidget(QWidget):
 
         tags = ", ".join(prompt.tags) if prompt.tags else "No tags"
         language = prompt.language or "en"
-        header = f"{prompt.name} — {prompt.category or 'Uncategorised'}\nLanguage: {language}\nTags: {tags}"
-        self._title.setText(header)
+        name_value = f"{prompt.name} — {prompt.category or 'Uncategorised'}"
+        self._name_label.setText(self._format_label_value("Name", name_value))
         version_display = prompt.version.strip() if prompt.version else "Not available"
-        self._version_value.setText(version_display or "Not available")
+        self._version_label.setText(self._format_label_value("Version", version_display or "Not available"))
         if prompt.rating_count > 0 and prompt.quality_score is not None:
-            rating_text = f"Rating: {prompt.quality_score:.1f}/10 ({prompt.rating_count} ratings)"
+            rating_value = f"{prompt.quality_score:.1f}/10 ({prompt.rating_count} ratings)"
         else:
-            rating_text = "Rating: not yet rated"
-        self._rating_label.setText(rating_text)
-        self._description.setText(prompt.description)
+            rating_value = "Not yet rated"
+        self._rating_label.setText(self._format_label_value("Rating", rating_value))
+        meta_html = "<br/>".join(
+            (
+                self._format_label_value("Language", language),
+                self._format_label_value("Tags", tags),
+            )
+        )
+        self._meta_label.setText(meta_html)
+        description_value = prompt.description or "No description provided."
+        self._description.setText(
+            self._format_label_value("Description", description_value, multiline=True)
+        )
         context_text = self._format_context_preview(prompt.context)
-        self._context.setText(f"Prompt Body (preview):\n{context_text}")
+        self._context.setText(
+            self._format_label_value("Prompt Body (preview)", context_text, multiline=True)
+        )
         if prompt.scenarios:
             scenario_lines = "\n".join(f"• {scenario}" for scenario in prompt.scenarios)
-            self._scenarios.setText(f"Scenarios:\n{scenario_lines}")
+            scenario_text = scenario_lines
         else:
-            self._scenarios.setText("Scenarios: none provided.")
-        example_lines = []
+            scenario_text = "None provided."
+        self._scenarios.setText(
+            self._format_label_value("Scenarios", scenario_text, multiline=True)
+        )
+        example_lines: list[str] = []
         if prompt.example_input:
             example_lines.append(f"Example input:\n{prompt.example_input}")
         if prompt.example_output:
             example_lines.append(f"Example output:\n{prompt.example_output}")
-        self._examples.setText("\n\n".join(example_lines) or "")
+        if example_lines:
+            examples_text = "\n\n".join(example_lines)
+            self._examples.setText(
+                self._format_label_value("Examples", examples_text, multiline=True)
+            )
+        else:
+            self._examples.clear()
         record_payload = prompt.to_record()
         metadata_extra = {
             key: value
@@ -493,12 +518,28 @@ class PromptDetailWidget(QWidget):
         truncated = context[: self._CONTEXT_PREVIEW_LIMIT].rstrip()
         return f"{truncated}…"
 
+    @staticmethod
+    def _format_label_value(label: str, value: str, *, multiline: bool = False) -> str:
+        """Return HTML rendering with italic label and escaped value."""
+
+        safe_label = escape(label)
+        safe_value = escape(value)
+        if multiline:
+            safe_value = safe_value.replace("\n", "<br/>")
+        return (
+            f'<span style="font-style: italic; color: #374151;">{safe_label}:</span> '
+            f"{safe_value}"
+        )
+
     def clear(self) -> None:
         """Reset the panel to its empty state."""
 
-        self._title.setText("Select a prompt to view details")
-        self._version_value.setText("Not available")
-        self._rating_label.setText("Rating: n/a")
+        self._name_label.setText(
+            self._format_label_value("Name", "Select a prompt to view details")
+        )
+        self._version_label.setText(self._format_label_value("Version", "Not available"))
+        self._rating_label.setText(self._format_label_value("Rating", "n/a"))
+        self._meta_label.clear()
         self._description.clear()
         self._context.clear()
         self._scenarios.clear()
@@ -559,7 +600,9 @@ class PromptDetailWidget(QWidget):
         """Display lineage/version info beneath the description."""
 
         if text:
-            self._lineage_label.setText(text)
+            self._lineage_label.setText(
+                self._format_label_value("Lineage", text, multiline=True)
+            )
             self._lineage_label.setVisible(True)
         else:
             self._lineage_label.clear()
@@ -3267,12 +3310,6 @@ class MainWindow(QMainWindow):
         """Fetch version/fork metadata for the detail pane."""
 
         summary_parts: List[str] = []
-        schema_version = (prompt.version or "").strip()
-        if schema_version:
-            summary_parts.append(f"Version {schema_version}")
-        else:
-            summary_parts.append("Version unknown")
-
         try:
             parent_link = self._manager.get_prompt_parent_fork(prompt.id)
         except PromptVersionError:
@@ -3287,8 +3324,11 @@ class MainWindow(QMainWindow):
         if children:
             child_label = "fork" if len(children) == 1 else "forks"
             summary_parts.append(f"{len(children)} {child_label}")
-
-        self._detail_widget.update_lineage_summary(" | ".join(summary_parts))
+        summary_text = " | ".join(summary_parts)
+        if summary_text:
+            self._detail_widget.update_lineage_summary(summary_text)
+        else:
+            self._detail_widget.update_lineage_summary("No lineage data yet.")
 
     def _handle_notification(self, notification: Notification) -> None:
         """React to notification updates published by the core manager."""
