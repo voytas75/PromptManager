@@ -2844,6 +2844,7 @@ class MainWindow(QMainWindow):
             self,
             name_generator=self._generate_prompt_name,
             description_generator=self._generate_prompt_description,
+            category_provider=self._manager.list_categories,
             category_generator=self._generate_prompt_category,
             tags_generator=self._generate_prompt_tags,
             scenario_generator=self._generate_prompt_scenarios,
@@ -2885,6 +2886,7 @@ class MainWindow(QMainWindow):
         dialog = PromptDialog(
             self,
             forked,
+            category_provider=self._manager.list_categories,
             name_generator=self._generate_prompt_name,
             description_generator=self._generate_prompt_description,
             category_generator=self._generate_prompt_category,
@@ -2922,6 +2924,7 @@ class MainWindow(QMainWindow):
 
         dialog = PromptDialog(
             self,
+            category_provider=self._manager.list_categories,
             name_generator=self._generate_prompt_name,
             description_generator=self._generate_prompt_description,
             category_generator=self._generate_prompt_category,
@@ -2960,6 +2963,7 @@ class MainWindow(QMainWindow):
         dialog = PromptDialog(
             self,
             prompt,
+            category_provider=self._manager.list_categories,
             name_generator=self._generate_prompt_name,
             description_generator=self._generate_prompt_description,
             category_generator=self._generate_prompt_category,

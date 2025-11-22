@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.11.2 - 2025-11-22 - Allow selecting prompt categories from the registry list.
 Updates: v0.11.1 - 2025-11-22 - Add execute-as-context shortcut to the prompt dialog.
 Updates: v0.11.0 - 2025-11-22 - Add prompt category management dialog with create/edit workflows.
 Updates: v0.10.8 - 2025-11-22 - Surface prompt versions and quick access to history inside the edit dialog.
@@ -419,6 +420,7 @@ class PromptDialog(QDialog):
         self,
         parent=None,
         prompt: Optional[Prompt] = None,
+        category_provider: Optional[Callable[[], Sequence[PromptCategory]]] = None,
         name_generator: Optional[Callable[[str], str]] = None,
         description_generator: Optional[Callable[[str], str]] = None,
         category_generator: Optional[Callable[[str], str]] = None,
@@ -431,6 +433,7 @@ class PromptDialog(QDialog):
         super().__init__(parent)
         self._source_prompt = prompt
         self._result_prompt: Optional[Prompt] = None
+        self._category_provider = category_provider
         self._name_generator = name_generator
         self._description_generator = description_generator
         self._prompt_engineer = prompt_engineer
@@ -438,6 +441,7 @@ class PromptDialog(QDialog):
         self._category_generator = category_generator
         self._tags_generator = tags_generator
         self._scenario_generator = scenario_generator
+        self._categories: List[PromptCategory] = []
         self._delete_requested = False
         self._delete_button: Optional[QPushButton] = None
         self._apply_button: Optional[QPushButton] = None
@@ -508,7 +512,14 @@ class PromptDialog(QDialog):
         version_container_layout.addStretch(1)
         form_layout.addRow("Version", version_container)
 
-        self._category_input = QLineEdit(self)
+        self._category_input = QComboBox(self)
+        self._category_input.setEditable(True)
+        self._category_input.setInsertPolicy(QComboBox.NoInsert)
+        self._category_input.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        self._category_input.setMinimumContentsLength(12)
+        line_edit = self._category_input.lineEdit()
+        if line_edit is not None:
+            line_edit.setPlaceholderText("General")
         self._language_input = QLineEdit(self)
         self._author_input = QLineEdit(self)
         self._tags_input = QLineEdit(self)
@@ -550,6 +561,7 @@ class PromptDialog(QDialog):
         category_container_layout.setContentsMargins(0, 0, 0, 0)
         category_container_layout.setSpacing(6)
         category_container_layout.addWidget(self._category_input)
+        self._populate_category_options()
         self._generate_category_button = QPushButton("Suggest", self)
         self._generate_category_button.setToolTip("Suggest a category based on the prompt body.")
         self._generate_category_button.clicked.connect(self._on_generate_category_clicked)  # type: ignore[arg-type]
@@ -683,7 +695,7 @@ class PromptDialog(QDialog):
         """Fill inputs with the existing prompt values for editing."""
 
         self._name_input.setText(prompt.name)
-        self._category_input.setText(prompt.category)
+        self._set_category_value(prompt.category)
         self._language_input.setText(prompt.language)
         self._author_input.setText(prompt.author or "")
         self._tags_input.setText(", ".join(prompt.tags))
@@ -755,7 +767,7 @@ class PromptDialog(QDialog):
             QMessageBox.warning(self, "Category suggestion failed", str(exc))
             return
         if suggestion:
-            self._category_input.setText(suggestion)
+            self._set_category_value(suggestion)
         else:
             QMessageBox.information(
                 self,
@@ -813,6 +825,79 @@ class PromptDialog(QDialog):
             seen.add(key)
             unique.append(scenario)
         self._scenarios_input.setPlainText("\n".join(unique))
+
+    def _populate_category_options(self) -> None:
+        """Populate the category selector from the registry provider."""
+
+        if self._category_input is None:
+            return
+        categories = self._load_categories()
+        current_text = self._category_input.currentText().strip()
+        self._category_input.blockSignals(True)
+        self._category_input.clear()
+        for category in categories:
+            self._category_input.addItem(category.label)
+        self._category_input.blockSignals(False)
+        if current_text:
+            self._set_category_value(current_text)
+
+    def _load_categories(self) -> List[PromptCategory]:
+        """Return available categories, refreshing from the provider when possible."""
+
+        if self._category_provider is None:
+            return self._categories
+        try:
+            categories = list(self._category_provider())
+        except Exception as exc:  # pragma: no cover - provider errors surface in GUI
+            logger.warning("Unable to load categories for prompt dialog: %s", exc, exc_info=True)
+            return self._categories
+        categories.sort(key=lambda category: category.label.lower())
+        self._categories = categories
+        return self._categories
+
+    def _set_category_value(self, value: Optional[str]) -> None:
+        """Set the category selector text while aligning with registry labels."""
+
+        if self._category_input is None:
+            return
+        resolved = self._resolve_category_label(value)
+        if not resolved:
+            self._category_input.setEditText("")
+            self._category_input.setCurrentIndex(-1)
+            return
+        index = self._category_input.findText(resolved, Qt.MatchFixedString)
+        if index >= 0:
+            self._category_input.setCurrentIndex(index)
+            return
+        self._category_input.setEditText(resolved)
+
+    def _current_category_value(self) -> str:
+        """Return the canonical category text from the selector."""
+
+        if self._category_input is None:
+            return ""
+        text = self._category_input.currentText().strip()
+        if not text:
+            return ""
+        resolved = self._resolve_category_label(text)
+        if resolved != text:
+            self._set_category_value(resolved)
+        return resolved
+
+    def _resolve_category_label(self, value: Optional[str]) -> str:
+        """Return the stored category label when the value matches an entry."""
+
+        text = (value or "").strip()
+        if not text:
+            return ""
+        slug = slugify_category(text)
+        lowered = text.lower()
+        for category in self._categories:
+            if category.label.lower() == lowered:
+                return category.label
+            if slug and category.slug == slug:
+                return category.label
+        return text
 
     def _generate_scenarios(self, context: str) -> List[str]:
         """Generate scenarios using configured helpers with heuristic fallback."""
@@ -1002,7 +1087,7 @@ class PromptDialog(QDialog):
 
         name = self._name_input.text().strip() or None
         description = self._description_input.toPlainText().strip() or None
-        category = self._category_input.text().strip() or None
+        category = self._current_category_value() or None
         tags = [tag.strip() for tag in self._tags_input.text().split(",") if tag.strip()]
 
         try:
@@ -1068,7 +1153,7 @@ class PromptDialog(QDialog):
                 description = generated_description
                 self._description_input.setPlainText(generated_description)
 
-        category = self._category_input.text().strip()
+        category = self._current_category_value()
         author = self._author_input.text().strip() or None
         if not name or not description:
             QMessageBox.warning(self, "Missing fields", "Name and description are required.")
