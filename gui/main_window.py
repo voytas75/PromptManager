@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.44 - 2025-11-23 - Add rating-based sorting to the prompt list.
 Updates: v0.15.43 - 2025-11-23 - Add prompt body size sorting to the list view.
 Updates: v0.15.42 - 2025-11-23 - Add similar prompt recommendations from the context menu.
 Updates: v0.15.41 - 2025-11-22 - Compact prompt header summary with inline metadata and shorter context preview.
@@ -815,6 +816,7 @@ class PromptSortOrder(Enum):
     QUALITY_DESC = "quality_desc"
     MODIFIED_DESC = "modified_desc"
     BODY_SIZE_DESC = "body_size_desc"
+    RATING_DESC = "rating_desc"
 
 
 class MainWindow(QMainWindow):
@@ -826,6 +828,7 @@ class MainWindow(QMainWindow):
         ("Quality (high-low)", PromptSortOrder.QUALITY_DESC),
         ("Last modified (newest)", PromptSortOrder.MODIFIED_DESC),
         ("Body size (long-short)", PromptSortOrder.BODY_SIZE_DESC),
+        ("Rating (high-low)", PromptSortOrder.RATING_DESC),
     )
 
     def __init__(
@@ -1470,6 +1473,17 @@ class MainWindow(QMainWindow):
         payload = prompt.context or prompt.description or ""
         return len(payload)
 
+    @staticmethod
+    def _prompt_average_rating(prompt: Prompt) -> float:
+        """Return the average rating for a prompt, defaulting to zero."""
+
+        if prompt.rating_count and prompt.rating_sum is not None:
+            try:
+                return float(prompt.rating_sum) / float(prompt.rating_count)
+            except ZeroDivisionError:  # pragma: no cover - defensive
+                return 0.0
+        return 0.0
+
     def _apply_filters(self, prompts: Sequence[Prompt]) -> List[Prompt]:
         """Apply category, tag, and quality filters to a prompt sequence."""
 
@@ -1528,6 +1542,14 @@ class MainWindow(QMainWindow):
                 return (-length, prompt.name.casefold(), str(prompt.id))
 
             return sorted(prompts, key=body_size_key)
+        if order is PromptSortOrder.RATING_DESC:
+
+            def rating_key(prompt: Prompt) -> tuple[float, int, str, str]:
+                average = self._prompt_average_rating(prompt)
+                count = prompt.rating_count
+                return (-average, -(count or 0), prompt.name.casefold(), str(prompt.id))
+
+            return sorted(prompts, key=rating_key)
         return list(prompts)
 
     def _on_filters_changed(self, *_: object) -> None:
