@@ -2,6 +2,12 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.17.4] - 2025-11-23
+
+### Added
+
+- Added a **Similar** action to the prompt list context menu that runs an embedding-based lookup and populates the prompt catalogue view with recommendations, helping users discover existing solutions before adding duplicates.
+
 ## [0.17.3] - 2025-11-23
 
 ### Added

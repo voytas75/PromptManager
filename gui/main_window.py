@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.42 - 2025-11-23 - Add similar prompt recommendations from the context menu.
 Updates: v0.15.41 - 2025-11-22 - Compact prompt header summary with inline metadata and shorter context preview.
 Updates: v0.15.40 - 2025-11-22 - Remember the last execute-as-context task text between runs.
 Updates: v0.15.39 - 2025-11-22 - Add execute-as-context actions for prompts in the list and editor dialogs.
@@ -2656,6 +2657,56 @@ class MainWindow(QMainWindow):
             description,
         )
 
+    def _show_similar_prompts(self, prompt: Prompt) -> None:
+        """Populate the prompt list with embedding-based recommendations."""
+
+        embedding_vector: Optional[List[float]]
+        if prompt.ext4 is not None:
+            try:
+                embedding_vector = [float(value) for value in prompt.ext4]
+            except (TypeError, ValueError):  # pragma: no cover - defensive
+                embedding_vector = None
+        else:
+            embedding_vector = None
+
+        if embedding_vector is None and not prompt.document.strip():
+            self.statusBar().showMessage(
+                "Selected prompt does not include enough text for similarity search.",
+                4000,
+            )
+            return
+
+        try:
+            similar_prompts = self._manager.search_prompts(
+                "" if embedding_vector is not None else prompt.document,
+                limit=10,
+                embedding=embedding_vector,
+            )
+        except PromptManagerError as exc:
+            self._show_error("Unable to load similar prompts", str(exc))
+            return
+
+        recommendations = [candidate for candidate in similar_prompts if candidate.id != prompt.id]
+        if not recommendations:
+            self.statusBar().showMessage("No similar prompts found.", 4000)
+            return
+
+        self._suggestions = None
+        self._current_prompts = list(recommendations)
+        self._preserve_search_order = True
+        filtered = self._apply_filters(self._current_prompts)
+        self._model.set_prompts(filtered)
+        self._list_view.clearSelection()
+        if filtered:
+            self._select_prompt(filtered[0].id)
+        else:
+            self._detail_widget.clear()
+        self._update_intent_hint(filtered)
+        self.statusBar().showMessage(
+            f"Showing prompts similar to '{prompt.name}'.",
+            4000,
+        )
+
     def _on_render_markdown_clicked(self) -> None:
         """Open a rendered markdown preview for the latest execution result."""
 
@@ -2779,6 +2830,7 @@ class MainWindow(QMainWindow):
         edit_action = menu.addAction("Edit Prompt")
         duplicate_action = menu.addAction("Duplicate Prompt")
         fork_action = menu.addAction("Fork Prompt")
+        similar_action = menu.addAction("Similar Prompts")
         execute_action = menu.addAction("Execute Prompt")
         execute_context_action = menu.addAction("Execute as Context…")
         copy_action = menu.addAction("Copy Prompt Text")
@@ -2788,6 +2840,7 @@ class MainWindow(QMainWindow):
             edit_action.setEnabled(False)
             duplicate_action.setEnabled(False)
             fork_action.setEnabled(False)
+            similar_action.setEnabled(False)
             execute_action.setEnabled(False)
             execute_context_action.setEnabled(False)
             copy_action.setEnabled(False)
@@ -2798,6 +2851,7 @@ class MainWindow(QMainWindow):
             has_context_body = bool((prompt.context or "").strip())
             execute_context_action.setEnabled(bool(self._manager.executor) and has_context_body)
             fork_action.setEnabled(True)
+            similar_action.setEnabled(True)
             if not (prompt.context or prompt.description):
                 copy_action.setEnabled(False)
             if not (prompt.description and prompt.description.strip()):
@@ -2812,6 +2866,8 @@ class MainWindow(QMainWindow):
             self._duplicate_prompt(prompt)
         elif selected_action is fork_action and prompt is not None:
             self._fork_prompt(prompt)
+        elif selected_action is similar_action and prompt is not None:
+            self._show_similar_prompts(prompt)
         elif selected_action is execute_action and prompt is not None:
             self._execute_prompt_from_context_menu(prompt)
         elif selected_action is execute_context_action and prompt is not None:
