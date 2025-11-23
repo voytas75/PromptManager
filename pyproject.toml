@@ -3,7 +3,7 @@ name = "prompt-manager"
 version = "0.17.1"
 description = "Desktop application for cataloguing, searching, and launching AI prompts."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = {text = "Proprietary"}
 authors = [{name = "Prompt Manager Team"}]
 keywords = ["prompts", "gui", "productivity", "ai"]
@@ -13,7 +13,7 @@ classifiers = [
     "License :: Other/Proprietary License",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Operating System :: OS Independent",
     "Topic :: Software Development :: Libraries",
     "Topic :: Text Processing :: Linguistic",
@@ -41,12 +41,12 @@ exclude = ["tests*", "data*", "PromptManagerBlueprint.txt", "AGENTS.md"]
 
 [tool.black]
 line-length = 100
-target-version = ["py311"]
+target-version = ["py312"]
 include = '\\.(py|pyi)$'
 exclude = '^data/'
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py312"
 line-length = 100
 src = ["."]
 exclude = ["data/"]
@@ -65,7 +65,7 @@ testpaths = ["tests"]
 [tool.pyright]
 include = ["main.py", "core", "config", "gui", "models", "tests"]
 exclude = ["data"]
-pythonVersion = "3.11"
+pythonVersion = "3.12"
 typeCheckingMode = "strict"
 reportMissingImports = "warning"
 reportMissingTypeStubs = "warning"
