@@ -7,6 +7,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 ### Added
 
 - Added a **Similar** action to the prompt list context menu that runs an embedding-based lookup and populates the prompt catalogue view with recommendations, helping users discover existing solutions before adding duplicates.
+- Introduced a **Body size (long-short)** sort option so catalogues can be ordered by prompt body length when hunting for comprehensive templates or trimming oversized entries.
 
 ## [0.17.3] - 2025-11-23
 

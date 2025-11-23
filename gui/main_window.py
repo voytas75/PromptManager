@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.43 - 2025-11-23 - Add prompt body size sorting to the list view.
 Updates: v0.15.42 - 2025-11-23 - Add similar prompt recommendations from the context menu.
 Updates: v0.15.41 - 2025-11-22 - Compact prompt header summary with inline metadata and shorter context preview.
 Updates: v0.15.40 - 2025-11-22 - Remember the last execute-as-context task text between runs.
@@ -813,6 +814,7 @@ class PromptSortOrder(Enum):
     NAME_DESC = "name_desc"
     QUALITY_DESC = "quality_desc"
     MODIFIED_DESC = "modified_desc"
+    BODY_SIZE_DESC = "body_size_desc"
 
 
 class MainWindow(QMainWindow):
@@ -823,6 +825,7 @@ class MainWindow(QMainWindow):
         ("Name (Z-A)", PromptSortOrder.NAME_DESC),
         ("Quality (high-low)", PromptSortOrder.QUALITY_DESC),
         ("Last modified (newest)", PromptSortOrder.MODIFIED_DESC),
+        ("Body size (long-short)", PromptSortOrder.BODY_SIZE_DESC),
     )
 
     def __init__(
@@ -1460,6 +1463,13 @@ class MainWindow(QMainWindow):
             return prompt.category_slug
         return slugify_category(prompt.category)
 
+    @staticmethod
+    def _prompt_body_length(prompt: Prompt) -> int:
+        """Return the length of the prompt body used for embedding/search."""
+
+        payload = prompt.context or prompt.description or ""
+        return len(payload)
+
     def _apply_filters(self, prompts: Sequence[Prompt]) -> List[Prompt]:
         """Apply category, tag, and quality filters to a prompt sequence."""
 
@@ -1511,6 +1521,13 @@ class MainWindow(QMainWindow):
                 return (-timestamp, prompt.name.casefold(), str(prompt.id))
 
             return sorted(prompts, key=modified_key)
+        if order is PromptSortOrder.BODY_SIZE_DESC:
+
+            def body_size_key(prompt: Prompt) -> tuple[int, str, str]:
+                length = self._prompt_body_length(prompt)
+                return (-length, prompt.name.casefold(), str(prompt.id))
+
+            return sorted(prompts, key=body_size_key)
         return list(prompts)
 
     def _on_filters_changed(self, *_: object) -> None:

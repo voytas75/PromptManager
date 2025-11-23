@@ -5,7 +5,7 @@ PromptManager is a PySide6 desktop application for managing reusable AI prompts 
 ## Updates
 
 Updates:
-  v0.17.4 - 2025-11-23 - Added Similar context menu action to surface embedding-based recommendations inside the GUI.
+  v0.17.4 - 2025-11-23 - Added Similar context menu action to surface embedding-based recommendations and a body-size sort order to spotlight verbose templates inside the GUI.
   v0.17.1 - 2025-11-23 - Added developer handbook aligned with AGENTS.md directives.
 
 ## Current Status
