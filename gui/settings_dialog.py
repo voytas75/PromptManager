@@ -20,7 +20,7 @@ from functools import partial
 from typing import Dict, Mapping, Optional, Sequence
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QPalette
+from PySide6.QtGui import QColor, QPalette, QGuiApplication
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -41,6 +41,7 @@ from PySide6.QtWidgets import (
     QRadioButton,
     QWidget,
     QHBoxLayout,
+    QScrollArea,
 )
 
 from config.persistence import persist_settings_to_config
@@ -83,6 +84,12 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Prompt Manager Settings")
         self.setMinimumWidth(860)
+        screen = QGuiApplication.primaryScreen()
+        if screen is not None:
+            available_height = screen.availableGeometry().height()
+            target_height = max(640, int(available_height * 0.85))
+            self.setMaximumHeight(available_height)
+            self.resize(self.minimumWidth(), target_height)
         self._litellm_model = litellm_model or ""
         self._litellm_inference_model = litellm_inference_model or ""
         self._litellm_api_key = litellm_api_key or ""
@@ -340,16 +347,26 @@ class SettingsDialog(QDialog):
         prompts_layout = QVBoxLayout(prompts_tab)
         prompts_layout.setContentsMargins(0, 0, 0, 0)
 
+        scroll_area = QScrollArea(prompts_tab)
+        scroll_area.setWidgetResizable(True)
+        prompts_layout.addWidget(scroll_area)
+
+        scroll_container = QWidget(scroll_area)
+        scroll_area.setWidget(scroll_container)
+        scroll_container_layout = QVBoxLayout(scroll_container)
+        scroll_container_layout.setContentsMargins(0, 0, 0, 0)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
         intro_label = QLabel(
             "Override the system prompts sent to LiteLLM for each supported workflow. "
             "Use descriptive, production-ready instructions; click Reset to restore defaults.",
-            prompts_tab,
+            scroll_container,
         )
         intro_label.setWordWrap(True)
-        prompts_layout.addWidget(intro_label)
+        scroll_container_layout.addWidget(intro_label)
 
         for key in PROMPT_TEMPLATE_KEYS:
-            section = QFrame(prompts_tab)
+            section = QFrame(scroll_container)
             section.setObjectName(f"promptTemplateSection_{key}")
             section.setFrameShape(QFrame.StyledPanel)
             section_layout = QVBoxLayout(section)
@@ -378,12 +395,12 @@ class SettingsDialog(QDialog):
             actions_row.addStretch(1)
             section_layout.addLayout(actions_row)
 
-            prompts_layout.addWidget(section)
+            scroll_container_layout.addWidget(section)
 
-        reset_all_btn = QPushButton("Reset all to defaults", prompts_tab)
+        reset_all_btn = QPushButton("Reset all to defaults", scroll_container)
         reset_all_btn.clicked.connect(self._reset_all_prompt_templates)  # type: ignore[arg-type]
-        prompts_layout.addWidget(reset_all_btn, alignment=Qt.AlignLeft)
-        prompts_layout.addStretch(1)
+        scroll_container_layout.addWidget(reset_all_btn, alignment=Qt.AlignLeft)
+        scroll_container_layout.addStretch(1)
 
         tab_widget.addTab(prompts_tab, "Prompt Templates")
 
