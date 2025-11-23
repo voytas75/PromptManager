@@ -20,6 +20,10 @@ from config.settings import (
     DEFAULT_EMBEDDING_BACKEND,
     DEFAULT_EMBEDDING_MODEL,
 )
+from prompt_templates import (
+    DEFAULT_PROMPT_TEMPLATES,
+    PROMPT_TEMPLATE_KEYS,
+)
 
 
 def _normalise_drop_params(value: Optional[object]) -> Optional[list[str]]:
@@ -77,6 +81,23 @@ def _is_default_chat_palette(palette: Optional[Mapping[str, str]]) -> bool:
     return True
 
 
+def _normalise_prompt_templates(value: Optional[object]) -> Optional[dict[str, str]]:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        return None
+    cleaned: dict[str, str] = {}
+    for key, template in value.items():
+        if key not in PROMPT_TEMPLATE_KEYS:
+            continue
+        if not isinstance(template, str):
+            continue
+        stripped = template.strip()
+        if stripped:
+            cleaned[key] = stripped
+    return cleaned or None
+
+
 def persist_settings_to_config(updates: dict[str, Optional[object]]) -> None:
     """Persist selected settings to ``config/config.json``.
 
@@ -119,6 +140,17 @@ def persist_settings_to_config(updates: dict[str, Optional[object]]) -> None:
         if key == "chat_colors":
             palette = _normalise_chat_palette(value)
             value = None if _is_default_chat_palette(palette) else palette
+        if key == "prompt_templates":
+            templates = _normalise_prompt_templates(value)
+            if templates:
+                filtered = {
+                    workflow: text
+                    for workflow, text in templates.items()
+                    if text != DEFAULT_PROMPT_TEMPLATES.get(workflow)
+                }
+                value = filtered or None
+            else:
+                value = None
         if key == "litellm_workflow_models" and isinstance(value, dict):
             cleaned: dict[str, str] = {}
             for route_key, route_value in value.items():

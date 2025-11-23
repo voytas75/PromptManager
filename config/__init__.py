@@ -16,6 +16,7 @@ from .settings import (
     DEFAULT_THEME_MODE,
     LITELLM_ROUTED_WORKFLOWS,
     PromptManagerSettings,
+    PromptTemplateOverrides,
     SettingsError,
     load_settings,
 )
@@ -28,6 +29,7 @@ __all__ = [
     "DEFAULT_EMBEDDING_MODEL",
     "DEFAULT_THEME_MODE",
     "PromptManagerSettings",
+    "PromptTemplateOverrides",
     "SettingsError",
     "load_settings",
     "LITELLM_ROUTED_WORKFLOWS",

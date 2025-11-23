@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, cast
 
 from config import PromptManagerSettings
+from config.settings import PromptTemplateOverrides
 
 from .execution import CodexExecutor
 from .embedding import EmbeddingProvider, EmbeddingSyncWorker, create_embedding_function
@@ -107,6 +108,20 @@ def build_prompt_manager(
     scenario_generator = None
     resolved_prompt_engineer = prompt_engineer
     structure_prompt_engineer: Optional[PromptEngineer] = None
+    prompt_template_overrides: Dict[str, str] = {}
+    templates_source: Optional[PromptTemplateOverrides] = getattr(settings, "prompt_templates", None)
+    if templates_source is not None:
+        try:
+            dumped = templates_source.model_dump(exclude_none=True)  # type: ignore[attr-defined]
+        except AttributeError:
+            dumped = {}
+        if isinstance(dumped, dict):
+            for key, value in dumped.items():
+                if not isinstance(value, str):
+                    continue
+                stripped = value.strip()
+                if stripped:
+                    prompt_template_overrides[key] = stripped
 
     workflow_routing = getattr(settings, "litellm_workflow_models", None) or {}
     fast_model = getattr(settings, "litellm_model", None)
@@ -136,12 +151,32 @@ def build_prompt_manager(
                 "LiteLLM is required for configured prompt workflows. Install litellm and configure credentials."
             ) from exc
 
-    name_generator = _construct(LiteLLMNameGenerator, "name_generation")
-    description_generator = _construct(LiteLLMDescriptionGenerator, "description_generation")
-    scenario_generator = _construct(LiteLLMScenarioGenerator, "scenario_generation")
+    name_generator = _construct(
+        LiteLLMNameGenerator,
+        "name_generation",
+        system_prompt=prompt_template_overrides.get("name_generation"),
+    )
+    description_generator = _construct(
+        LiteLLMDescriptionGenerator,
+        "description_generation",
+        system_prompt=prompt_template_overrides.get("description_generation"),
+    )
+    scenario_generator = _construct(
+        LiteLLMScenarioGenerator,
+        "scenario_generation",
+        system_prompt=prompt_template_overrides.get("scenario_generation"),
+    )
     if resolved_prompt_engineer is None:
-        resolved_prompt_engineer = _construct(PromptEngineer, "prompt_engineering")
-    structure_prompt_engineer = _construct(PromptEngineer, "prompt_structure_refinement")
+        resolved_prompt_engineer = _construct(
+            PromptEngineer,
+            "prompt_engineering",
+            system_prompt=prompt_template_overrides.get("prompt_engineering"),
+        )
+    structure_prompt_engineer = _construct(
+        PromptEngineer,
+        "prompt_structure_refinement",
+        system_prompt=prompt_template_overrides.get("prompt_engineering"),
+    )
     if structure_prompt_engineer is None:
         structure_prompt_engineer = resolved_prompt_engineer
     intent_classifier = IntentClassifier()
@@ -182,6 +217,7 @@ def build_prompt_manager(
         "workflow_models": workflow_routing if workflow_routing else None,
         "intent_classifier": intent_classifier,
         "notification_center": notification_center or default_notification_center,
+        "prompt_templates": prompt_template_overrides or None,
     }
     if scenario_generator is not None:
         manager_kwargs["scenario_generator"] = scenario_generator

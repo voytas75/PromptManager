@@ -1,5 +1,6 @@
 """Settings dialog for configuring Prompt Manager runtime options.
 
+Updates: v0.2.8 - 2025-11-23 - Surface editable LiteLLM prompt templates with reset controls.
 Updates: v0.2.7 - 2025-12-06 - Surface LiteLLM embedding model configuration.
 Updates: v0.2.6 - 2025-11-05 - Add theme mode toggle to the appearance settings.
 Updates: v0.2.5 - 2025-11-05 - Add chat appearance controls to settings dialog.
@@ -15,8 +16,10 @@ Updates: v0.1.0 - 2025-11-04 - Initial settings dialog implementation.
 from __future__ import annotations
 
 import json
-from typing import Mapping, Optional, Sequence
+from functools import partial
+from typing import Dict, Mapping, Optional, Sequence
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import (
     QDialog,
@@ -37,6 +40,7 @@ from PySide6.QtWidgets import (
     QButtonGroup,
     QRadioButton,
     QWidget,
+    QHBoxLayout,
 )
 
 from config.persistence import persist_settings_to_config
@@ -44,6 +48,12 @@ from config import LITELLM_ROUTED_WORKFLOWS
 from config.settings import (
     DEFAULT_CHAT_USER_BUBBLE_COLOR,
     DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR,
+)
+from prompt_templates import (
+    DEFAULT_PROMPT_TEMPLATES,
+    PROMPT_TEMPLATE_DESCRIPTIONS,
+    PROMPT_TEMPLATE_KEYS,
+    PROMPT_TEMPLATE_LABELS,
 )
 
 
@@ -68,6 +78,7 @@ class SettingsDialog(QDialog):
         chat_user_bubble_color: Optional[str] = None,
         theme_mode: Optional[str] = None,
         chat_colors: Optional[dict[str, str]] = None,
+        prompt_templates: Optional[dict[str, str]] = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Prompt Manager Settings")
@@ -112,6 +123,16 @@ class SettingsDialog(QDialog):
         self._chat_colors_value: Optional[dict[str, str]] = None
         self._theme_mode = "dark" if (theme_mode or "").strip().lower() == "dark" else "light"
         self._theme_combo: Optional[QComboBox] = None
+        self._prompt_template_inputs: Dict[str, QPlainTextEdit] = {}
+        self._prompt_templates_value: Optional[dict[str, str]] = None
+        self._prompt_template_initials: Dict[str, str] = {}
+        provided_templates = prompt_templates or {}
+        for key in PROMPT_TEMPLATE_KEYS:
+            incoming = provided_templates.get(key)
+            if isinstance(incoming, str) and incoming.strip():
+                self._prompt_template_initials[key] = incoming.strip()
+            else:
+                self._prompt_template_initials[key] = DEFAULT_PROMPT_TEMPLATES.get(key, "")
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -315,6 +336,57 @@ class SettingsDialog(QDialog):
 
         tab_widget.addTab(quick_tab, "Quick Actions")
 
+        prompts_tab = QWidget(self)
+        prompts_layout = QVBoxLayout(prompts_tab)
+        prompts_layout.setContentsMargins(0, 0, 0, 0)
+
+        intro_label = QLabel(
+            "Override the system prompts sent to LiteLLM for each supported workflow. "
+            "Use descriptive, production-ready instructions; click Reset to restore defaults.",
+            prompts_tab,
+        )
+        intro_label.setWordWrap(True)
+        prompts_layout.addWidget(intro_label)
+
+        for key in PROMPT_TEMPLATE_KEYS:
+            section = QFrame(prompts_tab)
+            section.setObjectName(f"promptTemplateSection_{key}")
+            section.setFrameShape(QFrame.StyledPanel)
+            section_layout = QVBoxLayout(section)
+            section_layout.setContentsMargins(12, 8, 12, 12)
+
+            title = QLabel(PROMPT_TEMPLATE_LABELS.get(key, key.title()), section)
+            title.setObjectName(f"promptTemplateTitle_{key}")
+            title.setStyleSheet("font-weight: 600;")
+            section_layout.addWidget(title)
+
+            description = QLabel(PROMPT_TEMPLATE_DESCRIPTIONS.get(key, ""), section)
+            description.setWordWrap(True)
+            section_layout.addWidget(description)
+
+            editor = QPlainTextEdit(section)
+            editor.setPlainText(self._prompt_template_initials.get(key, ""))
+            editor.setMinimumHeight(140)
+            editor.setPlaceholderText("Enter the system prompt sent to LiteLLM for this workflow.")
+            section_layout.addWidget(editor)
+            self._prompt_template_inputs[key] = editor
+
+            actions_row = QHBoxLayout()
+            reset_btn = QPushButton("Reset to default", section)
+            reset_btn.clicked.connect(partial(self._reset_prompt_template, key))  # type: ignore[arg-type]
+            actions_row.addWidget(reset_btn, alignment=Qt.AlignLeft)
+            actions_row.addStretch(1)
+            section_layout.addLayout(actions_row)
+
+            prompts_layout.addWidget(section)
+
+        reset_all_btn = QPushButton("Reset all to defaults", prompts_tab)
+        reset_all_btn.clicked.connect(self._reset_all_prompt_templates)  # type: ignore[arg-type]
+        prompts_layout.addWidget(reset_all_btn, alignment=Qt.AlignLeft)
+        prompts_layout.addStretch(1)
+
+        tab_widget.addTab(prompts_tab, "Prompt Templates")
+
         button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
         button_box.accepted.connect(self.accept)  # type: ignore[arg-type]
         button_box.rejected.connect(self.reject)  # type: ignore[arg-type]
@@ -396,6 +468,13 @@ class SettingsDialog(QDialog):
         if self._theme_combo is not None:
             self._theme_mode = "dark" if self._theme_combo.currentIndex() == 1 else "light"
 
+        prompts_payload: dict[str, str] = {}
+        for key, widget in self._prompt_template_inputs.items():
+            text = widget.toPlainText().strip()
+            if text:
+                prompts_payload[key] = text
+        self._prompt_templates_value = prompts_payload or None
+
         super().accept()
 
         # ------------------------------------------------------------------
@@ -448,7 +527,22 @@ class SettingsDialog(QDialog):
             "chat_user_bubble_color": self._chat_user_bubble_color,
             "chat_colors": self._chat_colors_value,
             "theme_mode": self._theme_mode,
+            "prompt_templates": self._prompt_templates_value,
         }
+
+    def _reset_prompt_template(self, key: str) -> None:
+        """Reset a single prompt template editor to its default value."""
+
+        editor = self._prompt_template_inputs.get(key)
+        if editor is None:
+            return
+        editor.setPlainText(DEFAULT_PROMPT_TEMPLATES.get(key, ""))
+
+    def _reset_all_prompt_templates(self) -> None:
+        """Reset every prompt template editor to the default text."""
+
+        for key in PROMPT_TEMPLATE_KEYS:
+            self._reset_prompt_template(key)
 
 
 __all__ = ["SettingsDialog", "persist_settings_to_config"]

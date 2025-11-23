@@ -1,6 +1,7 @@
 """Prompt Manager package façade and orchestration layer.
 
 Updates: v0.14.0 - 2025-11-22 - Add category registry, CRUD APIs, and prompt slugging.
+Updates: v0.13.21 - 2025-11-23 - Support configurable system prompt templates across workflows.
 Updates: v0.13.20 - 2025-11-22 - Keep prompt schema versions in sync with committed history numbers.
 Updates: v0.13.19 - 2025-11-22 - Add structure-only prompt refinement workflow and GUI hook.
 Updates: v0.13.18 - 2025-11-22 - Seed first prompt version when history is missing.
@@ -151,6 +152,7 @@ from ..notifications import (
     notification_center as default_notification_center,
 )
 from ..category_registry import CategoryRegistry
+from prompt_templates import DEFAULT_PROMPT_TEMPLATES, PROMPT_TEMPLATE_KEYS
 
 # Re‑export shared exception classes from centralised module to preserve the
 # original import path ``core.prompt_manager.PromptManagerError`` etc. during
@@ -242,6 +244,7 @@ class PromptManager:
         executor: Optional[CodexExecutor] = None,
         user_profile: Optional[UserProfile] = None,
         history_tracker: Optional[HistoryTracker] = None,
+        prompt_templates: Optional[Mapping[str, str]] = None,
     ) -> None:
         """Initialise the manager with data backends.
 
@@ -263,6 +266,7 @@ class PromptManager:
             history_tracker: Optional execution history tracker for persistence.
             user_profile: Optional profile to seed single-user personalisation state.
             prompt_engineer: Optional prompt refinement helper using LiteLLM.
+            prompt_templates: Optional mapping of workflow identifiers to system prompt overrides.
         """
         # Allow tests to supply repository directly; only require db_path when building one.
         if repository is None and db_path is None:
@@ -374,6 +378,7 @@ class PromptManager:
             except RepositoryError:
                 logger.warning("Unable to load persisted user profile", exc_info=True)
                 self._user_profile = None
+        self._prompt_templates: Dict[str, str] = self._normalise_prompt_templates(prompt_templates)
 
     @staticmethod
     def _normalise_model_identifier(value: Optional[str]) -> Optional[str]:
@@ -1298,6 +1303,7 @@ class PromptManager:
         drop_params: Optional[Sequence[str]] = None,
         reasoning_effort: Optional[str] = None,
         stream: Optional[bool] = None,
+        prompt_templates: Optional[Mapping[str, str]] = None,
     ) -> None:
         """Configure LiteLLM-backed workflows at runtime."""
 
@@ -1325,6 +1331,9 @@ class PromptManager:
         self._litellm_reasoning_effort = reasoning_effort
         if stream is not None:
             self._litellm_stream = bool(stream)
+
+        if prompt_templates is not None:
+            self._prompt_templates = self._normalise_prompt_templates(prompt_templates)
 
         # Reset existing helpers before rebuilding.
         self._name_generator = None
@@ -1362,16 +1371,33 @@ class PromptManager:
                 **extra,
             )
 
+        template_overrides = dict(self._prompt_templates)
         try:
-            self._name_generator = _construct(LiteLLMNameGenerator, "name_generation")
-            self._description_generator = _construct(
-                LiteLLMDescriptionGenerator, "description_generation"
+            self._name_generator = _construct(
+                LiteLLMNameGenerator,
+                "name_generation",
+                system_prompt=template_overrides.get("name_generation"),
             )
-            self._prompt_engineer = _construct(PromptEngineer, "prompt_engineering")
-            structure_engineer = _construct(PromptEngineer, "prompt_structure_refinement")
+            self._description_generator = _construct(
+                LiteLLMDescriptionGenerator,
+                "description_generation",
+                system_prompt=template_overrides.get("description_generation"),
+            )
+            self._prompt_engineer = _construct(
+                PromptEngineer,
+                "prompt_engineering",
+                system_prompt=template_overrides.get("prompt_engineering"),
+            )
+            structure_engineer = _construct(
+                PromptEngineer,
+                "prompt_structure_refinement",
+                system_prompt=template_overrides.get("prompt_engineering"),
+            )
             self._prompt_structure_engineer = structure_engineer or self._prompt_engineer
             self._scenario_generator = _construct(
-                LiteLLMScenarioGenerator, "scenario_generation"
+                LiteLLMScenarioGenerator,
+                "scenario_generation",
+                system_prompt=template_overrides.get("scenario_generation"),
             )
             self._executor = _construct(
                 CodexExecutor,
@@ -1393,6 +1419,24 @@ class PromptManager:
             self._litellm_fast_model or self._litellm_inference_model
         ):
             logger.debug("LiteLLM powered features enabled for intent classifier")
+
+    @staticmethod
+    def _normalise_prompt_templates(overrides: Optional[Mapping[str, str]]) -> Dict[str, str]:
+        """Return a cleaned mapping of workflow prompt overrides."""
+
+        if not overrides:
+            return {}
+        cleaned: Dict[str, str] = {}
+        for key, text in overrides.items():
+            if key not in PROMPT_TEMPLATE_KEYS:
+                continue
+            if not isinstance(text, str):
+                continue
+            stripped = text.strip()
+            default_text = DEFAULT_PROMPT_TEMPLATES.get(key)
+            if stripped and stripped != default_text:
+                cleaned[key] = stripped
+        return cleaned
 
     def _log_execution_success(
         self,

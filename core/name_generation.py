@@ -1,5 +1,6 @@
 """LiteLLM-backed prompt metadata generation utilities.
 
+Updates: v0.7.5 - 2025-11-23 - Allow custom system prompt overrides supplied via settings.
 Updates: v0.7.4 - 2025-11-05 - Remove explicit LiteLLM timeout to avoid premature cancellation errors.
 Updates: v0.7.3 - 2025-11-02 - Strip configured drop parameters before calling LiteLLM.
 Updates: v0.7.2 - 2025-11-17 - Retry without unsupported LiteLLM parameters when models reject them.
@@ -22,6 +23,10 @@ from .litellm_adapter import (
     call_completion_with_fallback,
     get_completion,
 )
+from prompt_templates import (
+    DESCRIPTION_GENERATION_PROMPT,
+    NAME_GENERATION_PROMPT,
+)
 
 class NameGenerationError(Exception):
     """Raised when a prompt name cannot be generated."""
@@ -41,11 +46,7 @@ class LiteLLMNameGenerator:
     timeout_seconds: Optional[float] = None
     api_version: Optional[str] = None
     drop_params: Optional[Sequence[str]] = None
-
-    _SYSTEM_PROMPT = (
-        "You generate concise, descriptive prompt names for a prompt catalogue. "
-        "Return a title of at most 5 words. Avoid punctuation except spaces."
-    )
+    system_prompt: Optional[str] = None
 
     def generate(self, context: str) -> str:
         """Return an LLM-generated prompt name from contextual text."""
@@ -56,7 +57,7 @@ class LiteLLMNameGenerator:
         request: Dict[str, object] = {
             "model": self.model,
             "messages": [
-                {"role": "system", "content": self._SYSTEM_PROMPT},
+                {"role": "system", "content": self._system_prompt_text()},
                 {
                     "role": "user",
                     "content": f"Suggest a concise prompt name for the following content:\n\n{context.strip()}",
@@ -103,6 +104,11 @@ class LiteLLMNameGenerator:
             raise NameGenerationError("LiteLLM returned an empty suggestion.")
         return suggestion
 
+    def _system_prompt_text(self) -> str:
+        """Return the configured or default system prompt."""
+
+        return (self.system_prompt or NAME_GENERATION_PROMPT).strip()
+
 
 @dataclass(slots=True)
 class LiteLLMDescriptionGenerator:
@@ -114,12 +120,7 @@ class LiteLLMDescriptionGenerator:
     timeout_seconds: Optional[float] = None
     api_version: Optional[str] = None
     drop_params: Optional[Sequence[str]] = None
-
-    _SYSTEM_PROMPT = (
-        "You write concise catalogue descriptions for reusable AI prompts. "
-        "Summarise the intent, inputs, and expected outcomes in 2 sentences. "
-        "Avoid bullet lists and marketing fluff."
-    )
+    system_prompt: Optional[str] = None
 
     def generate(self, context: str) -> str:
         completion, LiteLLMException = get_completion()
@@ -128,7 +129,7 @@ class LiteLLMDescriptionGenerator:
         request: Dict[str, object] = {
             "model": self.model,
             "messages": [
-                {"role": "system", "content": self._SYSTEM_PROMPT},
+                {"role": "system", "content": self._system_prompt_text()},
                 {
                     "role": "user",
                     "content": (
@@ -191,6 +192,11 @@ class LiteLLMDescriptionGenerator:
             raise DescriptionGenerationError("LiteLLM returned an empty description.")
 
         return summary
+
+    def _system_prompt_text(self) -> str:
+        """Return the configured or default description system prompt."""
+
+        return (self.system_prompt or DESCRIPTION_GENERATION_PROMPT).strip()
 
 
 def _summarise_litellm_error(exc: Exception) -> str:

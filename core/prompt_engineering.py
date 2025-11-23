@@ -1,5 +1,6 @@
 """LiteLLM-backed prompt engineering utilities for refining prompts.
 
+Updates: v0.1.4 - 2025-11-23 - Allow overriding the system prompt via settings.
 Updates: v0.1.3 - 2025-11-22 - Add structure-only refinement mode with targeted instructions.
 Updates: v0.1.2 - 2025-11-05 - Stop forwarding LiteLLM timeout parameter to avoid premature failures.
 Updates: v0.1.1 - 2025-11-02 - Drop configured LiteLLM parameters locally before refinement calls.
@@ -18,6 +19,7 @@ from .litellm_adapter import (
     call_completion_with_fallback,
     get_completion,
 )
+from prompt_templates import PROMPT_ENGINEERING_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -75,49 +77,7 @@ class PromptEngineer:
     timeout_seconds: Optional[float] = None
     max_tokens: int = 1200
     drop_params: Optional[Sequence[str]] = None
-
-    _SYSTEM_PROMPT = (
-        "You are a meticulous prompt engineering assistant."
-        " Analyse and refine prompts using the following ordered rules."
-        "\n\n"
-        "### Rules for LLM Prompt Query Language\n"
-        "1. Clarity and Specificity: define the task, detail level, tone, and explicitly state"
-        " what is out of scope.\n"
-        "2. Context Completeness: include relevant background, constraints, and summarise"
-        " large context within token budgets.\n"
-        "3. Output Structure Control: specify the desired output structure, format, and how"
-        " to handle unknowns or uncertainty.\n"
-        "4. Role/Goal Separation: optionally assign a role that is limited to the task and"
-        " restate the goal without implying sentience.\n"
-        "5. Deterministic Language: use imperative phrasing and explicit delimiters to"
-        " separate instructions from data.\n"
-        "6. Anthropomorphism Control: default to non-anthropomorphic framing unless the"
-        " use-case demands a persona.\n"
-        "7. Prevent Agency Misinterpretation: avoid implying memory, intent, or autonomy"
-        " beyond the prompt context.\n"
-        "8. Psychological Transparency: request reasoning steps and confidence when"
-        " helpful, balancing brevity and clarity.\n"
-        "9. Example-Driven Prompting: include examples (and counter-examples when"
-        " relevant) to anchor expectations.\n"
-        "10. Iterative Refinement: document refinements, versioning, and measurement"
-        " cues for future iterations.\n"
-        "11. Hybrid Natural-Formal Syntax: combine natural language with structured"
-        " schemas (e.g., JSON sections) when precision matters.\n"
-        "12. Guardrails and Safety: surface security, privacy, or policy constraints and"
-        " reference handling instructions.\n"
-        "13. Token and Resource Efficiency: stay concise, highlight required vs optional"
-        " context, and note truncation strategies.\n"
-        "14. Role-Play for Engagement: only when the use-case benefits from it and make"
-        " it explicit that the persona is simulated.\n"
-        "15. Conversational Polishing: optional—politeness is secondary to clarity.\n"
-        "Always preserve the author's intent while fixing omissions or ambiguities."
-        " Return precise, security conscious prompts with actionable structure."
-        " Produce deterministic guidance that can run unchanged in production systems."
-        "\n\nReturn a JSON object with the keys: analysis (string), improved_prompt (string),"
-        " checklist (array of strings), warnings (array of strings), and confidence (number 0-1)."
-        " If no changes are warranted set improved_prompt equal to the original but justify"
-        " the decision in analysis."
-    )
+    system_prompt: Optional[str] = None
 
     def refine(
         self,
@@ -149,7 +109,7 @@ class PromptEngineer:
         request: dict[str, Any] = {
             "model": self.model,
             "messages": [
-                {"role": "system", "content": self._SYSTEM_PROMPT},
+                {"role": "system", "content": self._system_prompt_text()},
                 {"role": "user", "content": user_payload},
             ],
             "temperature": self.temperature,
@@ -407,6 +367,11 @@ class PromptEngineer:
         raise PromptEngineeringError(
             "LiteLLM response did not include message content." + (f" Payload: {snippet}" if snippet else "")
         )
+
+    def _system_prompt_text(self) -> str:
+        """Return the configured system prompt or the default meta-prompt."""
+
+        return (self.system_prompt or PROMPT_ENGINEERING_PROMPT).strip()
 
 
 def _summarise_response_for_error(response: Any) -> str:

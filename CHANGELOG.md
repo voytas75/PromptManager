@@ -2,6 +2,14 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.17.3] - 2025-11-23
+
+### Added
+
+- Surfaced a **Prompt Templates** tab in the settings dialog that lists every LiteLLM system prompt (name, description, scenario, refinement) with inline editors, so teams can tailor the guidance without editing code.
+- Added Reset and Reset-all controls that restore the baked-in defaults with a single click, making it safe to experiment with custom templates.
+- Persist prompt template overrides via settings/configuration, propagate them through the factory, and ensure LiteLLM helpers respect the overrides immediately without restarting the app.
+
 ## [0.17.2] - 2025-11-22
 
 ### Changed

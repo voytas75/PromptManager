@@ -1,5 +1,6 @@
 """LiteLLM-backed prompt scenario generation utilities.
 
+Updates: v0.1.2 - 2025-11-23 - Support configurable system prompt overrides.
 Updates: v0.1.1 - 2025-11-05 - Remove explicit LiteLLM timeout to rely on provider defaults.
 Updates: v0.1.0 - 2025-11-19 - Introduce scenario generator for prompt usage guidance.
 """
@@ -18,6 +19,7 @@ from .litellm_adapter import (
     call_completion_with_fallback,
     get_completion,
 )
+from prompt_templates import SCENARIO_GENERATION_PROMPT
 
 
 class ScenarioGenerationError(Exception):
@@ -76,13 +78,7 @@ class LiteLLMScenarioGenerator:
     api_version: Optional[str] = None
     drop_params: Optional[Sequence[str]] = None
     default_max_scenarios: int = 3
-
-    _SYSTEM_PROMPT = (
-        "You help product teams document when to reuse AI prompts. "
-        "Given the full prompt text, produce concise, action-oriented usage scenarios. "
-        "Respond with a JSON array of unique strings. Each string should begin with a verb and "
-        "describe a situation where the prompt is helpful. Keep each scenario under 140 characters."
-    )
+    system_prompt: Optional[str] = None
 
     def generate(self, context: str, *, max_scenarios: Optional[int] = None) -> List[str]:
         """Return a ranked list of usage scenarios for the supplied prompt body."""
@@ -97,7 +93,7 @@ class LiteLLMScenarioGenerator:
         request: dict[str, object] = {
             "model": self.model,
             "messages": [
-                {"role": "system", "content": self._SYSTEM_PROMPT},
+                {"role": "system", "content": self._system_prompt_text()},
                 {
                     "role": "user",
                     # NOTE: Using an f-string avoids ``str.format`` parsing braces that may
@@ -154,6 +150,11 @@ class LiteLLMScenarioGenerator:
         if not scenarios:
             raise ScenarioGenerationError("LiteLLM returned no scenarios to surface.")
         return scenarios
+
+    def _system_prompt_text(self) -> str:
+        """Return the configured or default scenario template."""
+
+        return (self.system_prompt or SCENARIO_GENERATION_PROMPT).strip()
 
 
 __all__ = ["LiteLLMScenarioGenerator", "ScenarioGenerationError"]

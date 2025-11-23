@@ -1,5 +1,6 @@
 """Settings management for Prompt Manager configuration.
 
+Updates: v0.5.1 - 2025-11-23 - Add prompt template override settings.
 Updates: v0.5.0 - 2025-11-22 - Add structure-only prompt refinement workflow routing.
 Updates: v0.4.9 - 2025-12-06 - Require LiteLLM-backed embeddings with configurable model fields in the UI.
 Updates: v0.4.8 - 2025-12-03 - Persist chat colour palette overrides, including assistant bubble styling.
@@ -27,7 +28,7 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, cast, Literal
 
-from pydantic import Field, ValidationError, field_validator, model_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -78,6 +79,27 @@ class ChatColors(BaseSettings):
 
 _CHAT_COLOR_PATTERN = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
 _THEME_CHOICES = {"light", "dark"}
+
+
+class PromptTemplateOverrides(BaseModel):
+    """User supplied overrides for the core LiteLLM system prompts."""
+
+    name_generation: Optional[str] = Field(
+        default=None,
+        description="System prompt text for the name generation workflow.",
+    )
+    description_generation: Optional[str] = Field(
+        default=None,
+        description="System prompt text for the description generation workflow.",
+    )
+    scenario_generation: Optional[str] = Field(
+        default=None,
+        description="System prompt text for the scenario generation workflow.",
+    )
+    prompt_engineering: Optional[str] = Field(
+        default=None,
+        description="System prompt text for the prompt engineering workflow.",
+    )
 
 
 class SettingsError(Exception):
@@ -155,6 +177,10 @@ class PromptManagerSettings(BaseSettings):
         default=None,
         description="Preferred device identifier for local embedding backends (e.g. cpu, cuda).",
     )
+    prompt_templates: PromptTemplateOverrides = Field(
+        default_factory=PromptTemplateOverrides,
+        description="Optional overrides for the built-in LiteLLM system prompts.",
+    )
 
     # Pydantic v2 settings configuration
     model_config = cast(
@@ -188,6 +214,7 @@ class PromptManagerSettings(BaseSettings):
                 "categories": ["CATEGORIES", "categories"],
                 "theme_mode": ["THEME_MODE", "theme_mode"],
                 "chat_user_bubble_color": ["CHAT_USER_BUBBLE_COLOR", "chat_user_bubble_color"],
+                "prompt_templates": ["PROMPT_TEMPLATES", "prompt_templates"],
             },
         },
     )

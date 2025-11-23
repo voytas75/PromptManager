@@ -141,6 +141,7 @@ from config import (
     DEFAULT_EMBEDDING_MODEL,
     DEFAULT_THEME_MODE,
     PromptManagerSettings,
+    PromptTemplateOverrides,
 )
 from core import (
     IntentLabel,
@@ -3268,6 +3269,7 @@ class MainWindow(QMainWindow):
             chat_user_bubble_color=self._runtime_settings.get("chat_user_bubble_color"),
             theme_mode=self._runtime_settings.get("theme_mode"),
             chat_colors=self._runtime_settings.get("chat_colors"),
+            prompt_templates=self._runtime_settings.get("prompt_templates"),
         )
         if dialog.exec() != QDialog.Accepted:
             return
@@ -3281,7 +3283,7 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Closing Prompt Manager…", 2000)
         self.close()
 
-    def _apply_settings(self, updates: dict[str, Optional[str | list[dict[str, object]]]]) -> None:
+    def _apply_settings(self, updates: dict[str, Optional[object]]) -> None:
         """Persist settings, refresh catalogue, and update name generator."""
 
         self._runtime_settings["litellm_model"] = updates.get("litellm_model")
@@ -3352,6 +3354,17 @@ class MainWindow(QMainWindow):
         if theme_choice not in {"light", "dark"}:
             theme_choice = DEFAULT_THEME_MODE
         self._runtime_settings["theme_mode"] = theme_choice
+        prompt_templates_value = updates.get("prompt_templates")
+        if isinstance(prompt_templates_value, dict):
+            cleaned_prompt_templates = {
+                str(key): value.strip()
+                for key, value in prompt_templates_value.items()
+                if isinstance(value, str) and value.strip()
+            }
+            prompt_templates_payload: Optional[dict[str, str]] = cleaned_prompt_templates or None
+        else:
+            prompt_templates_payload = None
+        self._runtime_settings["prompt_templates"] = prompt_templates_payload
         persist_settings_to_config(
             {
                 "litellm_model": self._runtime_settings.get("litellm_model"),
@@ -3373,6 +3386,7 @@ class MainWindow(QMainWindow):
                     else None
                 ),
                 "theme_mode": self._runtime_settings.get("theme_mode"),
+                "prompt_templates": self._runtime_settings.get("prompt_templates"),
             }
         )
 
@@ -3399,6 +3413,16 @@ class MainWindow(QMainWindow):
                     self._settings.chat_colors = ChatColors(**cleaned_palette)
             else:
                 self._settings.chat_colors = ChatColors()
+            if prompt_templates_payload:
+                overrides_model = getattr(self._settings, "prompt_templates", None)
+                if isinstance(overrides_model, PromptTemplateOverrides):
+                    self._settings.prompt_templates = overrides_model.model_copy(
+                        update=prompt_templates_payload
+                    )
+                else:
+                    self._settings.prompt_templates = PromptTemplateOverrides(**prompt_templates_payload)
+            else:
+                self._settings.prompt_templates = PromptTemplateOverrides()
 
         self._quick_actions = self._build_quick_actions(self._runtime_settings.get("quick_actions"))
         self._register_quick_shortcuts()
@@ -3417,6 +3441,7 @@ class MainWindow(QMainWindow):
                 drop_params=self._runtime_settings.get("litellm_drop_params"),
                 reasoning_effort=self._runtime_settings.get("litellm_reasoning_effort"),
                 stream=self._runtime_settings.get("litellm_stream"),
+                prompt_templates=self._runtime_settings.get("prompt_templates"),
             )
         except NameGenerationError as exc:
             QMessageBox.warning(self, "LiteLLM configuration", str(exc))
@@ -3461,6 +3486,11 @@ class MainWindow(QMainWindow):
                     "assistant": settings.chat_colors.assistant,
                 }
                 if settings
+                else None
+            ),
+            "prompt_templates": (
+                settings.prompt_templates.model_dump(exclude_none=True)
+                if settings and settings.prompt_templates
                 else None
             ),
         }
