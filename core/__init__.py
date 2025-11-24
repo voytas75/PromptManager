@@ -51,7 +51,13 @@ from .prompt_manager import (
     CategoryNotFoundError,
     CategoryStorageError,
 )
-from .name_generation import NameGenerationError, DescriptionGenerationError, LiteLLMDescriptionGenerator
+from .name_generation import (
+    NameGenerationError,
+    DescriptionGenerationError,
+    CategorySuggestionError,
+    LiteLLMDescriptionGenerator,
+    LiteLLMCategoryGenerator,
+)
 from .scenario_generation import LiteLLMScenarioGenerator, ScenarioGenerationError
 from .repository import PromptRepository, RepositoryError, RepositoryNotFoundError
 from .embedding import create_embedding_function
@@ -110,12 +116,14 @@ __all__ = [
     "CatalogChangePlan",
     "NameGenerationError",
     "DescriptionGenerationError",
+    "CategorySuggestionError",
     "IntentClassifier",
     "IntentClassifierError",
     "IntentPrediction",
     "IntentLabel",
     "create_embedding_function",
     "LiteLLMDescriptionGenerator",
+    "LiteLLMCategoryGenerator",
     "LiteLLMScenarioGenerator",
     "CodexExecutor",
     "CodexExecutionResult",

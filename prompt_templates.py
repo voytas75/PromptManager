@@ -1,5 +1,6 @@
 """Default prompt templates surfaced across Prompt Manager workflows.
 
+Updates: v0.1.1 - 2025-11-24 - Add category suggestion template for LiteLLM workflows.
 Updates: v0.1.0 - 2025-11-23 - Centralise prompt template defaults for runtime overrides.
 """
 
@@ -68,11 +69,18 @@ PROMPT_ENGINEERING_PROMPT = (
     " the decision in analysis."
 )
 
+CATEGORY_GENERATION_PROMPT = (
+    "You classify AI prompts into an existing set of product categories. "
+    "Select the single best category label from the provided list. "
+    "Return only the label text without explanations or extra words."
+)
+
 PROMPT_TEMPLATE_KEYS = (
     "name_generation",
     "description_generation",
     "scenario_generation",
     "prompt_engineering",
+    "category_generation",
 )
 
 PROMPT_TEMPLATE_LABELS: Dict[str, str] = {
@@ -80,6 +88,7 @@ PROMPT_TEMPLATE_LABELS: Dict[str, str] = {
     "description_generation": "Prompt description synthesis",
     "scenario_generation": "Scenario drafting",
     "prompt_engineering": "Prompt refinement",
+    "category_generation": "Prompt category suggestions",
 }
 
 PROMPT_TEMPLATE_DESCRIPTIONS: Dict[str, str] = {
@@ -87,6 +96,7 @@ PROMPT_TEMPLATE_DESCRIPTIONS: Dict[str, str] = {
     "description_generation": "LLM system prompt used to auto-summarise prompt descriptions.",
     "scenario_generation": "LLM system prompt used to draft usage scenarios for prompts.",
     "prompt_engineering": "LLM system prompt used when refining prompts with the engineer.",
+    "category_generation": "LLM system prompt used to classify prompts into catalogue categories.",
 }
 
 DEFAULT_PROMPT_TEMPLATES: Dict[str, str] = {
@@ -94,6 +104,7 @@ DEFAULT_PROMPT_TEMPLATES: Dict[str, str] = {
     "description_generation": DESCRIPTION_GENERATION_PROMPT,
     "scenario_generation": SCENARIO_GENERATION_PROMPT,
     "prompt_engineering": PROMPT_ENGINEERING_PROMPT,
+    "category_generation": CATEGORY_GENERATION_PROMPT,
 }
 
 
@@ -129,6 +140,7 @@ __all__ = [
     "DESCRIPTION_GENERATION_PROMPT",
     "SCENARIO_GENERATION_PROMPT",
     "PROMPT_ENGINEERING_PROMPT",
+    "CATEGORY_GENERATION_PROMPT",
     "get_default_prompt",
     "normalise_prompt_templates",
 ]

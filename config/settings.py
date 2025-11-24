@@ -100,6 +100,10 @@ class PromptTemplateOverrides(BaseModel):
         default=None,
         description="System prompt text for the prompt engineering workflow.",
     )
+    category_generation: Optional[str] = Field(
+        default=None,
+        description="System prompt text for the category suggestion workflow.",
+    )
 
 
 class SettingsError(Exception):

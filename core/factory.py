@@ -1,5 +1,6 @@
 """Factories for constructing PromptManager instances from validated settings.
 
+Updates: v0.7.4 - 2025-11-24 - Wire LiteLLM category suggestion helper into manager construction.
 Updates: v0.7.3 - 2025-11-05 - Support LiteLLM workflow routing across fast/inference models.
 Updates: v0.7.2 - 2025-11-26 - Wire LiteLLM streaming flag into executor construction.
 Updates: v0.7.1 - 2025-11-19 - Configure LiteLLM scenario generator for prompt metadata enrichment.
@@ -23,6 +24,7 @@ from .history_tracker import HistoryTracker
 from .intent_classifier import IntentClassifier
 from .prompt_manager import NameGenerationError, PromptCacheError, PromptManager
 from .name_generation import (
+    LiteLLMCategoryGenerator,
     LiteLLMDescriptionGenerator,
     LiteLLMNameGenerator,
     NameGenerationError,
@@ -106,6 +108,7 @@ def build_prompt_manager(
     name_generator = None
     description_generator = None
     scenario_generator = None
+    category_generator = None
     resolved_prompt_engineer = prompt_engineer
     structure_prompt_engineer: Optional[PromptEngineer] = None
     prompt_template_overrides: Dict[str, str] = {}
@@ -179,6 +182,11 @@ def build_prompt_manager(
     )
     if structure_prompt_engineer is None:
         structure_prompt_engineer = resolved_prompt_engineer
+    category_generator = _construct(
+        LiteLLMCategoryGenerator,
+        "category_generation",
+        system_prompt=prompt_template_overrides.get("category_generation"),
+    )
     intent_classifier = IntentClassifier()
 
     repository_instance = repository or PromptRepository(str(settings.db_path))
@@ -221,6 +229,8 @@ def build_prompt_manager(
     }
     if scenario_generator is not None:
         manager_kwargs["scenario_generator"] = scenario_generator
+    if category_generator is not None:
+        manager_kwargs["category_generator"] = category_generator
     if resolved_prompt_engineer is not None:
         manager_kwargs["prompt_engineer"] = resolved_prompt_engineer
     if structure_prompt_engineer is not None:

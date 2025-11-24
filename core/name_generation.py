@@ -1,5 +1,6 @@
 """LiteLLM-backed prompt metadata generation utilities.
 
+Updates: v0.7.6 - 2025-11-24 - Add category suggestion helper leveraging LiteLLM.
 Updates: v0.7.5 - 2025-11-23 - Allow custom system prompt overrides supplied via settings.
 Updates: v0.7.4 - 2025-11-05 - Remove explicit LiteLLM timeout to avoid premature cancellation errors.
 Updates: v0.7.3 - 2025-11-02 - Strip configured drop parameters before calling LiteLLM.
@@ -14,7 +15,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Dict, Optional, Sequence
+from typing import Dict, List, Optional, Sequence
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +26,10 @@ from .litellm_adapter import (
 )
 from prompt_templates import (
     DESCRIPTION_GENERATION_PROMPT,
+    CATEGORY_GENERATION_PROMPT,
     NAME_GENERATION_PROMPT,
 )
+from models.category_model import PromptCategory
 
 class NameGenerationError(Exception):
     """Raised when a prompt name cannot be generated."""
@@ -34,6 +37,10 @@ class NameGenerationError(Exception):
 
 class DescriptionGenerationError(Exception):
     """Raised when a prompt description cannot be generated."""
+
+
+class CategorySuggestionError(Exception):
+    """Raised when a prompt category cannot be suggested."""
 
 
 @dataclass(slots=True)
@@ -199,6 +206,104 @@ class LiteLLMDescriptionGenerator:
         return (self.system_prompt or DESCRIPTION_GENERATION_PROMPT).strip()
 
 
+@dataclass(slots=True)
+class LiteLLMCategoryGenerator:
+    """Suggest prompt categories from the configured catalogue via LiteLLM."""
+
+    model: str
+    api_key: Optional[str] = None
+    api_base: Optional[str] = None
+    timeout_seconds: Optional[float] = None
+    api_version: Optional[str] = None
+    drop_params: Optional[Sequence[str]] = None
+    system_prompt: Optional[str] = None
+    max_categories: int = 24
+
+    def generate(self, context: str, *, categories: Sequence[PromptCategory]) -> str:
+        """Return the label of the best-fit category for the supplied prompt."""
+
+        completion, LiteLLMException = get_completion()
+        prompt_text = context.strip()
+        if not prompt_text:
+            raise CategorySuggestionError("Prompt context is required to suggest a category.")
+        if not categories:
+            raise CategorySuggestionError("At least one category is required to suggest a category.")
+
+        formatted_categories = self._format_categories(categories)
+        request: Dict[str, object] = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": self._system_prompt_text()},
+                {
+                    "role": "user",
+                    "content": (
+                        "Select the single best category label from the list below that matches the prompt.\n"
+                        "Respond with the exact label text only, without numbering or explanations.\n\n"
+                        f"Categories:\n{formatted_categories}\n\nPrompt:\n{prompt_text}"
+                    ),
+                },
+            ],
+            "temperature": 0.1,
+            "max_tokens": 12,
+        }
+        if self.timeout_seconds is not None:
+            request["timeout"] = self.timeout_seconds
+        if self.api_key:
+            request["api_key"] = self.api_key
+        if self.api_base:
+            request["api_base"] = self.api_base
+        if self.api_version:
+            request["api_version"] = self.api_version
+        dropped_params = apply_configured_drop_params(request, self.drop_params)
+        if dropped_params:
+            logger.debug(
+                "Dropping LiteLLM parameters for category suggestion",
+                extra={"dropped_params": list(dropped_params)},
+            )
+
+        try:
+            response = call_completion_with_fallback(
+                request,
+                completion,
+                LiteLLMException,
+                drop_candidates={"max_tokens", "max_output_tokens", "temperature", "timeout"},
+                pre_dropped=dropped_params,
+            )
+        except LiteLLMException as exc:  # type: ignore[arg-type]
+            raise CategorySuggestionError(_summarise_litellm_error(exc)) from exc
+        except Exception as exc:  # pragma: no cover - defensive
+            raise CategorySuggestionError("Unexpected error while calling LiteLLM") from exc
+
+        try:
+            message = response["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as exc:  # pragma: no cover - defensive
+            raise CategorySuggestionError("LiteLLM returned an unexpected payload") from exc
+
+        suggestion = str(message).strip()
+        if not suggestion:
+            raise CategorySuggestionError("LiteLLM returned an empty category suggestion.")
+        return suggestion
+
+    def _format_categories(self, categories: Sequence[PromptCategory]) -> str:
+        """Return a newline separated bullet list of categories with descriptions."""
+
+        entries: List[str] = []
+        limit = max(1, self.max_categories)
+        for category in list(categories)[:limit]:
+            label = (category.label or category.slug or "Uncategorised").strip()
+            description = (category.description or "").strip()
+            entry = f"- {label}"
+            if description:
+                entry += f": {description}"
+            entries.append(entry)
+        return "\n".join(entries)
+
+    def _system_prompt_text(self) -> str:
+        """Return the configured or default category system prompt."""
+
+        return (self.system_prompt or CATEGORY_GENERATION_PROMPT).strip()
+
+
 def _summarise_litellm_error(exc: Exception) -> str:
     """Return a concise, user-friendly message for LiteLLM failures."""
 
@@ -220,6 +325,8 @@ def _summarise_litellm_error(exc: Exception) -> str:
 __all__ = [
     "LiteLLMNameGenerator",
     "LiteLLMDescriptionGenerator",
+    "LiteLLMCategoryGenerator",
     "NameGenerationError",
     "DescriptionGenerationError",
+    "CategorySuggestionError",
 ]

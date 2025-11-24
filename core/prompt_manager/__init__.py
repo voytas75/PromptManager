@@ -1,5 +1,6 @@
 """Prompt Manager package façade and orchestration layer.
 
+Updates: v0.14.1 - 2025-11-24 - Add LiteLLM category suggestion workflow with classifier fallback.
 Updates: v0.14.0 - 2025-11-22 - Add category registry, CRUD APIs, and prompt slugging.
 Updates: v0.13.21 - 2025-11-23 - Support configurable system prompt templates across workflows.
 Updates: v0.13.20 - 2025-11-22 - Keep prompt schema versions in sync with committed history numbers.
@@ -122,15 +123,17 @@ except ImportError:  # pragma: no cover - redis optional during development
 from models.prompt_model import Prompt, PromptExecution, PromptVersion, PromptForkLink, UserProfile
 from models.response_style import ResponseStyle
 from models.prompt_note import PromptNote
-from models.category_model import PromptCategory
+from models.category_model import PromptCategory, slugify_category
 
 from ..embedding import EmbeddingGenerationError, EmbeddingProvider, EmbeddingSyncWorker
 from ..execution import CodexExecutionResult, CodexExecutor, ExecutionError
 from ..history_tracker import HistoryTracker, HistoryTrackerError
-from ..intent_classifier import IntentClassifier, IntentPrediction, rank_by_hints
+from ..intent_classifier import IntentClassifier, IntentLabel, IntentPrediction, rank_by_hints
 from ..name_generation import (
+    LiteLLMCategoryGenerator,
     LiteLLMDescriptionGenerator,
     LiteLLMNameGenerator,
+    CategorySuggestionError,
     DescriptionGenerationError,
     NameGenerationError,
 )
@@ -214,6 +217,46 @@ def _normalize_prompt_body(body: Optional[str]) -> str:
     return body.replace("\r\n", "\n")
 
 
+_CATEGORY_DEFAULT_MAP: Dict[IntentLabel, str] = {
+    IntentLabel.ANALYSIS: "Code Analysis",
+    IntentLabel.DEBUG: "Reasoning / Debugging",
+    IntentLabel.REFACTOR: "Refactoring",
+    IntentLabel.ENHANCEMENT: "Enhancement",
+    IntentLabel.DOCUMENTATION: "Documentation",
+    IntentLabel.REPORTING: "Reporting",
+    IntentLabel.GENERAL: "General",
+}
+
+_CATEGORY_KEYWORD_HINTS: Sequence[tuple[str, str]] = (
+    ("bug", "Reasoning / Debugging"),
+    ("error", "Reasoning / Debugging"),
+    ("refactor", "Refactoring"),
+    ("optimize", "Enhancement"),
+    ("optimiz", "Enhancement"),
+    ("document", "Documentation"),
+    ("summary", "Reporting"),
+    ("report", "Reporting"),
+)
+
+
+def _match_category_label(candidate: Optional[str], categories: Sequence[PromptCategory]) -> Optional[str]:
+    """Return the stored category label that best matches *candidate*."""
+
+    if not candidate:
+        return None
+    text = str(candidate).strip()
+    if not text:
+        return None
+    lowered = text.lower()
+    slug = slugify_category(text)
+    for category in categories:
+        if category.label.lower() == lowered:
+            return category.label
+        if slug and slug == category.slug:
+            return category.label
+    return None
+
+
 class PromptManager:
     """Manage prompt persistence, caching, and semantic search."""
 
@@ -234,6 +277,7 @@ class PromptManager:
         name_generator: Optional[LiteLLMNameGenerator] = None,
         description_generator: Optional[LiteLLMDescriptionGenerator] = None,
         scenario_generator: Optional[LiteLLMScenarioGenerator] = None,
+        category_generator: Optional[LiteLLMCategoryGenerator] = None,
         prompt_engineer: Optional[PromptEngineer] = None,
         structure_prompt_engineer: Optional[PromptEngineer] = None,
         fast_model: Optional[str] = None,
@@ -267,6 +311,7 @@ class PromptManager:
             user_profile: Optional profile to seed single-user personalisation state.
             prompt_engineer: Optional prompt refinement helper using LiteLLM.
             prompt_templates: Optional mapping of workflow identifiers to system prompt overrides.
+            category_generator: Optional LiteLLM helper for suggesting prompt categories.
         """
         # Allow tests to supply repository directly; only require db_path when building one.
         if repository is None and db_path is None:
@@ -328,6 +373,7 @@ class PromptManager:
         self._name_generator = name_generator
         self._description_generator = description_generator
         self._scenario_generator = scenario_generator
+        self._category_generator = category_generator
         self._prompt_engineer = prompt_engineer
         self._prompt_structure_engineer = structure_prompt_engineer or prompt_engineer
         self._litellm_fast_model: Optional[str] = self._normalise_model_identifier(fast_model)
@@ -348,12 +394,24 @@ class PromptManager:
         self._litellm_stream: bool = False
         self._litellm_drop_params: Optional[Sequence[str]] = None
         self._litellm_reasoning_effort: Optional[str] = None
-        for candidate in (name_generator, scenario_generator, prompt_engineer, executor):
+        for candidate in (
+            name_generator,
+            scenario_generator,
+            prompt_engineer,
+            executor,
+            category_generator,
+        ):
             if candidate is not None and getattr(candidate, "drop_params", None):
                 params = getattr(candidate, "drop_params")
                 self._litellm_drop_params = tuple(params)  # type: ignore[arg-type]
                 break
-        for candidate in (executor, name_generator, scenario_generator, prompt_engineer):
+        for candidate in (
+            executor,
+            name_generator,
+            scenario_generator,
+            prompt_engineer,
+            category_generator,
+        ):
             if candidate is not None and hasattr(candidate, "stream"):
                 self._litellm_stream = bool(getattr(candidate, "stream", False))
                 if self._litellm_stream:
@@ -1006,6 +1064,90 @@ class PromptManager:
             except Exception as exc:
                 raise ScenarioGenerationError(str(exc)) from exc
         return scenarios
+
+    def generate_prompt_category(self, context: str) -> str:
+        """Suggest a prompt category using LiteLLM with classifier-based fallback."""
+
+        text = (context or "").strip()
+        if not text:
+            return ""
+        categories = self.list_categories()
+        if not categories:
+            return ""
+
+        if self._category_generator is not None:
+            suggestion = self._run_category_generator(text, categories)
+            if suggestion:
+                matched = _match_category_label(suggestion, categories)
+                if matched:
+                    return matched
+
+        return self._fallback_category_from_context(text, categories)
+
+    def _run_category_generator(self, context: str, categories: Sequence[PromptCategory]) -> str:
+        """Return category suggestion from LiteLLM, logging failures for fallbacks."""
+
+        if self._category_generator is None:
+            return ""
+        task_id = f"category-suggest:{uuid.uuid4()}"
+        metadata = {
+            "context_length": len(context or ""),
+            "category_count": len(categories),
+        }
+        with self._notification_center.track_task(
+            title="Prompt category suggestion",
+            task_id=task_id,
+            start_message="Suggesting prompt category via LiteLLM…",
+            success_message="Prompt category suggested.",
+            failure_message="Prompt category suggestion failed",
+            metadata=metadata,
+            level=NotificationLevel.INFO,
+        ):
+            try:
+                return self._category_generator.generate(context, categories=categories)
+            except CategorySuggestionError as exc:
+                logger.debug(
+                    "LiteLLM category suggestion failed",
+                    extra={"error": str(exc)},
+                    exc_info=True,
+                )
+            except Exception:  # pragma: no cover - defensive
+                logger.warning("LiteLLM category suggestion failed unexpectedly", exc_info=True)
+        return ""
+
+    def _fallback_category_from_context(
+        self,
+        context: str,
+        categories: Sequence[PromptCategory],
+    ) -> str:
+        """Return a category suggestion using heuristics and classifier hints."""
+
+        classifier = self._intent_classifier
+        if classifier is not None:
+            prediction = classifier.classify(context)
+            if prediction.category_hints:
+                for hint in prediction.category_hints:
+                    matched = _match_category_label(hint, categories)
+                    if matched:
+                        return matched
+                return prediction.category_hints[0]
+            fallback = _CATEGORY_DEFAULT_MAP.get(prediction.label)
+            if fallback:
+                resolved = _match_category_label(fallback, categories)
+                if resolved:
+                    return resolved
+                return fallback
+
+        lowered = context.lower()
+        for keyword, category in _CATEGORY_KEYWORD_HINTS:
+            if keyword in lowered:
+                resolved = _match_category_label(category, categories)
+                return resolved or category
+
+        default_label = _match_category_label("General", categories)
+        if default_label:
+            return default_label
+        return categories[0].label if categories else "General"
 
     def refine_prompt_text(
         self,

@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.46 - 2025-11-24 - Use LiteLLM category suggestions with classifier fallback.
 Updates: v0.15.45 - 2025-11-24 - Inline prompt tags with the header and remove standalone tag label.
 Updates: v0.15.44 - 2025-11-23 - Add rating-based sorting to the prompt list.
 Updates: v0.15.43 - 2025-11-23 - Add prompt body size sorting to the list view.
@@ -200,25 +201,6 @@ def _default_chat_palette() -> dict[str, str]:
         "user": QColor(DEFAULT_CHAT_USER_BUBBLE_COLOR).name().lower(),
         "assistant": QColor(DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR).name().lower(),
     }
-
-
-def _match_category_label(text: str, categories: Sequence[PromptCategory]) -> Optional[str]:
-    """Return the stored category label matching a classifier hint."""
-
-    candidate = (text or "").strip()
-    if not candidate:
-        return None
-    lowered = candidate.lower()
-    slug = slugify_category(candidate)
-    for category in categories:
-        label_lower = category.label.lower()
-        if lowered == label_lower:
-            return category.label
-        if slug and slug == category.slug:
-            return category.label
-        if lowered in label_lower or label_lower in lowered:
-            return category.label
-    return None
 
 
 def _load_last_execute_context_task(settings: QSettings) -> str:
@@ -2209,55 +2191,16 @@ class MainWindow(QMainWindow):
         return list(self._manager.generate_prompt_scenarios(text))
 
     def _generate_prompt_category(self, context: str) -> str:
-        """Suggest a category using the intent classifier when available."""
+        """Suggest a category using LiteLLM when configured, else fallback heuristics."""
 
         text = (context or "").strip()
         if not text:
             return ""
-        classifier = self._manager.intent_classifier
-        prediction = None
         try:
-            categories = self._manager.list_categories()
+            return self._manager.generate_prompt_category(text)
         except PromptManagerError:
-            logger.debug("Unable to load categories for suggestion", exc_info=True)
-            categories = []
-        if classifier is not None:
-            prediction = classifier.classify(text)
-            if prediction.category_hints:
-                for hint in prediction.category_hints:
-                    matched = _match_category_label(hint, categories)
-                    if matched:
-                        return matched
-                return prediction.category_hints[0]
-            default_map = {
-                IntentLabel.ANALYSIS: "Code Analysis",
-                IntentLabel.DEBUG: "Reasoning / Debugging",
-                IntentLabel.REFACTOR: "Refactoring",
-                IntentLabel.ENHANCEMENT: "Enhancement",
-                IntentLabel.DOCUMENTATION: "Documentation",
-                IntentLabel.REPORTING: "Reporting",
-                IntentLabel.GENERAL: "General",
-            }
-            fallback_category = default_map.get(prediction.label)
-            if fallback_category:
-                resolved = _match_category_label(fallback_category, categories)
-                return resolved or fallback_category
-        lowered = text.lower()
-        keyword_categories = (
-            ("bug", "Reasoning / Debugging"),
-            ("error", "Reasoning / Debugging"),
-            ("refactor", "Refactoring"),
-            ("optimize", "Enhancement"),
-            ("optimiz", "Enhancement"),
-            ("document", "Documentation"),
-            ("summary", "Reporting"),
-            ("report", "Reporting"),
-        )
-        for keyword, category in keyword_categories:
-            if keyword in lowered:
-                resolved = _match_category_label(category, categories)
-                return resolved or category
-        return "General"
+            logger.debug("PromptManager category suggestion failed", exc_info=True)
+            return ""
 
     def _generate_prompt_tags(self, context: str) -> List[str]:
         """Suggest tags using the intent classifier and language heuristics."""

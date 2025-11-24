@@ -24,7 +24,7 @@ from core.prompt_manager import (
     RepositoryError,
     RepositoryNotFoundError,
 )
-from core.name_generation import DescriptionGenerationError
+from core.name_generation import CategorySuggestionError, DescriptionGenerationError
 from models.category_model import PromptCategory, slugify_category
 from models.prompt_model import Prompt, PromptForkLink, PromptVersion, UserProfile
 
@@ -320,6 +320,7 @@ def _build_manager(
     redis_client: Optional[_RedisStub] = None,
     name_generator: Optional[Any] = None,
     description_generator: Optional[Any] = None,
+    category_generator: Optional[Any] = None,
 ) -> PromptManager:
     repo = repository or _RecordingRepository()
     coll = collection or _StubCollection()
@@ -333,6 +334,7 @@ def _build_manager(
         intent_classifier=IntentClassifier(),
         name_generator=name_generator,
         description_generator=description_generator,
+        category_generator=category_generator,
     )
 
 
@@ -655,6 +657,39 @@ def test_generate_prompt_description_uses_generator() -> None:
     summary = manager.generate_prompt_description("My prompt body")
     assert summary == "Auto generated description"
     assert generator.calls == ["My prompt body"]
+
+
+def test_generate_prompt_category_uses_llm_when_available() -> None:
+    class _CategoryGenerator:
+        def __init__(self) -> None:
+            self.calls: List[str] = []
+
+        def generate(self, context: str, *, categories: Sequence[PromptCategory]) -> str:
+            self.calls.append(context)
+            assert categories  # ensure catalogue passed through
+            return "Documentation"
+
+    generator = _CategoryGenerator()
+    manager = _build_manager(category_generator=generator)
+    suggestion = manager.generate_prompt_category("Document the deployment pipeline.")
+    assert suggestion == "Documentation"
+    assert generator.calls == ["Document the deployment pipeline."]
+
+
+def test_generate_prompt_category_falls_back_without_llm() -> None:
+    manager = _build_manager()
+    suggestion = manager.generate_prompt_category("Share a weekly status summary for leadership.")
+    assert suggestion == "Reporting"
+
+
+def test_generate_prompt_category_falls_back_when_llm_fails() -> None:
+    class _FailingGenerator:
+        def generate(self, context: str, *, categories: Sequence[PromptCategory]) -> str:  # type: ignore[override]
+            raise CategorySuggestionError("model unavailable")
+
+    manager = _build_manager(category_generator=_FailingGenerator())
+    suggestion = manager.generate_prompt_category("Propose enhancements to optimise performance.")
+    assert suggestion == "Enhancement"
 
 
 def test_create_prompt_raises_when_repository_fails() -> None:
