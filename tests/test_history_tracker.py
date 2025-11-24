@@ -33,11 +33,17 @@ def test_history_tracker_records_success_and_failure(tmp_path) -> None:
         duration_ms=123,
         metadata={"usage": {"prompt_tokens": 5}},
         rating=7,
+        context_metadata={
+            "prompt": {"id": str(prompt.id), "category": prompt.category},
+            "execution": {"model": "gpt-4o-mini"},
+        },
     )
     assert success.response_text == "All clear!"
     assert success.request_text.endswith("...")
     assert success.duration_ms == 123
     assert success.rating == 7
+    assert success.metadata is not None
+    assert success.metadata.get("context", {}).get("prompt", {}).get("id") == str(prompt.id)
 
     failure = tracker.record_failure(
         prompt_id=prompt.id,

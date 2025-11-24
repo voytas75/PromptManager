@@ -1,5 +1,6 @@
 """Prompt execution history tracking utilities.
 
+Updates: v0.3.0 - 2025-11-24 - Persist execution context metadata (response styles, runtime config).
 Updates: v0.2.0 - 2025-11-09 - Capture optional ratings alongside execution logs.
 Updates: v0.1.0 - 2025-11-08 - Introduce HistoryTracker for execution logs.
 """
@@ -50,15 +51,19 @@ class HistoryTracker:
         duration_ms: Optional[int] = None,
         metadata: Optional[Mapping[str, object]] = None,
         rating: Optional[float] = None,
+        context_metadata: Optional[Mapping[str, object]] = None,
     ) -> PromptExecution:
         """Persist a successful execution."""
+        metadata_payload: dict[str, object] = dict(metadata) if metadata else {}
+        if context_metadata:
+            metadata_payload["context"] = dict(context_metadata)
         execution = self._build_execution(
             prompt_id=prompt_id,
             request_text=request_text,
             response_text=response_text,
             status=ExecutionStatus.SUCCESS,
             duration_ms=duration_ms,
-            metadata=metadata,
+            metadata=metadata_payload or None,
             rating=rating,
         )
         return self._store(execution)

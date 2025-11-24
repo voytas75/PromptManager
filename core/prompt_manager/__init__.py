@@ -1194,6 +1194,41 @@ class PromptManager:
             return fallback
         return "No description available."
 
+    def _build_execution_context_metadata(
+        self,
+        prompt: Prompt,
+        *,
+        stream_enabled: bool,
+        executor_model: Optional[str],
+        conversation_length: int,
+        request_text: str,
+        response_text: str,
+        response_style: Optional[Mapping[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Return structured metadata describing the execution context."""
+
+        prompt_metadata = {
+            "id": str(prompt.id),
+            "name": prompt.name,
+            "category": prompt.category,
+            "tags": list(prompt.tags),
+            "version": prompt.version,
+        }
+        execution_metadata = {
+            "model": executor_model,
+            "stream_enabled": stream_enabled,
+            "conversation_messages": conversation_length,
+            "request_chars": len(request_text or ""),
+            "response_chars": len(response_text or ""),
+        }
+        context: Dict[str, Any] = {
+            "prompt": prompt_metadata,
+            "execution": execution_metadata,
+        }
+        if response_style:
+            context["response_style"] = dict(response_style)
+        return context
+
     def refine_prompt_text(
         self,
         prompt_text: str,
@@ -1347,11 +1382,20 @@ class PromptManager:
                 augmented_conversation.append(
                     {"role": "assistant", "content": result.response_text}
                 )
+            context_metadata = self._build_execution_context_metadata(
+                prompt,
+                stream_enabled=stream_enabled,
+                executor_model=getattr(self._executor, "model", None),
+                conversation_length=len(augmented_conversation),
+                request_text=request_text,
+                response_text=result.response_text,
+            )
             history_entry = self._log_execution_success(
                 prompt.id,
                 request_text,
                 result,
                 conversation=augmented_conversation,
+                context_metadata=context_metadata,
             )
             try:
                 self.increment_usage(prompt.id)
@@ -1378,6 +1422,7 @@ class PromptManager:
         usage: Optional[Mapping[str, Any]] = None,
         metadata: Optional[Mapping[str, Any]] = None,
         rating: Optional[float] = None,
+        context_metadata: Optional[Mapping[str, Any]] = None,
     ) -> PromptExecution:
         """Persist a manual prompt execution entry (e.g., from GUI Save Result)."""
 
@@ -1401,6 +1446,7 @@ class PromptManager:
                 duration_ms=duration_ms,
                 metadata=payload_metadata,
                 rating=rating,
+                context_metadata=context_metadata,
             )
         except HistoryTrackerError as exc:
             raise PromptHistoryError(str(exc)) from exc
@@ -1632,6 +1678,7 @@ class PromptManager:
         result: CodexExecutionResult,
         *,
         conversation: Optional[Sequence[Mapping[str, str]]] = None,
+        context_metadata: Optional[Mapping[str, Any]] = None,
     ) -> Optional[PromptExecution]:
         """Persist a successful execution outcome when the tracker is available."""
 
@@ -1653,6 +1700,7 @@ class PromptManager:
                 response_text=result.response_text,
                 duration_ms=result.duration_ms,
                 metadata=metadata,
+                context_metadata=context_metadata,
             )
         except HistoryTrackerError:
             logger.warning(
