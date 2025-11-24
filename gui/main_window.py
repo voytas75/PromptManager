@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.47 - 2025-11-24 - Add creation date and usage count prompt sorting options.
 Updates: v0.15.46 - 2025-11-24 - Use LiteLLM category suggestions with classifier fallback.
 Updates: v0.15.45 - 2025-11-24 - Inline prompt tags with the header and remove standalone tag label.
 Updates: v0.15.44 - 2025-11-23 - Add rating-based sorting to the prompt list.
@@ -809,8 +810,10 @@ class PromptSortOrder(Enum):
     NAME_DESC = "name_desc"
     QUALITY_DESC = "quality_desc"
     MODIFIED_DESC = "modified_desc"
+    CREATED_DESC = "created_desc"
     BODY_SIZE_DESC = "body_size_desc"
     RATING_DESC = "rating_desc"
+    USAGE_DESC = "usage_desc"
 
 
 class MainWindow(QMainWindow):
@@ -821,8 +824,10 @@ class MainWindow(QMainWindow):
         ("Name (Z-A)", PromptSortOrder.NAME_DESC),
         ("Quality (high-low)", PromptSortOrder.QUALITY_DESC),
         ("Last modified (newest)", PromptSortOrder.MODIFIED_DESC),
+        ("Created (newest)", PromptSortOrder.CREATED_DESC),
         ("Body size (long-short)", PromptSortOrder.BODY_SIZE_DESC),
         ("Rating (high-low)", PromptSortOrder.RATING_DESC),
+        ("Usage count (high-low)", PromptSortOrder.USAGE_DESC),
     )
 
     def __init__(
@@ -1529,6 +1534,13 @@ class MainWindow(QMainWindow):
                 return (-timestamp, prompt.name.casefold(), str(prompt.id))
 
             return sorted(prompts, key=modified_key)
+        if order is PromptSortOrder.CREATED_DESC:
+
+            def created_key(prompt: Prompt) -> tuple[float, str, str]:
+                timestamp = prompt.created_at.timestamp() if prompt.created_at else 0.0
+                return (-timestamp, prompt.name.casefold(), str(prompt.id))
+
+            return sorted(prompts, key=created_key)
         if order is PromptSortOrder.BODY_SIZE_DESC:
 
             def body_size_key(prompt: Prompt) -> tuple[int, str, str]:
@@ -1544,6 +1556,14 @@ class MainWindow(QMainWindow):
                 return (-average, -(count or 0), prompt.name.casefold(), str(prompt.id))
 
             return sorted(prompts, key=rating_key)
+        if order is PromptSortOrder.USAGE_DESC:
+
+            def usage_key(prompt: Prompt) -> tuple[int, float, str, str]:
+                usage = prompt.usage_count
+                modified = prompt.last_modified.timestamp() if prompt.last_modified else 0.0
+                return (-(usage or 0), -modified, prompt.name.casefold(), str(prompt.id))
+
+            return sorted(prompts, key=usage_key)
         return list(prompts)
 
     def _on_filters_changed(self, *_: object) -> None:
