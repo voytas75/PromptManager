@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.45 - 2025-11-24 - Inline prompt tags with the header and remove standalone tag label.
 Updates: v0.15.44 - 2025-11-23 - Add rating-based sorting to the prompt list.
 Updates: v0.15.43 - 2025-11-23 - Add prompt body size sorting to the list view.
 Updates: v0.15.42 - 2025-11-23 - Add similar prompt recommendations from the context menu.
@@ -359,6 +360,7 @@ class PromptDetailWidget(QWidget):
         self._meta_label = QLabel("", content)
         self._meta_label.setWordWrap(True)
         self._meta_label.setTextFormat(Qt.RichText)
+        self._meta_label.setVisible(False)
         self._description = QLabel("", content)
         self._description.setWordWrap(True)
         self._description.setTextFormat(Qt.RichText)
@@ -486,14 +488,14 @@ class PromptDetailWidget(QWidget):
     def display_prompt(self, prompt: Prompt) -> None:
         """Populate labels using the provided prompt."""
 
-        tags = ", ".join(prompt.tags) if prompt.tags else "No tags"
         header_html = self._format_prompt_header(prompt)
         self._name_label.setText(header_html)
         self._version_label.clear()
         self._version_label.setVisible(False)
         self._rating_label.clear()
         self._rating_label.setVisible(False)
-        self._meta_label.setText(self._format_label_value("Tags", tags))
+        self._meta_label.clear()
+        self._meta_label.setVisible(False)
         description_value = prompt.description or "No description provided."
         self._description.setText(
             self._format_label_value("Description", description_value, multiline=True)
@@ -586,10 +588,19 @@ class PromptDetailWidget(QWidget):
         safe_title = escape(title)
         safe_category = escape(category)
         safe_details = escape(detail_text)
+
+        tag_suffix = ""
+        if prompt.tags:
+            cleaned_tags = [str(tag).strip() for tag in prompt.tags if str(tag).strip()]
+            if cleaned_tags:
+                safe_tags = escape(", ".join(cleaned_tags))
+                tag_suffix = f" [{safe_tags}]"
+
         return (
             f'<span style="font-weight:600;">{safe_title}</span> - '
             f"{safe_category} "
-            f'<span style="color: {detail_color};">({safe_details})</span>'
+            f'<span style="color: {detail_color};">({safe_details})</span>"
+            f"{tag_suffix}"
         )
 
     def _format_label_value(self, label: str, value: str, *, multiline: bool = False) -> str:
@@ -657,6 +668,7 @@ class PromptDetailWidget(QWidget):
         self._rating_label.clear()
         self._rating_label.setVisible(False)
         self._meta_label.clear()
+        self._meta_label.setVisible(False)
         self._description.clear()
         self._context.clear()
         self._scenarios.clear()
