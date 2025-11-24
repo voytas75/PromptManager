@@ -1342,6 +1342,7 @@ class PromptManager:
 
         conversation_history = _normalise_conversation(conversation)
         prompt = self.get_prompt(prompt_id)
+        stream_enabled = self._executor.stream if stream is None else bool(stream)
         task_id = f"prompt-exec:{prompt.id}:{uuid.uuid4()}"
         metadata = {
             "prompt_id": str(prompt.id),
