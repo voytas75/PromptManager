@@ -640,7 +640,7 @@ def test_generate_prompt_name_requires_configured_generator() -> None:
 def test_generate_prompt_description_requires_configured_generator() -> None:
     manager = _build_manager()
     with pytest.raises(DescriptionGenerationError):
-        manager.generate_prompt_description("Provide summary for this context.")
+        manager.generate_prompt_description("Provide summary for this context.", allow_fallback=False)
 
 
 def test_generate_prompt_description_uses_generator() -> None:
@@ -657,6 +657,22 @@ def test_generate_prompt_description_uses_generator() -> None:
     summary = manager.generate_prompt_description("My prompt body")
     assert summary == "Auto generated description"
     assert generator.calls == ["My prompt body"]
+
+
+def test_generate_prompt_description_falls_back_when_unconfigured() -> None:
+    manager = _build_manager()
+    summary = manager.generate_prompt_description("Summarise the release checklist.")
+    assert "overview" in summary.lower()
+
+
+def test_generate_prompt_description_falls_back_on_generator_failure() -> None:
+    class _FailingGenerator:
+        def generate(self, context: str) -> str:  # type: ignore[override]
+            raise DescriptionGenerationError("model unavailable")
+
+    manager = _build_manager(description_generator=_FailingGenerator())
+    summary = manager.generate_prompt_description("List deployment steps and checks.")
+    assert "deployment" in summary.lower()
 
 
 def test_generate_prompt_category_uses_llm_when_available() -> None:

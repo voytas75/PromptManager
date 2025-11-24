@@ -1011,15 +1011,27 @@ class PromptManager:
                 raise NameGenerationError(str(exc)) from exc
         return suggestion
 
-    def generate_prompt_description(self, context: str) -> str:
-        """Return a prompt description using the configured LiteLLM generator."""
+    def generate_prompt_description(
+        self,
+        context: str,
+        *,
+        allow_fallback: bool = True,
+        prompt: Optional[Prompt] = None,
+    ) -> str:
+        """Return a prompt description using LiteLLM with an optional deterministic fallback."""
 
+        text = (context or "").strip()
+        if not text:
+            raise DescriptionGenerationError("Prompt context is required to generate a description.")
         if self._description_generator is None:
+            if allow_fallback:
+                logger.debug("Description generator missing; using fallback summary")
+                return self._build_description_fallback(text, prompt=prompt)
             raise DescriptionGenerationError(
                 "LiteLLM description generator is not configured. Set PROMPT_MANAGER_LITELLM_MODEL."
             )
         task_id = f"description-gen:{uuid.uuid4()}"
-        metadata = {"context_length": len(context or "")}
+        metadata = {"context_length": len(text)}
         with self._notification_center.track_task(
             title="Prompt description generation",
             task_id=task_id,
@@ -1030,8 +1042,14 @@ class PromptManager:
             level=NotificationLevel.INFO,
         ):
             try:
-                summary = self._description_generator.generate(context)
+                summary = self._description_generator.generate(text)
             except Exception as exc:
+                if allow_fallback:
+                    logger.warning(
+                        "LiteLLM description generation failed; falling back",
+                        exc_info=True,
+                    )
+                    return self._build_description_fallback(text, prompt=prompt)
                 raise DescriptionGenerationError(str(exc)) from exc
         return summary
 
@@ -1148,6 +1166,33 @@ class PromptManager:
         if default_label:
             return default_label
         return categories[0].label if categories else "General"
+
+    def _build_description_fallback(self, context: str, prompt: Optional[Prompt]) -> str:
+        """Return a deterministic summary derived from prompt metadata and context."""
+
+        segments: List[str] = []
+        if prompt is not None:
+            name = (prompt.name or "").strip()
+            category = (prompt.category or "").strip() or "General"
+            if name:
+                segments.append(f"{name} focuses on {category.lower()} workflows.")
+            tags = ", ".join(tag.strip() for tag in prompt.tags if tag and str(tag).strip())
+            if tags:
+                segments.append(f"Common tags: {tags}.")
+            scenario = next((scenario.strip() for scenario in prompt.scenarios if scenario.strip()), "")
+            if scenario:
+                segments.append(f"Example use: {scenario}.")
+        collapsed = " ".join(context.split())
+        if collapsed:
+            max_chars = 220
+            snippet = collapsed[:max_chars].rstrip()
+            if len(collapsed) > max_chars:
+                snippet += "…"
+            segments.append(f"Overview: {snippet}")
+        fallback = " ".join(segment for segment in segments if segment).strip()
+        if fallback:
+            return fallback
+        return "No description available."
 
     def refine_prompt_text(
         self,
