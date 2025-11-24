@@ -599,7 +599,7 @@ class PromptDetailWidget(QWidget):
         return (
             f'<span style="font-weight:600;">{safe_title}</span> - '
             f"{safe_category} "
-            f'<span style="color: {detail_color};">({safe_details})</span>"
+            f'<span style="color: {detail_color};">({safe_details})</span>'
             f"{tag_suffix}"
         )
 
