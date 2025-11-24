@@ -2,6 +2,13 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.17.5] - 2025-11-24
+
+### Added
+
+- Prompt description generation now falls back to a deterministic summary (built from name, category, tags, and a trimmed context snippet) whenever LiteLLM is unavailable or errors, keeping workflows moving even without external API access.
+- History logging captures richer execution context—prompt metadata, runtime config (model, streaming, conversation length), and future response-style details—by extending `HistoryTracker.record_success` with a structured `context` payload.
+
 ## [0.17.4] - 2025-11-23
 
 ### Added
