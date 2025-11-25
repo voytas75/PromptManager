@@ -197,18 +197,15 @@ class TemplatePreviewWidget(QWidget):
         schema_mode = SchemaValidationMode.from_string(self._schema_mode.currentData())
         schema_text = self._schema_input.toPlainText()
         schema_result = self._validator.validate(variables, schema_text, mode=schema_mode)
-        errors: List[str] = []
         invalid_fields: Set[str] = self._top_level_fields(schema_result.field_errors)
         if not schema_result.is_valid:
-            if schema_result.errors:
-                errors.extend(schema_result.errors)
-            if schema_result.schema_error and not schema_result.errors:
-                errors.append(schema_result.schema_error)
+            message = "; ".join(schema_result.errors or [schema_result.schema_error or "Schema error"])
+            self._rendered_view.clear()
+            self._update_variable_states(set(variables.keys()), set(), invalid_fields)
+            self._set_status(message, is_error=True)
+            return
 
         render_result = self._renderer.render(self._template_text, variables)
-        if render_result.errors:
-            errors.extend(render_result.errors)
-
         missing = set(render_result.missing_variables)
         for name in self._variable_names:
             if name not in variables:
@@ -216,9 +213,12 @@ class TemplatePreviewWidget(QWidget):
 
         self._update_variable_states(set(variables.keys()), missing, invalid_fields)
 
-        if errors:
-            self._rendered_view.clear()
-            self._set_status("; ".join(errors), is_error=True)
+        if render_result.errors:
+            if missing:
+                self._rendered_view.setPlainText(self._template_text)
+            else:
+                self._rendered_view.clear()
+            self._set_status("; ".join(render_result.errors), is_error=True)
             return
 
         self._rendered_view.setPlainText(render_result.rendered_text)
