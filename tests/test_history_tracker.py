@@ -49,9 +49,15 @@ def test_history_tracker_records_success_and_failure(tmp_path) -> None:
         prompt_id=prompt.id,
         request_text="raise ValueError('boom')",
         error_message="Timeout",
+        context_metadata={
+            "execution": {"model": "gpt-4o-mini", "stream_enabled": False},
+            "prompt": {"id": str(prompt.id)},
+        },
     )
     assert failure.status.value == "failed"
     assert "Timeout" == failure.error_message
+    assert failure.metadata is not None
+    assert failure.metadata.get("context", {}).get("execution", {}).get("model") == "gpt-4o-mini"
 
     recent = tracker.list_recent(limit=5)
     assert {entry.id for entry in recent} == {success.id, failure.id}

@@ -197,6 +197,34 @@ _CHAT_PALETTE_KEYS = {"user", "assistant"}
 _EXECUTE_CONTEXT_TASK_KEY = "lastExecuteContextTask"
 
 
+def _match_category_label(value: Optional[str], categories: Sequence[PromptCategory]) -> Optional[str]:
+    """Return the canonical category label matching *value* via exact, slug, or fuzzy match."""
+
+    text = (value or "").strip()
+    if not text:
+        return None
+    lowered = text.lower()
+    slug = slugify_category(text)
+
+    for category in categories:
+        label_lower = category.label.lower()
+        if label_lower == lowered:
+            return category.label
+        if slug and category.slug == slug:
+            return category.label
+
+    if slug:
+        for category in categories:
+            if slug in category.slug:
+                return category.label
+
+    for category in categories:
+        if lowered in category.label.lower():
+            return category.label
+
+    return None
+
+
 def _default_chat_palette() -> dict[str, str]:
     return {
         "user": QColor(DEFAULT_CHAT_USER_BUBBLE_COLOR).name().lower(),

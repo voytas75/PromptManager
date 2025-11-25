@@ -76,8 +76,13 @@ class HistoryTracker:
         *,
         duration_ms: Optional[int] = None,
         metadata: Optional[Mapping[str, object]] = None,
+        context_metadata: Optional[Mapping[str, object]] = None,
     ) -> PromptExecution:
-        """Persist a failed execution attempt."""
+        """Persist a failed execution attempt, including optional context metadata."""
+
+        metadata_payload: dict[str, object] = dict(metadata) if metadata else {}
+        if context_metadata:
+            metadata_payload["context"] = dict(context_metadata)
         execution = self._build_execution(
             prompt_id=prompt_id,
             request_text=request_text,
@@ -85,7 +90,7 @@ class HistoryTracker:
             status=ExecutionStatus.FAILED,
             error_message=error_message,
             duration_ms=duration_ms,
-            metadata=metadata,
+            metadata=metadata_payload or None,
             rating=None,
         )
         return self._store(execution)

@@ -1369,11 +1369,20 @@ class PromptManager:
             except ExecutionError as exc:
                 failed_messages = list(conversation_history)
                 failed_messages.append({"role": "user", "content": request_text.strip()})
+                failure_context = self._build_execution_context_metadata(
+                    prompt,
+                    stream_enabled=stream_enabled,
+                    executor_model=getattr(self._executor, "model", None),
+                    conversation_length=len(failed_messages),
+                    request_text=request_text,
+                    response_text="",
+                )
                 self._log_execution_failure(
                     prompt.id,
                     request_text,
                     str(exc),
                     conversation=failed_messages,
+                    context_metadata=failure_context,
                 )
                 raise PromptExecutionError(str(exc)) from exc
 
@@ -1718,21 +1727,23 @@ class PromptManager:
         error_message: str,
         *,
         conversation: Optional[Sequence[Mapping[str, str]]] = None,
+        context_metadata: Optional[Mapping[str, Any]] = None,
     ) -> Optional[PromptExecution]:
         """Persist a failed execution attempt when history tracking is enabled."""
 
         tracker = self._history_tracker
         if tracker is None:
             return None
-        metadata: Optional[Mapping[str, Any]] = None
+        metadata_payload: Dict[str, Any] = {}
         if conversation:
-            metadata = {"conversation": list(conversation)}
+            metadata_payload["conversation"] = list(conversation)
         try:
             return tracker.record_failure(
                 prompt_id=prompt_id,
                 request_text=request_text,
                 error_message=error_message,
-                metadata=metadata,
+                metadata=metadata_payload or None,
+                context_metadata=context_metadata,
             )
         except HistoryTrackerError:
             logger.warning(
