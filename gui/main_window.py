@@ -900,6 +900,8 @@ class MainWindow(QMainWindow):
         self._suppress_query_signal = False
         self._quick_shortcuts: List[QShortcut] = []
         self._template_preview: Optional[TemplatePreviewWidget] = None
+        self._template_list_view: Optional[QListView] = None
+        self._template_detail_widget: Optional[PromptDetailWidget] = None
         self._layout_settings = QSettings("PromptManager", "MainWindow")
         self._last_execute_context_task: str = _load_last_execute_context_task(self._layout_settings)
         self._main_container: Optional[QFrame] = None
@@ -1240,19 +1242,45 @@ class MainWindow(QMainWindow):
         preview_layout = QVBoxLayout(preview_tab)
         preview_layout.setContentsMargins(12, 12, 12, 12)
         preview_layout.setSpacing(8)
+        preview_splitter = QSplitter(Qt.Horizontal, preview_tab)
+        preview_splitter.setChildrenCollapsible(False)
+
+        preview_list_panel = QWidget(preview_splitter)
+        preview_list_layout = QVBoxLayout(preview_list_panel)
+        preview_list_layout.setContentsMargins(0, 0, 0, 0)
+        preview_list_layout.setSpacing(6)
         preview_hint = QLabel(
             (
-                "Use JSON variables and optional schemas to render the selected prompt "
-                "as a Jinja2 template before executing it."
+                "Select a prompt to inspect variables and render it as a Jinja2 template. "
+                "Selections stay in sync with the main Prompts tab."
             ),
-            preview_tab,
+            preview_list_panel,
         )
         preview_hint.setWordWrap(True)
         preview_hint.setStyleSheet("color: #4b5563;")
-        preview_layout.addWidget(preview_hint)
-        self._template_preview = TemplatePreviewWidget(preview_tab)
+        preview_list_layout.addWidget(preview_hint)
+        self._template_list_view = QListView(preview_list_panel)
+        self._template_list_view.setModel(self._model)
+        self._template_list_view.setSelectionMode(QAbstractItemView.SingleSelection)
+        self._template_list_view.setSelectionModel(self._list_view.selectionModel())
+        self._template_list_view.doubleClicked.connect(self._on_prompt_double_clicked)  # type: ignore[arg-type]
+        preview_list_layout.addWidget(self._template_list_view, 3)
+        self._template_detail_widget = PromptDetailWidget(preview_list_panel)
+        preview_list_layout.addWidget(self._template_detail_widget, 4)
+
+        preview_render_panel = QWidget(preview_splitter)
+        preview_render_layout = QVBoxLayout(preview_render_panel)
+        preview_render_layout.setContentsMargins(0, 0, 0, 0)
+        preview_render_layout.setSpacing(8)
+        self._template_preview = TemplatePreviewWidget(preview_render_panel)
         self._template_preview.clear_template()
-        preview_layout.addWidget(self._template_preview, 1)
+        preview_render_layout.addWidget(self._template_preview)
+
+        preview_splitter.addWidget(preview_list_panel)
+        preview_splitter.addWidget(preview_render_panel)
+        preview_splitter.setStretchFactor(0, 1)
+        preview_splitter.setStretchFactor(1, 2)
+        preview_layout.addWidget(preview_splitter, 1)
         self._tab_widget.addTab(preview_tab, "Template Preview")
 
         layout.addWidget(self._tab_widget, stretch=1)
@@ -3701,10 +3729,14 @@ class MainWindow(QMainWindow):
             self._detail_widget.clear()
             self._reset_chat_session()
             self._update_template_preview(None)
+            if self._template_detail_widget is not None:
+                self._template_detail_widget.clear()
             return
         if self._chat_prompt_id and prompt.id != self._chat_prompt_id:
             self._reset_chat_session()
         self._detail_widget.display_prompt(prompt)
+        if self._template_detail_widget is not None:
+            self._template_detail_widget.display_prompt(prompt)
         self._update_prompt_lineage_summary(prompt)
         self._update_template_preview(prompt)
 
@@ -3738,8 +3770,12 @@ class MainWindow(QMainWindow):
         summary_text = " | ".join(summary_parts)
         if summary_text:
             self._detail_widget.update_lineage_summary(summary_text)
+            if self._template_detail_widget is not None:
+                self._template_detail_widget.update_lineage_summary(summary_text)
         else:
             self._detail_widget.update_lineage_summary("No lineage data yet.")
+            if self._template_detail_widget is not None:
+                self._template_detail_widget.update_lineage_summary("No lineage data yet.")
 
     def _update_template_preview(self, prompt: Optional[Prompt]) -> None:
         """Refresh the workspace template preview widget for the selected prompt."""
