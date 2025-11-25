@@ -906,7 +906,6 @@ class MainWindow(QMainWindow):
         self._main_splitter: Optional[QSplitter] = None
         self._list_splitter: Optional[QSplitter] = None
         self._workspace_splitter: Optional[QSplitter] = None
-        self._query_preview_splitter: Optional[QSplitter] = None
         self._main_splitter_left_width: Optional[int] = None
         self._suppress_main_splitter_sync = False
         self._notification_history: Deque[Notification] = deque(maxlen=200)
@@ -1165,32 +1164,10 @@ class MainWindow(QMainWindow):
         query_panel_layout.setSizeConstraint(QLayout.SetMinimumSize)
         query_panel_layout.setContentsMargins(0, 0, 0, 0)
         query_panel_layout.setSpacing(8)
-
-        self._query_preview_splitter = QSplitter(Qt.Vertical, query_panel)
-        self._query_preview_splitter.setChildrenCollapsible(False)
-
-        query_controls = QWidget(self._query_preview_splitter)
-        query_controls_layout = QVBoxLayout(query_controls)
-        query_controls_layout.setContentsMargins(0, 0, 0, 0)
-        query_controls_layout.setSpacing(8)
-        query_controls_layout.addWidget(self._query_input)
-        query_controls_layout.addLayout(actions_layout)
-        query_controls_layout.addLayout(language_layout)
-        query_controls_layout.addWidget(self._intent_hint)
-
-        preview_container = QWidget(self._query_preview_splitter)
-        preview_layout = QVBoxLayout(preview_container)
-        preview_layout.setContentsMargins(0, 0, 0, 0)
-        preview_layout.setSpacing(0)
-        self._template_preview = TemplatePreviewWidget(preview_container)
-        self._template_preview.clear_template()
-        preview_layout.addWidget(self._template_preview)
-
-        self._query_preview_splitter.addWidget(query_controls)
-        self._query_preview_splitter.addWidget(preview_container)
-        self._query_preview_splitter.setStretchFactor(0, 3)
-        self._query_preview_splitter.setStretchFactor(1, 4)
-        query_panel_layout.addWidget(self._query_preview_splitter)
+        query_panel_layout.addWidget(self._query_input)
+        query_panel_layout.addLayout(actions_layout)
+        query_panel_layout.addLayout(language_layout)
+        query_panel_layout.addWidget(self._intent_hint)
 
         output_panel = QWidget(self._workspace_splitter)
         output_layout = QVBoxLayout(output_panel)
@@ -1259,6 +1236,25 @@ class MainWindow(QMainWindow):
         self._tab_widget.addTab(self._notes_panel, "Notes")
         self._tab_widget.addTab(self._response_styles_panel, "Response Styles")
 
+        preview_tab = QWidget(self)
+        preview_layout = QVBoxLayout(preview_tab)
+        preview_layout.setContentsMargins(12, 12, 12, 12)
+        preview_layout.setSpacing(8)
+        preview_hint = QLabel(
+            (
+                "Use JSON variables and optional schemas to render the selected prompt "
+                "as a Jinja2 template before executing it."
+            ),
+            preview_tab,
+        )
+        preview_hint.setWordWrap(True)
+        preview_hint.setStyleSheet("color: #4b5563;")
+        preview_layout.addWidget(preview_hint)
+        self._template_preview = TemplatePreviewWidget(preview_tab)
+        self._template_preview.clear_template()
+        preview_layout.addWidget(self._template_preview, 1)
+        self._tab_widget.addTab(preview_tab, "Template Preview")
+
         layout.addWidget(self._tab_widget, stretch=1)
 
         self._update_detected_language(self._query_input.toPlainText(), force=True)
@@ -1308,7 +1304,6 @@ class MainWindow(QMainWindow):
             ("mainSplitter", self._main_splitter),
             ("listSplitter", self._list_splitter),
             ("workspaceSplitter", self._workspace_splitter),
-            ("queryPreviewSplitter", self._query_preview_splitter),
         )
         for key, splitter in entries:
             if splitter is None:
@@ -1386,7 +1381,6 @@ class MainWindow(QMainWindow):
             ("mainSplitter", self._main_splitter),
             ("listSplitter", self._list_splitter),
             ("workspaceSplitter", self._workspace_splitter),
-            ("queryPreviewSplitter", self._query_preview_splitter),
         )
         for key, splitter in entries:
             if splitter is None:
