@@ -906,6 +906,7 @@ class MainWindow(QMainWindow):
         self._main_splitter: Optional[QSplitter] = None
         self._list_splitter: Optional[QSplitter] = None
         self._workspace_splitter: Optional[QSplitter] = None
+        self._query_preview_splitter: Optional[QSplitter] = None
         self._main_splitter_left_width: Optional[int] = None
         self._suppress_main_splitter_sync = False
         self._notification_history: Deque[Notification] = deque(maxlen=200)
@@ -1161,17 +1162,33 @@ class MainWindow(QMainWindow):
         query_panel_layout = QVBoxLayout(query_panel)
         query_panel_layout.setSizeConstraint(QLayout.SetMinimumSize)
         query_panel_layout.setContentsMargins(0, 0, 0, 0)
-        query_panel_layout.setSpacing(8)
+        query_panel_layout.setSpacing(0)
 
-        query_panel_layout.addWidget(self._query_input)
+        self._query_preview_splitter = QSplitter(Qt.Vertical, query_panel)
+        self._query_preview_splitter.setChildrenCollapsible(False)
 
-        query_panel_layout.addLayout(actions_layout)
-        query_panel_layout.addLayout(language_layout)
+        query_controls = QWidget(self._query_preview_splitter)
+        query_controls_layout = QVBoxLayout(query_controls)
+        query_controls_layout.setContentsMargins(0, 0, 0, 0)
+        query_controls_layout.setSpacing(8)
+        query_controls_layout.addWidget(self._query_input)
+        query_controls_layout.addLayout(actions_layout)
+        query_controls_layout.addLayout(language_layout)
+        query_controls_layout.addWidget(self._intent_hint)
 
-        query_panel_layout.addWidget(self._intent_hint)
-        self._template_preview = TemplatePreviewWidget(self)
+        preview_container = QWidget(self._query_preview_splitter)
+        preview_layout = QVBoxLayout(preview_container)
+        preview_layout.setContentsMargins(0, 0, 0, 0)
+        preview_layout.setSpacing(0)
+        self._template_preview = TemplatePreviewWidget(preview_container)
         self._template_preview.clear_template()
-        query_panel_layout.addWidget(self._template_preview)
+        preview_layout.addWidget(self._template_preview)
+
+        self._query_preview_splitter.addWidget(query_controls)
+        self._query_preview_splitter.addWidget(preview_container)
+        self._query_preview_splitter.setStretchFactor(0, 3)
+        self._query_preview_splitter.setStretchFactor(1, 4)
+        query_panel_layout.addWidget(self._query_preview_splitter)
         workspace_layout.addWidget(query_panel)
 
         output_panel = QWidget(workspace_panel)
@@ -1287,6 +1304,7 @@ class MainWindow(QMainWindow):
             ("mainSplitter", self._main_splitter),
             ("listSplitter", self._list_splitter),
             ("workspaceSplitter", self._workspace_splitter),
+            ("queryPreviewSplitter", self._query_preview_splitter),
         )
         for key, splitter in entries:
             if splitter is None:
@@ -1364,6 +1382,7 @@ class MainWindow(QMainWindow):
             ("mainSplitter", self._main_splitter),
             ("listSplitter", self._list_splitter),
             ("workspaceSplitter", self._workspace_splitter),
+            ("queryPreviewSplitter", self._query_preview_splitter),
         )
         for key, splitter in entries:
             if splitter is None:
