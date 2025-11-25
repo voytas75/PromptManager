@@ -114,9 +114,18 @@ Secrets must never be committed; rely on `.env` files ignored by git or host-lev
 Key UI capabilities:
 - List/search/detail panes with CRUD operations, diff viewer, fork lineage, and scroll-safe prompt bodies.
 - Workspace under the toolbar supports Detect Need, Suggest Prompt, Copy Prompt flows, language auto-detection, and quick clearing.
+- A Template Preview frame below the workspace renders the selected prompt as a strict Jinja2 template, accepts JSON variables, and surfaces validation/missing-field issues instantly.
 - Command palette (`Ctrl+K` / `Ctrl+Shift+P`) and shortcuts (`Ctrl+1`–`Ctrl+4`) jump directly into explain/fix/document/enhance workflows.
 - Category/tag/quality filters plus taxonomy manager keep catalogues organized.
 - Settings dialog controls LiteLLM routing, streaming, quick actions, and embedding configuration; API keys entered in the GUI stay in memory only.
+
+### Template Preview & Validation
+
+- Variable input must be a JSON object; malformed payloads disable rendering with inline errors.
+- Optional schema textarea supports JSON Schema (Draft 2020-12 via `jsonschema`) or derived Pydantic models. Choose the mode from the combo box to highlight failing top-level fields and show descriptive error text.
+- Custom filters available in prompt bodies: `truncate` (adds ellipsis), `slugify` (matches category helpers), and `json` (pretty printing with optional indent parameter).
+- Missing variables, schema violations, and undefined placeholders paint statuses red/orange in the variable list and block the rendered preview.
+- Dependencies `Jinja2==3.1.4` and `jsonschema==4.23.0` ship in `requirements.txt`; no optional extras are required for developers.
 
 ## Executing Prompts
 

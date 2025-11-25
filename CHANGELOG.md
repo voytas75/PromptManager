@@ -2,6 +2,14 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.17.6] - 2025-11-25
+
+### Added
+
+- Introduced a reusable `core.templating` module that wraps Jinja2 with strict undefined handling, custom `truncate`/`slugify`/`json` filters, and optional JSON Schema or Pydantic validation helpers so any surface can safely render prompt templates.
+- Added a live **Template Preview** pane to the GUI workspace that renders the selected prompt with pasted JSON variables, validates payloads against optional schemas, and highlights missing/invalid fields inline before execution.
+- Documented the new workflow in README/README-DEV and bundled `Jinja2` plus `jsonschema` in the dependency manifests.
+
 ## [0.17.5] - 2025-11-24
 
 ### Added

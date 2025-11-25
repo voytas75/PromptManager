@@ -1,6 +1,6 @@
 [project]
 name = "prompt-manager"
-version = "0.17.5"
+version = "0.17.6"
 description = "Desktop application for cataloguing, searching, and launching AI prompts."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -21,6 +21,8 @@ classifiers = [
 dependencies = [
     "chromadb==0.4.24",
     "numpy>=1.26.4,<2",
+    "Jinja2==3.1.4",
+    "jsonschema==4.23.0",
     "pydantic==2.12.3",
     "pydantic-settings==2.2.1",
     "PyYAML==6.0.2",

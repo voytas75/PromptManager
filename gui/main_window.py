@@ -186,6 +186,7 @@ from .history_panel import HistoryPanel
 from .notes_panel import NotesPanel
 from .response_styles_panel import ResponseStylesPanel
 from .settings_dialog import SettingsDialog, persist_settings_to_config
+from .template_preview import TemplatePreviewWidget
 from .language_tools import DetectedLanguage, detect_language
 from .usage_logger import IntentUsageLogger
 from .notifications import QtNotificationBridge, NotificationHistoryDialog
@@ -898,6 +899,7 @@ class MainWindow(QMainWindow):
         self._stream_control_state: Dict[str, bool] = {}
         self._suppress_query_signal = False
         self._quick_shortcuts: List[QShortcut] = []
+        self._template_preview: Optional[TemplatePreviewWidget] = None
         self._layout_settings = QSettings("PromptManager", "MainWindow")
         self._last_execute_context_task: str = _load_last_execute_context_task(self._layout_settings)
         self._main_container: Optional[QFrame] = None
@@ -1167,6 +1169,9 @@ class MainWindow(QMainWindow):
         query_panel_layout.addLayout(language_layout)
 
         query_panel_layout.addWidget(self._intent_hint)
+        self._template_preview = TemplatePreviewWidget(self)
+        self._template_preview.clear_template()
+        query_panel_layout.addWidget(self._template_preview)
         workspace_layout.addWidget(query_panel)
 
         output_panel = QWidget(workspace_panel)
@@ -3678,11 +3683,13 @@ class MainWindow(QMainWindow):
         if prompt is None:
             self._detail_widget.clear()
             self._reset_chat_session()
+            self._update_template_preview(None)
             return
         if self._chat_prompt_id and prompt.id != self._chat_prompt_id:
             self._reset_chat_session()
         self._detail_widget.display_prompt(prompt)
         self._update_prompt_lineage_summary(prompt)
+        self._update_template_preview(prompt)
 
     def _select_prompt(self, prompt_id: uuid.UUID) -> None:
         """Highlight the given prompt in the list view when present."""
@@ -3716,6 +3723,17 @@ class MainWindow(QMainWindow):
             self._detail_widget.update_lineage_summary(summary_text)
         else:
             self._detail_widget.update_lineage_summary("No lineage data yet.")
+
+    def _update_template_preview(self, prompt: Optional[Prompt]) -> None:
+        """Refresh the workspace template preview widget for the selected prompt."""
+
+        if self._template_preview is None:
+            return
+        if prompt is None:
+            self._template_preview.clear_template()
+            return
+        template_text = prompt.context or prompt.description or ""
+        self._template_preview.set_template(template_text)
 
     def _handle_notification(self, notification: Notification) -> None:
         """React to notification updates published by the core manager."""
