@@ -1155,14 +1155,16 @@ class MainWindow(QMainWindow):
         workspace_layout = QVBoxLayout(workspace_panel)
         workspace_layout.setContentsMargins(0, 0, 0, 0)
 
-        self._workspace_splitter = None
+        self._workspace_splitter = QSplitter(Qt.Vertical, workspace_panel)
+        self._workspace_splitter.setChildrenCollapsible(False)
+        workspace_layout.addWidget(self._workspace_splitter, 1)
 
-        query_panel = QWidget(workspace_panel)
-        query_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        query_panel = QWidget(self._workspace_splitter)
+        query_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         query_panel_layout = QVBoxLayout(query_panel)
         query_panel_layout.setSizeConstraint(QLayout.SetMinimumSize)
         query_panel_layout.setContentsMargins(0, 0, 0, 0)
-        query_panel_layout.setSpacing(0)
+        query_panel_layout.setSpacing(8)
 
         self._query_preview_splitter = QSplitter(Qt.Vertical, query_panel)
         self._query_preview_splitter.setChildrenCollapsible(False)
@@ -1189,9 +1191,8 @@ class MainWindow(QMainWindow):
         self._query_preview_splitter.setStretchFactor(0, 3)
         self._query_preview_splitter.setStretchFactor(1, 4)
         query_panel_layout.addWidget(self._query_preview_splitter)
-        workspace_layout.addWidget(query_panel)
 
-        output_panel = QWidget(workspace_panel)
+        output_panel = QWidget(self._workspace_splitter)
         output_layout = QVBoxLayout(output_panel)
         output_layout.setContentsMargins(0, 0, 0, 0)
         output_layout.setSpacing(8)
@@ -1223,7 +1224,10 @@ class MainWindow(QMainWindow):
         result_actions_layout.addWidget(self._copy_result_to_text_window_button)
         result_actions_layout.addWidget(self._render_markdown_button)
         output_layout.addLayout(result_actions_layout)
-        workspace_layout.addWidget(output_panel, 1)
+        self._workspace_splitter.addWidget(query_panel)
+        self._workspace_splitter.addWidget(output_panel)
+        self._workspace_splitter.setStretchFactor(0, 3)
+        self._workspace_splitter.setStretchFactor(1, 5)
         self._main_splitter.addWidget(workspace_panel)
         self._main_splitter.setStretchFactor(0, 0)
         self._main_splitter.setStretchFactor(1, 1)
