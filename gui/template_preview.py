@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 from typing import Dict, List, Mapping, Optional, Sequence, Set
 
+from jinja2 import TemplateSyntaxError
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
@@ -39,6 +40,7 @@ class TemplatePreviewWidget(QWidget):
         self._validator = SchemaValidator()
         self._template_text: str = ""
         self._variable_names: List[str] = []
+        self._template_parse_error: Optional[str] = None
         self._build_ui()
         self._update_preview()
 
@@ -46,16 +48,22 @@ class TemplatePreviewWidget(QWidget):
         """Load a new template and refresh the preview state."""
 
         self._template_text = template_text or ""
-        self._variable_names = self._renderer.extract_variables(self._template_text)
-        status = (
-            "No template selected."
-            if not self._template_text.strip()
-            else f"Detected {len(self._variable_names)} variable(s)."
-        )
-        self._template_hint.setText(status)
-        self.setDisabled(not bool(self._template_text.strip()))
+        self._template_parse_error = None
         if not self._template_text.strip():
-            self._rendered_view.setPlainText("Select a prompt to enable the preview.")
+            self._variable_names = []
+            self._template_hint.setText("No template selected.")
+            self._update_preview()
+            return
+        try:
+            self._variable_names = self._renderer.extract_variables(self._template_text)
+            status = f"Detected {len(self._variable_names)} variable(s)."
+        except TemplateSyntaxError as exc:
+            self._variable_names = []
+            self._template_parse_error = (
+                f"Template syntax error on line {exc.lineno}: {exc.message}"
+            )
+            status = "Template contains syntax errors."
+        self._template_hint.setText(status)
         self._update_preview()
 
     def clear_template(self) -> None:
@@ -161,8 +169,15 @@ class TemplatePreviewWidget(QWidget):
 
     def _update_preview(self) -> None:
         if not self._template_text.strip():
-            self._update_variable_states(set(), set(self._variable_names), set())
+            self._update_variable_states(set(), set(), set())
+            self._rendered_view.clear()
             self._set_status("Select a prompt to enable template previews.", is_error=False)
+            return
+
+        if self._template_parse_error:
+            self._rendered_view.clear()
+            self._show_message_item(self._template_parse_error, self._ERROR_COLOR)
+            self._set_status(self._template_parse_error, is_error=True)
             return
 
         variables, parse_error = self._parse_variables()
@@ -247,6 +262,13 @@ class TemplatePreviewWidget(QWidget):
             item.setForeground(QColor(color))
             item.setFlags(Qt.ItemIsEnabled)
             self._variables_list.addItem(item)
+
+    def _show_message_item(self, text: str, color: str) -> None:
+        self._variables_list.clear()
+        item = QListWidgetItem(text)
+        item.setForeground(QColor(color))
+        item.setFlags(Qt.ItemIsEnabled)
+        self._variables_list.addItem(item)
 
     def _top_level_fields(self, field_paths: Sequence[str]) -> Set[str]:
         invalid: Set[str] = set()
