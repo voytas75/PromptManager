@@ -99,27 +99,31 @@ class TemplatePreviewWidget(QWidget):
         self._template_hint.setWordWrap(True)
         frame_layout.addWidget(self._template_hint)
 
-        variables_label = QLabel("Variables (JSON)", frame)
-        frame_layout.addWidget(variables_label)
+        editors_layout = QHBoxLayout()
+        editors_layout.setSpacing(12)
 
+        variables_column = QVBoxLayout()
+        variables_label = QLabel("Variables (JSON)", frame)
+        variables_column.addWidget(variables_label)
         self._variables_input = QPlainTextEdit(frame)
         self._variables_input.setPlaceholderText('{"customer": "Ada", "issue": "Payment failed"}')
-        self._variables_input.setFixedHeight(110)
+        self._variables_input.setMinimumHeight(140)
         self._variables_input.textChanged.connect(self._update_preview)  # type: ignore[arg-type]
-        frame_layout.addWidget(self._variables_input)
+        variables_column.addWidget(self._variables_input)
+        editors_layout.addLayout(variables_column, stretch=1)
 
+        schema_column = QVBoxLayout()
         schema_header = QHBoxLayout()
         schema_label = QLabel("Schema (optional)", frame)
         schema_header.addWidget(schema_label)
+        schema_header.addStretch(1)
         self._schema_mode = QComboBox(frame)
         self._schema_mode.addItem("No validation", SchemaValidationMode.NONE.value)
         self._schema_mode.addItem("JSON Schema", SchemaValidationMode.JSON_SCHEMA.value)
         self._schema_mode.addItem("Pydantic (derived)", SchemaValidationMode.PYDANTIC.value)
         self._schema_mode.currentIndexChanged.connect(self._update_preview)  # type: ignore[arg-type]
-        schema_header.addStretch(1)
         schema_header.addWidget(self._schema_mode)
-        frame_layout.addLayout(schema_header)
-
+        schema_column.addLayout(schema_header)
         self._schema_input = QPlainTextEdit(frame)
         self._schema_input.setPlaceholderText(
             "{\n"
@@ -130,9 +134,12 @@ class TemplatePreviewWidget(QWidget):
             '  "required": ["customer"]\n'
             "}"
         )
-        self._schema_input.setFixedHeight(110)
+        self._schema_input.setMinimumHeight(140)
         self._schema_input.textChanged.connect(self._update_preview)  # type: ignore[arg-type]
-        frame_layout.addWidget(self._schema_input)
+        schema_column.addWidget(self._schema_input)
+        editors_layout.addLayout(schema_column, stretch=1)
+
+        frame_layout.addLayout(editors_layout)
 
         self._variables_list = QListWidget(frame)
         self._variables_list.setObjectName("templatePreviewVariables")
