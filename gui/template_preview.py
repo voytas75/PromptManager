@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QPlainTextEdit,
+    QPushButton,
     QVBoxLayout,
     QWidget,
 )
@@ -114,14 +115,18 @@ class TemplatePreviewWidget(QWidget):
 
         schema_column = QVBoxLayout()
         schema_header = QHBoxLayout()
-        schema_label = QLabel("Schema (optional)", frame)
-        schema_header.addWidget(schema_label)
+        self._schema_toggle = QPushButton("Show Schema", frame)
+        self._schema_toggle.setCheckable(True)
+        self._schema_toggle.setChecked(False)
+        self._schema_toggle.clicked.connect(self._toggle_schema_visibility)  # type: ignore[arg-type]
+        schema_header.addWidget(self._schema_toggle)
         schema_header.addStretch(1)
         self._schema_mode = QComboBox(frame)
         self._schema_mode.addItem("No validation", SchemaValidationMode.NONE.value)
         self._schema_mode.addItem("JSON Schema", SchemaValidationMode.JSON_SCHEMA.value)
         self._schema_mode.addItem("Pydantic (derived)", SchemaValidationMode.PYDANTIC.value)
         self._schema_mode.currentIndexChanged.connect(self._update_preview)  # type: ignore[arg-type]
+        self._schema_mode.setVisible(False)
         schema_header.addWidget(self._schema_mode)
         schema_column.addLayout(schema_header)
         self._schema_input = QPlainTextEdit(frame)
@@ -136,6 +141,7 @@ class TemplatePreviewWidget(QWidget):
         )
         self._schema_input.setMinimumHeight(140)
         self._schema_input.textChanged.connect(self._update_preview)  # type: ignore[arg-type]
+        self._schema_input.setVisible(False)
         schema_column.addWidget(self._schema_input)
         editors_layout.addLayout(schema_column, stretch=1)
 
@@ -237,6 +243,13 @@ class TemplatePreviewWidget(QWidget):
             return
 
         self._set_status("Preview ready.", is_error=False)
+
+    def _toggle_schema_visibility(self) -> None:
+        self._schema_visible = self._schema_toggle.isChecked()
+        self._schema_toggle.setText("Hide Schema" if self._schema_visible else "Show Schema")
+        self._schema_mode.setVisible(self._schema_visible)
+        self._schema_input.setVisible(self._schema_visible)
+        self._update_preview()
 
     def _update_variable_states(
         self,
