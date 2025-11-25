@@ -1,9 +1,11 @@
 """Prompt engineering helpers façade.
 
+Updates: v0.14.1 - 2025-11-25 - Add module history metadata per AGENTS guidelines.
+
 This thin wrapper allows :class:`core.prompt_manager.PromptManager` and other
-call‑sites to depend on a stable abstraction rather than the concrete
-implementation in :pymod:`core.prompt_engineering`.  Future iterations can
-replace the underlying engine or add pre/post‑processing without touching
+call-sites to depend on a stable abstraction rather than the concrete
+implementation in :pymod:`core.prompt_engineering`. Future iterations can
+replace the underlying engine or add pre/post-processing without touching
 import sites.
 """
 

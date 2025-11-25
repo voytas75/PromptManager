@@ -33,9 +33,11 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 
 # Optional developer extras
-pip install -r requirements-dev.txt  # if present; otherwise install ruff, black, pytest, pyright manually
+pip install ruff black pytest pyright nox
 nox -s all
 ```
+
+There is no dedicated `requirements-dev.txt`; install the lint/type/test toolchain manually as shown above.
 
 1. Copy `config/config.template.json` to `config/config.json` for non-secret defaults.
 2. Export environment variables for anything secret or machine-specific (see below). Environment variables override JSON, which overrides built-in defaults.
@@ -124,6 +126,15 @@ Key UI capabilities:
 - Save results with notes and optional 1–10 ratings; averages feed into quality filters.
 - Programmatic access is available through `PromptManager.list_recent_executions()` and `PromptManager.list_executions_for_prompt(prompt_id)`.
 
+Every log entry also stores structured context metadata (prompt snapshot, executor model, streaming flag, request/response character counts, and optional response-style fingerprints). Inspect the metadata via the GUI history detail pane or fetch it directly from `PromptExecution.metadata` for downstream analytics.
+
+## Response Style Workflow
+
+- Capture reusable tone/formatting guidance from the **Response Styles** tab. The dialog records name, description, tone, voice, format instructions, guidelines, tags, and illustrative examples; timestamps and versions are maintained automatically.
+- Styles are persisted in the `response_styles` table and surfaced through `PromptManager.list_response_styles` (with `include_inactive` and `search` filters) and CRUD helpers.
+- GUI actions provide copy-to-clipboard, Markdown preview/export, and duplication capabilities so content writers can curate libraries without digging into SQLite.
+- When executions capture a style, the metadata stores the style ID plus flattened instructions so downstream automations can reuse the formatting contract.
+
 ## CLI Utilities
 
 | Command | Purpose |
@@ -169,4 +180,4 @@ These commands share the same validation logic as the GUI; pass explicit paths a
   }
   ```
 - Optional fields (`language`, `related_prompts`, `created_at`, `last_modified`, `usage_count`, `source`, extensions) map directly to the dataclass attributes; invalid values raise `config.SettingsError` or are logged during import.
-- Use `PROMPT_MANAGER_CATEGORIES_PATH` or inline JSON to seed categories, then manage them in-app with the taxonomy dialog.
+- Category management relies on the `CategoryRegistry`. Seed defaults with `PROMPT_MANAGER_CATEGORIES_PATH` or inline JSON (`PROMPT_MANAGER_CATEGORIES`), then use the GUI **Manage** dialog (or `PromptManager.create_category` / `update_category`) to add, rename, or archive entries. Each prompt stores both a user-facing label and a slug so renames propagate without breaking history or filters, and archives keep historical prompts readable without appearing in filters.

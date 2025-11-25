@@ -1,4 +1,7 @@
-"""Response style management tab."""
+"""Response style management tab.
+
+Updates: v0.15.1 - 2025-11-25 - Document module metadata for AGENTS compliance.
+"""
 
 from __future__ import annotations
 
