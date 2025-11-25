@@ -5,7 +5,6 @@ Updates: v0.1.0 - 2025-11-25 - Add dynamic Jinja2 preview with custom filters an
 
 from __future__ import annotations
 
-import json
 from typing import Dict, List, Mapping, Optional, Sequence, Set
 
 from jinja2 import TemplateSyntaxError
@@ -16,10 +15,12 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QPlainTextEdit,
     QPushButton,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
@@ -41,7 +42,9 @@ class TemplatePreviewWidget(QWidget):
         self._validator = SchemaValidator()
         self._template_text: str = ""
         self._variable_names: List[str] = []
+        self._variable_inputs: Dict[str, QLineEdit] = {}
         self._template_parse_error: Optional[str] = None
+        self._schema_visible = False
         self._build_ui()
         self._update_preview()
 
@@ -65,6 +68,7 @@ class TemplatePreviewWidget(QWidget):
             )
             status = "Template contains syntax errors."
         self._template_hint.setText(status)
+        self._rebuild_variable_inputs()
         self._update_preview()
 
     def clear_template(self) -> None:
@@ -73,12 +77,9 @@ class TemplatePreviewWidget(QWidget):
         self.set_template("")
 
     def variables_payload(self) -> Mapping[str, object]:
-        """Return the current variables dictionary when JSON parsing succeeds."""
+        """Return the current variables dictionary assembled from form inputs."""
 
-        variables, error = self._parse_variables()
-        if error:
-            return {}
-        return variables
+        return self._collect_variables()
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -104,13 +105,16 @@ class TemplatePreviewWidget(QWidget):
         editors_layout.setSpacing(12)
 
         variables_column = QVBoxLayout()
-        variables_label = QLabel("Variables (JSON)", frame)
+        variables_label = QLabel("Detected variables", frame)
         variables_column.addWidget(variables_label)
-        self._variables_input = QPlainTextEdit(frame)
-        self._variables_input.setPlaceholderText('{"customer": "Ada", "issue": "Payment failed"}')
-        self._variables_input.setMinimumHeight(140)
-        self._variables_input.textChanged.connect(self._update_preview)  # type: ignore[arg-type]
-        variables_column.addWidget(self._variables_input)
+        self._variables_scroll = QScrollArea(frame)
+        self._variables_scroll.setWidgetResizable(True)
+        self._variables_widget = QWidget(self._variables_scroll)
+        self._variables_layout = QVBoxLayout(self._variables_widget)
+        self._variables_layout.setContentsMargins(0, 0, 0, 0)
+        self._variables_layout.setSpacing(6)
+        self._variables_scroll.setWidget(self._variables_widget)
+        variables_column.addWidget(self._variables_scroll, 1)
         editors_layout.addLayout(variables_column, stretch=1)
 
         schema_column = QVBoxLayout()
@@ -168,17 +172,44 @@ class TemplatePreviewWidget(QWidget):
 
         layout.addWidget(frame)
 
-    def _parse_variables(self) -> tuple[Dict[str, object], Optional[str]]:
-        text = self._variables_input.toPlainText().strip()
-        if not text:
-            return {}, None
-        try:
-            payload = json.loads(text)
-        except json.JSONDecodeError as exc:
-            return {}, f"Invalid variables JSON: {exc.msg}"
-        if not isinstance(payload, Mapping):
-            return {}, "Variables payload must be a JSON object."
-        return dict(payload), None
+    def _rebuild_variable_inputs(self) -> None:
+        if not hasattr(self, "_variables_layout"):
+            return
+        while self._variables_layout.count():
+            item = self._variables_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+        self._variable_inputs.clear()
+        if not self._variable_names:
+            hint = QLabel("No placeholders detected in the prompt body.", self._variables_widget)
+            hint.setStyleSheet("color: #6b7280;")
+            self._variables_layout.addWidget(hint)
+            self._variables_layout.addStretch(1)
+            return
+        for name in self._variable_names:
+            container = QWidget(self._variables_widget)
+            container_layout = QVBoxLayout(container)
+            container_layout.setContentsMargins(0, 0, 0, 0)
+            container_layout.setSpacing(2)
+            label = QLabel(name, container)
+            label.setStyleSheet("font-weight: 500;")
+            field = QLineEdit(container)
+            field.setPlaceholderText(f"Enter value for {name}…")
+            field.textChanged.connect(self._update_preview)  # type: ignore[arg-type]
+            container_layout.addWidget(label)
+            container_layout.addWidget(field)
+            self._variables_layout.addWidget(container)
+            self._variable_inputs[name] = field
+        self._variables_layout.addStretch(1)
+
+    def _collect_variables(self) -> Dict[str, str]:
+        values: Dict[str, str] = {}
+        for name, widget in self._variable_inputs.items():
+            text = widget.text().strip()
+            if text:
+                values[name] = text
+        return values
 
     def _update_preview(self) -> None:
         if not self._template_text.strip():
@@ -193,19 +224,20 @@ class TemplatePreviewWidget(QWidget):
             self._set_status(self._template_parse_error, is_error=True)
             return
 
-        variables, parse_error = self._parse_variables()
-        if parse_error:
-            self._rendered_view.clear()
-            self._update_variable_states(set(), set(self._variable_names), set())
-            self._set_status(parse_error, is_error=True)
-            return
+        variables = self._collect_variables()
 
-        schema_mode = SchemaValidationMode.from_string(self._schema_mode.currentData())
-        schema_text = self._schema_input.toPlainText()
+        schema_mode = SchemaValidationMode.from_string(
+            self._schema_mode.currentData()
+            if self._schema_visible
+            else SchemaValidationMode.NONE.value
+        )
+        schema_text = self._schema_input.toPlainText() if self._schema_visible else ""
         schema_result = self._validator.validate(variables, schema_text, mode=schema_mode)
         invalid_fields: Set[str] = self._top_level_fields(schema_result.field_errors)
         if not schema_result.is_valid:
-            message = "; ".join(schema_result.errors or [schema_result.schema_error or "Schema error"])
+            message = "; ".join(
+                schema_result.errors or [schema_result.schema_error or "Schema error"]
+            )
             self._rendered_view.clear()
             self._update_variable_states(set(variables.keys()), set(), invalid_fields)
             self._set_status(message, is_error=True)
