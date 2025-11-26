@@ -1,13 +1,19 @@
 """Tests for execute-as-context task persistence helpers.
 
+Updates: v0.2.0 - 2025-11-26 - Cover history load/store helpers and trimming logic.
 Updates: v0.1.0 - 2025-11-22 - Cover helper functions that load/store the last task text.
 """
 
 from __future__ import annotations
 
+import json
+
 from gui.main_window import (
+    _EXECUTE_CONTEXT_HISTORY_KEY,
     _EXECUTE_CONTEXT_TASK_KEY,
+    _load_execute_context_history,
     _load_last_execute_context_task,
+    _store_execute_context_history,
     _store_last_execute_context_task,
 )
 
@@ -40,4 +46,35 @@ def test_store_last_execute_context_task_persists_text_and_syncs() -> None:
     _store_last_execute_context_task(settings, "Investigate timeouts")
 
     assert settings.values[_EXECUTE_CONTEXT_TASK_KEY] == "Investigate timeouts"
+    assert settings.synced is True
+
+
+def test_load_execute_context_history_returns_unique_trimmed_entries() -> None:
+    settings = _FakeSettings()
+    settings.values[_EXECUTE_CONTEXT_HISTORY_KEY] = json.dumps(
+        ["  Summarise logs  ", "Summarise logs", "Investigate outages", " "]
+    )
+
+    entries = _load_execute_context_history(settings, limit=3)
+
+    assert entries == ["Summarise logs", "Investigate outages"]
+
+
+def test_load_execute_context_history_handles_invalid_payload() -> None:
+    settings = _FakeSettings()
+    settings.values[_EXECUTE_CONTEXT_HISTORY_KEY] = "{"  # invalid JSON
+
+    assert _load_execute_context_history(settings) == []
+
+
+def test_store_execute_context_history_trims_and_limits() -> None:
+    settings = _FakeSettings()
+
+    _store_execute_context_history(
+        settings,
+        ["  Summarise logs  ", "Investigate outages", "Summarise logs", ""]
+    )
+
+    stored = json.loads(settings.values[_EXECUTE_CONTEXT_HISTORY_KEY])
+    assert stored == ["Summarise logs", "Investigate outages"]
     assert settings.synced is True

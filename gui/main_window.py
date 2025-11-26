@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.48 - 2025-11-26 - Add execute-as-context dialog with history picker and persistence.
 Updates: v0.15.47 - 2025-11-24 - Add creation date and usage count prompt sorting options.
 Updates: v0.15.46 - 2025-11-24 - Use LiteLLM category suggestions with classifier fallback.
 Updates: v0.15.45 - 2025-11-24 - Inline prompt tags with the header and remove standalone tag label.
@@ -115,7 +116,6 @@ from PySide6.QtWidgets import (
     QDialog,
     QDoubleSpinBox,
     QFrame,
-    QInputDialog,
     QLayout,
     QHBoxLayout,
     QLayoutItem,
@@ -182,6 +182,7 @@ from .dialogs import (
     PromptVersionHistoryDialog,
     SaveResultDialog,
 )
+from .execute_context_dialog import ExecuteContextDialog
 from .history_panel import HistoryPanel
 from .notes_panel import NotesPanel
 from .response_styles_panel import ResponseStylesPanel
@@ -196,6 +197,8 @@ logger = logging.getLogger(__name__)
 
 _CHAT_PALETTE_KEYS = {"user", "assistant"}
 _EXECUTE_CONTEXT_TASK_KEY = "lastExecuteContextTask"
+_EXECUTE_CONTEXT_HISTORY_KEY = "executeContextTaskHistory"
+_EXECUTE_CONTEXT_HISTORY_LIMIT = 15
 
 
 def _match_category_label(value: Optional[str], categories: Sequence[PromptCategory]) -> Optional[str]:
@@ -250,6 +253,55 @@ def _store_last_execute_context_task(settings: QSettings, value: str) -> None:
         settings.sync()
     except Exception:  # pragma: no cover - sync failures depend on platform state
         logger.warning("Unable to sync execute-context history", exc_info=True)
+
+
+def _load_execute_context_history(
+    settings: QSettings,
+    *,
+    limit: int = _EXECUTE_CONTEXT_HISTORY_LIMIT,
+) -> list[str]:
+    """Return the stored execute-context descriptions limited to *limit* entries."""
+
+    raw_value = settings.value(_EXECUTE_CONTEXT_HISTORY_KEY, "[]", str)
+    if raw_value is None:
+        return []
+    text = str(raw_value).strip()
+    if not text:
+        return []
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        logger.warning("Invalid execute-context history payload; resetting history.")
+        return []
+    if not isinstance(payload, list):
+        return []
+    entries: list[str] = []
+    for entry in payload:
+        candidate = str(entry).strip()
+        if not candidate or candidate in entries:
+            continue
+        entries.append(candidate)
+        if len(entries) >= max(limit, 0):
+            break
+    return entries
+
+
+def _store_execute_context_history(settings: QSettings, history: Sequence[str]) -> None:
+    """Persist execute-context descriptions as a JSON-encoded list."""
+
+    entries: list[str] = []
+    for entry in history:
+        candidate = str(entry).strip()
+        if not candidate or candidate in entries:
+            continue
+        entries.append(candidate)
+        if len(entries) >= _EXECUTE_CONTEXT_HISTORY_LIMIT:
+            break
+    settings.setValue(_EXECUTE_CONTEXT_HISTORY_KEY, json.dumps(entries))
+    try:
+        settings.sync()
+    except Exception:  # pragma: no cover - sync failures depend on platform state
+        logger.warning("Unable to sync execute-context history list", exc_info=True)
 
 
 def normalise_chat_palette(palette: Optional[Mapping[str, object]]) -> dict[str, str]:
@@ -904,6 +956,19 @@ class MainWindow(QMainWindow):
         self._template_detail_widget: Optional[PromptDetailWidget] = None
         self._layout_settings = QSettings("PromptManager", "MainWindow")
         self._last_execute_context_task: str = _load_last_execute_context_task(self._layout_settings)
+        self._execute_context_history_limit = _EXECUTE_CONTEXT_HISTORY_LIMIT
+        history_entries = _load_execute_context_history(
+            self._layout_settings,
+            limit=self._execute_context_history_limit,
+        )
+        self._execute_context_history: Deque[str] = deque(
+            history_entries,
+            maxlen=self._execute_context_history_limit,
+        )
+        last_history_entry = self._last_execute_context_task.strip()
+        if last_history_entry and last_history_entry not in self._execute_context_history:
+            self._execute_context_history.appendleft(last_history_entry)
+            self._persist_execute_context_history()
         self._main_container: Optional[QFrame] = None
         self._main_splitter: Optional[QSplitter] = None
         self._list_splitter: Optional[QSplitter] = None
@@ -1434,6 +1499,27 @@ class MainWindow(QMainWindow):
             _store_last_execute_context_task(self._layout_settings, "")
             return
         _store_last_execute_context_task(self._layout_settings, task_text)
+
+    def _persist_execute_context_history(self) -> None:
+        """Persist execute-context task history entries."""
+
+        _store_execute_context_history(self._layout_settings, tuple(self._execute_context_history))
+
+    def _record_execute_context_task(self, task_text: str) -> None:
+        """Insert *task_text* into the recent execute-context history."""
+
+        trimmed = task_text.strip()
+        if not trimmed:
+            return
+        entries: list[str] = [trimmed]
+        for existing in self._execute_context_history:
+            if existing == trimmed:
+                continue
+            entries.append(existing)
+            if len(entries) >= self._execute_context_history_limit:
+                break
+        self._execute_context_history = deque(entries, maxlen=self._execute_context_history_limit)
+        self._persist_execute_context_history()
 
     def showEvent(self, event: QShowEvent) -> None:  # type: ignore[override]
         """Ensure splitter state is captured once the window is visible."""
@@ -3018,20 +3104,21 @@ class MainWindow(QMainWindow):
                 self._show_status_message(message, 5000)
             return
         parent_widget = parent or self
-        task_text, accepted = QInputDialog.getMultiLineText(
-            parent_widget,
-            "Execute as Context",
-            "Describe the task to perform using this prompt's body as context:",
-            self._last_execute_context_task,
+        dialog = ExecuteContextDialog(
+            parent=parent_widget,
+            last_task=self._last_execute_context_task,
+            history=tuple(self._execute_context_history),
         )
-        if not accepted:
+        if dialog.exec() != QDialog.Accepted:
             return
+        task_text = dialog.task_text()
         cleaned_task = task_text.strip()
         if not cleaned_task:
             QMessageBox.warning(parent_widget, "Task required", "Enter a task before executing.")
             return
         self._last_execute_context_task = task_text
         self._persist_last_execute_context_task(task_text)
+        self._record_execute_context_task(task_text)
         request_payload = (
             "You will receive a task and a context block. "
             "Use the context exclusively when fulfilling the task.\n\n"
