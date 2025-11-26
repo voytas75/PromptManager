@@ -129,9 +129,9 @@ class LiteLLMEmbeddingFunction:
     def _extract_data_array(payload: Any) -> Sequence[Any]:
         """Extract the embedding data array from LiteLLM responses."""
 
-        payload_obj = cast(object, payload)
+        payload_obj = cast("object", payload)
         if isinstance(payload, Mapping) and "data" in payload:
-            payload_map = cast(Mapping[str, Any], payload)
+            payload_map = cast("Mapping[str, Any]", payload)
             data_obj: Any = payload_map["data"]
         elif hasattr(payload_obj, "data"):
             data_obj = getattr(payload_obj, "data")
@@ -139,7 +139,7 @@ class LiteLLMEmbeddingFunction:
             data_obj = payload_obj
         if not isinstance(data_obj, Sequence) or isinstance(data_obj, (str, bytes)):
             raise EmbeddingGenerationError("LiteLLM embedding response missing data array.")
-        return cast(Sequence[Any], data_obj)
+        return cast("Sequence[Any]", data_obj)
 
     @staticmethod
     def _extract_embedding_vector(item: Any, index: int) -> Sequence[Any]:
@@ -147,7 +147,7 @@ class LiteLLMEmbeddingFunction:
 
         candidate: Any
         if isinstance(item, Mapping):
-            mapping_item = cast(Mapping[str, Any], item)
+            mapping_item = cast("Mapping[str, Any]", item)
             candidate = mapping_item.get("embedding")
         elif hasattr(item, "embedding"):
             candidate = getattr(item, "embedding")
@@ -157,7 +157,7 @@ class LiteLLMEmbeddingFunction:
             except Exception:  # noqa: BLE001 - fallback when model_dump fails
                 dumped = None
             candidate = (
-                cast(Mapping[str, Any], dumped).get("embedding") if isinstance(dumped, Mapping) else None
+                cast("Mapping[str, Any]", dumped).get("embedding") if isinstance(dumped, Mapping) else None
             )
         else:
             candidate = item
@@ -167,10 +167,10 @@ class LiteLLMEmbeddingFunction:
                 f"LiteLLM response missing embedding at index {index}"
             )
         if isinstance(candidate, Mapping):
-            candidate = cast(Mapping[str, Any], candidate).get("embedding")
+            candidate = cast("Mapping[str, Any]", candidate).get("embedding")
         if not isinstance(candidate, Sequence) or isinstance(candidate, (str, bytes)):
             raise EmbeddingGenerationError("LiteLLM embedding payload is not a vector.")
-        return cast(Sequence[Any], candidate)
+        return cast("Sequence[Any]", candidate)
 
 
 class SentenceTransformersEmbeddingFunction:
@@ -188,7 +188,7 @@ class SentenceTransformersEmbeddingFunction:
             from sentence_transformers import SentenceTransformer  # type: ignore[import-not-found]
         except ImportError as exc:
             raise RuntimeError("sentence-transformers is not installed") from exc
-        sentence_transformer = cast(Any, SentenceTransformer)
+        sentence_transformer = cast("Any", SentenceTransformer)
         model: Any = sentence_transformer(self._model_name, device=self._device)
         return model
 
@@ -205,7 +205,7 @@ class SentenceTransformersEmbeddingFunction:
             embeddings = embeddings.tolist()
         if not isinstance(embeddings, Sequence):
             raise EmbeddingGenerationError("sentence-transformers returned invalid embeddings")
-        embedding_rows = cast(Sequence[Sequence[Any]], embeddings)
+        embedding_rows = cast("Sequence[Sequence[Any]]", embeddings)
         return [[float(value) for value in vector] for vector in embedding_rows]
 
 

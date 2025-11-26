@@ -98,10 +98,10 @@ def load_category_definitions(
                 logger.warning("Invalid category JSON in %s: %s", path, exc)
             else:
                 if isinstance(parsed, list):
-                    parsed_entries = cast(Sequence[object], parsed)
+                    parsed_entries = cast("Sequence[object]", parsed)
                     for raw_entry in parsed_entries:
                         if isinstance(raw_entry, Mapping):
-                            typed_entry = cast(Mapping[str, object], raw_entry)
+                            typed_entry = cast("Mapping[str, object]", raw_entry)
                             payloads.append(dict(typed_entry))
                 else:
                     logger.warning("Expected a list of category mappings in %s", path)

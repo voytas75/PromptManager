@@ -446,7 +446,7 @@ def main() -> int:
                     "Reinstall dependencies with `pip install -r requirements.txt` or launch without --gui."
                 )
                 return 4
-            launch_callable = cast(Callable[[object, Optional[object]], int], launch_gui_callable)
+            launch_callable = cast("Callable[[object, Optional[object]], int]", launch_gui_callable)
 
             dependency_error_type = getattr(gui_module, "GuiDependencyError", RuntimeError)
             if not isinstance(dependency_error_type, type) or not issubclass(

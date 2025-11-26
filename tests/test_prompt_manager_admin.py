@@ -5,17 +5,15 @@ from __future__ import annotations
 import sqlite3
 import types
 import uuid
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 import pytest
 from chromadb.errors import ChromaError
 
 from core.embedding import EmbeddingGenerationError
-from core.execution import CodexExecutionResult, ExecutionError
-from core.prompt_engineering import PromptRefinement
 from core.exceptions import CategoryError, CategoryNotFoundError, CategoryStorageError
+from core.execution import CodexExecutionResult, ExecutionError
 from core.history_tracker import HistoryTrackerError
 from core.intent_classifier import IntentLabel, IntentPrediction
 from core.prompt_engineering import PromptEngineeringError, PromptRefinement
@@ -23,12 +21,11 @@ from core.prompt_manager import (
     CategorySuggestionError,
     DescriptionGenerationError,
     NameGenerationError,
-    PromptCacheError,
-    PromptManager,
-    PromptManagerError,
     PromptEngineeringUnavailable,
     PromptExecutionError,
     PromptExecutionUnavailable,
+    PromptManager,
+    PromptManagerError,
     PromptStorageError,
     RedisError,
     ScenarioGenerationError,

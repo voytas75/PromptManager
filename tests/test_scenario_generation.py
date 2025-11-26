@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Iterable, List, Sequence
+from typing import Any, Callable, Dict, Sequence
 
 import pytest
 

@@ -177,7 +177,7 @@ class CodexExecutor:
         if stream_enabled:
             if not isinstance(response, Iterable):  # pragma: no cover - defensive
                 raise ExecutionError("LiteLLM streaming response is not iterable")
-            stream_iter = cast(Iterable[Any], response)
+            stream_iter = cast("Iterable[Any]", response)
             response_text, usage, raw_payload = _consume_streaming_response(
                 stream_iter,
                 on_stream,
@@ -185,17 +185,17 @@ class CodexExecutor:
         else:
             payload_mapping: Mapping[str, Any]
             if isinstance(response, Mapping):
-                payload_mapping = cast(Mapping[str, Any], response)
+                payload_mapping = cast("Mapping[str, Any]", response)
             else:
                 serialised_response = _serialise_chunk(response)
                 if not isinstance(serialised_response, Mapping):  # pragma: no cover - defensive
                     raise ExecutionError("LiteLLM returned an unexpected payload")
-                payload_mapping = cast(Mapping[str, Any], serialised_response)
+                payload_mapping = cast("Mapping[str, Any]", serialised_response)
             payload_dict: Dict[str, Any] = {str(key): value for key, value in payload_mapping.items()}
             response_text = _extract_completion_text(payload_dict).strip()
             usage_value = payload_dict.get("usage")
             if isinstance(usage_value, Mapping):
-                usage_mapping = cast(Mapping[str, Any], usage_value)
+                usage_mapping = cast("Mapping[str, Any]", usage_value)
                 usage = {str(key): value for key, value in usage_mapping.items()}
             else:
                 usage = {}
@@ -233,20 +233,20 @@ def _extract_completion_text(payload: Mapping[str, Any]) -> str:
     choices_value = payload.get("choices")
     if not isinstance(choices_value, Sequence) or not choices_value:
         raise ExecutionError("LiteLLM returned an unexpected payload")
-    choices = cast(Sequence[Any], choices_value)
+    choices = cast("Sequence[Any]", choices_value)
     first = choices[0]
     if not isinstance(first, Mapping):
         raise ExecutionError("LiteLLM returned an unexpected payload")
-    first_mapping = cast(Mapping[str, Any], first)
+    first_mapping = cast("Mapping[str, Any]", first)
     message_value = first_mapping.get("message")
     if isinstance(message_value, Mapping):
-        message_mapping = cast(Mapping[str, Any], message_value)
+        message_mapping = cast("Mapping[str, Any]", message_value)
         content = message_mapping.get("content")
         if content is not None:
             return str(content)
     delta_value = first_mapping.get("delta")
     if isinstance(delta_value, Mapping):
-        delta_mapping = cast(Mapping[str, Any], delta_value)
+        delta_mapping = cast("Mapping[str, Any]", delta_value)
         content = delta_mapping.get("content")
         if content is not None:
             return str(content)
@@ -299,7 +299,7 @@ def _serialise_chunk(chunk: Any) -> Any:
     """Best-effort conversion of LiteLLM streaming chunks into serialisable objects."""
 
     if isinstance(chunk, Mapping):
-        return dict(cast(Mapping[str, Any], chunk))
+        return dict(cast("Mapping[str, Any]", chunk))
     model_dump = getattr(chunk, "model_dump", None)
     if callable(model_dump):  # pragma: no branch - pydantic v2
         try:
@@ -320,24 +320,24 @@ def _extract_stream_text(payload: Any) -> str:
 
     if not isinstance(payload, Mapping):
         return ""
-    mapping_payload = cast(Mapping[str, Any], payload)
+    mapping_payload = cast("Mapping[str, Any]", payload)
     choices = mapping_payload.get("choices")
     if not isinstance(choices, Sequence) or not choices:
         return ""
-    choices_seq = cast(Sequence[Any], choices)
+    choices_seq = cast("Sequence[Any]", choices)
     first = choices_seq[0]
     if not isinstance(first, Mapping):
         return ""
-    first_mapping = cast(Mapping[str, Any], first)
+    first_mapping = cast("Mapping[str, Any]", first)
     delta = first_mapping.get("delta")
     if isinstance(delta, Mapping):
-        delta_mapping = cast(Mapping[str, Any], delta)
+        delta_mapping = cast("Mapping[str, Any]", delta)
         content = delta_mapping.get("content")
         if content:
             return str(content)
     message = first_mapping.get("message")
     if isinstance(message, Mapping):
-        message_mapping = cast(Mapping[str, Any], message)
+        message_mapping = cast("Mapping[str, Any]", message)
         content = message_mapping.get("content")
         if content:
             return str(content)
@@ -353,8 +353,8 @@ def _extract_stream_usage(payload: Any) -> Dict[str, Any]:
     empty: Dict[str, Any] = {}
     if not isinstance(payload, Mapping):
         return empty
-    usage_value = cast(Mapping[str, Any], payload).get("usage")
+    usage_value = cast("Mapping[str, Any]", payload).get("usage")
     if isinstance(usage_value, Mapping):
-        usage_mapping = cast(Mapping[str, Any], usage_value)
+        usage_mapping = cast("Mapping[str, Any]", usage_value)
         return {str(key): value for key, value in usage_mapping.items()}
     return empty

@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
+
 CatalogEntry = Dict[str, Any]
 
 
@@ -57,7 +58,7 @@ def _ensure_list(value: Any) -> List[str]:
     if isinstance(value, str):
         return [value]
     if isinstance(value, IterableABC):
-        iterable = cast(IterableABC[Any], value)
+        iterable = cast("IterableABC[Any]", value)
         return [str(item) for item in iterable]
     return [str(value)]
 
@@ -74,20 +75,20 @@ def _read_json(path: Path) -> List[CatalogEntry]:
     if isinstance(payload, dict):
         if "prompts" in payload and isinstance(payload["prompts"], list):
             entries: List[CatalogEntry] = []
-            raw_prompts = cast(List[object], payload["prompts"])
+            raw_prompts = cast("List[object]", payload["prompts"])
             for raw_entry in raw_prompts:
                 if not isinstance(raw_entry, dict):
                     raise ValueError("Catalogue prompts must be JSON objects")
-                entries.append(cast(CatalogEntry, raw_entry))
+                entries.append(cast("CatalogEntry", raw_entry))
             return entries
-        return [cast(CatalogEntry, payload)]
+        return [cast("CatalogEntry", payload)]
     if isinstance(payload, list):
         entries = []
-        raw_entries = cast(List[object], payload)
+        raw_entries = cast("List[object]", payload)
         for raw_entry in raw_entries:
             if not isinstance(raw_entry, dict):
                 raise ValueError("Prompt entries must be JSON objects")
-            entries.append(cast(CatalogEntry, raw_entry))
+            entries.append(cast("CatalogEntry", raw_entry))
         return entries
     raise ValueError(f"Prompt catalogue {path} must contain a JSON object or list")
 

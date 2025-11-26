@@ -58,7 +58,7 @@ def _resolve_redis_client(
         return redis_client
     if redis is None:
         raise PromptCacheError("Redis DSN provided but redis package is not installed")
-    from_url = cast(Callable[[str], "Redis"], getattr(redis, "from_url"))
+    from_url = cast("Callable[[str], Redis]", getattr(redis, "from_url"))
     return from_url(redis_dsn)
 
 
@@ -130,7 +130,7 @@ def build_prompt_manager(
     workflow_routing: Dict[str, str] = {}
     workflow_models_mapping: Mapping[str, object]
     if isinstance(workflow_models_setting, Mapping):
-        workflow_models_mapping = cast(Mapping[str, object], workflow_models_setting)
+        workflow_models_mapping = cast("Mapping[str, object]", workflow_models_setting)
     else:
         workflow_models_mapping = {}
     for key, value in workflow_models_mapping.items():

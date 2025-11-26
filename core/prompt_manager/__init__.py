@@ -443,15 +443,15 @@ class PromptManager:
                     is_persistent=True,
                     persist_directory=str(resolved_chroma_path),
                 )
-                self._chroma_client = cast(Any, chromadb.Client(chroma_settings))
+                self._chroma_client = cast("Any", chromadb.Client(chroma_settings))
             except Exception:
                 # Fallback to legacy PersistentClient signature if settings import or usage fails
                 self._chroma_client = cast(
-                    Any,
+                    "Any",
                     chromadb.PersistentClient(path=str(resolved_chroma_path)),
                 )
         else:
-            self._chroma_client = cast(Any, chroma_client)
+            self._chroma_client = cast("Any", chroma_client)
         self._initialise_chroma_collection()
 
         self._notification_center = notification_center or default_notification_center
@@ -504,7 +504,7 @@ class PromptManager:
             category_generator,
         ):
             if candidate is not None and getattr(candidate, "drop_params", None):
-                raw_params = cast(Sequence[str], getattr(candidate, "drop_params"))
+                raw_params = cast("Sequence[str]", getattr(candidate, "drop_params"))
                 self._litellm_drop_params = tuple(str(param) for param in raw_params)
                 break
         for candidate in (
@@ -577,7 +577,7 @@ class PromptManager:
 
         try:
             collection = cast(
-                CollectionProtocol,
+                "CollectionProtocol",
                 self._chroma_client.get_or_create_collection(
                     name=self._collection_name,
                     metadata={"hnsw:space": "cosine"},
@@ -738,9 +738,9 @@ class PromptManager:
         details["status"] = "online" if ping_ok else "offline"
 
         connection: Dict[str, Any] = {}
-        pool = cast(Optional[RedisConnectionPoolProtocol], getattr(client, "connection_pool", None))
+        pool = cast("Optional[RedisConnectionPoolProtocol]", getattr(client, "connection_pool", None))
         if pool is not None:
-            kwargs = cast(Mapping[str, Any], getattr(pool, "connection_kwargs", {}) or {})
+            kwargs = cast("Mapping[str, Any]", getattr(pool, "connection_kwargs", {}) or {})
             host = kwargs.get("host") or kwargs.get("unix_socket_path")
             if host:
                 connection["host"] = host
@@ -1915,7 +1915,7 @@ class PromptManager:
 
         if self._redis_client is not None:
             redis_close = cast(
-                Optional[Callable[[], Any]], getattr(self._redis_client, "close", None)
+                "Optional[Callable[[], Any]]", getattr(self._redis_client, "close", None)
             )
             if callable(redis_close):
                 try:
@@ -1926,10 +1926,10 @@ class PromptManager:
                         exc_info=True,
                     )
             pool = cast(
-                Optional[RedisConnectionPoolProtocol],
+                "Optional[RedisConnectionPoolProtocol]",
                 getattr(self._redis_client, "connection_pool", None),
             )
-            disconnect = cast(Optional[Callable[[], Any]], getattr(pool, "disconnect", None))
+            disconnect = cast("Optional[Callable[[], Any]]", getattr(pool, "disconnect", None))
             if callable(disconnect):
                 try:
                     disconnect()
@@ -2595,7 +2595,7 @@ class PromptManager:
         try:
             try:
                 results = cast(
-                    Dict[str, Any],
+                    "Dict[str, Any]",
                     collection.query(
                         query_texts=None,
                         query_embeddings=[query_embedding],
@@ -2609,7 +2609,7 @@ class PromptManager:
                 # *include* parameter.  Retry without it and tolerate missing
                 # distance information.
                 results = cast(
-                    Dict[str, Any],
+                    "Dict[str, Any]",
                     collection.query(
                         query_texts=None,
                         query_embeddings=[query_embedding],
@@ -2621,12 +2621,12 @@ class PromptManager:
             raise PromptStorageError("Failed to query prompts") from exc
 
         prompts: List[Prompt] = []
-        ids = cast(List[str], results.get("ids", [[]])[0])
-        documents = cast(List[str], results.get("documents", [[]])[0])
-        metadatas = cast(List[Dict[str, Any]], results.get("metadatas", [[]])[0])
+        ids = cast("List[str]", results.get("ids", [[]])[0])
+        documents = cast("List[str]", results.get("documents", [[]])[0])
+        metadatas = cast("List[Dict[str, Any]]", results.get("metadatas", [[]])[0])
         distance_values: List[Optional[float]]
         if "distances" in results:
-            distance_payload = cast(List[List[Optional[float]]], results.get("distances", []))
+            distance_payload = cast("List[List[Optional[float]]]", results.get("distances", []))
             distance_values = distance_payload[0] if distance_payload else []
         else:
             distance_values = []

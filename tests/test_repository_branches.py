@@ -25,7 +25,7 @@ from core.repository import (
     _parse_optional_datetime,
 )
 from models.category_model import PromptCategory
-from models.prompt_model import ExecutionStatus, Prompt, PromptExecution, PromptVersion
+from models.prompt_model import ExecutionStatus, Prompt, PromptExecution
 from models.prompt_note import PromptNote
 from models.response_style import ResponseStyle
 

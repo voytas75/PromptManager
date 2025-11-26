@@ -65,7 +65,7 @@ class ChatColors(BaseSettings):
     )
 
     model_config = cast(
-        SettingsConfigDict,
+        "SettingsConfigDict",
         {
             "env_prefix": "PROMPT_MANAGER_CHAT_",
             "case_sensitive": False,
@@ -187,7 +187,7 @@ class PromptManagerSettings(BaseSettings):
 
     # Pydantic v2 settings configuration
     model_config = cast(
-        SettingsConfigDict,
+        "SettingsConfigDict",
         {
             "env_prefix": "PROMPT_MANAGER_",
             "case_sensitive": False,
@@ -433,7 +433,7 @@ class PromptManagerSettings(BaseSettings):
                 )
             if choice == "fast":
                 continue
-            cleaned[key] = cast(Literal["fast", "inference"], choice)
+            cleaned[key] = cast("Literal['fast', 'inference']", choice)
         return cleaned or None
 
     @classmethod
@@ -461,7 +461,7 @@ class PromptManagerSettings(BaseSettings):
         # Compose an environment source that also considers aliases explicitly
         def env_with_aliases(_: BaseSettings | None = None) -> Dict[str, Any]:
             data: Dict[str, Any] = {}
-            config_dict = cast(Dict[str, Any], cls.model_config)
+            config_dict = cast("Dict[str, Any]", cls.model_config)
             prefix = str(config_dict.get("env_prefix", ""))
             # Collect both alias and field-name keys from environment
             mapping = {
@@ -503,7 +503,7 @@ class PromptManagerSettings(BaseSettings):
         return (
             init_settings,
             cls._json_config_settings_source(settings_cls),
-            cast(PydanticBaseSettingsSource, env_with_aliases),
+            cast("PydanticBaseSettingsSource", env_with_aliases),
             file_secret_settings,
         )
 
@@ -587,7 +587,7 @@ class PromptManagerSettings(BaseSettings):
                     mapped["litellm_api_version"] = data["AZURE_OPENAI_API_VERSION"]
                 return mapped
             return {}
-        return cast(PydanticBaseSettingsSource, _loader)
+        return cast("PydanticBaseSettingsSource", _loader)
 
 
 def load_settings(**overrides: Any) -> PromptManagerSettings:
