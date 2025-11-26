@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.50 - 2025-11-26 - Surface execute-context prompt text in the workspace and keep output mirrored across tabs.
 Updates: v0.15.49 - 2025-11-26 - Swap chat transcript above paste-text input to mirror chat layouts.
 Updates: v0.15.48 - 2025-11-26 - Add execute-as-context dialog with history picker and persistence.
 Updates: v0.15.47 - 2025-11-24 - Add creation date and usage count prompt sorting options.
@@ -2682,6 +2683,18 @@ class MainWindow(QMainWindow):
         self._end_chat_button.setEnabled(False)
         self.statusBar().showMessage("Chat session ended. Conversation preserved in history.", 5000)
 
+    def _set_workspace_text(self, text: str, *, focus: bool = False) -> None:
+        """Populate the paste-text workspace with *text* and optionally focus the field."""
+
+        if self._query_input is None:
+            return
+        self._query_input.setPlainText(text)
+        cursor = self._query_input.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        self._query_input.setTextCursor(cursor)
+        if focus:
+            self._query_input.setFocus(Qt.ShortcutFocusReason)
+
     def _execute_prompt_with_text(
         self,
         prompt: Prompt,
@@ -2740,11 +2753,7 @@ class MainWindow(QMainWindow):
 
         self._display_execution_result(prompt, outcome)
         if keep_text_after:
-            self._query_input.setPlainText(request_text)
-            cursor = self._query_input.textCursor()
-            cursor.movePosition(QTextCursor.End)
-            self._query_input.setTextCursor(cursor)
-            self._query_input.setFocus(Qt.ShortcutFocusReason)
+            self._set_workspace_text(request_text, focus=True)
 
         self._usage_logger.log_execute(
             prompt_name=prompt.name,
@@ -3104,6 +3113,7 @@ class MainWindow(QMainWindow):
                 self._show_status_message(message, 5000)
             return
         parent_widget = parent or self
+        self._set_workspace_text(context_text, focus=True)
         dialog = ExecuteContextDialog(
             parent=parent_widget,
             last_task=self._last_execute_context_task,
@@ -3125,13 +3135,16 @@ class MainWindow(QMainWindow):
             f"Task:\n{cleaned_task}\n\n"
             f"Context:\n{cleaned_context}"
         )
-        self._execute_prompt_with_text(
-            prompt,
-            request_payload,
-            status_prefix="Executed context",
-            empty_text_message="Provide context text before executing.",
-            keep_text_after=False,
-        )
+        try:
+            self._execute_prompt_with_text(
+                prompt,
+                request_payload,
+                status_prefix="Executed context",
+                empty_text_message="Provide context text before executing.",
+                keep_text_after=False,
+            )
+        finally:
+            self._set_workspace_text(context_text, focus=False)
 
     def _on_template_preview_run_requested(
         self,
