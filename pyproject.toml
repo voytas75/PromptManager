@@ -1,6 +1,6 @@
 [project]
 name = "prompt-manager"
-version = "0.17.6"
+version = "0.17.7"
 description = "Desktop application for cataloguing, searching, and launching AI prompts."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -32,7 +32,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest==8.2.0", "pytest-cov==4.1.0", "pyright==1.1.386"]
+dev = [
+    "pytest==8.2.0",
+    "pytest-cov==4.1.0",
+    "pytest-xdist==3.6.1",
+    "pyright==1.1.386",
+]
 
 [tool.setuptools.packages.find]
 include = ["config*", "core*", "gui*", "models*"]

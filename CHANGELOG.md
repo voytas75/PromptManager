@@ -2,6 +2,12 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.17.7] - 2025-11-26
+
+### Added
+
+- Added a pinned `pytest-xdist` dev dependency so the default `pytest -n auto` workflow can run under the project's managed environment without relying on globally installed packages.
+
 ## [0.17.6] - 2025-11-25
 
 ### Added
