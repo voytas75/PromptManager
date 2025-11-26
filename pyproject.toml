@@ -37,6 +37,7 @@ dev = [
     "pytest-cov==4.1.0",
     "pytest-xdist==3.6.1",
     "pyright==1.1.386",
+    "ruff>=0.6.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -46,12 +47,6 @@ exclude = ["tests*", "data*", "PromptManagerBlueprint.txt", "AGENTS.md"]
 [tool.setuptools.package-data]
 "gui.resources" = ["*.ico"]
 
-[tool.black]
-line-length = 100
-target-version = ["py312"]
-include = '\\.(py|pyi)$'
-exclude = '^data/'
-
 [tool.ruff]
 target-version = "py312"
 line-length = 100
@@ -60,13 +55,14 @@ exclude = ["data/"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
+extend-select = ["TCH"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["core", "config", "models", "gui", "tests"]
 combine-as-imports = true
 
 [tool.pytest.ini_options]
-addopts = "-q"
+addopts = "-q --cov=core --cov-report=xml --cov-report=term-missing"
 testpaths = ["tests"]
 
 [tool.pyright]
