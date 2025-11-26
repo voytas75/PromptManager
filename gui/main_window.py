@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.49 - 2025-11-26 - Swap chat transcript above paste-text input to mirror chat layouts.
 Updates: v0.15.48 - 2025-11-26 - Add execute-as-context dialog with history picker and persistence.
 Updates: v0.15.47 - 2025-11-24 - Add creation date and usage count prompt sorting options.
 Updates: v0.15.46 - 2025-11-24 - Use LiteLLM category suggestions with classifier fallback.
@@ -1268,10 +1269,10 @@ class MainWindow(QMainWindow):
         result_actions_layout.addWidget(self._copy_result_to_text_window_button)
         result_actions_layout.addWidget(self._render_markdown_button)
         output_layout.addLayout(result_actions_layout)
-        self._workspace_splitter.addWidget(query_panel)
         self._workspace_splitter.addWidget(output_panel)
-        self._workspace_splitter.setStretchFactor(0, 3)
-        self._workspace_splitter.setStretchFactor(1, 5)
+        self._workspace_splitter.addWidget(query_panel)
+        self._workspace_splitter.setStretchFactor(0, 5)
+        self._workspace_splitter.setStretchFactor(1, 3)
         self._main_splitter.addWidget(workspace_panel)
         self._main_splitter.setStretchFactor(0, 0)
         self._main_splitter.setStretchFactor(1, 1)
