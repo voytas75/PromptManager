@@ -9,29 +9,28 @@ import uuid
 from typing import Callable, List, Optional
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
-    QHBoxLayout,
+    QDialog,
     QFileDialog,
+    QHBoxLayout,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
-    QDialog,
-    QPushButton,
     QPlainTextEdit,
+    QPushButton,
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtGui import QGuiApplication
 
 from core import (
     PromptManager,
     PromptNoteError,
-    PromptNoteNotFoundError,
     PromptNoteStorageError,
 )
 from models.prompt_note import PromptNote
 
-from .dialogs import PromptNoteDialog, MarkdownPreviewDialog
+from .dialogs import MarkdownPreviewDialog, PromptNoteDialog
 
 
 class NotesPanel(QWidget):

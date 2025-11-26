@@ -15,25 +15,25 @@ Updates: v0.1.0 - 2025-10-31 - Introduce PromptRepository syncing Prompt datacla
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
 import sqlite3
 import uuid
-from datetime import datetime, timezone, timedelta
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Set
 
+from models.category_model import PromptCategory, slugify_category
 from models.prompt_model import (
     DEFAULT_PROFILE_ID,
     Prompt,
     PromptExecution,
-    PromptVersion,
     PromptForkLink,
+    PromptVersion,
     UserProfile,
 )
-from models.category_model import PromptCategory, slugify_category
-from models.response_style import ResponseStyle
 from models.prompt_note import PromptNote
+from models.response_style import ResponseStyle
 
 
 @dataclass(slots=True, frozen=True)

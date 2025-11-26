@@ -5,9 +5,9 @@ Updates: v0.1.0 - 2025-12-05 - Introduce ResponseStyle dataclass for formatting 
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-import uuid
 from typing import Any, Dict, List, Mapping, MutableMapping, Optional
 
 from .prompt_model import (

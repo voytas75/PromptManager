@@ -18,22 +18,22 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, cast
 from config import PromptManagerSettings
 from config.settings import PromptTemplateOverrides
 
-from .execution import CodexExecutor
+from .category_registry import load_category_definitions
 from .embedding import EmbeddingProvider, EmbeddingSyncWorker, create_embedding_function
+from .execution import CodexExecutor
 from .history_tracker import HistoryTracker
 from .intent_classifier import IntentClassifier
-from .prompt_manager import NameGenerationError, PromptCacheError, PromptManager
 from .name_generation import (
     LiteLLMCategoryGenerator,
     LiteLLMDescriptionGenerator,
     LiteLLMNameGenerator,
     NameGenerationError,
 )
-from .scenario_generation import LiteLLMScenarioGenerator
-from .prompt_engineering import PromptEngineer
-from .repository import PromptRepository
 from .notifications import NotificationCenter, notification_center as default_notification_center
-from .category_registry import load_category_definitions
+from .prompt_engineering import PromptEngineer
+from .prompt_manager import NameGenerationError, PromptCacheError, PromptManager
+from .repository import PromptRepository
+from .scenario_generation import LiteLLMScenarioGenerator
 
 try:  # pragma: no cover - redis optional dependency
     import redis

@@ -84,81 +84,81 @@ import uuid
 from collections import deque
 from collections.abc import Mapping
 from datetime import datetime, timezone
-from html import escape
 from enum import Enum
+from html import escape
 from pathlib import Path
 from typing import Any, Deque, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from PySide6.QtCore import (
     QAbstractListModel,
     QByteArray,
-    Signal,
     QModelIndex,
     QPoint,
     QRect,
+    QSettings,
     QSize,
     Qt,
-    QSettings,
+    Signal,
 )
 from PySide6.QtGui import (
     QColor,
     QGuiApplication,
     QKeySequence,
     QPalette,
-    QTextCursor,
-    QShortcut,
     QResizeEvent,
+    QShortcut,
     QShowEvent,
+    QTextCursor,
 )
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QAbstractSpinBox,
     QComboBox,
-    QFileDialog,
     QDialog,
     QDoubleSpinBox,
+    QFileDialog,
     QFrame,
-    QLayout,
     QHBoxLayout,
-    QLayoutItem,
     QLabel,
+    QLayout,
+    QLayoutItem,
     QLineEdit,
     QListView,
     QMainWindow,
     QMenu,
     QMessageBox,
     QPlainTextEdit,
-    QScrollArea,
     QPushButton,
+    QScrollArea,
+    QSizePolicy,
     QSplitter,
     QStyle,
     QTabWidget,
+    QTextEdit,
     QToolButton,
     QVBoxLayout,
     QWidget,
     QWidgetItem,
-    QSizePolicy,
-    QTextEdit,
 )
 
 from config import (
-    ChatColors,
     DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR,
     DEFAULT_CHAT_USER_BUBBLE_COLOR,
     DEFAULT_EMBEDDING_BACKEND,
     DEFAULT_EMBEDDING_MODEL,
     DEFAULT_THEME_MODE,
+    ChatColors,
     PromptManagerSettings,
     PromptTemplateOverrides,
 )
 from core import (
     IntentLabel,
     NameGenerationError,
-    PromptManager,
-    PromptManagerError,
     PromptExecutionError,
     PromptExecutionUnavailable,
     PromptHistoryError,
+    PromptManager,
+    PromptManagerError,
     PromptNotFoundError,
     PromptStorageError,
     PromptVersionError,
@@ -167,16 +167,16 @@ from core import (
     export_prompt_catalog,
     import_prompt_catalog,
 )
-from core.prompt_engineering import PromptRefinement
 from core.notifications import Notification, NotificationStatus
+from core.prompt_engineering import PromptRefinement
 from models.category_model import PromptCategory, slugify_category
 from models.prompt_model import Prompt
 
-from .command_palette import CommandPaletteDialog, QuickAction, rank_prompts_for_action
 from .code_highlighter import CodeHighlighter
+from .command_palette import CommandPaletteDialog, QuickAction, rank_prompts_for_action
 from .dialogs import (
-    CategoryManagerDialog,
     CatalogPreviewDialog,
+    CategoryManagerDialog,
     InfoDialog,
     MarkdownPreviewDialog,
     PromptDialog,
@@ -186,14 +186,13 @@ from .dialogs import (
 )
 from .execute_context_dialog import ExecuteContextDialog
 from .history_panel import HistoryPanel
+from .language_tools import DetectedLanguage, detect_language
 from .notes_panel import NotesPanel
+from .notifications import NotificationHistoryDialog, QtNotificationBridge
 from .response_styles_panel import ResponseStylesPanel
 from .settings_dialog import SettingsDialog, persist_settings_to_config
 from .template_preview import TemplatePreviewWidget
-from .language_tools import DetectedLanguage, detect_language
 from .usage_logger import IntentUsageLogger
-from .notifications import QtNotificationBridge, NotificationHistoryDialog
-
 
 logger = logging.getLogger(__name__)
 

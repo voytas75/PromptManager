@@ -7,8 +7,8 @@ Updates: v0.1.0 - 2025-10-31 - Introduce repository and manager storage integrat
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import uuid
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence
 
 import pytest
@@ -21,8 +21,8 @@ from core import (
 )
 from models.category_model import PromptCategory, slugify_category
 from models.prompt_model import Prompt, PromptVersion, UserProfile
-from models.response_style import ResponseStyle
 from models.prompt_note import PromptNote
+from models.response_style import ResponseStyle
 
 
 def _make_prompt(name: str = "Sample Prompt") -> Prompt:

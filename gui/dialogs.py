@@ -57,7 +57,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Dict, List, NamedTuple, Optional, Sequence
 
-from PySide6.QtCore import Qt, QEvent, Signal
+from PySide6.QtCore import QEvent, Qt, Signal
 from PySide6.QtGui import QGuiApplication, QPalette
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -65,9 +65,9 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QFormLayout,
     QGridLayout,
     QGroupBox,
-    QFormLayout,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -75,13 +75,13 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
-    QTabWidget,
-    QToolButton,
-    QTextBrowser,
+    QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
+    QTabWidget,
+    QTextBrowser,
+    QToolButton,
     QVBoxLayout,
-    QSizePolicy,
     QWidget,
 )
 
@@ -99,23 +99,21 @@ except ImportError:  # pragma: no cover – fallback for direct execution
 from core import (
     CatalogDiff,
     CatalogDiffEntry,
-    CategoryError,
     CategoryNotFoundError,
     CategoryStorageError,
-    NameGenerationError,
     DescriptionGenerationError,
-    ScenarioGenerationError,
+    NameGenerationError,
     PromptEngineeringUnavailable,
     PromptManager,
     PromptManagerError,
     RepositoryError,
+    ScenarioGenerationError,
 )
 from core.prompt_engineering import PromptEngineeringError, PromptRefinement
 from models.category_model import PromptCategory, slugify_category
 from models.prompt_model import Prompt, PromptVersion
 from models.prompt_note import PromptNote
 from models.response_style import ResponseStyle
-
 
 logger = logging.getLogger("prompt_manager.gui.dialogs")
 
@@ -2853,7 +2851,10 @@ class InfoDialog(QDialog):
     @staticmethod
     def _version_from_metadata() -> Optional[str]:
         try:
-            from importlib.metadata import PackageNotFoundError, version as pkg_version  # type: ignore
+            from importlib.metadata import (  # type: ignore
+                PackageNotFoundError,
+                version as pkg_version,
+            )
 
             try:
                 resolved = pkg_version("prompt-manager")

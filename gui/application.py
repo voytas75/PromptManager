@@ -14,12 +14,11 @@ from typing import MutableMapping, Optional, Sequence
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
-from core import PromptManager
 from config import PromptManagerSettings
+from core import PromptManager
 
 from .main_window import MainWindow
 from .resources import load_application_icon
-
 
 _DISPLAY_ENV_VARS = ("DISPLAY", "WAYLAND_DISPLAY", "MIR_SOCKET")
 

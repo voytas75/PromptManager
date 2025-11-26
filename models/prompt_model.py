@@ -14,14 +14,14 @@ Updates: v0.1.0 - 2025-10-30 - Initial Prompt schema with serialization helpers.
 
 from __future__ import annotations
 
-import json
 import hashlib
-import uuid
+import json
 import re
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence
 
 from .category_model import slugify_category
 

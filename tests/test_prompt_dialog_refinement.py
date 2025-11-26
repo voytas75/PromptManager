@@ -11,8 +11,8 @@ pytest.importorskip("PySide6")
 from PySide6.QtWidgets import QApplication
 
 from core.prompt_engineering import PromptRefinement
-from models.category_model import PromptCategory
 from gui.dialogs import PromptDialog
+from models.category_model import PromptCategory
 
 
 @pytest.fixture(scope="module")

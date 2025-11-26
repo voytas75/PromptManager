@@ -51,6 +51,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple, Union, cast
 
+import chromadb
+from chromadb.api import ClientAPI
+from chromadb.api.models.Collection import Collection
+from chromadb.errors import ChromaError
+
 # ---------------------------------------------------------------------------
 # NOTE: Transitional refactor
 # ---------------------------
@@ -60,13 +65,7 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 # classes have been migrated to ``core.exceptions`` so that they can be shared
 # across sub‑modules once the split is complete.
 # ---------------------------------------------------------------------------
-
 from config import LITELLM_ROUTED_WORKFLOWS
-
-import chromadb
-from chromadb.api import ClientAPI
-from chromadb.api.models.Collection import Collection
-from chromadb.errors import ChromaError
 
 os.environ.setdefault("CHROMA_TELEMETRY_IMPLEMENTATION", "none")
 os.environ.setdefault("CHROMA_ANONYMIZED_TELEMETRY", "0")
@@ -120,24 +119,55 @@ except ImportError:  # pragma: no cover - redis optional during development
     redis = None  # type: ignore
     RedisError = Exception  # type: ignore[misc,assignment]
 
-from models.prompt_model import Prompt, PromptExecution, PromptVersion, PromptForkLink, UserProfile
-from models.response_style import ResponseStyle
-from models.prompt_note import PromptNote
 from models.category_model import PromptCategory, slugify_category
+from models.prompt_model import Prompt, PromptExecution, PromptForkLink, PromptVersion, UserProfile
+from models.prompt_note import PromptNote
+from models.response_style import ResponseStyle
+from prompt_templates import DEFAULT_PROMPT_TEMPLATES, PROMPT_TEMPLATE_KEYS
 
+from ..category_registry import CategoryRegistry
 from ..embedding import EmbeddingGenerationError, EmbeddingProvider, EmbeddingSyncWorker
+
+# Re‑export shared exception classes from centralised module to preserve the
+# original import path ``core.prompt_manager.PromptManagerError`` etc. during
+# the deprecation window.
+from ..exceptions import (  # noqa: F401 – re-export for backward compatibility
+    CategoryError,
+    CategoryNotFoundError,
+    CategoryStorageError,
+    PromptCacheError,
+    PromptEngineeringUnavailable,
+    PromptExecutionError,
+    PromptExecutionUnavailable,
+    PromptHistoryError,
+    PromptManagerError,
+    PromptNoteError,
+    PromptNoteNotFoundError,
+    PromptNoteStorageError,
+    PromptNotFoundError,
+    PromptStorageError,
+    PromptVersionError,
+    PromptVersionNotFoundError,
+    ResponseStyleError,
+    ResponseStyleNotFoundError,
+    ResponseStyleStorageError,
+)
 from ..execution import CodexExecutionResult, CodexExecutor, ExecutionError
 from ..history_tracker import HistoryTracker, HistoryTrackerError
 from ..intent_classifier import IntentClassifier, IntentLabel, IntentPrediction, rank_by_hints
 from ..name_generation import (
+    CategorySuggestionError,
+    DescriptionGenerationError,
     LiteLLMCategoryGenerator,
     LiteLLMDescriptionGenerator,
     LiteLLMNameGenerator,
-    CategorySuggestionError,
-    DescriptionGenerationError,
     NameGenerationError,
 )
-from ..scenario_generation import LiteLLMScenarioGenerator, ScenarioGenerationError
+from ..notifications import (
+    NotificationCenter,
+    NotificationLevel,
+    notification_center as default_notification_center,
+)
 from ..prompt_engineering import (
     PromptEngineer,
     PromptEngineeringError,
@@ -149,39 +179,7 @@ from ..repository import (
     RepositoryError,
     RepositoryNotFoundError,
 )
-from ..notifications import (
-    NotificationCenter,
-    NotificationLevel,
-    notification_center as default_notification_center,
-)
-from ..category_registry import CategoryRegistry
-from prompt_templates import DEFAULT_PROMPT_TEMPLATES, PROMPT_TEMPLATE_KEYS
-
-# Re‑export shared exception classes from centralised module to preserve the
-# original import path ``core.prompt_manager.PromptManagerError`` etc. during
-# the deprecation window.
-from ..exceptions import (  # noqa: F401 – re-export for backward compatibility
-    CategoryError,
-    CategoryNotFoundError,
-    CategoryStorageError,
-    PromptManagerError,
-    PromptNotFoundError,
-    PromptExecutionUnavailable,
-    PromptExecutionError,
-    PromptHistoryError,
-    PromptStorageError,
-    PromptCacheError,
-    PromptEngineeringUnavailable,
-    PromptVersionError,
-    PromptVersionNotFoundError,
-    ResponseStyleError,
-    ResponseStyleNotFoundError,
-    ResponseStyleStorageError,
-    PromptNoteError,
-    PromptNoteNotFoundError,
-    PromptNoteStorageError,
-)
-
+from ..scenario_generation import LiteLLMScenarioGenerator, ScenarioGenerationError
 
 logger = logging.getLogger(__name__)
 
@@ -2821,17 +2819,16 @@ __all__ = [
 ]
 
 # Re‑export storage façade for external use
-from .storage import PromptStorage  # noqa: E402  (after __all__)
-
-# Execution facade re‑exports
-from .execution import (  # noqa: E402
-    PromptExecutor,
-    ExecutionResult,
-)
-
 # Engineering facade re‑exports
 from .engineering import (  # noqa: E402
     PromptEngineerFacade,
     PromptEngineeringError,
     PromptRefinement,
 )
+
+# Execution facade re‑exports
+from .execution import (  # noqa: E402
+    ExecutionResult,
+    PromptExecutor,
+)
+from .storage import PromptStorage  # noqa: E402  (after __all__)

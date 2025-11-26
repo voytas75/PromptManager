@@ -15,7 +15,7 @@ import queue
 import threading
 import time
 import uuid
-from typing import Any, Callable, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Callable, List, Mapping, Optional, Sequence, Tuple
 
 from models.prompt_model import Prompt
 

@@ -9,10 +9,10 @@ import uuid
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
-import sqlite3
 
 import pytest
 
+from core.category_registry import CategoryRegistry
 from core.repository import (
     PromptRepository,
     RepositoryError,
@@ -21,7 +21,6 @@ from core.repository import (
     _json_loads_list,
     _json_loads_optional,
 )
-from core.category_registry import CategoryRegistry
 from models.category_model import PromptCategory
 from models.prompt_model import ExecutionStatus, Prompt, PromptExecution
 

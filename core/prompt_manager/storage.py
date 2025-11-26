@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import threading
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Optional
 
 from ..repository import PromptRepository  # relative to core package
 

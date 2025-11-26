@@ -12,9 +12,9 @@ from core.embedding import (
     EmbeddingGenerationError,
     EmbeddingProvider,
     EmbeddingSyncWorker,
-    create_embedding_function,
     LiteLLMEmbeddingFunction,
     SentenceTransformersEmbeddingFunction,
+    create_embedding_function,
 )
 from models.prompt_model import Prompt
 

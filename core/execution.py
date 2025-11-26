@@ -19,7 +19,11 @@ from typing import Any, Callable, Dict, Mapping, Optional
 
 from models.prompt_model import Prompt
 
-from .litellm_adapter import apply_configured_drop_params, call_completion_with_fallback, get_completion
+from .litellm_adapter import (
+    apply_configured_drop_params,
+    call_completion_with_fallback,
+    get_completion,
+)
 
 logger = logging.getLogger("prompt_manager.execution")
 

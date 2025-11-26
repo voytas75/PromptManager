@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from gui.language_tools import DetectedLanguage, detect_language
+from gui.language_tools import detect_language
 
 
 def test_detect_language_returns_plain_for_empty_input() -> None:

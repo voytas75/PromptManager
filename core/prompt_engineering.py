@@ -14,12 +14,13 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Iterable, Optional, Sequence
 
+from prompt_templates import PROMPT_ENGINEERING_PROMPT
+
 from .litellm_adapter import (
     apply_configured_drop_params,
     call_completion_with_fallback,
     get_completion,
 )
-from prompt_templates import PROMPT_ENGINEERING_PROMPT
 
 logger = logging.getLogger(__name__)
 

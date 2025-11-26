@@ -4,10 +4,10 @@ import pytest
 
 import core.name_generation as name_gen_module
 from core.name_generation import (
-    LiteLLMNameGenerator,
-    LiteLLMDescriptionGenerator,
-    NameGenerationError,
     DescriptionGenerationError,
+    LiteLLMDescriptionGenerator,
+    LiteLLMNameGenerator,
+    NameGenerationError,
 )
 
 

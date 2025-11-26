@@ -9,8 +9,8 @@ Updates: v0.1.0 - 2025-11-03 - Cover JSON/env precedence and validation errors.
 
 from __future__ import annotations
 
-import logging
 import json
+import logging
 from pathlib import Path
 
 import pytest

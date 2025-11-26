@@ -5,9 +5,9 @@ Updates: v0.1.0 - 2025-11-11 - Introduce notification bridge and history dialog.
 
 from __future__ import annotations
 
-from typing import Iterable, Sequence
+from typing import Sequence
 
-from PySide6.QtCore import QObject, Signal, Qt
+from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtGui import QClipboard, QGuiApplication
 from PySide6.QtWidgets import (
     QDialog,

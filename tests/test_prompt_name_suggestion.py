@@ -8,6 +8,7 @@ import sys
 import types
 from pathlib import Path
 
+
 def _install_qt_stubs() -> None:
     try:
         import PySide6  # noqa: F401

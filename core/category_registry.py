@@ -5,10 +5,10 @@ Updates: v0.1.0 - 2025-11-22 - Introduce PromptCategory registry and defaults.
 
 from __future__ import annotations
 
-from pathlib import Path
 import json
 import logging
-from typing import Iterable, List, Mapping, MutableMapping, Optional, Sequence
+from pathlib import Path
+from typing import List, Mapping, MutableMapping, Optional, Sequence
 
 from models.category_model import PromptCategory, slugify_category
 

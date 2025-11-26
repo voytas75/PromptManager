@@ -5,9 +5,9 @@ Updates: v0.1.0 - 2025-12-06 - Add PromptNote dataclass for simple note storage.
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-import uuid
 from typing import Any, Dict
 
 

@@ -19,17 +19,19 @@ from typing import Dict, List, Optional, Sequence
 
 logger = logging.getLogger(__name__)
 
+from models.category_model import PromptCategory
+from prompt_templates import (
+    CATEGORY_GENERATION_PROMPT,
+    DESCRIPTION_GENERATION_PROMPT,
+    NAME_GENERATION_PROMPT,
+)
+
 from .litellm_adapter import (
     apply_configured_drop_params,
     call_completion_with_fallback,
     get_completion,
 )
-from prompt_templates import (
-    DESCRIPTION_GENERATION_PROMPT,
-    CATEGORY_GENERATION_PROMPT,
-    NAME_GENERATION_PROMPT,
-)
-from models.category_model import PromptCategory
+
 
 class NameGenerationError(Exception):
     """Raised when a prompt name cannot be generated."""

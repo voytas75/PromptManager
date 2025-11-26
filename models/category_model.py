@@ -10,7 +10,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Mapping, Optional
 
-
 _SLUG_PATTERN = re.compile(r"[^a-z0-9]+")
 
 

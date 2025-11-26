@@ -8,13 +8,13 @@ Updates: v0.1.0 - 2025-10-30 - Package scaffold.
 """
 
 from .settings import (
-    ChatColors,
     DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR,
     DEFAULT_CHAT_USER_BUBBLE_COLOR,
     DEFAULT_EMBEDDING_BACKEND,
     DEFAULT_EMBEDDING_MODEL,
     DEFAULT_THEME_MODE,
     LITELLM_ROUTED_WORKFLOWS,
+    ChatColors,
     PromptManagerSettings,
     PromptTemplateOverrides,
     SettingsError,

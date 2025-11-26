@@ -20,35 +20,35 @@ from functools import partial
 from typing import Dict, Mapping, Optional, Sequence
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QPalette, QGuiApplication
+from PySide6.QtGui import QColor, QGuiApplication, QPalette
 from PySide6.QtWidgets import (
+    QButtonGroup,
+    QCheckBox,
+    QColorDialog,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QFrame,
     QGridLayout,
-    QComboBox,
-    QColorDialog,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
-    QFrame,
     QMessageBox,
     QPlainTextEdit,
-    QCheckBox,
     QPushButton,
-    QVBoxLayout,
-    QTabWidget,
-    QButtonGroup,
     QRadioButton,
-    QWidget,
-    QHBoxLayout,
     QScrollArea,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
 )
 
-from config.persistence import persist_settings_to_config
 from config import LITELLM_ROUTED_WORKFLOWS
+from config.persistence import persist_settings_to_config
 from config.settings import (
-    DEFAULT_CHAT_USER_BUBBLE_COLOR,
     DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR,
+    DEFAULT_CHAT_USER_BUBBLE_COLOR,
 )
 from prompt_templates import (
     DEFAULT_PROMPT_TEMPLATES,

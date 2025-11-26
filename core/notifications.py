@@ -5,6 +5,7 @@ Updates: v0.1.0 - 2025-11-11 - Introduce notification hub with task tracking hel
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 import uuid
@@ -13,9 +14,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Deque, Dict, Iterable, Iterator, List, Optional, Tuple
-
-import logging
+from typing import Any, Callable, Deque, Dict, Iterator, List, Optional, Tuple
 
 logger = logging.getLogger("prompt_manager.notifications")
 

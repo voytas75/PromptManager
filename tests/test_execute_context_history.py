@@ -16,6 +16,7 @@ from gui.main_window import (
     _FILTER_QUALITY_KEY,
     _FILTER_SORT_KEY,
     _FILTER_TAG_KEY,
+    PromptSortOrder,
     _load_execute_context_history,
     _load_filter_preferences,
     _load_last_execute_context_task,
@@ -23,7 +24,6 @@ from gui.main_window import (
     _store_filter_preferences,
     _store_last_execute_context_task,
     _store_sort_preference,
-    PromptSortOrder,
 )
 
 

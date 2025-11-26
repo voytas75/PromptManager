@@ -14,12 +14,13 @@ from typing import List, Optional, Sequence
 
 logger = logging.getLogger(__name__)
 
+from prompt_templates import SCENARIO_GENERATION_PROMPT
+
 from .litellm_adapter import (
     apply_configured_drop_params,
     call_completion_with_fallback,
     get_completion,
 )
-from prompt_templates import SCENARIO_GENERATION_PROMPT
 
 
 class ScenarioGenerationError(Exception):

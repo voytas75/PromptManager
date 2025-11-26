@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional, Sequence
 import pytest
 
 from core.intent_classifier import IntentClassifier
+from core.name_generation import CategorySuggestionError, DescriptionGenerationError
 from core.prompt_manager import (
     NameGenerationError,
     PromptCacheError,
@@ -24,7 +25,6 @@ from core.prompt_manager import (
     RepositoryError,
     RepositoryNotFoundError,
 )
-from core.name_generation import CategorySuggestionError, DescriptionGenerationError
 from models.category_model import PromptCategory, slugify_category
 from models.prompt_model import Prompt, PromptForkLink, PromptVersion, UserProfile
 

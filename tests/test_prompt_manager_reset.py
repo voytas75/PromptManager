@@ -6,8 +6,6 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-import pytest
-
 from core.embedding import EmbeddingGenerationError
 from core.prompt_manager import PromptManager
 from core.repository import PromptRepository

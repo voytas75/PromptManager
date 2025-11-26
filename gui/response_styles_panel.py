@@ -5,33 +5,32 @@ Updates: v0.15.1 - 2025-11-25 - Document module metadata for AGENTS compliance.
 
 from __future__ import annotations
 
-from typing import Callable, List, Optional
 import uuid
+from typing import Callable, List, Optional
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
+    QDialog,
     QFileDialog,
     QHBoxLayout,
     QListWidget,
     QListWidgetItem,
-    QDialog,
     QMessageBox,
-    QPushButton,
     QPlainTextEdit,
+    QPushButton,
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtGui import QGuiApplication
 
 from core import (
     PromptManager,
     ResponseStyleError,
-    ResponseStyleNotFoundError,
     ResponseStyleStorageError,
 )
 from models.response_style import ResponseStyle
 
-from .dialogs import ResponseStyleDialog, MarkdownPreviewDialog
+from .dialogs import MarkdownPreviewDialog, ResponseStyleDialog
 
 
 class ResponseStylesPanel(QWidget):

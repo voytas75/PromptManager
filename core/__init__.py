@@ -10,6 +10,10 @@ Updates: v0.2.0 - 2025-10-31 - Surface PromptRepository alongside PromptManager.
 Updates: v0.1.0 - 2025-10-30 - Expose PromptManager API.
 """
 
+from models.category_model import PromptCategory
+from models.prompt_note import PromptNote
+from models.response_style import ResponseStyle
+
 from .catalog_importer import (
     CatalogChangePlan,
     CatalogChangeType,
@@ -21,47 +25,24 @@ from .catalog_importer import (
     import_prompt_catalog,
     load_prompt_catalog,
 )
+from .category_registry import CategoryRegistry
+from .embedding import create_embedding_function
+from .execution import CodexExecutionResult, CodexExecutor, ExecutionError
 from .factory import build_prompt_manager
+from .history_tracker import HistoryTracker, HistoryTrackerError
 from .intent_classifier import (
     IntentClassifier,
     IntentClassifierError,
     IntentLabel,
     IntentPrediction,
 )
-from .history_tracker import HistoryTracker, HistoryTrackerError
-from .prompt_manager import (
-    PromptCacheError,
-    PromptExecutionError,
-    PromptExecutionUnavailable,
-    PromptEngineeringUnavailable,
-    PromptHistoryError,
-    PromptManager,
-    PromptManagerError,
-    PromptNotFoundError,
-    PromptStorageError,
-    PromptVersionError,
-    PromptVersionNotFoundError,
-    ResponseStyleError,
-    ResponseStyleNotFoundError,
-    ResponseStyleStorageError,
-    PromptNoteError,
-    PromptNoteNotFoundError,
-    PromptNoteStorageError,
-    CategoryError,
-    CategoryNotFoundError,
-    CategoryStorageError,
-)
 from .name_generation import (
-    NameGenerationError,
-    DescriptionGenerationError,
     CategorySuggestionError,
-    LiteLLMDescriptionGenerator,
+    DescriptionGenerationError,
     LiteLLMCategoryGenerator,
+    LiteLLMDescriptionGenerator,
+    NameGenerationError,
 )
-from .scenario_generation import LiteLLMScenarioGenerator, ScenarioGenerationError
-from .repository import PromptRepository, RepositoryError, RepositoryNotFoundError
-from .embedding import create_embedding_function
-from .execution import CodexExecutor, CodexExecutionResult, ExecutionError
 from .notifications import (
     Notification,
     NotificationCenter,
@@ -71,10 +52,30 @@ from .notifications import (
     notification_center,
 )
 from .prompt_engineering import PromptEngineer, PromptEngineeringError, PromptRefinement
-from .category_registry import CategoryRegistry
-from models.response_style import ResponseStyle
-from models.prompt_note import PromptNote
-from models.category_model import PromptCategory
+from .prompt_manager import (
+    CategoryError,
+    CategoryNotFoundError,
+    CategoryStorageError,
+    PromptCacheError,
+    PromptEngineeringUnavailable,
+    PromptExecutionError,
+    PromptExecutionUnavailable,
+    PromptHistoryError,
+    PromptManager,
+    PromptManagerError,
+    PromptNoteError,
+    PromptNoteNotFoundError,
+    PromptNoteStorageError,
+    PromptNotFoundError,
+    PromptStorageError,
+    PromptVersionError,
+    PromptVersionNotFoundError,
+    ResponseStyleError,
+    ResponseStyleNotFoundError,
+    ResponseStyleStorageError,
+)
+from .repository import PromptRepository, RepositoryError, RepositoryNotFoundError
+from .scenario_generation import LiteLLMScenarioGenerator, ScenarioGenerationError
 
 __all__ = [
     "PromptManager",
