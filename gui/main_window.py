@@ -1274,6 +1274,9 @@ class MainWindow(QMainWindow):
         preview_render_layout.setSpacing(8)
         self._template_preview = TemplatePreviewWidget(preview_render_panel)
         self._template_preview.clear_template()
+        self._template_preview.run_requested.connect(  # type: ignore[arg-type]
+            self._on_template_preview_run_requested
+        )
         preview_render_layout.addWidget(self._template_preview)
 
         preview_splitter.addWidget(preview_list_panel)
@@ -1291,6 +1294,8 @@ class MainWindow(QMainWindow):
 
         has_executor = self._manager.executor is not None
         self._run_button.setEnabled(has_executor)
+        if self._template_preview is not None:
+            self._template_preview.set_run_enabled(has_executor)
         self._copy_result_button.setEnabled(False)
         self._copy_result_to_text_window_button.setEnabled(False)
         self._save_button.setEnabled(False)
@@ -2622,6 +2627,8 @@ class MainWindow(QMainWindow):
             if streaming_enabled:
                 self._end_streaming_run()
             self._run_button.setEnabled(False)
+            if self._template_preview is not None:
+                self._template_preview.set_run_enabled(False)
             self._usage_logger.log_execute(
                 prompt_name=prompt.name,
                 success=False,
@@ -3036,6 +3043,34 @@ class MainWindow(QMainWindow):
             request_payload,
             status_prefix="Executed context",
             empty_text_message="Provide context text before executing.",
+            keep_text_after=False,
+        )
+
+    def _on_template_preview_run_requested(
+        self,
+        rendered_text: str,
+        variables: dict[str, str],
+    ) -> None:
+        """Execute the selected prompt using the rendered template preview text."""
+
+        prompt = self._current_prompt()
+        if prompt is None:
+            self._show_status_message("Select a prompt before running from the preview.", 4000)
+            return
+        payload = rendered_text.strip()
+        if not payload:
+            self._show_status_message("Render the template before running it.", 4000)
+            return
+        if variables:
+            self.statusBar().showMessage(
+                f"Running template with {len(variables)} variable(s)…",
+                2000,
+            )
+        self._execute_prompt_with_text(
+            prompt,
+            payload,
+            status_prefix="Executed preview",
+            empty_text_message="Render the template before running it.",
             keep_text_after=False,
         )
 
@@ -3595,6 +3630,10 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "LiteLLM configuration", str(exc))
 
         self._load_prompts(self._search_input.text())
+        has_executor = self._manager.executor is not None
+        self._run_button.setEnabled(has_executor)
+        if self._template_preview is not None:
+            self._template_preview.set_run_enabled(has_executor)
 
     def _initial_runtime_settings(
         self, settings: Optional[PromptManagerSettings]

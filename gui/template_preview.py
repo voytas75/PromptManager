@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Dict, List, Mapping, Optional, Sequence, Set
 
 from jinja2 import TemplateSyntaxError
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QComboBox,
@@ -31,6 +31,8 @@ from core.templating import SchemaValidationMode, SchemaValidator, TemplateRende
 class TemplatePreviewWidget(QWidget):
     """Provide a JSON-driven variables editor with live Jinja2 previews."""
 
+    run_requested = Signal(str, dict)
+
     _SUCCESS_COLOR = "#047857"
     _ERROR_COLOR = "#b91c1c"
     _WARNING_COLOR = "#b45309"
@@ -45,6 +47,9 @@ class TemplatePreviewWidget(QWidget):
         self._variable_inputs: Dict[str, QLineEdit] = {}
         self._template_parse_error: Optional[str] = None
         self._schema_visible = False
+        self._preview_ready = False
+        self._last_rendered_text: str = ""
+        self._run_enabled = False
         self._build_ui()
         self._update_preview()
 
@@ -170,6 +175,14 @@ class TemplatePreviewWidget(QWidget):
         self._status_label.setWordWrap(True)
         frame_layout.addWidget(self._status_label)
 
+        button_row = QHBoxLayout()
+        button_row.addStretch(1)
+        self._run_button = QPushButton("Run Prompt", frame)
+        self._run_button.setEnabled(False)
+        self._run_button.clicked.connect(self._on_run_clicked)  # type: ignore[arg-type]
+        button_row.addWidget(self._run_button)
+        frame_layout.addLayout(button_row)
+
         layout.addWidget(frame)
 
     def _rebuild_variable_inputs(self) -> None:
@@ -212,16 +225,20 @@ class TemplatePreviewWidget(QWidget):
         return values
 
     def _update_preview(self) -> None:
+        self._last_rendered_text = ""
+        self._preview_ready = False
         if not self._template_text.strip():
             self._update_variable_states(set(), set(), set())
             self._rendered_view.clear()
             self._set_status("Select a prompt to enable template previews.", is_error=False)
+            self._refresh_run_button_state()
             return
 
         if self._template_parse_error:
             self._rendered_view.clear()
             self._show_message_item(self._template_parse_error, self._ERROR_COLOR)
             self._set_status(self._template_parse_error, is_error=True)
+            self._refresh_run_button_state()
             return
 
         variables = self._collect_variables()
@@ -241,6 +258,7 @@ class TemplatePreviewWidget(QWidget):
             self._rendered_view.clear()
             self._update_variable_states(set(variables.keys()), set(), invalid_fields)
             self._set_status(message, is_error=True)
+            self._refresh_run_button_state()
             return
 
         render_result = self._renderer.render(self._template_text, variables)
@@ -257,14 +275,17 @@ class TemplatePreviewWidget(QWidget):
             else:
                 self._rendered_view.clear()
             self._set_status("; ".join(render_result.errors), is_error=True)
+            self._refresh_run_button_state()
             return
 
         self._rendered_view.setPlainText(render_result.rendered_text)
+        self._last_rendered_text = render_result.rendered_text
         if missing:
             self._set_status(
                 f"Missing variables: {', '.join(sorted(missing))}",
                 is_error=True,
             )
+            self._refresh_run_button_state()
             return
 
         if invalid_fields:
@@ -272,9 +293,12 @@ class TemplatePreviewWidget(QWidget):
                 f"Fields failing validation: {', '.join(sorted(invalid_fields))}",
                 is_error=True,
             )
+            self._refresh_run_button_state()
             return
 
+        self._preview_ready = True
         self._set_status("Preview ready.", is_error=False)
+        self._refresh_run_button_state()
 
     def _toggle_schema_visibility(self) -> None:
         self._schema_visible = self._schema_toggle.isChecked()
@@ -336,6 +360,29 @@ class TemplatePreviewWidget(QWidget):
         color = self._ERROR_COLOR if is_error else self._SUCCESS_COLOR
         self._status_label.setStyleSheet(f"color: {color};")
         self._status_label.setText(message)
+
+    def set_run_enabled(self, enabled: bool) -> None:
+        """Enable or disable the Run Prompt button based on executor availability."""
+
+        self._run_enabled = bool(enabled)
+        self._refresh_run_button_state()
+
+    def _refresh_run_button_state(self) -> None:
+        if not hasattr(self, "_run_button"):
+            return
+        can_run = (
+            self._run_enabled
+            and self._preview_ready
+            and bool(self._last_rendered_text.strip())
+        )
+        self._run_button.setEnabled(can_run)
+
+    def _on_run_clicked(self) -> None:
+        if not (self._preview_ready and self._last_rendered_text.strip()):
+            self._set_status("Preview must be ready before running.", is_error=True)
+            return
+        variables = self._collect_variables()
+        self.run_requested.emit(self._last_rendered_text, dict(variables))
 
 
 __all__ = ["TemplatePreviewWidget"]
