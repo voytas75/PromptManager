@@ -49,7 +49,7 @@ def test_store_last_execute_context_task_persists_text_and_syncs() -> None:
     assert settings.synced is True
 
 
-def test_load_execute_context_history_returns_unique_trimmed_entries() -> None:
+def test_load_execute_context_history_preserves_whitespace() -> None:
     settings = _FakeSettings()
     settings.values[_EXECUTE_CONTEXT_HISTORY_KEY] = json.dumps(
         ["  Summarise logs  ", "Summarise logs", "Investigate outages", " "]
@@ -57,7 +57,7 @@ def test_load_execute_context_history_returns_unique_trimmed_entries() -> None:
 
     entries = _load_execute_context_history(settings, limit=3)
 
-    assert entries == ["Summarise logs", "Investigate outages"]
+    assert entries == ["  Summarise logs  ", "Summarise logs", "Investigate outages"]
 
 
 def test_load_execute_context_history_handles_invalid_payload() -> None:
@@ -67,7 +67,7 @@ def test_load_execute_context_history_handles_invalid_payload() -> None:
     assert _load_execute_context_history(settings) == []
 
 
-def test_store_execute_context_history_trims_and_limits() -> None:
+def test_store_execute_context_history_preserves_whitespace_and_limits() -> None:
     settings = _FakeSettings()
 
     _store_execute_context_history(
@@ -76,5 +76,5 @@ def test_store_execute_context_history_trims_and_limits() -> None:
     )
 
     stored = json.loads(settings.values[_EXECUTE_CONTEXT_HISTORY_KEY])
-    assert stored == ["Summarise logs", "Investigate outages"]
+    assert stored == ["  Summarise logs  ", "Investigate outages", "Summarise logs"]
     assert settings.synced is True

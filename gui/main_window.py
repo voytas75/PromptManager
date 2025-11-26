@@ -277,8 +277,8 @@ def _load_execute_context_history(
         return []
     entries: list[str] = []
     for entry in payload:
-        candidate = str(entry).strip()
-        if not candidate or candidate in entries:
+        candidate = str(entry)
+        if not candidate.strip() or candidate in entries:
             continue
         entries.append(candidate)
         if len(entries) >= max(limit, 0):
@@ -291,8 +291,8 @@ def _store_execute_context_history(settings: QSettings, history: Sequence[str]) 
 
     entries: list[str] = []
     for entry in history:
-        candidate = str(entry).strip()
-        if not candidate or candidate in entries:
+        candidate = str(entry)
+        if not candidate.strip() or candidate in entries:
             continue
         entries.append(candidate)
         if len(entries) >= _EXECUTE_CONTEXT_HISTORY_LIMIT:
@@ -965,8 +965,8 @@ class MainWindow(QMainWindow):
             history_entries,
             maxlen=self._execute_context_history_limit,
         )
-        last_history_entry = self._last_execute_context_task.strip()
-        if last_history_entry and last_history_entry not in self._execute_context_history:
+        last_history_entry = self._last_execute_context_task
+        if last_history_entry.strip() and last_history_entry not in self._execute_context_history:
             self._execute_context_history.appendleft(last_history_entry)
             self._persist_execute_context_history()
         self._main_container: Optional[QFrame] = None
@@ -1508,12 +1508,11 @@ class MainWindow(QMainWindow):
     def _record_execute_context_task(self, task_text: str) -> None:
         """Insert *task_text* into the recent execute-context history."""
 
-        trimmed = task_text.strip()
-        if not trimmed:
+        if not task_text.strip():
             return
-        entries: list[str] = [trimmed]
+        entries: list[str] = [task_text]
         for existing in self._execute_context_history:
-            if existing == trimmed:
+            if existing == task_text:
                 continue
             entries.append(existing)
             if len(entries) >= self._execute_context_history_limit:
