@@ -87,7 +87,7 @@ from datetime import datetime, timezone
 from html import escape
 from enum import Enum
 from pathlib import Path
-from typing import Any, Deque, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Deque, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from PySide6.QtCore import (
     QAbstractListModel,
@@ -201,6 +201,10 @@ _CHAT_PALETTE_KEYS = {"user", "assistant"}
 _EXECUTE_CONTEXT_TASK_KEY = "lastExecuteContextTask"
 _EXECUTE_CONTEXT_HISTORY_KEY = "executeContextTaskHistory"
 _EXECUTE_CONTEXT_HISTORY_LIMIT = 15
+_FILTER_CATEGORY_KEY = "filterCategorySlug"
+_FILTER_TAG_KEY = "filterTag"
+_FILTER_QUALITY_KEY = "filterQuality"
+_FILTER_SORT_KEY = "filterSortOrder"
 
 
 def _match_category_label(value: Optional[str], categories: Sequence[PromptCategory]) -> Optional[str]:
@@ -304,6 +308,57 @@ def _store_execute_context_history(settings: QSettings, history: Sequence[str]) 
         settings.sync()
     except Exception:  # pragma: no cover - sync failures depend on platform state
         logger.warning("Unable to sync execute-context history list", exc_info=True)
+
+
+def _load_filter_preferences(settings: QSettings) -> Tuple[Optional[str], Optional[str], Optional[float], Optional[str]]:
+    """Return persisted filter selections (category, tag, quality, sort)."""
+
+    def _clean_text(value: object) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text or None
+
+    category = _clean_text(settings.value(_FILTER_CATEGORY_KEY, None))
+    tag = _clean_text(settings.value(_FILTER_TAG_KEY, None))
+    raw_quality = settings.value(_FILTER_QUALITY_KEY, None)
+    quality: Optional[float] = None
+    if raw_quality not in {None, ""}:
+        try:
+            quality = float(raw_quality)
+        except (TypeError, ValueError):
+            logger.warning("Invalid quality filter value '%s'; resetting to default.", raw_quality)
+            quality = None
+    sort_value = _clean_text(settings.value(_FILTER_SORT_KEY, None))
+    return category, tag, quality, sort_value
+
+
+def _store_filter_preferences(
+    settings: QSettings,
+    *,
+    category_slug: Optional[str],
+    tag: Optional[str],
+    min_quality: float,
+) -> None:
+    """Persist current filter selections."""
+
+    settings.setValue(_FILTER_CATEGORY_KEY, category_slug or "")
+    settings.setValue(_FILTER_TAG_KEY, tag or "")
+    settings.setValue(_FILTER_QUALITY_KEY, float(min_quality))
+    try:
+        settings.sync()
+    except Exception:  # pragma: no cover - sync failures depend on platform state
+        logger.warning("Unable to sync filter preferences", exc_info=True)
+
+
+def _store_sort_preference(settings: QSettings, sort_value: PromptSortOrder) -> None:
+    """Persist the selected prompt sort order."""
+
+    settings.setValue(_FILTER_SORT_KEY, sort_value.value)
+    try:
+        settings.sync()
+    except Exception:  # pragma: no cover
+        logger.warning("Unable to sync sort preference", exc_info=True)
 
 
 def normalise_chat_palette(palette: Optional[Mapping[str, object]]) -> dict[str, str]:
@@ -938,6 +993,9 @@ class MainWindow(QMainWindow):
         self._chat_prompt_id: Optional[uuid.UUID] = None
         self._sort_combo: Optional[QComboBox] = None
         self._sort_order = PromptSortOrder.NAME_ASC
+        self._pending_category_slug: Optional[str] = None
+        self._pending_tag_value: Optional[str] = None
+        self._pending_quality_value: Optional[float] = None
         self._history_limit = 50
         self._runtime_settings = self._initial_runtime_settings(settings)
         self._usage_logger = IntentUsageLogger()
@@ -957,6 +1015,17 @@ class MainWindow(QMainWindow):
         self._template_list_view: Optional[QListView] = None
         self._template_detail_widget: Optional[PromptDetailWidget] = None
         self._layout_settings = QSettings("PromptManager", "MainWindow")
+        (
+            self._pending_category_slug,
+            self._pending_tag_value,
+            self._pending_quality_value,
+            stored_sort_value,
+        ) = _load_filter_preferences(self._layout_settings)
+        if stored_sort_value:
+            try:
+                self._sort_order = PromptSortOrder(stored_sort_value)
+            except ValueError:
+                logger.warning("Unknown stored sort order: %s", stored_sort_value)
         self._last_execute_context_task: str = _load_last_execute_context_task(self._layout_settings)
         self._execute_context_history_limit = _EXECUTE_CONTEXT_HISTORY_LIMIT
         history_entries = _load_execute_context_history(
@@ -1161,6 +1230,11 @@ class MainWindow(QMainWindow):
             self._quality_filter.fontMetrics().horizontalAdvance("10.0") + 32
         )
         self._quality_filter.valueChanged.connect(self._on_filters_changed)
+        if self._pending_quality_value is not None:
+            self._quality_filter.blockSignals(True)
+            self._quality_filter.setValue(self._pending_quality_value)
+            self._quality_filter.blockSignals(False)
+            self._pending_quality_value = None
 
         filter_layout.addWidget(QLabel("Category:", self))
         filter_layout.addWidget(self._category_filter)
@@ -1522,6 +1596,24 @@ class MainWindow(QMainWindow):
         self._execute_context_history = deque(entries, maxlen=self._execute_context_history_limit)
         self._persist_execute_context_history()
 
+    def _persist_filter_preferences(self) -> None:
+        """Persist the current category, tag, and quality filters."""
+
+        category_value = self._category_filter.currentData()
+        tag_value = self._tag_filter.currentData()
+        min_quality = self._quality_filter.value()
+        _store_filter_preferences(
+            self._layout_settings,
+            category_slug=category_value,
+            tag=tag_value,
+            min_quality=min_quality,
+        )
+
+    def _persist_sort_preference(self) -> None:
+        """Persist the currently selected sort order."""
+
+        _store_sort_preference(self._layout_settings, self._sort_order)
+
     def showEvent(self, event: QShowEvent) -> None:  # type: ignore[override]
         """Ensure splitter state is captured once the window is visible."""
 
@@ -1594,28 +1686,34 @@ class MainWindow(QMainWindow):
 
         categories = self._manager.list_categories()
         current_category = self._category_filter.currentData()
+        target_category = current_category or self._pending_category_slug
         self._category_filter.blockSignals(True)
         self._category_filter.clear()
         self._category_filter.addItem("All categories", None)
         for category in categories:
             self._category_filter.addItem(category.label, category.slug)
-        category_index = self._category_filter.findData(current_category)
+        category_index = self._category_filter.findData(target_category)
         self._category_filter.setCurrentIndex(category_index if category_index != -1 else 0)
         self._category_filter.blockSignals(False)
+        if target_category and category_index != -1:
+            self._pending_category_slug = None
 
     def _populate_tag_filter(self, prompts: Sequence[Prompt]) -> None:
         """Populate the tag filter options."""
 
         tags = sorted({tag for prompt in prompts for tag in prompt.tags})
         current_tag = self._tag_filter.currentData()
+        target_tag = current_tag or self._pending_tag_value
         self._tag_filter.blockSignals(True)
         self._tag_filter.clear()
         self._tag_filter.addItem("All tags", None)
         for tag in tags:
             self._tag_filter.addItem(tag, tag)
-        tag_index = self._tag_filter.findData(current_tag)
+        tag_index = self._tag_filter.findData(target_tag)
         self._tag_filter.setCurrentIndex(tag_index if tag_index != -1 else 0)
         self._tag_filter.blockSignals(False)
+        if target_tag and tag_index != -1:
+            self._pending_tag_value = None
 
     def _on_manage_categories_clicked(self) -> None:
         """Open the category management dialog."""
@@ -1740,6 +1838,7 @@ class MainWindow(QMainWindow):
         """Refresh the prompt list when filter widgets change."""
 
         self._refresh_filtered_view(preserve_order=self._preserve_search_order)
+        self._persist_filter_preferences()
 
     def _on_sort_changed(self, index: int) -> None:
         """Re-sort the prompt list when the sort selection changes."""
@@ -1766,6 +1865,7 @@ class MainWindow(QMainWindow):
         else:
             self._detail_widget.clear()
         self._update_intent_hint(sorted_prompts)
+        self._persist_sort_preference()
 
     def _refresh_filtered_view(self, *, preserve_order: bool = False) -> None:
         filtered = self._apply_filters(self._current_prompts)

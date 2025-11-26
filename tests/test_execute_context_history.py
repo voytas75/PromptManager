@@ -1,5 +1,6 @@
-"""Tests for execute-as-context task persistence helpers.
+"""Tests for settings/persistence helpers.
 
+Updates: v0.3.0 - 2025-11-26 - Cover filter preference helpers for category/tag/sort persistence.
 Updates: v0.2.0 - 2025-11-26 - Cover history load/store helpers and trimming logic.
 Updates: v0.1.0 - 2025-11-22 - Cover helper functions that load/store the last task text.
 """
@@ -11,10 +12,18 @@ import json
 from gui.main_window import (
     _EXECUTE_CONTEXT_HISTORY_KEY,
     _EXECUTE_CONTEXT_TASK_KEY,
+    _FILTER_CATEGORY_KEY,
+    _FILTER_QUALITY_KEY,
+    _FILTER_SORT_KEY,
+    _FILTER_TAG_KEY,
     _load_execute_context_history,
+    _load_filter_preferences,
     _load_last_execute_context_task,
     _store_execute_context_history,
+    _store_filter_preferences,
     _store_last_execute_context_task,
+    _store_sort_preference,
+    PromptSortOrder,
 )
 
 
@@ -77,4 +86,54 @@ def test_store_execute_context_history_preserves_whitespace_and_limits() -> None
 
     stored = json.loads(settings.values[_EXECUTE_CONTEXT_HISTORY_KEY])
     assert stored == ["  Summarise logs  ", "Investigate outages", "Summarise logs"]
+    assert settings.synced is True
+
+
+def test_load_filter_preferences_returns_trimmed_state() -> None:
+    settings = _FakeSettings()
+    settings.values[_FILTER_CATEGORY_KEY] = "  incident_response  "
+    settings.values[_FILTER_TAG_KEY] = "  outages  "
+    settings.values[_FILTER_QUALITY_KEY] = "4.5"
+    settings.values[_FILTER_SORT_KEY] = "usage_desc"
+
+    category, tag, quality, sort_value = _load_filter_preferences(settings)
+
+    assert category == "incident_response"
+    assert tag == "outages"
+    assert quality == 4.5
+    assert sort_value == "usage_desc"
+
+
+def test_load_filter_preferences_handles_invalid_quality() -> None:
+    settings = _FakeSettings()
+    settings.values[_FILTER_QUALITY_KEY] = "fast"
+
+    _, _, quality, sort_value = _load_filter_preferences(settings)
+
+    assert quality is None
+    assert sort_value is None
+
+
+def test_store_filter_preferences_persists_values_and_syncs() -> None:
+    settings = _FakeSettings()
+
+    _store_filter_preferences(
+        settings,
+        category_slug="incident_response",
+        tag="outages",
+        min_quality=3.2,
+    )
+
+    assert settings.values[_FILTER_CATEGORY_KEY] == "incident_response"
+    assert settings.values[_FILTER_TAG_KEY] == "outages"
+    assert settings.values[_FILTER_QUALITY_KEY] == 3.2
+    assert settings.synced is True
+
+
+def test_store_sort_preference_persists_value() -> None:
+    settings = _FakeSettings()
+
+    _store_sort_preference(settings, PromptSortOrder.USAGE_DESC)
+
+    assert settings.values[_FILTER_SORT_KEY] == PromptSortOrder.USAGE_DESC.value
     assert settings.synced is True
