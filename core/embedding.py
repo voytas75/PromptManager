@@ -15,7 +15,7 @@ import queue
 import threading
 import time
 import uuid
-from typing import Any, Callable, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple, cast
 
 from models.prompt_model import Prompt
 
@@ -79,7 +79,7 @@ class LiteLLMEmbeddingFunction:
         inputs = list(input)
         if not inputs:
             return []
-        request = {
+        request: Dict[str, Any] = {
             "model": self._model,
             "input": inputs,
         }
@@ -129,15 +129,17 @@ class LiteLLMEmbeddingFunction:
     def _extract_data_array(payload: Any) -> Sequence[Any]:
         """Extract the embedding data array from LiteLLM responses."""
 
+        payload_obj = cast(object, payload)
         if isinstance(payload, Mapping) and "data" in payload:
-            data = payload["data"]
-        elif hasattr(payload, "data"):
-            data = getattr(payload, "data")
+            payload_map = cast(Mapping[str, Any], payload)
+            data_obj: Any = payload_map["data"]
+        elif hasattr(payload_obj, "data"):
+            data_obj = getattr(payload_obj, "data")
         else:
-            data = payload
-        if not isinstance(data, Sequence) or isinstance(data, (str, bytes)):
+            data_obj = payload_obj
+        if not isinstance(data_obj, Sequence) or isinstance(data_obj, (str, bytes)):
             raise EmbeddingGenerationError("LiteLLM embedding response missing data array.")
-        return data
+        return cast(Sequence[Any], data_obj)
 
     @staticmethod
     def _extract_embedding_vector(item: Any, index: int) -> Sequence[Any]:
@@ -145,7 +147,8 @@ class LiteLLMEmbeddingFunction:
 
         candidate: Any
         if isinstance(item, Mapping):
-            candidate = item.get("embedding")
+            mapping_item = cast(Mapping[str, Any], item)
+            candidate = mapping_item.get("embedding")
         elif hasattr(item, "embedding"):
             candidate = getattr(item, "embedding")
         elif hasattr(item, "model_dump"):
@@ -153,7 +156,9 @@ class LiteLLMEmbeddingFunction:
                 dumped = item.model_dump()
             except Exception:  # noqa: BLE001 - fallback when model_dump fails
                 dumped = None
-            candidate = dumped.get("embedding") if isinstance(dumped, Mapping) else None
+            candidate = (
+                cast(Mapping[str, Any], dumped).get("embedding") if isinstance(dumped, Mapping) else None
+            )
         else:
             candidate = item
 
@@ -162,10 +167,10 @@ class LiteLLMEmbeddingFunction:
                 f"LiteLLM response missing embedding at index {index}"
             )
         if isinstance(candidate, Mapping):
-            candidate = candidate.get("embedding")
+            candidate = cast(Mapping[str, Any], candidate).get("embedding")
         if not isinstance(candidate, Sequence) or isinstance(candidate, (str, bytes)):
             raise EmbeddingGenerationError("LiteLLM embedding payload is not a vector.")
-        return candidate
+        return cast(Sequence[Any], candidate)
 
 
 class SentenceTransformersEmbeddingFunction:
@@ -176,27 +181,32 @@ class SentenceTransformersEmbeddingFunction:
             raise ValueError("sentence-transformers backend requires a model name.")
         self._model_name = model
         self._device = device
-        self._model = self._load_model()
+        self._model: Any = self._load_model()
 
-    def _load_model(self):
+    def _load_model(self) -> Any:
         try:  # pragma: no cover - runtime dependency
-            from sentence_transformers import SentenceTransformer
+            from sentence_transformers import SentenceTransformer  # type: ignore[import-not-found]
         except ImportError as exc:
             raise RuntimeError("sentence-transformers is not installed") from exc
-        return SentenceTransformer(self._model_name, device=self._device)
+        sentence_transformer = cast(Any, SentenceTransformer)
+        model: Any = sentence_transformer(self._model_name, device=self._device)
+        return model
 
     def __call__(self, input: Sequence[str]) -> List[List[float]]:
         inputs = list(input)
         if not inputs:
             return []
-        embeddings = self._model.encode(
+        embeddings: Any = self._model.encode(
             inputs,
             convert_to_numpy=True,
             normalize_embeddings=False,
         )
         if hasattr(embeddings, "tolist"):
             embeddings = embeddings.tolist()
-        return [[float(value) for value in vector] for vector in embeddings]
+        if not isinstance(embeddings, Sequence):
+            raise EmbeddingGenerationError("sentence-transformers returned invalid embeddings")
+        embedding_rows = cast(Sequence[Sequence[Any]], embeddings)
+        return [[float(value) for value in vector] for vector in embedding_rows]
 
 
 def create_embedding_function(

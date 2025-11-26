@@ -13,6 +13,7 @@ Updates: v0.1.0 - 2025-11-03 - Added build_prompt_manager helper for GUI/bootstr
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, cast
 
 from config import PromptManagerSettings
@@ -114,19 +115,30 @@ def build_prompt_manager(
     prompt_template_overrides: Dict[str, str] = {}
     templates_source: Optional[PromptTemplateOverrides] = getattr(settings, "prompt_templates", None)
     if templates_source is not None:
+        template_mapping: Mapping[str, object]
         try:
-            dumped = templates_source.model_dump(exclude_none=True)  # type: ignore[attr-defined]
+            template_mapping = templates_source.model_dump(exclude_none=True)  # type: ignore[attr-defined]
         except AttributeError:
-            dumped = {}
-        if isinstance(dumped, dict):
-            for key, value in dumped.items():
-                if not isinstance(value, str):
-                    continue
+            template_mapping = {}
+        for key, value in template_mapping.items():
+            if isinstance(value, str):
                 stripped = value.strip()
                 if stripped:
-                    prompt_template_overrides[key] = stripped
+                    prompt_template_overrides[str(key)] = stripped
 
-    workflow_routing = getattr(settings, "litellm_workflow_models", None) or {}
+    workflow_models_setting = getattr(settings, "litellm_workflow_models", None)
+    workflow_routing: Dict[str, str] = {}
+    workflow_models_mapping: Mapping[str, object]
+    if isinstance(workflow_models_setting, Mapping):
+        workflow_models_mapping = cast(Mapping[str, object], workflow_models_setting)
+    else:
+        workflow_models_mapping = {}
+    for key, value in workflow_models_mapping.items():
+        key_text = key.strip()
+        value_text = str(value).strip().lower()
+        if not key_text or value_text not in {"fast", "inference"}:
+            continue
+        workflow_routing[key_text] = value_text
     fast_model = getattr(settings, "litellm_model", None)
     inference_model = getattr(settings, "litellm_inference_model", None)
 
@@ -190,11 +202,7 @@ def build_prompt_manager(
     intent_classifier = IntentClassifier()
 
     repository_instance = repository or PromptRepository(str(settings.db_path))
-    history_tracker = (
-        HistoryTracker(repository_instance)
-        if isinstance(repository_instance, PromptRepository)
-        else None
-    )
+    history_tracker = HistoryTracker(repository_instance)
     category_definitions = load_category_definitions(
         inline_definitions=getattr(settings, "categories", None),
         path=getattr(settings, "categories_path", None),
@@ -237,8 +245,7 @@ def build_prompt_manager(
         manager_kwargs["structure_prompt_engineer"] = structure_prompt_engineer
     if executor is not None:
         manager_kwargs["executor"] = executor
-    if history_tracker is not None:
-        manager_kwargs["history_tracker"] = history_tracker
+    manager_kwargs["history_tracker"] = history_tracker
 
     manager = PromptManager(**manager_kwargs)
     return manager

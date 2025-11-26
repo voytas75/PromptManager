@@ -13,11 +13,25 @@ import json
 import logging
 import textwrap
 import uuid
+from collections.abc import Iterable as IterableABC
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
+CatalogEntry = Dict[str, Any]
+
+
+def _entry_list_factory() -> List[CatalogDiffEntry]:
+    return []
+
+
+def _prompt_list_factory() -> List[Prompt]:
+    return []
+
+
+def _prompt_pair_list_factory() -> List[Tuple[Prompt, Prompt]]:
+    return []
 
 from models.prompt_model import Prompt
 
@@ -42,41 +56,54 @@ def _ensure_list(value: Any) -> List[str]:
         return []
     if isinstance(value, str):
         return [value]
-    if isinstance(value, Iterable):
-        return [str(item) for item in value]
+    if isinstance(value, IterableABC):
+        iterable = cast(IterableABC[Any], value)
+        return [str(item) for item in iterable]
     return [str(value)]
 
 
-def _read_json(path: Path) -> List[Dict[str, Any]]:
+def _read_json(path: Path) -> List[CatalogEntry]:
     try:
         contents = path.read_text(encoding="utf-8")
     except OSError as exc:
         raise FileNotFoundError(f"Cannot read prompt catalogue: {path}") from exc
     try:
-        payload = json.loads(contents)
+        payload: object = json.loads(contents)
     except json.JSONDecodeError as exc:
         raise ValueError(f"Invalid JSON in {path}") from exc
     if isinstance(payload, dict):
         if "prompts" in payload and isinstance(payload["prompts"], list):
-            return payload["prompts"]
-        return [payload]
+            entries: List[CatalogEntry] = []
+            raw_prompts = cast(List[object], payload["prompts"])
+            for raw_entry in raw_prompts:
+                if not isinstance(raw_entry, dict):
+                    raise ValueError("Catalogue prompts must be JSON objects")
+                entries.append(cast(CatalogEntry, raw_entry))
+            return entries
+        return [cast(CatalogEntry, payload)]
     if isinstance(payload, list):
-        return payload
+        entries = []
+        raw_entries = cast(List[object], payload)
+        for raw_entry in raw_entries:
+            if not isinstance(raw_entry, dict):
+                raise ValueError("Prompt entries must be JSON objects")
+            entries.append(cast(CatalogEntry, raw_entry))
+        return entries
     raise ValueError(f"Prompt catalogue {path} must contain a JSON object or list")
 
 
-def _load_entries_from_path(path: Path) -> List[Dict[str, Any]]:
+def _load_entries_from_path(path: Path) -> List[CatalogEntry]:
     if not path.exists():
         raise FileNotFoundError(str(path))
     if path.is_dir():
-        entries: List[Dict[str, Any]] = []
+        entries: List[CatalogEntry] = []
         for candidate in sorted(path.glob("*.json")):
             entries.extend(_read_json(candidate))
         return entries
     return _read_json(path)
 
 
-def _entry_to_prompt(entry: Dict[str, Any]) -> Prompt:
+def _entry_to_prompt(entry: CatalogEntry) -> Prompt:
     if "name" not in entry or "description" not in entry:
         raise ValueError("Prompt catalogue entries must include 'name' and 'description'")
 
@@ -176,7 +203,7 @@ class CatalogDiffEntry:
 class CatalogDiff:
     """Aggregate diff describing catalogue changes."""
 
-    entries: List[CatalogDiffEntry] = field(default_factory=list)
+    entries: List[CatalogDiffEntry] = field(default_factory=_entry_list_factory)
     added: int = 0
     updated: int = 0
     skipped: int = 0
@@ -199,9 +226,9 @@ class CatalogDiff:
 class CatalogChangePlan:
     """Plan describing how a catalogue import should be applied."""
 
-    create: List[Prompt] = field(default_factory=list)
-    update: List[Tuple[Prompt, Prompt]] = field(default_factory=list)
-    skip: List[Prompt] = field(default_factory=list)
+    create: List[Prompt] = field(default_factory=_prompt_list_factory)
+    update: List[Tuple[Prompt, Prompt]] = field(default_factory=_prompt_pair_list_factory)
+    skip: List[Prompt] = field(default_factory=_prompt_list_factory)
     diff: CatalogDiff = field(default_factory=CatalogDiff)
 
 

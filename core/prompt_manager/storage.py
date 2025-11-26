@@ -20,7 +20,9 @@ from __future__ import annotations
 
 import threading
 from pathlib import Path
-from typing import Optional
+from typing import Any, Iterator, Optional
+
+from models.prompt_model import Prompt
 
 from ..repository import PromptRepository  # relative to core package
 
@@ -53,20 +55,20 @@ class PromptStorage:
     # These will be replaced with richer logic in subsequent refactors.
     # ------------------------------------------------------------------
 
-    def __getattr__(self, item):  # noqa: D401,E501  (simple delegation)
+    def __getattr__(self, item: str) -> Any:  # noqa: D401,E501  (simple delegation)
         return getattr(self._repo, item)
 
     # Example explicit wrapper – others can be added incrementally
-    def list_prompts(self, *args, **kwargs):  # noqa: ANN001,D401,E501
+    def list_prompts(self, limit: Optional[int] = None) -> list[Prompt]:  # noqa: D401,E501
         """Return list of prompts (proxy)."""
 
         with self._lock:
-            return self._repo.list_prompts(*args, **kwargs)
+            return self._repo.list(limit=limit)
 
     # Implementing *iter* provides transparent iteration support
-    def __iter__(self):  # noqa: D401
-        return iter(self._repo)
+    def __iter__(self) -> Iterator[Prompt]:  # noqa: D401
+        return iter(self.list_prompts())
 
     # Length for convenience
-    def __len__(self):  # noqa: D401
-        return len(self._repo)
+    def __len__(self) -> int:  # noqa: D401
+        return len(self.list_prompts())

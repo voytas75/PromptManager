@@ -15,7 +15,7 @@ import time
 import uuid
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Mapping, Optional
+from typing import Any, Callable, Dict, Mapping, Optional, cast
 
 from models.prompt_model import Prompt
 
@@ -170,43 +170,39 @@ class CodexExecutor:
             raise ExecutionError("Unexpected error while calling LiteLLM") from exc
         duration_ms = int((time.perf_counter() - started) * 1000)
 
-        usage: Mapping[str, Any]
+        usage: Dict[str, Any]
         response_text: str
-        raw_payload: Mapping[str, Any]
+        raw_payload: Dict[str, Any]
 
         if stream_enabled:
             if not isinstance(response, Iterable):  # pragma: no cover - defensive
                 raise ExecutionError("LiteLLM streaming response is not iterable")
+            stream_iter = cast(Iterable[Any], response)
             response_text, usage, raw_payload = _consume_streaming_response(
-                response,
+                stream_iter,
                 on_stream,
             )
         else:
-            try:
-                content = response["choices"][0]["message"]["content"]
-            except (KeyError, IndexError, TypeError) as exc:  # pragma: no cover - defensive
-                raise ExecutionError("LiteLLM returned an unexpected payload") from exc
-
+            payload_mapping: Mapping[str, Any]
             if isinstance(response, Mapping):
-                usage = response.get("usage") or {}
-                raw_payload = response
-            else:  # pragma: no cover - defensive
+                payload_mapping = cast(Mapping[str, Any], response)
+            else:
+                serialised_response = _serialise_chunk(response)
+                if not isinstance(serialised_response, Mapping):  # pragma: no cover - defensive
+                    raise ExecutionError("LiteLLM returned an unexpected payload")
+                payload_mapping = cast(Mapping[str, Any], serialised_response)
+            payload_dict: Dict[str, Any] = {str(key): value for key, value in payload_mapping.items()}
+            response_text = _extract_completion_text(payload_dict).strip()
+            usage_value = payload_dict.get("usage")
+            if isinstance(usage_value, Mapping):
+                usage_mapping = cast(Mapping[str, Any], usage_value)
+                usage = {str(key): value for key, value in usage_mapping.items()}
+            else:
                 usage = {}
-                raw_payload = {"raw": response}
-            response_text = str(content).strip()
+            raw_payload = payload_dict
 
         if stream_enabled:
             response_text = response_text.strip()
-
-        if not isinstance(usage, Mapping):  # pragma: no cover - defensive
-            usage = {}
-        else:
-            usage = dict(usage)
-
-        if isinstance(raw_payload, Mapping):
-            raw_payload = dict(raw_payload)
-        else:  # pragma: no cover - defensive
-            raw_payload = {"raw": raw_payload}
 
         result = CodexExecutionResult(
             prompt_id=prompt.id,
@@ -231,14 +227,43 @@ class CodexExecutor:
 __all__ = ["CodexExecutor", "CodexExecutionResult", "ExecutionError"]
 
 
+def _extract_completion_text(payload: Mapping[str, Any]) -> str:
+    """Extract assistant content from a LiteLLM completion payload."""
+
+    choices_value = payload.get("choices")
+    if not isinstance(choices_value, Sequence) or not choices_value:
+        raise ExecutionError("LiteLLM returned an unexpected payload")
+    choices = cast(Sequence[Any], choices_value)
+    first = choices[0]
+    if not isinstance(first, Mapping):
+        raise ExecutionError("LiteLLM returned an unexpected payload")
+    first_mapping = cast(Mapping[str, Any], first)
+    message_value = first_mapping.get("message")
+    if isinstance(message_value, Mapping):
+        message_mapping = cast(Mapping[str, Any], message_value)
+        content = message_mapping.get("content")
+        if content is not None:
+            return str(content)
+    delta_value = first_mapping.get("delta")
+    if isinstance(delta_value, Mapping):
+        delta_mapping = cast(Mapping[str, Any], delta_value)
+        content = delta_mapping.get("content")
+        if content is not None:
+            return str(content)
+    text = first_mapping.get("text")
+    if text is not None:
+        return str(text)
+    raise ExecutionError("LiteLLM response is missing assistant content.")
+
+
 def _consume_streaming_response(
     stream: Iterable[Any],
     on_stream: Optional[Callable[[str], None]] = None,
-) -> tuple[str, Mapping[str, Any], Mapping[str, Any]]:
+) -> tuple[str, Dict[str, Any], Dict[str, Any]]:
     """Aggregate LiteLLM streaming chunks into final response text and metadata."""
 
     accumulated: list[str] = []
-    usage: Mapping[str, Any] = {}
+    usage: Dict[str, Any] = {}
     serialised_chunks: list[Any] = []
 
     for chunk in stream:
@@ -254,7 +279,7 @@ def _consume_streaming_response(
                     logger.warning("Streaming callback raised an exception", exc_info=True)
         chunk_usage = _extract_stream_usage(serialised)
         if chunk_usage:
-            usage = chunk_usage
+            usage = dict(chunk_usage)
 
     final_text = "".join(accumulated)
     raw_payload: Dict[str, Any] = {
@@ -274,7 +299,7 @@ def _serialise_chunk(chunk: Any) -> Any:
     """Best-effort conversion of LiteLLM streaming chunks into serialisable objects."""
 
     if isinstance(chunk, Mapping):
-        return dict(chunk)
+        return dict(cast(Mapping[str, Any], chunk))
     model_dump = getattr(chunk, "model_dump", None)
     if callable(model_dump):  # pragma: no branch - pydantic v2
         try:
@@ -295,34 +320,41 @@ def _extract_stream_text(payload: Any) -> str:
 
     if not isinstance(payload, Mapping):
         return ""
-    choices = payload.get("choices")
+    mapping_payload = cast(Mapping[str, Any], payload)
+    choices = mapping_payload.get("choices")
     if not isinstance(choices, Sequence) or not choices:
         return ""
-    first = choices[0]
+    choices_seq = cast(Sequence[Any], choices)
+    first = choices_seq[0]
     if not isinstance(first, Mapping):
         return ""
-    delta = first.get("delta")
+    first_mapping = cast(Mapping[str, Any], first)
+    delta = first_mapping.get("delta")
     if isinstance(delta, Mapping):
-        content = delta.get("content")
+        delta_mapping = cast(Mapping[str, Any], delta)
+        content = delta_mapping.get("content")
         if content:
             return str(content)
-    message = first.get("message")
+    message = first_mapping.get("message")
     if isinstance(message, Mapping):
-        content = message.get("content")
+        message_mapping = cast(Mapping[str, Any], message)
+        content = message_mapping.get("content")
         if content:
             return str(content)
-    text = first.get("text")
+    text = first_mapping.get("text")
     if isinstance(text, str):
         return text
     return ""
 
 
-def _extract_stream_usage(payload: Any) -> Mapping[str, Any]:
+def _extract_stream_usage(payload: Any) -> Dict[str, Any]:
     """Return usage metadata from a streaming payload if present."""
 
+    empty: Dict[str, Any] = {}
     if not isinstance(payload, Mapping):
-        return {}
-    usage = payload.get("usage")
-    if isinstance(usage, Mapping):
-        return usage
-    return {}
+        return empty
+    usage_value = cast(Mapping[str, Any], payload).get("usage")
+    if isinstance(usage_value, Mapping):
+        usage_mapping = cast(Mapping[str, Any], usage_value)
+        return {str(key): value for key, value in usage_mapping.items()}
+    return empty
