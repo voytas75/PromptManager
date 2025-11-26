@@ -9,7 +9,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Iterable, List, Sequence
+from typing import Iterable, List, Protocol, Sequence, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -204,12 +204,15 @@ class IntentClassifier:
         return prediction
 
 
+PromptLike = TypeVar("PromptLike", bound="PromptLikeProtocol")
+
+
 def rank_by_hints(
-    prompts: Iterable["PromptLike"],
+    prompts: Iterable[PromptLike],
     *,
     category_hints: Sequence[str],
     tag_hints: Sequence[str],
-) -> List["PromptLike"]:
+) -> List[PromptLike]:
     """Return prompts ordered by category/tag hints while preserving stability."""
 
     matched: List[PromptLike] = []
@@ -236,12 +239,20 @@ def rank_by_hints(
     return [*matched, *secondary, *remainder]
 
 
-class PromptLike:
-    """Small protocol describing objects accepted by `rank_by_hints`."""
+class PromptLikeProtocol(Protocol):
+    """Structural type describing objects accepted by `rank_by_hints`."""
 
-    id: object  # pragma: no cover - attribute hints only
-    category: str  # pragma: no cover - attribute hints only
-    tags: Sequence[str]  # pragma: no cover - attribute hints only
+    @property
+    def id(self) -> object:  # pragma: no cover - attribute hints only
+        ...
+
+    @property
+    def category(self) -> str:  # pragma: no cover - attribute hints only
+        ...
+
+    @property
+    def tags(self) -> Sequence[str]:  # pragma: no cover - attribute hints only
+        ...
 
 
 __all__ = [
@@ -250,5 +261,5 @@ __all__ = [
     "IntentLabel",
     "IntentPrediction",
     "rank_by_hints",
+    "PromptLikeProtocol",
 ]
-

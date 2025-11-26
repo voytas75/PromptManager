@@ -49,11 +49,23 @@ import uuid
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple, Union, cast
+from types import TracebackType
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Protocol,
+    Sequence,
+    Tuple,
+    Union,
+    cast,
+)
 
 import chromadb
 from chromadb.api import ClientAPI
-from chromadb.api.models.Collection import Collection
 from chromadb.errors import ChromaError
 
 # ---------------------------------------------------------------------------
@@ -112,15 +124,83 @@ def _normalise_conversation(
         normalised.append({"role": role, "content": str(content)})
     return normalised
 
+
+def _coerce_int(value: Any) -> Optional[int]:
+    """Return an integer representation when conversion succeeds."""
+
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 try:
-    import redis
-    from redis.exceptions import RedisError
+    from redis.exceptions import RedisError as _RedisErrorType
 except ImportError:  # pragma: no cover - redis optional during development
-    redis = None  # type: ignore
-    RedisError = Exception  # type: ignore[misc,assignment]
+    _RedisErrorType = Exception
+
+RedisError = _RedisErrorType
+
+
+# ---------------------------------------------------------------------------
+# Protocols for optional dependencies to keep type hints precise without
+# importing heavy runtime modules when they are absent in development.
+# ---------------------------------------------------------------------------
+RedisValue = Union[str, bytes, memoryview]
+
+
+class RedisConnectionPoolProtocol(Protocol):
+    """Subset of redis-py connection pool used for diagnostics."""
+
+    connection_kwargs: Mapping[str, Any]
+
+    def disconnect(self) -> None:
+        """Close all pooled connections."""
+
+
+class RedisClientProtocol(Protocol):
+    """Subset of redis-py client behaviour used within the manager."""
+
+    connection_pool: Optional[RedisConnectionPoolProtocol]
+
+    def ping(self) -> bool: ...
+
+    def dbsize(self) -> int: ...
+
+    def info(self) -> Mapping[str, Any]: ...
+
+    def get(self, name: str) -> Optional[RedisValue]: ...
+
+    def setex(self, name: str, time: int, value: RedisValue) -> bool: ...
+
+    def delete(self, *names: str) -> int: ...
+
+    def close(self) -> None: ...
+
+
+class CollectionProtocol(Protocol):
+    """Minimal Chroma collection surface consumed by the manager."""
+
+    def count(self) -> int: ...
+
+    def delete(self, **kwargs: Any) -> Any: ...
+
+    def upsert(self, **kwargs: Any) -> Any: ...
+
+    def query(self, **kwargs: Any) -> Mapping[str, Any]: ...
+
+    def peek(self, **kwargs: Any) -> Any: ...
+
 
 from models.category_model import PromptCategory, slugify_category
-from models.prompt_model import Prompt, PromptExecution, PromptForkLink, PromptVersion, UserProfile
+from models.prompt_model import (
+    ExecutionStatus,
+    Prompt,
+    PromptExecution,
+    PromptForkLink,
+    PromptVersion,
+    UserProfile,
+)
 from models.prompt_note import PromptNote
 from models.response_style import ResponseStyle
 from prompt_templates import DEFAULT_PROMPT_TEMPLATES, PROMPT_TEMPLATE_KEYS
@@ -184,8 +264,27 @@ from ..scenario_generation import LiteLLMScenarioGenerator, ScenarioGenerationEr
 logger = logging.getLogger(__name__)
 
 # Public exports of this module (until full split is finished)
+_REEXPORTED_EXCEPTIONS = (
+    CategoryError,
+    CategoryNotFoundError,
+    CategoryStorageError,
+    PromptManagerError,
+    PromptNotFoundError,
+    PromptExecutionUnavailable,
+    PromptExecutionError,
+    PromptHistoryError,
+    PromptStorageError,
+    PromptCacheError,
+    PromptEngineeringUnavailable,
+    ResponseStyleError,
+    ResponseStyleNotFoundError,
+    ResponseStyleStorageError,
+    PromptNoteError,
+    PromptNoteNotFoundError,
+    PromptNoteStorageError,
+)
+
 __all__ = [
-    # Exceptions
     "CategoryError",
     "CategoryNotFoundError",
     "CategoryStorageError",
@@ -203,7 +302,6 @@ __all__ = [
     "PromptNoteError",
     "PromptNoteNotFoundError",
     "PromptNoteStorageError",
-    # Main class will be added later when moved.
 ]
 
 
@@ -237,7 +335,9 @@ _CATEGORY_KEYWORD_HINTS: Sequence[tuple[str, str]] = (
 )
 
 
-def _match_category_label(candidate: Optional[str], categories: Sequence[PromptCategory]) -> Optional[str]:
+def _match_category_label(
+    candidate: Optional[str], categories: Sequence[PromptCategory]
+) -> Optional[str]:
     """Return the stored category label that best matches *candidate*."""
 
     if not candidate:
@@ -264,7 +364,7 @@ class PromptManager:
         db_path: Union[str, Path, None] = None,
         collection_name: str = "prompt_manager",
         cache_ttl_seconds: int = 300,
-        redis_client: Optional["redis.Redis"] = None,
+        redis_client: Optional[RedisClientProtocol] = None,
         chroma_client: Optional[ClientAPI] = None,
         embedding_function: Optional[Any] = None,
         repository: Optional[PromptRepository] = None,
@@ -280,13 +380,13 @@ class PromptManager:
         structure_prompt_engineer: Optional[PromptEngineer] = None,
         fast_model: Optional[str] = None,
         inference_model: Optional[str] = None,
-        workflow_models: Optional[Mapping[str, str]] = None,
+        workflow_models: Optional[Mapping[str, Optional[str]]] = None,
         intent_classifier: Optional[IntentClassifier] = None,
         notification_center: Optional[NotificationCenter] = None,
         executor: Optional[CodexExecutor] = None,
         user_profile: Optional[UserProfile] = None,
         history_tracker: Optional[HistoryTracker] = None,
-        prompt_templates: Optional[Mapping[str, str]] = None,
+        prompt_templates: Optional[Mapping[str, object]] = None,
     ) -> None:
         """Initialise the manager with data backends.
 
@@ -317,9 +417,9 @@ class PromptManager:
 
         self._closed = False
         self._cache_ttl_seconds = cache_ttl_seconds
-        self._redis_client = redis_client
+        self._redis_client: Optional[RedisClientProtocol] = redis_client
         self._chroma_client: Any
-        self._collection: Any = cast(Any, None)
+        self._collection: Optional[CollectionProtocol] = None
         resolved_db_path = Path(db_path).expanduser() if db_path is not None else None
         resolved_chroma_path = Path(chroma_path).expanduser()
         self._db_path = resolved_db_path
@@ -376,8 +476,12 @@ class PromptManager:
         self._prompt_structure_engineer = structure_prompt_engineer or prompt_engineer
         self._litellm_fast_model: Optional[str] = self._normalise_model_identifier(fast_model)
         if self._litellm_fast_model is None and getattr(name_generator, "model", None):
-            self._litellm_fast_model = self._normalise_model_identifier(getattr(name_generator, "model"))
-        self._litellm_inference_model: Optional[str] = self._normalise_model_identifier(inference_model)
+            self._litellm_fast_model = self._normalise_model_identifier(
+                getattr(name_generator, "model")
+            )
+        self._litellm_inference_model: Optional[str] = self._normalise_model_identifier(
+            inference_model
+        )
         self._litellm_workflow_models: Dict[str, str] = {}
         if workflow_models:
             for key, value in workflow_models.items():
@@ -400,8 +504,8 @@ class PromptManager:
             category_generator,
         ):
             if candidate is not None and getattr(candidate, "drop_params", None):
-                params = getattr(candidate, "drop_params")
-                self._litellm_drop_params = tuple(params)  # type: ignore[arg-type]
+                raw_params = cast(Sequence[str], getattr(candidate, "drop_params"))
+                self._litellm_drop_params = tuple(str(param) for param in raw_params)
                 break
         for candidate in (
             executor,
@@ -472,12 +576,15 @@ class PromptManager:
         """Create or refresh the Chroma collection backing prompt embeddings."""
 
         try:
-            collection = self._chroma_client.get_or_create_collection(
-                name=self._collection_name,
-                metadata={"hnsw:space": "cosine"},
-                embedding_function=self._embedding_function,
+            collection = cast(
+                CollectionProtocol,
+                self._chroma_client.get_or_create_collection(
+                    name=self._collection_name,
+                    metadata={"hnsw:space": "cosine"},
+                    embedding_function=self._embedding_function,
+                ),
             )
-            self._collection = cast(Any, collection)
+            self._collection = collection
         except ChromaError as exc:
             raise PromptStorageError("Unable to initialise ChromaDB collection") from exc
 
@@ -534,9 +641,12 @@ class PromptManager:
         body_diff: str
 
     @property
-    def collection(self) -> Collection:
+    def collection(self) -> CollectionProtocol:
         """Expose the underlying Chroma collection."""
-        return cast(Collection, self._collection)
+
+        if self._collection is None:
+            raise PromptManagerError("Chroma collection is not initialised.")
+        return self._collection
 
     @property
     def repository(self) -> PromptRepository:
@@ -628,9 +738,9 @@ class PromptManager:
         details["status"] = "online" if ping_ok else "offline"
 
         connection: Dict[str, Any] = {}
-        pool = getattr(client, "connection_pool", None)
+        pool = cast(Optional[RedisConnectionPoolProtocol], getattr(client, "connection_pool", None))
         if pool is not None:
-            kwargs = getattr(pool, "connection_kwargs", {}) or {}
+            kwargs = cast(Mapping[str, Any], getattr(pool, "connection_kwargs", {}) or {})
             host = kwargs.get("host") or kwargs.get("unix_socket_path")
             if host:
                 connection["host"] = host
@@ -645,34 +755,44 @@ class PromptManager:
         if connection:
             details["connection"] = connection
 
+        stats: Dict[str, Any] = {}
+        hits: Optional[int] = None
+        misses: Optional[int] = None
+
         try:
             dbsize = client.dbsize()
         except RedisError:
             dbsize = None
         if dbsize is not None:
-            details.setdefault("stats", {})["keys"] = int(dbsize)
+            stats["keys"] = int(dbsize)
 
+        info_data: Optional[Mapping[str, Any]] = None
         try:
-            info = client.info()
+            info_data = client.info()
         except RedisError as exc:
-            details.setdefault("stats", {})["info_error"] = str(exc)
+            stats["info_error"] = str(exc)
         else:
-            stats = details.setdefault("stats", {})
             for key in ("used_memory_human", "used_memory_peak_human", "maxmemory_human"):
-                if info.get(key) is not None:
-                    stats[key] = info[key]
-            hits = info.get("keyspace_hits")
-            misses = info.get("keyspace_misses")
+                value = info_data.get(key)
+                if value is not None:
+                    stats[key] = value
+            hits = _coerce_int(info_data.get("keyspace_hits"))
+            misses = _coerce_int(info_data.get("keyspace_misses"))
             if hits is not None:
                 stats["hits"] = hits
             if misses is not None:
                 stats["misses"] = misses
-        if hits and misses is not None:
+            role = info_data.get("role")
+            if role is not None:
+                details["role"] = role
+
+        if hits is not None and misses is not None:
             total = hits + misses
             if total:
                 stats["hit_rate"] = round((hits / total) * 100, 2)
-        if "role" in info:
-            details["role"] = info["role"]
+
+        if stats:
+            details["stats"] = stats
         return details
 
     def get_chroma_details(self) -> Dict[str, Any]:
@@ -697,9 +817,7 @@ class PromptManager:
             path_obj = Path(self._chroma_path)
             if path_obj.exists():
                 size_bytes = sum(
-                    entry.stat().st_size
-                    for entry in path_obj.rglob("*")
-                    if entry.is_file()
+                    entry.stat().st_size for entry in path_obj.rglob("*") if entry.is_file()
                 )
                 details.setdefault("stats", {})["disk_usage_bytes"] = size_bytes
         except (OSError, ValueError):
@@ -845,7 +963,9 @@ class PromptManager:
         try:
             with sqlite3.connect(str(db_path), timeout=60.0) as connection:
                 integrity_rows = connection.execute("PRAGMA integrity_check;").fetchall()
-                integrity_failures = [str(row[0]) for row in integrity_rows if str(row[0]).lower() != "ok"]
+                integrity_failures = [
+                    str(row[0]) for row in integrity_rows if str(row[0]).lower() != "ok"
+                ]
                 if integrity_failures:
                     message = "; ".join(integrity_failures)
                     raise PromptStorageError(f"Chroma integrity check failed: {message}")
@@ -873,10 +993,15 @@ class PromptManager:
             collection.peek(limit=min(count or 1, 10))
             diagnostics.append("Collection peek: ok")
         except ChromaError as exc:
-            raise PromptStorageError("Unable to query Chroma collection during verification") from exc
+            raise PromptStorageError(
+                "Unable to query Chroma collection during verification"
+            ) from exc
 
         summary = "\n".join(diagnostics)
-        logger.info("Chroma vector store verification completed successfully: %s", summary.replace("\n", " | "))
+        logger.info(
+            "Chroma vector store verification completed successfully: %s",
+            summary.replace("\n", " | "),
+        )
         return summary
 
     def compact_repository(self) -> None:
@@ -917,7 +1042,9 @@ class PromptManager:
         try:
             with sqlite3.connect(str(db_path), timeout=60.0) as connection:
                 integrity_rows = connection.execute("PRAGMA integrity_check;").fetchall()
-                integrity_failures = [str(row[0]) for row in integrity_rows if str(row[0]).lower() != "ok"]
+                integrity_failures = [
+                    str(row[0]) for row in integrity_rows if str(row[0]).lower() != "ok"
+                ]
                 if integrity_failures:
                     message = "; ".join(integrity_failures)
                     raise PromptStorageError(f"SQLite integrity check failed: {message}")
@@ -938,7 +1065,10 @@ class PromptManager:
         diagnostics.append(f"Prompts: {prompts_total}")
 
         summary = "\n".join(diagnostics)
-        logger.info("SQLite repository verification completed successfully: %s", summary.replace("\n", " | "))
+        logger.info(
+            "SQLite repository verification completed successfully: %s",
+            summary.replace("\n", " | "),
+        )
         return summary
 
     def clear_usage_logs(self, logs_path: Optional[Union[str, Path]] = None) -> None:
@@ -1020,7 +1150,9 @@ class PromptManager:
 
         text = (context or "").strip()
         if not text:
-            raise DescriptionGenerationError("Prompt context is required to generate a description.")
+            raise DescriptionGenerationError(
+                "Prompt context is required to generate a description."
+            )
         if self._description_generator is None:
             if allow_fallback:
                 logger.debug("Description generator missing; using fallback summary")
@@ -1177,7 +1309,9 @@ class PromptManager:
             tags = ", ".join(tag.strip() for tag in prompt.tags if tag and str(tag).strip())
             if tags:
                 segments.append(f"Common tags: {tags}.")
-            scenario = next((scenario.strip() for scenario in prompt.scenarios if scenario.strip()), "")
+            scenario = next(
+                (scenario.strip() for scenario in prompt.scenarios if scenario.strip()), ""
+            )
             if scenario:
                 segments.append(f"Example use: {scenario}.")
         collapsed = " ".join(context.split())
@@ -1262,7 +1396,7 @@ class PromptManager:
             level=NotificationLevel.INFO,
         ):
             try:
-                return self._prompt_engineer.refine(
+                return engineer.refine(
                     prompt_text,
                     name=name,
                     description=description,
@@ -1462,7 +1596,9 @@ class PromptManager:
             self._apply_rating(prompt_id, rating)
         return execution
 
-    def update_execution_note(self, execution_id: uuid.UUID, note: Optional[str]) -> PromptExecution:
+    def update_execution_note(
+        self, execution_id: uuid.UUID, note: Optional[str]
+    ) -> PromptExecution:
         """Update the note metadata for a history entry."""
 
         tracker = self._history_tracker
@@ -1511,7 +1647,7 @@ class PromptManager:
     def query_executions(
         self,
         *,
-        status: Optional[str] = None,
+        status: Optional[Union[ExecutionStatus, str]] = None,
         prompt_id: Optional[uuid.UUID] = None,
         search: Optional[str] = None,
         limit: Optional[int] = None,
@@ -1521,9 +1657,17 @@ class PromptManager:
         tracker = self._history_tracker
         if tracker is None:
             return []
+        status_filter: Optional[ExecutionStatus] = None
+        if isinstance(status, ExecutionStatus):
+            status_filter = status
+        elif isinstance(status, str):
+            try:
+                status_filter = ExecutionStatus(status)
+            except ValueError:
+                logger.debug("Ignoring unknown execution status filter", extra={"status": status})
         try:
             return tracker.query_executions(
-                status=status,
+                status=status_filter,
                 prompt_id=prompt_id,
                 search=search,
                 limit=limit,
@@ -1540,11 +1684,11 @@ class PromptManager:
         api_version: Optional[str],
         *,
         inference_model: Optional[str] = None,
-        workflow_models: Optional[Mapping[str, str]] = None,
+        workflow_models: Optional[Mapping[str, Optional[str]]] = None,
         drop_params: Optional[Sequence[str]] = None,
         reasoning_effort: Optional[str] = None,
         stream: Optional[bool] = None,
-        prompt_templates: Optional[Mapping[str, str]] = None,
+        prompt_templates: Optional[Mapping[str, object]] = None,
     ) -> None:
         """Configure LiteLLM-backed workflows at runtime."""
 
@@ -1589,9 +1733,7 @@ class PromptManager:
             self._litellm_stream = False
             return
 
-        drop_params_payload = (
-            list(self._litellm_drop_params) if self._litellm_drop_params else None
-        )
+        drop_params_payload = list(self._litellm_drop_params) if self._litellm_drop_params else None
 
         def _select_model(workflow: str) -> Optional[str]:
             selection = self._litellm_workflow_models.get(workflow, "fast")
@@ -1662,7 +1804,7 @@ class PromptManager:
             logger.debug("LiteLLM powered features enabled for intent classifier")
 
     @staticmethod
-    def _normalise_prompt_templates(overrides: Optional[Mapping[str, str]]) -> Dict[str, str]:
+    def _normalise_prompt_templates(overrides: Optional[Mapping[str, object]]) -> Dict[str, str]:
         """Return a cleaned mapping of workflow prompt overrides."""
 
         if not overrides:
@@ -1772,7 +1914,9 @@ class PromptManager:
                 logger.debug("Failed to stop embedding worker cleanly", exc_info=True)
 
         if self._redis_client is not None:
-            redis_close = getattr(self._redis_client, "close", None)
+            redis_close = cast(
+                Optional[Callable[[], Any]], getattr(self._redis_client, "close", None)
+            )
             if callable(redis_close):
                 try:
                     redis_close()
@@ -1781,8 +1925,11 @@ class PromptManager:
                         "Failed to close Redis client cleanly",
                         exc_info=True,
                     )
-            pool = getattr(self._redis_client, "connection_pool", None)
-            disconnect = getattr(pool, "disconnect", None)
+            pool = cast(
+                Optional[RedisConnectionPoolProtocol],
+                getattr(self._redis_client, "connection_pool", None),
+            )
+            disconnect = cast(Optional[Callable[[], Any]], getattr(pool, "disconnect", None))
             if callable(disconnect):
                 try:
                     disconnect()
@@ -1807,7 +1954,12 @@ class PromptManager:
     def __enter__(self) -> "PromptManager":
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> None:  # noqa: ANN001 - dynamic signature
+    def __exit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc: Optional[BaseException],
+        tb: Optional[TracebackType],
+    ) -> None:
         self.close()
 
     def create_prompt(
@@ -2093,7 +2245,7 @@ class PromptManager:
         except RepositoryError as exc:
             raise PromptStorageError(f"Failed to delete prompt {prompt_id} from SQLite") from exc
         try:
-            self._collection.delete(ids=[str(prompt_id)])
+            self.collection.delete(ids=[str(prompt_id)])
         except ChromaError as exc:
             raise PromptStorageError(f"Failed to delete prompt {prompt_id}") from exc
         try:
@@ -2429,9 +2581,11 @@ class PromptManager:
         if not query_text and embedding is None:
             raise ValueError("query_text or embedding must be provided")
 
-        query_embedding: Optional[List[float]]
+        collection = self.collection
+
+        query_embedding: List[float]
         if embedding is not None:
-            query_embedding = list(embedding)
+            query_embedding = [float(value) for value in embedding]
         else:
             try:
                 query_embedding = self._embedding_provider.embed(query_text)
@@ -2442,9 +2596,9 @@ class PromptManager:
             try:
                 results = cast(
                     Dict[str, Any],
-                    self._collection.query(
+                    collection.query(
                         query_texts=None,
-                        query_embeddings=[query_embedding] if query_embedding is not None else None,
+                        query_embeddings=[query_embedding],
                         n_results=limit,
                         where=where,
                         include=["documents", "metadatas", "distances"],
@@ -2456,9 +2610,9 @@ class PromptManager:
                 # distance information.
                 results = cast(
                     Dict[str, Any],
-                    self._collection.query(
+                    collection.query(
                         query_texts=None,
-                        query_embeddings=[query_embedding] if query_embedding is not None else None,
+                        query_embeddings=[query_embedding],
                         n_results=limit,
                         where=where,
                     ),
@@ -2470,7 +2624,19 @@ class PromptManager:
         ids = cast(List[str], results.get("ids", [[]])[0])
         documents = cast(List[str], results.get("documents", [[]])[0])
         metadatas = cast(List[Dict[str, Any]], results.get("metadatas", [[]])[0])
-        distances = cast(List[float], results.get("distances", [[]])[0] if "distances" in results else [None] * len(ids))
+        distance_values: List[Optional[float]]
+        if "distances" in results:
+            distance_payload = cast(List[List[Optional[float]]], results.get("distances", []))
+            distance_values = distance_payload[0] if distance_payload else []
+        else:
+            distance_values = []
+        if len(distance_values) < len(ids):
+            distance_values = [
+                *distance_values,
+                *([None] * (len(ids) - len(distance_values))),
+            ]
+
+        distances = distance_values
 
         for prompt_id, document, metadata, distance in zip(ids, documents, metadatas, distances):
             try:
@@ -2506,7 +2672,9 @@ class PromptManager:
 
         return prompts
 
-    def suggest_prompts(self, query_text: str, *, limit: int = 5) -> "PromptManager.IntentSuggestions":
+    def suggest_prompts(
+        self, query_text: str, *, limit: int = 5
+    ) -> "PromptManager.IntentSuggestions":
         """Return intent-ranked prompt recommendations for the supplied query."""
 
         if limit <= 0:
@@ -2605,7 +2773,10 @@ class PromptManager:
         if not favorite_categories and not favorite_tags:
             return list(prompts)
 
-        category_weights = {name: (len(favorite_categories) - idx) * 2 for idx, name in enumerate(favorite_categories)}
+        category_weights = {
+            name: (len(favorite_categories) - idx) * 2
+            for idx, name in enumerate(favorite_categories)
+        }
         tag_weights = {name: len(favorite_tags) - idx for idx, name in enumerate(favorite_tags)}
 
         scored: List[tuple[float, int, Prompt]] = []
@@ -2729,12 +2900,17 @@ class PromptManager:
         if self._redis_client is None:
             return None
         try:
-            cached = self._redis_client.get(self._cache_key(prompt_id))
+            cached_value: Optional[RedisValue] = self._redis_client.get(self._cache_key(prompt_id))
         except RedisError as exc:  # pragma: no cover - redis not in CI
             raise PromptCacheError("Failed to read prompt from Redis") from exc
-        if not cached:
+        if not cached_value:
             return None
-        cached_text = cached.decode("utf-8") if isinstance(cached, bytes) else str(cached)
+        if isinstance(cached_value, memoryview):
+            cached_text = cached_value.tobytes().decode("utf-8")
+        elif isinstance(cached_value, bytes):
+            cached_text = cached_value.decode("utf-8")
+        else:
+            cached_text = str(cached_value)
         try:
             record = json.loads(cached_text)
         except json.JSONDecodeError as exc:
@@ -2756,7 +2932,9 @@ class PromptManager:
         """Format cache key for prompt entries."""
         return f"prompt:{prompt_id}"
 
-    def _persist_embedding(self, prompt: Prompt, embedding: Sequence[float], *, is_new: bool) -> None:
+    def _persist_embedding(
+        self, prompt: Prompt, embedding: Sequence[float], *, is_new: bool
+    ) -> None:
         """Persist embeddings to Chroma and refresh caches."""
 
         payload: Dict[str, Any] = {
@@ -2765,8 +2943,9 @@ class PromptManager:
             "metadatas": [prompt.to_metadata()],
             "embeddings": [list(embedding)],
         }
+        collection = self.collection
         try:
-            self._collection.upsert(**payload)
+            collection.upsert(**payload)
         except ChromaError as exc:
             raise PromptStorageError(f"Failed to persist embedding for prompt {prompt.id}") from exc
         try:
