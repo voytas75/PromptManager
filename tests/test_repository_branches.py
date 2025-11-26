@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -20,6 +20,7 @@ from core.repository import (
     _json_dumps,
     _json_loads_list,
     _json_loads_optional,
+    _parse_optional_datetime,
 )
 from models.category_model import PromptCategory
 from models.prompt_model import ExecutionStatus, Prompt, PromptExecution
@@ -219,3 +220,122 @@ def test_category_registry_ensure_creates_custom_entry(tmp_path: Path) -> None:
     assert custom.slug == "custom-support"
     stored = repo.list_categories(include_archived=True)
     assert any(entry.slug == "custom-support" for entry in stored)
+
+
+def test_prompt_catalogue_stats_cover_edge_cases(tmp_path: Path) -> None:
+    repo = PromptRepository(str(tmp_path / "repo.db"))
+    recent = _make_prompt("Recent")
+    recent.category = "Docs"
+    recent.tags = ["docs"]
+    stale = _make_prompt("Stale")
+    stale.category = ""
+    stale.tags = []
+    stale.is_active = False
+    stale.last_modified = datetime.now(timezone.utc) - timedelta(days=45)
+
+    repo.add(recent)
+    repo.add(stale)
+
+    stats = repo.get_prompt_catalogue_stats()
+    assert stats.total_prompts == 2
+    assert stats.active_prompts == 1
+    assert stats.inactive_prompts == 1
+    assert stats.prompts_without_category == 1
+    assert stats.prompts_without_tags == 1
+    assert stats.distinct_categories == 1
+    assert stats.distinct_tags == 1
+    assert stats.stale_prompts == 1
+    assert stats.average_tags_per_prompt == pytest.approx(0.5)
+    assert isinstance(stats.last_modified_at, datetime)
+
+
+def test_get_prompts_for_ids_preserves_order(tmp_path: Path) -> None:
+    repo = PromptRepository(str(tmp_path / "repo.db"))
+    first = _make_prompt("First")
+    second = _make_prompt("Second")
+    repo.add(first)
+    repo.add(second)
+
+    ordered = repo.get_prompts_for_ids([second.id, first.id, uuid.uuid4()])
+    assert [prompt.id for prompt in ordered] == [second.id, first.id]
+
+
+def test_set_category_active_toggles_state(tmp_path: Path) -> None:
+    repo = PromptRepository(str(tmp_path / "repo.db"))
+    category = PromptCategory(slug="docs", label="Docs", description="Docs prompts")
+    repo.create_category(category)
+
+    updated = repo.set_category_active("docs", False)
+    assert updated.is_active is False
+
+    with pytest.raises(RepositoryNotFoundError):
+        repo.set_category_active("missing", True)
+
+
+def test_parse_optional_datetime_variants() -> None:
+    naive = datetime(2024, 1, 1, 12, 0, 0)
+    parsed_naive = _parse_optional_datetime(naive)
+    assert parsed_naive.tzinfo is not None
+    iso_text = "2024-01-02T03:04:05"
+    parsed_text = _parse_optional_datetime(iso_text)
+    assert parsed_text.tzinfo is not None
+    assert _parse_optional_datetime("") is None
+
+
+def test_sync_category_definitions_and_get_category(tmp_path: Path) -> None:
+    repo = PromptRepository(str(tmp_path / "repo.db"))
+    categories = [
+        PromptCategory(slug="analysis", label="Analysis", description="Analysis prompts"),
+        PromptCategory(slug="helpers", label="Helpers", description="Helper prompts"),
+    ]
+    created = repo.sync_category_definitions(categories)
+    assert set(entry.slug for entry in created) == {"analysis", "helpers"}
+    assert repo.get_category("analysis") is not None
+
+
+def test_update_prompt_category_labels_applies_to_prompts(tmp_path: Path) -> None:
+    repo = PromptRepository(str(tmp_path / "repo.db"))
+    category = PromptCategory(slug="legacy", label="Legacy", description="Legacy")
+    repo.create_category(category)
+    prompt = _make_prompt("Needs relabel")
+    prompt.category = "Legacy"
+    prompt.category_slug = "legacy"
+    repo.add(prompt)
+    repo.update_prompt_category_labels("legacy", "Modernised")
+    reloaded = repo.get(prompt.id)
+    assert reloaded.category == "Modernised"
+
+
+def test_update_execution_roundtrip(tmp_path: Path) -> None:
+    repo = PromptRepository(str(tmp_path / "repo.db"))
+    prompt = _make_prompt("Execution prompt")
+    repo.add(prompt)
+    execution = PromptExecution(
+        id=uuid.uuid4(),
+        prompt_id=prompt.id,
+        request_text="inspect logs",
+        response_text="done",
+        status=ExecutionStatus.SUCCESS,
+    )
+    repo.add_execution(execution)
+    execution.response_text = "updated"
+    repo.update_execution(execution)
+    assert repo.get_execution(execution.id).response_text == "updated"
+    with pytest.raises(RepositoryNotFoundError):
+        repo.update_execution(
+            PromptExecution(
+                id=uuid.uuid4(),
+                prompt_id=prompt.id,
+                request_text="missing",
+                response_text="missing",
+                status=ExecutionStatus.SUCCESS,
+            )
+        )
+
+
+def test_create_category_duplicate_raises(tmp_path: Path) -> None:
+    repo = PromptRepository(str(tmp_path / "repo.db"))
+    category = PromptCategory(slug="dup", label="Duplicate", description="dup")
+    repo.create_category(category)
+    with pytest.raises(RepositoryError):
+        repo.create_category(category)

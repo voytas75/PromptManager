@@ -11,15 +11,18 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence
+import types
 
 import pytest
 
+from core.embedding import EmbeddingGenerationError
 from core.intent_classifier import IntentClassifier
 from core.name_generation import CategorySuggestionError, DescriptionGenerationError
 from core.prompt_manager import (
     NameGenerationError,
     PromptCacheError,
     PromptManager,
+    PromptManagerError,
     PromptNotFoundError,
     PromptStorageError,
     RepositoryError,
@@ -809,6 +812,147 @@ def test_update_prompt_handles_chroma_and_cache_failures() -> None:
     repo.storage[prompt.id] = _clone_prompt(prompt)
     updated = manager_ok.update_prompt(prompt)
     assert updated.id == prompt.id
+
+
+def test_suggest_prompts_handles_repository_error_on_empty_query() -> None:
+    class _Repo(_RecordingRepository):
+        def list(self, limit: Optional[int] = None) -> List[Prompt]:  # type: ignore[override]
+            raise RepositoryError("list failed")
+
+    manager = _build_manager(repository=_Repo())
+    with pytest.raises(PromptStorageError):
+        manager.suggest_prompts("   ", limit=1)
+
+
+def test_suggest_prompts_handles_initial_search_errors() -> None:
+    manager = _build_manager()
+
+    def _fail_search(self: PromptManager, *_: Any, **__: Any) -> List[Prompt]:
+        raise PromptManagerError("search failed")
+
+    manager.search_prompts = types.MethodType(_fail_search, manager)
+    result = manager.suggest_prompts("Find diagnostics")
+    assert result.fallback_used is True
+
+
+def test_suggest_prompts_handles_fallback_search_errors() -> None:
+    manager = _build_manager()
+    calls = {"count": 0}
+
+    def _search(self: PromptManager, query: str, *, limit: int = 5) -> List[Prompt]:
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return []
+        raise PromptManagerError("fallback failed")
+
+    manager.search_prompts = types.MethodType(_search, manager)
+    result = manager.suggest_prompts("Investigate ci flakes", limit=1)
+    assert result.fallback_used is True
+
+
+def test_suggest_prompts_raises_when_repository_fallback_fails() -> None:
+    class _Repo(_RecordingRepository):
+        def list(self, limit: Optional[int] = None) -> List[Prompt]:  # type: ignore[override]
+            raise RepositoryError("list fail")
+
+    manager = _build_manager(repository=_Repo())
+
+    def _empty_search(self: PromptManager, *_: Any, **__: Any) -> List[Prompt]:
+        return []
+
+    manager.search_prompts = types.MethodType(_empty_search, manager)
+    with pytest.raises(PromptStorageError):
+        manager.suggest_prompts("Observability prompts")
+
+
+def test_update_prompt_requires_existing_prompt_metadata() -> None:
+    prompt = _sample_prompt()
+
+    class _MissingRepo(_RecordingRepository):
+        def get(self, prompt_id: uuid.UUID) -> Prompt:  # type: ignore[override]
+            raise RepositoryNotFoundError("missing get")
+
+    manager_missing = _build_manager(repository=_MissingRepo())
+    with pytest.raises(PromptNotFoundError):
+        manager_missing.update_prompt(prompt)
+
+    class _ErrorRepo(_RecordingRepository):
+        def get(self, prompt_id: uuid.UUID) -> Prompt:  # type: ignore[override]
+            raise RepositoryError("broken get")
+
+    manager_error = _build_manager(repository=_ErrorRepo())
+    with pytest.raises(PromptStorageError):
+        manager_error.update_prompt(prompt)
+
+
+def test_update_prompt_handles_version_lookup_failures() -> None:
+    prompt = _sample_prompt()
+
+    class _VersionRepo(_RecordingRepository):
+        def __init__(self) -> None:
+            super().__init__()
+            self.storage[prompt.id] = _clone_prompt(prompt)
+
+        def get_prompt_latest_version(self, prompt_id: uuid.UUID) -> Optional[PromptVersion]:  # noqa: D401
+            raise RepositoryError("version lookup failed")
+
+    repo = _VersionRepo()
+    manager = _build_manager(repository=repo)
+    assert manager.update_prompt(prompt).id == prompt.id
+
+
+def test_update_prompt_skips_version_when_body_unchanged() -> None:
+    prompt = _sample_prompt()
+
+    class _VersionRepo(_RecordingRepository):
+        def __init__(self) -> None:
+            super().__init__()
+            self.storage[prompt.id] = _clone_prompt(prompt)
+
+        def get_prompt_latest_version(self, prompt_id: uuid.UUID) -> Optional[PromptVersion]:  # noqa: D401
+            return PromptVersion(
+                id=1,
+                prompt_id=prompt_id,
+                version_number=0,
+                created_at=datetime.now(timezone.utc),
+                parent_version_id=None,
+                commit_message=None,
+                snapshot=self.storage[prompt_id].to_record(),
+            )
+
+    repo = _VersionRepo()
+    manager = _build_manager(repository=repo)
+    result = manager.update_prompt(prompt)
+    assert result.version == prompt.version
+
+
+def test_update_prompt_schedules_embedding_refresh_on_failure() -> None:
+    prompt = _sample_prompt()
+    repo = _RecordingRepository()
+    repo.storage[prompt.id] = _clone_prompt(prompt)
+    manager = _build_manager(repository=repo)
+
+    class _FailingEmbeddingProvider:
+        def embed(self, _: str) -> List[float]:
+            raise EmbeddingGenerationError("fail")
+
+    class _Worker:
+        def __init__(self) -> None:
+            self.scheduled: List[uuid.UUID] = []
+
+        def schedule(self, prompt_id: uuid.UUID) -> None:
+            self.scheduled.append(prompt_id)
+
+    manager._embedding_provider = _FailingEmbeddingProvider()  # type: ignore[assignment]
+    worker = _Worker()
+    manager._embedding_worker = worker  # type: ignore[assignment]
+
+    def _cache_fail(_: Prompt) -> None:
+        raise PromptCacheError("cache")
+
+    manager._cache_prompt = _cache_fail  # type: ignore[assignment]
+    assert manager.update_prompt(prompt).id == prompt.id
+    assert worker.scheduled == [prompt.id]
 
 
 def test_delete_prompt_handles_repository_and_chroma_errors() -> None:
