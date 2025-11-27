@@ -1,5 +1,6 @@
 """Workspace template preview widget with live variable validation.
 
+Updates: v0.2.0 - 2025-11-27 - Persist template variables and schema settings per prompt using QSettings.
 Updates: v0.1.9 - 2025-11-27 - Expose run trigger for external shortcuts and publish run state changes.
 Updates: v0.1.8 - 2025-11-27 - Move schema toggle controls above editors and collapse the schema panel when hidden.
 Updates: v0.1.7 - 2025-11-27 - Make the variables/schema editors and rendered preview vertically resizable.
@@ -14,10 +15,11 @@ Updates: v0.1.0 - 2025-11-25 - Add dynamic Jinja2 preview with custom filters an
 
 from __future__ import annotations
 
+import json
 from typing import Dict, List, Mapping, Optional, Sequence, Set
 
 from jinja2 import TemplateSyntaxError
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSettings, Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QFrame,
@@ -61,13 +63,17 @@ class TemplatePreviewWidget(QWidget):
         self._last_rendered_text: str = ""
         self._run_enabled = False
         self._last_run_ready = False
+        self._current_prompt_id: Optional[str] = None
+        self._state_store = QSettings("PromptManager", "TemplatePreviewState")
+        self._suspend_persist = False
         self._build_ui()
         self._update_preview()
 
-    def set_template(self, template_text: str) -> None:
+    def set_template(self, template_text: str, prompt_id: Optional[str] = None) -> None:
         """Load a new template and refresh the preview state."""
 
         self._template_text = template_text or ""
+        self._current_prompt_id = prompt_id
         self._template_parse_error = None
         if not self._template_text.strip():
             self._variable_names = []
@@ -83,12 +89,13 @@ class TemplatePreviewWidget(QWidget):
             status = "Template contains syntax errors."
         self._template_hint.setText(status)
         self._rebuild_variable_inputs()
+        self._restore_persisted_state()
         self._update_preview()
 
     def clear_template(self) -> None:
         """Reset the widget to an empty template state."""
 
-        self.set_template("")
+        self.set_template("", None)
 
     def variables_payload(self) -> Mapping[str, object]:
         """Return the current variables dictionary assembled from form inputs."""
@@ -252,70 +259,73 @@ class TemplatePreviewWidget(QWidget):
     def _update_preview(self) -> None:
         self._last_rendered_text = ""
         self._preview_ready = False
-        if not self._template_text.strip():
-            self._rendered_view.clear()
-            self._set_status("Select a prompt to enable template previews.", is_error=False)
-            self._refresh_run_button_state()
-            return
+        try:
+            if not self._template_text.strip():
+                self._rendered_view.clear()
+                self._set_status("Select a prompt to enable template previews.", is_error=False)
+                self._refresh_run_button_state()
+                return
 
-        if self._template_parse_error:
-            self._rendered_view.setPlainText(self._template_text)
-            self._set_status(self._template_parse_error, is_error=True)
-            self._refresh_run_button_state()
-            return
+            if self._template_parse_error:
+                self._rendered_view.setPlainText(self._template_text)
+                self._set_status(self._template_parse_error, is_error=True)
+                self._refresh_run_button_state()
+                return
 
-        variables = self._collect_variables()
+            variables = self._collect_variables()
 
-        schema_mode = SchemaValidationMode.from_string(
-            self._schema_mode.currentData()
-            if self._schema_visible
-            else SchemaValidationMode.NONE.value
-        )
-        schema_text = self._schema_input.toPlainText() if self._schema_visible else ""
-        schema_result = self._validator.validate(variables, schema_text, mode=schema_mode)
-        invalid_fields: Set[str] = self._top_level_fields(schema_result.field_errors)
-        if not schema_result.is_valid:
-            message = "; ".join(
-                schema_result.errors or [schema_result.schema_error or "Schema error"]
+            schema_mode = SchemaValidationMode.from_string(
+                self._schema_mode.currentData()
+                if self._schema_visible
+                else SchemaValidationMode.NONE.value
             )
-            self._rendered_view.clear()
-            self._set_status(message, is_error=True)
+            schema_text = self._schema_input.toPlainText() if self._schema_visible else ""
+            schema_result = self._validator.validate(variables, schema_text, mode=schema_mode)
+            invalid_fields: Set[str] = self._top_level_fields(schema_result.field_errors)
+            if not schema_result.is_valid:
+                message = "; ".join(
+                    schema_result.errors or [schema_result.schema_error or "Schema error"]
+                )
+                self._rendered_view.clear()
+                self._set_status(message, is_error=True)
+                self._refresh_run_button_state()
+                return
+
+            render_result = self._renderer.render(self._template_text, variables)
+            missing = set(render_result.missing_variables)
+            for name in self._variable_names:
+                if name not in variables:
+                    missing.add(name)
+
+            if render_result.errors:
+                self._rendered_view.setPlainText(self._template_text)
+                self._set_status("; ".join(render_result.errors), is_error=True)
+                self._refresh_run_button_state()
+                return
+
+            self._rendered_view.setPlainText(render_result.rendered_text)
+            self._last_rendered_text = render_result.rendered_text
+            if missing:
+                self._set_status(
+                    f"Missing variables: {', '.join(sorted(missing))}",
+                    is_error=True,
+                )
+                self._refresh_run_button_state()
+                return
+
+            if invalid_fields:
+                self._set_status(
+                    f"Fields failing validation: {', '.join(sorted(invalid_fields))}",
+                    is_error=True,
+                )
+                self._refresh_run_button_state()
+                return
+
+            self._preview_ready = True
+            self._set_status("Preview ready.", is_error=False)
             self._refresh_run_button_state()
-            return
-
-        render_result = self._renderer.render(self._template_text, variables)
-        missing = set(render_result.missing_variables)
-        for name in self._variable_names:
-            if name not in variables:
-                missing.add(name)
-
-        if render_result.errors:
-            self._rendered_view.setPlainText(self._template_text)
-            self._set_status("; ".join(render_result.errors), is_error=True)
-            self._refresh_run_button_state()
-            return
-
-        self._rendered_view.setPlainText(render_result.rendered_text)
-        self._last_rendered_text = render_result.rendered_text
-        if missing:
-            self._set_status(
-                f"Missing variables: {', '.join(sorted(missing))}",
-                is_error=True,
-            )
-            self._refresh_run_button_state()
-            return
-
-        if invalid_fields:
-            self._set_status(
-                f"Fields failing validation: {', '.join(sorted(invalid_fields))}",
-                is_error=True,
-            )
-            self._refresh_run_button_state()
-            return
-
-        self._preview_ready = True
-        self._set_status("Preview ready.", is_error=False)
-        self._refresh_run_button_state()
+        finally:
+            self._persist_state()
 
     def _toggle_schema_visibility(self) -> None:
         self._schema_visible = self._schema_toggle.isChecked()
@@ -371,6 +381,61 @@ class TemplatePreviewWidget(QWidget):
         variables = self._collect_variables()
         self.run_requested.emit(self._last_rendered_text, dict(variables))
         return True
+
+    def _restore_persisted_state(self) -> None:
+        key = self._state_key()
+        if key is None:
+            return
+        raw_value = self._state_store.value(key)
+        if not isinstance(raw_value, str):
+            return
+        try:
+            payload = json.loads(raw_value)
+        except json.JSONDecodeError:
+            return
+        variables = payload.get("variables")
+        schema_visible = payload.get("schema_visible")
+        schema_text = payload.get("schema_text")
+        schema_mode_value = payload.get("schema_mode")
+        self._suspend_persist = True
+        try:
+            if isinstance(variables, dict):
+                for name, value in variables.items():
+                    widget = self._variable_inputs.get(name)
+                    if widget is not None:
+                        widget.setPlainText(str(value))
+            if isinstance(schema_text, str) and self._schema_input.toPlainText() != schema_text:
+                self._schema_input.setPlainText(schema_text)
+            if isinstance(schema_visible, bool) and self._schema_toggle.isChecked() != schema_visible:
+                self._schema_toggle.setChecked(schema_visible)
+            if isinstance(schema_mode_value, str):
+                index = self._schema_mode.findData(schema_mode_value)
+                if index >= 0 and index != self._schema_mode.currentIndex():
+                    self._schema_mode.setCurrentIndex(index)
+        finally:
+            self._suspend_persist = False
+
+    def _persist_state(self) -> None:
+        if self._suspend_persist:
+            return
+        key = self._state_key()
+        if key is None:
+            return
+        state = {
+            "variables": self._variable_text_payload(),
+            "schema_visible": self._schema_toggle.isChecked(),
+            "schema_text": self._schema_input.toPlainText(),
+            "schema_mode": self._schema_mode.currentData(),
+        }
+        self._state_store.setValue(key, json.dumps(state))
+
+    def _state_key(self) -> Optional[str]:
+        if not self._current_prompt_id:
+            return None
+        return f"prompt/{self._current_prompt_id}"
+
+    def _variable_text_payload(self) -> Dict[str, str]:
+        return {name: widget.toPlainText() for name, widget in self._variable_inputs.items()}
 
     @property
     def content_splitter(self) -> QSplitter:

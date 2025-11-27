@@ -4088,7 +4088,7 @@ class MainWindow(QMainWindow):
             self._template_preview.clear_template()
             return
         template_text = prompt.context or prompt.description or ""
-        self._template_preview.set_template(template_text)
+        self._template_preview.set_template(template_text, str(prompt.id))
 
     def _on_template_run_state_changed(self, can_run: bool) -> None:
         """Synchronise the Template tab shortcut button with preview availability."""
