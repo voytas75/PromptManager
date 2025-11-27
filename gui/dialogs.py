@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.11.3 - 2025-11-27 - Add busy indicators to prompt metadata generators.
 Updates: v0.11.2 - 2025-11-22 - Allow selecting prompt categories from the registry list.
 Updates: v0.11.1 - 2025-11-22 - Add execute-as-context shortcut to the prompt dialog.
 Updates: v0.11.0 - 2025-11-22 - Add prompt category management dialog with create/edit workflows.
@@ -55,7 +56,7 @@ from copy import deepcopy
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, Dict, List, NamedTuple, Optional, Sequence
+from typing import Callable, Dict, List, NamedTuple, Optional, Sequence, TypeVar
 
 from PySide6.QtCore import QEvent, Qt, Signal
 from PySide6.QtGui import QGuiApplication, QPalette
@@ -96,6 +97,7 @@ try:
 except ImportError:  # pragma: no cover – fallback for direct execution
     from gui.resources import load_application_icon  # type: ignore
 
+from .processing_indicator import ProcessingIndicator
 from core import (
     CatalogDiff,
     CatalogDiffEntry,
@@ -118,6 +120,7 @@ from models.response_style import ResponseStyle
 logger = logging.getLogger("prompt_manager.gui.dialogs")
 
 _WORD_PATTERN = re.compile(r"[A-Za-z0-9]+")
+_TaskResult = TypeVar("_TaskResult")
 
 
 class SystemInfo(NamedTuple):
@@ -742,11 +745,27 @@ class PromptDialog(QDialog):
         self._result_prompt = None
         self.accept()
 
+    def _run_with_indicator(
+        self,
+        message: str,
+        func: Callable[..., _TaskResult],
+        *args,
+        **kwargs,
+    ) -> _TaskResult:
+        """Execute *func* on a worker thread while showing a busy indicator."""
+
+        indicator = ProcessingIndicator(self, message)
+        return indicator.run(func, *args, **kwargs)
+
     def _on_generate_name_clicked(self) -> None:
         """Generate a prompt name from the context field."""
 
         try:
-            suggestion = self._generate_name(self._context_input.toPlainText())
+            suggestion = self._run_with_indicator(
+                "Generating prompt name…",
+                self._generate_name,
+                self._context_input.toPlainText(),
+            )
         except NameGenerationError as exc:
             QMessageBox.warning(self, "Name generation failed", str(exc))
             return
@@ -760,7 +779,14 @@ class PromptDialog(QDialog):
             return
         context = self._context_input.toPlainText()
         try:
-            suggestion = (self._category_generator(context) or "").strip()
+            suggestion = (
+                self._run_with_indicator(
+                    "Generating category suggestion…",
+                    self._category_generator,
+                    context,
+                )
+                or ""
+            ).strip()
         except Exception as exc:  # noqa: BLE001 - surface generator failures to the user
             QMessageBox.warning(self, "Category suggestion failed", str(exc))
             return
@@ -780,7 +806,11 @@ class PromptDialog(QDialog):
             return
         context = self._context_input.toPlainText()
         try:
-            suggestions = self._tags_generator(context) or []
+            suggestions = self._run_with_indicator(
+                "Generating tags…",
+                self._tags_generator,
+                context,
+            ) or []
         except Exception as exc:  # noqa: BLE001 - surface generator failures to the user
             QMessageBox.warning(self, "Tag suggestion failed", str(exc))
             return
@@ -934,7 +964,11 @@ class PromptDialog(QDialog):
             )
             return
         try:
-            scenarios = self._generate_scenarios(context)
+            scenarios = self._run_with_indicator(
+                "Generating example scenarios…",
+                self._generate_scenarios,
+                context,
+            )
         except ScenarioGenerationError as exc:
             QMessageBox.warning(self, "Scenario generation failed", str(exc))
             return
