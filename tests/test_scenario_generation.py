@@ -42,6 +42,17 @@ def test_extract_candidates_supports_multiple_payload_shapes() -> None:
     assert _extract_candidates(plain_text) == ["First line", "Second line"]
 
 
+def test_extract_candidates_strips_markdown_code_fences() -> None:
+    """Scenario responses wrapped in Markdown fences should be cleaned."""
+
+    fenced = """```json\nInitiate collaborative prompt refinement.\nGuide multi-role experts to iterate on drafts.\n```"""
+
+    assert _extract_candidates(fenced) == [
+        "Initiate collaborative prompt refinement.",
+        "Guide multi-role experts to iterate on drafts.",
+    ]
+
+
 def test_extract_candidates_handles_partial_json_arrays() -> None:
     """Truncated JSON arrays should still produce clean scenario entries."""
 

@@ -1,5 +1,6 @@
 """LiteLLM-backed prompt scenario generation utilities.
 
+Updates: v0.1.3 - 2025-11-27 - Strip Markdown code fences before parsing scenarios.
 Updates: v0.1.2 - 2025-11-23 - Support configurable system prompt overrides.
 Updates: v0.1.1 - 2025-11-05 - Remove explicit LiteLLM timeout to rely on provider defaults.
 Updates: v0.1.0 - 2025-11-19 - Introduce scenario generator for prompt usage guidance.
@@ -48,9 +49,25 @@ def _normalise_scenarios(candidates: Sequence[str], limit: int) -> List[str]:
     return cleaned
 
 
+def _strip_code_fences(response_text: str) -> str:
+    """Remove leading/trailing Markdown code fences to aid parsing."""
+
+    stripped = response_text.lstrip()
+    if not stripped.startswith("```"):
+        return response_text
+    lines = stripped.splitlines()
+    if not lines:
+        return ""
+    lines = lines[1:]
+    while lines and lines[-1].strip().startswith("```"):
+        lines.pop()
+    return "\n".join(lines).strip()
+
+
 def _extract_candidates(response_text: str) -> List[str]:
     """Parse LiteLLM output into a list of candidate scenario strings."""
 
+    response_text = _strip_code_fences(response_text)
     stripped = response_text.strip()
     if not stripped:
         return []
@@ -68,6 +85,8 @@ def _extract_candidates(response_text: str) -> List[str]:
                 text = text[:-1].strip()
             if len(text) >= 2 and text[0] == text[-1] and text[0] in {'"', "'", "`"}:
                 text = text[1:-1].strip()
+            if text.startswith("```") or text.endswith("```"):
+                continue
             if text:
                 cleaned.append(text)
         return cleaned
