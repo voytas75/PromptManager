@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.11.7 - 2025-11-27 - Add copy prompt body control to the version history dialog.
 Updates: v0.11.6 - 2025-11-27 - Add prompt part selector to response style dialog and rename copy to prompt parts.
 Updates: v0.11.5 - 2025-11-27 - Add import fallback for processing indicator in test harnesses.
 Updates: v0.11.4 - 2025-11-27 - Ensure clearing scenarios removes persisted metadata.
@@ -3031,9 +3032,13 @@ class PromptVersionHistoryDialog(QDialog):
         refresh_button.clicked.connect(self._load_versions)  # type: ignore[arg-type]
         button_row.addWidget(refresh_button)
 
-        copy_button = QPushButton("Copy Snapshot", self)
-        copy_button.clicked.connect(self._copy_snapshot_to_clipboard)  # type: ignore[arg-type]
-        button_row.addWidget(copy_button)
+        copy_snapshot_button = QPushButton("Copy Snapshot", self)
+        copy_snapshot_button.clicked.connect(self._copy_snapshot_to_clipboard)  # type: ignore[arg-type]
+        button_row.addWidget(copy_snapshot_button)
+
+        copy_body_button = QPushButton("Copy Prompt Body", self)
+        copy_body_button.clicked.connect(self._copy_body_to_clipboard)  # type: ignore[arg-type]
+        button_row.addWidget(copy_body_button)
 
         restore_button = QPushButton("Restore Version", self)
         restore_button.clicked.connect(self._on_restore_clicked)  # type: ignore[arg-type]
@@ -3074,13 +3079,7 @@ class PromptVersionHistoryDialog(QDialog):
         snapshot_text = json.dumps(version.snapshot, ensure_ascii=False, indent=2)
         self._snapshot_view.setPlainText(snapshot_text)
 
-        raw_body = version.snapshot.get("context")
-        if isinstance(raw_body, str) and raw_body.strip():
-            body_text = raw_body
-        elif raw_body:
-            body_text = str(raw_body)
-        else:
-            body_text = self._EMPTY_BODY_TEXT
+        body_text = self._body_text_for_version(version)
         self._body_view.setPlainText(body_text)
 
         previous_version = self._previous_version(version)
@@ -3119,6 +3118,16 @@ class PromptVersionHistoryDialog(QDialog):
             return self._versions[next_index]
         return None
 
+    def _body_text_for_version(self, version: PromptVersion) -> str:
+        """Return the prompt body stored in the snapshot or a placeholder."""
+
+        raw_body = version.snapshot.get("context")
+        if isinstance(raw_body, str) and raw_body.strip():
+            return raw_body
+        if raw_body:
+            return str(raw_body)
+        return self._EMPTY_BODY_TEXT
+
     def _copy_snapshot_to_clipboard(self) -> None:
         version = self._selected_version()
         if version is None:
@@ -3126,6 +3135,16 @@ class PromptVersionHistoryDialog(QDialog):
         snapshot_text = json.dumps(version.snapshot, ensure_ascii=False, indent=2)
         QGuiApplication.clipboard().setText(snapshot_text)
         self._status_callback("Snapshot copied to clipboard", 2000)
+
+    def _copy_body_to_clipboard(self) -> None:
+        """Copy the selected prompt version body to the clipboard."""
+
+        version = self._selected_version()
+        if version is None:
+            return
+        body_text = self._body_text_for_version(version)
+        QGuiApplication.clipboard().setText(body_text)
+        self._status_callback("Prompt body copied to clipboard", 2000)
 
     def _on_restore_clicked(self) -> None:
         version = self._selected_version()
