@@ -1,5 +1,6 @@
 """Workspace template preview widget with live variable validation.
 
+Updates: v0.1.4 - 2025-11-27 - Add contextual hints for template syntax errors.
 Updates: v0.1.3 - 2025-11-27 - Keep raw templates visible while surfacing parse/render errors.
 Updates: v0.1.2 - 2025-11-27 - Make rendered prompt view resizable with a splitter.
 Updates: v0.1.1 - 2025-11-27 - Capture variables with multiline editors sized to four lines.
@@ -28,7 +29,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from core.templating import SchemaValidationMode, SchemaValidator, TemplateRenderer
+from core.templating import (
+    SchemaValidationMode,
+    SchemaValidator,
+    TemplateRenderer,
+    format_template_syntax_error,
+)
 
 
 class TemplatePreviewWidget(QWidget):
@@ -71,9 +77,7 @@ class TemplatePreviewWidget(QWidget):
             status = f"Detected {len(self._variable_names)} variable(s)."
         except TemplateSyntaxError as exc:
             self._variable_names = []
-            self._template_parse_error = (
-                f"Template syntax error on line {exc.lineno}: {exc.message}"
-            )
+            self._template_parse_error = format_template_syntax_error(self._template_text, exc)
             status = "Template contains syntax errors."
         self._template_hint.setText(status)
         self._rebuild_variable_inputs()

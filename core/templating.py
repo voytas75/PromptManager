@@ -1,5 +1,6 @@
 """Jinja2 templating utilities for workspace previews and validation.
 
+Updates: v0.1.1 - 2025-11-27 - Add contextual hints to Jinja2 syntax errors.
 Updates: v0.1.0 - 2025-11-25 - Add strict Jinja2 renderer, custom filters,
 and schema validation helpers.
 """
@@ -52,6 +53,71 @@ class TemplateRenderResult:
     missing_variables: Set[str] = field(default_factory=set)
 
 
+def format_template_syntax_error(template_text: str, exc: TemplateSyntaxError) -> str:
+    """Return a descriptive syntax error message with line context and hints."""
+
+    base = f"Template syntax error on line {exc.lineno}: {exc.message}"
+    line_text = _line_at(template_text, exc.lineno)
+    if line_text:
+        snippet = line_text.strip()
+        if snippet:
+            base = f"{base} | Line {exc.lineno}: {snippet}"
+    hint = _delimiter_hint(line_text)
+    if hint:
+        base = f"{base} Hint: {hint}"
+    return base
+
+
+def _line_at(text: str, number: int) -> str:
+    if number <= 0:
+        return ""
+    lines = text.splitlines()
+    if number > len(lines):
+        return ""
+    return lines[number - 1]
+
+
+def _delimiter_hint(line_text: str | None) -> str | None:
+    if not line_text:
+        return None
+    counts = {
+        "{{": line_text.count("{{"),
+        "}}": line_text.count("}}"),
+        "{%": line_text.count("{%"),
+        "%}": line_text.count("%}"),
+        "{#": line_text.count("{#"),
+        "#}": line_text.count("#}"),
+    }
+    if counts["{{"] > counts["}}"]:
+        fragment = _extract_fragment(line_text, "{{", "}}")
+        detail = f"`{{{{ {fragment} }}`" if fragment else "'{{' expression"
+        return "missing closing '}}' for " + detail + "."
+    if counts["}}"] > counts["{{"]:
+        return "missing opening '{{' before '}}'."
+    if counts["{%"] > counts["%}"]:
+        fragment = _extract_fragment(line_text, "{%", "%}")
+        detail = fragment or "block"
+        return "missing closing '%}' for '" + detail + "' block."
+    if counts["%}"] > counts["{%"]:
+        return "missing opening '{%' for '%}'."
+    if counts["{#"] > counts["#}"]:
+        return "missing closing '#}' for comment block."
+    if counts["#}"] > counts["{#"]:
+        return "missing opening '{#' for comment block."
+    return None
+
+
+def _extract_fragment(line_text: str, start_token: str, end_token: str) -> str:
+    start = line_text.find(start_token)
+    if start == -1:
+        return ""
+    start += len(start_token)
+    end = line_text.find(end_token, start)
+    fragment = line_text[start:end if end != -1 else len(line_text)]
+    fragment = fragment.strip()
+    return fragment[:40]
+
+
 class TemplateRenderer:
     """Render Jinja2 templates with strict variable enforcement and custom filters."""
 
@@ -95,7 +161,7 @@ class TemplateRenderer:
             rendered = compiled.render(**variables)
             return TemplateRenderResult(rendered_text=rendered, errors=[])
         except TemplateSyntaxError as exc:  # pragma: no cover - error path exercised in tests
-            message = f"Syntax error on line {exc.lineno}: {exc.message}"
+            message = format_template_syntax_error(template_text, exc)
             return TemplateRenderResult(rendered_text="", errors=[message])
         except UndefinedError as exc:
             missing = self._infer_missing_variable(str(exc))
@@ -309,4 +375,5 @@ __all__ = [
     "SchemaValidator",
     "SchemaValidationResult",
     "SchemaValidationMode",
+    "format_template_syntax_error",
 ]

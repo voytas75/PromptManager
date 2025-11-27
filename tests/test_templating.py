@@ -1,4 +1,7 @@
-"""Unit tests for the Jinja2 template renderer and schema validation helpers."""
+"""Unit tests for the Jinja2 template renderer and schema validation helpers.
+
+Updates: v0.2.0 - 2025-11-27 - Assert syntax error hints for unmatched delimiters.
+"""
 from __future__ import annotations
 
 import json
@@ -38,6 +41,17 @@ def test_template_renderer_reports_missing_variables() -> None:
     assert result.rendered_text == ""
     assert "item" in result.missing_variables
     assert result.errors
+
+
+def test_template_renderer_includes_hint_for_unmatched_braces() -> None:
+    """Syntax errors should include helpful hints for unmatched delimiters."""
+
+    renderer = TemplateRenderer()
+    template = "{{ customer "
+    result = renderer.render(template, {"customer": "Ada"})
+    assert result.errors
+    assert "Hint" in result.errors[0]
+    assert "closing '}}'" in result.errors[0]
 
 
 def test_schema_validator_rejects_invalid_json_payload() -> None:
