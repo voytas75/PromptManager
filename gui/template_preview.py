@@ -1,5 +1,6 @@
 """Workspace template preview widget with live variable validation.
 
+Updates: v0.1.2 - 2025-11-27 - Make rendered prompt view resizable with a splitter.
 Updates: v0.1.1 - 2025-11-27 - Capture variables with multiline editors sized to four lines.
 Updates: v0.1.0 - 2025-11-25 - Add dynamic Jinja2 preview with custom filters and schema validation.
 """
@@ -21,6 +22,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
+    QSplitter,
     QVBoxLayout,
     QWidget,
 )
@@ -156,24 +158,43 @@ class TemplatePreviewWidget(QWidget):
 
         frame_layout.addLayout(editors_layout)
 
-        self._variables_list = QListWidget(frame)
+        content_splitter = QSplitter(Qt.Vertical, frame)
+        content_splitter.setChildrenCollapsible(False)
+
+        status_container = QWidget(content_splitter)
+        status_layout = QVBoxLayout(status_container)
+        status_layout.setContentsMargins(0, 0, 0, 0)
+        status_layout.setSpacing(6)
+
+        self._variables_list = QListWidget(status_container)
         self._variables_list.setObjectName("templatePreviewVariables")
-        self._variables_list.setMaximumHeight(120)
         self._variables_list.setAlternatingRowColors(True)
-        frame_layout.addWidget(self._variables_list)
+        status_layout.addWidget(self._variables_list)
+        content_splitter.addWidget(status_container)
 
-        preview_label = QLabel("Rendered preview", frame)
-        frame_layout.addWidget(preview_label)
+        preview_container = QWidget(content_splitter)
+        preview_layout = QVBoxLayout(preview_container)
+        preview_layout.setContentsMargins(0, 0, 0, 0)
+        preview_layout.setSpacing(6)
 
-        self._rendered_view = QPlainTextEdit(frame)
+        preview_label = QLabel("Rendered preview", preview_container)
+        preview_layout.addWidget(preview_label)
+
+        self._rendered_view = QPlainTextEdit(preview_container)
         self._rendered_view.setReadOnly(True)
         self._rendered_view.setPlaceholderText("Supply variables to render the prompt preview…")
         self._rendered_view.setMinimumHeight(140)
-        frame_layout.addWidget(self._rendered_view)
+        preview_layout.addWidget(self._rendered_view, 1)
 
-        self._status_label = QLabel("", frame)
+        self._status_label = QLabel("", preview_container)
         self._status_label.setWordWrap(True)
-        frame_layout.addWidget(self._status_label)
+        preview_layout.addWidget(self._status_label)
+
+        content_splitter.addWidget(preview_container)
+        content_splitter.setStretchFactor(0, 1)
+        content_splitter.setStretchFactor(1, 2)
+
+        frame_layout.addWidget(content_splitter, 1)
 
         button_row = QHBoxLayout()
         button_row.addStretch(1)
