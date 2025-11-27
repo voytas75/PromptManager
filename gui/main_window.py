@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.52 - 2025-11-27 - Allow resizing between template list and detail panes with a splitter.
 Updates: v0.15.51 - 2025-11-27 - Show modal processing indicator when persisting prompt edits.
 Updates: v0.15.50 - 2025-11-26 - Surface execute-context prompt text in the workspace and keep output mirrored across tabs.
 Updates: v0.15.49 - 2025-11-26 - Swap chat transcript above paste-text input to mirror chat layouts.
@@ -1401,14 +1402,19 @@ class MainWindow(QMainWindow):
         preview_hint.setWordWrap(True)
         preview_hint.setStyleSheet("color: #4b5563;")
         preview_list_layout.addWidget(preview_hint)
-        self._template_list_view = QListView(preview_list_panel)
+        preview_list_splitter = QSplitter(Qt.Vertical, preview_list_panel)
+        preview_list_splitter.setChildrenCollapsible(False)
+        self._template_list_view = QListView(preview_list_splitter)
         self._template_list_view.setModel(self._model)
         self._template_list_view.setSelectionMode(QAbstractItemView.SingleSelection)
         self._template_list_view.setSelectionModel(self._list_view.selectionModel())
         self._template_list_view.doubleClicked.connect(self._on_prompt_double_clicked)  # type: ignore[arg-type]
-        preview_list_layout.addWidget(self._template_list_view, 3)
-        self._template_detail_widget = PromptDetailWidget(preview_list_panel)
-        preview_list_layout.addWidget(self._template_detail_widget, 4)
+        preview_list_splitter.addWidget(self._template_list_view)
+        self._template_detail_widget = PromptDetailWidget(preview_list_splitter)
+        preview_list_splitter.addWidget(self._template_detail_widget)
+        preview_list_splitter.setStretchFactor(0, 1)
+        preview_list_splitter.setStretchFactor(1, 2)
+        preview_list_layout.addWidget(preview_list_splitter, 1)
 
         preview_render_panel = QWidget(preview_splitter)
         preview_render_layout = QVBoxLayout(preview_render_panel)
