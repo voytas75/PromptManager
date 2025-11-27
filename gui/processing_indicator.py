@@ -1,6 +1,7 @@
 """Transient processing overlays for long-running GUI tasks.
 
 Updates:
+  v0.1.2 - 2025-11-27 - Center the busy progress bar to avoid stretching across the dialog.
   v0.1.1 - 2025-11-27 - Run blocking tasks on a worker thread so the UI stays responsive.
   v0.1.0 - 2025-11-27 - Add reusable busy indicator for prompt workflows.
 """
@@ -14,7 +15,7 @@ from typing import Callable, Optional, Type, TypeVar
 
 from PySide6.QtCore import QEventLoop, Qt
 from PySide6.QtGui import QGuiApplication
-from PySide6.QtWidgets import QProgressDialog, QWidget
+from PySide6.QtWidgets import QDialog, QLabel, QProgressBar, QVBoxLayout, QWidget
 
 _T = TypeVar("_T")
 
@@ -23,17 +24,7 @@ class ProcessingIndicator(AbstractContextManager["ProcessingIndicator"]):
     """Display a modal busy dialog while scoped work executes."""
 
     def __init__(self, parent: QWidget, message: str, *, title: str = "Processing") -> None:
-        self._dialog = QProgressDialog(parent)
-        self._dialog.setWindowTitle(title)
-        self._dialog.setLabelText(message)
-        self._dialog.setRange(0, 0)
-        self._dialog.setCancelButton(None)
-        self._dialog.setAutoClose(False)
-        self._dialog.setAutoReset(False)
-        self._dialog.setMinimumDuration(0)
-        self._dialog.setWindowModality(Qt.ApplicationModal)
-        self._dialog.setWindowFlag(Qt.WindowTitleHint, True)
-        self._dialog.setWindowFlag(Qt.WindowSystemMenuHint, False)
+        self._dialog = _ProcessingDialog(parent, title=title, message=message)
 
     def __enter__(self) -> "ProcessingIndicator":
         self._dialog.show()
@@ -89,5 +80,34 @@ class ProcessingIndicator(AbstractContextManager["ProcessingIndicator"]):
         self._dialog.setLabelText(message)
         QGuiApplication.processEvents(QEventLoop.AllEvents)
 
+
+class _ProcessingDialog(QDialog):
+    """Compact dialog that centers an indeterminate progress bar."""
+
+    def __init__(self, parent: QWidget, *, title: str, message: str) -> None:
+        super().__init__(parent, Qt.Dialog | Qt.CustomizeWindowHint | Qt.WindowTitleHint)
+        self.setWindowTitle(title)
+        self.setModal(True)
+        self.setWindowModality(Qt.ApplicationModal)
+        self.setMinimumWidth(320)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setSpacing(12)
+
+        self._label = QLabel(message, self)
+        self._label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self._label, alignment=Qt.AlignCenter)
+
+        self._progress = QProgressBar(self)
+        self._progress.setRange(0, 0)
+        self._progress.setFixedWidth(220)
+        self._progress.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self._progress, alignment=Qt.AlignCenter)
+
+    def setLabelText(self, text: str) -> None:
+        """Update the message displayed above the progress bar."""
+
+        self._label.setText(text)
 
 __all__ = ["ProcessingIndicator"]
