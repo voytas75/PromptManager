@@ -1062,6 +1062,7 @@ class PromptDialog(QDialog):
             unavailable_title="Prompt refinement unavailable",
             unavailable_message="Configure LiteLLM in Settings to enable prompt engineering.",
             result_title="Prompt refined",
+            indicator_message="Refining prompt…",
         )
 
     def _on_refine_structure_clicked(self) -> None:
@@ -1072,6 +1073,7 @@ class PromptDialog(QDialog):
             unavailable_title="Prompt refinement unavailable",
             unavailable_message="Configure LiteLLM in Settings to enable prompt engineering.",
             result_title="Prompt structure refined",
+            indicator_message="Improving prompt structure…",
         )
 
     def _on_execute_context_clicked(self) -> None:
@@ -1101,6 +1103,7 @@ class PromptDialog(QDialog):
         unavailable_title: str,
         unavailable_message: str,
         result_title: str,
+        indicator_message: str,
     ) -> None:
         """Execute a refinement handler and surface the summary to the user."""
 
@@ -1123,7 +1126,9 @@ class PromptDialog(QDialog):
         tags = [tag.strip() for tag in self._tags_input.text().split(",") if tag.strip()]
 
         try:
-            result = handler(
+            result = self._run_with_indicator(
+                indicator_message,
+                handler,
                 prompt_text,
                 name=name,
                 description=description,
