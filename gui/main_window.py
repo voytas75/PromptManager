@@ -3430,8 +3430,10 @@ class MainWindow(QMainWindow):
         if updated is None:
             return
         try:
-            with ProcessingIndicator(self, "Saving prompt changes…"):
-                stored = self._manager.update_prompt(updated)
+            stored = ProcessingIndicator(self, "Saving prompt changes…").run(
+                self._manager.update_prompt,
+                updated,
+            )
         except PromptNotFoundError:
             self._show_error("Prompt missing", "The prompt cannot be located. Refresh and try again.")
             self._load_prompts()
@@ -3483,8 +3485,10 @@ class MainWindow(QMainWindow):
         """Persist prompt edits triggered via the Apply button."""
 
         try:
-            with ProcessingIndicator(dialog, "Saving prompt changes…"):
-                stored = self._manager.update_prompt(prompt)
+            stored = ProcessingIndicator(dialog, "Saving prompt changes…").run(
+                self._manager.update_prompt,
+                prompt,
+            )
         except PromptNotFoundError:
             self._show_error(
                 "Prompt missing",
