@@ -52,6 +52,7 @@ def _make_response_style(name: str = "Concise Summary") -> ResponseStyle:
         id=uuid.uuid4(),
         name=name,
         description="Produce concise summaries with actionable next steps.",
+        prompt_part="Response Style",
         tone="concise",
         voice="mentor",
         format_instructions="Use bullet lists followed by a short paragraph.",

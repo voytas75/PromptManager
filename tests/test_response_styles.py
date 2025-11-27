@@ -22,6 +22,7 @@ def _make_response_style(name: str = "Friendly Reviewer") -> ResponseStyle:
         id=uuid.uuid4(),
         name=name,
         description="Short, friendly summaries.",
+        prompt_part="System Instruction",
         tone="friendly",
         voice="mentor",
         format_instructions="Use bullet lists.",
@@ -45,6 +46,7 @@ def test_response_style_roundtrip() -> None:
     assert loaded.id == style.id
     assert loaded.tags == style.tags
     assert loaded.metadata == style.metadata
+    assert loaded.prompt_part == style.prompt_part
 
 
 def test_repository_crud(tmp_path) -> None:
@@ -56,15 +58,18 @@ def test_repository_crud(tmp_path) -> None:
     repo.add_response_style(style)
     stored = repo.get_response_style(style.id)
     assert stored.name == style.name
+    assert stored.prompt_part == style.prompt_part
 
     style.description = "Updated description"
     style.tags.append("detailed")
+    style.prompt_part = "Output Formatter"
     style.touch()
     repo.update_response_style(style)
 
     updated = repo.get_response_style(style.id)
     assert updated.description == "Updated description"
     assert "detailed" in updated.tags
+    assert updated.prompt_part == "Output Formatter"
 
     repo.delete_response_style(style.id)
     with pytest.raises(RepositoryNotFoundError):
@@ -76,9 +81,11 @@ def test_repository_filters_and_search(tmp_path) -> None:
 
     repo = PromptRepository(str(tmp_path / "repo.db"))
     active = _make_response_style("Active Style")
+    active.prompt_part = "Output Formatter"
     inactive = _make_response_style("Inactive Style")
     inactive.is_active = False
     inactive.description = "Formal legal voice."
+    inactive.prompt_part = "Legal Brief"
 
     repo.add_response_style(active)
     repo.add_response_style(inactive)
@@ -92,3 +99,7 @@ def test_repository_filters_and_search(tmp_path) -> None:
     searched = repo.list_response_styles(include_inactive=True, search="legal")
     assert len(searched) == 1
     assert searched[0].name == "Inactive Style"
+
+    part_search = repo.list_response_styles(include_inactive=True, search="formatter")
+    assert len(part_search) == 1
+    assert part_search[0].name == "Active Style"

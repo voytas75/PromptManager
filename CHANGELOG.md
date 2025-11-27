@@ -2,6 +2,16 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.17.8] - 2025-11-27
+
+### Added
+
+- ResponseStyle records now include a `prompt_part` classification so entries can represent response styles, system snippets, output formatters, or any other prompt component; the SQLite schema, repository helpers, and tests were updated accordingly.
+
+### Changed
+
+- The GUI Response Styles tab has been renamed to **Prompt Parts**, the dialog now captures the prompt part type, and detail/export views display the new metadata so teams can curate all prompt fragments from a single surface; README/README-DEV were refreshed to document the workflow.
+
 ## [0.17.7] - 2025-11-26
 
 ### Added

@@ -1,5 +1,6 @@
 """Response style data model definitions.
 
+Updates: v0.1.1 - 2025-11-27 - Add prompt part classification so entries cover any prompt segment.
 Updates: v0.1.0 - 2025-12-05 - Introduce ResponseStyle dataclass for formatting presets.
 """
 
@@ -26,6 +27,7 @@ class ResponseStyle:
     id: uuid.UUID
     name: str
     description: str
+    prompt_part: str = "Response Style"
     tone: Optional[str] = None
     voice: Optional[str] = None
     format_instructions: Optional[str] = None
@@ -59,6 +61,7 @@ class ResponseStyle:
             "id": str(self.id),
             "name": self.name,
             "description": self.description,
+            "prompt_part": self.prompt_part,
             "tone": self.tone,
             "voice": self.voice,
             "format_instructions": self.format_instructions,
@@ -90,6 +93,7 @@ class ResponseStyle:
             id=_ensure_uuid(data.get("id") or uuid.uuid4()),
             name=str(data.get("name") or ""),
             description=str(data.get("description") or ""),
+            prompt_part=str(data.get("prompt_part") or "Response Style"),
             tone=str(data.get("tone") or "") or None,
             voice=str(data.get("voice") or "") or None,
             format_instructions=str(data.get("format_instructions") or "") or None,
@@ -105,4 +109,3 @@ class ResponseStyle:
             ext2=_deserialize_metadata(data.get("ext2")),
             ext3=_deserialize_metadata(data.get("ext3")),
         )
-

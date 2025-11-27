@@ -135,14 +135,14 @@ Key UI capabilities:
 - Save results with notes and optional 1–10 ratings; averages feed into quality filters.
 - Programmatic access is available through `PromptManager.list_recent_executions()` and `PromptManager.list_executions_for_prompt(prompt_id)`.
 
-Every log entry also stores structured context metadata (prompt snapshot, executor model, streaming flag, request/response character counts, and optional response-style fingerprints). Inspect the metadata via the GUI history detail pane or fetch it directly from `PromptExecution.metadata` for downstream analytics.
+Every log entry also stores structured context metadata (prompt snapshot, executor model, streaming flag, request/response character counts, and optional prompt-part fingerprints). Inspect the metadata via the GUI history detail pane or fetch it directly from `PromptExecution.metadata` for downstream analytics.
 
-## Response Style Workflow
+## Prompt Parts Workflow
 
-- Capture reusable tone/formatting guidance from the **Response Styles** tab. The dialog records name, description, tone, voice, format instructions, guidelines, tags, and illustrative examples; timestamps and versions are maintained automatically.
-- Styles are persisted in the `response_styles` table and surfaced through `PromptManager.list_response_styles` (with `include_inactive` and `search` filters) and CRUD helpers.
+- Capture reusable prompt segments (response styles, system instructions, output formatters, evaluation rubrics) from the **Prompt Parts** tab. The dialog records name, prompt part classification, description, tone, voice, format instructions, guidelines, tags, and illustrative examples; timestamps and versions are maintained automatically.
+- Entries are persisted in the `response_styles` table (now with a `prompt_part` column) and surfaced through `PromptManager.list_response_styles` (with `include_inactive` and `search` filters) alongside CRUD helpers.
 - GUI actions provide copy-to-clipboard, Markdown preview/export, and duplication capabilities so content writers can curate libraries without digging into SQLite.
-- When executions capture a style, the metadata stores the style ID plus flattened instructions so downstream automations can reuse the formatting contract.
+- When executions capture a prompt part, the metadata stores the part ID plus flattened instructions so downstream automations can reuse the formatting contract.
 
 ## CLI Utilities
 

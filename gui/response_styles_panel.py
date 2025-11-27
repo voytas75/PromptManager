@@ -1,5 +1,6 @@
-"""Response style management tab.
+"""Prompt part management tab.
 
+Updates: v0.15.2 - 2025-11-27 - Add prompt part classification column and rename UI strings accordingly.
 Updates: v0.15.1 - 2025-11-25 - Document module metadata for AGENTS compliance.
 """
 
@@ -34,7 +35,7 @@ from .dialogs import MarkdownPreviewDialog, ResponseStyleDialog
 
 
 class ResponseStylesPanel(QWidget):
-    """Display and manage response styles inside their own tab."""
+    """Display and manage prompt parts (including response styles) inside their own tab."""
 
     def __init__(
         self,
@@ -50,7 +51,7 @@ class ResponseStylesPanel(QWidget):
         self._list = QListWidget(self)
         self._detail_view = QPlainTextEdit(self)
         self._detail_view.setReadOnly(True)
-        self._detail_view.setPlaceholderText("Select a response style to view its details…")
+        self._detail_view.setPlaceholderText("Select a prompt part to view its details…")
         self._build_ui()
         self._load_styles()
 
@@ -96,7 +97,7 @@ class ResponseStylesPanel(QWidget):
         try:
             self._styles = self._manager.list_response_styles(include_inactive=True)
         except ResponseStyleStorageError as exc:
-            QMessageBox.critical(self, "Unable to load response styles", str(exc))
+            QMessageBox.critical(self, "Unable to load prompt parts", str(exc))
             self._styles = []
         self._list.clear()
         for style in self._styles:
@@ -140,7 +141,12 @@ class ResponseStylesPanel(QWidget):
     def _format_style(self, style: Optional[ResponseStyle]) -> str:
         if style is None:
             return ""
-        lines = [f"Name: {style.name}", f"Description:\n{style.description or 'n/a'}", ""]
+        lines = [
+            f"Name: {style.name}",
+            f"Prompt part: {style.prompt_part}",
+            f"Description:\n{style.description or 'n/a'}",
+            "",
+        ]
         lines.append(f"Tone: {style.tone or 'n/a'}")
         lines.append(f"Voice: {style.voice or 'n/a'}")
         if style.tags:
@@ -169,15 +175,15 @@ class ResponseStylesPanel(QWidget):
         try:
             self._manager.create_response_style(result)
         except ResponseStyleError as exc:
-            QMessageBox.critical(self, "Unable to create response style", str(exc))
+            QMessageBox.critical(self, "Unable to create prompt part", str(exc))
             return
         self._load_styles()
-        self._show_status("Response style created.")
+        self._show_status("Prompt part created.")
 
     def _on_edit_clicked(self) -> None:
         style = self._selected_style()
         if style is None:
-            QMessageBox.information(self, "Edit response style", "Select a response style first.")
+            QMessageBox.information(self, "Edit prompt part", "Select a prompt part first.")
             return
         dialog = ResponseStyleDialog(self, style=style)
         if dialog.exec() != QDialog.Accepted:
@@ -188,20 +194,20 @@ class ResponseStylesPanel(QWidget):
         try:
             self._manager.update_response_style(result)
         except ResponseStyleError as exc:
-            QMessageBox.critical(self, "Unable to update response style", str(exc))
+            QMessageBox.critical(self, "Unable to update prompt part", str(exc))
             return
         self._load_styles()
-        self._show_status("Response style updated.")
+        self._show_status("Prompt part updated.")
 
     def _on_delete_clicked(self) -> None:
         style = self._selected_style()
         if style is None:
-            QMessageBox.information(self, "Delete response style", "Select a response style first.")
+            QMessageBox.information(self, "Delete prompt part", "Select a prompt part first.")
             return
         confirmation = QMessageBox.question(
             self,
-            "Delete response style",
-            f"Delete response style '{style.name}'?",
+            "Delete prompt part",
+            f"Delete prompt part '{style.name}'?",
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
         )
@@ -210,40 +216,40 @@ class ResponseStylesPanel(QWidget):
         try:
             self._manager.delete_response_style(style.id)
         except ResponseStyleError as exc:
-            QMessageBox.critical(self, "Unable to delete response style", str(exc))
+            QMessageBox.critical(self, "Unable to delete prompt part", str(exc))
             return
         self._load_styles()
-        self._show_status("Response style deleted.")
+        self._show_status("Prompt part deleted.")
 
     def _on_copy_clicked(self) -> None:
         style = self._selected_style()
         if style is None:
-            QMessageBox.information(self, "Copy response style", "Select a response style first.")
+            QMessageBox.information(self, "Copy prompt part", "Select a prompt part first.")
             return
         clipboard = QGuiApplication.clipboard()
         clipboard.setText(self._format_style(style))
-        self._show_status("Response style copied to clipboard.")
+        self._show_status("Prompt part copied to clipboard.")
 
     def _on_markdown_clicked(self) -> None:
         style = self._selected_style()
         if style is None:
-            QMessageBox.information(self, "Markdown preview", "Select a response style first.")
+            QMessageBox.information(self, "Markdown preview", "Select a prompt part first.")
             return
         content = self._format_style(style)
         if not content.strip():
-            QMessageBox.information(self, "Markdown preview", "The selected response style is empty.")
+            QMessageBox.information(self, "Markdown preview", "The selected prompt part is empty.")
             return
-        dialog = MarkdownPreviewDialog(content, self, title="Response Style Preview")
+        dialog = MarkdownPreviewDialog(content, self, title="Prompt Part Preview")
         dialog.exec()
 
     def _on_export_clicked(self) -> None:
         if not self._styles:
-            QMessageBox.information(self, "Export response styles", "There are no response styles to export yet.")
+            QMessageBox.information(self, "Export prompt parts", "There are no prompt parts to export yet.")
             return
         path, _ = QFileDialog.getSaveFileName(
             self,
-            "Export response styles",
-            "response_styles.txt",
+            "Export prompt parts",
+            "prompt_parts.txt",
             "Text Files (*.txt);;All Files (*.*)",
         )
         if not path:
@@ -252,6 +258,7 @@ class ResponseStylesPanel(QWidget):
         for style in self._styles:
             lines.append("---")
             lines.append(f"Name: {style.name}")
+            lines.append(f"Prompt part: {style.prompt_part}")
             lines.append(f"Description: {style.description}")
             lines.append(f"Tone: {style.tone or 'n/a'}")
             lines.append(f"Voice: {style.voice or 'n/a'}")
@@ -274,7 +281,7 @@ class ResponseStylesPanel(QWidget):
         except OSError as exc:
             QMessageBox.critical(self, "Export failed", str(exc))
             return
-        self._show_status(f"Exported {len(self._styles)} response styles.")
+        self._show_status(f"Exported {len(self._styles)} prompt parts.")
 
     def _show_status(self, message: str, duration_ms: int = 3000) -> None:
         if self._status_callback is not None:

@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.54 - 2025-11-27 - Rename Response Styles tab to Prompt Parts and surface prompt part metadata.
 Updates: v0.15.53 - 2025-11-27 - Persist Template tab splitter layouts and rename the tab to Template.
 Updates: v0.15.52 - 2025-11-27 - Allow resizing between template list and detail panes with a splitter.
 Updates: v0.15.51 - 2025-11-27 - Show modal processing indicator when persisting prompt edits.
@@ -1382,7 +1383,7 @@ class MainWindow(QMainWindow):
         self._tab_widget.addTab(result_tab, "Prompts")
         self._tab_widget.addTab(self._history_panel, "History")
         self._tab_widget.addTab(self._notes_panel, "Notes")
-        self._tab_widget.addTab(self._response_styles_panel, "Response Styles")
+        self._tab_widget.addTab(self._response_styles_panel, "Prompt Parts")
 
         preview_tab = QWidget(self)
         preview_layout = QVBoxLayout(preview_tab)

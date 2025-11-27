@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.11.6 - 2025-11-27 - Add prompt part selector to response style dialog and rename copy to prompt parts.
 Updates: v0.11.5 - 2025-11-27 - Add import fallback for processing indicator in test harnesses.
 Updates: v0.11.4 - 2025-11-27 - Ensure clearing scenarios removes persisted metadata.
 Updates: v0.11.3 - 2025-11-27 - Add busy indicators to prompt metadata generators.
@@ -2552,7 +2553,16 @@ class SaveResultDialog(QDialog):
 
 
 class ResponseStyleDialog(QDialog):
-    """Modal dialog for creating or editing response styles."""
+    """Modal dialog for creating or editing prompt parts (response styles, system sections, etc.)."""
+
+    _PROMPT_PART_PRESETS: Sequence[str] = (
+        "Response Style",
+        "System Instruction",
+        "Task Context",
+        "Input Formatter",
+        "Output Formatter",
+        "Reference Section",
+    )
 
     def __init__(
         self,
@@ -2563,7 +2573,7 @@ class ResponseStyleDialog(QDialog):
         super().__init__(parent)
         self._source_style = style
         self._result_style: Optional[ResponseStyle] = None
-        self.setWindowTitle("New Response Style" if style is None else "Edit Response Style")
+        self.setWindowTitle("New Prompt Part" if style is None else "Edit Prompt Part")
         self.resize(640, 620)
         self._build_ui()
         if style is not None:
@@ -2571,7 +2581,7 @@ class ResponseStyleDialog(QDialog):
 
     @property
     def result_style(self) -> Optional[ResponseStyle]:
-        """Return the resulting response style."""
+        """Return the resulting prompt part entry."""
 
         return self._result_style
 
@@ -2581,6 +2591,12 @@ class ResponseStyleDialog(QDialog):
         form = QFormLayout()
         self._name_input = QLineEdit(self)
         form.addRow("Name*", self._name_input)
+
+        self._prompt_part_input = QComboBox(self)
+        self._prompt_part_input.setEditable(True)
+        self._prompt_part_input.addItems(self._PROMPT_PART_PRESETS)
+        self._prompt_part_input.setCurrentText("Response Style")
+        form.addRow("Prompt part*", self._prompt_part_input)
 
         self._tone_input = QLineEdit(self)
         self._tone_input.setPlaceholderText("Friendly, formal, analytical…")
@@ -2598,16 +2614,16 @@ class ResponseStyleDialog(QDialog):
         self._version_input.setPlaceholderText("1.0")
         form.addRow("Version", self._version_input)
 
-        self._is_active_checkbox = QCheckBox("Style is active", self)
+        self._is_active_checkbox = QCheckBox("Prompt part is active", self)
         self._is_active_checkbox.setChecked(True)
         form.addRow("", self._is_active_checkbox)
 
         layout.addLayout(form)
 
-        layout.addWidget(QLabel("Response phrase*", self))
+        layout.addWidget(QLabel("Prompt snippet*", self))
         self._phrase_input = QPlainTextEdit(self)
         self._phrase_input.setPlaceholderText(
-            "Paste the response snippet or format instructions you want to reuse…"
+            "Paste the prompt fragment, response style, or reusable instructions you want to capture…"
         )
         self._phrase_input.setFixedHeight(100)
         layout.addWidget(self._phrase_input)
@@ -2642,11 +2658,12 @@ class ResponseStyleDialog(QDialog):
         layout.addWidget(buttons)
 
     def _populate(self, style: ResponseStyle) -> None:
-        """Populate dialog fields from an existing response style."""
+        """Populate dialog fields from an existing prompt part."""
 
         self._name_input.setText(style.name)
         self._description_input.setPlainText(style.description)
         self._phrase_input.setPlainText(style.format_instructions or style.description)
+        self._prompt_part_input.setCurrentText(style.prompt_part)
         self._tone_input.setText(style.tone or "")
         self._voice_input.setText(style.voice or "")
         self._format_input.setPlainText(style.format_instructions or "")
@@ -2661,9 +2678,10 @@ class ResponseStyleDialog(QDialog):
 
         phrase = self._phrase_input.toPlainText().strip()
         if not phrase:
-            QMessageBox.warning(self, "Missing phrase", "Paste a response phrase before saving the style.")
+            QMessageBox.warning(self, "Missing snippet", "Paste a prompt snippet before saving the entry.")
             return
 
+        prompt_part = self._prompt_part_input.currentText().strip() or "Response Style"
         tone = self._tone_input.text().strip() or None
         voice = self._voice_input.text().strip() or None
         format_instructions = self._format_input.toPlainText().strip() or phrase
@@ -2685,6 +2703,7 @@ class ResponseStyleDialog(QDialog):
         payload = {
             "name": name,
             "description": description,
+            "prompt_part": prompt_part,
             "tone": tone,
             "voice": voice,
             "format_instructions": format_instructions,
@@ -2711,9 +2730,9 @@ class ResponseStyleDialog(QDialog):
         if tokens:
             snippet = " ".join(tokens[:max_words]).title()
             if snippet:
-                return f"{snippet} Style"
+                return f"{snippet} Part"
         timestamp = datetime.now(timezone.utc).strftime("%H%M%S")
-        return f"Response Style {timestamp}"
+        return f"Prompt Part {timestamp}"
 
 
 class PromptNoteDialog(QDialog):

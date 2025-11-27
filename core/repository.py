@@ -1,5 +1,6 @@
 """SQLite-backed repository for persistent prompt storage.
 
+Updates: v0.10.1 - 2025-11-27 - Add prompt part column to response styles for generalized prompt components.
 Updates: v0.10.0 - 2025-11-22 - Add prompt versioning and fork lineage persistence tables.
 Updates: v0.9.0 - 2025-12-08 - Remove task template persistence after feature retirement.
 Updates: v0.8.0 - 2025-12-06 - Add PromptNote persistence with CRUD helpers.
@@ -216,6 +217,7 @@ class PromptRepository:
         "id",
         "name",
         "description",
+        "prompt_part",
         "tone",
         "voice",
         "format_instructions",
@@ -1211,6 +1213,7 @@ class PromptRepository:
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 description TEXT NOT NULL,
+                prompt_part TEXT NOT NULL DEFAULT 'Response Style',
                 tone TEXT,
                 voice TEXT,
                 format_instructions TEXT,
@@ -1232,6 +1235,17 @@ class PromptRepository:
             "CREATE INDEX IF NOT EXISTS idx_response_styles_name "
             "ON response_styles(name);"
         )
+        response_style_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(response_styles);")
+        }
+        if "prompt_part" not in response_style_columns:
+            conn.execute(
+                "ALTER TABLE response_styles ADD COLUMN prompt_part TEXT DEFAULT 'Response Style';"
+            )
+            conn.execute(
+                "UPDATE response_styles SET prompt_part = 'Response Style' "
+                "WHERE prompt_part IS NULL OR TRIM(prompt_part) = '';"
+            )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS prompt_notes (
@@ -1391,6 +1405,7 @@ class PromptRepository:
             "id": record["id"],
             "name": record["name"],
             "description": record["description"],
+            "prompt_part": record["prompt_part"],
             "tone": record["tone"],
             "voice": record["voice"],
             "format_instructions": record["format_instructions"],
@@ -1420,6 +1435,7 @@ class PromptRepository:
         payload["ext2"] = _json_loads_optional(row["ext2"])
         payload["ext3"] = _json_loads_optional(row["ext3"])
         payload["is_active"] = row["is_active"]
+        payload.setdefault("prompt_part", "Response Style")
         return ResponseStyle.from_record(payload)
 
     def _note_to_row(self, note: PromptNote) -> Dict[str, Any]:
@@ -1508,9 +1524,11 @@ class PromptRepository:
         if not include_inactive:
             clauses.append("is_active = 1")
         if search:
-            clauses.append("(LOWER(name) LIKE ? OR LOWER(description) LIKE ?)")
+            clauses.append(
+                "(LOWER(name) LIKE ? OR LOWER(description) LIKE ? OR LOWER(prompt_part) LIKE ?)"
+            )
             pattern = f"%{search.lower()}%"
-            params.extend([pattern, pattern])
+            params.extend([pattern, pattern, pattern])
         if clauses:
             query += " WHERE " + " AND ".join(clauses)
         query += " ORDER BY name COLLATE NOCASE;"

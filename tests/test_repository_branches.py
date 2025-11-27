@@ -44,6 +44,7 @@ def _make_response_style(name: str = "Detailed") -> ResponseStyle:
         id=uuid.uuid4(),
         name=name,
         description="Detailed responses",
+        prompt_part="System Instruction",
         tone="formal",
         voice="assistant",
         format_instructions="json",

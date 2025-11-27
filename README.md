@@ -38,25 +38,25 @@ python -m main
 - Semantic search that embeds every prompt facet (name, description, tags, scenarios) via LiteLLM or sentence-transformers and returns cosine-ranked matches directly from ChromaDB.
 - Full PySide6 GUI with list/search/detail panes, in-place CRUD, fork/version history, quick action palette, and refined prompt editing workflows.
 - Live Jinja2 template preview pane beside the workspace that renders prompts with JSON variables, ships custom filters (`truncate`, `slugify`, `json`), and validates payloads with optional JSON Schema or Pydantic feedback in real time.
-- Response Style registry with dedicated GUI tab, CRUD, clipboard/export helpers, and reusable tone/formatting presets that can be attached to executions for consistent voice.
+- Prompt Parts registry with a dedicated GUI tab, CRUD, clipboard/export helpers, and reusable tone/formatting presets that can be attached to executions for consistent voice.
 - Prompt execution workspace with LiteLLM-backed runs, streaming output, chat-style transcripts, rating-based quality feedback, export/import utilities, and persisted execution history complete with context metadata (model, streaming flag, style hints).
 - Typed configuration loader (`config.settings`) that validates paths, TTLs, and provider settings from env vars or JSON, failing fast with actionable errors.
 - Redis-backed caching plus optional deterministic embeddings for air-gapped deployments; maintenance dialog exposes one-click reset tooling.
 - CLI helpers (`catalog-export`, `suggest`, `usage-report`, `reembed`) reuse the same validation stack for automation-friendly integrations.
 
-### Response Styles & Formatting
+### Prompt Parts & Formatting
 
-Use the **Response Styles** tab to capture reusable tone, voice, structure, and formatting rules. Each style stores:
+Use the **Prompt Parts** tab to capture reusable response styles, system instructions, redaction rules, or any other prompt segment. Each entry stores:
 
-- Human-readable name/description for discovery.
+- Prompt part name (Response Style, System Instruction, Output Formatter, etc.) and human-readable description for discovery.
 - Tone/voice hints plus free-form guidelines.
 - Rich format instructions and illustrative examples.
 
-Styles can be copied, exported to Markdown, or deleted from the tab. They are persisted in SQLite and referenced from execution metadata so downstream automation (or future runtime hooks) can apply the same tone and structure without duplicating large instruction blocks.
+Prompt parts can be copied, exported to Markdown, or deleted from the tab. They are persisted in SQLite and referenced from execution metadata so downstream automation (or future runtime hooks) can apply the same tone and structure without duplicating large instruction blocks.
 
 ### Execution History & Auditing
 
-Every run logs to SQLite with request/response snippets, latency, token usage, status, and structured context metadata (prompt info, model, streaming flag, response-style fingerprints). The GUI History tab and programmatic APIs (`list_recent_executions`, `list_executions_for_prompt`) surface the data for reviews, and the log payload is ready for downstream analytics or incident investigations.
+Every run logs to SQLite with request/response snippets, latency, token usage, status, and structured context metadata (prompt info, model, streaming flag, prompt-part fingerprints). The GUI History tab and programmatic APIs (`list_recent_executions`, `list_executions_for_prompt`) surface the data for reviews, and the log payload is ready for downstream analytics or incident investigations.
 
 ## Developer
 
