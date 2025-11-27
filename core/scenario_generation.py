@@ -57,8 +57,20 @@ def _extract_candidates(response_text: str) -> List[str]:
     try:
         parsed = json.loads(stripped)
     except json.JSONDecodeError:
-        lines = [line.strip() for line in stripped.splitlines()]
-        return [line for line in lines if line]
+        cleaned: List[str] = []
+        for line in stripped.splitlines():
+            text = line.strip()
+            if not text or text in {"[", "]"}:
+                continue
+            if text.endswith(",]"):
+                text = text[:-2].strip()
+            elif text.endswith(","):
+                text = text[:-1].strip()
+            if len(text) >= 2 and text[0] == text[-1] and text[0] in {'"', "'", "`"}:
+                text = text[1:-1].strip()
+            if text:
+                cleaned.append(text)
+        return cleaned
     if isinstance(parsed, list):
         return [str(item) for item in parsed]
     if isinstance(parsed, str):
@@ -84,9 +96,9 @@ class LiteLLMScenarioGenerator:
     def generate(self, context: str, *, max_scenarios: Optional[int] = None) -> List[str]:
         """Return a ranked list of usage scenarios for the supplied prompt body."""
 
-        completion, LiteLLMException = get_completion()
         if not context.strip():
             raise ScenarioGenerationError("Prompt context is required to generate scenarios.")
+        completion, LiteLLMException = get_completion()
 
         limit = max_scenarios if max_scenarios is not None else self.default_max_scenarios
         limit = max(1, min(int(limit), 5))

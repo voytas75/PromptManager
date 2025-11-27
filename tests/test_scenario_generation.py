@@ -42,6 +42,22 @@ def test_extract_candidates_supports_multiple_payload_shapes() -> None:
     assert _extract_candidates(plain_text) == ["First line", "Second line"]
 
 
+def test_extract_candidates_handles_partial_json_arrays() -> None:
+    """Truncated JSON arrays should still produce clean scenario entries."""
+
+    response = """
+    [
+    "Draft detailed, stepwise chronicles for fictional world-building or simulation-based technical processes.",
+    "Summarise tactical response options across distributed operations.",
+    ]
+    """
+
+    assert _extract_candidates(response) == [
+        "Draft detailed, stepwise chronicles for fictional world-building or simulation-based technical processes.",
+        "Summarise tactical response options across distributed operations.",
+    ]
+
+
 def test_generate_invokes_litellm_with_drop_params(monkeypatch: pytest.MonkeyPatch) -> None:
     """LiteLLMScenarioGenerator should drop configured params and return normalised scenarios."""
 
