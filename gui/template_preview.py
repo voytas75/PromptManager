@@ -1,5 +1,6 @@
 """Workspace template preview widget with live variable validation.
 
+Updates: v0.1.1 - 2025-11-27 - Capture variables with multiline editors sized to four lines.
 Updates: v0.1.0 - 2025-11-25 - Add dynamic Jinja2 preview with custom filters and schema validation.
 """
 
@@ -15,7 +16,6 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QPlainTextEdit,
@@ -44,7 +44,7 @@ class TemplatePreviewWidget(QWidget):
         self._validator = SchemaValidator()
         self._template_text: str = ""
         self._variable_names: List[str] = []
-        self._variable_inputs: Dict[str, QLineEdit] = {}
+        self._variable_inputs: Dict[str, QPlainTextEdit] = {}
         self._template_parse_error: Optional[str] = None
         self._schema_visible = False
         self._preview_ready = False
@@ -207,8 +207,12 @@ class TemplatePreviewWidget(QWidget):
             container_layout.setSpacing(2)
             label = QLabel(name, container)
             label.setStyleSheet("font-weight: 500;")
-            field = QLineEdit(container)
+            field = QPlainTextEdit(container)
             field.setPlaceholderText(f"Enter value for {name}…")
+            field.setLineWrapMode(QPlainTextEdit.WidgetWidth)
+            metrics = field.fontMetrics()
+            default_height = (metrics.lineSpacing() * 4) + 12
+            field.setFixedHeight(default_height)
             field.textChanged.connect(self._update_preview)  # type: ignore[arg-type]
             container_layout.addWidget(label)
             container_layout.addWidget(field)
@@ -219,7 +223,7 @@ class TemplatePreviewWidget(QWidget):
     def _collect_variables(self) -> Dict[str, str]:
         values: Dict[str, str] = {}
         for name, widget in self._variable_inputs.items():
-            text = widget.text().strip()
+            text = widget.toPlainText().strip()
             if text:
                 values[name] = text
         return values
