@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.57 - 2025-11-27 - Switch back to the Prompts tab after running templates so output is visible.
 Updates: v0.15.56 - 2025-11-27 - Add Template tab run shortcut and toast notifications for copy actions.
 Updates: v0.15.55 - 2025-11-27 - Wire Template tab detail actions to the shared prompt handlers.
 Updates: v0.15.54 - 2025-11-27 - Rename Response Styles tab to Prompt Parts and surface prompt part metadata.
@@ -3316,6 +3317,8 @@ class MainWindow(QMainWindow):
                 f"Running template with {len(variables)} variable(s)…",
                 2000,
             )
+        if self._tab_widget.currentIndex() != 0:
+            self._tab_widget.setCurrentIndex(0)
         self._execute_prompt_with_text(
             prompt,
             payload,
