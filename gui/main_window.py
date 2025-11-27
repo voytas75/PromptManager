@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.51 - 2025-11-27 - Show modal processing indicator when persisting prompt edits.
 Updates: v0.15.50 - 2025-11-26 - Surface execute-context prompt text in the workspace and keep output mirrored across tabs.
 Updates: v0.15.49 - 2025-11-26 - Swap chat transcript above paste-text input to mirror chat layouts.
 Updates: v0.15.48 - 2025-11-26 - Add execute-as-context dialog with history picker and persistence.
@@ -189,6 +190,7 @@ from .history_panel import HistoryPanel
 from .language_tools import DetectedLanguage, detect_language
 from .notes_panel import NotesPanel
 from .notifications import NotificationHistoryDialog, QtNotificationBridge
+from .processing_indicator import ProcessingIndicator
 from .response_styles_panel import ResponseStylesPanel
 from .settings_dialog import SettingsDialog, persist_settings_to_config
 from .template_preview import TemplatePreviewWidget
@@ -3428,7 +3430,8 @@ class MainWindow(QMainWindow):
         if updated is None:
             return
         try:
-            stored = self._manager.update_prompt(updated)
+            with ProcessingIndicator(self, "Saving prompt changes…"):
+                stored = self._manager.update_prompt(updated)
         except PromptNotFoundError:
             self._show_error("Prompt missing", "The prompt cannot be located. Refresh and try again.")
             self._load_prompts()
@@ -3480,7 +3483,8 @@ class MainWindow(QMainWindow):
         """Persist prompt edits triggered via the Apply button."""
 
         try:
-            stored = self._manager.update_prompt(prompt)
+            with ProcessingIndicator(dialog, "Saving prompt changes…"):
+                stored = self._manager.update_prompt(prompt)
         except PromptNotFoundError:
             self._show_error(
                 "Prompt missing",
