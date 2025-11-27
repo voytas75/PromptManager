@@ -1,5 +1,6 @@
 """Workspace template preview widget with live variable validation.
 
+Updates: v0.1.3 - 2025-11-27 - Keep raw templates visible while surfacing parse/render errors.
 Updates: v0.1.2 - 2025-11-27 - Make rendered prompt view resizable with a splitter.
 Updates: v0.1.1 - 2025-11-27 - Capture variables with multiline editors sized to four lines.
 Updates: v0.1.0 - 2025-11-25 - Add dynamic Jinja2 preview with custom filters and schema validation.
@@ -260,7 +261,7 @@ class TemplatePreviewWidget(QWidget):
             return
 
         if self._template_parse_error:
-            self._rendered_view.clear()
+            self._rendered_view.setPlainText(self._template_text)
             self._show_message_item(self._template_parse_error, self._ERROR_COLOR)
             self._set_status(self._template_parse_error, is_error=True)
             self._refresh_run_button_state()
@@ -295,10 +296,7 @@ class TemplatePreviewWidget(QWidget):
         self._update_variable_states(set(variables.keys()), missing, invalid_fields)
 
         if render_result.errors:
-            if missing:
-                self._rendered_view.setPlainText(self._template_text)
-            else:
-                self._rendered_view.clear()
+            self._rendered_view.setPlainText(self._template_text)
             self._set_status("; ".join(render_result.errors), is_error=True)
             self._refresh_run_button_state()
             return
