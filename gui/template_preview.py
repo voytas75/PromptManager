@@ -1,5 +1,6 @@
 """Workspace template preview widget with live variable validation.
 
+Updates: v0.1.7 - 2025-11-27 - Make the variables/schema editors and rendered preview vertically resizable.
 Updates: v0.1.6 - 2025-11-27 - Consolidate template status messaging into the footer label only.
 Updates: v0.1.5 - 2025-11-27 - Persist splitter sizes for the status and preview panes.
 Updates: v0.1.4 - 2025-11-27 - Add contextual hints for template syntax errors.
@@ -110,7 +111,9 @@ class TemplatePreviewWidget(QWidget):
         self._template_hint.setWordWrap(True)
         frame_layout.addWidget(self._template_hint)
 
-        editors_layout = QHBoxLayout()
+        editors_container = QWidget(frame)
+        editors_layout = QHBoxLayout(editors_container)
+        editors_layout.setContentsMargins(0, 0, 0, 0)
         editors_layout.setSpacing(12)
 
         variables_column = QVBoxLayout()
@@ -158,10 +161,9 @@ class TemplatePreviewWidget(QWidget):
         schema_column.addWidget(self._schema_input)
         editors_layout.addLayout(schema_column, stretch=1)
 
-        frame_layout.addLayout(editors_layout)
-
         self._content_splitter = QSplitter(Qt.Vertical, frame)
         self._content_splitter.setChildrenCollapsible(False)
+        self._content_splitter.addWidget(editors_container)
 
         preview_container = QWidget(self._content_splitter)
         preview_layout = QVBoxLayout(preview_container)
@@ -183,6 +185,7 @@ class TemplatePreviewWidget(QWidget):
 
         self._content_splitter.addWidget(preview_container)
         self._content_splitter.setStretchFactor(0, 1)
+        self._content_splitter.setStretchFactor(1, 1)
 
         frame_layout.addWidget(self._content_splitter, 1)
 
