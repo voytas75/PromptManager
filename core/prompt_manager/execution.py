@@ -6,13 +6,16 @@ decouple the high‑level PromptManager API from direct dependency on a specific
 implementation so that we may later introduce alternative execution back‑ends
 (streaming, batch, mock for testing) without touching calling code.
 
+Updates: v0.14.1 – 2025‑11‑27 – Align façade with CodexExecutor prompt-centric API.
 Updates: v0.14.0 – 2025‑11‑18 – Initial scaffold with proxy implementation.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Callable, Iterable, Mapping, Optional, Sequence
+
+from models.prompt_model import Prompt
 
 from ..execution import CodexExecutionResult, CodexExecutor, ExecutionError
 
@@ -31,45 +34,54 @@ class PromptExecutor:
 
     def __init__(
         self,
-        model_name: str,
-        api_key: str | None = None,
+        model: str,
+        api_key: Optional[str] = None,
         *,
-        base_url: str | None = None,
-        timeout_seconds: float | None = None,
+        api_base: Optional[str] = None,
+        api_version: Optional[str] = None,
+        timeout_seconds: Optional[float] = None,
+        temperature: float = 0.2,
+        max_output_tokens: int = 1024,
+        drop_params: Optional[Sequence[str]] = None,
+        reasoning_effort: Optional[str] = None,
+        stream: bool = False,
     ) -> None:
         self._executor = CodexExecutor(
-            model_name,
+            model=model,
             api_key=api_key,
-            base_url=base_url,
+            api_base=api_base,
+            api_version=api_version,
             timeout_seconds=timeout_seconds,
+            temperature=temperature,
+            max_output_tokens=max_output_tokens,
+            drop_params=drop_params,
+            reasoning_effort=reasoning_effort,
+            stream=stream,
         )
-
-    # ------------------------------------------------------------------
-    # Delegations – we purposefully expose only minimal subset. Additional
-    # methods can be added as they are consumed by PromptManager.
-    # ------------------------------------------------------------------
 
     def execute(
         self,
-        messages: Sequence[Mapping[str, str]] | None,
+        prompt: Prompt,
+        request_text: str,
         *,
-        stream: bool = False,
-        metadata: Mapping[str, Any] | None = None,
+        conversation: Optional[Sequence[Mapping[str, str]]] = None,
+        stream: Optional[bool] = None,
+        on_stream: Optional[Callable[[str], None]] = None,
     ) -> ExecutionResult:
-        """Run the messages through the underlying executor."""
+        """Run ``request_text`` against ``prompt`` via LiteLLM."""
 
-        return self._executor.execute(messages, stream=stream, metadata=metadata)
+        return self._executor.execute(
+            prompt,
+            request_text,
+            conversation=conversation,
+            stream=stream,
+            on_stream=on_stream,
+        )
 
-    async def aexecute(
-        self,
-        messages: Sequence[Mapping[str, str]] | None,
-        *,
-        metadata: Mapping[str, Any] | None = None,
-    ) -> ExecutionResult:  # noqa: D401
-        """Async variant of :meth:`execute`."""
+    def save_transcript(self, conversation: Iterable[str], path: str | Path) -> None:
+        """Persist a plain-text transcript for debugging sessions."""
 
-        return await self._executor.aexecute(messages, metadata=metadata)
-
-    # Helper: save run transcript to disk – useful in debugging.
-    def save_transcript(self, conversation: Iterable[str], path: str | Path) -> None:  # noqa: D401,E501
-        self._executor.save_transcript(conversation, path)
+        resolved_path = Path(path)
+        resolved_path.parent.mkdir(parents=True, exist_ok=True)
+        lines = [str(line) for line in conversation]
+        resolved_path.write_text("\n".join(lines), encoding="utf-8")

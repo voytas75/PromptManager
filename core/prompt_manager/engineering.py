@@ -1,5 +1,6 @@
 """Prompt engineering helpers façade.
 
+Updates: v0.14.2 - 2025-11-27 - Align façade signature with PromptEngineer implementation.
 Updates: v0.14.1 - 2025-11-25 - Add module history metadata per AGENTS guidelines.
 
 This thin wrapper allows :class:`core.prompt_manager.PromptManager` and other
@@ -11,7 +12,7 @@ import sites.
 
 from __future__ import annotations
 
-from typing import Sequence
+from typing import Optional, Sequence
 
 from ..prompt_engineering import PromptEngineer, PromptEngineeringError, PromptRefinement
 
@@ -25,15 +26,54 @@ __all__ = [
 class PromptEngineerFacade:
     """Facade over :class:`core.prompt_engineering.PromptEngineer`."""
 
-    def __init__(self, model_name: str | None = None):
-        self._engineer = PromptEngineer(model_name=model_name) if model_name else PromptEngineer()
+    def __init__(self, *, engineer: Optional[PromptEngineer] = None, model_name: Optional[str] = None) -> None:
+        if engineer is not None:
+            self._engineer = engineer
+        elif model_name is not None:
+            self._engineer = PromptEngineer(model=model_name)
+        else:
+            raise ValueError("Either an engineer instance or model_name must be provided.")
 
-    def refine(self, prompt_text: str, *, hints: Sequence[str] | None = None) -> PromptRefinement:  # noqa: D401,E501
-        """Return a refined prompt based on provided hints."""
+    def refine(
+        self,
+        prompt_text: str,
+        *,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        category: Optional[str] = None,
+        tags: Optional[Sequence[str]] = None,
+        negative_constraints: Optional[Sequence[str]] = None,
+        structure_only: bool = False,
+    ) -> PromptRefinement:
+        """Refine a prompt using the underlying engineer."""
 
-        return self._engineer.refine(prompt_text, hints=hints)
+        return self._engineer.refine(
+            prompt_text,
+            name=name,
+            description=description,
+            category=category,
+            tags=tags,
+            negative_constraints=negative_constraints,
+            structure_only=structure_only,
+        )
 
-    async def arefine(self, prompt_text: str, *, hints: Sequence[str] | None = None) -> PromptRefinement:  # noqa: D401,E501
-        """Async variant of :meth:`refine`."""
+    def refine_structure(
+        self,
+        prompt_text: str,
+        *,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        category: Optional[str] = None,
+        tags: Optional[Sequence[str]] = None,
+        negative_constraints: Optional[Sequence[str]] = None,
+    ) -> PromptRefinement:
+        """Run structure-only refinement via :meth:`PromptEngineer.refine_structure`."""
 
-        return await self._engineer.arefine(prompt_text, hints=hints)
+        return self._engineer.refine_structure(
+            prompt_text,
+            name=name,
+            description=description,
+            category=category,
+            tags=tags,
+            negative_constraints=negative_constraints,
+        )

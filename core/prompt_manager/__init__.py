@@ -1726,6 +1726,7 @@ class PromptManager:
         self._prompt_engineer = None
         self._prompt_structure_engineer = None
         self._scenario_generator = None
+        self._category_generator = None
         self._executor = None
 
         if not (self._litellm_fast_model or self._litellm_inference_model):
@@ -1781,6 +1782,11 @@ class PromptManager:
                 LiteLLMScenarioGenerator,
                 "scenario_generation",
                 system_prompt=template_overrides.get("scenario_generation"),
+            )
+            self._category_generator = _construct(
+                LiteLLMCategoryGenerator,
+                "category_generation",
+                system_prompt=template_overrides.get("category_generation"),
             )
             self._executor = _construct(
                 CodexExecutor,
