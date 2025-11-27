@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.55 - 2025-11-27 - Wire Template tab detail actions to the shared prompt handlers.
 Updates: v0.15.54 - 2025-11-27 - Rename Response Styles tab to Prompt Parts and surface prompt part metadata.
 Updates: v0.15.53 - 2025-11-27 - Persist Template tab splitter layouts and rename the tab to Template.
 Updates: v0.15.52 - 2025-11-27 - Allow resizing between template list and detail panes with a splitter.
@@ -1417,6 +1418,10 @@ class MainWindow(QMainWindow):
         self._template_list_view.doubleClicked.connect(self._on_prompt_double_clicked)  # type: ignore[arg-type]
         preview_list_splitter.addWidget(self._template_list_view)
         self._template_detail_widget = PromptDetailWidget(preview_list_splitter)
+        self._template_detail_widget.delete_requested.connect(self._on_delete_clicked)  # type: ignore[arg-type]
+        self._template_detail_widget.edit_requested.connect(self._on_edit_clicked)  # type: ignore[arg-type]
+        self._template_detail_widget.version_history_requested.connect(self._open_version_history_dialog)  # type: ignore[arg-type]
+        self._template_detail_widget.fork_requested.connect(self._on_fork_clicked)  # type: ignore[arg-type]
         preview_list_splitter.addWidget(self._template_detail_widget)
         preview_list_splitter.setStretchFactor(0, 1)
         preview_list_splitter.setStretchFactor(1, 2)
