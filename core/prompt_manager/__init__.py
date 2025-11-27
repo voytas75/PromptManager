@@ -56,6 +56,7 @@ from typing import (
     Dict,
     List,
     Mapping,
+    MutableMapping,
     Optional,
     Protocol,
     Sequence,
@@ -333,6 +334,8 @@ _CATEGORY_KEYWORD_HINTS: Sequence[tuple[str, str]] = (
     ("summary", "Reporting"),
     ("report", "Reporting"),
 )
+
+_CATEGORY_INSIGHT_KEY = "category_insight"
 
 
 def _match_category_label(
@@ -1297,6 +1300,162 @@ class PromptManager:
             return default_label
         return categories[0].label if categories else "General"
 
+    def _update_category_insight(
+        self,
+        prompt: Prompt,
+        *,
+        previous_prompt: Optional[Prompt],
+    ) -> None:
+        """Capture LiteLLM-backed category drift metadata on the prompt."""
+
+        if self._category_generator is None:
+            self._set_category_insight_metadata(prompt, None)
+            return
+
+        context_text = self._category_context_text(prompt)
+        if not context_text:
+            self._set_category_insight_metadata(prompt, None)
+            return
+
+        categories = self.list_categories()
+        if not categories:
+            self._set_category_insight_metadata(prompt, None)
+            return
+
+        try:
+            suggestion_raw = self._category_generator.generate(context_text, categories=categories)
+        except CategorySuggestionError as exc:
+            logger.debug(
+                "Category drift suggestion failed",
+                extra={
+                    "prompt_id": str(prompt.id),
+                    "error": str(exc),
+                },
+            )
+            self._set_category_insight_metadata(prompt, None)
+            return
+        except Exception:
+            logger.warning(
+                "Category drift suggestion failed unexpectedly",
+                extra={"prompt_id": str(prompt.id)},
+                exc_info=True,
+            )
+            self._set_category_insight_metadata(prompt, None)
+            return
+
+        suggestion_label = _match_category_label(suggestion_raw, categories) or (suggestion_raw or "").strip()
+        if not suggestion_label:
+            self._set_category_insight_metadata(prompt, None)
+            return
+
+        current_label = (prompt.category or "").strip()
+        timestamp = datetime.now(timezone.utc).isoformat()
+        labels_match = current_label and suggestion_label.lower() == current_label.lower()
+
+        previous_insight = self._extract_category_insight(previous_prompt)
+        if labels_match:
+            adoption_payload = self._build_category_adoption_insight(
+                previous_prompt,
+                previous_insight,
+                suggestion_label,
+                suggestion_raw,
+                current_label,
+                timestamp,
+            )
+            if adoption_payload:
+                self._set_category_insight_metadata(prompt, adoption_payload)
+            else:
+                self._set_category_insight_metadata(prompt, None)
+            return
+
+        insight: Dict[str, Any] = {
+            "status": "suggested",
+            "suggested_label": suggestion_label,
+            "suggestion_raw": suggestion_raw,
+            "current_label": current_label,
+            "updated_at": timestamp,
+        }
+        if previous_prompt is not None:
+            insight["previous_category"] = previous_prompt.category
+        self._set_category_insight_metadata(prompt, insight)
+
+    @staticmethod
+    def _category_context_text(prompt: Prompt) -> str:
+        """Return the most descriptive text for category inference."""
+
+        for candidate in (prompt.context, prompt.description, prompt.document):
+            text = (candidate or "").strip()
+            if text:
+                return text
+        return ""
+
+    @staticmethod
+    def _extract_category_insight(prompt: Optional[Prompt]) -> Optional[Dict[str, Any]]:
+        """Return the stored category insight mapping, if present."""
+
+        if prompt is None:
+            return None
+        ext2 = prompt.ext2 if isinstance(prompt.ext2, Mapping) else None
+        if not ext2:
+            return None
+        payload = ext2.get(_CATEGORY_INSIGHT_KEY)
+        if isinstance(payload, Mapping):
+            return {str(key): value for key, value in payload.items()}
+        return None
+
+    def _build_category_adoption_insight(
+        self,
+        previous_prompt: Optional[Prompt],
+        previous_insight: Optional[Mapping[str, Any]],
+        suggestion_label: str,
+        suggestion_raw: str,
+        current_label: str,
+        timestamp: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Return metadata describing an accepted LiteLLM category suggestion."""
+
+        if previous_prompt is None or previous_insight is None:
+            return None
+        status = str(previous_insight.get("status") or "").strip().lower()
+        if status != "suggested":
+            return None
+        previous_suggested = str(previous_insight.get("suggested_label") or "").strip()
+        if not previous_suggested or previous_suggested.lower() != suggestion_label.lower():
+            return None
+        previous_label = (previous_prompt.category or "").strip()
+        if not previous_label or previous_label.lower() == current_label.lower():
+            return None
+        return {
+            "status": "adopted",
+            "suggested_label": suggestion_label,
+            "suggestion_raw": suggestion_raw,
+            "previous_label": previous_label,
+            "current_label": current_label,
+            "adopted_at": timestamp,
+        }
+
+    @staticmethod
+    def _set_category_insight_metadata(
+        prompt: Prompt,
+        insight: Optional[Mapping[str, Any]],
+    ) -> None:
+        """Persist or clear category insight metadata on the prompt record."""
+
+        if isinstance(prompt.ext2, MutableMapping):
+            metadata: Dict[str, Any] = dict(prompt.ext2)
+        elif isinstance(prompt.ext2, Mapping):
+            metadata = dict(prompt.ext2)
+        else:
+            metadata = {}
+
+        if insight is None:
+            if metadata.pop(_CATEGORY_INSIGHT_KEY, None) is not None:
+                prompt.ext2 = metadata or None
+            return
+
+        metadata[_CATEGORY_INSIGHT_KEY] = dict(insight)
+        prompt.ext2 = metadata
+
     def _build_description_fallback(self, context: str, prompt: Optional[Prompt]) -> str:
         """Return a deterministic summary derived from prompt metadata and context."""
 
@@ -1977,6 +2136,7 @@ class PromptManager:
     ) -> Prompt:
         """Persist a new prompt in SQLite/ChromaDB and prime the cache."""
         prompt = self._apply_category_metadata(prompt)
+        self._update_category_insight(prompt, previous_prompt=None)
         generated_embedding: Optional[List[float]] = None
         if embedding is not None:
             generated_embedding = list(embedding)
@@ -2177,6 +2337,8 @@ class PromptManager:
                 extra={"prompt_id": str(prompt.id)},
                 exc_info=True,
             )
+
+        self._update_category_insight(prompt, previous_prompt=previous_prompt)
 
         body_changed = _normalize_prompt_body(previous_prompt.context) != _normalize_prompt_body(
             prompt.context
