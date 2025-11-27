@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.11.8 - 2025-11-27 - Show toast confirmations for dialog copy actions.
 Updates: v0.11.7 - 2025-11-27 - Add copy prompt body control to the version history dialog.
 Updates: v0.11.6 - 2025-11-27 - Add prompt part selector to response style dialog and rename copy to prompt parts.
 Updates: v0.11.5 - 2025-11-27 - Add import fallback for processing indicator in test harnesses.
@@ -105,6 +106,10 @@ try:
     from .processing_indicator import ProcessingIndicator
 except ImportError:  # pragma: no cover – fallback when loaded outside package
     from gui.processing_indicator import ProcessingIndicator
+try:
+    from .toast import show_toast
+except ImportError:  # pragma: no cover - fallback when loaded outside package
+    from gui.toast import show_toast
 from core import (
     CatalogDiff,
     CatalogDiffEntry,
@@ -3135,6 +3140,7 @@ class PromptVersionHistoryDialog(QDialog):
         snapshot_text = json.dumps(version.snapshot, ensure_ascii=False, indent=2)
         QGuiApplication.clipboard().setText(snapshot_text)
         self._status_callback("Snapshot copied to clipboard", 2000)
+        show_toast(self, "Snapshot copied to clipboard.")
 
     def _copy_body_to_clipboard(self) -> None:
         """Copy the selected prompt version body to the clipboard."""
@@ -3145,6 +3151,7 @@ class PromptVersionHistoryDialog(QDialog):
         body_text = self._body_text_for_version(version)
         QGuiApplication.clipboard().setText(body_text)
         self._status_callback("Prompt body copied to clipboard", 2000)
+        show_toast(self, "Prompt body copied to clipboard.")
 
     def _on_restore_clicked(self) -> None:
         version = self._selected_version()

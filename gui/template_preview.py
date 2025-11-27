@@ -1,5 +1,6 @@
 """Workspace template preview widget with live variable validation.
 
+Updates: v0.1.9 - 2025-11-27 - Expose run trigger for external shortcuts and publish run state changes.
 Updates: v0.1.8 - 2025-11-27 - Move schema toggle controls above editors and collapse the schema panel when hidden.
 Updates: v0.1.7 - 2025-11-27 - Make the variables/schema editors and rendered preview vertically resizable.
 Updates: v0.1.6 - 2025-11-27 - Consolidate template status messaging into the footer label only.
@@ -42,6 +43,7 @@ class TemplatePreviewWidget(QWidget):
     """Provide a JSON-driven variables editor with live Jinja2 previews."""
 
     run_requested = Signal(str, dict)
+    run_state_changed = Signal(bool)
 
     _SUCCESS_COLOR = "#047857"
     _ERROR_COLOR = "#b91c1c"
@@ -58,6 +60,7 @@ class TemplatePreviewWidget(QWidget):
         self._preview_ready = False
         self._last_rendered_text: str = ""
         self._run_enabled = False
+        self._last_run_ready = False
         self._build_ui()
         self._update_preview()
 
@@ -352,13 +355,22 @@ class TemplatePreviewWidget(QWidget):
             and bool(self._last_rendered_text.strip())
         )
         self._run_button.setEnabled(can_run)
+        if can_run != self._last_run_ready:
+            self._last_run_ready = can_run
+            self.run_state_changed.emit(can_run)
 
     def _on_run_clicked(self) -> None:
+        self.request_run()
+
+    def request_run(self) -> bool:
+        """Emit the run signal when the preview is ready; return True on success."""
+
         if not (self._preview_ready and self._last_rendered_text.strip()):
             self._set_status("Preview must be ready before running.", is_error=True)
-            return
+            return False
         variables = self._collect_variables()
         self.run_requested.emit(self._last_rendered_text, dict(variables))
+        return True
 
     @property
     def content_splitter(self) -> QSplitter:

@@ -1,5 +1,6 @@
 """Qt helpers for surfacing core notification events in the GUI.
 
+Updates: v0.1.1 - 2025-11-27 - Add toast confirmation for copying notification details.
 Updates: v0.1.0 - 2025-11-11 - Introduce notification bridge and history dialog.
 """
 
@@ -18,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.notifications import Notification, NotificationCenter
+from .toast import show_toast
 
 
 class QtNotificationBridge(QObject):
@@ -68,6 +70,7 @@ class NotificationHistoryDialog(QDialog):
         notification: Notification = selected.data(Qt.UserRole)
         clipboard: QClipboard = QGuiApplication.clipboard()
         clipboard.setText(_format_notification(notification, include_metadata=True))
+        show_toast(self, "Notification details copied to clipboard.")
 
 
 def _format_notification(notification: Notification, *, include_metadata: bool = False) -> str:

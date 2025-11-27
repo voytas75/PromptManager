@@ -1,5 +1,6 @@
 """Notes tab for storing simple prompt notes.
 
+Updates: v0.1.1 - 2025-11-27 - Add toast callback for clipboard operations.
 Updates: v0.1.0 - 2025-12-06 - Initial implementation with CRUD actions.
 """
 
@@ -42,10 +43,12 @@ class NotesPanel(QWidget):
         parent: Optional[QWidget] = None,
         *,
         status_callback: Optional[Callable[[str, int], None]] = None,
+        toast_callback: Optional[Callable[[str, int], None]] = None,
     ) -> None:
         super().__init__(parent)
         self._manager = manager
         self._status_callback = status_callback
+        self._toast_callback = toast_callback
         self._notes: List[PromptNote] = []
         self._list = QListWidget(self)
         self._note_view = QPlainTextEdit(self)
@@ -199,7 +202,7 @@ class NotesPanel(QWidget):
             return
         clipboard = QGuiApplication.clipboard()
         clipboard.setText(note.note)
-        self._show_status("Note copied to clipboard.")
+        self._show_toast("Note copied to clipboard.")
 
     def _on_export_clicked(self) -> None:
         if not self._notes:
@@ -243,6 +246,12 @@ class NotesPanel(QWidget):
     def _show_status(self, message: str, duration_ms: int = 3000) -> None:
         if self._status_callback is not None:
             self._status_callback(message, duration_ms)
+
+    def _show_toast(self, message: str, duration_ms: int = 2500) -> None:
+        if self._toast_callback is not None:
+            self._toast_callback(message, duration_ms)
+        else:
+            self._show_status(message, duration_ms)
 
 
 __all__ = ["NotesPanel"]

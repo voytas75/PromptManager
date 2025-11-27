@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.56 - 2025-11-27 - Add Template tab run shortcut and toast notifications for copy actions.
 Updates: v0.15.55 - 2025-11-27 - Wire Template tab detail actions to the shared prompt handlers.
 Updates: v0.15.54 - 2025-11-27 - Rename Response Styles tab to Prompt Parts and surface prompt part metadata.
 Updates: v0.15.53 - 2025-11-27 - Persist Template tab splitter layouts and rename the tab to Template.
@@ -198,6 +199,7 @@ from .processing_indicator import ProcessingIndicator
 from .response_styles_panel import ResponseStylesPanel
 from .settings_dialog import SettingsDialog, persist_settings_to_config
 from .template_preview import TemplatePreviewWidget
+from .toast import show_toast
 from .usage_logger import IntentUsageLogger
 
 logger = logging.getLogger(__name__)
@@ -1019,6 +1021,7 @@ class MainWindow(QMainWindow):
         self._template_preview: Optional[TemplatePreviewWidget] = None
         self._template_list_view: Optional[QListView] = None
         self._template_detail_widget: Optional[PromptDetailWidget] = None
+        self._template_run_shortcut_button: Optional[QPushButton] = None
         self._layout_settings = QSettings("PromptManager", "MainWindow")
         (
             self._pending_category_slug,
@@ -1373,12 +1376,14 @@ class MainWindow(QMainWindow):
             self._manager,
             self,
             status_callback=self._show_status_message,
+            toast_callback=self._show_toast,
         )
 
         self._response_styles_panel = ResponseStylesPanel(
             self._manager,
             self,
             status_callback=self._show_status_message,
+            toast_callback=self._show_toast,
         )
 
         self._tab_widget.addTab(result_tab, "Prompts")
@@ -1436,6 +1441,9 @@ class MainWindow(QMainWindow):
         self._template_preview.run_requested.connect(  # type: ignore[arg-type]
             self._on_template_preview_run_requested
         )
+        self._template_preview.run_state_changed.connect(  # type: ignore[arg-type]
+            self._on_template_run_state_changed
+        )
         preview_render_layout.addWidget(self._template_preview)
 
         preview_splitter.addWidget(preview_list_panel)
@@ -1443,6 +1451,18 @@ class MainWindow(QMainWindow):
         preview_splitter.setStretchFactor(0, 1)
         preview_splitter.setStretchFactor(1, 2)
         preview_layout.addWidget(preview_splitter, 1)
+
+        template_actions = QHBoxLayout()
+        template_actions.setContentsMargins(0, 0, 0, 0)
+        template_actions.setSpacing(8)
+        template_actions.addStretch(1)
+        run_shortcut = QPushButton("Run Rendered Template", preview_tab)
+        run_shortcut.setEnabled(False)
+        run_shortcut.setToolTip("Execute the rendered template using the selected prompt.")
+        run_shortcut.clicked.connect(self._on_template_tab_run_clicked)  # type: ignore[arg-type]
+        template_actions.addWidget(run_shortcut)
+        self._template_run_shortcut_button = run_shortcut
+        preview_layout.addLayout(template_actions)
         self._tab_widget.addTab(preview_tab, "Template")
 
         layout.addWidget(self._tab_widget, stretch=1)
@@ -2961,7 +2981,7 @@ class MainWindow(QMainWindow):
             return
         clipboard = QGuiApplication.clipboard()
         clipboard.setText(payload)
-        self.statusBar().showMessage(f"Copied '{prompt.name}' to the clipboard.", 4000)
+        self._show_toast(f"Copied '{prompt.name}' to the clipboard.")
         self._usage_logger.log_copy(prompt_name=prompt.name, prompt_has_body=bool(prompt.context))
 
     def _show_prompt_description(self, prompt: Prompt) -> None:
@@ -3069,7 +3089,7 @@ class MainWindow(QMainWindow):
             return
         clipboard = QGuiApplication.clipboard()
         clipboard.setText(response)
-        self.statusBar().showMessage("Prompt result copied to the clipboard.", 4000)
+        self._show_toast("Prompt result copied to the clipboard.")
 
     def _on_copy_result_to_text_window_clicked(self) -> None:
         """Populate the workspace text window with the latest execution result."""
@@ -3086,7 +3106,7 @@ class MainWindow(QMainWindow):
         cursor.movePosition(QTextCursor.End)
         self._query_input.setTextCursor(cursor)
         self._query_input.setFocus(Qt.ShortcutFocusReason)
-        self.statusBar().showMessage("Prompt result copied to the text window.", 4000)
+        self._show_toast("Prompt result copied to the text window.")
 
     def _apply_suggestions(self, suggestions: PromptManager.IntentSuggestions) -> None:
         """Apply intent suggestions to the list view and update filters."""
@@ -4063,6 +4083,20 @@ class MainWindow(QMainWindow):
         template_text = prompt.context or prompt.description or ""
         self._template_preview.set_template(template_text)
 
+    def _on_template_run_state_changed(self, can_run: bool) -> None:
+        """Synchronise the Template tab shortcut button with preview availability."""
+
+        if self._template_run_shortcut_button is not None:
+            self._template_run_shortcut_button.setEnabled(can_run)
+
+    def _on_template_tab_run_clicked(self) -> None:
+        """Invoke the template preview execution shortcut."""
+
+        if self._template_preview is None:
+            return
+        if not self._template_preview.request_run():
+            self._show_status_message("Render the template before running it.", 4000)
+
     def _handle_notification(self, notification: Notification) -> None:
         """React to notification updates published by the core manager."""
 
@@ -4136,6 +4170,11 @@ class MainWindow(QMainWindow):
         """Show a transient status bar message."""
 
         self.statusBar().showMessage(message, duration_ms)
+
+    def _show_toast(self, message: str, duration_ms: int = 2500) -> None:
+        """Display a toast anchored to the main window."""
+
+        show_toast(self, message, duration_ms)
 
 
 __all__ = ["MainWindow", "PromptListModel", "PromptDetailWidget"]
