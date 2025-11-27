@@ -22,7 +22,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Set
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 from models.category_model import PromptCategory, slugify_category
 from models.prompt_model import (
@@ -857,6 +857,67 @@ class PromptRepository:
         except sqlite3.Error as exc:
             raise RepositoryError("Failed to fetch filtered executions") from exc
         return [self._row_to_execution(row) for row in rows]
+
+    def get_execution_analytics(
+        self,
+        *,
+        since: Optional[datetime] = None,
+        limit: int = 5,
+    ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+        """Return overall and per-prompt execution aggregates."""
+
+        limit_value = max(1, int(limit)) if limit else 5
+        filters: List[str] = []
+        params: List[Any] = []
+        if since is not None:
+            filters.append("datetime(executed_at) >= ?")
+            params.append(since.isoformat())
+        where_clause = f" WHERE {' AND '.join(filters)}" if filters else ""
+
+        summary_query = (
+            "SELECT "
+            "COUNT(*) AS total_runs, "
+            "SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) AS success_runs, "
+            "AVG(duration_ms) AS avg_duration_ms, "
+            "AVG(rating) AS avg_rating "
+            "FROM prompt_executions"
+            f"{where_clause};"
+        )
+
+        prompt_query = (
+            "SELECT "
+            "prompt_id, "
+            "MAX(p.name) AS prompt_name, "
+            "COUNT(*) AS total_runs, "
+            "SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) AS success_runs, "
+            "AVG(duration_ms) AS avg_duration_ms, "
+            "AVG(rating) AS avg_rating, "
+            "MAX(executed_at) AS last_executed_at "
+            "FROM prompt_executions "
+            "LEFT JOIN prompts p ON p.id = prompt_executions.prompt_id "
+            f"{where_clause} "
+            "GROUP BY prompt_id "
+            "ORDER BY success_runs DESC, avg_rating DESC, total_runs DESC "
+            "LIMIT ?;"
+        )
+
+        def _row_to_dict(row: Optional[sqlite3.Row]) -> Dict[str, Any]:
+            if row is None:
+                return {}
+            return {key: row[key] for key in row.keys()}
+
+        try:
+            with _connect(self._db_path) as conn:
+                summary_row = conn.execute(summary_query, params).fetchone()
+                prompt_params = list(params)
+                prompt_params.append(limit_value)
+                prompt_rows = conn.execute(prompt_query, prompt_params).fetchall()
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to compute execution analytics") from exc
+
+        summary = _row_to_dict(summary_row)
+        aggregates = [_row_to_dict(row) for row in prompt_rows]
+        return summary, aggregates
 
     def update_execution(self, execution: PromptExecution) -> PromptExecution:
         """Persist changes to an existing execution entry."""

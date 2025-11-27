@@ -29,7 +29,12 @@ from .category_registry import CategoryRegistry
 from .embedding import create_embedding_function
 from .execution import CodexExecutionResult, CodexExecutor, ExecutionError
 from .factory import build_prompt_manager
-from .history_tracker import HistoryTracker, HistoryTrackerError
+from .history_tracker import (
+    ExecutionAnalytics,
+    HistoryTracker,
+    HistoryTrackerError,
+    PromptExecutionAnalytics,
+)
 from .intent_classifier import (
     IntentClassifier,
     IntentClassifierError,
@@ -135,6 +140,8 @@ __all__ = [
     "ScenarioGenerationError",
     "HistoryTracker",
     "HistoryTrackerError",
+    "ExecutionAnalytics",
+    "PromptExecutionAnalytics",
     "Notification",
     "NotificationCenter",
     "NotificationLevel",

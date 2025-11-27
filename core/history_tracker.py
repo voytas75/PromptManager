@@ -7,9 +7,10 @@ Updates: v0.1.0 - 2025-11-08 - Introduce HistoryTracker for execution logs.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List, Mapping, Optional
 
 from models.prompt_model import ExecutionStatus, PromptExecution
@@ -19,9 +20,37 @@ from .repository import PromptRepository, RepositoryError, RepositoryNotFoundErr
 _DEFAULT_MAX_REQUEST_LENGTH = 16_000
 _DEFAULT_MAX_RESPONSE_LENGTH = 24_000
 
+logger = logging.getLogger("prompt_manager.history_tracker")
+
 
 class HistoryTrackerError(Exception):
     """Raised when execution history cannot be persisted."""
+
+
+@dataclass(slots=True)
+class PromptExecutionAnalytics:
+    """Per-prompt aggregates for execution history."""
+
+    prompt_id: uuid.UUID
+    name: str
+    total_runs: int
+    success_rate: float
+    average_duration_ms: Optional[float]
+    average_rating: Optional[float]
+    rating_trend: Optional[float]
+    last_executed_at: Optional[datetime]
+
+
+@dataclass(slots=True)
+class ExecutionAnalytics:
+    """Aggregated execution statistics across the catalogue."""
+
+    total_runs: int
+    success_rate: float
+    average_duration_ms: Optional[float]
+    average_rating: Optional[float]
+    prompt_breakdown: List[PromptExecutionAnalytics]
+    window_start: Optional[datetime] = None
 
 
 def _clip(text: Optional[str], max_length: int) -> str:
@@ -146,6 +175,74 @@ class HistoryTracker:
         except RepositoryError as exc:
             raise HistoryTrackerError(f"Unable to query execution history: {exc}") from exc
 
+    def summarize(
+        self,
+        *,
+        window_days: Optional[int] = 30,
+        prompt_limit: int = 5,
+        trend_window: int = 5,
+    ) -> ExecutionAnalytics:
+        """Return aggregated execution metrics for the stored history."""
+
+        since: Optional[datetime] = None
+        if window_days is not None:
+            since = datetime.now(timezone.utc) - timedelta(days=max(window_days, 0))
+        try:
+            summary_row, prompt_rows = self.repository.get_execution_analytics(
+                since=since,
+                limit=prompt_limit,
+            )
+        except RepositoryError as exc:
+            raise HistoryTrackerError(f"Unable to compute execution analytics: {exc}") from exc
+
+        total_runs = int(summary_row.get("total_runs", 0) or 0)
+        success_runs = int(summary_row.get("success_runs", 0) or 0)
+        average_duration = _coerce_float(summary_row.get("avg_duration_ms"))
+        average_rating = _coerce_float(summary_row.get("avg_rating"))
+        success_rate = success_runs / total_runs if total_runs else 0.0
+
+        prompt_stats: List[PromptExecutionAnalytics] = []
+        for row in prompt_rows:
+            prompt_identifier = row.get("prompt_id")
+            if not prompt_identifier:
+                continue
+            try:
+                prompt_id = uuid.UUID(str(prompt_identifier))
+            except (TypeError, ValueError):
+                continue
+            total = int(row.get("total_runs", 0) or 0)
+            success_total = int(row.get("success_runs", 0) or 0)
+            prompt_success_rate = success_total / total if total else 0.0
+            prompt_average_duration = _coerce_float(row.get("avg_duration_ms"))
+            prompt_average_rating = _coerce_float(row.get("avg_rating"))
+            last_executed = _parse_datetime(row.get("last_executed_at"))
+            rating_trend = self._compute_rating_trend(
+                prompt_id,
+                prompt_average_rating,
+                trend_window,
+            )
+            prompt_stats.append(
+                PromptExecutionAnalytics(
+                    prompt_id=prompt_id,
+                    name=str(row.get("prompt_name") or "Unknown Prompt"),
+                    total_runs=total,
+                    success_rate=prompt_success_rate,
+                    average_duration_ms=prompt_average_duration,
+                    average_rating=prompt_average_rating,
+                    rating_trend=rating_trend,
+                    last_executed_at=last_executed,
+                )
+            )
+
+        return ExecutionAnalytics(
+            total_runs=total_runs,
+            success_rate=success_rate,
+            average_duration_ms=average_duration,
+            average_rating=average_rating,
+            prompt_breakdown=prompt_stats,
+            window_start=since,
+        )
+
     def _build_execution(
         self,
         *,
@@ -207,5 +304,58 @@ class HistoryTracker:
         except RepositoryError as exc:
             raise HistoryTrackerError(f"Unable to update execution {execution_id}: {exc}") from exc
 
+    def _compute_rating_trend(
+        self,
+        prompt_id: uuid.UUID,
+        baseline_average: Optional[float],
+        trend_window: int,
+    ) -> Optional[float]:
+        if trend_window <= 0:
+            return None
+        try:
+            recent = self.repository.list_executions_for_prompt(prompt_id, limit=trend_window)
+        except RepositoryError as exc:
+            logger.debug(
+                "Unable to compute rating trend",
+                exc_info=exc,
+                extra={"prompt_id": str(prompt_id)},
+            )
+            return None
+        ratings = [entry.rating for entry in recent if entry.rating is not None]
+        if not ratings:
+            return None
+        recent_average = sum(ratings) / len(ratings)
+        if baseline_average is None:
+            return recent_average
+        return recent_average - baseline_average
 
-__all__ = ["HistoryTracker", "HistoryTrackerError"]
+
+def _coerce_float(value: Optional[object]) -> Optional[float]:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_datetime(value: Optional[object]) -> Optional[datetime]:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    try:
+        parsed = datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+__all__ = [
+    "ExecutionAnalytics",
+    "HistoryTracker",
+    "HistoryTrackerError",
+    "PromptExecutionAnalytics",
+]

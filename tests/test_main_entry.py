@@ -11,13 +11,16 @@ import json
 import logging
 import sys
 import types
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
+import uuid
 
 import pytest
 
 import main
 from config.settings import DEFAULT_EMBEDDING_BACKEND, DEFAULT_EMBEDDING_MODEL
+from core.history_tracker import ExecutionAnalytics, PromptExecutionAnalytics
 from core.intent_classifier import IntentLabel, IntentPrediction
 from core.prompt_manager import PromptManagerError
 
@@ -49,6 +52,7 @@ class _DummyManager:
         self.reembed_error: Exception | None = None
         self.reembed_called = False
         self.reembed_reset = False
+        self.execution_analytics: ExecutionAnalytics | None = None
 
     def close(self) -> None:
         self.closed = True
@@ -67,6 +71,37 @@ class _DummyManager:
         if self.reembed_error is not None:
             raise self.reembed_error
         return self.reembed_result
+
+    def get_execution_analytics(
+        self,
+        *,
+        window_days: int | None = None,
+        prompt_limit: int = 5,
+        trend_window: int = 5,
+    ) -> ExecutionAnalytics | None:
+        return self.execution_analytics
+
+
+def _build_execution_analytics(total_runs: int = 5) -> ExecutionAnalytics:
+    now = datetime.now(timezone.utc)
+    prompt_stats = PromptExecutionAnalytics(
+        prompt_id=uuid.uuid4(),
+        name="Prompt Alpha",
+        total_runs=total_runs,
+        success_rate=1.0,
+        average_duration_ms=150.0,
+        average_rating=4.8,
+        rating_trend=0.4,
+        last_executed_at=now,
+    )
+    return ExecutionAnalytics(
+        total_runs=total_runs,
+        success_rate=0.9,
+        average_duration_ms=200.0,
+        average_rating=4.5,
+        prompt_breakdown=[prompt_stats],
+        window_start=now,
+    )
 
 
 def test_main_print_settings_logs_and_exits(
@@ -407,3 +442,47 @@ def test_reembed_command_handles_manager_errors(
     assert exit_code == 7
     output = capsys.readouterr().out
     assert "Failed to rebuild embeddings" in output
+
+
+def test_history_analytics_command_renders_summary(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "history-analytics", "--window-days", "7", "--limit", "2"],
+    )
+    manager = _DummyManager()
+    manager.execution_analytics = _build_execution_analytics()
+    monkeypatch.setattr(main, "load_settings", lambda: _DummySettings())
+    monkeypatch.setattr(main, "build_prompt_manager", lambda _: manager)
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "Execution analytics" in output
+    assert "Prompt Alpha" in output
+    assert manager.closed is True
+
+
+def test_history_analytics_handles_empty_results(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "history-analytics", "--window-days", "0"])
+    manager = _DummyManager()
+    manager.execution_analytics = ExecutionAnalytics(
+        total_runs=0,
+        success_rate=0.0,
+        average_duration_ms=None,
+        average_rating=None,
+        prompt_breakdown=[],
+        window_start=None,
+    )
+    monkeypatch.setattr(main, "load_settings", lambda: _DummySettings())
+    monkeypatch.setattr(main, "build_prompt_manager", lambda _: manager)
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    assert "No execution history" in capsys.readouterr().out
+    assert manager.closed is True

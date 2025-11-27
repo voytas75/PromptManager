@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import uuid
 
-from core.history_tracker import HistoryTracker
+import pytest
+
+from core.history_tracker import ExecutionAnalytics, HistoryTracker
 from core.repository import PromptRepository
 from models.prompt_model import Prompt
 
@@ -82,3 +84,51 @@ def test_history_tracker_updates_note(tmp_path) -> None:
 
     cleared = tracker.update_note(execution.id, "")
     assert not (cleared.metadata or {}).get("note")
+
+
+def test_history_tracker_summarize_returns_metrics(tmp_path) -> None:
+    repo = PromptRepository(str(tmp_path / "repo.db"))
+    prompt = _make_prompt()
+    repo.add(prompt)
+    tracker = HistoryTracker(repo)
+
+    tracker.record_success(
+        prompt_id=prompt.id,
+        request_text="demo",
+        response_text="ok",
+        duration_ms=100,
+        rating=4.0,
+    )
+    tracker.record_failure(
+        prompt_id=prompt.id,
+        request_text="demo",
+        error_message="boom",
+    )
+    tracker.record_success(
+        prompt_id=prompt.id,
+        request_text="demo",
+        response_text="better",
+        duration_ms=50,
+        rating=5.0,
+    )
+
+    analytics = tracker.summarize(window_days=None, prompt_limit=3, trend_window=2)
+    assert isinstance(analytics, ExecutionAnalytics)
+    assert analytics.total_runs == 3
+    assert pytest.approx(analytics.success_rate, rel=1e-3) == 2 / 3
+    assert analytics.prompt_breakdown, "Expected per-prompt breakdown"
+    stats = analytics.prompt_breakdown[0]
+    assert stats.total_runs == 3
+    assert pytest.approx(stats.success_rate, rel=1e-3) == 2 / 3
+    assert stats.rating_trend is not None
+    assert stats.average_duration_ms and stats.average_duration_ms >= 50
+
+
+def test_history_tracker_summarize_handles_empty_history(tmp_path) -> None:
+    repo = PromptRepository(str(tmp_path / "repo.db"))
+    tracker = HistoryTracker(repo)
+
+    analytics = tracker.summarize(window_days=None)
+
+    assert analytics.total_runs == 0
+    assert analytics.prompt_breakdown == []

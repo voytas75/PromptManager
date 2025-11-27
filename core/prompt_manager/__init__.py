@@ -234,7 +234,11 @@ from ..exceptions import (  # noqa: F401 – re-export for backward compatibilit
     ResponseStyleStorageError,
 )
 from ..execution import CodexExecutionResult, CodexExecutor, ExecutionError
-from ..history_tracker import HistoryTracker, HistoryTrackerError
+from ..history_tracker import (
+    ExecutionAnalytics,
+    HistoryTracker,
+    HistoryTrackerError,
+)
 from ..intent_classifier import IntentClassifier, IntentLabel, IntentPrediction, rank_by_hints
 from ..name_generation import (
     CategorySuggestionError,
@@ -1834,6 +1838,27 @@ class PromptManager:
         except HistoryTrackerError:
             logger.warning("Unable to query execution history", exc_info=True)
             return []
+
+    def get_execution_analytics(
+        self,
+        *,
+        window_days: Optional[int] = 30,
+        prompt_limit: int = 5,
+        trend_window: int = 5,
+    ) -> Optional[ExecutionAnalytics]:
+        """Return aggregated execution analytics for downstream consumers."""
+
+        tracker = self._history_tracker
+        if tracker is None:
+            return None
+        try:
+            return tracker.summarize(
+                window_days=window_days,
+                prompt_limit=prompt_limit,
+                trend_window=trend_window,
+            )
+        except HistoryTrackerError as exc:
+            raise PromptHistoryError(str(exc)) from exc
 
     def set_name_generator(
         self,

@@ -233,6 +233,77 @@ def _run_usage_report(args: argparse.Namespace, logger: logging.Logger) -> int:
     return 0
 
 
+def _format_metric(value: Optional[float], *, suffix: str = "") -> str:
+    if value is None:
+        return "n/a"
+    formatted = f"{value:.2f}" if abs(value) < 1000 else f"{value:.0f}"
+    return f"{formatted}{suffix}" if suffix else formatted
+
+
+def _run_history_analytics(manager, args: argparse.Namespace, logger: logging.Logger) -> int:
+    """Render aggregate execution analytics for CLI consumers."""
+
+    window_days = getattr(args, "window_days", None)
+    if window_days is not None and window_days <= 0:
+        window_days = None
+    prompt_limit = max(1, int(getattr(args, "limit", 5) or 5))
+    trend_window = max(1, int(getattr(args, "trend_window", 5) or 5))
+    try:
+        analytics = manager.get_execution_analytics(
+            window_days=window_days,
+            prompt_limit=prompt_limit,
+            trend_window=trend_window,
+        )
+    except PromptHistoryError as exc:
+        logger.error("Unable to compute execution analytics: %s", exc)
+        return 7
+
+    if analytics is None or analytics.total_runs == 0:
+        logger.info("No execution history available for the requested window.")
+        return 0
+
+    window_label = (
+        analytics.window_start.isoformat(timespec="seconds")
+        if analytics.window_start is not None
+        else "Full history"
+    )
+    lines = [
+        "Execution analytics",
+        "-------------------",
+        f"Window start: {window_label}",
+        f"Total runs: {analytics.total_runs}",
+        f"Success rate: {analytics.success_rate * 100:.1f}%",
+        f"Average latency: {_format_metric(analytics.average_duration_ms, suffix=' ms')}",
+        f"Average rating: {_format_metric(analytics.average_rating)}",
+        "",
+    ]
+
+    if not analytics.prompt_breakdown:
+        lines.append("No prompts have execution history within this window.")
+    else:
+        lines.append("Top prompts:")
+        for index, stats in enumerate(analytics.prompt_breakdown, start=1):
+            avg_rating = _format_metric(stats.average_rating)
+            latency = _format_metric(stats.average_duration_ms, suffix=" ms")
+            trend = _format_metric(stats.rating_trend)
+            last_run = (
+                stats.last_executed_at.isoformat(timespec="seconds")
+                if stats.last_executed_at is not None
+                else "n/a"
+            )
+            lines.append(
+                (
+                    f"{index}. {stats.name} — runs:{stats.total_runs} "
+                    f"success:{stats.success_rate * 100:.1f}% "
+                    f"avg_rating:{avg_rating} trend:{trend} latency:{latency} "
+                    f"last:{last_run}"
+                )
+            )
+
+    print("\n".join(lines))
+    return 0
+
+
 def _run_reembed(manager, logger: logging.Logger) -> int:
     """Reset the Chroma vector store and regenerate embeddings for all prompts."""
 
@@ -362,6 +433,29 @@ def parse_args() -> argparse.Namespace:
         help="Path to the usage log (defaults to data/logs/intent_usage.jsonl).",
     )
 
+    analytics_parser = subparsers.add_parser(
+        "history-analytics",
+        help="Display aggregated execution analytics for recorded prompts.",
+    )
+    analytics_parser.add_argument(
+        "--window-days",
+        type=int,
+        default=30,
+        help="Look-back window in days (<=0 includes full history).",
+    )
+    analytics_parser.add_argument(
+        "--limit",
+        type=int,
+        default=5,
+        help="Number of prompts to display (default: 5).",
+    )
+    analytics_parser.add_argument(
+        "--trend-window",
+        type=int,
+        default=5,
+        help="Executions considered when computing rating trends (default: 5).",
+    )
+
     subparsers.add_parser(
         "reembed",
         help="Delete the current ChromaDB directory and regenerate embeddings for all prompts.",
@@ -407,6 +501,13 @@ def main() -> int:
         if command == "usage-report":
             try:
                 result = _run_usage_report(args, logger)
+            finally:
+                manager.close()
+            return result
+
+        if command == "history-analytics":
+            try:
+                result = _run_history_analytics(manager, args, logger)
             finally:
                 manager.close()
             return result
