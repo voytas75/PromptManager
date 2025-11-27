@@ -1,5 +1,6 @@
 """Workspace template preview widget with live variable validation.
 
+Updates: v0.1.6 - 2025-11-27 - Remove duplicate no-placeholder hint so status list remains authoritative.
 Updates: v0.1.5 - 2025-11-27 - Persist splitter sizes for the status and preview panes.
 Updates: v0.1.4 - 2025-11-27 - Add contextual hints for template syntax errors.
 Updates: v0.1.3 - 2025-11-27 - Keep raw templates visible while surfacing parse/render errors.
@@ -222,9 +223,6 @@ class TemplatePreviewWidget(QWidget):
                 widget.deleteLater()
         self._variable_inputs.clear()
         if not self._variable_names:
-            hint = QLabel("No placeholders detected in the prompt body.", self._variables_widget)
-            hint.setStyleSheet("color: #6b7280;")
-            self._variables_layout.addWidget(hint)
             self._variables_layout.addStretch(1)
             return
         for name in self._variable_names:
