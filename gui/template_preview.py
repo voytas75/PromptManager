@@ -1,6 +1,6 @@
 """Workspace template preview widget with live variable validation.
 
-Updates: v0.1.6 - 2025-11-27 - Remove duplicate no-placeholder hint so status list remains authoritative.
+Updates: v0.1.6 - 2025-11-27 - Consolidate template status messaging into the footer label only.
 Updates: v0.1.5 - 2025-11-27 - Persist splitter sizes for the status and preview panes.
 Updates: v0.1.4 - 2025-11-27 - Add contextual hints for template syntax errors.
 Updates: v0.1.3 - 2025-11-27 - Keep raw templates visible while surfacing parse/render errors.
@@ -15,14 +15,11 @@ from typing import Dict, List, Mapping, Optional, Sequence, Set
 
 from jinja2 import TemplateSyntaxError
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QComboBox,
     QFrame,
     QHBoxLayout,
     QLabel,
-    QListWidget,
-    QListWidgetItem,
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
@@ -46,8 +43,6 @@ class TemplatePreviewWidget(QWidget):
 
     _SUCCESS_COLOR = "#047857"
     _ERROR_COLOR = "#b91c1c"
-    _WARNING_COLOR = "#b45309"
-    _INFO_COLOR = "#6b7280"
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
@@ -168,17 +163,6 @@ class TemplatePreviewWidget(QWidget):
         self._content_splitter = QSplitter(Qt.Vertical, frame)
         self._content_splitter.setChildrenCollapsible(False)
 
-        status_container = QWidget(self._content_splitter)
-        status_layout = QVBoxLayout(status_container)
-        status_layout.setContentsMargins(0, 0, 0, 0)
-        status_layout.setSpacing(6)
-
-        self._variables_list = QListWidget(status_container)
-        self._variables_list.setObjectName("templatePreviewVariables")
-        self._variables_list.setAlternatingRowColors(True)
-        status_layout.addWidget(self._variables_list)
-        self._content_splitter.addWidget(status_container)
-
         preview_container = QWidget(self._content_splitter)
         preview_layout = QVBoxLayout(preview_container)
         preview_layout.setContentsMargins(0, 0, 0, 0)
@@ -199,7 +183,6 @@ class TemplatePreviewWidget(QWidget):
 
         self._content_splitter.addWidget(preview_container)
         self._content_splitter.setStretchFactor(0, 1)
-        self._content_splitter.setStretchFactor(1, 2)
 
         frame_layout.addWidget(self._content_splitter, 1)
 
@@ -257,7 +240,6 @@ class TemplatePreviewWidget(QWidget):
         self._last_rendered_text = ""
         self._preview_ready = False
         if not self._template_text.strip():
-            self._update_variable_states(set(), set(), set())
             self._rendered_view.clear()
             self._set_status("Select a prompt to enable template previews.", is_error=False)
             self._refresh_run_button_state()
@@ -265,7 +247,6 @@ class TemplatePreviewWidget(QWidget):
 
         if self._template_parse_error:
             self._rendered_view.setPlainText(self._template_text)
-            self._show_message_item(self._template_parse_error, self._ERROR_COLOR)
             self._set_status(self._template_parse_error, is_error=True)
             self._refresh_run_button_state()
             return
@@ -285,7 +266,6 @@ class TemplatePreviewWidget(QWidget):
                 schema_result.errors or [schema_result.schema_error or "Schema error"]
             )
             self._rendered_view.clear()
-            self._update_variable_states(set(variables.keys()), set(), invalid_fields)
             self._set_status(message, is_error=True)
             self._refresh_run_button_state()
             return
@@ -295,8 +275,6 @@ class TemplatePreviewWidget(QWidget):
         for name in self._variable_names:
             if name not in variables:
                 missing.add(name)
-
-        self._update_variable_states(set(variables.keys()), missing, invalid_fields)
 
         if render_result.errors:
             self._rendered_view.setPlainText(self._template_text)
@@ -332,45 +310,6 @@ class TemplatePreviewWidget(QWidget):
         self._schema_mode.setVisible(self._schema_visible)
         self._schema_input.setVisible(self._schema_visible)
         self._update_preview()
-
-    def _update_variable_states(
-        self,
-        provided: Set[str],
-        missing: Set[str],
-        invalid: Set[str],
-    ) -> None:
-        self._variables_list.clear()
-        if not self._variable_names:
-            item = QListWidgetItem("No placeholders detected in the prompt body.")
-            item.setForeground(QColor(self._INFO_COLOR))
-            item.setFlags(Qt.ItemIsEnabled)
-            self._variables_list.addItem(item)
-            return
-
-        for name in self._variable_names:
-            if name in invalid:
-                status = "Invalid"
-                color = self._WARNING_COLOR
-            elif name in missing:
-                status = "Missing"
-                color = self._ERROR_COLOR
-            elif name in provided:
-                status = "Ready"
-                color = self._SUCCESS_COLOR
-            else:
-                status = "Unused"
-                color = self._INFO_COLOR
-            item = QListWidgetItem(f"{name} — {status}")
-            item.setForeground(QColor(color))
-            item.setFlags(Qt.ItemIsEnabled)
-            self._variables_list.addItem(item)
-
-    def _show_message_item(self, text: str, color: str) -> None:
-        self._variables_list.clear()
-        item = QListWidgetItem(text)
-        item.setForeground(QColor(color))
-        item.setFlags(Qt.ItemIsEnabled)
-        self._variables_list.addItem(item)
 
     def _top_level_fields(self, field_paths: Sequence[str]) -> Set[str]:
         invalid: Set[str] = set()
