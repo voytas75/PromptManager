@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.11.5 - 2025-11-27 - Add import fallback for processing indicator in test harnesses.
 Updates: v0.11.4 - 2025-11-27 - Ensure clearing scenarios removes persisted metadata.
 Updates: v0.11.3 - 2025-11-27 - Add busy indicators to prompt metadata generators.
 Updates: v0.11.2 - 2025-11-22 - Allow selecting prompt categories from the registry list.
@@ -98,7 +99,10 @@ try:
 except ImportError:  # pragma: no cover – fallback for direct execution
     from gui.resources import load_application_icon  # type: ignore
 
-from .processing_indicator import ProcessingIndicator
+try:
+    from .processing_indicator import ProcessingIndicator
+except ImportError:  # pragma: no cover – fallback when loaded outside package
+    from gui.processing_indicator import ProcessingIndicator
 from core import (
     CatalogDiff,
     CatalogDiffEntry,
