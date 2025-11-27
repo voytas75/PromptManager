@@ -1,6 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
-Updates: v0.15.57 - 2025-11-27 - Switch back to the Prompts tab after running templates so output is visible.
+Updates: v0.15.57 - 2025-11-27 - Switch back to the Prompts tab after running templates and show a busy indicator while switching.
 Updates: v0.15.56 - 2025-11-27 - Add Template tab run shortcut and toast notifications for copy actions.
 Updates: v0.15.55 - 2025-11-27 - Wire Template tab detail actions to the shared prompt handlers.
 Updates: v0.15.54 - 2025-11-27 - Rename Response Styles tab to Prompt Parts and surface prompt part metadata.
@@ -1023,6 +1023,7 @@ class MainWindow(QMainWindow):
         self._template_list_view: Optional[QListView] = None
         self._template_detail_widget: Optional[PromptDetailWidget] = None
         self._template_run_shortcut_button: Optional[QPushButton] = None
+        self._template_transition_indicator: Optional[ProcessingIndicator] = None
         self._layout_settings = QSettings("PromptManager", "MainWindow")
         (
             self._pending_category_slug,
@@ -2690,6 +2691,8 @@ class MainWindow(QMainWindow):
         if widget is self._history_panel:
             self._history_panel.refresh()
             self._usage_logger.log_history_view(total=self._history_panel.row_count())
+        if index == 0:
+            self._hide_template_transition_indicator()
 
     def _on_save_result_clicked(self) -> None:
         """Persist the latest execution result with optional user notes."""
@@ -3318,6 +3321,7 @@ class MainWindow(QMainWindow):
                 2000,
             )
         if self._tab_widget.currentIndex() != 0:
+            self._show_template_transition_indicator()
             self._tab_widget.setCurrentIndex(0)
         self._execute_prompt_with_text(
             prompt,
@@ -4100,6 +4104,24 @@ class MainWindow(QMainWindow):
         if not self._template_preview.request_run():
             self._show_status_message("Render the template before running it.", 4000)
 
+    def _show_template_transition_indicator(self) -> None:
+        """Display a busy dialog while switching from Template to Prompts."""
+
+        if self._template_transition_indicator is not None:
+            return
+        indicator = ProcessingIndicator(self, "Opening Prompts tab…", title="Switching Tabs")
+        indicator.__enter__()
+        self._template_transition_indicator = indicator
+
+    def _hide_template_transition_indicator(self) -> None:
+        """Dismiss the template transition indicator if it is visible."""
+
+        indicator = self._template_transition_indicator
+        if indicator is None:
+            return
+        self._template_transition_indicator = None
+        indicator.__exit__(None, None, None)
+
     def _handle_notification(self, notification: Notification) -> None:
         """React to notification updates published by the core manager."""
 
@@ -4146,6 +4168,7 @@ class MainWindow(QMainWindow):
         self._save_splitter_state()
         if hasattr(self, "_notification_bridge"):
             self._notification_bridge.close()
+        self._hide_template_transition_indicator()
         super().closeEvent(event)
 
     @staticmethod
