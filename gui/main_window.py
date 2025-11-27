@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.53 - 2025-11-27 - Persist Template tab splitter layouts and rename the tab to Template.
 Updates: v0.15.52 - 2025-11-27 - Allow resizing between template list and detail panes with a splitter.
 Updates: v0.15.51 - 2025-11-27 - Show modal processing indicator when persisting prompt edits.
 Updates: v0.15.50 - 2025-11-26 - Surface execute-context prompt text in the workspace and keep output mirrored across tabs.
@@ -1046,6 +1047,8 @@ class MainWindow(QMainWindow):
         self._main_splitter: Optional[QSplitter] = None
         self._list_splitter: Optional[QSplitter] = None
         self._workspace_splitter: Optional[QSplitter] = None
+        self._template_preview_splitter: Optional[QSplitter] = None
+        self._template_preview_list_splitter: Optional[QSplitter] = None
         self._main_splitter_left_width: Optional[int] = None
         self._suppress_main_splitter_sync = False
         self._notification_history: Deque[Notification] = deque(maxlen=200)
@@ -1387,6 +1390,7 @@ class MainWindow(QMainWindow):
         preview_layout.setSpacing(8)
         preview_splitter = QSplitter(Qt.Horizontal, preview_tab)
         preview_splitter.setChildrenCollapsible(False)
+        self._template_preview_splitter = preview_splitter
 
         preview_list_panel = QWidget(preview_splitter)
         preview_list_layout = QVBoxLayout(preview_list_panel)
@@ -1404,6 +1408,7 @@ class MainWindow(QMainWindow):
         preview_list_layout.addWidget(preview_hint)
         preview_list_splitter = QSplitter(Qt.Vertical, preview_list_panel)
         preview_list_splitter.setChildrenCollapsible(False)
+        self._template_preview_list_splitter = preview_list_splitter
         self._template_list_view = QListView(preview_list_splitter)
         self._template_list_view.setModel(self._model)
         self._template_list_view.setSelectionMode(QAbstractItemView.SingleSelection)
@@ -1432,7 +1437,7 @@ class MainWindow(QMainWindow):
         preview_splitter.setStretchFactor(0, 1)
         preview_splitter.setStretchFactor(1, 2)
         preview_layout.addWidget(preview_splitter, 1)
-        self._tab_widget.addTab(preview_tab, "Template Preview")
+        self._tab_widget.addTab(preview_tab, "Template")
 
         layout.addWidget(self._tab_widget, stretch=1)
 
@@ -1481,11 +1486,17 @@ class MainWindow(QMainWindow):
     def _restore_splitter_state(self) -> None:
         """Restore splitter sizes from persisted settings."""
 
-        entries = (
+        entries: list[tuple[str, Optional[QSplitter]]] = [
             ("mainSplitter", self._main_splitter),
             ("listSplitter", self._list_splitter),
             ("workspaceSplitter", self._workspace_splitter),
-        )
+            ("templatePreviewSplitter", self._template_preview_splitter),
+            ("templatePreviewListSplitter", self._template_preview_list_splitter),
+        ]
+        if self._template_preview is not None:
+            entries.append(
+                ("templatePreviewContentSplitter", self._template_preview.content_splitter)
+            )
         for key, splitter in entries:
             if splitter is None:
                 continue
@@ -1558,11 +1569,17 @@ class MainWindow(QMainWindow):
     def _save_splitter_state(self) -> None:
         """Persist splitter sizes for future sessions."""
 
-        entries = (
+        entries: list[tuple[str, Optional[QSplitter]]] = [
             ("mainSplitter", self._main_splitter),
             ("listSplitter", self._list_splitter),
             ("workspaceSplitter", self._workspace_splitter),
-        )
+            ("templatePreviewSplitter", self._template_preview_splitter),
+            ("templatePreviewListSplitter", self._template_preview_list_splitter),
+        ]
+        if self._template_preview is not None:
+            entries.append(
+                ("templatePreviewContentSplitter", self._template_preview.content_splitter)
+            )
         for key, splitter in entries:
             if splitter is None:
                 continue

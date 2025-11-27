@@ -1,5 +1,6 @@
 """Workspace template preview widget with live variable validation.
 
+Updates: v0.1.5 - 2025-11-27 - Persist splitter sizes for the status and preview panes.
 Updates: v0.1.4 - 2025-11-27 - Add contextual hints for template syntax errors.
 Updates: v0.1.3 - 2025-11-27 - Keep raw templates visible while surfacing parse/render errors.
 Updates: v0.1.2 - 2025-11-27 - Make rendered prompt view resizable with a splitter.
@@ -163,10 +164,10 @@ class TemplatePreviewWidget(QWidget):
 
         frame_layout.addLayout(editors_layout)
 
-        content_splitter = QSplitter(Qt.Vertical, frame)
-        content_splitter.setChildrenCollapsible(False)
+        self._content_splitter = QSplitter(Qt.Vertical, frame)
+        self._content_splitter.setChildrenCollapsible(False)
 
-        status_container = QWidget(content_splitter)
+        status_container = QWidget(self._content_splitter)
         status_layout = QVBoxLayout(status_container)
         status_layout.setContentsMargins(0, 0, 0, 0)
         status_layout.setSpacing(6)
@@ -175,9 +176,9 @@ class TemplatePreviewWidget(QWidget):
         self._variables_list.setObjectName("templatePreviewVariables")
         self._variables_list.setAlternatingRowColors(True)
         status_layout.addWidget(self._variables_list)
-        content_splitter.addWidget(status_container)
+        self._content_splitter.addWidget(status_container)
 
-        preview_container = QWidget(content_splitter)
+        preview_container = QWidget(self._content_splitter)
         preview_layout = QVBoxLayout(preview_container)
         preview_layout.setContentsMargins(0, 0, 0, 0)
         preview_layout.setSpacing(6)
@@ -195,11 +196,11 @@ class TemplatePreviewWidget(QWidget):
         self._status_label.setWordWrap(True)
         preview_layout.addWidget(self._status_label)
 
-        content_splitter.addWidget(preview_container)
-        content_splitter.setStretchFactor(0, 1)
-        content_splitter.setStretchFactor(1, 2)
+        self._content_splitter.addWidget(preview_container)
+        self._content_splitter.setStretchFactor(0, 1)
+        self._content_splitter.setStretchFactor(1, 2)
 
-        frame_layout.addWidget(content_splitter, 1)
+        frame_layout.addWidget(self._content_splitter, 1)
 
         button_row = QHBoxLayout()
         button_row.addStretch(1)
@@ -410,6 +411,12 @@ class TemplatePreviewWidget(QWidget):
             return
         variables = self._collect_variables()
         self.run_requested.emit(self._last_rendered_text, dict(variables))
+
+    @property
+    def content_splitter(self) -> QSplitter:
+        """Return the splitter controlling status and preview panes."""
+
+        return self._content_splitter
 
 
 __all__ = ["TemplatePreviewWidget"]
