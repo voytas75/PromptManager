@@ -1,5 +1,6 @@
 """Prompt dialog refinement controls tests.
 
+Updates: v0.1.1 - 2025-11-27 - Cover scenario metadata stripping helper.
 Updates: v0.1.0 - 2025-11-22 - Verify structure-only refinement button wiring.
 """
 
@@ -11,7 +12,7 @@ pytest.importorskip("PySide6")
 from PySide6.QtWidgets import QApplication
 
 from core.prompt_engineering import PromptRefinement
-from gui.dialogs import PromptDialog
+from gui.dialogs import PromptDialog, _strip_scenarios_metadata
 from models.category_model import PromptCategory
 
 
@@ -67,3 +68,15 @@ def test_prompt_dialog_normalises_category_from_registry(qt_app: QApplication) -
     finally:
         dialog.close()
         dialog.deleteLater()
+
+
+def test_strip_scenarios_metadata_removes_entries() -> None:
+    metadata = {"scenarios": ["Keep"], "ext": {"extra": True}}
+
+    cleaned = _strip_scenarios_metadata(metadata)
+    assert cleaned is not metadata
+    assert cleaned == {"ext": {"extra": True}}
+    assert metadata["scenarios"] == ["Keep"]
+
+    assert _strip_scenarios_metadata({"scenarios": []}) is None
+    assert _strip_scenarios_metadata(None) is None
