@@ -1,5 +1,6 @@
 """Workspace template preview widget with live variable validation.
 
+Updates: v0.1.8 - 2025-11-27 - Move schema toggle controls above editors and collapse the schema panel when hidden.
 Updates: v0.1.7 - 2025-11-27 - Make the variables/schema editors and rendered preview vertically resizable.
 Updates: v0.1.6 - 2025-11-27 - Consolidate template status messaging into the footer label only.
 Updates: v0.1.5 - 2025-11-27 - Persist splitter sizes for the status and preview panes.
@@ -111,6 +112,24 @@ class TemplatePreviewWidget(QWidget):
         self._template_hint.setWordWrap(True)
         frame_layout.addWidget(self._template_hint)
 
+        schema_controls = QHBoxLayout()
+        schema_controls.setContentsMargins(0, 0, 0, 0)
+        schema_controls.setSpacing(6)
+        self._schema_toggle = QPushButton("Show Schema", frame)
+        self._schema_toggle.setCheckable(True)
+        self._schema_toggle.setChecked(False)
+        self._schema_toggle.clicked.connect(self._toggle_schema_visibility)  # type: ignore[arg-type]
+        schema_controls.addWidget(self._schema_toggle)
+        self._schema_mode = QComboBox(frame)
+        self._schema_mode.addItem("No validation", SchemaValidationMode.NONE.value)
+        self._schema_mode.addItem("JSON Schema", SchemaValidationMode.JSON_SCHEMA.value)
+        self._schema_mode.addItem("Pydantic (derived)", SchemaValidationMode.PYDANTIC.value)
+        self._schema_mode.currentIndexChanged.connect(self._update_preview)  # type: ignore[arg-type]
+        self._schema_mode.setVisible(False)
+        schema_controls.addWidget(self._schema_mode)
+        schema_controls.addStretch(1)
+        frame_layout.addLayout(schema_controls)
+
         editors_container = QWidget(frame)
         editors_layout = QHBoxLayout(editors_container)
         editors_layout.setContentsMargins(0, 0, 0, 0)
@@ -129,23 +148,11 @@ class TemplatePreviewWidget(QWidget):
         variables_column.addWidget(self._variables_scroll, 1)
         editors_layout.addLayout(variables_column, stretch=1)
 
-        schema_column = QVBoxLayout()
-        schema_header = QHBoxLayout()
-        self._schema_toggle = QPushButton("Show Schema", frame)
-        self._schema_toggle.setCheckable(True)
-        self._schema_toggle.setChecked(False)
-        self._schema_toggle.clicked.connect(self._toggle_schema_visibility)  # type: ignore[arg-type]
-        schema_header.addWidget(self._schema_toggle)
-        schema_header.addStretch(1)
-        self._schema_mode = QComboBox(frame)
-        self._schema_mode.addItem("No validation", SchemaValidationMode.NONE.value)
-        self._schema_mode.addItem("JSON Schema", SchemaValidationMode.JSON_SCHEMA.value)
-        self._schema_mode.addItem("Pydantic (derived)", SchemaValidationMode.PYDANTIC.value)
-        self._schema_mode.currentIndexChanged.connect(self._update_preview)  # type: ignore[arg-type]
-        self._schema_mode.setVisible(False)
-        schema_header.addWidget(self._schema_mode)
-        schema_column.addLayout(schema_header)
-        self._schema_input = QPlainTextEdit(frame)
+        self._schema_panel = QWidget(frame)
+        schema_column = QVBoxLayout(self._schema_panel)
+        schema_column.setContentsMargins(0, 0, 0, 0)
+        schema_column.setSpacing(4)
+        self._schema_input = QPlainTextEdit(self._schema_panel)
         self._schema_input.setPlaceholderText(
             "{\n"
             '  "type": "object",\n'
@@ -157,9 +164,9 @@ class TemplatePreviewWidget(QWidget):
         )
         self._schema_input.setMinimumHeight(140)
         self._schema_input.textChanged.connect(self._update_preview)  # type: ignore[arg-type]
-        self._schema_input.setVisible(False)
         schema_column.addWidget(self._schema_input)
-        editors_layout.addLayout(schema_column, stretch=1)
+        self._schema_panel.setVisible(False)
+        editors_layout.addWidget(self._schema_panel, stretch=1)
 
         self._content_splitter = QSplitter(Qt.Vertical, frame)
         self._content_splitter.setChildrenCollapsible(False)
@@ -311,7 +318,8 @@ class TemplatePreviewWidget(QWidget):
         self._schema_visible = self._schema_toggle.isChecked()
         self._schema_toggle.setText("Hide Schema" if self._schema_visible else "Show Schema")
         self._schema_mode.setVisible(self._schema_visible)
-        self._schema_input.setVisible(self._schema_visible)
+        if hasattr(self, "_schema_panel"):
+            self._schema_panel.setVisible(self._schema_visible)
         self._update_preview()
 
     def _top_level_fields(self, field_paths: Sequence[str]) -> Set[str]:
