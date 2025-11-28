@@ -90,6 +90,7 @@ import json
 import logging
 import uuid
 from collections import deque
+from dataclasses import dataclass
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from enum import Enum
@@ -214,6 +215,16 @@ _FILTER_CATEGORY_KEY = "filterCategorySlug"
 _FILTER_TAG_KEY = "filterTag"
 _FILTER_QUALITY_KEY = "filterQuality"
 _FILTER_SORT_KEY = "filterSortOrder"
+
+
+@dataclass(slots=True)
+class _PromptLoadResult:
+    """Fetched prompt data assembled from repository and optional search."""
+
+    all_prompts: List[Prompt]
+    search_results: Optional[List[Prompt]]
+    preserve_search_order: bool
+    search_error: Optional[str]
 
 
 def _match_category_label(value: Optional[str], categories: Sequence[PromptCategory]) -> Optional[str]:
@@ -1025,7 +1036,6 @@ class MainWindow(QMainWindow):
         self._template_detail_widget: Optional[PromptDetailWidget] = None
         self._template_run_shortcut_button: Optional[QPushButton] = None
         self._template_transition_indicator: Optional[ProcessingIndicator] = None
-        self._search_indicator: Optional[ProcessingIndicator] = None
         self._layout_settings = QSettings("PromptManager", "MainWindow")
         (
             self._pending_category_slug,
@@ -1685,39 +1695,81 @@ class MainWindow(QMainWindow):
     def _load_prompts(self, search_text: str = "") -> None:
         """Populate the list model from the repository or semantic search."""
 
-        stripped = search_text.strip()
-        self._preserve_search_order = False
-
         try:
-            self._all_prompts = self._manager.repository.list()
+            result = self._fetch_prompt_load_result(search_text)
         except RepositoryError as exc:
             self._show_error("Unable to load prompts", str(exc))
             return
+        self._apply_prompt_load_result(result)
 
-        self._populate_filters(self._all_prompts)
+    def _load_prompts_with_indicator(self, search_text: str) -> None:
+        """Fetch prompts on a worker thread while displaying a busy dialog."""
+
+        if self._search_button is not None:
+            self._search_button.setEnabled(False)
+        try:
+            result = ProcessingIndicator(self, "Searching prompts…", title="Searching Prompts").run(
+                self._fetch_prompt_load_result,
+                search_text,
+            )
+        except RepositoryError as exc:
+            self._show_error("Unable to load prompts", str(exc))
+            return
+        finally:
+            if self._search_button is not None:
+                self._search_button.setEnabled(True)
+        self._apply_prompt_load_result(result)
+
+    def _fetch_prompt_load_result(self, search_text: str) -> _PromptLoadResult:
+        """Return prompt data queried from the repository and optional search."""
+
+        stripped = search_text.strip()
+        all_prompts = list(self._manager.repository.list())
+        search_results: Optional[List[Prompt]] = None
+        search_error: Optional[str] = None
+        preserve_order = False
 
         if stripped:
             try:
-                search_results = self._manager.search_prompts(stripped, limit=50)
+                search_results = list(self._manager.search_prompts(stripped, limit=50))
             except PromptManagerError as exc:
-                self._show_error("Unable to search prompts", str(exc))
+                search_error = str(exc)
             else:
-                # Directly display semantic search results; they already include
-                # similarity scores and are sorted by best match.
-                self._suggestions = None
-                self._current_prompts = list(search_results)
-                self._preserve_search_order = True
+                preserve_order = True
 
-                filtered = self._apply_filters(self._current_prompts)
-                # Do **not** apply additional sorting – relevance order matters.
-                self._model.set_prompts(filtered)
-                self._list_view.clearSelection()
-                if filtered:
-                    self._select_prompt(filtered[0].id)
-                else:
-                    self._detail_widget.clear()
-                self._update_intent_hint(filtered)
-                return
+        return _PromptLoadResult(
+            all_prompts=all_prompts,
+            search_results=search_results,
+            preserve_search_order=preserve_order,
+            search_error=search_error,
+        )
+
+    def _apply_prompt_load_result(self, result: _PromptLoadResult) -> None:
+        """Update UI models based on fetched prompt data."""
+
+        self._all_prompts = list(result.all_prompts)
+        self._preserve_search_order = result.preserve_search_order
+        self._populate_filters(self._all_prompts)
+
+        if result.search_error:
+            self._show_error("Unable to search prompts", result.search_error)
+
+        if result.search_results is not None and result.preserve_search_order:
+            # Directly display semantic search results; they already include
+            # similarity scores and are sorted by best match.
+            self._suggestions = None
+            self._current_prompts = list(result.search_results)
+
+            filtered = self._apply_filters(self._current_prompts)
+            # Do **not** apply additional sorting – relevance order matters.
+            self._model.set_prompts(filtered)
+            self._list_view.clearSelection()
+            if filtered:
+                self._select_prompt(filtered[0].id)
+            else:
+                self._detail_widget.clear()
+            self._update_intent_hint(filtered)
+            return
 
         self._suggestions = None
         self._current_prompts = list(self._all_prompts)
@@ -3141,6 +3193,17 @@ class MainWindow(QMainWindow):
     def _on_search_changed(self, text: str) -> None:
         """Run prompt search on demand via the Search button."""
 
+        self._handle_search_request(text, use_indicator=False)
+
+    def _on_search_button_clicked(self) -> None:
+        """Run the prompt search explicitly via the Search button."""
+
+        text = self._search_input.text() if self._search_input is not None else ""
+        self._handle_search_request(text, use_indicator=True)
+
+    def _handle_search_request(self, text: str, *, use_indicator: bool) -> None:
+        """Normalize search input handling and trigger prompt loads."""
+
         stripped = text.strip()
 
         # When a search query is active disable the sort combo so the user sees
@@ -3149,40 +3212,12 @@ class MainWindow(QMainWindow):
         if self._sort_combo is not None:
             self._sort_combo.setEnabled(not bool(stripped))
 
-        if not text or len(stripped) >= 2:
+        if text and len(stripped) < 2:
+            return
+        if use_indicator:
+            self._load_prompts_with_indicator(text)
+        else:
             self._load_prompts(text)
-
-    def _on_search_button_clicked(self) -> None:
-        """Run the prompt search explicitly via the Search button."""
-
-        text = self._search_input.text() if self._search_input is not None else ""
-        self._show_search_indicator()
-        try:
-            self._on_search_changed(text)
-        finally:
-            self._hide_search_indicator()
-
-    def _show_search_indicator(self) -> None:
-        """Display a busy dialog while prompt searches execute."""
-
-        if self._search_indicator is not None:
-            return
-        if self._search_button is not None:
-            self._search_button.setEnabled(False)
-        indicator = ProcessingIndicator(self, "Searching prompts…", title="Searching Prompts")
-        self._search_indicator = indicator
-        indicator.__enter__()
-
-    def _hide_search_indicator(self) -> None:
-        """Dismiss the search busy dialog when work completes."""
-
-        if self._search_button is not None:
-            self._search_button.setEnabled(True)
-        indicator = self._search_indicator
-        if indicator is None:
-            return
-        self._search_indicator = None
-        indicator.__exit__(None, None, None)
 
     def _on_prompt_double_clicked(self, index: QModelIndex) -> None:
         """Open the edit dialog when a prompt is double-clicked."""
