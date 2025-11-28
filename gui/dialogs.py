@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.11.11 - 2025-11-28 - Make maintenance dialog vertically scrollable with shorter default height.
 Updates: v0.11.10 - 2025-11-28 - Add prompt body diff tab comparing selected versions to the current prompt.
 Updates: v0.11.9 - 2025-11-28 - Add category health analytics table to the maintenance dialog.
 Updates: v0.11.8 - 2025-11-27 - Show toast confirmations for dialog copy actions.
@@ -84,6 +85,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
@@ -1375,9 +1377,17 @@ class PromptMaintenanceDialog(QDialog):
         self._refresh_storage_info()
 
     def _build_ui(self) -> None:
-        layout = QVBoxLayout(self)
+        outer_layout = QVBoxLayout(self)
 
-        self._tab_widget = QTabWidget(self)
+        scroll_area = QScrollArea(self)
+        scroll_area.setWidgetResizable(True)
+        outer_layout.addWidget(scroll_area, stretch=1)
+
+        scroll_contents = QWidget(self)
+        scroll_area.setWidget(scroll_contents)
+        layout = QVBoxLayout(scroll_contents)
+
+        self._tab_widget = QTabWidget(scroll_contents)
         layout.addWidget(self._tab_widget, stretch=1)
 
         metadata_tab = QWidget(self)
@@ -2396,7 +2406,7 @@ class CategoryManagerDialog(QDialog):
         self._refresh_button = QPushButton("Refresh", self)
         self._refresh_button.clicked.connect(self._on_refresh_clicked)  # type: ignore[arg-type]
         button_row.addWidget(self._refresh_button)
-        layout.addLayout(button_row)
+        outer_layout.addLayout(button_row)
 
         close_buttons = QDialogButtonBox(QDialogButtonBox.Close, self)
         close_buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
