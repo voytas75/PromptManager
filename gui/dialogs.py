@@ -67,7 +67,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, MutableMapping, NamedTuple, Optional, Sequence, TypeVar
 
-from PySide6.QtCore import QEvent, Qt, Signal
+from PySide6.QtCore import QEvent, QSettings, Qt, Signal
 from PySide6.QtGui import QGuiApplication, QPalette
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -1367,8 +1367,10 @@ class PromptMaintenanceDialog(QDialog):
         self._category_table: QTableWidget
         self._category_refresh_button: QPushButton
         self._reset_log_view: QPlainTextEdit
+        self._settings = QSettings("PromptManager", "PromptMaintenanceDialog")
         self.setWindowTitle("Prompt Maintenance")
-        self.resize(640, 320)
+        self.resize(780, 360)
+        self._restore_window_size()
         self._build_ui()
         self._refresh_catalogue_stats()
         self._refresh_category_health()
@@ -1381,6 +1383,7 @@ class PromptMaintenanceDialog(QDialog):
 
         scroll_area = QScrollArea(self)
         scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         outer_layout.addWidget(scroll_area, stretch=1)
 
         scroll_contents = QWidget(self)
@@ -2409,6 +2412,17 @@ class CategoryManagerDialog(QDialog):
         self._refresh_button.clicked.connect(self._on_refresh_clicked)  # type: ignore[arg-type]
         button_row.addWidget(self._refresh_button)
         outer_layout.addLayout(button_row)
+
+    def _restore_window_size(self) -> None:
+        width = self._settings.value("width", type=int)
+        height = self._settings.value("height", type=int)
+        if isinstance(width, int) and isinstance(height, int) and width > 0 and height > 0:
+            self.resize(width, height)
+
+    def closeEvent(self, event: QEvent) -> None:  # type: ignore[override]
+        self._settings.setValue("width", self.width())
+        self._settings.setValue("height", self.height())
+        super().closeEvent(event)
 
         close_buttons = QDialogButtonBox(QDialogButtonBox.Close, self)
         close_buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
