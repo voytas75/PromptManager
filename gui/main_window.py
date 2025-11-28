@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.61 - 2025-11-28 - Refresh prompt list and re-enable sorting when the search query is cleared via the inline icon.
 Updates: v0.15.60 - 2025-11-28 - Add background task center with progress bars and completion toasts.
 Updates: v0.15.59 - 2025-11-28 - Add Refresh Scenarios action to prompt detail views and wire persistence to LiteLLM.
 Updates: v0.15.58 - 2025-11-28 - Show a busy indicator while running prompt searches.
@@ -1031,6 +1032,7 @@ class MainWindow(QMainWindow):
         self._all_prompts: List[Prompt] = []
         self._current_prompts: List[Prompt] = []
         self._preserve_search_order: bool = False
+        self._search_active: bool = False
         self._suggestions: Optional[PromptManager.IntentSuggestions] = None
         self._last_execution: Optional[PromptManager.ExecutionOutcome] = None
         self._last_prompt_name: Optional[str] = None
@@ -1134,10 +1136,11 @@ class MainWindow(QMainWindow):
         self._search_input = QLineEdit(self)
         self._search_input.setPlaceholderText("Search prompts…")
         # Display an in‑field “✕” icon that clears the current text when clicked.
-        # Qt provides this built‑in via the *clearButtonEnabled* property so we
+        # Qt provides this built-in via the *clearButtonEnabled* property so we
         # do not have to manage an extra button or custom stylesheet.
         self._search_input.setClearButtonEnabled(True)
         self._search_input.returnPressed.connect(self._on_search_button_clicked)  # type: ignore[arg-type]
+        self._search_input.textChanged.connect(self._on_search_changed)  # type: ignore[arg-type]
         controls_layout.addWidget(self._search_input)
 
         self._search_button = QPushButton("Search", self)
@@ -3228,9 +3231,18 @@ class MainWindow(QMainWindow):
         return self._model.prompt_at(index.row())
 
     def _on_search_changed(self, text: str) -> None:
-        """Run prompt search on demand via the Search button."""
+        """Refresh list + sorting when the inline clear action removes the query."""
 
-        self._handle_search_request(text, use_indicator=False)
+        if text.strip():
+            return
+
+        if not self._search_active and (self._sort_combo is None or self._sort_combo.isEnabled()):
+            return
+
+        self._search_active = False
+        if self._sort_combo is not None:
+            self._sort_combo.setEnabled(True)
+        self._load_prompts("")
 
     def _on_search_button_clicked(self) -> None:
         """Run the prompt search explicitly via the Search button."""
@@ -3242,12 +3254,13 @@ class MainWindow(QMainWindow):
         """Normalize search input handling and trigger prompt loads."""
 
         stripped = text.strip()
+        self._search_active = bool(stripped)
 
         # When a search query is active disable the sort combo so the user sees
         # results strictly ordered by relevance.  Re-enable it once the query
         # field is cleared so manual sorting becomes available again.
         if self._sort_combo is not None:
-            self._sort_combo.setEnabled(not bool(stripped))
+            self._sort_combo.setEnabled(not self._search_active)
 
         if text and len(stripped) < 2:
             return
