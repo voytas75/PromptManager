@@ -37,6 +37,7 @@ from PySide6.QtWidgets import (
 )
 
 from core import AnalyticsSnapshot, PromptManager, build_analytics_snapshot, snapshot_dataset_rows
+from .processing_indicator import ProcessingIndicator
 
 
 class AnalyticsDashboardPanel(QWidget):
@@ -104,18 +105,18 @@ class AnalyticsDashboardPanel(QWidget):
         self._window_spin.setRange(0, 365)
         self._window_spin.setValue(30)
         self._window_spin.setMinimumWidth(90)
-        self._window_spin.valueChanged.connect(lambda _value: self.refresh())
+        self._window_spin.valueChanged.connect(self._handle_window_changed)  # type: ignore[arg-type]
         controls.addWidget(self._window_spin)
 
         controls.addWidget(QLabel("Top prompts:", self))
         self._prompt_limit_spin.setRange(3, 25)
         self._prompt_limit_spin.setValue(5)
         self._prompt_limit_spin.setMinimumWidth(90)
-        self._prompt_limit_spin.valueChanged.connect(lambda _value: self.refresh())
+        self._prompt_limit_spin.valueChanged.connect(self._handle_prompt_limit_changed)  # type: ignore[arg-type]
         controls.addWidget(self._prompt_limit_spin)
 
         refresh_button = QPushButton("Refresh", self)
-        refresh_button.clicked.connect(self.refresh)  # type: ignore[arg-type]
+        refresh_button.clicked.connect(self._handle_refresh_clicked)  # type: ignore[arg-type]
         controls.addWidget(refresh_button)
 
         export_button = QPushButton("Export CSV", self)
@@ -142,16 +143,26 @@ class AnalyticsDashboardPanel(QWidget):
         status_layout.addStretch(1)
         layout.addLayout(status_layout)
 
-    def refresh(self) -> None:
+    def refresh(self, *, show_indicator: bool = False) -> None:
         window_days = self._window_spin.value()
         prompt_limit = self._prompt_limit_spin.value()
-        try:
-            snapshot = build_analytics_snapshot(
+        message = "Refreshing analytics…"
+
+        def _build_snapshot() -> AnalyticsSnapshot:
+            return build_analytics_snapshot(
                 self._manager,
                 window_days=window_days,
                 prompt_limit=prompt_limit,
                 usage_log_path=self._usage_log_path,
             )
+
+        try:
+            if show_indicator:
+                snapshot = ProcessingIndicator(self, message, title="Updating Analytics").run(
+                    _build_snapshot
+                )
+            else:
+                snapshot = _build_snapshot()
         except Exception as exc:  # pragma: no cover - GUI feedback only
             QMessageBox.critical(self, "Analytics", f"Unable to build analytics snapshot: {exc}")
             return
@@ -159,6 +170,15 @@ class AnalyticsDashboardPanel(QWidget):
         self._update_visuals()
         now_local = datetime.now(timezone.utc).astimezone()
         self._status_label.setText(f"Refreshed at {now_local.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+
+    def _handle_window_changed(self, _: int) -> None:
+        self.refresh(show_indicator=True)
+
+    def _handle_prompt_limit_changed(self, _: int) -> None:
+        self.refresh(show_indicator=True)
+
+    def _handle_refresh_clicked(self) -> None:
+        self.refresh(show_indicator=True)
 
     def _update_visuals(self) -> None:
         self._update_chart()
