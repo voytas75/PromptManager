@@ -627,11 +627,6 @@ class PromptDetailWidget(QWidget):
         self._refresh_scenarios_button.clicked.connect(self.refresh_scenarios_requested.emit)  # type: ignore[arg-type]
         actions_layout.addWidget(self._refresh_scenarios_button)
 
-        self._share_button = QPushButton("Share Prompt", share_frame)
-        self._share_button.setObjectName("sharePromptButton")
-        self._share_button.setEnabled(False)
-        self._share_button.clicked.connect(self.share_requested.emit)  # type: ignore[arg-type]
-
         self._edit_button = QPushButton("Edit Prompt", content)
         self._edit_button.setObjectName("editPromptButton")
         self._edit_button.setEnabled(False)
@@ -674,6 +669,10 @@ class PromptDetailWidget(QWidget):
         share_layout.addWidget(self._share_metadata_checkbox)
 
         share_layout.addStretch(1)
+        self._share_button = QPushButton("Share Prompt", share_frame)
+        self._share_button.setObjectName("sharePromptButton")
+        self._share_button.setEnabled(False)
+        self._share_button.clicked.connect(self.share_requested.emit)  # type: ignore[arg-type]
         share_layout.addWidget(self._share_button)
         content_layout.addWidget(share_frame)
         content_layout.addStretch(1)
