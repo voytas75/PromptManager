@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.58 - 2025-11-28 - Show a busy indicator while running prompt searches.
 Updates: v0.15.57 - 2025-11-27 - Switch back to the Prompts tab after running templates and show a busy indicator while switching.
 Updates: v0.15.56 - 2025-11-27 - Add Template tab run shortcut and toast notifications for copy actions.
 Updates: v0.15.55 - 2025-11-27 - Wire Template tab detail actions to the shared prompt handlers.
@@ -1024,6 +1025,7 @@ class MainWindow(QMainWindow):
         self._template_detail_widget: Optional[PromptDetailWidget] = None
         self._template_run_shortcut_button: Optional[QPushButton] = None
         self._template_transition_indicator: Optional[ProcessingIndicator] = None
+        self._search_indicator: Optional[ProcessingIndicator] = None
         self._layout_settings = QSettings("PromptManager", "MainWindow")
         (
             self._pending_category_slug,
@@ -3154,7 +3156,33 @@ class MainWindow(QMainWindow):
         """Run the prompt search explicitly via the Search button."""
 
         text = self._search_input.text() if self._search_input is not None else ""
-        self._on_search_changed(text)
+        self._show_search_indicator()
+        try:
+            self._on_search_changed(text)
+        finally:
+            self._hide_search_indicator()
+
+    def _show_search_indicator(self) -> None:
+        """Display a busy dialog while prompt searches execute."""
+
+        if self._search_indicator is not None:
+            return
+        if self._search_button is not None:
+            self._search_button.setEnabled(False)
+        indicator = ProcessingIndicator(self, "Searching prompts…", title="Searching Prompts")
+        self._search_indicator = indicator
+        indicator.__enter__()
+
+    def _hide_search_indicator(self) -> None:
+        """Dismiss the search busy dialog when work completes."""
+
+        if self._search_button is not None:
+            self._search_button.setEnabled(True)
+        indicator = self._search_indicator
+        if indicator is None:
+            return
+        self._search_indicator = None
+        indicator.__exit__(None, None, None)
 
     def _on_prompt_double_clicked(self, index: QModelIndex) -> None:
         """Open the edit dialog when a prompt is double-clicked."""
