@@ -1366,7 +1366,7 @@ class PromptMaintenanceDialog(QDialog):
         self._category_refresh_button: QPushButton
         self._reset_log_view: QPlainTextEdit
         self.setWindowTitle("Prompt Maintenance")
-        self.resize(640, 420)
+        self.resize(640, 360)
         self._build_ui()
         self._refresh_catalogue_stats()
         self._refresh_category_health()
