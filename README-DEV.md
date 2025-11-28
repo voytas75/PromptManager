@@ -118,6 +118,7 @@ Key UI capabilities:
 - Command palette (`Ctrl+K` / `Ctrl+Shift+P`) and shortcuts (`Ctrl+1`–`Ctrl+4`) jump directly into explain/fix/document/enhance workflows.
 - Category/tag/quality filters plus taxonomy manager keep catalogues organized.
 - Settings dialog controls LiteLLM routing, streaming, quick actions, and embedding configuration; API keys entered in the GUI stay in memory only.
+- Share panel (bordered row beneath the action buttons) lets users pick what to publish (body-only, body + description, or body + description + scenarios), toggle metadata inclusion, and then pick a provider (ShareText today). Uploads happen on a worker thread, and the resulting URL is copied to the clipboard automatically.
 
 ### Template Preview & Validation
 

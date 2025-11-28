@@ -2,6 +2,16 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.18.0] - 2025-11-28
+
+### Added
+
+- Added a bordered **Share** panel beneath the prompt action buttons that lets users pick the data scope (body only, body + description, body + description + scenarios), optionally include metadata, and then choose a provider. The first provider ships via ShareText and automatically copies the resulting link to the clipboard while logging usage analytics.
+
+### Changed
+
+- Version bumped to `0.18.0` to reflect the new sharing workflow and UI changes.
+
 ## [0.17.9] - 2025-11-28
 
 ### Added
