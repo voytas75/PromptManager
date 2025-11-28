@@ -42,6 +42,7 @@ python -m main
 - Prompt execution workspace with LiteLLM-backed runs, streaming output, chat-style transcripts, rating-based quality feedback, export/import utilities, and persisted execution history complete with context metadata (model, streaming flag, style hints).
 - Typed configuration loader (`config.settings`) that validates paths, TTLs, and provider settings from env vars or JSON, failing fast with actionable errors.
 - Redis-backed caching plus optional deterministic embeddings for air-gapped deployments; maintenance dialog exposes one-click reset tooling.
+- Maintenance dialog snapshot action that zips the SQLite database, Chroma store, and a manifest so teams can back up catalogues before running destructive tasks.
 - CLI helpers (`catalog-export`, `suggest`, `usage-report`, `reembed`) reuse the same validation stack for automation-friendly integrations.
 - Execution analytics CLI (`history-analytics`) summarises success rates, latency, and rating trends so prompt authors can spot their best-performing assets without exporting raw logs.
 - Benchmark CLI (`benchmark`) runs prompts across configured LiteLLM models, prints per-run duration/token usage, and surfaces recent analytics, while `refresh-scenarios` regenerates persisted usage examples without opening the GUI.

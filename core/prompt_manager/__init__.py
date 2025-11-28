@@ -1,5 +1,6 @@
 """Prompt Manager package façade and orchestration layer.
 
+Updates: v0.14.3 - 2025-11-28 - Add data snapshot helper for maintenance workflows.
 Updates: v0.14.2 - 2025-11-28 - Add execution benchmarks, scenario refresh APIs, and category health analytics.
 Updates: v0.14.1 - 2025-11-24 - Add LiteLLM category suggestion workflow with classifier fallback.
 Updates: v0.14.0 - 2025-11-22 - Add category registry, CRUD APIs, and prompt slugging.
@@ -41,14 +42,17 @@ Updates: v0.1.0 - 2025-10-30 - Initial PromptManager with CRUD and search suppor
 from __future__ import annotations
 
 import difflib
+import hashlib
 import json
 import logging
 import os
 import shutil
 import sqlite3
 import uuid
-from dataclasses import dataclass, replace
+import zipfile
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
+from importlib import metadata as importlib_metadata
 from pathlib import Path
 from types import TracebackType
 from typing import (
@@ -1126,6 +1130,39 @@ class PromptManager:
         )
         return summary
 
+    def create_data_snapshot(self, destination: Union[str, Path]) -> Path:
+        """Zip the SQLite repository, Chroma store, and a manifest for backups."""
+
+        db_path = self._resolve_repository_path()
+        chroma_path = Path(self._chroma_path).expanduser()
+        self._persist_chroma_client()
+
+        timestamp_label = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        target = Path(destination).expanduser()
+        if target.exists() and target.is_dir():
+            target.mkdir(parents=True, exist_ok=True)
+            archive_path = target / f"prompt-manager-snapshot-{timestamp_label}.zip"
+        else:
+            archive_path = target if target.suffix.lower() == ".zip" else target.with_suffix(".zip")
+            archive_path.parent.mkdir(parents=True, exist_ok=True)
+        archive_path = archive_path.resolve()
+
+        manifest = self._build_snapshot_manifest(db_path, chroma_path)
+
+        try:
+            with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                archive.write(db_path, arcname=f"sqlite/{db_path.name}")
+                self._write_chroma_directory(archive, chroma_path)
+                archive.writestr(
+                    "manifest.json",
+                    json.dumps(manifest, ensure_ascii=False, indent=2),
+                )
+        except OSError as exc:
+            raise PromptManagerError(f"Unable to create snapshot archive: {exc}") from exc
+
+        logger.info("Snapshot archive created at %s", archive_path)
+        return archive_path
+
     def clear_usage_logs(self, logs_path: Optional[Union[str, Path]] = None) -> None:
         """Remove persisted usage analytics logs while keeping settings intact."""
 
@@ -1161,6 +1198,85 @@ class PromptManager:
             return self._repository.get_prompt_catalogue_stats()
         except RepositoryError as exc:
             raise PromptStorageError("Unable to compute prompt catalogue statistics") from exc
+
+    def _build_snapshot_manifest(self, db_path: Path, chroma_path: Path) -> Dict[str, Any]:
+        sqlite_stat = db_path.stat()
+        sqlite_info: Dict[str, Any] = {
+            "path": str(db_path),
+            "size_bytes": sqlite_stat.st_size,
+            "modified_at": datetime.fromtimestamp(sqlite_stat.st_mtime, timezone.utc).isoformat(),
+            "sha256": self._hash_file(db_path),
+        }
+
+        chroma_info: Dict[str, Any] = {
+            "path": str(chroma_path),
+            "exists": chroma_path.exists(),
+        }
+        if chroma_path.exists():
+            size_bytes = 0
+            file_count = 0
+            latest_mtime: Optional[float] = None
+            for entry in chroma_path.rglob("*"):
+                if entry.is_symlink():
+                    continue
+                try:
+                    stat = entry.stat()
+                except OSError:
+                    continue
+                if entry.is_file():
+                    size_bytes += stat.st_size
+                    file_count += 1
+                    latest_mtime = stat.st_mtime if latest_mtime is None else max(latest_mtime, stat.st_mtime)
+            chroma_info["size_bytes"] = size_bytes
+            chroma_info["files"] = file_count
+            if latest_mtime is not None:
+                chroma_info["modified_at"] = datetime.fromtimestamp(latest_mtime, timezone.utc).isoformat()
+
+        manifest: Dict[str, Any] = {
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "version": self._package_version(),
+            "sqlite": sqlite_info,
+            "chroma": chroma_info,
+            "prompt_stats": self._serialise_catalogue_stats(),
+        }
+        return manifest
+
+    def _write_chroma_directory(self, archive: zipfile.ZipFile, chroma_path: Path) -> None:
+        if not chroma_path.exists():
+            return
+        for entry in chroma_path.rglob("*"):
+            if entry.is_dir() or entry.is_symlink():
+                continue
+            arcname = Path("chroma") / entry.relative_to(chroma_path)
+            archive.write(entry, arcname=str(arcname))
+
+    @staticmethod
+    def _hash_file(path: Path) -> str:
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                if not chunk:
+                    break
+                digest.update(chunk)
+        return digest.hexdigest()
+
+    def _serialise_catalogue_stats(self) -> Optional[Dict[str, Any]]:
+        try:
+            stats = self.get_prompt_catalogue_stats()
+        except PromptManagerError:
+            return None
+        payload = asdict(stats)
+        last_modified = payload.get("last_modified_at")
+        if isinstance(last_modified, datetime):
+            payload["last_modified_at"] = last_modified.isoformat()
+        return payload
+
+    @staticmethod
+    def _package_version() -> Optional[str]:
+        try:
+            return importlib_metadata.version("prompt-manager")
+        except importlib_metadata.PackageNotFoundError:
+            return None
 
     def get_category_health(self) -> List["PromptManager.CategoryHealth"]:
         """Return prompt and execution health metrics for each category."""

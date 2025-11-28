@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import types
 import uuid
+import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
@@ -830,6 +832,31 @@ def test_repository_verification_and_maintenance(
 
     manager.compact_repository()
     manager.optimize_repository()
+
+
+def test_snapshot_archive_includes_sqlite_and_chroma(
+    prompt_manager: tuple[PromptManager, _DummyCollection, _DummyChromaClient, Path],
+    tmp_path: Path,
+) -> None:
+    manager, _, _, chroma_dir = prompt_manager
+    manager.create_prompt(_make_prompt("Snapshot prompt"))
+    extra_dir = chroma_dir / "collections"
+    extra_dir.mkdir(parents=True, exist_ok=True)
+    (extra_dir / "dummy.bin").write_text("payload")
+
+    archive_path = manager.create_data_snapshot(tmp_path / "snapshots")
+    assert archive_path.exists()
+
+    db_name = manager._resolve_repository_path().name  # noqa: SLF001 - test uses private helper
+    with zipfile.ZipFile(archive_path) as archive:
+        names = set(archive.namelist())
+        assert f"sqlite/{db_name}" in names
+        assert "manifest.json" in names
+        manifest = json.loads(archive.read("manifest.json"))
+    assert manifest["sqlite"]["size_bytes"] > 0
+    assert manifest["chroma"]["path"]
+    stats = manifest["prompt_stats"]
+    assert stats is None or stats["total_prompts"] >= 1
 
 
 def test_generate_prompt_name_and_scenarios(

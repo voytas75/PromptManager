@@ -172,6 +172,7 @@ These commands share the same validation logic as the GUI; pass explicit paths a
 ## Maintenance, Telemetry & Analytics
 
 - **Maintenance dialog**: Provides buttons to clear SQLite prompts, wipe ChromaDB embeddings, or reset all application data (usage logs, cache) with confirmation prompts and logging.
+- **Snapshot backups**: Use the **Create Backup Snapshot** button in the maintenance dialog to zip the SQLite database, Chroma persistence directory, and a JSON manifest before running destructive tasks; the archive path is user-selected so it can be stored outside the project tree.
 - **Category health panel**: Review per-category prompt counts, active prompt ratios, recent execution timestamps, and success rates directly inside the maintenance dialog; use the Refresh button after batch edits.
 - **Telemetry**: ChromaDB anonymized telemetry is disabled (`anonymized_telemetry=False`). Set `PROMPT_MANAGER_CHROMA_TELEMETRY=1` to opt in or adjust `core/prompt_manager.py` if you need different defaults.
 - **Usage analytics**: GUI intent workspace interactions are logged to `data/logs/intent_usage.jsonl` (timestamp, hashed query metadata, detected intents, top prompts). Disable via `gui.usage_logger.IntentUsageLogger` instantiation or by clearing the log path.

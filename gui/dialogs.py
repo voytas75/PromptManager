@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.11.12 - 2025-11-28 - Add backup snapshot action to the maintenance dialog.
 Updates: v0.11.11 - 2025-11-28 - Make maintenance dialog vertically scrollable with shorter default height.
 Updates: v0.11.10 - 2025-11-28 - Add prompt body diff tab comparing selected versions to the current prompt.
 Updates: v0.11.9 - 2025-11-28 - Add category health analytics table to the maintenance dialog.
@@ -71,10 +72,12 @@ from PySide6.QtCore import QEvent, QSettings, Qt, Signal
 from PySide6.QtGui import QGuiApplication, QPalette
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
     QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QFileDialog,
     QFormLayout,
     QGridLayout,
     QGroupBox,
@@ -1695,6 +1698,11 @@ class PromptMaintenanceDialog(QDialog):
         reset_buttons_layout.setContentsMargins(0, 0, 0, 0)
         reset_buttons_layout.setSpacing(8)
 
+        snapshot_button = QPushButton("Create Backup Snapshot", reset_buttons_container)
+        snapshot_button.setToolTip("Zip the SQLite database, Chroma store, and manifest before running resets.")
+        snapshot_button.clicked.connect(self._on_snapshot_clicked)  # type: ignore[arg-type]
+        reset_buttons_layout.addWidget(snapshot_button)
+
         reset_sqlite_button = QPushButton("Clear Prompt Database", reset_buttons_container)
         reset_sqlite_button.setToolTip("Delete all prompts and execution history from SQLite.")
         reset_sqlite_button.clicked.connect(self._on_reset_prompts_clicked)  # type: ignore[arg-type]
@@ -1887,6 +1895,37 @@ class PromptMaintenanceDialog(QDialog):
         self._append_log(f"Tag task completed. Updated {updated} prompt(s).")
         if updated:
             self.maintenance_applied.emit(f"Generated tags for {updated} prompt(s).")
+
+    def _on_snapshot_clicked(self) -> None:
+        """Prompt for a destination and create a maintenance snapshot."""
+
+        default_name = datetime.now(timezone.utc).strftime("prompt-manager-snapshot-%Y%m%d-%H%M%S.zip")
+        default_path = str(Path.home() / default_name)
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Maintenance Snapshot",
+            default_path,
+            "Zip Archives (*.zip)",
+        )
+        if not path:
+            return
+
+        self._append_reset_log("Creating maintenance snapshot…")
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
+            archive_path = self._manager.create_data_snapshot(path)
+        except PromptManagerError as exc:
+            QMessageBox.critical(self, "Snapshot failed", str(exc))
+            self._append_reset_log(f"Snapshot failed: {exc}")
+        else:
+            self._append_reset_log(f"Snapshot saved to {archive_path}")
+            QMessageBox.information(
+                self,
+                "Snapshot created",
+                f"Backup stored at:\n{archive_path}",
+            )
+        finally:
+            QApplication.restoreOverrideCursor()
 
     def _on_reset_prompts_clicked(self) -> None:
         """Clear the SQLite prompt repository."""

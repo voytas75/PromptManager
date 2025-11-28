@@ -9,6 +9,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 - Added an execution benchmark workflow powered by `PromptManager.benchmark_prompts`, a new CLI command (`python -m main benchmark …`), and summary output that surfaces duration/token usage plus existing history analytics so prompt authors can compare models without leaving the terminal.
 - Added scenario refresh APIs (`PromptManager.refresh_prompt_scenarios`) with matching CLI (`python -m main refresh-scenarios <prompt_id>`) and a **Refresh Scenarios** button in the prompt detail pane so stored usage examples stay in sync with the latest LiteLLM suggestions.
 - Extended the maintenance dialog with a **Category Health** table driven by new repository analytics, exposing per-category prompt counts, activation ratios, success rates, and last execution timestamps for rapid taxonomy audits; README/README-DEV now document the panel.
+- Added a **Create Backup Snapshot** control to the maintenance dialog plus a `PromptManager.create_data_snapshot` helper so admins can zip the SQLite DB, Chroma directory, and a manifest before running destructive reset tasks; README/README-DEV document the workflow.
 
 ### Added
 
