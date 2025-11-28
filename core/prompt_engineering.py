@@ -12,7 +12,8 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from typing import Any, Iterable, Optional, Sequence
+from collections.abc import Iterable as IterableABC, Sequence as SequenceABC
+from typing import Any, Iterable, Mapping, Optional, Sequence, cast
 
 from prompt_templates import PROMPT_ENGINEERING_PROMPT
 
@@ -178,8 +179,9 @@ class PromptEngineer:
         confidence = max(0.0, min(confidence, 1.0))
 
         raw_response: Optional[dict[str, Any]] = None
-        if isinstance(response, dict):
-            raw_response = response
+        if isinstance(response, Mapping):
+            response_mapping = cast(Mapping[str, Any], response)
+            raw_response = {str(key): value for key, value in response_mapping.items()}
 
         logger.debug(
             "Prompt refinement completed",
@@ -295,16 +297,18 @@ class PromptEngineer:
             if isinstance(value, str):
                 text = value.strip()
                 return text or None
-            if isinstance(value, dict):
+            mapping_value = _as_mapping(value)
+            if mapping_value is not None:
                 for key in ("content", "text", "value"):
-                    if key in value:
-                        normalised = _normalise_content(value[key])
+                    if key in mapping_value:
+                        normalised = _normalise_content(mapping_value[key])
                         if normalised:
                             return normalised
                 return None
-            if isinstance(value, Iterable) and not isinstance(value, (bytes, bytearray, str)):
+            if isinstance(value, IterableABC) and not isinstance(value, (bytes, bytearray, str)):
                 parts: list[str] = []
-                for item in value:
+                iterable_value = cast(Iterable[Any], value)
+                for item in iterable_value:
                     normalised = _normalise_content(item)
                     if normalised:
                         parts.append(normalised)
@@ -323,15 +327,14 @@ class PromptEngineer:
             return text or None
 
         def _extract_from_choice(choice: Any) -> Optional[str]:
-            if choice is None:
-                return None
-            if isinstance(choice, dict):
-                message = choice.get("message")
+            mapping_choice = _as_mapping(choice)
+            if mapping_choice is not None:
+                message = mapping_choice.get("message")
                 normalised = _normalise_content(message)
                 if normalised:
                     return normalised
-                text = choice.get("text")
-                if text:
+                text = mapping_choice.get("text")
+                if text is not None:
                     return _normalise_content(text)
             else:
                 if hasattr(choice, "message"):
@@ -344,22 +347,27 @@ class PromptEngineer:
                         return normalised
             return None
 
-        choices: Optional[Any] = None
-        if isinstance(response, dict):
-            choices = response.get("choices")
+        choices_value: Any = None
+        response_mapping = _as_mapping(response)
+        if response_mapping is not None:
+            choices_value = response_mapping.get("choices")
         elif hasattr(response, "choices"):
-            choices = getattr(response, "choices")
-        elif isinstance(response, list):
-            choices = response
+            choices_value = getattr(response, "choices")
+        elif isinstance(response, SequenceABC) and not isinstance(response, (bytes, bytearray, str)):
+            choices_value = cast(Sequence[Any], response)
 
-        if isinstance(choices, dict):
-            choices = [choices]
+        choices_sequence: Sequence[Any] = ()
+        if isinstance(choices_value, Mapping):
+            choices_sequence = [choices_value]
+        elif isinstance(choices_value, SequenceABC) and not isinstance(
+            choices_value, (bytes, bytearray, str)
+        ):
+            choices_sequence = cast(Sequence[Any], choices_value)
 
-        if isinstance(choices, Iterable) and not isinstance(choices, (bytes, bytearray, str)):
-            for choice in choices:
-                content = _extract_from_choice(choice)
-                if content:
-                    return content
+        for choice in choices_sequence:
+            content = _extract_from_choice(choice)
+            if content:
+                return content
 
         if isinstance(response, str):
             return response
@@ -373,6 +381,23 @@ class PromptEngineer:
         """Return the configured system prompt or the default meta-prompt."""
 
         return (self.system_prompt or PROMPT_ENGINEERING_PROMPT).strip()
+
+
+def _as_mapping(value: Any) -> Optional[Mapping[str, Any]]:
+    """Return a mapping view for dynamic LiteLLM payload objects when possible."""
+
+    if isinstance(value, Mapping):
+        return cast(Mapping[str, Any], value)
+    for attr in ("model_dump", "dict"):
+        candidate = getattr(value, attr, None)
+        if callable(candidate):
+            try:
+                result = candidate()
+            except Exception:  # pragma: no cover - best effort normalisation
+                continue
+            if isinstance(result, Mapping):
+                return cast(Mapping[str, Any], result)
+    return None
 
 
 def _summarise_response_for_error(response: Any) -> str:
@@ -399,8 +424,9 @@ def _parse_refinement_payload(text: str) -> dict[str, Any]:
         raise ValueError("empty payload")
     try:
         parsed = json.loads(stripped)
-        if isinstance(parsed, dict):
-            return parsed
+        if isinstance(parsed, Mapping):
+            parsed_mapping = cast(Mapping[str, Any], parsed)
+            return {str(key): value for key, value in parsed_mapping.items()}
     except json.JSONDecodeError:
         pass
 
@@ -409,11 +435,12 @@ def _parse_refinement_payload(text: str) -> dict[str, Any]:
         if char != "{":
             continue
         try:
-            parsed, end = decoder.raw_decode(stripped[index:])
+            parsed_obj, _ = decoder.raw_decode(stripped[index:])
         except json.JSONDecodeError:
             continue
-        if isinstance(parsed, dict):
-            return parsed
+        if isinstance(parsed_obj, Mapping):
+            parsed_mapping = cast(Mapping[str, Any], parsed_obj)
+            return {str(key): value for key, value in parsed_mapping.items()}
     raise ValueError("unable to parse prompt engineering payload")
 
 

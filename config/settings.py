@@ -26,7 +26,7 @@ import os
 import re
 from collections import OrderedDict
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Tuple, Type, cast
+from typing import Any, Dict, List, Literal, Mapping, Optional, Sequence, Tuple, Type, cast
 
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 from pydantic_settings import (
@@ -268,9 +268,11 @@ class PromptManagerSettings(BaseSettings):
             value = parsed
         if isinstance(value, list):
             cleaned: list[dict[str, object]] = []
-            for entry in value:
-                if isinstance(entry, dict):
-                    cleaned.append(entry)
+            entries = cast(Sequence[object], value)
+            for entry in entries:
+                if isinstance(entry, Mapping):
+                    entry_mapping = cast(Mapping[object, object], entry)
+                    cleaned.append({str(key): entry_mapping[key] for key in entry_mapping})
             return cleaned or None
         raise ValueError("categories must be provided as a list of objects")
 
@@ -361,10 +363,12 @@ class PromptManagerSettings(BaseSettings):
         if not isinstance(value, list):
             raise ValueError("quick_actions must be a list of action definitions")
         normalised: list[dict[str, object]] = []
-        for entry in value:
-            if not isinstance(entry, dict):
+        entries = cast(Sequence[object], value)
+        for entry in entries:
+            if not isinstance(entry, Mapping):
                 raise ValueError("quick_actions items must be objects")
-            normalised.append({str(key): entry[key] for key in entry})
+            entry_mapping = cast(Mapping[object, object], entry)
+            normalised.append({str(key): entry_mapping[key] for key in entry_mapping})
         return normalised
 
     @field_validator("litellm_drop_params", mode="before")
@@ -380,15 +384,15 @@ class PromptManagerSettings(BaseSettings):
             except json.JSONDecodeError:
                 items = [item.strip() for item in stripped.split(",") if item.strip()]
             else:
-                if isinstance(parsed, list):
-                    items = [str(item).strip() for item in parsed if str(item).strip()]
-                elif isinstance(parsed, (tuple, set)):
-                    items = [str(item).strip() for item in parsed if str(item).strip()]
+                if isinstance(parsed, Sequence) and not isinstance(parsed, (str, bytes, bytearray)):
+                    sequence = cast(Sequence[object], parsed)
+                    items = [str(item).strip() for item in sequence if str(item).strip()]
                 else:
                     items = [str(parsed).strip()]
             return items or None
-        if isinstance(value, (list, tuple, set)):
-            items = [str(item).strip() for item in value if str(item).strip()]
+        if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+            sequence_value = cast(Sequence[object], value)
+            items = [str(item).strip() for item in sequence_value if str(item).strip()]
             return items or None
         raise ValueError("litellm_drop_params must be a list, comma-separated string, or JSON array")
 
@@ -417,10 +421,11 @@ class PromptManagerSettings(BaseSettings):
                 raise ValueError(
                     "litellm_workflow_models must be a JSON object mapping workflow to model tier"
                 ) from exc
-        if not isinstance(value, dict):
+        if not isinstance(value, Mapping):
             raise ValueError("litellm_workflow_models must be a mapping of workflow names to model tiers")
+        mapping_value = cast(Mapping[object, object], value)
         cleaned: Dict[str, Literal["fast", "inference"]] = {}
-        for raw_key, raw_value in value.items():
+        for raw_key, raw_value in mapping_value.items():
             key = str(raw_key).strip()
             if key not in LITELLM_ROUTED_WORKFLOWS:
                 raise ValueError(f"Unsupported LiteLLM workflow '{key}'")
@@ -490,7 +495,7 @@ class PromptManagerSettings(BaseSettings):
                     if val is None and key.isupper():
                         val = os.getenv(key)
                     if val is not None:
-                        if isinstance(val, str) and not val.strip():
+                        if not val.strip():
                             continue
                         # Map to canonical field keys accepted by the model
                         if field in {"db_path", "chroma_path"}:
@@ -541,15 +546,19 @@ class PromptManagerSettings(BaseSettings):
                 if not isinstance(data, dict):
                     message = f"Configuration file {path} must contain a JSON object"
                     raise SettingsError(message)
+                mapping_data = cast(Mapping[object, Any], data)
+                data_dict: Dict[str, Any] = {str(key): value for key, value in mapping_data.items()}
                 mapped: Dict[str, Any] = {}
-                if "database_path" in data and "db_path" not in data:
-                    mapped["db_path"] = data["database_path"]
+                if "database_path" in data_dict and "db_path" not in data_dict:
+                    mapped["db_path"] = data_dict["database_path"]
                 disallowed_secret_keys = {
                     "litellm_api_key",
                     "AZURE_OPENAI_API_KEY",
                 }
                 removed_secrets = [
-                    key for key in disallowed_secret_keys if key in data and data.pop(key, None) is not None
+                    key
+                    for key in disallowed_secret_keys
+                    if key in data_dict and data_dict.pop(key, None) is not None
                 ]
                 if removed_secrets:
                     logger.warning(
@@ -579,12 +588,12 @@ class PromptManagerSettings(BaseSettings):
                     "chat_colors",
                     "theme_mode",
                 ):
-                    if key in data:
-                        mapped[key] = data[key]
-                if "litellm_api_base" not in mapped and "AZURE_OPENAI_ENDPOINT" in data:
-                    mapped["litellm_api_base"] = data["AZURE_OPENAI_ENDPOINT"]
-                if "litellm_api_version" not in mapped and "AZURE_OPENAI_API_VERSION" in data:
-                    mapped["litellm_api_version"] = data["AZURE_OPENAI_API_VERSION"]
+                    if key in data_dict:
+                        mapped[key] = data_dict[key]
+                if "litellm_api_base" not in mapped and "AZURE_OPENAI_ENDPOINT" in data_dict:
+                    mapped["litellm_api_base"] = data_dict["AZURE_OPENAI_ENDPOINT"]
+                if "litellm_api_version" not in mapped and "AZURE_OPENAI_API_VERSION" in data_dict:
+                    mapped["litellm_api_version"] = data_dict["AZURE_OPENAI_API_VERSION"]
                 return mapped
             return {}
         return cast("PydanticBaseSettingsSource", _loader)
