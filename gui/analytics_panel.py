@@ -103,12 +103,14 @@ class AnalyticsDashboardPanel(QWidget):
         controls.addWidget(QLabel("Window (days):", self))
         self._window_spin.setRange(0, 365)
         self._window_spin.setValue(30)
+        self._window_spin.setMinimumWidth(90)
         self._window_spin.valueChanged.connect(lambda _value: self.refresh())
         controls.addWidget(self._window_spin)
 
         controls.addWidget(QLabel("Top prompts:", self))
         self._prompt_limit_spin.setRange(3, 25)
         self._prompt_limit_spin.setValue(5)
+        self._prompt_limit_spin.setMinimumWidth(90)
         self._prompt_limit_spin.valueChanged.connect(lambda _value: self.refresh())
         controls.addWidget(self._prompt_limit_spin)
 
