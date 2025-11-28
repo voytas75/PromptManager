@@ -1326,6 +1326,22 @@ class PromptManager:
             )
         scenarios = self.generate_prompt_scenarios(context_source, max_scenarios=max_scenarios)
         prompt.scenarios = list(scenarios)
+        ext5_payload: Optional[MutableMapping[str, Any]]
+        if isinstance(prompt.ext5, MutableMapping):
+            ext5_payload = prompt.ext5
+        elif isinstance(prompt.ext5, Mapping):
+            ext5_payload = dict(prompt.ext5)
+        else:
+            ext5_payload = None
+        if scenarios:
+            if ext5_payload is None:
+                ext5_payload = {}
+            ext5_payload["scenarios"] = list(scenarios)
+        elif ext5_payload is not None:
+            ext5_payload.pop("scenarios", None)
+            if not ext5_payload:
+                ext5_payload = None
+        prompt.ext5 = ext5_payload
         prompt.last_modified = datetime.now(timezone.utc)
         try:
             return self.update_prompt(prompt)

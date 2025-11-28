@@ -2060,7 +2060,11 @@ class MainWindow(QMainWindow):
         if prompt is None:
             return
         try:
-            updated_prompt = self._manager.refresh_prompt_scenarios(prompt.id)
+            indicator = ProcessingIndicator(self, "Refreshing scenarios…")
+            updated_prompt = indicator.run(
+                self._manager.refresh_prompt_scenarios,
+                prompt.id,
+            )
         except (ScenarioGenerationError, PromptManagerError) as exc:
             QMessageBox.warning(self, "Scenario refresh failed", str(exc))
             return

@@ -876,16 +876,25 @@ def test_refresh_prompt_scenarios_updates_prompt(
     prompt = manager.create_prompt(_make_prompt("Scenario Refresh"))
 
     class _ScenarioGenerator:
+        def __init__(self) -> None:
+            self.calls = 0
+
         def generate(self, context: str, *, max_scenarios: int) -> List[str]:
-            return [f"Scenario {index}" for index in range(1, max_scenarios + 1)]
+            self.calls += 1
+            base = self.calls * 10
+            return [f"Scenario {base + index}" for index in range(1, max_scenarios + 1)]
 
     manager._scenario_generator = _ScenarioGenerator()
 
     updated = manager.refresh_prompt_scenarios(prompt.id, max_scenarios=2)
-
-    assert updated.scenarios == ["Scenario 1", "Scenario 2"]
+    assert updated.scenarios == ["Scenario 11", "Scenario 12"]
     persisted = manager.get_prompt(prompt.id)
-    assert persisted.scenarios == ["Scenario 1", "Scenario 2"]
+    assert persisted.scenarios == ["Scenario 11", "Scenario 12"]
+
+    updated_again = manager.refresh_prompt_scenarios(prompt.id, max_scenarios=1)
+    assert updated_again.scenarios == ["Scenario 21"]
+    persisted_again = manager.get_prompt(prompt.id)
+    assert persisted_again.scenarios == ["Scenario 21"]
 
 
 def test_get_category_health_returns_counts_and_stats(
