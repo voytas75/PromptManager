@@ -1099,6 +1099,7 @@ class MainWindow(QMainWindow):
         # Qt provides this built‑in via the *clearButtonEnabled* property so we
         # do not have to manage an extra button or custom stylesheet.
         self._search_input.setClearButtonEnabled(True)
+        self._search_input.returnPressed.connect(self._on_search_button_clicked)  # type: ignore[arg-type]
         controls_layout.addWidget(self._search_input)
 
         self._search_button = QPushButton("Search", self)
