@@ -1165,10 +1165,6 @@ class MainWindow(QMainWindow):
         self._maintenance_button.clicked.connect(self._on_maintenance_clicked)  # type: ignore[arg-type]
         controls_layout.addWidget(self._maintenance_button)
 
-        self._history_button = QPushButton("History", self)
-        self._history_button.clicked.connect(self._on_history_clicked)  # type: ignore[arg-type]
-        controls_layout.addWidget(self._history_button)
-
         self._notifications_button = QPushButton("Notifications", self)
         self._notifications_button.clicked.connect(self._on_notifications_clicked)  # type: ignore[arg-type]
         controls_layout.addWidget(self._notifications_button)
@@ -1524,7 +1520,6 @@ class MainWindow(QMainWindow):
         self._save_button.setEnabled(False)
         self._continue_chat_button.setEnabled(False)
         self._end_chat_button.setEnabled(False)
-        self._history_button.setEnabled(True)
 
     def _restore_window_geometry(self) -> None:
         """Restore window size/position from persistent settings."""
@@ -2782,11 +2777,6 @@ class MainWindow(QMainWindow):
         top_name = suggestions.prompts[0].name if suggestions.prompts else None
         if top_name:
             self.statusBar().showMessage(f"Top suggestion: {top_name}", 5000)
-
-    def _on_history_clicked(self) -> None:
-        """Switch to the history tab."""
-
-        self._tab_widget.setCurrentWidget(self._history_panel)
 
     def _on_tab_changed(self, index: int) -> None:
         widget = self._tab_widget.widget(index)
