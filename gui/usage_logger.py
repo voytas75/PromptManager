@@ -30,6 +30,12 @@ class IntentUsageLogger:
         self._enabled = enabled
         self._path = Path(path) if path is not None else Path("data") / "logs" / "intent_usage.jsonl"
 
+    @property
+    def log_path(self) -> Path:
+        """Return the resolved path for the usage log."""
+
+        return self._path
+
     def log_detect(self, *, prediction: IntentPrediction, query_text: str) -> None:
         """Log details for an intent detection event."""
 

@@ -1,5 +1,6 @@
 """Lightweight integration checks for main module.
 
+Updates: v0.5.0 - 2025-11-28 - Cover analytics diagnostics CLI path and export flags.
 Updates: v0.4.0 - 2025-11-30 - Remove catalogue import command coverage.
 Updates: v0.3.0 - 2025-11-15 - Cover enhanced --print-settings summary and masked API keys.
 Updates: v0.2.0 - 2025-11-05 - Add coverage for GUI dependency fallback.
@@ -120,6 +121,61 @@ def _build_execution_analytics(total_runs: int = 5) -> ExecutionAnalytics:
         average_rating=4.5,
         prompt_breakdown=[prompt_stats],
         window_start=now,
+    )
+
+
+def _build_dummy_snapshot() -> SimpleNamespace:
+    now = datetime.now(timezone.utc)
+    return SimpleNamespace(
+        execution=_build_execution_analytics(),
+        usage_frequency=[
+            SimpleNamespace(
+                name="Prompt Delta",
+                usage_count=4,
+                success_rate=0.75,
+                last_executed_at=now,
+            )
+        ],
+        model_costs=[
+            SimpleNamespace(
+                model="gpt-fast",
+                run_count=2,
+                prompt_tokens=10,
+                completion_tokens=8,
+                total_tokens=18,
+            )
+        ],
+        benchmark_stats=[
+            SimpleNamespace(
+                model="gpt-bench",
+                run_count=1,
+                success_rate=1.0,
+                average_duration_ms=110.0,
+                total_tokens=25,
+            )
+        ],
+        intent_success=[
+            SimpleNamespace(
+                bucket=now,
+                success_rate=1.0,
+                success=2,
+                total=2,
+            )
+        ],
+        embedding=SimpleNamespace(
+            backend_ok=True,
+            backend_message="ok",
+            backend_dimension=32,
+            inferred_dimension=None,
+            chroma_ok=True,
+            chroma_message="ok",
+            chroma_count=2,
+            repository_total=2,
+            prompts_with_embeddings=2,
+            missing_prompts=[],
+            mismatched_prompts=[],
+            consistent_counts=True,
+        ),
     )
 
 
@@ -304,6 +360,91 @@ def test_main_embedding_diagnostics_returns_failure_on_issue(
     output = capsys.readouterr().out
     assert "Backend: ERROR" in output
     assert "Dimension mismatches" in output
+    assert manager.closed is True
+
+
+def test_main_runs_analytics_diagnostics(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "prompt-manager",
+            "diagnostics",
+            "analytics",
+            "--window-days",
+            "14",
+            "--prompt-limit",
+            "7",
+            "--dataset",
+            "usage",
+        ],
+    )
+    monkeypatch.setattr(main, "load_settings", lambda: _DummySettings())
+    manager = _DummyManager()
+    captured_args: dict[str, object] = {}
+
+    def _snapshot_stub(
+        _manager: _DummyManager,
+        *,
+        window_days: int,
+        prompt_limit: int,
+        usage_log_path: Path | None,
+    ) -> SimpleNamespace:
+        captured_args["window_days"] = window_days
+        captured_args["prompt_limit"] = prompt_limit
+        captured_args["usage_log_path"] = usage_log_path
+        return _build_dummy_snapshot()
+
+    monkeypatch.setattr(main, "build_prompt_manager", lambda settings: manager)
+    monkeypatch.setattr(main, "build_analytics_snapshot", _snapshot_stub)
+    monkeypatch.setattr(main, "snapshot_dataset_rows", lambda *_: [])
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "Analytics dashboard" in output
+    assert captured_args["window_days"] == 14
+    assert captured_args["prompt_limit"] == 7
+    assert manager.closed is True
+
+
+def test_main_analytics_diagnostics_exports_csv(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys,
+) -> None:
+    export_path = tmp_path / "analytics.csv"
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "prompt-manager",
+            "diagnostics",
+            "analytics",
+            "--export-csv",
+            str(export_path),
+            "--dataset",
+            "usage",
+        ],
+    )
+    monkeypatch.setattr(main, "load_settings", lambda: _DummySettings())
+    manager = _DummyManager()
+    snapshot = _build_dummy_snapshot()
+    monkeypatch.setattr(main, "build_prompt_manager", lambda settings: manager)
+    monkeypatch.setattr(main, "build_analytics_snapshot", lambda *_, **__: snapshot)
+
+    def _dataset_rows(_, dataset: str) -> list[dict[str, object]]:
+        assert dataset == "usage"
+        return [{"prompt_name": "Prompt Delta", "usage_count": 4}]
+
+    monkeypatch.setattr(main, "snapshot_dataset_rows", _dataset_rows)
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    assert export_path.exists()
+    contents = export_path.read_text(encoding="utf-8")
+    assert "prompt_name" in contents
+    assert "Prompt Delta" in contents
     assert manager.closed is True
 
 

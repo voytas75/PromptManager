@@ -1,0 +1,416 @@
+"""Analytics dashboard panel wiring for the Prompt Manager GUI.
+
+Updates: v0.1.0 - 2025-11-28 - Introduce dashboard tab with charts and CSV export.
+"""
+
+from __future__ import annotations
+
+import csv
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import List, Optional, Sequence
+
+from PySide6.QtCharts import (
+    QBarCategoryAxis,
+    QBarSeries,
+    QBarSet,
+    QChart,
+    QChartView,
+    QDateTimeAxis,
+    QLineSeries,
+    QValueAxis,
+)
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QPainter
+from PySide6.QtWidgets import (
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QSpinBox,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+    QComboBox,
+)
+
+from core import AnalyticsSnapshot, PromptManager, build_analytics_snapshot, snapshot_dataset_rows
+
+
+class AnalyticsDashboardPanel(QWidget):
+    """Interactive analytics dashboard with charts and CSV export."""
+
+    _DATASETS: Sequence[tuple[str, str]] = (
+        ("usage", "Usage Frequency"),
+        ("model_costs", "Model Cost Breakdown"),
+        ("benchmark", "Benchmark Success"),
+        ("intent", "Intent Success Trend"),
+        ("embedding", "Embedding Health"),
+    )
+
+    def __init__(
+        self,
+        manager: PromptManager,
+        parent: Optional[QWidget] = None,
+        *,
+        usage_log_path: Optional[Path] = None,
+    ) -> None:
+        super().__init__(parent)
+        self._manager = manager
+        self._usage_log_path = usage_log_path
+        self._snapshot: Optional[AnalyticsSnapshot] = None
+        self._chart_view = QChartView(self)
+        self._dataset_combo = QComboBox(self)
+        self._chart_type_combo = QComboBox(self)
+        self._window_spin = QSpinBox(self)
+        self._prompt_limit_spin = QSpinBox(self)
+        self._table = QTableWidget(self)
+        self._status_label = QLabel("", self)
+        self._embedding_summary = QLabel("", self)
+        self._build_ui()
+        self.refresh()
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self)
+        header = QLabel(
+            (
+                "Explore execution, benchmark, and embedding metrics. "
+                "Adjust the look-back window, dataset, and chart style to inspect performance trends."
+            ),
+            self,
+        )
+        header.setWordWrap(True)
+        layout.addWidget(header)
+
+        controls = QHBoxLayout()
+        controls.setSpacing(8)
+
+        dataset_label = QLabel("Dataset:", self)
+        controls.addWidget(dataset_label)
+        for key, label in self._DATASETS:
+            self._dataset_combo.addItem(label, key)
+        self._dataset_combo.currentIndexChanged.connect(self._update_visuals)  # type: ignore[arg-type]
+        controls.addWidget(self._dataset_combo)
+
+        controls.addWidget(QLabel("Chart:", self))
+        self._chart_type_combo.addItem("Bar", "bar")
+        self._chart_type_combo.addItem("Line", "line")
+        self._chart_type_combo.currentIndexChanged.connect(self._update_chart)  # type: ignore[arg-type]
+        controls.addWidget(self._chart_type_combo)
+
+        controls.addWidget(QLabel("Window (days):", self))
+        self._window_spin.setRange(0, 365)
+        self._window_spin.setValue(30)
+        self._window_spin.valueChanged.connect(lambda _value: self.refresh())
+        controls.addWidget(self._window_spin)
+
+        controls.addWidget(QLabel("Top prompts:", self))
+        self._prompt_limit_spin.setRange(3, 25)
+        self._prompt_limit_spin.setValue(5)
+        self._prompt_limit_spin.valueChanged.connect(lambda _value: self.refresh())
+        controls.addWidget(self._prompt_limit_spin)
+
+        refresh_button = QPushButton("Refresh", self)
+        refresh_button.clicked.connect(self.refresh)  # type: ignore[arg-type]
+        controls.addWidget(refresh_button)
+
+        export_button = QPushButton("Export CSV", self)
+        export_button.clicked.connect(self._export_csv)  # type: ignore[arg-type]
+        controls.addWidget(export_button)
+
+        controls.addStretch(1)
+        layout.addLayout(controls)
+
+        self._chart_view.setRenderHint(QPainter.Antialiasing)
+        layout.addWidget(self._chart_view, stretch=2)
+
+        self._table.setColumnCount(0)
+        self._table.setRowCount(0)
+        self._table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self._table.setSelectionMode(QTableWidget.NoSelection)
+        layout.addWidget(self._table, stretch=1)
+
+        self._embedding_summary.setWordWrap(True)
+        layout.addWidget(self._embedding_summary)
+
+        status_layout = QHBoxLayout()
+        status_layout.addWidget(self._status_label)
+        status_layout.addStretch(1)
+        layout.addLayout(status_layout)
+
+    def refresh(self) -> None:
+        window_days = self._window_spin.value()
+        prompt_limit = self._prompt_limit_spin.value()
+        try:
+            snapshot = build_analytics_snapshot(
+                self._manager,
+                window_days=window_days,
+                prompt_limit=prompt_limit,
+                usage_log_path=self._usage_log_path,
+            )
+        except Exception as exc:  # pragma: no cover - GUI feedback only
+            QMessageBox.critical(self, "Analytics", f"Unable to build analytics snapshot: {exc}")
+            return
+        self._snapshot = snapshot
+        self._update_visuals()
+        now_local = datetime.now(timezone.utc).astimezone()
+        self._status_label.setText(f"Refreshed at {now_local.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+
+    def _update_visuals(self) -> None:
+        self._update_chart()
+        self._populate_table()
+        self._update_embedding_summary()
+
+    def _update_chart(self) -> None:
+        chart = QChart()
+        chart.legend().setVisible(False)
+        dataset_key = self._dataset_combo.currentData()
+        chart_type = self._chart_type_combo.currentData()
+        snapshot = self._snapshot
+        if snapshot is None:
+            self._chart_view.setChart(chart)
+            return
+
+        if dataset_key == "embedding":
+            chart.setTitle("Embedding health visualised in the summary below")
+            self._chart_view.setChart(chart)
+            return
+
+        labels: List[str] = []
+        values: List[float] = []
+        if dataset_key == "usage":
+            for entry in snapshot.usage_frequency:
+                labels.append(entry.name)
+                values.append(float(entry.usage_count))
+            chart.setTitle("Prompt usage frequency")
+        elif dataset_key == "model_costs":
+            for entry in snapshot.model_costs:
+                labels.append(entry.model)
+                values.append(float(entry.total_tokens))
+            chart.setTitle("Total tokens by model")
+        elif dataset_key == "benchmark":
+            for entry in snapshot.benchmark_stats:
+                labels.append(entry.model)
+                values.append(entry.success_rate * 100)
+            chart.setTitle("Benchmark success rate (%)")
+        elif dataset_key == "intent":
+            line_series = QLineSeries()
+            for point in snapshot.intent_success:
+                labels.append(point.bucket.date().isoformat())
+                line_series.append(point.bucket.timestamp() * 1000, point.success_rate * 100)
+            if not labels:
+                chart.setTitle("No intent success data recorded")
+                self._chart_view.setChart(chart)
+                return
+            chart.addSeries(line_series)
+            axis_x = QDateTimeAxis()
+            axis_x.setFormat("MMM d")
+            axis_x.setTitleText("Date")
+            axis_y = QValueAxis()
+            axis_y.setRange(0, 100)
+            axis_y.setTitleText("Success %")
+            chart.addAxis(axis_x, Qt.AlignmentFlag.AlignBottom)
+            chart.addAxis(axis_y, Qt.AlignmentFlag.AlignLeft)
+            line_series.attachAxis(axis_x)
+            line_series.attachAxis(axis_y)
+            chart.setTitle("Intent workspace success rate")
+            self._chart_view.setChart(chart)
+            return
+        else:
+            self._chart_view.setChart(chart)
+            return
+
+        if not labels:
+            chart.setTitle("No data available for this dataset")
+            self._chart_view.setChart(chart)
+            return
+
+        if chart_type == "line":
+            series = QLineSeries()
+            for index, value in enumerate(values):
+                series.append(float(index), value)
+            chart.addSeries(series)
+            axis_x = QValueAxis()
+            axis_x.setRange(0, max(len(values) - 1, 0))
+            axis_x.setLabelFormat("%d")
+            axis_x.setTitleText("Index")
+            axis_y = QValueAxis()
+            axis_y.setRange(0, max(values) * 1.1 if values else 1)
+            chart.addAxis(axis_x, Qt.AlignmentFlag.AlignBottom)
+            chart.addAxis(axis_y, Qt.AlignmentFlag.AlignLeft)
+            series.attachAxis(axis_x)
+            series.attachAxis(axis_y)
+        else:
+            bar_series = QBarSeries()
+            bar_set = QBarSet("value")
+            for value in values:
+                bar_set << value
+            bar_series.append(bar_set)
+            chart.addSeries(bar_series)
+            axis_x = QBarCategoryAxis()
+            axis_x.append(labels)
+            axis_y = QValueAxis()
+            axis_y.setRange(0, max(values) * 1.1 if values else 1)
+            chart.addAxis(axis_x, Qt.AlignmentFlag.AlignBottom)
+            chart.addAxis(axis_y, Qt.AlignmentFlag.AlignLeft)
+            bar_series.attachAxis(axis_x)
+            bar_series.attachAxis(axis_y)
+
+        self._chart_view.setChart(chart)
+
+    def _populate_table(self) -> None:
+        dataset_key = self._dataset_combo.currentData()
+        snapshot = self._snapshot
+        if snapshot is None:
+            self._table.clear()
+            self._table.setRowCount(0)
+            self._table.setColumnCount(0)
+            return
+
+        headers: List[str]
+        rows: List[List[str]]
+        if dataset_key == "usage":
+            headers = ["Prompt", "Usage Count", "Success Rate", "Last Used"]
+            rows = [
+                [
+                    entry.name,
+                    str(entry.usage_count),
+                    self._format_pct(entry.success_rate),
+                    entry.last_executed_at.isoformat(timespec="seconds") if entry.last_executed_at else "n/a",
+                ]
+                for entry in snapshot.usage_frequency
+            ]
+        elif dataset_key == "model_costs":
+            headers = ["Model", "Runs", "Prompt Tokens", "Completion Tokens", "Total Tokens"]
+            rows = [
+                [
+                    entry.model,
+                    str(entry.run_count),
+                    str(entry.prompt_tokens),
+                    str(entry.completion_tokens),
+                    str(entry.total_tokens),
+                ]
+                for entry in snapshot.model_costs
+            ]
+        elif dataset_key == "benchmark":
+            headers = ["Model", "Runs", "Success Rate", "Avg Duration (ms)", "Tokens"]
+            rows = [
+                [
+                    entry.model,
+                    str(entry.run_count),
+                    self._format_pct(entry.success_rate),
+                    f"{entry.average_duration_ms:.0f}" if entry.average_duration_ms is not None else "n/a",
+                    str(entry.total_tokens),
+                ]
+                for entry in snapshot.benchmark_stats
+            ]
+        elif dataset_key == "intent":
+            headers = ["Date", "Success Rate", "Success", "Total"]
+            rows = [
+                [
+                    point.bucket.date().isoformat(),
+                    self._format_pct(point.success_rate),
+                    str(point.success),
+                    str(point.total),
+                ]
+                for point in snapshot.intent_success
+            ]
+        else:
+            headers = ["Metric", "Value"]
+            report = snapshot.embedding
+            if report is None:
+                rows = [["Status", "Embedding diagnostics unavailable"]]
+            else:
+                rows = [
+                    ["Backend", f"{'ok' if report.backend_ok else 'error'} - {report.backend_message}"],
+                    ["Dimension", str(report.backend_dimension or report.inferred_dimension or 'n/a')],
+                    ["Chroma", f"{'ok' if report.chroma_ok else 'error'} - {report.chroma_message}"],
+                    ["Stored count", str(report.prompts_with_embeddings)],
+                    ["Repository prompts", str(report.repository_total)],
+                    ["Missing", str(len(report.missing_prompts))],
+                    ["Dimension mismatches", str(len(report.mismatched_prompts))],
+                ]
+
+        self._table.setColumnCount(len(headers))
+        self._table.setHorizontalHeaderLabels(headers)
+        self._table.setRowCount(len(rows))
+        for row_index, row in enumerate(rows):
+            for column_index, value in enumerate(row):
+                self._table.setItem(row_index, column_index, QTableWidgetItem(value))
+        self._table.resizeColumnsToContents()
+
+    def _update_embedding_summary(self) -> None:
+        snapshot = self._snapshot
+        if snapshot is None or snapshot.embedding is None:
+            self._embedding_summary.setText("Embedding diagnostics unavailable.")
+            return
+        report = snapshot.embedding
+        consistent = (
+            "consistent" if report.consistent_counts else "mismatch"
+            if report.consistent_counts is False
+            else "unknown"
+        )
+        self._embedding_summary.setText(
+            (
+                f"Embedding backend: {'ok' if report.backend_ok else 'error'} ({report.backend_message}). "
+                f"Chroma: {'ok' if report.chroma_ok else 'error'} ({report.chroma_message}). "
+                f"Vectors stored {report.prompts_with_embeddings}/{report.repository_total} ({consistent})."
+            )
+        )
+
+    def _export_csv(self) -> None:
+        snapshot = self._snapshot
+        if snapshot is None:
+            QMessageBox.information(self, "Analytics", "No analytics data available to export.")
+            return
+        dataset_key = self._dataset_combo.currentData()
+        try:
+            rows = snapshot_dataset_rows(snapshot, dataset_key)
+        except ValueError as exc:  # pragma: no cover - defensive
+            QMessageBox.warning(self, "Analytics", str(exc))
+            return
+        if not rows:
+            QMessageBox.information(self, "Analytics", "Selected dataset has no rows to export.")
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export analytics dataset",
+            "analytics.csv",
+            "CSV Files (*.csv)",
+        )
+        if not path:
+            return
+        try:
+            self._write_csv(Path(path), rows)
+        except OSError as exc:  # pragma: no cover - filesystem errors rare in tests
+            QMessageBox.critical(self, "Analytics", f"Unable to export dataset: {exc}")
+            return
+        QMessageBox.information(self, "Analytics", f"Dataset exported to {path}")
+
+    @staticmethod
+    def _write_csv(path: Path, rows: Sequence[dict[str, object]]) -> None:
+        headers: List[str] = []
+        seen: set[str] = set()
+        for row in rows:
+            for key in row.keys():
+                if key in seen:
+                    continue
+                seen.add(key)
+                headers.append(key)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=headers)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow({header: row.get(header, "") for header in headers})
+
+    @staticmethod
+    def _format_pct(value: Optional[float]) -> str:
+        if value is None:
+            return "n/a"
+        return f"{value * 100:.1f}%"
+
+
+__all__ = ["AnalyticsDashboardPanel"]

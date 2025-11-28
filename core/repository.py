@@ -1,5 +1,6 @@
 """SQLite-backed repository for persistent prompt storage.
 
+Updates: v0.10.3 - 2025-11-28 - Add model usage and benchmark analytics queries for dashboards.
 Updates: v0.10.2 - 2025-11-28 - Add category prompt/execution aggregation helpers for maintenance workflows.
 Updates: v0.10.1 - 2025-11-27 - Add prompt part column to response styles for generalized prompt components.
 Updates: v0.10.0 - 2025-11-22 - Add prompt versioning and fork lineage persistence tables.
@@ -919,6 +920,92 @@ class PromptRepository:
         summary = _row_to_dict(summary_row)
         aggregates = [_row_to_dict(row) for row in prompt_rows]
         return summary, aggregates
+
+    def get_model_usage_breakdown(
+        self,
+        *,
+        since: Optional[datetime] = None,
+    ) -> List[Dict[str, Any]]:
+        """Return aggregated token usage grouped by model identifier."""
+
+        filters = ["metadata IS NOT NULL", "json_valid(metadata)"]
+        params: List[Any] = []
+        if since is not None:
+            filters.append("datetime(executed_at) >= ?")
+            params.append(since.isoformat())
+        where_clause = f" WHERE {' AND '.join(filters)}" if filters else ""
+
+        query = (
+            "SELECT "
+            "COALESCE("
+            "json_extract(metadata, '$.context.execution.model'), "
+            "json_extract(metadata, '$.model'), "
+            "'unknown'"
+            ") AS model, "
+            "COUNT(*) AS run_count, "
+            "SUM(COALESCE(json_extract(metadata, '$.usage.prompt_tokens'), 0)) AS prompt_tokens, "
+            "SUM(COALESCE(json_extract(metadata, '$.usage.completion_tokens'), 0)) AS completion_tokens, "
+            "SUM(COALESCE(json_extract(metadata, '$.usage.total_tokens'), 0)) AS total_tokens "
+            "FROM prompt_executions "
+            f"{where_clause} "
+            "GROUP BY model "
+            "ORDER BY run_count DESC;"
+        )
+
+        try:
+            with _connect(self._db_path) as conn:
+                rows = conn.execute(query, params).fetchall()
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to compute model usage breakdown") from exc
+        results: List[Dict[str, Any]] = []
+        for row in rows:
+            results.append({key: row[key] for key in row.keys()})
+        return results
+
+    def get_benchmark_execution_stats(
+        self,
+        *,
+        since: Optional[datetime] = None,
+    ) -> List[Dict[str, Any]]:
+        """Return aggregated metrics for persisted benchmark executions."""
+
+        filters = [
+            "metadata IS NOT NULL",
+            "json_valid(metadata)",
+            "COALESCE(json_extract(metadata, '$.benchmark'), 0) = 1",
+        ]
+        params: List[Any] = []
+        if since is not None:
+            filters.append("datetime(executed_at) >= ?")
+            params.append(since.isoformat())
+        where_clause = f" WHERE {' AND '.join(filters)}" if filters else ""
+
+        query = (
+            "SELECT "
+            "COALESCE("
+            "json_extract(metadata, '$.model'), "
+            "json_extract(metadata, '$.context.execution.model'), "
+            "'unknown'"
+            ") AS model, "
+            "COUNT(*) AS total_runs, "
+            "SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) AS success_runs, "
+            "AVG(duration_ms) AS avg_duration_ms, "
+            "SUM(COALESCE(json_extract(metadata, '$.usage.total_tokens'), 0)) AS total_tokens "
+            "FROM prompt_executions "
+            f"{where_clause} "
+            "GROUP BY model "
+            "ORDER BY total_runs DESC;"
+        )
+
+        try:
+            with _connect(self._db_path) as conn:
+                rows = conn.execute(query, params).fetchall()
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to compute benchmark execution stats") from exc
+        results: List[Dict[str, Any]] = []
+        for row in rows:
+            results.append({key: row[key] for key in row.keys()})
+        return results
 
     def get_prompt_execution_statistics(
         self,

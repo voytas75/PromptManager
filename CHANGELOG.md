@@ -2,6 +2,18 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.19.0] - 2025-11-28
+
+### Added
+
+- Added an **Analytics** tab to the GUI that visualises usage frequency, LiteLLM model cost breakdowns, benchmark success, and intent success trends with switchable bar/line charts, adjustable look-back windows, and one-click CSV export; embedding health summaries now live alongside the charts.
+- Extended the `diagnostics` CLI with an `analytics` target plus `--window-days`, `--prompt-limit`, `--dataset`, and `--export-csv` flags so terminal users can build the same dashboard snapshot (including embedding health) and persist datasets to CSV.
+- Introduced a `core.analytics_dashboard` helper and new repository aggregate queries for model usage/benchmark stats, enabling future surfaces to reuse the same execution/benchmark/embedding metrics.
+
+### Changed
+
+- Diagnostics documentation and README sections now highlight both `diagnostics embeddings` and `diagnostics analytics`, clarifying how to obtain vector health checks or exportable performance snapshots.
+
 ## [0.18.0] - 2025-11-28
 
 ### Added

@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.63 - 2025-11-28 - Add analytics dashboard tab with charts and CSV export.
 Updates: v0.15.62 - 2025-11-28 - Share prompts via ShareText and copy the share link to the clipboard.
 Updates: v0.15.61 - 2025-11-28 - Refresh prompt list and re-enable sorting when the search query is cleared via the inline icon.
 Updates: v0.15.60 - 2025-11-28 - Add background task center with progress bars and completion toasts.
@@ -191,6 +192,7 @@ from core.sharing import ShareProvider, ShareTextProvider, format_prompt_for_sha
 from models.category_model import PromptCategory, slugify_category
 from models.prompt_model import Prompt
 
+from .analytics_panel import AnalyticsDashboardPanel
 from .code_highlighter import CodeHighlighter
 from .command_palette import CommandPaletteDialog, QuickAction, rank_prompts_for_action
 from .dialogs import (
@@ -1495,10 +1497,18 @@ class MainWindow(QMainWindow):
             toast_callback=self._show_toast,
         )
 
+        usage_log_path = getattr(self._usage_logger, "log_path", None)
+        self._analytics_panel = AnalyticsDashboardPanel(
+            self._manager,
+            self,
+            usage_log_path=usage_log_path,
+        )
+
         self._tab_widget.addTab(result_tab, "Prompts")
         self._tab_widget.addTab(self._history_panel, "History")
         self._tab_widget.addTab(self._notes_panel, "Notes")
         self._tab_widget.addTab(self._response_styles_panel, "Prompt Parts")
+        self._tab_widget.addTab(self._analytics_panel, "Analytics")
 
         preview_tab = QWidget(self)
         preview_layout = QVBoxLayout(preview_tab)

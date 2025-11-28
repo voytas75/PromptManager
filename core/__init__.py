@@ -1,5 +1,6 @@
 """Core service layer for Prompt Manager.
 
+Updates: v0.10.0 - 2025-11-28 - Export analytics dashboard helpers for diagnostics dashboards.
 Updates: v0.9.0 - 2025-12-06 - Export PromptNote models and exception helpers.
 Updates: v0.7.1 - 2025-11-30 - Restore catalogue import helpers for GUI workflows.
 Updates: v0.6.0 - 2025-11-15 - Export prompt engineering helpers alongside manager API.
@@ -14,6 +15,15 @@ from models.category_model import PromptCategory
 from models.prompt_note import PromptNote
 from models.response_style import ResponseStyle
 
+from .analytics_dashboard import (
+    AnalyticsSnapshot,
+    BenchmarkStatsEntry,
+    IntentSuccessPoint,
+    ModelCostEntry,
+    UsageFrequencyEntry,
+    build_analytics_snapshot,
+    snapshot_dataset_rows,
+)
 from .catalog_importer import (
     CatalogChangePlan,
     CatalogChangeType,
@@ -145,6 +155,13 @@ __all__ = [
     "HistoryTrackerError",
     "ExecutionAnalytics",
     "PromptExecutionAnalytics",
+    "AnalyticsSnapshot",
+    "UsageFrequencyEntry",
+    "ModelCostEntry",
+    "BenchmarkStatsEntry",
+    "IntentSuccessPoint",
+    "build_analytics_snapshot",
+    "snapshot_dataset_rows",
     "Notification",
     "NotificationCenter",
     "NotificationLevel",

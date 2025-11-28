@@ -1,5 +1,6 @@
 """Application entry point for Prompt Manager.
 
+Updates: v0.8.1 - 2025-11-28 - Add analytics diagnostics target with dashboard export.
 Updates: v0.8.0 - 2025-02-14 - Add embedding diagnostics CLI command.
 Updates: v0.7.9 - 2025-11-28 - Add benchmark and scenario refresh CLI commands.
 Updates: v0.7.8 - 2025-12-07 - Add CLI command to rebuild embeddings from scratch.
@@ -21,6 +22,7 @@ Updates: v0.1.0 - 2025-10-30 - Initial CLI bootstrap loading settings and buildi
 from __future__ import annotations
 
 import argparse
+import csv
 import importlib
 import json
 import logging
@@ -29,7 +31,7 @@ import textwrap
 import uuid
 from collections import Counter
 from pathlib import Path
-from typing import Callable, Optional, Sequence, cast
+from typing import Callable, Mapping, Optional, Sequence, cast
 
 from config import (
     DEFAULT_EMBEDDING_BACKEND,
@@ -38,7 +40,13 @@ from config import (
     PromptManagerSettings,
     load_settings,
 )
-from core import PromptManagerError, build_prompt_manager, export_prompt_catalog
+from core import (
+    PromptManagerError,
+    build_analytics_snapshot,
+    build_prompt_manager,
+    export_prompt_catalog,
+    snapshot_dataset_rows,
+)
 
 
 def _mask_secret(value: Optional[str]) -> str:
@@ -79,6 +87,30 @@ def _describe_path(path_value: object, *, expect_directory: bool, allow_missing_
     if not parent.exists():
         message += f", parent missing: {parent}"
     return message
+
+
+def _write_csv_rows(path: Path, rows: Sequence[Mapping[str, object]]) -> Path:
+    """Persist dictionaries to CSV and return the resolved path."""
+
+    if not rows:
+        raise ValueError("No rows available for export")
+    headers: list[str] = []
+    seen_keys: set[str] = set()
+    for row in rows:
+        for key in row.keys():
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            headers.append(str(key))
+
+    resolved = path.expanduser()
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    with resolved.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=headers)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({key: row.get(key) for key in headers})
+    return resolved
 
 
 def _print_settings_summary(settings: PromptManagerSettings) -> None:
@@ -349,6 +381,8 @@ def _run_diagnostics(manager, args: argparse.Namespace, logger: logging.Logger) 
     target = getattr(args, "target", None)
     if target == "embeddings":
         return _run_embedding_diagnostics(manager, args, logger)
+    if target == "analytics":
+        return _run_analytics_diagnostics(manager, args, logger)
     logger.error("Unknown diagnostics target: %s", target)
     return 5
 
@@ -430,6 +464,137 @@ def _run_embedding_diagnostics(
         )
         return 6
     logger.info("Embedding diagnostics completed successfully.")
+    return 0
+
+
+def _run_analytics_diagnostics(
+    manager, args: argparse.Namespace, logger: logging.Logger
+) -> int:
+    window_days = max(0, int(getattr(args, "window_days", 30) or 0))
+    prompt_limit = max(1, int(getattr(args, "prompt_limit", 5) or 1))
+    usage_log_path = getattr(args, "usage_log", None)
+
+    snapshot = build_analytics_snapshot(
+        manager,
+        window_days=window_days if window_days > 0 else 0,
+        prompt_limit=prompt_limit,
+        usage_log_path=usage_log_path,
+    )
+
+    def _pct(value: Optional[float]) -> str:
+        if value is None:
+            return "n/a"
+        return f"{value * 100:.1f}%"
+
+    print("\nAnalytics dashboard\n-------------------")
+
+    execution = snapshot.execution
+    if execution is None:
+        print("No execution history analytics available.")
+    else:
+        avg_duration = (
+            f"{execution.average_duration_ms:.0f} ms"
+            if execution.average_duration_ms is not None
+            else "n/a"
+        )
+        avg_rating = (
+            f"{execution.average_rating:.2f}"
+            if execution.average_rating is not None
+            else "n/a"
+        )
+        print(
+            textwrap.dedent(
+                f"""
+                Execution summary (last {window_days or 'all'} days)
+                  runs: {execution.total_runs}
+                  success rate: {_pct(execution.success_rate)}
+                  average duration: {avg_duration}
+                  average rating: {avg_rating}
+                """
+            ).strip()
+        )
+        if execution.prompt_breakdown:
+            print("\nTop prompt trends:")
+            for prompt_stats in execution.prompt_breakdown:
+                avg_duration_prompt = (
+                    f"{prompt_stats.average_duration_ms:.0f} ms"
+                    if prompt_stats.average_duration_ms is not None
+                    else "n/a"
+                )
+                avg_rating_prompt = (
+                    f"{prompt_stats.average_rating:.2f}"
+                    if prompt_stats.average_rating is not None
+                    else "n/a"
+                )
+                print(
+                    f"  - {prompt_stats.name}: runs={prompt_stats.total_runs}, "
+                    f"success={_pct(prompt_stats.success_rate)}, duration={avg_duration_prompt}, rating={avg_rating_prompt}"
+                )
+
+    if snapshot.usage_frequency:
+        print("\nCatalogue usage frequency:")
+        for entry in snapshot.usage_frequency:
+            last_used = entry.last_executed_at.isoformat() if entry.last_executed_at else "n/a"
+            print(
+                f"  - {entry.name}: counter={entry.usage_count}, success={_pct(entry.success_rate)}, last_used={last_used}"
+            )
+
+    if snapshot.model_costs:
+        print("\nModel cost breakdown (tokens):")
+        for entry in snapshot.model_costs:
+            print(
+                f"  - {entry.model}: runs={entry.run_count}, prompt={entry.prompt_tokens}, completion={entry.completion_tokens}, total={entry.total_tokens}"
+            )
+
+    if snapshot.benchmark_stats:
+        print("\nBenchmark success by model:")
+        for entry in snapshot.benchmark_stats:
+            avg_duration = (
+                f"{entry.average_duration_ms:.0f} ms"
+                if entry.average_duration_ms is not None
+                else "n/a"
+            )
+            print(
+                f"  - {entry.model}: runs={entry.run_count}, success={_pct(entry.success_rate)}, duration={avg_duration}, tokens={entry.total_tokens}"
+            )
+
+    if snapshot.intent_success:
+        print("\nIntent workspace execution success:")
+        for point in snapshot.intent_success[-10:]:
+            print(
+                f"  - {point.bucket.date().isoformat()}: {_pct(point.success_rate)} ({point.success}/{point.total})"
+            )
+
+    embedding = snapshot.embedding
+    if embedding is not None:
+        print("\nEmbedding diagnostics summary:")
+        print(f"  backend: {'ok' if embedding.backend_ok else 'error'} ({embedding.backend_message})")
+        print(f"  dimension: {embedding.backend_dimension or embedding.inferred_dimension or 'n/a'}")
+        print(f"  chroma: {'ok' if embedding.chroma_ok else 'error'} ({embedding.chroma_message})")
+        if embedding.consistent_counts is not None:
+            status = "matched" if embedding.consistent_counts else "mismatch"
+            print(
+                f"  vectors stored: {embedding.prompts_with_embeddings} / repository {embedding.repository_total} (chroma {status})"
+            )
+
+    export_path = getattr(args, "export_csv", None)
+    if export_path:
+        dataset = getattr(args, "dataset", "usage")
+        try:
+            rows = snapshot_dataset_rows(snapshot, dataset)
+        except ValueError as exc:
+            logger.error("%s", exc)
+            return 5
+        if not rows:
+            logger.info("Dataset '%s' is empty; skipping export.", dataset)
+        else:
+            try:
+                resolved = _write_csv_rows(Path(export_path), rows)
+            except (OSError, ValueError) as exc:
+                logger.error("Unable to export analytics dataset: %s", exc)
+                return 5
+            logger.info("Analytics dataset '%s' exported to %s", dataset, resolved)
+
     return 0
 
 
@@ -730,7 +895,7 @@ def parse_args() -> argparse.Namespace:
     )
     diagnostics_parser.add_argument(
         "target",
-        choices=("embeddings",),
+        choices=("embeddings", "analytics"),
         help="Diagnostics target to execute.",
     )
     diagnostics_parser.add_argument(
@@ -738,6 +903,36 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default="Prompt Manager diagnostics probe",
         help="Sample text used when probing the embedding backend (default provided).",
+    )
+    diagnostics_parser.add_argument(
+        "--window-days",
+        type=int,
+        default=30,
+        help="Analytics look-back window in days (analytics target only).",
+    )
+    diagnostics_parser.add_argument(
+        "--prompt-limit",
+        type=int,
+        default=5,
+        help="Number of prompts to summarise in analytics outputs (analytics target).",
+    )
+    diagnostics_parser.add_argument(
+        "--usage-log",
+        type=Path,
+        default=None,
+        help="Path to the intent usage log for analytics exports (defaults to data/logs/intent_usage.jsonl).",
+    )
+    diagnostics_parser.add_argument(
+        "--dataset",
+        choices=("usage", "model_costs", "benchmark", "intent", "embedding"),
+        default="usage",
+        help="Analytics dataset exported when --export-csv is provided.",
+    )
+    diagnostics_parser.add_argument(
+        "--export-csv",
+        type=Path,
+        default=None,
+        help="Optional CSV path for analytics dataset export.",
     )
 
     return parser.parse_args()
