@@ -20,7 +20,7 @@ from PySide6.QtCharts import (
     QLineSeries,
     QValueAxis,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -70,7 +70,11 @@ class AnalyticsDashboardPanel(QWidget):
         self._table = QTableWidget(self)
         self._status_label = QLabel("", self)
         self._embedding_summary = QLabel("", self)
+        self._settings = QSettings("PromptManager", "AnalyticsPanel")
+        self._initial_window_days = self._settings.value("windowDays", 30, int)
+        self._initial_prompt_limit = self._settings.value("promptLimit", 5, int)
         self._build_ui()
+        self._apply_initial_preferences()
         self.refresh()
 
     def _build_ui(self) -> None:
@@ -170,6 +174,7 @@ class AnalyticsDashboardPanel(QWidget):
         self._update_visuals()
         now_local = datetime.now(timezone.utc).astimezone()
         self._status_label.setText(f"Refreshed at {now_local.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+        self._persist_preferences(window_days, prompt_limit)
 
     def _handle_window_changed(self, _: int) -> None:
         self.refresh(show_indicator=True)
@@ -433,6 +438,20 @@ class AnalyticsDashboardPanel(QWidget):
         if value is None:
             return "n/a"
         return f"{value * 100:.1f}%"
+
+    def _apply_initial_preferences(self) -> None:
+        self._window_spin.blockSignals(True)
+        self._prompt_limit_spin.blockSignals(True)
+        window_pref = max(0, min(365, int(self._initial_window_days)))
+        prompt_pref = max(3, min(25, int(self._initial_prompt_limit)))
+        self._window_spin.setValue(window_pref)
+        self._prompt_limit_spin.setValue(prompt_pref)
+        self._window_spin.blockSignals(False)
+        self._prompt_limit_spin.blockSignals(False)
+
+    def _persist_preferences(self, window_days: int, prompt_limit: int) -> None:
+        self._settings.setValue("windowDays", window_days)
+        self._settings.setValue("promptLimit", prompt_limit)
 
 
 __all__ = ["AnalyticsDashboardPanel"]
