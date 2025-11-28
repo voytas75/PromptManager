@@ -2,7 +2,13 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
-## [0.17.8] - 2025-11-27
+## [0.17.9] - 2025-11-28
+
+### Added
+
+- Added an execution benchmark workflow powered by `PromptManager.benchmark_prompts`, a new CLI command (`python -m main benchmark …`), and summary output that surfaces duration/token usage plus existing history analytics so prompt authors can compare models without leaving the terminal.
+- Added scenario refresh APIs (`PromptManager.refresh_prompt_scenarios`) with matching CLI (`python -m main refresh-scenarios <prompt_id>`) and a **Refresh Scenarios** button in the prompt detail pane so stored usage examples stay in sync with the latest LiteLLM suggestions.
+- Extended the maintenance dialog with a **Category Health** table driven by new repository analytics, exposing per-category prompt counts, activation ratios, success rates, and last execution timestamps for rapid taxonomy audits; README/README-DEV now document the panel.
 
 ### Added
 
@@ -11,6 +17,8 @@ All notable changes to **Prompt Manager** will be documented in this file.
 ### Changed
 
 - The GUI Response Styles tab has been renamed to **Prompt Parts**, the dialog now captures the prompt part type, and detail/export views display the new metadata so teams can curate all prompt fragments from a single surface; README/README-DEV were refreshed to document the workflow.
+
+## [0.17.8] - 2025-11-27
 
 ## [0.17.7] - 2025-11-26
 

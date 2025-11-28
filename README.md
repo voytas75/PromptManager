@@ -44,6 +44,7 @@ python -m main
 - Redis-backed caching plus optional deterministic embeddings for air-gapped deployments; maintenance dialog exposes one-click reset tooling.
 - CLI helpers (`catalog-export`, `suggest`, `usage-report`, `reembed`) reuse the same validation stack for automation-friendly integrations.
 - Execution analytics CLI (`history-analytics`) summarises success rates, latency, and rating trends so prompt authors can spot their best-performing assets without exporting raw logs.
+- Benchmark CLI (`benchmark`) runs prompts across configured LiteLLM models, prints per-run duration/token usage, and surfaces recent analytics, while `refresh-scenarios` regenerates persisted usage examples without opening the GUI.
 
 ### Prompt Parts & Formatting
 

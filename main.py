@@ -1,5 +1,6 @@
 """Application entry point for Prompt Manager.
 
+Updates: v0.7.9 - 2025-11-28 - Add benchmark and scenario refresh CLI commands.
 Updates: v0.7.8 - 2025-12-07 - Add CLI command to rebuild embeddings from scratch.
 Updates: v0.7.7 - 2025-11-05 - Surface LiteLLM workflow routing details in CLI summaries.
 Updates: v0.7.6 - 2025-11-05 - Expand CLI settings summary to list fast and inference LiteLLM models.
@@ -24,9 +25,10 @@ import json
 import logging
 import logging.config
 import textwrap
+import uuid
 from collections import Counter
 from pathlib import Path
-from typing import Callable, Optional, cast
+from typing import Callable, Optional, Sequence, cast
 
 from config import (
     DEFAULT_EMBEDDING_BACKEND,
@@ -230,6 +232,115 @@ def _run_usage_report(args: argparse.Namespace, logger: logging.Logger) -> int:
         for name, count in top_prompts.most_common(5):
             print(f"  {name}: {count}")
 
+    return 0
+
+
+def _run_benchmark(manager, args: argparse.Namespace, logger: logging.Logger) -> int:
+    prompt_values: Sequence[str] = getattr(args, "prompt_ids", []) or []
+    if not prompt_values:
+        logger.error("At least one --prompt value is required for benchmarking.")
+        return 5
+    try:
+        prompt_ids = [uuid.UUID(value) for value in prompt_values]
+    except (ValueError, TypeError) as exc:
+        logger.error("Invalid prompt identifier: %s", exc)
+        return 5
+
+    request_text = getattr(args, "request", None)
+    request_file = getattr(args, "request_file", None)
+    if request_file is not None:
+        try:
+            request_text = Path(request_file).expanduser().read_text(encoding="utf-8")
+        except OSError as exc:
+            logger.error("Unable to read request file: %s", exc)
+            return 5
+    if not request_text or not request_text.strip():
+        logger.error("Benchmark input must be supplied via --request or --request-file.")
+        return 5
+
+    history_window = getattr(args, "history_window", None)
+    if history_window is not None and history_window <= 0:
+        history_window = None
+    trend_window = max(1, int(getattr(args, "trend_window", 5) or 5))
+    models = getattr(args, "models", None)
+
+    try:
+        report = manager.benchmark_prompts(
+            prompt_ids,
+            request_text,
+            models=models,
+            persist_history=getattr(args, "persist_history", False),
+            history_window_days=history_window,
+            trend_window=trend_window,
+        )
+    except PromptManagerError as exc:
+        logger.error("Benchmark failed: %s", exc)
+        return 5
+
+    if not report.runs:
+        logger.info("No benchmark runs were executed.")
+        return 0
+
+    print("\nBenchmark results\n-----------------")
+    for run in report.runs:
+        status = "ERROR" if run.error else "OK"
+        usage_parts = []
+        prompt_tokens = run.usage.get("prompt_tokens") if isinstance(run.usage, dict) else None
+        completion_tokens = run.usage.get("completion_tokens") if isinstance(run.usage, dict) else None
+        total_tokens = run.usage.get("total_tokens") if isinstance(run.usage, dict) else None
+        if prompt_tokens is not None:
+            usage_parts.append(f"prompt={prompt_tokens}")
+        if completion_tokens is not None:
+            usage_parts.append(f"completion={completion_tokens}")
+        if total_tokens is not None:
+            usage_parts.append(f"total={total_tokens}")
+        usage_text = f"tokens({', '.join(usage_parts)})" if usage_parts else "tokens(n/a)"
+
+        if run.error:
+            print(f"- {run.prompt_name} [{run.model}] -> {status}: {run.error}")
+        else:
+            duration_text = f"{run.duration_ms} ms" if run.duration_ms is not None else "n/a"
+            print(f"- {run.prompt_name} [{run.model}] -> {status}: {duration_text}, {usage_text}")
+            preview = run.response_preview.replace("\n", " ") if run.response_preview else ""
+            if preview:
+                if len(preview) > 120:
+                    preview = preview[:117].rstrip() + "..."
+                print(f"  preview: {preview}")
+        if run.history:
+            history = run.history
+            success_rate = f"{history.success_rate * 100:.1f}%" if history.success_rate else "0%"
+            avg_duration = f"{history.average_duration_ms:.0f} ms" if history.average_duration_ms else "n/a"
+            avg_rating = f"{history.average_rating:.1f}" if history.average_rating is not None else "n/a"
+            print(
+                "  history: runs=%s, success_rate=%s, avg_duration=%s, avg_rating=%s"
+                % (history.total_runs, success_rate, avg_duration, avg_rating)
+            )
+        if run.error is None and not run.response_preview:
+            print("  preview: (empty response)")
+
+    return 0
+
+
+def _run_refresh_scenarios(manager, args: argparse.Namespace, logger: logging.Logger) -> int:
+    try:
+        prompt_id = uuid.UUID(str(getattr(args, "prompt_id")))
+    except (ValueError, TypeError) as exc:
+        logger.error("Invalid prompt id: %s", exc)
+        return 5
+
+    max_scenarios = max(1, int(getattr(args, "max_scenarios", 3) or 3))
+    try:
+        prompt = manager.refresh_prompt_scenarios(prompt_id, max_scenarios=max_scenarios)
+    except PromptManagerError as exc:
+        logger.error("Failed to refresh scenarios: %s", exc)
+        return 5
+
+    print(f"Updated scenarios for {prompt.name}:")
+    if prompt.scenarios:
+        for scenario in prompt.scenarios:
+            print(f" - {scenario}")
+    else:
+        print(" - (none)")
     return 0
 
 
@@ -461,6 +572,69 @@ def parse_args() -> argparse.Namespace:
         help="Delete the current ChromaDB directory and regenerate embeddings for all prompts.",
     )
 
+    benchmark_parser = subparsers.add_parser(
+        "benchmark",
+        help="Run one or more prompts against configured models for side-by-side comparison.",
+    )
+    benchmark_parser.add_argument(
+        "--prompt",
+        dest="prompt_ids",
+        action="append",
+        required=True,
+        help="Prompt UUID to benchmark (repeat for multiple prompts).",
+    )
+    benchmark_parser.add_argument(
+        "--request",
+        type=str,
+        default=None,
+        help="Inline benchmark input text.",
+    )
+    benchmark_parser.add_argument(
+        "--request-file",
+        type=Path,
+        default=None,
+        help="Path to a file containing the benchmark input text.",
+    )
+    benchmark_parser.add_argument(
+        "--model",
+        dest="models",
+        action="append",
+        help="Model identifier to benchmark (repeatable). Defaults to configured fast/inference models.",
+    )
+    benchmark_parser.add_argument(
+        "--history-window",
+        type=int,
+        default=30,
+        help="Days of execution history to summarise (set to 0 for full history).",
+    )
+    benchmark_parser.add_argument(
+        "--trend-window",
+        type=int,
+        default=5,
+        help="Executions considered when computing rating trend (default: 5).",
+    )
+    benchmark_parser.add_argument(
+        "--persist-history",
+        action="store_true",
+        help="Persist benchmark runs to execution history for future analytics.",
+    )
+
+    refresh_scenarios_parser = subparsers.add_parser(
+        "refresh-scenarios",
+        help="Regenerate and persist usage scenarios for a prompt.",
+    )
+    refresh_scenarios_parser.add_argument(
+        "prompt_id",
+        type=str,
+        help="Prompt UUID to refresh.",
+    )
+    refresh_scenarios_parser.add_argument(
+        "--max-scenarios",
+        type=int,
+        default=3,
+        help="Number of scenarios to request from the generator (default: 3).",
+    )
+
     return parser.parse_args()
 
 
@@ -515,6 +689,20 @@ def main() -> int:
         if command == "reembed":
             try:
                 result = _run_reembed(manager, logger)
+            finally:
+                manager.close()
+            return result
+
+        if command == "benchmark":
+            try:
+                result = _run_benchmark(manager, args, logger)
+            finally:
+                manager.close()
+            return result
+
+        if command == "refresh-scenarios":
+            try:
+                result = _run_refresh_scenarios(manager, args, logger)
             finally:
                 manager.close()
             return result

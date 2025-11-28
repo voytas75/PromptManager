@@ -868,6 +868,50 @@ def test_generate_prompt_name_and_scenarios(
     assert manager._scenario_generator.calls[0][1] == 4
 
 
+def test_refresh_prompt_scenarios_updates_prompt(
+    prompt_manager: tuple[PromptManager, _DummyCollection, _DummyChromaClient, Path],
+) -> None:
+    manager, _, _, _ = prompt_manager
+
+    prompt = manager.create_prompt(_make_prompt("Scenario Refresh"))
+
+    class _ScenarioGenerator:
+        def generate(self, context: str, *, max_scenarios: int) -> List[str]:
+            return [f"Scenario {index}" for index in range(1, max_scenarios + 1)]
+
+    manager._scenario_generator = _ScenarioGenerator()
+
+    updated = manager.refresh_prompt_scenarios(prompt.id, max_scenarios=2)
+
+    assert updated.scenarios == ["Scenario 1", "Scenario 2"]
+    persisted = manager.get_prompt(prompt.id)
+    assert persisted.scenarios == ["Scenario 1", "Scenario 2"]
+
+
+def test_get_category_health_returns_counts_and_stats(
+    prompt_manager: tuple[PromptManager, _DummyCollection, _DummyChromaClient, Path],
+) -> None:
+    manager, _, _, _ = prompt_manager
+    prompt = _make_prompt("Health Prompt")
+    prompt.category = "Documentation"
+    prompt.category_slug = slugify_category(prompt.category)
+    stored = manager.create_prompt(prompt)
+
+    execution = PromptExecution(
+        id=uuid.uuid4(),
+        prompt_id=stored.id,
+        request_text="demo",
+        response_text="ok",
+    )
+    manager.repository.add_execution(execution)
+
+    health_entries = manager.get_category_health()
+    target = next((entry for entry in health_entries if entry.slug == prompt.category_slug), None)
+    assert target is not None
+    assert target.total_prompts >= 1
+    assert target.active_prompts >= 1
+
+
 def test_rebuild_embeddings_counts_success_and_failures(
     prompt_manager: tuple[PromptManager, _DummyCollection, _DummyChromaClient, Path],
 ) -> None:

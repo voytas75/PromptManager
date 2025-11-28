@@ -151,7 +151,10 @@ Every log entry also stores structured context metadata (prompt snapshot, execut
 | `python -m main catalog-export <path> [--format json|yaml]` | Export prompts; YAML requires PyYAML (already bundled). |
 | `python -m main suggest "search query"` | Run semantic retrieval and print top matches with intent metadata. |
 | `python -m main usage-report [--path <file>]` | Summarize anonymized GUI analytics (counts, intents, recommendations). |
+| `python -m main history-analytics [--window-days N --limit M --trend-window K]` | Display execution success rates, durations, and ratings for recent prompts. |
 | `python -m main reembed` | Rebuild the ChromaDB vector store after backend/model changes or corruption. |
+| `python -m main benchmark --prompt <uuid> [--model <id>] --request "…"` | Execute one or more prompts across configured LiteLLM models and compare duration/token usage alongside history stats. |
+| `python -m main refresh-scenarios <uuid> [--max-scenarios N]` | Regenerate and persist scenario lists for a prompt via LiteLLM or the heuristic fallback. |
 
 These commands share the same validation logic as the GUI; pass explicit paths as needed.
 
@@ -169,6 +172,7 @@ These commands share the same validation logic as the GUI; pass explicit paths a
 ## Maintenance, Telemetry & Analytics
 
 - **Maintenance dialog**: Provides buttons to clear SQLite prompts, wipe ChromaDB embeddings, or reset all application data (usage logs, cache) with confirmation prompts and logging.
+- **Category health panel**: Review per-category prompt counts, active prompt ratios, recent execution timestamps, and success rates directly inside the maintenance dialog; use the Refresh button after batch edits.
 - **Telemetry**: ChromaDB anonymized telemetry is disabled (`anonymized_telemetry=False`). Set `PROMPT_MANAGER_CHROMA_TELEMETRY=1` to opt in or adjust `core/prompt_manager.py` if you need different defaults.
 - **Usage analytics**: GUI intent workspace interactions are logged to `data/logs/intent_usage.jsonl` (timestamp, hashed query metadata, detected intents, top prompts). Disable via `gui.usage_logger.IntentUsageLogger` instantiation or by clearing the log path.
 

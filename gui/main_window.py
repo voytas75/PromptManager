@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.59 - 2025-11-28 - Add Refresh Scenarios action to prompt detail views and wire persistence to LiteLLM.
 Updates: v0.15.58 - 2025-11-28 - Show a busy indicator while running prompt searches.
 Updates: v0.15.57 - 2025-11-27 - Switch back to the Prompts tab after running templates and show a busy indicator while switching.
 Updates: v0.15.56 - 2025-11-27 - Add Template tab run shortcut and toast notifications for copy actions.
@@ -92,6 +93,7 @@ import uuid
 from collections import deque
 from dataclasses import dataclass
 from collections.abc import Mapping
+from functools import partial
 from datetime import datetime, timezone
 from enum import Enum
 from html import escape
@@ -172,6 +174,7 @@ from core import (
     PromptStorageError,
     PromptVersionError,
     RepositoryError,
+    ScenarioGenerationError,
     diff_prompt_catalog,
     export_prompt_catalog,
     import_prompt_catalog,
@@ -471,6 +474,7 @@ class PromptDetailWidget(QWidget):
     edit_requested = Signal()
     fork_requested = Signal()
     version_history_requested = Signal()
+    refresh_scenarios_requested = Signal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -609,6 +613,12 @@ class PromptDetailWidget(QWidget):
         self._version_history_button.clicked.connect(self.version_history_requested.emit)  # type: ignore[arg-type]
         actions_layout.addWidget(self._version_history_button)
 
+        self._refresh_scenarios_button = QPushButton("Refresh Scenarios", content)
+        self._refresh_scenarios_button.setObjectName("refreshScenariosButton")
+        self._refresh_scenarios_button.setEnabled(False)
+        self._refresh_scenarios_button.clicked.connect(self.refresh_scenarios_requested.emit)  # type: ignore[arg-type]
+        actions_layout.addWidget(self._refresh_scenarios_button)
+
         self._edit_button = QPushButton("Edit Prompt", content)
         self._edit_button.setObjectName("editPromptButton")
         self._edit_button.setEnabled(False)
@@ -693,6 +703,7 @@ class PromptDetailWidget(QWidget):
         self._delete_button.setEnabled(True)
         self._fork_button.setEnabled(True)
         self._version_history_button.setEnabled(True)
+        self._refresh_scenarios_button.setEnabled(True)
 
     def _format_context_preview(self, context: Optional[str]) -> str:
         """Return a truncated context preview for the prompt summary."""
@@ -703,6 +714,11 @@ class PromptDetailWidget(QWidget):
             return context
         truncated = context[: self._CONTEXT_PREVIEW_LIMIT].rstrip()
         return f"{truncated}…"
+
+    def current_prompt(self) -> Optional[Prompt]:
+        """Return the currently displayed prompt, if any."""
+
+        return self._current_prompt
 
     def _format_prompt_header(self, prompt: Prompt) -> str:
         """Return the combined prompt title/category/metadata header."""
@@ -824,6 +840,7 @@ class PromptDetailWidget(QWidget):
         self._delete_button.setEnabled(False)
         self._fork_button.setEnabled(False)
         self._version_history_button.setEnabled(False)
+        self._refresh_scenarios_button.setEnabled(False)
         self._lineage_label.clear()
         self._lineage_label.setVisible(False)
 
@@ -1003,6 +1020,9 @@ class MainWindow(QMainWindow):
         self._detail_widget.edit_requested.connect(self._on_edit_clicked)  # type: ignore[arg-type]
         self._detail_widget.version_history_requested.connect(self._open_version_history_dialog)  # type: ignore[arg-type]
         self._detail_widget.fork_requested.connect(self._on_fork_clicked)  # type: ignore[arg-type]
+        self._detail_widget.refresh_scenarios_requested.connect(  # type: ignore[arg-type]
+            partial(self._handle_refresh_scenarios_request, self._detail_widget)
+        )
         self._all_prompts: List[Prompt] = []
         self._current_prompts: List[Prompt] = []
         self._preserve_search_order: bool = False
@@ -1442,6 +1462,9 @@ class MainWindow(QMainWindow):
         self._template_detail_widget.edit_requested.connect(self._on_edit_clicked)  # type: ignore[arg-type]
         self._template_detail_widget.version_history_requested.connect(self._open_version_history_dialog)  # type: ignore[arg-type]
         self._template_detail_widget.fork_requested.connect(self._on_fork_clicked)  # type: ignore[arg-type]
+        self._template_detail_widget.refresh_scenarios_requested.connect(  # type: ignore[arg-type]
+            partial(self._handle_refresh_scenarios_request, self._template_detail_widget)
+        )
         preview_list_splitter.addWidget(self._template_detail_widget)
         preview_list_splitter.setStretchFactor(0, 1)
         preview_list_splitter.setStretchFactor(1, 2)
@@ -2029,6 +2052,20 @@ class MainWindow(QMainWindow):
         if any(prompt.id == prompt_id for prompt in sorted_prompts):
             self._select_prompt(prompt_id)
             self._detail_widget.display_prompt(updated_prompt)
+
+    def _handle_refresh_scenarios_request(self, detail_widget: PromptDetailWidget) -> None:
+        """Regenerate persisted scenarios for the currently displayed prompt."""
+
+        prompt = detail_widget.current_prompt()
+        if prompt is None:
+            return
+        try:
+            updated_prompt = self._manager.refresh_prompt_scenarios(prompt.id)
+        except (ScenarioGenerationError, PromptManagerError) as exc:
+            QMessageBox.warning(self, "Scenario refresh failed", str(exc))
+            return
+        self._refresh_prompt_after_rating(updated_prompt.id)
+        self._show_toast("Scenarios refreshed.")
 
     def _update_intent_hint(self, prompts: Sequence[Prompt]) -> None:
         """Update the hint label with detected intent context and matches."""

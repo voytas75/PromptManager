@@ -1,5 +1,6 @@
 """SQLite-backed repository for persistent prompt storage.
 
+Updates: v0.10.2 - 2025-11-28 - Add category prompt/execution aggregation helpers for maintenance workflows.
 Updates: v0.10.1 - 2025-11-27 - Add prompt part column to response styles for generalized prompt components.
 Updates: v0.10.0 - 2025-11-22 - Add prompt versioning and fork lineage persistence tables.
 Updates: v0.9.0 - 2025-12-08 - Remove task template persistence after feature retirement.
@@ -918,6 +919,99 @@ class PromptRepository:
         summary = _row_to_dict(summary_row)
         aggregates = [_row_to_dict(row) for row in prompt_rows]
         return summary, aggregates
+
+    def get_prompt_execution_statistics(
+        self,
+        prompt_id: uuid.UUID,
+        *,
+        since: Optional[datetime] = None,
+    ) -> Dict[str, Any]:
+        """Return aggregate execution metrics for a single prompt."""
+
+        filters = ["prompt_id = ?"]
+        params: List[Any] = [str(prompt_id)]
+        if since is not None:
+            filters.append("datetime(executed_at) >= ?")
+            params.append(since.isoformat())
+        where_clause = f" WHERE {' AND '.join(filters)}"
+
+        query = (
+            "SELECT "
+            "COUNT(*) AS total_runs, "
+            "SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) AS success_runs, "
+            "AVG(duration_ms) AS avg_duration_ms, "
+            "AVG(rating) AS avg_rating, "
+            "MAX(executed_at) AS last_executed_at, "
+            "MAX(p.name) AS prompt_name "
+            "FROM prompt_executions "
+            "LEFT JOIN prompts p ON p.id = prompt_executions.prompt_id"
+            f"{where_clause};"
+        )
+
+        def _row_to_dict(row: Optional[sqlite3.Row]) -> Dict[str, Any]:
+            if row is None:
+                return {}
+            return {key: row[key] for key in row.keys()}
+
+        try:
+            with _connect(self._db_path) as conn:
+                row = conn.execute(query, params).fetchone()
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to compute prompt execution statistics") from exc
+        return _row_to_dict(row)
+
+    def get_category_prompt_counts(self) -> Dict[str, Dict[str, Any]]:
+        """Return prompt totals per category (active/inactive)."""
+
+        query = (
+            "SELECT "
+            "category_slug AS slug, "
+            "COUNT(*) AS total_prompts, "
+            "SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) AS active_prompts "
+            "FROM prompts "
+            "GROUP BY category_slug;"
+        )
+        try:
+            with _connect(self._db_path) as conn:
+                rows = conn.execute(query).fetchall()
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to compute category prompt counts") from exc
+        counts: Dict[str, Dict[str, Any]] = {}
+        for row in rows:
+            slug = row["slug"] if row["slug"] is not None else ""
+            counts[str(slug)] = {
+                "total_prompts": int(row["total_prompts"] or 0),
+                "active_prompts": int(row["active_prompts"] or 0),
+            }
+        return counts
+
+    def get_category_execution_statistics(self) -> Dict[str, Dict[str, Any]]:
+        """Return execution aggregates grouped by prompt category."""
+
+        query = (
+            "SELECT "
+            "p.category_slug AS slug, "
+            "COUNT(*) AS total_runs, "
+            "SUM(CASE WHEN pe.status = 'success' THEN 1 ELSE 0 END) AS success_runs, "
+            "MAX(pe.executed_at) AS last_executed_at "
+            "FROM prompt_executions pe "
+            "JOIN prompts p ON p.id = pe.prompt_id "
+            "GROUP BY p.category_slug;"
+        )
+        try:
+            with _connect(self._db_path) as conn:
+                rows = conn.execute(query).fetchall()
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to compute category execution statistics") from exc
+        stats: Dict[str, Dict[str, Any]] = {}
+        for row in rows:
+            slug = row["slug"] if row["slug"] is not None else ""
+            stats[str(slug)] = {
+                "total_runs": int(row["total_runs"] or 0),
+                "success_runs": int(row["success_runs"] or 0),
+                "last_executed_at": row["last_executed_at"],
+            }
+        return stats
 
     def update_execution(self, execution: PromptExecution) -> PromptExecution:
         """Persist changes to an existing execution entry."""

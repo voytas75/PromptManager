@@ -1,5 +1,6 @@
 """Prompt execution history tracking utilities.
 
+Updates: v0.3.1 - 2025-11-28 - Add per-prompt analytics helper for benchmarks and maintenance surfaces.
 Updates: v0.3.0 - 2025-11-24 - Persist execution context metadata (response styles, runtime config).
 Updates: v0.2.0 - 2025-11-09 - Capture optional ratings alongside execution logs.
 Updates: v0.1.0 - 2025-11-08 - Introduce HistoryTracker for execution logs.
@@ -241,6 +242,50 @@ class HistoryTracker:
             average_rating=average_rating,
             prompt_breakdown=prompt_stats,
             window_start=since,
+        )
+
+    def summarize_prompt(
+        self,
+        prompt_id: uuid.UUID,
+        *,
+        window_days: Optional[int] = None,
+        trend_window: int = 5,
+    ) -> Optional[PromptExecutionAnalytics]:
+        """Return aggregate execution metrics for a specific prompt."""
+
+        since: Optional[datetime] = None
+        if window_days is not None:
+            since = datetime.now(timezone.utc) - timedelta(days=max(window_days, 0))
+        try:
+            stats = self.repository.get_prompt_execution_statistics(prompt_id, since=since)
+        except RepositoryError as exc:
+            raise HistoryTrackerError(
+                f"Unable to compute execution analytics for prompt {prompt_id}: {exc}"
+            ) from exc
+
+        total_runs = int(stats.get("total_runs", 0) or 0)
+        if total_runs == 0:
+            return None
+
+        success_runs = int(stats.get("success_runs", 0) or 0)
+        average_duration = _coerce_float(stats.get("avg_duration_ms"))
+        average_rating = _coerce_float(stats.get("avg_rating"))
+        last_executed = _parse_datetime(stats.get("last_executed_at"))
+        rating_trend = self._compute_rating_trend(
+            prompt_id,
+            average_rating,
+            trend_window,
+        )
+
+        return PromptExecutionAnalytics(
+            prompt_id=prompt_id,
+            name=str(stats.get("prompt_name") or ""),
+            total_runs=total_runs,
+            success_rate=success_runs / total_runs if total_runs else 0.0,
+            average_duration_ms=average_duration,
+            average_rating=average_rating,
+            rating_trend=rating_trend,
+            last_executed_at=last_executed,
         )
 
     def _build_execution(

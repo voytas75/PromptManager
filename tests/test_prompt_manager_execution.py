@@ -13,6 +13,7 @@ from core import (
     ExecutionError,
     HistoryTracker,
     PromptExecutionError,
+    PromptExecutionUnavailable,
     PromptManager,
     PromptRepository,
 )
@@ -68,6 +69,16 @@ class _StubExecutor:
         self.called_with: Optional[str] = None
         self.conversation_length: int = 0
         self.stream_flag: Optional[bool] = None
+        self.model = "gpt-fast"
+        self.api_key = "test"
+        self.api_base = None
+        self.api_version = None
+        self.timeout_seconds = 30.0
+        self.max_output_tokens = 256
+        self.temperature = 0.2
+        self.drop_params = None
+        self.reasoning_effort = None
+        self.stream = False
 
     def execute(  # type: ignore[override]
         self,
@@ -304,4 +315,42 @@ def test_history_methods_without_tracker(tmp_path: Path) -> None:
     assert tracker is None
     assert manager.list_recent_executions() == []
     assert manager.list_executions_for_prompt(prompt.id) == []
+    manager.close()
+
+
+def test_benchmark_prompts_returns_runs_with_history(tmp_path: Path) -> None:
+    executor = _StubExecutor()
+    manager, prompt, tracker = _manager_with_dependencies(tmp_path, executor)
+
+    manager.execute_prompt(prompt.id, "seed history")
+    report = manager.benchmark_prompts([prompt.id], "benchmark input")
+
+    assert report.runs
+    run = report.runs[0]
+    assert run.prompt_id == prompt.id
+    assert run.model == executor.model
+    assert run.error is None
+    assert run.history is not None
+    manager.close()
+
+
+def test_benchmark_prompts_persists_history_when_requested(tmp_path: Path) -> None:
+    executor = _StubExecutor()
+    manager, prompt, tracker = _manager_with_dependencies(tmp_path, executor)
+
+    assert tracker is not None
+    manager.benchmark_prompts([prompt.id], "benchmark input", persist_history=True)
+    entries = tracker.list_for_prompt(prompt.id)
+    assert entries
+    assert entries[0].metadata and entries[0].metadata.get("benchmark") is True
+    manager.close()
+
+
+def test_benchmark_prompts_rejects_unknown_models_for_stub_executor(tmp_path: Path) -> None:
+    executor = _StubExecutor()
+    manager, prompt, _ = _manager_with_dependencies(tmp_path, executor)
+
+    with pytest.raises(PromptExecutionUnavailable):
+        manager.benchmark_prompts([prompt.id], "demo", models=["gpt-inference"])
+
     manager.close()

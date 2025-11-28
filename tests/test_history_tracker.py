@@ -132,3 +132,35 @@ def test_history_tracker_summarize_handles_empty_history(tmp_path) -> None:
 
     assert analytics.total_runs == 0
     assert analytics.prompt_breakdown == []
+
+
+def test_history_tracker_summarize_prompt_returns_metrics(tmp_path) -> None:
+    repo = PromptRepository(str(tmp_path / "repo.db"))
+    prompt = _make_prompt()
+    repo.add(prompt)
+    tracker = HistoryTracker(repo)
+
+    tracker.record_success(
+        prompt_id=prompt.id,
+        request_text="demo",
+        response_text="ok",
+        duration_ms=80,
+        rating=4.5,
+    )
+    tracker.record_failure(
+        prompt_id=prompt.id,
+        request_text="demo",
+        error_message="boom",
+    )
+
+    stats = tracker.summarize_prompt(prompt.id, window_days=None, trend_window=2)
+    assert stats is not None
+    assert stats.prompt_id == prompt.id
+    assert stats.total_runs == 2
+    assert stats.success_rate == pytest.approx(0.5)
+    assert stats.average_duration_ms == pytest.approx(80.0)
+    assert stats.average_rating == pytest.approx(4.5)
+    assert stats.rating_trend is not None
+
+    missing = tracker.summarize_prompt(uuid.uuid4(), window_days=None)
+    assert missing is None

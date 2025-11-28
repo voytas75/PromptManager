@@ -1,5 +1,6 @@
 """Prompt Manager package façade and orchestration layer.
 
+Updates: v0.14.2 - 2025-11-28 - Add execution benchmarks, scenario refresh APIs, and category health analytics.
 Updates: v0.14.1 - 2025-11-24 - Add LiteLLM category suggestion workflow with classifier fallback.
 Updates: v0.14.0 - 2025-11-22 - Add category registry, CRUD APIs, and prompt slugging.
 Updates: v0.13.21 - 2025-11-23 - Support configurable system prompt templates across workflows.
@@ -135,6 +136,22 @@ def _coerce_int(value: Any) -> Optional[int]:
         return None
 
 
+def _parse_timestamp(value: Any) -> Optional[datetime]:
+    """Return a timezone-aware datetime when parsing succeeds."""
+
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    try:
+        parsed = datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
 try:
     from redis.exceptions import RedisError as _RedisErrorType
 except ImportError:  # pragma: no cover - redis optional during development
@@ -238,6 +255,7 @@ from ..history_tracker import (
     ExecutionAnalytics,
     HistoryTracker,
     HistoryTrackerError,
+    PromptExecutionAnalytics,
 )
 from ..intent_classifier import IntentClassifier, IntentLabel, IntentPrediction, rank_by_hints
 from ..name_generation import (
@@ -636,6 +654,36 @@ class PromptManager:
         result: CodexExecutionResult
         history_entry: Optional[PromptExecution]
         conversation: List[Dict[str, str]]
+
+    @dataclass(slots=True)
+    class BenchmarkRun:
+        """Single benchmark result for a prompt/model pair."""
+
+        prompt_id: uuid.UUID
+        prompt_name: str
+        model: str
+        duration_ms: Optional[int]
+        usage: Mapping[str, Any]
+        response_preview: str
+        error: Optional[str]
+        history: Optional[PromptExecutionAnalytics]
+
+    @dataclass(slots=True)
+    class BenchmarkReport:
+        """Structured response returned by benchmark_prompts."""
+
+        runs: List["PromptManager.BenchmarkRun"]
+
+    @dataclass(slots=True)
+    class CategoryHealth:
+        """Aggregated prompt and execution metrics for a category."""
+
+        slug: str
+        label: str
+        total_prompts: int
+        active_prompts: int
+        success_rate: Optional[float]
+        last_executed_at: Optional[datetime]
 
     @dataclass(slots=True)
     class PromptVersionDiff:
@@ -1114,6 +1162,48 @@ class PromptManager:
         except RepositoryError as exc:
             raise PromptStorageError("Unable to compute prompt catalogue statistics") from exc
 
+    def get_category_health(self) -> List["PromptManager.CategoryHealth"]:
+        """Return prompt and execution health metrics for each category."""
+
+        try:
+            prompt_counts = self._repository.get_category_prompt_counts()
+            execution_stats = self._repository.get_category_execution_statistics()
+        except RepositoryError as exc:
+            raise PromptStorageError("Unable to compute category health metrics") from exc
+
+        categories = {
+            category.slug: category for category in self._category_registry.all(include_archived=True)
+        }
+        slug_keys = set(prompt_counts.keys()) | set(execution_stats.keys()) | set(categories.keys())
+        if not slug_keys:
+            slug_keys.add("")
+
+        results: List[PromptManager.CategoryHealth] = []
+        for slug in sorted(slug_keys or {""}):
+            category = categories.get(slug)
+            label = category.label if category else ((slug.replace("-", " ").title()) if slug else "Uncategorised")
+            counts = prompt_counts.get(slug, {"total_prompts": 0, "active_prompts": 0})
+            stats = execution_stats.get(slug)
+            success_rate: Optional[float] = None
+            last_executed_at: Optional[datetime] = None
+            if stats:
+                total_runs = int(stats.get("total_runs", 0) or 0)
+                success_runs = int(stats.get("success_runs", 0) or 0)
+                success_rate = success_runs / total_runs if total_runs else None
+                last_executed_at = _parse_timestamp(stats.get("last_executed_at"))
+            results.append(
+                PromptManager.CategoryHealth(
+                    slug=slug or "",
+                    label=label,
+                    total_prompts=int(counts.get("total_prompts", 0) or 0),
+                    active_prompts=int(counts.get("active_prompts", 0) or 0),
+                    success_rate=success_rate,
+                    last_executed_at=last_executed_at,
+                )
+            )
+
+        return results
+
     def refresh_user_profile(self) -> Optional[UserProfile]:
         """Reload the persisted profile from the repository."""
 
@@ -1219,6 +1309,28 @@ class PromptManager:
             except Exception as exc:
                 raise ScenarioGenerationError(str(exc)) from exc
         return scenarios
+
+    def refresh_prompt_scenarios(
+        self,
+        prompt_id: uuid.UUID,
+        *,
+        max_scenarios: int = 3,
+    ) -> Prompt:
+        """Regenerate and persist scenarios for the specified prompt."""
+
+        prompt = self.get_prompt(prompt_id)
+        context_source = prompt.context or prompt.description
+        if not context_source:
+            raise ScenarioGenerationError(
+                "Prompt is missing context or description; unable to generate scenarios."
+            )
+        scenarios = self.generate_prompt_scenarios(context_source, max_scenarios=max_scenarios)
+        prompt.scenarios = list(scenarios)
+        prompt.last_modified = datetime.now(timezone.utc)
+        try:
+            return self.update_prompt(prompt)
+        except PromptManagerError as exc:
+            raise PromptStorageError("Failed to persist refreshed scenarios") from exc
 
     def generate_prompt_category(self, context: str) -> str:
         """Suggest a prompt category using LiteLLM with classifier-based fallback."""
@@ -1717,6 +1829,179 @@ class PromptManager:
             conversation=augmented_conversation,
         )
 
+    def benchmark_prompts(
+        self,
+        prompt_ids: Sequence[uuid.UUID],
+        request_text: str,
+        *,
+        models: Optional[Sequence[str]] = None,
+        persist_history: bool = False,
+        history_window_days: Optional[int] = 30,
+        trend_window: int = 5,
+    ) -> "PromptManager.BenchmarkReport":
+        """Execute prompts across one or more models and return benchmark data."""
+
+        if not prompt_ids:
+            raise PromptExecutionError("At least one prompt must be provided for benchmarking.")
+        text = (request_text or "").strip()
+        if not text:
+            raise PromptExecutionError("Benchmark execution requires non-empty input text.")
+        if self._executor is None:
+            raise PromptExecutionUnavailable(
+                "Prompt execution is not configured. Provide LiteLLM credentials and model."
+            )
+
+        unique_prompt_ids: list[uuid.UUID] = []
+        seen_prompts: set[uuid.UUID] = set()
+        for prompt_id in prompt_ids:
+            if prompt_id in seen_prompts:
+                continue
+            seen_prompts.add(prompt_id)
+            unique_prompt_ids.append(prompt_id)
+
+        prompts: list[Prompt] = [self.get_prompt(prompt_id) for prompt_id in unique_prompt_ids]
+
+        model_candidates: list[str] = []
+        if models:
+            for candidate in models:
+                value = str(candidate or "").strip()
+                if value and value not in model_candidates:
+                    model_candidates.append(value)
+        if not model_candidates:
+            for candidate in (
+                getattr(self._executor, "model", None),
+                self._litellm_fast_model,
+                self._litellm_inference_model,
+            ):
+                if candidate and candidate not in model_candidates:
+                    model_candidates.append(str(candidate))
+        if not model_candidates:
+            raise PromptExecutionUnavailable("No LiteLLM models are configured for benchmarking.")
+
+        base_executor = self._executor
+
+        def _executor_for_model(model_name: str) -> CodexExecutor:
+            if isinstance(base_executor, CodexExecutor):
+                if base_executor.model == model_name:
+                    return base_executor
+                drop_params = list(base_executor.drop_params) if base_executor.drop_params else None
+                return CodexExecutor(
+                    model=model_name,
+                    api_key=base_executor.api_key,
+                    api_base=base_executor.api_base,
+                    api_version=base_executor.api_version,
+                    timeout_seconds=base_executor.timeout_seconds,
+                    max_output_tokens=base_executor.max_output_tokens,
+                    temperature=base_executor.temperature,
+                    drop_params=drop_params,
+                    reasoning_effort=base_executor.reasoning_effort,
+                    stream=base_executor.stream,
+                )
+            base_model = getattr(base_executor, "model", None)
+            if base_model and base_model == model_name:
+                return cast("CodexExecutor", base_executor)
+            raise PromptExecutionUnavailable(
+                "Configured executor does not support switching models; specify the configured model only."
+            )
+
+        tracker = self._history_tracker
+        prompt_analytics: Dict[uuid.UUID, Optional[PromptExecutionAnalytics]] = {}
+        if tracker is not None:
+            for prompt in prompts:
+                try:
+                    prompt_analytics[prompt.id] = tracker.summarize_prompt(
+                        prompt.id,
+                        window_days=history_window_days,
+                        trend_window=trend_window,
+                    )
+                except HistoryTrackerError:
+                    prompt_analytics[prompt.id] = None
+        else:
+            prompt_analytics = {prompt.id: None for prompt in prompts}
+
+        runs: list[PromptManager.BenchmarkRun] = []
+        for prompt in prompts:
+            history = prompt_analytics.get(prompt.id)
+            for model_name in model_candidates:
+                executor_for_model = _executor_for_model(model_name)
+                try:
+                    result = executor_for_model.execute(
+                        prompt,
+                        text,
+                        conversation=None,
+                        stream=False,
+                        on_stream=None,
+                    )
+                except ExecutionError as exc:
+                    runs.append(
+                        PromptManager.BenchmarkRun(
+                            prompt_id=prompt.id,
+                            prompt_name=prompt.name,
+                            model=model_name,
+                            duration_ms=None,
+                            usage={},
+                            response_preview="",
+                            error=str(exc),
+                            history=history,
+                        )
+                    )
+                    if persist_history:
+                        self._log_execution_failure(
+                            prompt.id,
+                            text,
+                            str(exc),
+                            conversation=[{"role": "user", "content": text}],
+                            context_metadata=None,
+                            extra_metadata={"benchmark": True, "model": model_name},
+                        )
+                    continue
+
+                try:
+                    usage_data = dict(result.usage)
+                except Exception:  # pragma: no cover - defensive
+                    usage_data = {}
+
+                preview = (result.response_text or "").strip()
+                if len(preview) > 400:
+                    preview = preview[:397].rstrip() + "…"
+
+                runs.append(
+                    PromptManager.BenchmarkRun(
+                        prompt_id=prompt.id,
+                        prompt_name=prompt.name,
+                        model=model_name,
+                        duration_ms=result.duration_ms,
+                        usage=usage_data,
+                        response_preview=preview,
+                        error=None,
+                        history=history,
+                    )
+                )
+
+                if persist_history:
+                    conversation = [
+                        {"role": "user", "content": text},
+                        {"role": "assistant", "content": result.response_text},
+                    ]
+                    context_metadata = self._build_execution_context_metadata(
+                        prompt,
+                        stream_enabled=bool(getattr(executor_for_model, "stream", False)),
+                        executor_model=model_name,
+                        conversation_length=len(conversation),
+                        request_text=text,
+                        response_text=result.response_text,
+                    )
+                    self._log_execution_success(
+                        prompt.id,
+                        text,
+                        result,
+                        conversation=conversation,
+                        context_metadata=context_metadata,
+                        extra_metadata={"benchmark": True, "model": model_name},
+                    )
+
+        return PromptManager.BenchmarkReport(runs=runs)
+
     def save_execution_result(
         self,
         prompt_id: uuid.UUID,
@@ -2019,6 +2304,7 @@ class PromptManager:
         *,
         conversation: Optional[Sequence[Mapping[str, str]]] = None,
         context_metadata: Optional[Mapping[str, Any]] = None,
+        extra_metadata: Optional[Mapping[str, Any]] = None,
     ) -> Optional[PromptExecution]:
         """Persist a successful execution outcome when the tracker is available."""
 
@@ -2033,6 +2319,9 @@ class PromptManager:
         metadata: Dict[str, Any] = {"usage": usage_metadata}
         if conversation:
             metadata["conversation"] = list(conversation)
+        if extra_metadata:
+            for key, value in extra_metadata.items():
+                metadata[key] = value
         try:
             return tracker.record_success(
                 prompt_id=prompt_id,
@@ -2058,6 +2347,7 @@ class PromptManager:
         *,
         conversation: Optional[Sequence[Mapping[str, str]]] = None,
         context_metadata: Optional[Mapping[str, Any]] = None,
+        extra_metadata: Optional[Mapping[str, Any]] = None,
     ) -> Optional[PromptExecution]:
         """Persist a failed execution attempt when history tracking is enabled."""
 
@@ -2067,6 +2357,9 @@ class PromptManager:
         metadata_payload: Dict[str, Any] = {}
         if conversation:
             metadata_payload["conversation"] = list(conversation)
+        if extra_metadata:
+            for key, value in extra_metadata.items():
+                metadata_payload[key] = value
         try:
             return tracker.record_failure(
                 prompt_id=prompt_id,

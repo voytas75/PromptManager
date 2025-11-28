@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.11.9 - 2025-11-28 - Add category health analytics table to the maintenance dialog.
 Updates: v0.11.8 - 2025-11-27 - Show toast confirmations for dialog copy actions.
 Updates: v0.11.7 - 2025-11-27 - Add copy prompt body control to the version history dialog.
 Updates: v0.11.6 - 2025-11-27 - Add prompt part selector to response style dialog and rename copy to prompt parts.
@@ -1359,11 +1360,14 @@ class PromptMaintenanceDialog(QDialog):
         self._sqlite_optimize_button: QPushButton
         self._sqlite_verify_button: QPushButton
         self._stats_refresh_button: QPushButton
+        self._category_table: QTableWidget
+        self._category_refresh_button: QPushButton
         self._reset_log_view: QPlainTextEdit
         self.setWindowTitle("Prompt Maintenance")
         self.resize(640, 420)
         self._build_ui()
         self._refresh_catalogue_stats()
+        self._refresh_category_health()
         self._refresh_redis_info()
         self._refresh_chroma_info()
         self._refresh_storage_info()
@@ -1426,6 +1430,33 @@ class PromptMaintenanceDialog(QDialog):
         stats_layout.addWidget(helper_label, len(stat_rows) + 1, 0, 1, 2)
 
         metadata_layout.addWidget(stats_group)
+
+        health_group = QGroupBox("Category Health", metadata_tab)
+        health_layout = QVBoxLayout(health_group)
+        health_layout.setContentsMargins(12, 12, 12, 12)
+        health_layout.setSpacing(8)
+
+        self._category_table = QTableWidget(0, 5, health_group)
+        self._category_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self._category_table.setSelectionMode(QTableWidget.NoSelection)
+        self._category_table.setHorizontalHeaderLabels(
+            [
+                "Category",
+                "Prompts",
+                "Active",
+                "Success rate",
+                "Last executed",
+            ]
+        )
+        self._category_table.horizontalHeader().setStretchLastSection(True)
+        self._category_table.verticalHeader().setVisible(False)
+        health_layout.addWidget(self._category_table)
+
+        self._category_refresh_button = QPushButton("Refresh Category Health", health_group)
+        self._category_refresh_button.clicked.connect(self._refresh_category_health)  # type: ignore[arg-type]
+        health_layout.addWidget(self._category_refresh_button, alignment=Qt.AlignRight)
+
+        metadata_layout.addWidget(health_group)
 
         description = QLabel(
             "Run maintenance tasks to enrich prompt metadata. Only prompts missing the "
@@ -1698,6 +1729,26 @@ class PromptMaintenanceDialog(QDialog):
             "last_modified_at",
             self._format_timestamp(stats.last_modified_at),
         )
+
+    def _refresh_category_health(self) -> None:
+        try:
+            health_entries = self._manager.get_category_health()
+        except PromptManagerError as exc:
+            QMessageBox.warning(self, "Category health", str(exc))
+            self._category_table.setRowCount(0)
+            return
+
+        self._category_table.setRowCount(len(health_entries))
+        for row, entry in enumerate(health_entries):
+            success_text = "—"
+            if entry.success_rate is not None:
+                success_text = f"{entry.success_rate * 100:.1f}%"
+            executed_text = self._format_timestamp(entry.last_executed_at)
+            self._category_table.setItem(row, 0, QTableWidgetItem(entry.label))
+            self._category_table.setItem(row, 1, QTableWidgetItem(str(entry.total_prompts)))
+            self._category_table.setItem(row, 2, QTableWidgetItem(str(entry.active_prompts)))
+            self._category_table.setItem(row, 3, QTableWidgetItem(success_text))
+            self._category_table.setItem(row, 4, QTableWidgetItem(executed_text or "—"))
 
     def _append_log(self, message: str) -> None:
         timestamp = datetime.now(timezone.utc).strftime("%H:%M:%S")
