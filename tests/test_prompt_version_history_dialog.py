@@ -38,8 +38,11 @@ def test_version_history_dialog_defaults_to_body_tab(qt_app: QApplication) -> No
     try:
         tab_titles = [dialog._tab_widget.tabText(index) for index in range(dialog._tab_widget.count())]
         assert tab_titles[0] == "Prompt body"
+        assert tab_titles[1] == "Diff vs previous"
+        assert tab_titles[2] == "Diff vs current"
         assert dialog._tab_widget.currentIndex() == 0
         assert dialog._body_view.toPlainText() == PromptVersionHistoryDialog._BODY_PLACEHOLDER
+        assert "No versions" in dialog._current_diff_view.toPlainText()
     finally:
         dialog.close()
         dialog.deleteLater()

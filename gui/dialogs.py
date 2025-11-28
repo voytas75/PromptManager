@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.11.10 - 2025-11-28 - Add prompt body diff tab comparing selected versions to the current prompt.
 Updates: v0.11.9 - 2025-11-28 - Add category health analytics table to the maintenance dialog.
 Updates: v0.11.8 - 2025-11-27 - Show toast confirmations for dialog copy actions.
 Updates: v0.11.7 - 2025-11-27 - Add copy prompt body control to the version history dialog.
@@ -51,6 +52,7 @@ Updates: v0.1.0 - 2025-11-04 - Implement create/edit prompt dialog backed by Pro
 
 from __future__ import annotations
 
+import difflib
 import json
 import logging
 import os
@@ -3076,6 +3078,9 @@ class PromptVersionHistoryDialog(QDialog):
         self._diff_view = QPlainTextEdit(self)
         self._diff_view.setReadOnly(True)
         self._tab_widget.addTab(self._diff_view, "Diff vs previous")
+        self._current_diff_view = QPlainTextEdit(self)
+        self._current_diff_view.setReadOnly(True)
+        self._tab_widget.addTab(self._current_diff_view, "Diff vs current")
         self._snapshot_view = QPlainTextEdit(self)
         self._snapshot_view.setReadOnly(True)
         self._tab_widget.addTab(self._snapshot_view, "Snapshot JSON")
@@ -3123,6 +3128,7 @@ class PromptVersionHistoryDialog(QDialog):
         else:
             self._body_view.setPlainText(self._BODY_PLACEHOLDER)
             self._diff_view.setPlainText("No versions have been recorded for this prompt yet.")
+            self._current_diff_view.setPlainText("No versions have been recorded for this prompt yet.")
             self._snapshot_view.clear()
 
     def _on_selection_changed(self) -> None:
@@ -3130,6 +3136,7 @@ class PromptVersionHistoryDialog(QDialog):
         if version is None:
             self._body_view.setPlainText(self._BODY_PLACEHOLDER)
             self._diff_view.clear()
+            self._current_diff_view.clear()
             self._snapshot_view.clear()
             return
         snapshot_text = json.dumps(version.snapshot, ensure_ascii=False, indent=2)
@@ -3137,6 +3144,7 @@ class PromptVersionHistoryDialog(QDialog):
 
         body_text = self._body_text_for_version(version)
         self._body_view.setPlainText(body_text)
+        self._current_diff_view.setPlainText(self._format_diff_against_current(version, body_text))
 
         previous_version = self._previous_version(version)
         if previous_version is None:
@@ -3183,6 +3191,36 @@ class PromptVersionHistoryDialog(QDialog):
         if raw_body:
             return str(raw_body)
         return self._EMPTY_BODY_TEXT
+
+    def _current_prompt_body(self) -> str:
+        raw_body = getattr(self._prompt, "context", None)
+        if isinstance(raw_body, str):
+            return raw_body
+        if raw_body:
+            return str(raw_body)
+        return ""
+
+    def _format_diff_against_current(self, version: PromptVersion, version_body: str) -> str:
+        current_body = self._current_prompt_body()
+        current_text = current_body.strip()
+        version_text = version_body.strip()
+        if not current_text and not version_text:
+            return "Current prompt and selected version bodies are empty."
+        if current_body == version_body:
+            return "Version body matches the current prompt."
+        current_lines = current_body.splitlines()
+        version_lines = version_body.splitlines()
+        diff = difflib.unified_diff(
+            current_lines,
+            version_lines,
+            fromfile="Current prompt",
+            tofile=f"Version v{version.version_number}",
+            lineterm="",
+        )
+        diff_text = "\n".join(diff)
+        if not diff_text.strip():
+            return "Version body matches the current prompt."
+        return diff_text
 
     def _copy_snapshot_to_clipboard(self) -> None:
         version = self._selected_version()
