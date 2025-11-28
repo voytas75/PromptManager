@@ -128,6 +128,7 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QAbstractSpinBox,
+    QCheckBox,
     QComboBox,
     QDialog,
     QDoubleSpinBox,
@@ -621,6 +622,10 @@ class PromptDetailWidget(QWidget):
         )
         self._share_payload_combo.setEnabled(False)
         share_payload_layout.addWidget(self._share_payload_combo)
+        self._share_metadata_checkbox = QCheckBox("Add metadata", content)
+        self._share_metadata_checkbox.setChecked(False)
+        self._share_metadata_checkbox.setEnabled(False)
+        share_payload_layout.addWidget(self._share_metadata_checkbox)
         share_payload_layout.addStretch(1)
         content_layout.addLayout(share_payload_layout)
 
@@ -739,6 +744,7 @@ class PromptDetailWidget(QWidget):
         self._refresh_scenarios_button.setEnabled(True)
         self._share_button.setEnabled(True)
         self._share_payload_combo.setEnabled(True)
+        self._share_metadata_checkbox.setEnabled(True)
 
     def _format_context_preview(self, context: Optional[str]) -> str:
         """Return a truncated, single-line context preview for the prompt summary."""
@@ -882,6 +888,8 @@ class PromptDetailWidget(QWidget):
         self._refresh_scenarios_button.setEnabled(False)
         self._share_button.setEnabled(False)
         self._share_payload_combo.setEnabled(False)
+        self._share_metadata_checkbox.setChecked(False)
+        self._share_metadata_checkbox.setEnabled(False)
         self._lineage_label.clear()
         self._lineage_label.setVisible(False)
 
@@ -897,6 +905,11 @@ class PromptDetailWidget(QWidget):
         if data is None:
             return "body_description_scenarios"
         return str(data)
+
+    def share_include_metadata(self) -> bool:
+        """Return True when metadata should be appended to the shared payload."""
+
+        return self._share_metadata_checkbox.isChecked()
 
     def _ensure_metadata_visible(self, title: str, payload: str) -> None:
         """Reveal the metadata widget with the provided payload."""
@@ -3210,6 +3223,7 @@ class MainWindow(QMainWindow):
             prompt,
             include_description=include_description,
             include_scenarios=include_scenarios,
+            include_metadata=self._detail_widget.share_include_metadata(),
         )
         if not payload.strip():
             self._show_error("Unable to share prompt", "Share payload is empty.")
