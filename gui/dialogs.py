@@ -1378,6 +1378,21 @@ class PromptMaintenanceDialog(QDialog):
         self._refresh_chroma_info()
         self._refresh_storage_info()
 
+    def _restore_window_size(self) -> None:
+        """Resize the dialog using the last persisted geometry if available."""
+
+        width = self._settings.value("width", type=int)
+        height = self._settings.value("height", type=int)
+        if isinstance(width, int) and isinstance(height, int) and width > 0 and height > 0:
+            self.resize(width, height)
+
+    def closeEvent(self, event: QEvent) -> None:  # type: ignore[override]
+        """Persist the current window size before closing."""
+
+        self._settings.setValue("width", self.width())
+        self._settings.setValue("height", self.height())
+        super().closeEvent(event)
+
     def _build_ui(self) -> None:
         outer_layout = QVBoxLayout(self)
 
