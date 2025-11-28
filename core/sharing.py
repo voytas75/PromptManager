@@ -39,11 +39,18 @@ class ShareProvider(Protocol):
 
     info: ShareProviderInfo
 
-    def share(self, prompt: Prompt) -> ShareResult:  # pragma: no cover - Protocol
-        """Share *prompt* and return a :class:`ShareResult`."""
+    def share(self, payload: str, prompt: Prompt | None = None) -> ShareResult:  # pragma: no cover - Protocol
+        """Share *payload* (optionally describing *prompt*) and return a :class:`ShareResult`."""
 
 
-def format_prompt_for_share(prompt: Prompt) -> str:
+def format_prompt_for_share(
+    prompt: Prompt,
+    *,
+    include_description: bool = True,
+    include_scenarios: bool = True,
+    include_examples: bool = True,
+    include_metadata: bool = True,
+) -> str:
     """Return a readable text payload for uploading to sharing services."""
 
     lines: list[str] = []
@@ -60,31 +67,35 @@ def format_prompt_for_share(prompt: Prompt) -> str:
     if prompt.quality_score is not None and prompt.rating_count > 0:
         lines.append(f"Quality score: {prompt.quality_score:.1f}/10 ({prompt.rating_count} ratings)")
     lines.append("")
-    lines.append("## Description")
-    lines.append(prompt.description or "No description provided.")
-    lines.append("")
+    if include_description:
+        lines.append("## Description")
+        description_text = prompt.description or "No description provided."
+        lines.append(description_text)
+        lines.append("")
     lines.append("## Prompt Body")
     lines.append(prompt.context or "No prompt text provided.")
     lines.append("")
-    if prompt.scenarios:
+    if include_scenarios and prompt.scenarios:
         lines.append("## Scenarios")
         for scenario in prompt.scenarios:
             scenario_text = str(scenario).strip()
             if scenario_text:
                 lines.append(f"- {scenario_text}")
         lines.append("")
-    example_sections: list[str] = []
-    if prompt.example_input:
-        example_sections.append(f"Example input:\n{prompt.example_input}")
-    if prompt.example_output:
-        example_sections.append(f"Example output:\n{prompt.example_output}")
-    if example_sections:
-        lines.append("## Examples")
-        lines.append("\n\n".join(example_sections))
-        lines.append("")
-    metadata = prompt.to_metadata()
-    metadata_lines = ["## Metadata", json.dumps(metadata, ensure_ascii=False, indent=2)]
-    lines.extend(metadata_lines)
+    if include_examples:
+        example_sections: list[str] = []
+        if prompt.example_input:
+            example_sections.append(f"Example input:\n{prompt.example_input}")
+        if prompt.example_output:
+            example_sections.append(f"Example output:\n{prompt.example_output}")
+        if example_sections:
+            lines.append("## Examples")
+            lines.append("\n\n".join(example_sections))
+            lines.append("")
+    if include_metadata:
+        metadata = prompt.to_metadata()
+        lines.append("## Metadata")
+        lines.append(json.dumps(metadata, ensure_ascii=False, indent=2))
     payload = "\n".join(lines).strip()
     return payload or "Prompt content unavailable."
 
@@ -105,8 +116,7 @@ class ShareTextProvider:
             description="Publish prompts via sharetext.io and copy the link to the clipboard.",
         )
 
-    def share(self, prompt: Prompt) -> ShareResult:
-        payload = format_prompt_for_share(prompt)
+    def share(self, payload: str, prompt: Prompt | None = None) -> ShareResult:
         body = json.dumps({"text": payload, "expiry": self._expiry}, ensure_ascii=False).encode("utf-8")
         request = urllib.request.Request(
             self._API_URL,

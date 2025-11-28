@@ -186,7 +186,7 @@ from core import (
 )
 from core.notifications import Notification, NotificationStatus
 from core.prompt_engineering import PromptRefinement
-from core.sharing import ShareProvider, ShareTextProvider
+from core.sharing import ShareProvider, ShareTextProvider, format_prompt_for_share
 from models.category_model import PromptCategory, slugify_category
 from models.prompt_model import Prompt
 
@@ -604,6 +604,26 @@ class PromptDetailWidget(QWidget):
         self._basic_metadata_text = ""
         self._current_prompt: Optional[Prompt] = None
 
+        share_payload_layout = QHBoxLayout()
+        share_payload_layout.setContentsMargins(0, 0, 0, 0)
+        share_payload_layout.setSpacing(6)
+
+        share_payload_label = QLabel("Share data:", content)
+        share_payload_label.setObjectName("sharePayloadLabel")
+        share_payload_layout.addWidget(share_payload_label)
+
+        self._share_payload_combo = QComboBox(content)
+        self._share_payload_combo.addItem("Prompt body only", "body")
+        self._share_payload_combo.addItem("Body + description", "body_description")
+        self._share_payload_combo.addItem(
+            "Body + description + scenarios",
+            "body_description_scenarios",
+        )
+        self._share_payload_combo.setEnabled(False)
+        share_payload_layout.addWidget(self._share_payload_combo)
+        share_payload_layout.addStretch(1)
+        content_layout.addLayout(share_payload_layout)
+
         actions_layout = QHBoxLayout()
         actions_layout.setContentsMargins(0, 0, 0, 0)
         actions_layout.addStretch(1)
@@ -718,6 +738,7 @@ class PromptDetailWidget(QWidget):
         self._version_history_button.setEnabled(True)
         self._refresh_scenarios_button.setEnabled(True)
         self._share_button.setEnabled(True)
+        self._share_payload_combo.setEnabled(True)
 
     def _format_context_preview(self, context: Optional[str]) -> str:
         """Return a truncated, single-line context preview for the prompt summary."""
@@ -860,6 +881,7 @@ class PromptDetailWidget(QWidget):
         self._version_history_button.setEnabled(False)
         self._refresh_scenarios_button.setEnabled(False)
         self._share_button.setEnabled(False)
+        self._share_payload_combo.setEnabled(False)
         self._lineage_label.clear()
         self._lineage_label.setVisible(False)
 
@@ -867,6 +889,14 @@ class PromptDetailWidget(QWidget):
         """Return the share button so callers can anchor menus."""
 
         return self._share_button
+
+    def share_payload_mode(self) -> str:
+        """Return the selected share payload mode."""
+
+        data = self._share_payload_combo.currentData()
+        if data is None:
+            return "body_description_scenarios"
+        return str(data)
 
     def _ensure_metadata_visible(self, title: str, payload: str) -> None:
         """Reveal the metadata widget with the provided payload."""
@@ -3138,13 +3168,16 @@ class MainWindow(QMainWindow):
         if provider is None:
             self._show_error("Sharing unavailable", "Selected share provider is not registered.")
             return
+        payload = self._build_share_payload(prompt)
+        if payload is None:
+            return
         indicator = ProcessingIndicator(
             self,
             f"Sharing via {provider.info.label}…",
             title="Sharing Prompt",
         )
         try:
-            result = indicator.run(provider.share, prompt)
+            result = indicator.run(provider.share, payload, prompt)
         except ShareProviderError as exc:
             self._show_error("Unable to share prompt", str(exc))
             return
@@ -3163,6 +3196,25 @@ class MainWindow(QMainWindow):
                 f"Delete this share later via: {result.delete_url}",
                 10000,
             )
+
+    def _build_share_payload(self, prompt: Prompt) -> Optional[str]:
+        """Return the formatted share payload for the selected mode."""
+
+        mode = self._detail_widget.share_payload_mode()
+        include_description = mode in {"body_description", "body_description_scenarios"}
+        include_scenarios = mode == "body_description_scenarios"
+        if not (prompt.context or "").strip():
+            self._show_error("Unable to share prompt", "Prompt body is empty.")
+            return None
+        payload = format_prompt_for_share(
+            prompt,
+            include_description=include_description,
+            include_scenarios=include_scenarios,
+        )
+        if not payload.strip():
+            self._show_error("Unable to share prompt", "Share payload is empty.")
+            return None
+        return payload
 
     def _show_prompt_description(self, prompt: Prompt) -> None:
         """Display the prompt description in a dialog for quick reference."""
