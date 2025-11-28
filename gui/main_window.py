@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.62 - 2025-11-28 - Share prompts via ShareText and copy the share link to the clipboard.
 Updates: v0.15.61 - 2025-11-28 - Refresh prompt list and re-enable sorting when the search query is cleared via the inline icon.
 Updates: v0.15.60 - 2025-11-28 - Add background task center with progress bars and completion toasts.
 Updates: v0.15.59 - 2025-11-28 - Add Refresh Scenarios action to prompt detail views and wire persistence to LiteLLM.
@@ -115,6 +116,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import (
     QColor,
+    QCursor,
     QGuiApplication,
     QKeySequence,
     QPalette,
@@ -175,6 +177,7 @@ from core import (
     PromptNotFoundError,
     PromptStorageError,
     PromptVersionError,
+    ShareProviderError,
     RepositoryError,
     ScenarioGenerationError,
     diff_prompt_catalog,
@@ -183,6 +186,7 @@ from core import (
 )
 from core.notifications import Notification, NotificationStatus
 from core.prompt_engineering import PromptRefinement
+from core.sharing import ShareProvider, ShareTextProvider
 from models.category_model import PromptCategory, slugify_category
 from models.prompt_model import Prompt
 
@@ -477,6 +481,7 @@ class PromptDetailWidget(QWidget):
     fork_requested = Signal()
     version_history_requested = Signal()
     refresh_scenarios_requested = Signal()
+    share_requested = Signal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -621,6 +626,12 @@ class PromptDetailWidget(QWidget):
         self._refresh_scenarios_button.clicked.connect(self.refresh_scenarios_requested.emit)  # type: ignore[arg-type]
         actions_layout.addWidget(self._refresh_scenarios_button)
 
+        self._share_button = QPushButton("Share Prompt", content)
+        self._share_button.setObjectName("sharePromptButton")
+        self._share_button.setEnabled(False)
+        self._share_button.clicked.connect(self.share_requested.emit)  # type: ignore[arg-type]
+        actions_layout.addWidget(self._share_button)
+
         self._edit_button = QPushButton("Edit Prompt", content)
         self._edit_button.setObjectName("editPromptButton")
         self._edit_button.setEnabled(False)
@@ -706,6 +717,7 @@ class PromptDetailWidget(QWidget):
         self._fork_button.setEnabled(True)
         self._version_history_button.setEnabled(True)
         self._refresh_scenarios_button.setEnabled(True)
+        self._share_button.setEnabled(True)
 
     def _format_context_preview(self, context: Optional[str]) -> str:
         """Return a truncated, single-line context preview for the prompt summary."""
@@ -847,8 +859,14 @@ class PromptDetailWidget(QWidget):
         self._fork_button.setEnabled(False)
         self._version_history_button.setEnabled(False)
         self._refresh_scenarios_button.setEnabled(False)
+        self._share_button.setEnabled(False)
         self._lineage_label.clear()
         self._lineage_label.setVisible(False)
+
+    def share_button(self) -> QPushButton:
+        """Return the share button so callers can anchor menus."""
+
+        return self._share_button
 
     def _ensure_metadata_visible(self, title: str, payload: str) -> None:
         """Reveal the metadata widget with the provided payload."""
@@ -1029,6 +1047,7 @@ class MainWindow(QMainWindow):
         self._detail_widget.refresh_scenarios_requested.connect(  # type: ignore[arg-type]
             partial(self._handle_refresh_scenarios_request, self._detail_widget)
         )
+        self._detail_widget.share_requested.connect(self._on_share_prompt_requested)  # type: ignore[arg-type]
         self._all_prompts: List[Prompt] = []
         self._current_prompts: List[Prompt] = []
         self._preserve_search_order: bool = False
@@ -1063,6 +1082,8 @@ class MainWindow(QMainWindow):
         self._template_detail_widget: Optional[PromptDetailWidget] = None
         self._template_run_shortcut_button: Optional[QPushButton] = None
         self._template_transition_indicator: Optional[ProcessingIndicator] = None
+        self._share_providers: Dict[str, ShareProvider] = {}
+        self._register_share_provider(ShareTextProvider())
         self._layout_settings = QSettings("PromptManager", "MainWindow")
         (
             self._pending_category_slug,
@@ -3082,6 +3103,66 @@ class MainWindow(QMainWindow):
         clipboard.setText(payload)
         self._show_toast(f"Copied '{prompt.name}' to the clipboard.")
         self._usage_logger.log_copy(prompt_name=prompt.name, prompt_has_body=bool(prompt.context))
+
+    def _register_share_provider(self, provider: ShareProvider) -> None:
+        """Store a share provider so it can be shown in the share menu."""
+
+        self._share_providers[provider.info.name] = provider
+
+    def _on_share_prompt_requested(self) -> None:
+        """Display provider choices and initiate the share workflow."""
+
+        prompt = self._detail_widget.current_prompt()
+        if prompt is None:
+            self.statusBar().showMessage("Select a prompt to share first.", 4000)
+            return
+        if not self._share_providers:
+            self._show_error("Sharing unavailable", "No share providers are configured.")
+            return
+        button = self._detail_widget.share_button()
+        menu = QMenu(self)
+        for provider in self._share_providers.values():
+            action = menu.addAction(provider.info.label)
+            action.setData(provider.info.name)
+            action.setToolTip(provider.info.description)
+        chosen = menu.exec_(button.mapToGlobal(button.rect().bottomLeft()))
+        if chosen is None:
+            return
+        provider_name = str(chosen.data())
+        self._share_prompt(provider_name, prompt)
+
+    def _share_prompt(self, provider_name: str, prompt: Prompt) -> None:
+        """Share *prompt* using the requested provider and copy the share link."""
+
+        provider = self._share_providers.get(provider_name)
+        if provider is None:
+            self._show_error("Sharing unavailable", "Selected share provider is not registered.")
+            return
+        indicator = ProcessingIndicator(
+            self,
+            f"Sharing via {provider.info.label}…",
+            title="Sharing Prompt",
+        )
+        try:
+            result = indicator.run(provider.share, prompt)
+        except ShareProviderError as exc:
+            self._show_error("Unable to share prompt", str(exc))
+            return
+        clipboard = QGuiApplication.clipboard()
+        clipboard.setText(result.url)
+        message = f"{result.provider.label} link copied to clipboard."
+        self._show_toast(message)
+        self.statusBar().showMessage(message, 5000)
+        self._usage_logger.log_share(
+            provider=result.provider.name,
+            prompt_name=prompt.name,
+            payload_chars=result.payload_chars,
+        )
+        if result.delete_url:
+            self.statusBar().showMessage(
+                f"Delete this share later via: {result.delete_url}",
+                10000,
+            )
 
     def _show_prompt_description(self, prompt: Prompt) -> None:
         """Display the prompt description in a dialog for quick reference."""

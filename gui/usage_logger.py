@@ -71,6 +71,18 @@ class IntentUsageLogger:
         }
         self._append(record)
 
+    def log_share(self, *, provider: str, prompt_name: str, payload_chars: int) -> None:
+        """Log that a prompt was shared via an external provider."""
+
+        record = {
+            "timestamp": _now_iso(),
+            "event": "share",
+            "provider": provider,
+            "prompt_name": prompt_name,
+            "chars": payload_chars,
+        }
+        self._append(record)
+
     def log_execute(
         self,
         *,

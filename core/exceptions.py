@@ -100,3 +100,11 @@ class PromptVersionError(PromptManagerError):
 
 class PromptVersionNotFoundError(PromptVersionError):
     """Raised when the requested prompt version or fork lineage entry is missing."""
+
+
+class PromptShareError(PromptManagerError):
+    """Base class for prompt sharing workflow failures."""
+
+
+class ShareProviderError(PromptShareError):
+    """Raised when a remote sharing provider rejects or fails a request."""
