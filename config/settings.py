@@ -587,6 +587,7 @@ class PromptManagerSettings(BaseSettings):
                     "chat_user_bubble_color",
                     "chat_colors",
                     "theme_mode",
+                    "prompt_templates",
                 ):
                     if key in data_dict:
                         mapped[key] = data_dict[key]
