@@ -1502,7 +1502,9 @@ class PromptMaintenanceDialog(QDialog):
 
         self._log_view = QPlainTextEdit(metadata_tab)
         self._log_view.setReadOnly(True)
-        metadata_layout.addWidget(self._log_view, stretch=1)
+        self._log_view.setMinimumHeight(120)
+        self._log_view.setMaximumHeight(200)
+        metadata_layout.addWidget(self._log_view)
 
         self._tab_widget.addTab(metadata_tab, "Metadata")
 
