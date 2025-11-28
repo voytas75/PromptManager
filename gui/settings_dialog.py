@@ -1,5 +1,6 @@
 """Settings dialog for configuring Prompt Manager runtime options.
 
+Updates: v0.2.9 - 2025-11-28 - Persist dialog geometry between sessions.
 Updates: v0.2.8 - 2025-11-23 - Surface editable LiteLLM prompt templates with reset controls.
 Updates: v0.2.7 - 2025-12-06 - Surface LiteLLM embedding model configuration.
 Updates: v0.2.6 - 2025-11-05 - Add theme mode toggle to the appearance settings.
@@ -19,7 +20,7 @@ import json
 from functools import partial
 from typing import Dict, Mapping, Optional, Sequence
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, QSettings, Qt
 from PySide6.QtGui import QColor, QGuiApplication, QPalette
 from PySide6.QtWidgets import (
     QButtonGroup,
@@ -83,13 +84,16 @@ class SettingsDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Prompt Manager Settings")
+        self._settings = QSettings("PromptManager", "SettingsDialog")
         self.setMinimumWidth(860)
         screen = QGuiApplication.primaryScreen()
+        target_height = 720
         if screen is not None:
             available_height = screen.availableGeometry().height()
             target_height = max(640, int(available_height * 0.85))
             self.setMaximumHeight(available_height)
-            self.resize(self.minimumWidth(), target_height)
+        self.resize(self.minimumWidth(), target_height)
+        self._restore_window_size(default_width=self.width(), default_height=self.height())
         self._litellm_model = litellm_model or ""
         self._litellm_inference_model = litellm_inference_model or ""
         self._litellm_api_key = litellm_api_key or ""
@@ -141,6 +145,17 @@ class SettingsDialog(QDialog):
             else:
                 self._prompt_template_initials[key] = DEFAULT_PROMPT_TEMPLATES.get(key, "")
         self._build_ui()
+
+    def _restore_window_size(self, *, default_width: int, default_height: int) -> None:
+        width = self._settings.value("width", default_width, type=int)
+        height = self._settings.value("height", default_height, type=int)
+        if isinstance(width, int) and isinstance(height, int) and width > 0 and height > 0:
+            self.resize(width, height)
+
+    def closeEvent(self, event: QEvent) -> None:  # type: ignore[override]
+        self._settings.setValue("width", self.width())
+        self._settings.setValue("height", self.height())
+        super().closeEvent(event)
 
     def _build_ui(self) -> None:
         palette = self.palette()
