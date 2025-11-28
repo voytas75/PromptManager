@@ -53,6 +53,21 @@ class _DummyManager:
         self.reembed_called = False
         self.reembed_reset = False
         self.execution_analytics: ExecutionAnalytics | None = None
+        self.embedding_diagnostics = SimpleNamespace(
+            backend_ok=True,
+            backend_message="Backend reachable",
+            backend_dimension=32,
+            inferred_dimension=None,
+            chroma_ok=True,
+            chroma_message="Chroma reachable",
+            chroma_count=1,
+            repository_total=1,
+            prompts_with_embeddings=1,
+            missing_prompts=[],
+            mismatched_prompts=[],
+            consistent_counts=True,
+        )
+        self.diagnostics_sample_text: str | None = None
 
     def close(self) -> None:
         self.closed = True
@@ -80,6 +95,10 @@ class _DummyManager:
         trend_window: int = 5,
     ) -> ExecutionAnalytics | None:
         return self.execution_analytics
+
+    def diagnose_embeddings(self, *, sample_text: str = "Prompt Manager diagnostics probe"):
+        self.diagnostics_sample_text = sample_text
+        return self.embedding_diagnostics
 
 
 def _build_execution_analytics(total_runs: int = 5) -> ExecutionAnalytics:
@@ -237,6 +256,54 @@ def test_main_returns_error_when_gui_dependency_missing(
     assert exit_code == 4
     output = capsys.readouterr().out
     assert "Unable to start GUI" in output
+    assert manager.closed is True
+
+
+def test_main_runs_embedding_diagnostics(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "diagnostics", "embeddings"])
+    monkeypatch.setattr(main, "load_settings", lambda: _DummySettings())
+    manager = _DummyManager()
+    monkeypatch.setattr(main, "build_prompt_manager", lambda settings: manager)
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "Embedding diagnostics" in output
+    assert manager.diagnostics_sample_text == "Prompt Manager diagnostics probe"
+    assert manager.closed is True
+
+
+def test_main_embedding_diagnostics_returns_failure_on_issue(
+    monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "diagnostics", "embeddings"])
+    monkeypatch.setattr(main, "load_settings", lambda: _DummySettings())
+    manager = _DummyManager()
+    mismatch = SimpleNamespace(prompt_name="Mismatch", prompt_id=uuid.uuid4(), stored_dimension=8)
+    missing = SimpleNamespace(prompt_name="Missing", prompt_id=uuid.uuid4())
+    manager.embedding_diagnostics = SimpleNamespace(
+        backend_ok=False,
+        backend_message="Backend unreachable",
+        backend_dimension=None,
+        inferred_dimension=32,
+        chroma_ok=True,
+        chroma_message="ok",
+        chroma_count=2,
+        repository_total=2,
+        prompts_with_embeddings=1,
+        missing_prompts=[missing],
+        mismatched_prompts=[mismatch],
+        consistent_counts=False,
+    )
+    monkeypatch.setattr(main, "build_prompt_manager", lambda settings: manager)
+
+    exit_code = main.main()
+
+    assert exit_code == 6
+    output = capsys.readouterr().out
+    assert "Backend: ERROR" in output
+    assert "Dimension mismatches" in output
     assert manager.closed is True
 
 

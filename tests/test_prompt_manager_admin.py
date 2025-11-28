@@ -1574,6 +1574,51 @@ def test_clear_usage_logs_creates_and_resets(tmp_path: Path) -> None:
     assert not any(logs_path.iterdir())
 
 
+def test_diagnose_embeddings_reports_backend_and_store_health(
+    prompt_manager: tuple[PromptManager, _DummyCollection, _DummyChromaClient, Path],
+) -> None:
+    manager, collection, _, _ = prompt_manager
+    prompt = _make_prompt("Vector ok")
+    prompt.ext4 = [0.1] * 32
+    manager.repository.add(prompt)
+    collection.count_value = 1
+
+    report = manager.diagnose_embeddings(sample_text="diagnostics sample")
+
+    assert report.backend_ok is True
+    assert report.chroma_ok is True
+    assert report.prompts_with_embeddings == 1
+    assert report.repository_total == 1
+    assert report.mismatched_prompts == []
+    assert report.consistent_counts is True
+
+
+def test_diagnose_embeddings_flags_mismatches_and_missing_vectors(
+    prompt_manager: tuple[PromptManager, _DummyCollection, _DummyChromaClient, Path],
+) -> None:
+    manager, collection, _, _ = prompt_manager
+    good_prompt = _make_prompt("Aligned")
+    good_prompt.ext4 = [0.2] * 32
+    manager.repository.add(good_prompt)
+
+    bad_prompt = _make_prompt("Mismatched")
+    bad_prompt.ext4 = [0.3] * 8
+    manager.repository.add(bad_prompt)
+
+    missing_prompt = _make_prompt("Missing")
+    manager.repository.add(missing_prompt)
+
+    collection.count_value = 1
+
+    report = manager.diagnose_embeddings()
+
+    assert len(report.mismatched_prompts) == 1
+    assert report.mismatched_prompts[0].prompt_id == bad_prompt.id
+    assert len(report.missing_prompts) == 1
+    assert report.missing_prompts[0].prompt_id == missing_prompt.id
+    assert report.consistent_counts is False
+
+
 def test_manager_close_releases_resources(
     prompt_manager: tuple[PromptManager, _DummyCollection, _DummyChromaClient, Path],
 ) -> None:

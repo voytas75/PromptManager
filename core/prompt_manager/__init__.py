@@ -1,5 +1,6 @@
 """Prompt Manager package façade and orchestration layer.
 
+Updates: v0.14.4 - 2025-02-14 - Add embedding diagnostics helper for CLI integration.
 Updates: v0.14.3 - 2025-11-28 - Add data snapshot helper for maintenance workflows.
 Updates: v0.14.2 - 2025-11-28 - Add execution benchmarks, scenario refresh APIs, and category health analytics.
 Updates: v0.14.1 - 2025-11-24 - Add LiteLLM category suggestion workflow with classifier fallback.
@@ -677,6 +678,38 @@ class PromptManager:
         """Structured response returned by benchmark_prompts."""
 
         runs: List["PromptManager.BenchmarkRun"]
+
+    @dataclass(slots=True)
+    class EmbeddingDimensionMismatch:
+        """Stored prompt embedding vector that no longer matches the reference dimension."""
+
+        prompt_id: uuid.UUID
+        prompt_name: str
+        stored_dimension: int
+
+    @dataclass(slots=True)
+    class MissingEmbedding:
+        """Prompt record that is missing a persisted embedding vector."""
+
+        prompt_id: uuid.UUID
+        prompt_name: str
+
+    @dataclass(slots=True)
+    class EmbeddingDiagnostics:
+        """Summary of embedding backend health and stored vector consistency."""
+
+        backend_ok: bool
+        backend_message: str
+        backend_dimension: Optional[int]
+        inferred_dimension: Optional[int]
+        chroma_ok: bool
+        chroma_message: str
+        chroma_count: Optional[int]
+        repository_total: int
+        prompts_with_embeddings: int
+        missing_prompts: List["PromptManager.MissingEmbedding"]
+        mismatched_prompts: List["PromptManager.EmbeddingDimensionMismatch"]
+        consistent_counts: Optional[bool]
 
     @dataclass(slots=True)
     class CategoryHealth:
@@ -1463,6 +1496,111 @@ class PromptManager:
             return self.update_prompt(prompt)
         except PromptManagerError as exc:
             raise PromptStorageError("Failed to persist refreshed scenarios") from exc
+
+    def diagnose_embeddings(
+        self,
+        *,
+        sample_text: str = "Prompt Manager diagnostics probe",
+    ) -> "PromptManager.EmbeddingDiagnostics":
+        """Return embedding backend health and stored vector consistency details."""
+
+        provider = getattr(self, "_embedding_provider", None)
+        if provider is None:
+            raise PromptManagerError("Embedding provider is not configured.")
+
+        backend_ok = True
+        backend_message = "Embedding backend reachable."
+        backend_dimension: Optional[int] = None
+        try:
+            probe_vector = provider.embed(sample_text)
+            backend_dimension = len(probe_vector)
+            if backend_dimension == 0:
+                backend_ok = False
+                backend_message = "Embedding backend returned an empty vector."
+        except EmbeddingGenerationError as exc:
+            backend_ok = False
+            backend_message = f"Unable to generate embeddings: {exc}"
+        except Exception as exc:  # noqa: BLE001 - defensive diagnostics surface
+            backend_ok = False
+            backend_message = f"Unexpected embedding backend error: {exc}"
+
+        chroma_ok = False
+        chroma_message = "Chroma collection unavailable."
+        chroma_count: Optional[int] = None
+        try:
+            collection = self.collection
+        except PromptManagerError as exc:
+            chroma_message = str(exc)
+        else:
+            try:
+                chroma_count = int(collection.count())
+                chroma_ok = True
+                chroma_message = "Chroma collection reachable."
+            except Exception as exc:  # noqa: BLE001 - defensive diagnostics surface
+                chroma_message = f"Unable to query Chroma collection: {exc}"
+
+        try:
+            prompts = self._repository.list()
+        except RepositoryError as exc:
+            raise PromptStorageError("Unable to load prompts for embedding diagnostics") from exc
+
+        missing_prompts: List[PromptManager.MissingEmbedding] = []
+        mismatched: List[PromptManager.EmbeddingDimensionMismatch] = []
+        prompts_with_embeddings = 0
+        inferred_dimension: Optional[int] = None
+        reference_dimension = backend_dimension if backend_dimension else None
+
+        for prompt in prompts:
+            vector = prompt.ext4
+            if not vector:
+                missing_prompts.append(
+                    PromptManager.MissingEmbedding(
+                        prompt_id=prompt.id,
+                        prompt_name=prompt.name or "Unnamed prompt",
+                    )
+                )
+                continue
+            vector_values = list(vector)
+            stored_dimension = len(vector_values)
+            if stored_dimension == 0:
+                missing_prompts.append(
+                    PromptManager.MissingEmbedding(
+                        prompt_id=prompt.id,
+                        prompt_name=prompt.name or "Unnamed prompt",
+                    )
+                )
+                continue
+            prompts_with_embeddings += 1
+            if reference_dimension is None:
+                reference_dimension = stored_dimension
+                inferred_dimension = stored_dimension
+            if reference_dimension is not None and stored_dimension != reference_dimension:
+                mismatched.append(
+                    PromptManager.EmbeddingDimensionMismatch(
+                        prompt_id=prompt.id,
+                        prompt_name=prompt.name or "Unnamed prompt",
+                        stored_dimension=stored_dimension,
+                    )
+                )
+
+        consistent_counts: Optional[bool] = None
+        if chroma_count is not None:
+            consistent_counts = chroma_count == prompts_with_embeddings
+
+        return PromptManager.EmbeddingDiagnostics(
+            backend_ok=backend_ok,
+            backend_message=backend_message,
+            backend_dimension=backend_dimension if backend_ok else None,
+            inferred_dimension=inferred_dimension,
+            chroma_ok=chroma_ok,
+            chroma_message=chroma_message,
+            chroma_count=chroma_count,
+            repository_total=len(prompts),
+            prompts_with_embeddings=prompts_with_embeddings,
+            missing_prompts=missing_prompts,
+            mismatched_prompts=mismatched,
+            consistent_counts=consistent_counts,
+        )
 
     def generate_prompt_category(self, context: str) -> str:
         """Suggest a prompt category using LiteLLM with classifier-based fallback."""

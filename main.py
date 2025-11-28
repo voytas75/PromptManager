@@ -1,5 +1,6 @@
 """Application entry point for Prompt Manager.
 
+Updates: v0.8.0 - 2025-02-14 - Add embedding diagnostics CLI command.
 Updates: v0.7.9 - 2025-11-28 - Add benchmark and scenario refresh CLI commands.
 Updates: v0.7.8 - 2025-12-07 - Add CLI command to rebuild embeddings from scratch.
 Updates: v0.7.7 - 2025-11-05 - Surface LiteLLM workflow routing details in CLI summaries.
@@ -344,6 +345,94 @@ def _run_refresh_scenarios(manager, args: argparse.Namespace, logger: logging.Lo
     return 0
 
 
+def _run_diagnostics(manager, args: argparse.Namespace, logger: logging.Logger) -> int:
+    target = getattr(args, "target", None)
+    if target == "embeddings":
+        return _run_embedding_diagnostics(manager, args, logger)
+    logger.error("Unknown diagnostics target: %s", target)
+    return 5
+
+
+def _run_embedding_diagnostics(
+    manager, args: argparse.Namespace, logger: logging.Logger
+) -> int:
+    sample_text = getattr(args, "sample_text", "Prompt Manager diagnostics probe")
+    try:
+        report = manager.diagnose_embeddings(sample_text=sample_text)
+    except PromptManagerError as exc:
+        logger.error("Embedding diagnostics failed: %s", exc)
+        return 5
+
+    print("\nEmbedding diagnostics\n---------------------")
+    dimension = report.backend_dimension or report.inferred_dimension
+    dimension_text = str(dimension) if dimension is not None else "unknown"
+    backend_status = "OK" if report.backend_ok else "ERROR"
+    print(f"Backend: {backend_status} (dimension={dimension_text}) - {report.backend_message}")
+
+    chroma_status = "OK" if report.chroma_ok else "ERROR"
+    chroma_count_text = (
+        str(report.chroma_count) if report.chroma_count is not None else "unknown"
+    )
+    print(f"Chroma: {chroma_status} (documents={chroma_count_text}) - {report.chroma_message}")
+
+    missing_count = len(report.missing_prompts)
+    print(
+        "Repository: %s prompts (%s with embeddings, missing=%s)"
+        % (
+            report.repository_total,
+            report.prompts_with_embeddings,
+            missing_count,
+        )
+    )
+
+    if report.consistent_counts is None:
+        print("Vector store consistency: unknown (Chroma document count unavailable)")
+    elif report.consistent_counts:
+        print("Vector store consistency: OK (counts match)")
+    else:
+        chroma_value = report.chroma_count if report.chroma_count is not None else "unknown"
+        print(
+            "Vector store consistency: MISMATCH (Chroma=%s, stored embeddings=%s)"
+            % (chroma_value, report.prompts_with_embeddings)
+        )
+
+    if missing_count:
+        print(f"\nPrompts missing embeddings ({missing_count}):")
+        for issue in report.missing_prompts[:10]:
+            name = issue.prompt_name or "Unnamed prompt"
+            print(f" - {name} ({issue.prompt_id})")
+        if missing_count > 10:
+            print(f"   ... {missing_count - 10} more")
+
+    mismatch_count = len(report.mismatched_prompts)
+    if mismatch_count:
+        print(f"\nDimension mismatches ({mismatch_count} prompts):")
+        for mismatch in report.mismatched_prompts[:10]:
+            name = mismatch.prompt_name or "Unnamed prompt"
+            print(f" - {name} ({mismatch.prompt_id}) stored={mismatch.stored_dimension}")
+        if mismatch_count > 10:
+            print(f"   ... {mismatch_count - 10} more")
+
+    issues: list[str] = []
+    if not report.backend_ok:
+        issues.append("backend")
+    if not report.chroma_ok:
+        issues.append("chroma")
+    if mismatch_count:
+        issues.append("dimension mismatches")
+    if report.consistent_counts is False:
+        issues.append("vector store count mismatch")
+
+    if issues:
+        logger.warning(
+            "Embedding diagnostics completed with issues: %s",
+            ", ".join(issues),
+        )
+        return 6
+    logger.info("Embedding diagnostics completed successfully.")
+    return 0
+
+
 def _format_metric(value: Optional[float], *, suffix: str = "") -> str:
     if value is None:
         return "n/a"
@@ -635,6 +724,22 @@ def parse_args() -> argparse.Namespace:
         help="Number of scenarios to request from the generator (default: 3).",
     )
 
+    diagnostics_parser = subparsers.add_parser(
+        "diagnostics",
+        help="Run backend diagnostics such as embedding health checks.",
+    )
+    diagnostics_parser.add_argument(
+        "target",
+        choices=("embeddings",),
+        help="Diagnostics target to execute.",
+    )
+    diagnostics_parser.add_argument(
+        "--sample-text",
+        type=str,
+        default="Prompt Manager diagnostics probe",
+        help="Sample text used when probing the embedding backend (default provided).",
+    )
+
     return parser.parse_args()
 
 
@@ -703,6 +808,13 @@ def main() -> int:
         if command == "refresh-scenarios":
             try:
                 result = _run_refresh_scenarios(manager, args, logger)
+            finally:
+                manager.close()
+            return result
+
+        if command == "diagnostics":
+            try:
+                result = _run_diagnostics(manager, args, logger)
             finally:
                 manager.close()
             return result
