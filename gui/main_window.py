@@ -605,30 +605,6 @@ class PromptDetailWidget(QWidget):
         self._basic_metadata_text = ""
         self._current_prompt: Optional[Prompt] = None
 
-        share_payload_layout = QHBoxLayout()
-        share_payload_layout.setContentsMargins(0, 0, 0, 0)
-        share_payload_layout.setSpacing(6)
-
-        share_payload_label = QLabel("Share data:", content)
-        share_payload_label.setObjectName("sharePayloadLabel")
-        share_payload_layout.addWidget(share_payload_label)
-
-        self._share_payload_combo = QComboBox(content)
-        self._share_payload_combo.addItem("Prompt body only", "body")
-        self._share_payload_combo.addItem("Body + description", "body_description")
-        self._share_payload_combo.addItem(
-            "Body + description + scenarios",
-            "body_description_scenarios",
-        )
-        self._share_payload_combo.setEnabled(False)
-        share_payload_layout.addWidget(self._share_payload_combo)
-        self._share_metadata_checkbox = QCheckBox("Add metadata", content)
-        self._share_metadata_checkbox.setChecked(False)
-        self._share_metadata_checkbox.setEnabled(False)
-        share_payload_layout.addWidget(self._share_metadata_checkbox)
-        share_payload_layout.addStretch(1)
-        content_layout.addLayout(share_payload_layout)
-
         actions_layout = QHBoxLayout()
         actions_layout.setContentsMargins(0, 0, 0, 0)
         actions_layout.addStretch(1)
@@ -651,11 +627,10 @@ class PromptDetailWidget(QWidget):
         self._refresh_scenarios_button.clicked.connect(self.refresh_scenarios_requested.emit)  # type: ignore[arg-type]
         actions_layout.addWidget(self._refresh_scenarios_button)
 
-        self._share_button = QPushButton("Share Prompt", content)
+        self._share_button = QPushButton("Share Prompt", share_frame)
         self._share_button.setObjectName("sharePromptButton")
         self._share_button.setEnabled(False)
         self._share_button.clicked.connect(self.share_requested.emit)  # type: ignore[arg-type]
-        actions_layout.addWidget(self._share_button)
 
         self._edit_button = QPushButton("Edit Prompt", content)
         self._edit_button.setObjectName("editPromptButton")
@@ -670,6 +645,37 @@ class PromptDetailWidget(QWidget):
         actions_layout.addWidget(self._delete_button)
 
         content_layout.addLayout(actions_layout)
+
+        share_frame = QFrame(content)
+        share_frame.setObjectName("shareOptionsFrame")
+        share_frame.setFrameStyle(QFrame.StyledPanel | QFrame.Plain)
+        share_frame.setLineWidth(1)
+        share_layout = QHBoxLayout(share_frame)
+        share_layout.setContentsMargins(12, 8, 12, 8)
+        share_layout.setSpacing(8)
+
+        share_payload_label = QLabel("Share data:", share_frame)
+        share_payload_label.setObjectName("sharePayloadLabel")
+        share_layout.addWidget(share_payload_label)
+
+        self._share_payload_combo = QComboBox(share_frame)
+        self._share_payload_combo.addItem("Prompt body only", "body")
+        self._share_payload_combo.addItem("Body + description", "body_description")
+        self._share_payload_combo.addItem(
+            "Body + description + scenarios",
+            "body_description_scenarios",
+        )
+        self._share_payload_combo.setEnabled(False)
+        share_layout.addWidget(self._share_payload_combo)
+
+        self._share_metadata_checkbox = QCheckBox("Add metadata", share_frame)
+        self._share_metadata_checkbox.setChecked(False)
+        self._share_metadata_checkbox.setEnabled(False)
+        share_layout.addWidget(self._share_metadata_checkbox)
+
+        share_layout.addStretch(1)
+        share_layout.addWidget(self._share_button)
+        content_layout.addWidget(share_frame)
         content_layout.addStretch(1)
 
         self._scroll_area.setWidget(content)
