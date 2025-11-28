@@ -707,14 +707,18 @@ class PromptDetailWidget(QWidget):
         self._refresh_scenarios_button.setEnabled(True)
 
     def _format_context_preview(self, context: Optional[str]) -> str:
-        """Return a truncated context preview for the prompt summary."""
+        """Return a truncated, single-line context preview for the prompt summary."""
 
         if not context:
             return "No prompt text provided."
-        if len(context) <= self._CONTEXT_PREVIEW_LIMIT:
-            return context
-        truncated = context[: self._CONTEXT_PREVIEW_LIMIT].rstrip()
-        return f"{truncated}…"
+
+        limited = context[: self._CONTEXT_PREVIEW_LIMIT]
+        if len(context) > self._CONTEXT_PREVIEW_LIMIT:
+            limited = f"{limited.rstrip()}…"
+
+        # Collapse newlines (and other whitespace sequences) so the preview stays on one line.
+        flattened = " ".join(limited.split())
+        return flattened or "No prompt text provided."
 
     def current_prompt(self) -> Optional[Prompt]:
         """Return the currently displayed prompt, if any."""
