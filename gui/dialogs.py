@@ -1,5 +1,6 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
+Updates: v0.11.13 - 2025-11-28 - Keep maintenance dialog button pinned below the scroll surface.
 Updates: v0.11.12 - 2025-11-28 - Add backup snapshot action to the maintenance dialog.
 Updates: v0.11.11 - 2025-11-28 - Make maintenance dialog vertically scrollable with shorter default height.
 Updates: v0.11.10 - 2025-11-28 - Add prompt body diff tab comparing selected versions to the current prompt.
@@ -1730,7 +1731,7 @@ class PromptMaintenanceDialog(QDialog):
 
         self._buttons = QDialogButtonBox(QDialogButtonBox.Close, self)
         self._buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
-        layout.addWidget(self._buttons)
+        outer_layout.addWidget(self._buttons)
 
     def _set_stat_value(self, key: str, value: str) -> None:
         label = self._stats_labels.get(key)
