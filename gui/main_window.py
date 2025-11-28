@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.60 - 2025-11-28 - Add background task center with progress bars and completion toasts.
 Updates: v0.15.59 - 2025-11-28 - Add Refresh Scenarios action to prompt detail views and wire persistence to LiteLLM.
 Updates: v0.15.58 - 2025-11-28 - Show a busy indicator while running prompt searches.
 Updates: v0.15.57 - 2025-11-27 - Switch back to the Prompts tab after running templates and show a busy indicator while switching.
@@ -200,7 +201,7 @@ from .execute_context_dialog import ExecuteContextDialog
 from .history_panel import HistoryPanel
 from .language_tools import DetectedLanguage, detect_language
 from .notes_panel import NotesPanel
-from .notifications import NotificationHistoryDialog, QtNotificationBridge
+from .notifications import BackgroundTaskCenterDialog, QtNotificationBridge
 from .processing_indicator import ProcessingIndicator
 from .response_styles_panel import ResponseStylesPanel
 from .settings_dialog import SettingsDialog, persist_settings_to_config
@@ -1099,6 +1100,7 @@ class MainWindow(QMainWindow):
         self._notification_indicator.setObjectName("notificationIndicator")
         self._notification_indicator.setStyleSheet("color: #2f80ed; font-weight: 500;")
         self._notification_indicator.setVisible(bool(self._active_notifications))
+        self._task_center_dialog: Optional[BackgroundTaskCenterDialog] = None
         self._notification_bridge = QtNotificationBridge(self._manager.notification_center, self)
         self._notification_bridge.notification_received.connect(self._handle_notification)
         self.setWindowTitle("Prompt Manager")
@@ -4236,10 +4238,15 @@ class MainWindow(QMainWindow):
         self._notification_history.append(notification)
         self._update_active_notification(notification)
         self._update_notification_indicator()
+        if self._task_center_dialog is not None:
+            self._task_center_dialog.handle_notification(notification)
         if show_status:
             message = self._format_notification_message(notification)
             duration = 0 if notification.status is NotificationStatus.STARTED else 5000
             self.statusBar().showMessage(message, duration)
+        if notification.task_id and notification.status in {NotificationStatus.SUCCEEDED, NotificationStatus.FAILED}:
+            toast_duration = 3500 if notification.status is NotificationStatus.SUCCEEDED else 4500
+            self._show_toast(self._format_notification_message(notification), toast_duration)
 
     def _update_active_notification(self, notification: Notification) -> None:
         task_id = notification.task_id
@@ -4265,14 +4272,25 @@ class MainWindow(QMainWindow):
         return f"{notification.title}: {status} — {notification.message}"
 
     def _on_notifications_clicked(self) -> None:
-        dialog = NotificationHistoryDialog(tuple(self._notification_history), self)
-        dialog.exec()
+        dialog = self._ensure_task_center_dialog()
+        dialog.set_history(tuple(self._notification_history))
+        dialog.set_active_notifications(tuple(self._active_notifications.values()))
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+
+    def _ensure_task_center_dialog(self) -> BackgroundTaskCenterDialog:
+        if self._task_center_dialog is None:
+            self._task_center_dialog = BackgroundTaskCenterDialog(self)
+        return self._task_center_dialog
 
     def closeEvent(self, event) -> None:  # type: ignore[override]
         self._save_window_geometry()
         self._save_splitter_state()
         if hasattr(self, "_notification_bridge"):
             self._notification_bridge.close()
+        if self._task_center_dialog is not None:
+            self._task_center_dialog.close()
         self._hide_template_transition_indicator()
         super().closeEvent(event)
 
