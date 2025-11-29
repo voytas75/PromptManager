@@ -19,25 +19,33 @@ classifiers = [
     "Topic :: Text Processing :: Linguistic",
 ]
 dependencies = [
-    "chromadb==0.4.24",
-    "numpy>=1.26.4,<2",
-    "Jinja2==3.1.4",
-    "jsonschema==4.23.0",
-    "pydantic==2.12.3",
-    "pydantic-settings==2.2.1",
-    "PyYAML==6.0.2",
-    "PySide6==6.7.2",
-    "redis==5.0.1",
-    "litellm==1.61.15",
+    "chromadb==1.3.5",
+    "numpy>=2.0.0,<3",
+    "Jinja2==3.1.6",
+    "jsonschema==4.25.1",
+    "pydantic==2.12.5",
+    "pydantic-settings==2.12.0",
+    "PyYAML==6.0.3",
+    "PySide6==6.10.1",
+    "redis==7.1.0",
+    "litellm==1.80.7",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest==8.2.0",
-    "pytest-cov==4.1.0",
-    "pytest-xdist==3.6.1",
-    "pyright==1.1.386",
-    "ruff>=0.6.0",
+    "pytest==9.0.1",
+    "pytest-cov==7.0.0",
+    "pytest-xdist==3.8.0",
+    "pyright==1.1.407",
+    "ruff==0.14.7",
+    "pytest-asyncio==0.24.0",  # Latest as of Nov 2025
+    "hypothesis==6.116.0",     # Latest
+    "respx==0.21.0",           # Latest
+    "vcrpy==6.0.1",            # Latest
+    "pytest-mock==3.14.0",     # Latest
+    "bandit==1.7.9",           # For security lints
+    "py-spy==0.3.14",          # For profiling
+    "tenacity==9.0.0",         # For retries
 ]
 
 [tool.setuptools.packages.find]
