@@ -1,6 +1,7 @@
 """Qt widgets for the Enhanced Prompt Workbench experience.
 
 Updates:
+  v0.1.10 - 2025-11-29 - Style wizard footer container explicitly to match host palette.
   v0.1.9 - 2025-11-29 - Apply palette colors to wizard button boxes and buttons.
   v0.1.8 - 2025-11-29 - Enforce palette-colored wizard backgrounds via style attributes.
   v0.1.7 - 2025-11-29 - Force wizard/page styled backgrounds so palette colors render on Windows.
@@ -517,6 +518,14 @@ class GuidedPromptWizard(QWizard):
                 for button in button_box.findChildren(QPushButton):
                     button.setPalette(palette)
                     button.setAutoFillBackground(True)
+            footer_container = self.findChild(QWidget, "qt_wizard_button_widget")
+            if footer_container is not None:
+                footer_container.setPalette(palette)
+                footer_container.setAutoFillBackground(True)
+                footer_container.setAttribute(Qt.WA_StyledBackground, True)
+                footer_container.setStyleSheet(
+                    f"#qt_wizard_button_widget {{ background-color: {window_color}; border-top: 1px solid {mid_color}; }}"
+                )
         finally:
             self._palette_updating = False
 
