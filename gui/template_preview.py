@@ -16,7 +16,7 @@ Updates: v0.1.0 - 2025-11-25 - Add dynamic Jinja2 preview with custom filters an
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING
 
 from jinja2 import TemplateSyntaxError
 from PySide6.QtCore import QSettings, Qt, Signal
@@ -39,6 +39,9 @@ from core.templating import (
     TemplateRenderer,
     format_template_syntax_error,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
 
 
 class TemplatePreviewWidget(QWidget):

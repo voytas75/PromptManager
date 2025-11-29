@@ -15,7 +15,6 @@ import json
 import logging
 import uuid
 from collections import deque
-from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
@@ -139,6 +138,8 @@ from .toast import show_toast
 from .usage_logger import IntentUsageLogger
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
+    from collections.abc import Iterable, Mapping, Sequence
+
     from core.prompt_engineering import PromptRefinement
     from models.prompt_model import Prompt
 

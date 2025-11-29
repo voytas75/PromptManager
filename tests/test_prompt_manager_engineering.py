@@ -6,14 +6,16 @@ Updates: v0.1.0 - 2025-11-18 - Initial tests for prompt refinement workflow.
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
 from core import PromptEngineeringUnavailable, PromptManager
 from core.prompt_engineering import PromptRefinement
 from core.repository import PromptRepository
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class _StubEmbeddingProvider:

@@ -8,7 +8,7 @@ Updates: v0.15.1 - 2025-11-25 - Document module metadata for AGENTS compliance.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QGuiApplication
@@ -30,9 +30,13 @@ from core import (
     ResponseStyleError,
     ResponseStyleStorageError,
 )
-from models.response_style import ResponseStyle
 
 from .dialogs import MarkdownPreviewDialog, ResponseStyleDialog
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from models.response_style import ResponseStyle
 
 
 class ResponseStylesPanel(QWidget):

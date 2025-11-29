@@ -10,11 +10,14 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from core.intent_classifier import IntentPrediction
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from core.intent_classifier import IntentPrediction
 
 logger = logging.getLogger("prompt_manager.gui.usage")
 

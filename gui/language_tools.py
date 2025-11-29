@@ -6,8 +6,11 @@ Updates: v0.1.0 - 2025-11-10 - Introduce lightweight language detection for quer
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 
 @dataclass(slots=True)

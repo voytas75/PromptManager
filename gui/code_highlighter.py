@@ -6,10 +6,13 @@ Updates: v0.1.0 - 2025-11-10 - Provide keyword-based highlighting for common lan
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from PySide6.QtGui import QColor, QFont, QSyntaxHighlighter, QTextCharFormat
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 
 @dataclass(slots=True)

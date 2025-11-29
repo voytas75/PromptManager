@@ -7,8 +7,8 @@ Updates: v0.1.0 - 2025-11-11 - Introduce notification bridge and history dialog.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtGui import QClipboard, QGuiApplication
@@ -28,6 +28,9 @@ from PySide6.QtWidgets import (
 from core.notifications import Notification, NotificationCenter, NotificationStatus
 
 from .toast import show_toast
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class QtNotificationBridge(QObject):

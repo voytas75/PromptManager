@@ -5,7 +5,6 @@ Updates: v0.2.0 - 2025-11-30 - Ensure GUI import helpers remain functional post-
 
 from __future__ import annotations
 
-import builtins
 import json
 import uuid
 from typing import TYPE_CHECKING
@@ -23,6 +22,7 @@ from core.catalog_importer import (
 from models.prompt_model import Prompt
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
+    import builtins
     from pathlib import Path
 
 

@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable, Iterable, Mapping, Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -18,6 +17,9 @@ from core.execution import (
     _supports_reasoning,
 )
 from models.prompt_model import Prompt
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable, Mapping, Sequence
 
 
 def _make_prompt() -> Prompt:

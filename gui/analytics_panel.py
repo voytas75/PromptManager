@@ -6,9 +6,9 @@ Updates: v0.1.0 - 2025-11-28 - Introduce dashboard tab with charts and CSV expor
 from __future__ import annotations
 
 import csv
-from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from PySide6.QtCharts import (
     QBarCategoryAxis,
@@ -39,6 +39,9 @@ from PySide6.QtWidgets import (
 from core import AnalyticsSnapshot, PromptManager, build_analytics_snapshot, snapshot_dataset_rows
 
 from .processing_indicator import ProcessingIndicator
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class AnalyticsDashboardPanel(QWidget):

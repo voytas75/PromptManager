@@ -5,8 +5,8 @@ Updates: v0.1.0 - 2025-11-29 - Introduce dedicated prompt template editor dialog
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from functools import partial
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -28,6 +28,9 @@ from prompt_templates import (
     PROMPT_TEMPLATE_KEYS,
     PROMPT_TEMPLATE_LABELS,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
 class PromptTemplateEditorDialog(QDialog):

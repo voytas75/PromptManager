@@ -9,14 +9,16 @@ Updates:
 from __future__ import annotations
 
 import threading
-from collections.abc import Callable
 from contextlib import AbstractContextManager
-from types import TracebackType
-from typing import TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 from PySide6.QtCore import QEventLoop, Qt
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QDialog, QLabel, QProgressBar, QVBoxLayout, QWidget
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from types import TracebackType
 
 _T = TypeVar("_T")
 

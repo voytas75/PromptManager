@@ -10,10 +10,8 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Sequence
 from dataclasses import dataclass
-
-logger = logging.getLogger(__name__)
+from typing import TYPE_CHECKING
 
 from prompt_templates import SCENARIO_GENERATION_PROMPT
 
@@ -22,6 +20,9 @@ from .litellm_adapter import (
     call_completion_with_fallback,
     get_completion,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class ScenarioGenerationError(Exception):
@@ -135,7 +136,7 @@ class LiteLLMScenarioGenerator:
                     # f‑string is evaluated prior to concatenation, so braces inside
                     # *context* remain intact.
                     "content": (
-                        f"Return up to {limit} scenarios describing when this prompt should be used.\n\n"
+                        f"Return up to {limit} usage scenarios for this prompt.\n\n"
                         f"Prompt:\n{context.strip()}"
                     ),
                 },
@@ -190,3 +191,4 @@ class LiteLLMScenarioGenerator:
 
 
 __all__ = ["LiteLLMScenarioGenerator", "ScenarioGenerationError"]
+logger = logging.getLogger(__name__)

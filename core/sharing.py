@@ -9,10 +9,12 @@ import json
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from core.exceptions import ShareProviderError
-from models.prompt_model import Prompt
+
+if TYPE_CHECKING:
+    from models.prompt_model import Prompt
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,7 +41,11 @@ class ShareProvider(Protocol):
 
     info: ShareProviderInfo
 
-    def share(self, payload: str, prompt: Prompt | None = None) -> ShareResult:  # pragma: no cover - Protocol
+    def share(
+        self,
+        payload: str,
+        prompt: Prompt | None = None,
+    ) -> ShareResult:  # pragma: no cover - Protocol
         """Share *payload* (optionally describing *prompt*) and return a :class:`ShareResult`."""
 
 
@@ -65,7 +71,7 @@ def format_prompt_for_share(
         if tags:
             lines.append(f"Tags: {tags}")
     if prompt.quality_score is not None and prompt.rating_count > 0:
-        lines.append(f"Quality score: {prompt.quality_score:.1f}/10 ({prompt.rating_count} ratings)")
+        lines.append(f"Quality: {prompt.quality_score:.1f}/10 ({prompt.rating_count} ratings)")
     lines.append("")
     if include_description:
         lines.append("## Description")
@@ -117,7 +123,10 @@ class ShareTextProvider:
         )
 
     def share(self, payload: str, prompt: Prompt | None = None) -> ShareResult:
-        body = json.dumps({"text": payload, "expiry": self._expiry}, ensure_ascii=False).encode("utf-8")
+        body = json.dumps(
+            {"text": payload, "expiry": self._expiry},
+            ensure_ascii=False,
+        ).encode("utf-8")
         request = urllib.request.Request(
             self._API_URL,
             data=body,

@@ -6,10 +6,12 @@ Updates: v0.1.0 - 2025-11-22 - Introduce PromptCategory dataclass and helpers.
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
 
 _SLUG_PATTERN = re.compile(r"[^a-z0-9]+")
 

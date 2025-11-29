@@ -7,7 +7,7 @@ Updates: v0.1.0 - 2025-12-06 - Initial implementation with CRUD actions.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QGuiApplication
@@ -29,9 +29,13 @@ from core import (
     PromptNoteError,
     PromptNoteStorageError,
 )
-from models.prompt_note import PromptNote
 
 from .dialogs import MarkdownPreviewDialog, PromptNoteDialog
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from models.prompt_note import PromptNote
 
 
 class NotesPanel(QWidget):

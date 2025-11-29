@@ -17,8 +17,8 @@ Updates: v0.1.0 - 2025-11-04 - Initial settings dialog implementation.
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Sequence
 from functools import partial
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QEvent, QSettings, Qt
 from PySide6.QtGui import QColor, QGuiApplication, QPalette
@@ -57,6 +57,9 @@ from prompt_templates import (
     PROMPT_TEMPLATE_KEYS,
     PROMPT_TEMPLATE_LABELS,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
 
 
 class SettingsDialog(QDialog):

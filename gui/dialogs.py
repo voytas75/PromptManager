@@ -63,12 +63,12 @@ import platform
 import re
 import textwrap
 import uuid
-from collections.abc import Callable, MutableMapping, Sequence
 from copy import deepcopy
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     NamedTuple,
     TypeVar,
@@ -142,6 +142,9 @@ from models.category_model import PromptCategory, slugify_category
 from models.prompt_model import Prompt, PromptVersion
 from models.prompt_note import PromptNote
 from models.response_style import ResponseStyle
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, MutableMapping, Sequence
 
 logger = logging.getLogger("prompt_manager.gui.dialogs")
 

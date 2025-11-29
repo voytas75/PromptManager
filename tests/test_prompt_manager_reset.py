@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import uuid
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from core.embedding import EmbeddingGenerationError
 from core.prompt_manager import PromptManager
 from core.repository import PromptRepository
 from models.prompt_model import Prompt, PromptExecution, UserProfile
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _make_prompt(name: str = "Diagnostics") -> Prompt:

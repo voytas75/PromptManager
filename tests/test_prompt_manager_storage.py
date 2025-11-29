@@ -8,9 +8,8 @@ Updates: v0.1.0 - 2025-10-31 - Introduce repository and manager storage integrat
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -24,6 +23,9 @@ from models.category_model import PromptCategory, slugify_category
 from models.prompt_model import Prompt, PromptVersion, UserProfile
 from models.prompt_note import PromptNote
 from models.response_style import ResponseStyle
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 def _make_prompt(name: str = "Sample Prompt") -> Prompt:

@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import builtins
 import json
 import sqlite3
 import types
 import uuid
 import zipfile
-from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -39,6 +37,8 @@ from models.prompt_model import ExecutionStatus, Prompt, PromptExecution, Prompt
 from prompt_templates import DEFAULT_PROMPT_TEMPLATES
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
+    import builtins
+    from collections.abc import Mapping, Sequence
     from pathlib import Path
 
 

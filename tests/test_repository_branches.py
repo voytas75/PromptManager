@@ -9,7 +9,7 @@ import sqlite3
 import uuid
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -28,6 +28,9 @@ from models.category_model import PromptCategory
 from models.prompt_model import ExecutionStatus, Prompt, PromptExecution
 from models.prompt_note import PromptNote
 from models.response_style import ResponseStyle
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _make_prompt(name: str = "Repo Branch Test") -> Prompt:

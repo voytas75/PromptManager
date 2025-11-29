@@ -5,9 +5,8 @@ Updates: v0.1.0 - 2025-11-10 - Introduce keyboard-driven quick action palette.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -22,7 +21,10 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from models.prompt_model import Prompt
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping, Sequence
+
+    from models.prompt_model import Prompt
 
 
 @dataclass(slots=True)

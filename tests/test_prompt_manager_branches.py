@@ -6,14 +6,12 @@ Updates: v0.1.0 - 2025-10-30 - Add unit tests for error handling and caching pat
 
 from __future__ import annotations
 
-import builtins
 import json
 import types
 import uuid
-from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -32,6 +30,10 @@ from core.prompt_manager import (
 )
 from models.category_model import PromptCategory, slugify_category
 from models.prompt_model import Prompt, PromptForkLink, PromptVersion, UserProfile
+
+if TYPE_CHECKING:
+    import builtins
+    from collections.abc import Sequence
 
 
 def _clone_prompt(prompt: Prompt) -> Prompt:

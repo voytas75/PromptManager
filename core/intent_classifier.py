@@ -233,9 +233,9 @@ def rank_by_hints[PromptLikeT: PromptLikeProtocol](
 ) -> list[PromptLikeT]:
     """Return prompts ordered by category/tag hints while preserving stability."""
 
-    matched: list[PromptLike] = []
-    secondary: list[PromptLike] = []
-    remainder: list[PromptLike] = []
+    matched: list[PromptLikeT] = []
+    secondary: list[PromptLikeT] = []
+    remainder: list[PromptLikeT] = []
 
     normalized_categories = {hint.lower() for hint in category_hints}
     normalized_tags = {hint.lower() for hint in tag_hints}

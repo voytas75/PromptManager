@@ -1,25 +1,27 @@
 """SQLite-backed repository for persistent prompt storage.
 
-Updates: v0.10.3 - 2025-11-28 - Add model usage and benchmark analytics queries for dashboards.
-Updates: v0.10.2 - 2025-11-28 - Add category prompt/execution aggregation helpers for maintenance workflows.
-Updates: v0.10.1 - 2025-11-27 - Add prompt part column to response styles for generalized prompt components.
-Updates: v0.10.0 - 2025-11-22 - Add prompt versioning and fork lineage persistence tables.
-Updates: v0.9.0 - 2025-12-08 - Remove task template persistence after feature retirement.
-Updates: v0.8.0 - 2025-12-06 - Add PromptNote persistence with CRUD helpers.
-Updates: v0.7.0 - 2025-12-05 - Add ResponseStyle persistence with CRUD helpers.
-Updates: v0.6.1 - 2025-11-30 - Add repository reset helper for maintenance workflows.
-Updates: v0.6.0 - 2025-11-25 - Add prompt catalogue statistics accessor for maintenance UI.
-Updates: v0.5.1 - 2025-11-19 - Persist prompt usage scenarios alongside prompt records.
-Updates: v0.4.0 - 2025-11-11 - Persist single-user profile preferences alongside prompts.
-Updates: v0.3.0 - 2025-11-09 - Add rating aggregation columns and execution rating support.
-Updates: v0.2.0 - 2025-11-08 - Add prompt execution history persistence APIs.
-Updates: v0.1.0 - 2025-10-31 - Introduce PromptRepository syncing Prompt dataclass with SQLite.
+Updates:
+  v0.10.4 - 2025-11-29 - Gate typing-only imports and add repository logger.
+  v0.10.3 - 2025-11-28 - Add usage and benchmark analytics queries.
+  v0.10.2 - 2025-11-28 - Add category aggregation helpers for maintenance.
+  v0.10.1 - 2025-11-27 - Add prompt part column to response styles.
+  v0.10.0 - 2025-11-22 - Add prompt versioning and fork lineage tables.
+  v0.9.0 - 2025-12-08 - Remove task template persistence after retirement.
+  v0.8.0 - 2025-12-06 - Add PromptNote persistence with CRUD helpers.
+  v0.7.0 - 2025-12-05 - Add ResponseStyle persistence with CRUD helpers.
+  v0.6.1 - 2025-11-30 - Add repository reset helper for maintenance.
+  v0.6.0 - 2025-11-25 - Add prompt catalogue statistics accessor.
+  v0.5.1 - 2025-11-19 - Persist prompt usage scenarios with prompts.
+  v0.4.0 - 2025-11-11 - Persist single-user profile preferences.
+  v0.3.0 - 2025-11-09 - Add rating aggregation and execution history.
+  v0.2.0 - 2025-11-08 - Add prompt execution history persistence APIs.
+  v0.1.0 - 2025-10-31 - Introduce PromptRepository for SQLite storage.
 """
 
 from __future__ import annotations
 
-import builtins
 import json
+import logging
 import sqlite3
 import uuid
 from collections.abc import Sequence
@@ -39,6 +41,8 @@ from models.prompt_model import (
 )
 from models.prompt_note import PromptNote
 from models.response_style import ResponseStyle
+
+logger = logging.getLogger("prompt_manager.repository")
 
 
 @dataclass(slots=True, frozen=True)
@@ -78,6 +82,14 @@ def _connect(db_path: Path) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode = WAL;")
     conn.execute("PRAGMA synchronous = NORMAL;")
     return conn
+
+
+def _stringify_uuid(value: uuid.UUID | str) -> str:
+    """Return a canonical UUID string for storage."""
+
+    if isinstance(value, uuid.UUID):
+        return str(value)
+    return str(uuid.UUID(str(value)))
 
 
 def _json_dumps(value: Any | None) -> str | None:
@@ -339,7 +351,7 @@ class PromptRepository:
             with _connect(self._db_path) as conn:
                 cursor = conn.execute(
                     "SELECT * FROM prompts WHERE id = ?;",
-                    (str(prompt_id),),
+                    (_stringify_uuid(prompt_id),),
                 )
                 row = cursor.fetchone()
         except sqlite3.Error as exc:
@@ -374,7 +386,7 @@ class PromptRepository:
             with _connect(self._db_path) as conn:
                 cursor = conn.execute(
                     "DELETE FROM prompts WHERE id = ?;",
-                    (str(prompt_id),),
+                    (_stringify_uuid(prompt_id),),
                 )
                 if cursor.rowcount == 0:
                     raise RepositoryNotFoundError(f"Prompt {prompt_id} not found")
@@ -385,7 +397,7 @@ class PromptRepository:
 
     # Category management ------------------------------------------------ #
 
-    def list_categories(self, include_archived: bool = False) -> builtins.list[PromptCategory]:
+    def list_categories(self, include_archived: bool = False) -> list[PromptCategory]:
         """Return all stored categories."""
 
         query = "SELECT * FROM prompt_categories"
@@ -524,7 +536,7 @@ class PromptRepository:
     def sync_category_definitions(
         self,
         categories: Sequence[PromptCategory],
-    ) -> builtins.list[PromptCategory]:
+    ) -> list[PromptCategory]:
         """Ensure the provided categories exist; return any newly created ones."""
 
         existing = {category.slug for category in self.list_categories(include_archived=True)}
@@ -577,7 +589,7 @@ class PromptRepository:
                     ) VALUES (?, ?, ?, ?, ?, ?);
                     """,
                     (
-                        str(prompt.id),
+                        _stringify_uuid(prompt.id),
                         parent_id,
                         version_number,
                         timestamp,
@@ -587,8 +599,10 @@ class PromptRepository:
                 )
                 version_id = cursor.lastrowid
                 row = conn.execute(
-                    "SELECT version_id, prompt_id, parent_version, version_number, created_at, commit_message, snapshot_json "
-                    "FROM prompt_versions WHERE version_id = ?;",
+                    (
+                        "SELECT version_id, prompt_id, parent_version, version_number, created_at, "
+                        "commit_message, snapshot_json FROM prompt_versions WHERE version_id = ?;"
+                    ),
                     (version_id,),
                 ).fetchone()
         except sqlite3.Error as exc:
@@ -604,14 +618,15 @@ class PromptRepository:
         prompt_id: uuid.UUID,
         *,
         limit: int | None = None,
-    ) -> builtins.list[PromptVersion]:
+    ) -> list[PromptVersion]:
         """Return stored versions for a prompt ordered by newest first."""
 
         query = (
-            "SELECT version_id, prompt_id, parent_version, version_number, created_at, commit_message, snapshot_json "
-            "FROM prompt_versions WHERE prompt_id = ? ORDER BY version_number DESC"
+            "SELECT version_id, prompt_id, parent_version, version_number, created_at, "
+            "commit_message, snapshot_json FROM prompt_versions WHERE prompt_id = ? "
+            "ORDER BY version_number DESC"
         )
-        params: list[Any] = [str(prompt_id)]
+        params: list[Any] = [_stringify_uuid(prompt_id)]
         if limit is not None:
             query += " LIMIT ?"
             params.append(int(limit))
@@ -631,8 +646,10 @@ class PromptRepository:
         try:
             with _connect(self._db_path) as conn:
                 row = conn.execute(
-                    "SELECT version_id, prompt_id, parent_version, version_number, created_at, commit_message, snapshot_json "
-                    "FROM prompt_versions WHERE version_id = ?;",
+                    (
+                        "SELECT version_id, prompt_id, parent_version, version_number, created_at, "
+                        "commit_message, snapshot_json FROM prompt_versions WHERE version_id = ?;"
+                    ),
                     (int(version_id),),
                 ).fetchone()
         except sqlite3.Error as exc:
@@ -649,9 +666,12 @@ class PromptRepository:
         try:
             with _connect(self._db_path) as conn:
                 row = conn.execute(
-                    "SELECT version_id, prompt_id, parent_version, version_number, created_at, commit_message, snapshot_json "
-                    "FROM prompt_versions WHERE prompt_id = ? ORDER BY version_number DESC LIMIT 1;",
-                    (str(prompt_id),),
+                    (
+                        "SELECT version_id, prompt_id, parent_version, version_number, created_at, "
+                        "commit_message, snapshot_json FROM prompt_versions WHERE prompt_id = ? "
+                        "ORDER BY version_number DESC LIMIT 1;"
+                    ),
+                    (_stringify_uuid(prompt_id),),
                 ).fetchone()
         except sqlite3.Error as exc:
             raise RepositoryError("Failed to load latest prompt version") from exc
@@ -670,7 +690,7 @@ class PromptRepository:
         timestamp = datetime.now(UTC).isoformat()
         try:
             with _connect(self._db_path) as conn:
-                cursor = conn.execute(
+                conn.execute(
                     """
                     INSERT INTO prompt_forks (source_prompt_id, child_prompt_id, created_at)
                     VALUES (?, ?, ?)
@@ -678,12 +698,18 @@ class PromptRepository:
                         source_prompt_id = excluded.source_prompt_id,
                         created_at = excluded.created_at;
                     """,
-                    (str(source_prompt_id), str(child_prompt_id), timestamp),
+                    (
+                        _stringify_uuid(source_prompt_id),
+                        _stringify_uuid(child_prompt_id),
+                        timestamp,
+                    ),
                 )
-                fork_id = cursor.lastrowid
                 row = conn.execute(
-                    "SELECT fork_id, source_prompt_id, child_prompt_id, created_at FROM prompt_forks WHERE child_prompt_id = ?;",
-                    (str(child_prompt_id),),
+                    (
+                        "SELECT fork_id, source_prompt_id, child_prompt_id, created_at "
+                        "FROM prompt_forks WHERE child_prompt_id = ?;"
+                    ),
+                    (_stringify_uuid(child_prompt_id),),
                 ).fetchone()
         except sqlite3.Error as exc:
             raise RepositoryError("Failed to record prompt fork") from exc
@@ -699,9 +725,12 @@ class PromptRepository:
         try:
             with _connect(self._db_path) as conn:
                 row = conn.execute(
-                    "SELECT fork_id, source_prompt_id, child_prompt_id, created_at FROM prompt_forks "
-                    "WHERE child_prompt_id = ? ORDER BY datetime(created_at) DESC LIMIT 1;",
-                    (str(prompt_id),),
+                    (
+                        "SELECT fork_id, source_prompt_id, child_prompt_id, created_at "
+                        "FROM prompt_forks WHERE child_prompt_id = ? ORDER BY datetime(created_at) DESC "
+                        "LIMIT 1;"
+                    ),
+                    (_stringify_uuid(prompt_id),),
                 ).fetchone()
         except sqlite3.Error as exc:
             raise RepositoryError("Failed to load prompt parent fork") from exc
@@ -710,15 +739,17 @@ class PromptRepository:
             return None
         return PromptForkLink.from_row(row)
 
-    def list_prompt_children(self, prompt_id: uuid.UUID) -> builtins.list[PromptForkLink]:
+    def list_prompt_children(self, prompt_id: uuid.UUID) -> list[PromptForkLink]:
         """Return lineage entries for prompts forked from the provided prompt."""
 
         try:
             with _connect(self._db_path) as conn:
                 cursor = conn.execute(
-                    "SELECT fork_id, source_prompt_id, child_prompt_id, created_at FROM prompt_forks "
-                    "WHERE source_prompt_id = ? ORDER BY datetime(created_at) DESC;",
-                    (str(prompt_id),),
+                    (
+                        "SELECT fork_id, source_prompt_id, child_prompt_id, created_at "
+                        "FROM prompt_forks WHERE source_prompt_id = ? ORDER BY datetime(created_at) DESC;"
+                    ),
+                    (_stringify_uuid(prompt_id),),
                 )
                 rows = cursor.fetchall()
         except sqlite3.Error as exc:
@@ -726,7 +757,7 @@ class PromptRepository:
 
         return [PromptForkLink.from_row(row) for row in rows]
 
-    def list(self, limit: int | None = None) -> builtins.list[Prompt]:
+    def list(self, limit: int | None = None) -> list[Prompt]:
         """Return prompts ordered by most recently modified."""
         # For deterministic unit tests ensure stable ordering when a small
         # *limit* is requested – return oldest first so callers get predictable
@@ -767,7 +798,7 @@ class PromptRepository:
             with _connect(self._db_path) as conn:
                 cursor = conn.execute(
                     "SELECT * FROM prompt_executions WHERE id = ?;",
-                    (str(execution_id),),
+                    (_stringify_uuid(execution_id),),
                 )
                 row = cursor.fetchone()
         except sqlite3.Error as exc:
@@ -780,7 +811,7 @@ class PromptRepository:
         self,
         *,
         limit: int | None = None,
-    ) -> builtins.list[PromptExecution]:
+    ) -> list[PromptExecution]:
         """Return executions ordered by most recent first."""
         clause = "ORDER BY datetime(executed_at) DESC"
         if limit is not None:
@@ -799,10 +830,10 @@ class PromptRepository:
         prompt_id: uuid.UUID,
         *,
         limit: int | None = None,
-    ) -> builtins.list[PromptExecution]:
+    ) -> list[PromptExecution]:
         """Return execution history for a given prompt."""
         clause = "WHERE prompt_id = ? ORDER BY datetime(executed_at) DESC"
-        params: list[Any] = [str(prompt_id)]
+        params: list[Any] = [_stringify_uuid(prompt_id)]
         if limit is not None:
             clause += f" LIMIT {int(limit)}"
         query = f"SELECT * FROM prompt_executions {clause};"
@@ -822,7 +853,7 @@ class PromptRepository:
         search: str | None = None,
         limit: int | None = None,
         order_desc: bool = True,
-    ) -> builtins.list[PromptExecution]:
+    ) -> list[PromptExecution]:
         """Return executions filtered by status, prompt, and search term."""
 
         query = "SELECT * FROM prompt_executions"
@@ -834,7 +865,7 @@ class PromptRepository:
             params.append(status)
         if prompt_id:
             conditions.append("prompt_id = ?")
-            params.append(str(prompt_id))
+            params.append(_stringify_uuid(prompt_id))
         if search:
             like = f"%{search.lower()}%"
             conditions.append(
@@ -867,7 +898,7 @@ class PromptRepository:
         *,
         since: datetime | None = None,
         limit: int = 5,
-    ) -> tuple[dict[str, Any], builtins.list[dict[str, Any]]]:
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         """Return overall and per-prompt execution aggregates."""
 
         limit_value = max(1, int(limit)) if limit else 5
@@ -927,7 +958,7 @@ class PromptRepository:
         self,
         *,
         since: datetime | None = None,
-    ) -> builtins.list[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Return aggregated token usage grouped by model identifier."""
 
         filters = ["metadata IS NOT NULL", "json_valid(metadata)"]
@@ -946,7 +977,8 @@ class PromptRepository:
             ") AS model, "
             "COUNT(*) AS run_count, "
             "SUM(COALESCE(json_extract(metadata, '$.usage.prompt_tokens'), 0)) AS prompt_tokens, "
-            "SUM(COALESCE(json_extract(metadata, '$.usage.completion_tokens'), 0)) AS completion_tokens, "
+            "SUM(COALESCE(json_extract(metadata, '$.usage.completion_tokens'), 0)) "
+            "AS completion_tokens, "
             "SUM(COALESCE(json_extract(metadata, '$.usage.total_tokens'), 0)) AS total_tokens "
             "FROM prompt_executions "
             f"{where_clause} "
@@ -968,7 +1000,7 @@ class PromptRepository:
         self,
         *,
         since: datetime | None = None,
-    ) -> builtins.list[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Return aggregated metrics for persisted benchmark executions."""
 
         filters = [
@@ -1018,7 +1050,7 @@ class PromptRepository:
         """Return aggregate execution metrics for a single prompt."""
 
         filters = ["prompt_id = ?"]
-        params: list[Any] = [str(prompt_id)]
+        params: list[Any] = [_stringify_uuid(prompt_id)]
         if since is not None:
             filters.append("datetime(executed_at) >= ?")
             params.append(since.isoformat())
@@ -1125,7 +1157,7 @@ class PromptRepository:
     def _prompt_to_row(self, prompt: Prompt) -> dict[str, Any]:
         """Convert Prompt into SQLite-friendly mapping."""
         return {
-            "id": str(prompt.id),
+            "id": _stringify_uuid(prompt.id),
             "name": prompt.name,
             "description": prompt.description,
             "category": prompt.category,
@@ -1302,8 +1334,11 @@ class PromptRepository:
         """Return the next version number for the given prompt."""
 
         row = conn.execute(
-            "SELECT COALESCE(MAX(version_number), 0) AS current FROM prompt_versions WHERE prompt_id = ?;",
-            (str(prompt_id),),
+            (
+                "SELECT COALESCE(MAX(version_number), 0) AS current FROM prompt_versions "
+                "WHERE prompt_id = ?;"
+            ),
+            (_stringify_uuid(prompt_id),),
         ).fetchone()
         current = row["current"] if row is not None else 0
         current_value = int(current or 0)
@@ -1317,8 +1352,11 @@ class PromptRepository:
         """Return the version_id for the latest version of a prompt."""
 
         row = conn.execute(
-            "SELECT version_id FROM prompt_versions WHERE prompt_id = ? ORDER BY version_number DESC LIMIT 1;",
-            (str(prompt_id),),
+            (
+                "SELECT version_id FROM prompt_versions WHERE prompt_id = ? "
+                "ORDER BY version_number DESC LIMIT 1;"
+            ),
+            (_stringify_uuid(prompt_id),),
         ).fetchone()
         if row is None:
             return None
@@ -1384,10 +1422,12 @@ class PromptRepository:
             """
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_prompt_categories_active ON prompt_categories(is_active);"
+            "CREATE INDEX IF NOT EXISTS idx_prompt_categories_active "
+            "ON prompt_categories(is_active);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_prompt_categories_parent ON prompt_categories(parent_slug);"
+            "CREATE INDEX IF NOT EXISTS idx_prompt_categories_parent "
+            "ON prompt_categories(parent_slug);"
         )
         conn.execute(
             """
@@ -1400,15 +1440,18 @@ class PromptRepository:
                 commit_message TEXT,
                 snapshot_json TEXT NOT NULL,
                 FOREIGN KEY(prompt_id) REFERENCES prompts(id) ON DELETE CASCADE,
-                FOREIGN KEY(parent_version) REFERENCES prompt_versions(version_id) ON DELETE SET NULL
+                FOREIGN KEY(parent_version) REFERENCES prompt_versions(version_id)
+                    ON DELETE SET NULL
             );
             """
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_prompt_versions_prompt_id ON prompt_versions(prompt_id);"
+            "CREATE INDEX IF NOT EXISTS idx_prompt_versions_prompt_id "
+            "ON prompt_versions(prompt_id);"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_prompt_versions_created_at ON prompt_versions(created_at);"
+            "CREATE INDEX IF NOT EXISTS idx_prompt_versions_created_at "
+            "ON prompt_versions(created_at);"
         )
         conn.execute(
             """
@@ -1423,7 +1466,8 @@ class PromptRepository:
             """
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_prompt_forks_source ON prompt_forks(source_prompt_id);"
+            "CREATE INDEX IF NOT EXISTS idx_prompt_forks_source "
+            "ON prompt_forks(source_prompt_id);"
         )
         conn.execute(
             """
@@ -1553,7 +1597,7 @@ class PromptRepository:
         if existing_profile is None:
             conn.execute(
                 "INSERT INTO user_profile (id, username, updated_at) VALUES (?, ?, ?);",
-                (str(DEFAULT_PROFILE_ID), "default", datetime.now(UTC).isoformat()),
+                (_stringify_uuid(DEFAULT_PROFILE_ID), "default", datetime.now(UTC).isoformat()),
             )
 
     def _backfill_category_slugs(self, conn: sqlite3.Connection) -> None:
@@ -1561,8 +1605,8 @@ class PromptRepository:
 
         try:
             cursor = conn.execute(
-                "SELECT id, category FROM prompts WHERE (category_slug IS NULL OR category_slug = '') "
-                "AND category IS NOT NULL AND TRIM(category) != '';"
+                "SELECT id, category FROM prompts WHERE (category_slug IS NULL OR "
+                "category_slug = '') AND category IS NOT NULL AND TRIM(category) != '';"
             )
             rows = cursor.fetchall()
             for row in rows:
@@ -1590,7 +1634,7 @@ class PromptRepository:
                 conn.execute("DELETE FROM user_profile;")
                 conn.execute(
                     "INSERT INTO user_profile (id, username, updated_at) VALUES (?, ?, ?);",
-                    (str(DEFAULT_PROFILE_ID), "default", datetime.now(UTC).isoformat()),
+                    (_stringify_uuid(DEFAULT_PROFILE_ID), "default", datetime.now(UTC).isoformat()),
                 )
         except sqlite3.Error as exc:
             raise RepositoryError("Failed to reset repository data") from exc
@@ -1745,7 +1789,7 @@ class PromptRepository:
             with _connect(self._db_path) as conn:
                 cursor = conn.execute(
                     "SELECT * FROM response_styles WHERE id = ?;",
-                    (str(style_id),),
+                    (_stringify_uuid(style_id),),
                 )
                 row = cursor.fetchone()
         except sqlite3.Error as exc:
@@ -1759,7 +1803,7 @@ class PromptRepository:
         *,
         include_inactive: bool = False,
         search: str | None = None,
-    ) -> builtins.list[ResponseStyle]:
+    ) -> list[ResponseStyle]:
         """Return stored response styles ordered by case-insensitive name."""
 
         query = "SELECT * FROM response_styles"
@@ -1790,7 +1834,7 @@ class PromptRepository:
             with _connect(self._db_path) as conn:
                 deleted = conn.execute(
                     "DELETE FROM response_styles WHERE id = ?;",
-                    (str(style_id),),
+                    (_stringify_uuid(style_id),),
                 ).rowcount
         except sqlite3.Error as exc:
             raise RepositoryError(f"Failed to delete response style {style_id}") from exc
@@ -1803,8 +1847,9 @@ class PromptRepository:
         """Insert a new prompt note."""
 
         payload = self._note_to_row(note)
+        column_list = ", ".join(self._NOTE_COLUMNS)
         placeholders = ", ".join(f":{column}" for column in self._NOTE_COLUMNS)
-        query = f"INSERT INTO prompt_notes ({', '.join(self._NOTE_COLUMNS)}) VALUES ({placeholders});"
+        query = f"INSERT INTO prompt_notes ({column_list}) VALUES ({placeholders});"
         try:
             with _connect(self._db_path) as conn:
                 conn.execute(query, payload)
@@ -1838,7 +1883,7 @@ class PromptRepository:
             with _connect(self._db_path) as conn:
                 cursor = conn.execute(
                     "SELECT * FROM prompt_notes WHERE id = ?;",
-                    (str(note_id),),
+                    (_stringify_uuid(note_id),),
                 )
                 row = cursor.fetchone()
         except sqlite3.Error as exc:
@@ -1847,7 +1892,7 @@ class PromptRepository:
             raise RepositoryNotFoundError(f"Prompt note {note_id} not found")
         return self._row_to_note(row)
 
-    def list_prompt_notes(self) -> builtins.list[PromptNote]:
+    def list_prompt_notes(self) -> list[PromptNote]:
         """Return stored prompt notes ordered by modification time."""
 
         try:
@@ -1866,19 +1911,19 @@ class PromptRepository:
             with _connect(self._db_path) as conn:
                 deleted = conn.execute(
                     "DELETE FROM prompt_notes WHERE id = ?;",
-                    (str(note_id),),
+                    (_stringify_uuid(note_id),),
                 ).rowcount
         except sqlite3.Error as exc:
             raise RepositoryError(f"Failed to delete prompt note {note_id}") from exc
         if deleted == 0:
             raise RepositoryNotFoundError(f"Prompt note {note_id} not found")
 
-    def get_prompts_for_ids(self, prompt_ids: Sequence[uuid.UUID]) -> builtins.list[Prompt]:
+    def get_prompts_for_ids(self, prompt_ids: Sequence[uuid.UUID]) -> list[Prompt]:
         """Return prompts that match provided identifiers in input order."""
 
         if not prompt_ids:
             return []
-        ids = [str(pid) for pid in prompt_ids]
+        ids = [_stringify_uuid(pid) for pid in prompt_ids]
         placeholders = ", ".join("?" for _ in ids)
         query = f"SELECT * FROM prompts WHERE id IN ({placeholders});"
         try:

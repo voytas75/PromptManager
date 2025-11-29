@@ -8,12 +8,9 @@ Updates: v0.1.0 - 2025-11-08 - Provide filterable, editable execution history wo
 from __future__ import annotations
 
 import csv
-import uuid
-from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -41,6 +38,11 @@ from core import (
 from models.prompt_model import ExecutionStatus, PromptExecution
 
 from .dialogs import SaveResultDialog
+
+if TYPE_CHECKING:
+    import uuid
+    from collections.abc import Callable
+    from datetime import datetime
 
 
 @dataclass(slots=True)

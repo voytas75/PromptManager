@@ -9,16 +9,19 @@ from __future__ import annotations
 
 import os
 import sys
-from collections.abc import MutableMapping, Sequence
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
-from config import PromptManagerSettings
-from core import PromptManager
-
 from .main_window import MainWindow
 from .resources import load_application_icon
+
+if TYPE_CHECKING:
+    from collections.abc import MutableMapping, Sequence
+
+    from config import PromptManagerSettings
+    from core import PromptManager
 
 _DISPLAY_ENV_VARS = ("DISPLAY", "WAYLAND_DISPLAY", "MIR_SOCKET")
 

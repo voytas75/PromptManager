@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -13,6 +12,9 @@ from core.scenario_generation import (
     _extract_candidates,
     _normalise_scenarios,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Sequence
 
 
 def test_normalise_scenarios_trims_and_limits() -> None:

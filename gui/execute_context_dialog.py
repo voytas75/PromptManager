@@ -5,7 +5,7 @@ Updates: v0.1.0 - 2025-11-26 - Add execute-as-context history picker dialog.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QTextCursor
@@ -19,6 +19,9 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QVBoxLayout,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class ExecuteContextDialog(QDialog):
