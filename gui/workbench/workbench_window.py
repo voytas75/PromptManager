@@ -1,6 +1,7 @@
 """Qt widgets for the Enhanced Prompt Workbench experience.
 
 Updates:
+  v0.1.6 - 2025-11-29 - Apply palette snapshots to wizard styling for consistent themes.
   v0.1.5 - 2025-11-29 - Rely on native palette for wizard styling to match host themes.
   v0.1.4 - 2025-11-29 - Apply palette-aware stylesheet for portable wizard colors.
   v0.1.3 - 2025-11-29 - Prevent guided wizard palette updates from re-triggering change events.
@@ -419,16 +420,68 @@ class GuidedPromptWizard(QWizard):
         try:
             self.setPalette(palette)
             self.setAutoFillBackground(True)
+            window_color = palette.color(QPalette.Window).name()
+            window_text = palette.color(QPalette.WindowText).name()
+            base_color = palette.color(QPalette.Base).name()
+            button_color = palette.color(QPalette.Button).name()
+            button_text = palette.color(QPalette.ButtonText).name()
+            mid_color = palette.color(QPalette.Mid).name()
+            highlight_color = palette.color(QPalette.Highlight).name()
             palette_snapshot = {
-                "window": palette.color(QPalette.Window).name(),
-                "window_text": palette.color(QPalette.WindowText).name(),
-                "base": palette.color(QPalette.Base).name(),
-                "button": palette.color(QPalette.Button).name(),
-                "mid": palette.color(QPalette.Mid).name(),
-                "highlight": palette.color(QPalette.Highlight).name(),
+                "window": window_color,
+                "window_text": window_text,
+                "base": base_color,
+                "button": button_color,
+                "mid": mid_color,
+                "highlight": highlight_color,
             }
             logger.debug("GUIDED_PALETTE snapshot=%s", palette_snapshot)
-            self.setStyleSheet("")
+            stylesheet = textwrap.dedent(
+                f"""
+                QWizard,
+                QWizardPage {{
+                    background-color: {window_color};
+                    color: {window_text};
+                }}
+                QWizard::header {{
+                    background-color: {window_color};
+                    border-bottom: 1px solid {mid_color};
+                }}
+                QWizard::sidepanel {{
+                    background-color: {window_color};
+                }}
+                QLabel {{
+                    color: {window_text};
+                }}
+                QStackedWidget {{
+                    background-color: {base_color};
+                }}
+                QLineEdit,
+                QPlainTextEdit,
+                QComboBox,
+                QTextEdit {{
+                    background-color: {base_color};
+                    color: {window_text};
+                    border: 1px solid {mid_color};
+                }}
+                QPushButton {{
+                    background-color: {button_color};
+                    color: {button_text};
+                    border: 1px solid {mid_color};
+                    border-radius: 4px;
+                    padding: 4px 10px;
+                }}
+                QPushButton:hover {{
+                    background-color: {highlight_color};
+                    color: {window_text};
+                }}
+                QPushButton:pressed {{
+                    background-color: {mid_color};
+                    color: {window_text};
+                }}
+                """
+            ).strip()
+            self.setStyleSheet(stylesheet)
             for page in (self._goal_page, self._context_page, self._detail_page):
                 page.setPalette(palette)
                 page.setAutoFillBackground(True)
