@@ -1,6 +1,7 @@
 """LiteLLM-backed prompt metadata generation utilities.
 
 Updates:
+  v0.7.8 - 2025-11-29 - Move Sequence import behind TYPE_CHECKING per Ruff TC003.
   v0.7.7 - 2025-11-29 - Guard PromptCategory import for typing and wrap long literals.
   v0.7.6 - 2025-11-24 - Add category suggestion helper leveraging LiteLLM.
   v0.7.5 - 2025-11-23 - Allow custom system prompt overrides supplied via settings.
@@ -17,7 +18,6 @@ Updates:
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -34,6 +34,8 @@ from .litellm_adapter import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover - imported for annotations only
+    from collections.abc import Sequence
+
     from models.category_model import PromptCategory
 
 logger = logging.getLogger(__name__)

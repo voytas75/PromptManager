@@ -1,6 +1,7 @@
 """Prompt execution history tracking utilities.
 
 Updates:
+  v0.3.3 - 2025-11-29 - Move Mapping import into TYPE_CHECKING for Ruff TC003.
   v0.3.2 - 2025-11-29 - Reformat docstring to satisfy Ruff line length limits.
   v0.3.1 - 2025-11-28 - Add per-prompt analytics helper for benchmarks and maintenance surfaces.
   v0.3.0 - 2025-11-24 - Persist execution context metadata (response styles, runtime config).
@@ -12,13 +13,16 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 
 from models.prompt_model import ExecutionStatus, PromptExecution
 
 from .repository import PromptRepository, RepositoryError, RepositoryNotFoundError
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 _DEFAULT_MAX_REQUEST_LENGTH = 16_000
 _DEFAULT_MAX_RESPONSE_LENGTH = 24_000

@@ -13,19 +13,23 @@ Usage (internal):
     >>> storage = PromptStorage(db_path="data/prompt_manager.db")
     >>> prompt = storage.get("prompt_123")
 
-Updates: v0.14.0 – 2025‑11‑18 – Initial scaffold with proxy implementation.
+Updates:
+  v0.14.1 - 2025-11-29 - Move typing-only imports behind TYPE_CHECKING and wrap init.
+  v0.14.0 - 2025-11-18 - Initial scaffold with proxy implementation.
 """
 
 from __future__ import annotations
 
 import threading
-from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
-
-from models.prompt_model import Prompt
+from typing import TYPE_CHECKING, Any
 
 from ..repository import PromptRepository  # relative to core package
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from models.prompt_model import Prompt
 
 # Public re‑export to keep mypy/pyright consumers happy
 __all__ = ["PromptStorage"]
@@ -42,7 +46,12 @@ class PromptStorage:
 
     _lock: threading.RLock
 
-    def __init__(self, db_path: str | Path | None = None, *, repository: PromptRepository | None = None):
+    def __init__(
+        self,
+        db_path: str | Path | None = None,
+        *,
+        repository: PromptRepository | None = None,
+    ) -> None:
         self._lock = threading.RLock()
 
         if repository is not None:

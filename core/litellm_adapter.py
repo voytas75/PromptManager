@@ -1,6 +1,7 @@
 """Shared LiteLLM adapters for Prompt Manager.
 
 Updates:
+  v0.7.2 - 2025-11-29 - Gate typing-only collection imports for Ruff TC003 compliance.
   v0.7.1 - 2025-11-29 - Reformat docstring and wrap long retry diagnostics strings.
   v0.7.0 - 2025-11-02 - Strip drop parameters before LiteLLM retries to match provider support.
   v0.6.3 - 2025-11-17 - Retry completion calls without unsupported parameters rejected by models.
@@ -13,7 +14,10 @@ from __future__ import annotations
 
 import importlib
 import logging
-from collections.abc import Callable, Iterable, Sequence
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable, Sequence
 
 
 class LiteLLMNotInstalledError(RuntimeError):

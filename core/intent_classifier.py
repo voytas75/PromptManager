@@ -1,16 +1,20 @@
 """Intent classification helpers for intent-aware prompt suggestions.
 
-Updates: v0.6.0 - 2025-11-06 - Provide rule-based classifier aligned with hybrid retrieval plan.
+Updates:
+  v0.6.1 - 2025-11-29 - Adopt PEP 695 generics and gate typing-only imports for Ruff.
+  v0.6.0 - 2025-11-06 - Provide rule-based classifier aligned with hybrid retrieval plan.
 """
 
 from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Protocol, TypeVar
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
 
 logger = logging.getLogger(__name__)
 
@@ -205,15 +209,28 @@ class IntentClassifier:
         return prediction
 
 
-PromptLike = TypeVar("PromptLike", bound="PromptLikeProtocol")
+class PromptLikeProtocol(Protocol):
+    """Structural type describing objects accepted by `rank_by_hints`."""
+
+    @property
+    def id(self) -> object:  # pragma: no cover - attribute hints only
+        ...
+
+    @property
+    def category(self) -> str:  # pragma: no cover - attribute hints only
+        ...
+
+    @property
+    def tags(self) -> Sequence[str]:  # pragma: no cover - attribute hints only
+        ...
 
 
-def rank_by_hints(
-    prompts: Iterable[PromptLike],
+def rank_by_hints[PromptLikeT: PromptLikeProtocol](
+    prompts: Iterable[PromptLikeT],
     *,
     category_hints: Sequence[str],
     tag_hints: Sequence[str],
-) -> list[PromptLike]:
+) -> list[PromptLikeT]:
     """Return prompts ordered by category/tag hints while preserving stability."""
 
     matched: list[PromptLike] = []
@@ -238,22 +255,6 @@ def rank_by_hints(
             remainder.append(prompt)
 
     return [*matched, *secondary, *remainder]
-
-
-class PromptLikeProtocol(Protocol):
-    """Structural type describing objects accepted by `rank_by_hints`."""
-
-    @property
-    def id(self) -> object:  # pragma: no cover - attribute hints only
-        ...
-
-    @property
-    def category(self) -> str:  # pragma: no cover - attribute hints only
-        ...
-
-    @property
-    def tags(self) -> Sequence[str]:  # pragma: no cover - attribute hints only
-        ...
 
 
 __all__ = [

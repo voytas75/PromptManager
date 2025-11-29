@@ -38,14 +38,14 @@ dev = [
     "pytest-xdist==3.8.0",
     "pyright==1.1.407",
     "ruff==0.14.7",
-    "pytest-asyncio==0.24.0",  # Latest as of Nov 2025
-    "hypothesis==6.116.0",     # Latest
-    "respx==0.21.0",           # Latest
-    "vcrpy==6.0.1",            # Latest
-    "pytest-mock==3.14.0",     # Latest
-    "bandit==1.7.9",           # For security lints
-    "py-spy==0.3.14",          # For profiling
-    "tenacity==9.0.0",         # For retries
+    "pytest-asyncio==1.3.0",  # Updated to support pytest 9.x
+    "hypothesis==6.116.0",
+    "respx==0.21.0",
+    "vcrpy==6.0.1",
+    "pytest-mock==3.14.0",
+    "bandit==1.7.9",
+    "py-spy==0.3.14",
+    "tenacity==9.0.0",
 ]
 
 [tool.setuptools.packages.find]

@@ -1,6 +1,7 @@
 """Application-wide notification infrastructure for long-running tasks.
 
 Updates:
+  v0.1.2 - 2025-11-29 - Move Callable/Iterator imports under TYPE_CHECKING per lint.
   v0.1.1 - 2025-11-29 - Reformat docstring and wrap subscription constructor signature.
   v0.1.0 - 2025-11-11 - Introduce notification hub with task tracking helpers.
 """
@@ -12,12 +13,14 @@ import threading
 import time
 import uuid
 from collections import deque
-from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
 
 logger = logging.getLogger("prompt_manager.notifications")
 

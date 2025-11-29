@@ -1,23 +1,28 @@
 """Execution façade for Prompt Manager.
 
-This module provides lightweight wrappers around the existing low‑level
-executor classes (e.g. :class:`core.execution.CodexExecutor`).  The goal is to
-decouple the high‑level PromptManager API from direct dependency on a specific
-implementation so that we may later introduce alternative execution back‑ends
+This module provides lightweight wrappers around the existing low-level
+executor classes (e.g. :class:`core.execution.CodexExecutor`). The goal is to
+decouple the high-level PromptManager API from direct dependency on a specific
+implementation so that we may later introduce alternative execution back-ends
 (streaming, batch, mock for testing) without touching calling code.
 
-Updates: v0.14.1 – 2025‑11‑27 – Align façade with CodexExecutor prompt-centric API.
-Updates: v0.14.0 – 2025‑11‑18 – Initial scaffold with proxy implementation.
+Updates:
+  v0.14.2 - 2025-11-29 - Move typing-only imports behind TYPE_CHECKING for Ruff.
+  v0.14.1 - 2025-11-27 - Align façade with CodexExecutor prompt-centric API.
+  v0.14.0 - 2025-11-18 - Initial scaffold with proxy implementation.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping, Sequence
 from pathlib import Path
-
-from models.prompt_model import Prompt
+from typing import TYPE_CHECKING
 
 from ..execution import CodexExecutionResult, CodexExecutor, ExecutionError
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable, Mapping, Sequence
+
+    from models.prompt_model import Prompt
 
 __all__ = [
     "ExecutionError",
