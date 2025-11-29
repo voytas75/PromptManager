@@ -685,10 +685,28 @@ class WorkbenchWindow(QMainWindow):
         if self._executor is None:
             self._status.showMessage("CodexExecutor is not configured.", 6000)
             return
-        request_text = self._test_input.toPlainText().strip()
-        if not request_text:
-            self._status.showMessage("Provide test input before running.", 6000)
-            return
+        raw_request = self._test_input.toPlainText().strip()
+        fallback_message = None
+        if raw_request:
+            request_text = raw_request
+        else:
+            fallback_value: tuple[str, str] | None = None
+            for name, value in variables.items():
+                trimmed = value.strip()
+                if trimmed:
+                    fallback_value = (name, trimmed)
+                    break
+            if fallback_value is not None:
+                request_text = fallback_value[1]
+                fallback_message = (
+                    f"No test input supplied; using the '{fallback_value[0]}' variable value."
+                )
+            else:
+                request_text = (
+                    self._session.goal_statement.strip()
+                    or "Run a preview based on the current prompt."
+                )
+                fallback_message = "No test input supplied; using the prompt goal instead."
         prompt = self._session.build_prompt()
         prompt.context = rendered_text
         indicator = ProcessingIndicator(self, "Running prompt…")
@@ -713,6 +731,8 @@ class WorkbenchWindow(QMainWindow):
             self._update_history()
             return
         self._render_execution(result, request_text, variables)
+        if fallback_message:
+            self._status.showMessage(fallback_message, 5000)
 
     def _render_execution(
         self,
