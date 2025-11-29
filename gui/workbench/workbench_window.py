@@ -1,7 +1,7 @@
 """Qt widgets for the Enhanced Prompt Workbench experience.
 
 Updates:
-  v0.1.5 - 2025-11-29 - Normalise wizard background/header colors across platforms.
+  v0.1.5 - 2025-11-29 - Rely on native palette for wizard styling to match host themes.
   v0.1.4 - 2025-11-29 - Apply palette-aware stylesheet for portable wizard colors.
   v0.1.3 - 2025-11-29 - Prevent guided wizard palette updates from re-triggering change events.
   v0.1.2 - 2025-11-29 - Keep guided wizard colors in sync with the current theme palette.
@@ -419,29 +419,7 @@ class GuidedPromptWizard(QWizard):
         try:
             self.setPalette(palette)
             self.setAutoFillBackground(True)
-            stylesheet = textwrap.dedent(
-                """
-                QWizard,
-                QWizardPage {
-                    background-color: palette(base);
-                    color: palette(window-text);
-                }
-                QWizard::header {
-                    background-color: palette(window);
-                    border-bottom: 1px solid palette(mid);
-                }
-                QWizard::sidepanel {
-                    background-color: palette(window);
-                }
-                QLabel {
-                    color: palette(window-text);
-                }
-                QStackedWidget {
-                    background-color: palette(base);
-                }
-                """
-            ).strip()
-            self.setStyleSheet(stylesheet)
+            self.setStyleSheet("")
             for page in (self._goal_page, self._context_page, self._detail_page):
                 page.setPalette(palette)
                 page.setAutoFillBackground(True)
