@@ -63,7 +63,7 @@ exclude = ["data/"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
-extend-select = ["TCH"]
+extend-select = ["TC"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["core", "config", "models", "gui", "tests"]

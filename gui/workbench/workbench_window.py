@@ -464,6 +464,10 @@ class GuidedPromptWizard(QWizard):
                 QStackedWidget {{
                     background-color: {base_color};
                 }}
+                QWizard QDialogButtonBox {{
+                    background-color: {window_color};
+                    border-top: 1px solid {mid_color};
+                }}
                 QLineEdit,
                 QPlainTextEdit,
                 QComboBox,
@@ -500,6 +504,11 @@ class GuidedPromptWizard(QWizard):
                 stack.setPalette(palette)
                 stack.setAutoFillBackground(True)
                 stack.setAttribute(Qt.WA_StyledBackground, True)
+            button_box = self.findChild(QDialogButtonBox)
+            if button_box is not None:
+                button_box.setPalette(palette)
+                button_box.setAutoFillBackground(True)
+                button_box.setAttribute(Qt.WA_StyledBackground, True)
         finally:
             self._palette_updating = False
 
