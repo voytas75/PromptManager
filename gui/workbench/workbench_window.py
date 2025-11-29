@@ -1,6 +1,7 @@
 """Qt widgets for the Enhanced Prompt Workbench experience.
 
 Updates:
+  v0.1.5 - 2025-11-29 - Normalise wizard background/header colors across platforms.
   v0.1.4 - 2025-11-29 - Apply palette-aware stylesheet for portable wizard colors.
   v0.1.3 - 2025-11-29 - Prevent guided wizard palette updates from re-triggering change events.
   v0.1.2 - 2025-11-29 - Keep guided wizard colors in sync with the current theme palette.
@@ -422,8 +423,15 @@ class GuidedPromptWizard(QWizard):
                 """
                 QWizard,
                 QWizardPage {
-                    background-color: palette(window);
+                    background-color: palette(base);
                     color: palette(window-text);
+                }
+                QWizard::header {
+                    background-color: palette(window);
+                    border-bottom: 1px solid palette(mid);
+                }
+                QWizard::sidepanel {
+                    background-color: palette(window);
                 }
                 QLabel {
                     color: palette(window-text);
