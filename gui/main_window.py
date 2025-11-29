@@ -1,6 +1,7 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.15.68 - 2025-11-29 - Embed result actions inside the output text area with overlay controls.
   v0.15.67 - 2025-11-29 - Move result action buttons inside the output tab.
   v0.15.66 - 2025-11-29 - Add Enhanced Prompt Workbench launcher and wiring.
   v0.15.65 - 2025-11-29 - Remove QModelIndex default construction for Ruff B008 compliance.
@@ -32,7 +33,9 @@ from typing import (
 from PySide6.QtCore import (
     QAbstractListModel,
     QByteArray,
+    QEvent,
     QModelIndex,
+    QObject,
     QPoint,
     QRect,
     QSettings,
@@ -1104,6 +1107,7 @@ class MainWindow(QMainWindow):
         self._template_preview_list_splitter: QSplitter | None = None
         self._main_splitter_left_width: int | None = None
         self._suppress_main_splitter_sync = False
+        self._result_actions_overlay: QWidget | None = None
         self._notification_history: deque[Notification] = deque(maxlen=200)
         self._active_notifications: dict[str, Notification] = {}
         for note in self._manager.notification_center.history():
@@ -1404,16 +1408,10 @@ class MainWindow(QMainWindow):
         self._result_text = QPlainTextEdit(self)
         self._result_text.setReadOnly(True)
         self._result_text.setPlaceholderText("Run a prompt to see output here.")
+        self._result_text.viewport().installEventFilter(self)
         output_tab_layout.addWidget(self._result_text, 1)
 
-        primary_result_actions = QHBoxLayout()
-        primary_result_actions.setContentsMargins(0, 0, 0, 0)
-        primary_result_actions.setSpacing(8)
-        primary_result_actions.addWidget(self._save_button)
-        primary_result_actions.addWidget(self._copy_result_button)
-        primary_result_actions.addWidget(self._copy_result_to_text_window_button)
-        primary_result_actions.addStretch(1)
-        output_tab_layout.addLayout(primary_result_actions)
+        self._build_result_actions_overlay()
 
         self._result_tabs.addTab(output_tab, "Output")
 
@@ -1569,6 +1567,57 @@ class MainWindow(QMainWindow):
         self._save_button.setEnabled(False)
         self._continue_chat_button.setEnabled(False)
         self._end_chat_button.setEnabled(False)
+
+    def _build_result_actions_overlay(self) -> None:
+        """Create the floating overlay that hosts result action buttons."""
+
+        if self._result_text is None:
+            return
+        if self._result_actions_overlay is not None:
+            self._result_actions_overlay.deleteLater()
+        overlay_parent = self._result_text.viewport()
+        overlay = QWidget(overlay_parent)
+        overlay.setObjectName("resultActionsOverlay")
+        overlay.setAttribute(Qt.WA_StyledBackground, True)
+        overlay_layout = QHBoxLayout(overlay)
+        overlay_layout.setContentsMargins(8, 8, 8, 8)
+        overlay_layout.setSpacing(8)
+        overlay_layout.addWidget(self._save_button)
+        overlay_layout.addWidget(self._copy_result_button)
+        overlay_layout.addWidget(self._copy_result_to_text_window_button)
+        self._result_actions_overlay = overlay
+        overlay.show()
+        self._position_result_overlay()
+
+    def _position_result_overlay(self) -> None:
+        """Anchor the result action overlay to the bottom-right of the viewport."""
+
+        if self._result_text is None or self._result_actions_overlay is None:
+            return
+        viewport = self._result_text.viewport()
+        overlay = self._result_actions_overlay
+        if viewport is None or overlay is None:
+            return
+        overlay.adjustSize()
+        desired_width = overlay.width()
+        desired_height = overlay.height()
+        margin = 12
+        x = viewport.width() - desired_width - margin
+        y = viewport.height() - desired_height - margin
+        if x < margin:
+            x = max(0, viewport.width() - desired_width)
+        if y < margin:
+            y = max(0, viewport.height() - desired_height)
+        overlay.move(x, y)
+        overlay.raise_()
+
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+        """Respond to viewport events so overlays stay aligned."""
+
+        if self._result_text is not None and obj is self._result_text.viewport():
+            if event.type() in {QEvent.Resize, QEvent.Show}:
+                self._position_result_overlay()
+        return super().eventFilter(obj, event)
 
     def _restore_window_geometry(self) -> None:
         """Restore window size/position from persistent settings."""
