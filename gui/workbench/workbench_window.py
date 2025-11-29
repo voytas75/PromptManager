@@ -1,6 +1,7 @@
 """Qt widgets for the Enhanced Prompt Workbench experience.
 
 Updates:
+  v0.1.8 - 2025-11-29 - Enforce palette-colored wizard backgrounds via style attributes.
   v0.1.7 - 2025-11-29 - Force wizard/page styled backgrounds so palette colors render on Windows.
   v0.1.6 - 2025-11-29 - Apply palette snapshots to wizard styling for consistent themes.
   v0.1.5 - 2025-11-29 - Rely on native palette for wizard styling to match host themes.
@@ -41,6 +42,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSplitter,
     QStatusBar,
+    QStackedWidget,
     QTabWidget,
     QTextEdit,
     QToolBar,
@@ -442,11 +444,15 @@ class GuidedPromptWizard(QWizard):
                 f"""
                 QWizard,
                 QWizardPage {{
+                    background-color: {window_color} !important;
+                    color: {window_text};
+                }}
+                QWizard QWidget {{
                     background-color: {window_color};
                     color: {window_text};
                 }}
                 QWizard::header {{
-                    background-color: {window_color};
+                    background-color: {window_color} !important;
                     border-bottom: 1px solid {mid_color};
                 }}
                 QWizard::sidepanel {{
@@ -489,6 +495,11 @@ class GuidedPromptWizard(QWizard):
                 page.setPalette(palette)
                 page.setAutoFillBackground(True)
                 page.setAttribute(Qt.WA_StyledBackground, True)
+            stack = self.findChild(QStackedWidget)
+            if stack is not None:
+                stack.setPalette(palette)
+                stack.setAutoFillBackground(True)
+                stack.setAttribute(Qt.WA_StyledBackground, True)
         finally:
             self._palette_updating = False
 
