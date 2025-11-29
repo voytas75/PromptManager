@@ -1,6 +1,7 @@
 """Qt widgets for the Enhanced Prompt Workbench experience.
 
 Updates:
+  v0.1.14 - 2025-11-29 - Replace QWizard with custom-styled dialog to control Guided mode appearance.
   v0.1.13 - 2025-11-29 - Manually paint wizard background with palette colors to avoid OS tinting.
   v0.1.12 - 2025-11-29 - Force Fusion style for wizard to ensure palette-driven theming on Windows.
   v0.1.11 - 2025-11-29 - Log resolved wizard palette roles for troubleshooting theme differences.
@@ -54,10 +55,7 @@ from PySide6.QtWidgets import (
     QToolButton,
     QVBoxLayout,
     QWidget,
-    QWizard,
-    QWizardPage,
 )
-from PySide6.QtWidgets import QStyleFactory
 
 from core import PromptManager, PromptManagerError
 from core.execution import CodexExecutionResult, CodexExecutor, ExecutionError
@@ -308,10 +306,9 @@ class VariableCaptureDialog(QDialog):
         layout.addWidget(buttons)
 
 
-class _GoalWizardPage(QWizardPage):
+class _GoalWizardPage(QWidget):
     def __init__(self, session: WorkbenchSession) -> None:
         super().__init__()
-        self.setTitle("Goal and Audience")
         layout = QFormLayout(self)
         self.name_input = QLineEdit(self)
         self.name_input.setPlaceholderText("Friendly prompt name…")
@@ -328,10 +325,9 @@ class _GoalWizardPage(QWizardPage):
         layout.addRow("Audience", self.audience_input)
 
 
-class _ContextWizardPage(QWizardPage):
+class _ContextWizardPage(QWidget):
     def __init__(self, session: WorkbenchSession) -> None:
         super().__init__()
-        self.setTitle("System Role and Context")
         layout = QFormLayout(self)
         self.role_input = QPlainTextEdit(self)
         self.role_input.setPlainText(session.system_role)
@@ -345,10 +341,9 @@ class _ContextWizardPage(QWizardPage):
         layout.addRow("Context", self.context_input)
 
 
-class _DetailWizardPage(QWizardPage):
+class _DetailWizardPage(QWidget):
     def __init__(self, session: WorkbenchSession) -> None:
         super().__init__()
-        self.setTitle("Variables and Constraints")
         layout = QGridLayout(self)
         constraint_label = QLabel("One constraint per line", self)
         layout.addWidget(constraint_label, 0, 0)
@@ -373,17 +368,19 @@ class _DetailWizardPage(QWizardPage):
         layout.addWidget(self.variables_input, 1, 1)
 
 
-class GuidedPromptWizard(QWizard):
-    """Multi-step wizard that emits updates whenever fields change."""
+class GuidedPromptWizard(QDialog):
+    """Custom-styled wizard dialog that emits updates whenever fields change."""
 
     updated = Signal(dict)
 
     def __init__(self, session: WorkbenchSession, parent: QWidget | None = None) -> None:
-        self._palette_updating: bool = False
         super().__init__(parent)
+        self._palette_updating = False
         self.setAttribute(Qt.WA_StyledBackground, True)
         self._session = session
         self.setWindowTitle("Guided Prompt Wizard")
+        self.setModal(True)
+        self.resize(840, 640)
         palette = self._resolve_theme_palette(parent)
         if palette is not None:
             logger.debug(
@@ -404,9 +401,12 @@ class GuidedPromptWizard(QWizard):
         self._goal_page = _GoalWizardPage(session)
         self._context_page = _ContextWizardPage(session)
         self._detail_page = _DetailWizardPage(session)
-        self.addPage(self._goal_page)
-        self.addPage(self._context_page)
-        self.addPage(self._detail_page)
+        self._pages: list[tuple[str, QWidget]] = [
+            ("Goal and Audience", self._goal_page),
+            ("System Role and Context", self._context_page),
+            ("Variables and Constraints", self._detail_page),
+        ]
+        self._build_ui()
         if palette is not None:
             self._apply_palette(palette)
         for widget in (
@@ -419,8 +419,47 @@ class GuidedPromptWizard(QWizard):
             self._detail_page.variables_input,
         ):
             widget.textChanged.connect(self._emit_update)  # type: ignore[arg-type]
-        self.currentIdChanged.connect(lambda _: self._emit_update())  # type: ignore[arg-type]
+        self._stack.currentChanged.connect(self._on_page_changed)
+        self._on_page_changed()
         self._emit_update()
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+        header = QVBoxLayout()
+        header.setSpacing(4)
+        self._title_label = QLabel("", self)
+        self._title_label.setStyleSheet("font-size: 20px; font-weight: 600;")
+        self._step_label = QLabel("", self)
+        self._step_label.setStyleSheet("color: rgba(255, 255, 255, 0.85);")
+        header.addWidget(self._title_label)
+        header.addWidget(self._step_label)
+        layout.addLayout(header)
+        self._stack = QStackedWidget(self)
+        self._stack.setObjectName("guidedWizardStack")
+        for _, widget in self._pages:
+            self._stack.addWidget(widget)
+        layout.addWidget(self._stack, 1)
+        self._footer_widget = QWidget(self)
+        button_row = QHBoxLayout(self._footer_widget)
+        button_row.setContentsMargins(0, 12, 0, 0)
+        button_row.addStretch(1)
+        self._back_button = QPushButton("Back", self)
+        self._next_button = QPushButton("Next", self)
+        self._finish_button = QPushButton("Finish", self)
+        self._cancel_button = QPushButton("Cancel", self)
+        for button in (self._back_button, self._next_button, self._finish_button, self._cancel_button):
+            button.setMinimumWidth(110)
+        self._back_button.clicked.connect(self._go_back)
+        self._next_button.clicked.connect(self._go_next)
+        self._finish_button.clicked.connect(self._finish)
+        self._cancel_button.clicked.connect(self.reject)
+        button_row.addWidget(self._back_button)
+        button_row.addWidget(self._next_button)
+        button_row.addWidget(self._finish_button)
+        button_row.addWidget(self._cancel_button)
+        layout.addWidget(self._footer_widget)
 
     def changeEvent(self, event: QEvent) -> None:  # type: ignore[override]
         super().changeEvent(event)
@@ -469,98 +508,79 @@ class GuidedPromptWizard(QWizard):
             logger.debug("GUIDED_PALETTE snapshot=%s", palette_snapshot)
             stylesheet = textwrap.dedent(
                 f"""
-                QWizard,
-                QWizardPage {{
-                    background-color: {window_color} !important;
-                    color: {window_text};
-                }}
-                QWizard QWidget {{
+                GuidedPromptWizard {{
                     background-color: {window_color};
                     color: {window_text};
+                    border-radius: 8px;
                 }}
-                QWizard::header {{
-                    background-color: {window_color} !important;
-                    border-bottom: 1px solid {mid_color};
-                }}
-                QWizard::sidepanel {{
-                    background-color: {window_color};
-                }}
-                QLabel {{
+                GuidedPromptWizard QLabel {{
                     color: {window_text};
                 }}
-                QStackedWidget {{
+                #guidedWizardStack {{
                     background-color: {base_color};
+                    border-radius: 6px;
                 }}
-                QWizard QDialogButtonBox {{
-                    background-color: {window_color} !important;
-                    border-top: 1px solid {mid_color};
-                }}
-                QWizard QDialogButtonBox QWidget {{
-                    background-color: {window_color} !important;
-                    color: {window_text};
-                }}
-                QLineEdit,
-                QPlainTextEdit,
-                QComboBox,
-                QTextEdit {{
+                GuidedPromptWizard QLineEdit,
+                GuidedPromptWizard QPlainTextEdit,
+                GuidedPromptWizard QComboBox,
+                GuidedPromptWizard QTextEdit {{
                     background-color: {base_color};
                     color: {window_text};
                     border: 1px solid {mid_color};
                 }}
-                QDialogButtonBox QPushButton {{
+                GuidedPromptWizard QPushButton {{
                     background-color: {button_color};
                     color: {button_text};
                     border: 1px solid {mid_color};
                     border-radius: 4px;
                     padding: 4px 10px;
                 }}
-                QDialogButtonBox QPushButton:hover {{
+                GuidedPromptWizard QPushButton:hover {{
                     background-color: {highlight_color};
                     color: {window_text};
                 }}
-                QDialogButtonBox QPushButton:pressed {{
+                GuidedPromptWizard QPushButton:pressed {{
                     background-color: {mid_color};
                     color: {window_text};
                 }}
                 """
             ).strip()
             self.setStyleSheet(stylesheet)
-            styled_pages = (self._goal_page, self._context_page, self._detail_page)
-            for page in styled_pages:
+            for page in (self._goal_page, self._context_page, self._detail_page):
                 page.setPalette(palette)
                 page.setAutoFillBackground(True)
                 page.setAttribute(Qt.WA_StyledBackground, True)
-            stack = self.findChild(QStackedWidget)
-            if stack is not None:
-                stack.setPalette(palette)
-                stack.setAutoFillBackground(True)
-                stack.setAttribute(Qt.WA_StyledBackground, True)
-            button_box = self.findChild(QDialogButtonBox)
-            if button_box is not None:
-                button_box.setPalette(palette)
-                button_box.setAutoFillBackground(True)
-                button_box.setAttribute(Qt.WA_StyledBackground, True)
-                for button in button_box.findChildren(QPushButton):
-                    button.setPalette(palette)
-                    button.setAutoFillBackground(True)
-                footer_panel = button_box.parentWidget()
-                if footer_panel is not None:
-                    footer_panel.setPalette(palette)
-                    footer_panel.setAutoFillBackground(True)
-                    footer_panel.setAttribute(Qt.WA_StyledBackground, True)
-                    footer_panel.setStyleSheet(
-                        f"background-color: {window_color}; border-top: 1px solid {mid_color};"
-                    )
-            footer_container = self.findChild(QWidget, "qt_wizard_button_widget")
-            if footer_container is not None:
-                footer_container.setPalette(palette)
-                footer_container.setAutoFillBackground(True)
-                footer_container.setAttribute(Qt.WA_StyledBackground, True)
-                footer_container.setStyleSheet(
-                    f"#qt_wizard_button_widget {{ background-color: {window_color}; border-top: 1px solid {mid_color}; }}"
-                )
+            self._stack.setPalette(palette)
+            self._stack.setAutoFillBackground(True)
+            self._stack.setAttribute(Qt.WA_StyledBackground, True)
+            self._footer_widget.setPalette(palette)
+            self._footer_widget.setAutoFillBackground(True)
+            self._footer_widget.setAttribute(Qt.WA_StyledBackground, True)
         finally:
             self._palette_updating = False
+
+    def _on_page_changed(self) -> None:
+        index = self._stack.currentIndex()
+        total = self._stack.count()
+        self._title_label.setText(self._pages[index][0])
+        self._step_label.setText(f"Step {index + 1} of {total}")
+        self._back_button.setEnabled(index > 0)
+        self._next_button.setVisible(index < total - 1)
+        self._finish_button.setVisible(index == total - 1)
+        self._emit_update()
+
+    def _go_next(self) -> None:
+        index = self._stack.currentIndex()
+        if index < self._stack.count() - 1:
+            self._stack.setCurrentIndex(index + 1)
+
+    def _go_back(self) -> None:
+        index = self._stack.currentIndex()
+        if index > 0:
+            self._stack.setCurrentIndex(index - 1)
+
+    def _finish(self) -> None:
+        self.accept()
 
     def _emit_update(self) -> None:
         variables: dict[str, WorkbenchVariable] = {}
