@@ -1,6 +1,6 @@
 # PromptManager
 
-PromptManager is a desktop-first prompt operations hub that catalogues, searches, and executes AI prompts with a PySide6 GUI, SQLite persistence, Redis caching, and ChromaDB-backed semantic retrieval. It targets Python 3.12+ and ships with strict typing, automated testing, and reproducible configuration baked in.
+PromptManager is a desktop-first prompt operations hub that catalogues, searches, and executes AI prompts with a PySide6 GUI, SQLite persistence, optional Redis caching, and ChromaDB-backed semantic retrieval. It targets Python 3.12+ and ships with strict typing, automated testing, and reproducible configuration baked in.
 
 ## Installation
 
@@ -44,7 +44,7 @@ python -m main
 - Dedicated Prompt Template editor dialog (toolbar button) that exposes every LiteLLM system prompt with inline validation and reset-to-default controls so teams can fine-tune guidance without editing config files.
 - Prompt sharing workflows baked into the prompt detail pane: choose whether to publish just the body, body + description, or body + description + scenarios, optionally include metadata, and the app uploads to ShareText and copies the share URL to your clipboard.
 - Typed configuration loader (`config.settings`) that validates paths, TTLs, and provider settings from env vars or JSON, failing fast with actionable errors.
-- Redis-backed caching plus optional deterministic embeddings for air-gapped deployments; maintenance dialog exposes one-click reset tooling.
+- Optional Redis-backed caching plus deterministic embeddings for air-gapped deployments; leave `PROMPT_MANAGER_REDIS_DSN` unset to skip Redis entirely while keeping the rest of the app functional. Maintenance dialog exposes one-click reset tooling.
 - Maintenance dialog snapshot action that zips the SQLite database, Chroma store, and a manifest so teams can back up catalogues before running destructive tasks.
 - CLI helpers (`catalog-export`, `suggest`, `usage-report`, `reembed`) reuse the same validation stack for automation-friendly integrations.
 - Diagnostics CLI targets (`python -m main diagnostics embeddings|analytics`) verify embedding backends,

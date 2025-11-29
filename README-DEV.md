@@ -1,6 +1,6 @@
 # PromptManager – Developer Guide
 
-PromptManager is a PySide6 desktop application for managing reusable AI prompts with SQLite persistence, Redis caching, and ChromaDB-powered semantic retrieval. This document captures the engineering conventions, environment expectations, and deep technical workflows required to extend the project safely.
+PromptManager is a PySide6 desktop application for managing reusable AI prompts with SQLite persistence, optional Redis caching, and ChromaDB-powered semantic retrieval. This document captures the engineering conventions, environment expectations, and deep technical workflows required to extend the project safely.
 
 ## Updates
 
@@ -14,7 +14,7 @@ Updates:
 
 - `models/prompt_model.Prompt` holds the canonical schema (extension slots `ext1`–`ext5`, serialization helpers, embedding document builder).
 - `core.repository.PromptRepository` provides SQLite CRUD and backs the GUI plus CLI utilities.
-- `core.prompt_manager.PromptManager` orchestrates persistence, Redis caching, LiteLLM execution, and ChromaDB similarity queries.
+- `core.prompt_manager.PromptManager` orchestrates persistence, optional Redis caching, LiteLLM execution, and ChromaDB similarity queries.
 - PySide6 GUI (`main.py --gui`) exposes list/search/detail panes, prompt editor with refinement workflow, quick action palette, notes, history, and taxonomy management dialogs.
 - Notification center, status tracking for long-running embedding/LLM tasks, and preference profile ensure responsive UX.
 
@@ -53,7 +53,7 @@ All settings are defined via `pydantic-settings` in `config/settings.py`. Provid
 | --- | --- | --- |
 | `PROMPT_MANAGER_DATABASE_PATH` | SQLite database path | `data/prompt_manager.db` |
 | `PROMPT_MANAGER_CHROMA_PATH` | ChromaDB persistence directory | `data/chromadb` |
-| `PROMPT_MANAGER_REDIS_DSN` | Redis connection string | `redis://localhost:6379/0` |
+| `PROMPT_MANAGER_REDIS_DSN` | Redis connection string (leave unset to disable caching) | `redis://localhost:6379/0` |
 | `PROMPT_MANAGER_CACHE_TTL_SECONDS` | Cache TTL in seconds (>0) | `600` |
 | `PROMPT_MANAGER_CONFIG_JSON` | Path to base JSON config | `config/config.json` |
 | `PROMPT_MANAGER_CATEGORIES_PATH` / `PROMPT_MANAGER_CATEGORIES` | Category seed definitions (file or inline JSON) | `[{"slug": "review","label": "Review"}]` |
