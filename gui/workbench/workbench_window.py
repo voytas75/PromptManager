@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from PySide6.QtCore import QPoint, Qt, Signal
-from PySide6.QtGui import QFont, QTextCharFormat, QTextCursor
+from PySide6.QtGui import QFont, QGuiApplication, QPalette, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import (
     QButtonGroup,
     QDialog,
@@ -354,15 +354,20 @@ class GuidedPromptWizard(QWizard):
         super().__init__(parent)
         self._session = session
         self.setWindowTitle("Guided Prompt Wizard")
+        palette = None
         if parent is not None:
-            self.setPalette(parent.palette())
-            self.setStyleSheet(parent.styleSheet())
+            palette = parent.palette()
+        if palette is None:
+            app = QGuiApplication.instance()
+            palette = app.palette() if app is not None else None
         self._goal_page = _GoalWizardPage(session)
         self._context_page = _ContextWizardPage(session)
         self._detail_page = _DetailWizardPage(session)
         self.addPage(self._goal_page)
         self.addPage(self._context_page)
         self.addPage(self._detail_page)
+        if palette is not None:
+            self._apply_palette(palette)
         for widget in (
             self._goal_page.name_input,
             self._goal_page.goal_input,
@@ -375,6 +380,20 @@ class GuidedPromptWizard(QWizard):
             widget.textChanged.connect(self._emit_update)  # type: ignore[arg-type]
         self.currentIdChanged.connect(lambda _: self._emit_update())  # type: ignore[arg-type]
         self._emit_update()
+
+    def _apply_palette(self, palette: QPalette) -> None:
+        text_color = palette.color(QPalette.Text).name()
+        window_color = palette.color(QPalette.Window).name()
+        self.setPalette(palette)
+        self.setStyleSheet(
+            "QWizard { background-color: %s; color: %s; }"
+            "QWizardPage { background-color: %s; color: %s; }"
+            "QLabel { color: %s; }"
+            % (window_color, text_color, window_color, text_color, text_color)
+        )
+        for page in (self._goal_page, self._context_page, self._detail_page):
+            page.setPalette(palette)
+            page.setAutoFillBackground(True)
 
     def _emit_update(self) -> None:
         variables: dict[str, WorkbenchVariable] = {}
