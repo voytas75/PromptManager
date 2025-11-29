@@ -1,7 +1,7 @@
 # Application runtime dependencies for Prompt Manager.
 chromadb==0.4.24
 numpy>=1.26.4,<2
-Jinja2==3.1.4
+Jinja2==3.1.6
 jsonschema==4.23.0
 pydantic==2.12.3
 pydantic-settings==2.2.1
