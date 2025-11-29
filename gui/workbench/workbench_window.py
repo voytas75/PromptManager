@@ -368,7 +368,7 @@ class GuidedPromptWizard(QWizard):
         super().__init__(parent)
         self._session = session
         self.setWindowTitle("Guided Prompt Wizard")
-        palette = None
+        palette: QPalette | None = None
         if parent is not None:
             palette = parent.palette()
         if palette is None:
@@ -395,7 +395,7 @@ class GuidedPromptWizard(QWizard):
         self.currentIdChanged.connect(lambda _: self._emit_update())  # type: ignore[arg-type]
         self._emit_update()
 
-def _apply_palette(self, palette: QPalette) -> None:
+    def _apply_palette(self, palette: QPalette) -> None:
         text_color = palette.color(QPalette.Text).name()
         window_color = palette.color(QPalette.Window).name()
         base_color = palette.color(QPalette.Base).name()
