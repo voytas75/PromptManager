@@ -1,6 +1,7 @@
 """Qt widgets for the Enhanced Prompt Workbench experience.
 
 Updates:
+  v0.1.13 - 2025-11-29 - Manually paint wizard background with palette colors to avoid OS tinting.
   v0.1.12 - 2025-11-29 - Force Fusion style for wizard to ensure palette-driven theming on Windows.
   v0.1.11 - 2025-11-29 - Log resolved wizard palette roles for troubleshooting theme differences.
   v0.1.10 - 2025-11-29 - Style wizard footer container explicitly to match host palette.
@@ -27,7 +28,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from PySide6.QtCore import QPoint, Qt, Signal, QEvent
-from PySide6.QtGui import QFont, QGuiApplication, QPalette, QTextCharFormat, QTextCursor
+from PySide6.QtGui import QFont, QGuiApplication, QPalette, QPainter, QPaintEvent, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import (
     QButtonGroup,
     QDialog,
@@ -429,6 +430,11 @@ class GuidedPromptWizard(QWizard):
             palette = self._resolve_theme_palette(self.parentWidget())
             if palette is not None:
                 self._apply_palette(palette)
+
+    def paintEvent(self, event: QPaintEvent) -> None:  # type: ignore[override]
+        painter = QPainter(self)
+        painter.fillRect(self.rect(), self.palette().color(QPalette.Window))
+        super().paintEvent(event)
 
     def _resolve_theme_palette(self, parent: QWidget | None) -> QPalette | None:
         app = QGuiApplication.instance()
