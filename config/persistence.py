@@ -34,7 +34,7 @@ def _normalise_drop_params(value: Optional[object]) -> Optional[list[str]]:
     if isinstance(value, str):
         items = [part.strip() for part in value.split(",") if part.strip()]
     elif isinstance(value, Iterable):
-        iterable = cast(Iterable[object], value)
+        iterable = cast("Iterable[object]", value)
         items = [str(item).strip() for item in iterable if str(item).strip()]
     else:
         return None
@@ -52,7 +52,7 @@ _CHAT_COLOR_PATTERN = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
 def _normalise_chat_palette(value: Optional[object]) -> Optional[dict[str, str]]:
     if value is None or not isinstance(value, Mapping):
         return None
-    mapping = cast(Mapping[str, object], value)
+    mapping = cast("Mapping[str, object]", value)
     cleaned: dict[str, str] = {}
     for role, colour in mapping.items():
         if role not in _CHAT_PALETTE_KEYS or not isinstance(colour, str):
@@ -83,7 +83,7 @@ def _is_default_chat_palette(palette: Optional[Mapping[str, str]]) -> bool:
 def _normalise_prompt_templates(value: Optional[object]) -> Optional[dict[str, str]]:
     if value is None or not isinstance(value, Mapping):
         return None
-    template_mapping = cast(Mapping[str, object], value)
+    template_mapping = cast("Mapping[str, object]", value)
     cleaned: dict[str, str] = {}
     for key, template in template_mapping.items():
         if key not in PROMPT_TEMPLATE_KEYS:
@@ -111,7 +111,7 @@ def persist_settings_to_config(updates: dict[str, Optional[object]]) -> None:
         try:
             parsed = json.loads(config_path.read_text(encoding="utf-8"))
             if isinstance(parsed, Mapping):
-                parsed_mapping = cast(Mapping[object, Any], parsed)
+                parsed_mapping = cast("Mapping[object, Any]", parsed)
                 config_data = {str(key): value for key, value in parsed_mapping.items()}
         except json.JSONDecodeError:
             config_data = {}
@@ -144,7 +144,7 @@ def persist_settings_to_config(updates: dict[str, Optional[object]]) -> None:
         if key == "prompt_templates":
             templates = _normalise_prompt_templates(value)
             if templates:
-                defaults = cast(Mapping[str, str], DEFAULT_PROMPT_TEMPLATES)
+                defaults = cast("Mapping[str, str]", DEFAULT_PROMPT_TEMPLATES)
                 filtered: dict[str, str] = {}
                 for workflow, text in templates.items():
                     if text != defaults.get(workflow):
@@ -154,7 +154,7 @@ def persist_settings_to_config(updates: dict[str, Optional[object]]) -> None:
                 value = None
         if key == "litellm_workflow_models" and isinstance(value, Mapping):
             cleaned: dict[str, str] = {}
-            for route_key, route_value in cast(Mapping[object, object], value).items():
+            for route_key, route_value in cast("Mapping[object, object]", value).items():
                 choice = str(route_value).strip().lower()
                 if choice == "inference":
                     cleaned[str(route_key)] = "inference"

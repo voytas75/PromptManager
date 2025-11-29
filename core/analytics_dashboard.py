@@ -7,15 +7,17 @@ from __future__ import annotations
 
 import json
 import logging
-import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence
+from typing import TYPE_CHECKING, Dict, List, Optional
 
-from core.history_tracker import ExecutionAnalytics
 from core.prompt_manager import PromptHistoryError, PromptManager, PromptManagerError
-from models.prompt_model import Prompt
+
+if TYPE_CHECKING:  # pragma: no cover - type hints only
+    from uuid import UUID
+
+    from core.history_tracker import ExecutionAnalytics
 
 logger = logging.getLogger("prompt_manager.analytics")
 
@@ -24,7 +26,7 @@ logger = logging.getLogger("prompt_manager.analytics")
 class UsageFrequencyEntry:
     """Summarise prompt usage volume for ranking charts."""
 
-    prompt_id: uuid.UUID
+    prompt_id: "UUID"
     name: str
     usage_count: int
     success_rate: Optional[float]
@@ -90,9 +92,13 @@ def build_analytics_snapshot(
     else:
         since = datetime.now(timezone.utc) - timedelta(days=window_days)
 
-    usage_path = Path(usage_log_path) if usage_log_path is not None else Path("data") / "logs" / "intent_usage.jsonl"
+    usage_path = (
+        Path(usage_log_path)
+        if usage_log_path is not None
+        else Path("data") / "logs" / "intent_usage.jsonl"
+    )
 
-    execution_summary: Optional[ExecutionAnalytics] = None
+    execution_summary: Optional["ExecutionAnalytics"] = None
     try:
         execution_summary = manager.get_execution_analytics(
             window_days=window_days if window_days > 0 else None,
@@ -133,8 +139,16 @@ def snapshot_dataset_rows(snapshot: AnalyticsSnapshot, dataset: str) -> List[Dic
                 "prompt_id": str(entry.prompt_id),
                 "prompt_name": entry.name,
                 "usage_count": entry.usage_count,
-                "success_rate": round(entry.success_rate * 100, 2) if entry.success_rate is not None else None,
-                "last_executed_at": entry.last_executed_at.isoformat() if entry.last_executed_at else None,
+                "success_rate": (
+                    round(entry.success_rate * 100, 2)
+                    if entry.success_rate is not None
+                    else None
+                ),
+                "last_executed_at": (
+                    entry.last_executed_at.isoformat()
+                    if entry.last_executed_at
+                    else None
+                ),
             }
             for entry in snapshot.usage_frequency
         ]
@@ -235,7 +249,11 @@ def _collect_usage_frequency(
     return entries
 
 
-def _collect_model_costs(manager: PromptManager, *, since: Optional[datetime]) -> List[ModelCostEntry]:
+def _collect_model_costs(
+    manager: PromptManager,
+    *,
+    since: Optional[datetime],
+) -> List[ModelCostEntry]:
     try:
         rows = manager.repository.get_model_usage_breakdown(since=since)
     except Exception as exc:  # pragma: no cover - defensive
@@ -256,7 +274,11 @@ def _collect_model_costs(manager: PromptManager, *, since: Optional[datetime]) -
     return entries
 
 
-def _collect_benchmark_stats(manager: PromptManager, *, since: Optional[datetime]) -> List[BenchmarkStatsEntry]:
+def _collect_benchmark_stats(
+    manager: PromptManager,
+    *,
+    since: Optional[datetime],
+) -> List[BenchmarkStatsEntry]:
     try:
         rows = manager.repository.get_benchmark_execution_stats(since=since)
     except Exception as exc:  # pragma: no cover - defensive
@@ -270,7 +292,9 @@ def _collect_benchmark_stats(manager: PromptManager, *, since: Optional[datetime
         success_rate = success_runs / total_runs if total_runs else 0.0
         avg_duration = row.get("avg_duration_ms")
         try:
-            avg_duration_value: Optional[float] = float(avg_duration) if avg_duration is not None else None
+            avg_duration_value: Optional[float] = (
+                float(avg_duration) if avg_duration is not None else None
+            )
         except (TypeError, ValueError):  # pragma: no cover - defensive
             avg_duration_value = None
         entries.append(

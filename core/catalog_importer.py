@@ -1,9 +1,10 @@
-"""Utilities for importing, previewing, and exporting prompt catalogues.
+"""Import, preview, and export prompt catalogues for Prompt Manager.
 
-Updates: v0.7.1 - 2025-11-30 - Retain import helpers for GUI workflows after removing the CLI command.
-Updates: v0.6.1 - 2025-11-17 - Require explicit catalogue paths; remove built-in fallback prompts.
-Updates: v0.6.0 - 2025-11-06 - Add diff previews, export helpers, and bulk directory support.
-Updates: v0.5.0 - 2025-11-05 - Seed SQLite/Chroma from packaged or user-provided catalogues.
+Updates:
+  v0.7.1 - 2025-11-30 - Retained GUI helpers after removing the CLI command.
+  v0.6.1 - 2025-11-17 - Required explicit catalogue paths; removed fallback prompts.
+  v0.6.0 - 2025-11-06 - Added diff previews, export helpers, and bulk directory support.
+  v0.5.0 - 2025-11-05 - Seeded SQLite/Chroma from packaged or user catalogues.
 """
 
 from __future__ import annotations
@@ -17,13 +18,19 @@ from collections.abc import Iterable as IterableABC
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple, cast
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from pathlib import Path
+
+from models.prompt_model import Prompt
+
+from .prompt_manager import PromptManager, PromptStorageError
 
 CatalogEntry = Dict[str, Any]
 
 
-def _entry_list_factory() -> List[CatalogDiffEntry]:
+def _entry_list_factory() -> List["CatalogDiffEntry"]:
     return []
 
 
@@ -34,9 +41,6 @@ def _prompt_list_factory() -> List[Prompt]:
 def _prompt_pair_list_factory() -> List[Tuple[Prompt, Prompt]]:
     return []
 
-from models.prompt_model import Prompt
-
-from .prompt_manager import PromptManager, PromptStorageError
 
 logger = logging.getLogger("prompt_manager.catalog")
 
@@ -63,7 +67,7 @@ def _ensure_list(value: Any) -> List[str]:
     return [str(value)]
 
 
-def _read_json(path: Path) -> List[CatalogEntry]:
+def _read_json(path: "Path") -> List[CatalogEntry]:
     try:
         contents = path.read_text(encoding="utf-8")
     except OSError as exc:
@@ -93,7 +97,7 @@ def _read_json(path: Path) -> List[CatalogEntry]:
     raise ValueError(f"Prompt catalogue {path} must contain a JSON object or list")
 
 
-def _load_entries_from_path(path: Path) -> List[CatalogEntry]:
+def _load_entries_from_path(path: "Path") -> List[CatalogEntry]:
     if not path.exists():
         raise FileNotFoundError(str(path))
     if path.is_dir():
@@ -144,7 +148,7 @@ def _entry_to_prompt(entry: CatalogEntry) -> Prompt:
     return Prompt.from_record(record)
 
 
-def load_prompt_catalog(catalog_path: Optional[Path]) -> List[Prompt]:
+def load_prompt_catalog(catalog_path: Optional["Path"]) -> List[Prompt]:
     """Load prompts from a user-provided path."""
 
     if catalog_path is None:
@@ -395,7 +399,7 @@ class CatalogImportResult:
 
 def diff_prompt_catalog(
     manager: PromptManager,
-    catalog_path: Optional[Path],
+    catalog_path: Optional["Path"],
     *,
     overwrite: bool = True,
 ) -> CatalogDiff:
@@ -409,7 +413,7 @@ def diff_prompt_catalog(
 
 def import_prompt_catalog(
     manager: PromptManager,
-    catalog_path: Optional[Path],
+    catalog_path: Optional["Path"],
     *,
     overwrite: bool = True,
 ) -> CatalogImportResult:
@@ -442,11 +446,11 @@ def import_prompt_catalog(
 
 def export_prompt_catalog(
     manager: PromptManager,
-    output_path: Path,
+    output_path: "Path",
     *,
     fmt: str = "json",
     include_inactive: bool = False,
-) -> Path:
+) -> "Path":
     """Export the current prompt repository to JSON or YAML."""
 
     fmt_lower = fmt.lower()

@@ -1,21 +1,11 @@
-"""Settings management for Prompt Manager configuration.
+"""Settings management utilities for Prompt Manager configuration.
 
-Updates: v0.5.1 - 2025-11-23 - Add prompt template override settings.
-Updates: v0.5.0 - 2025-11-22 - Add structure-only prompt refinement workflow routing.
-Updates: v0.4.9 - 2025-12-06 - Require LiteLLM-backed embeddings with configurable model fields in the UI.
-Updates: v0.4.8 - 2025-12-03 - Persist chat colour palette overrides, including assistant bubble styling.
-Updates: v0.4.7 - 2025-11-05 - Add theme mode configuration options.
-Updates: v0.4.6 - 2025-11-05 - Add chat appearance configuration options.
-Updates: v0.4.5 - 2025-11-05 - Add LiteLLM workflow routing configuration.
-Updates: v0.4.4 - 2025-11-05 - Introduce LiteLLM inference model configuration.
-Updates: v0.4.3 - 2025-11-26 - Add LiteLLM streaming configuration flag.
-Updates: v0.4.2 - 2025-11-15 - Ignore LiteLLM API secrets in JSON configuration files with warnings.
-Updates: v0.4.1 - 2025-11-14 - Load LiteLLM API key from JSON configuration files.
-Updates: v0.4.0 - 2025-11-07 - Add configurable embedding backend options.
-Updates: v0.3.2 - 2025-10-30 - Document revised settings precedence examples.
-Updates: v0.3.1 - 2025-10-30 - Ensure env overrides JSON; remove unused helpers.
-Updates: v0.3.0 - 2025-10-30 - Migrate to Pydantic v2 with pydantic-settings.
-Updates: v0.2.0 - 2025-11-03 - Introduce env/JSON-backed settings with validation.
+Updates:
+  v0.5.1 - 2025-11-23 - Added prompt template override settings.
+  v0.5.0 - 2025-11-22 - Added structure-only prompt refinement routing.
+  v0.4.9 - 2025-12-06 - Required LiteLLM-backed embeddings with UI fields.
+  v0.4.8 - 2025-12-03 - Persisted chat colour palette overrides.
+  v0.4.7 - 2025-11-05 - Added theme mode and chat appearance options.
 """
 
 from __future__ import annotations
@@ -56,9 +46,12 @@ DEFAULT_EMBEDDING_MODEL = "text-embedding-3-large"
 
 
 class ChatColors(BaseSettings):
-    """Sub‑model storing UI colour customisation options."""
+    """Sub-model storing UI colour customisation options."""
 
-    user: str = Field(default=DEFAULT_CHAT_USER_BUBBLE_COLOR, description="User chat bubble colour (hex)")
+    user: str = Field(
+        default=DEFAULT_CHAT_USER_BUBBLE_COLOR,
+        description="User chat bubble colour (hex)",
+    )
     assistant: str = Field(
         default=DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR,
         description="Assistant chat bubble colour (hex)",
@@ -118,25 +111,44 @@ class PromptManagerSettings(BaseSettings):
     cache_ttl_seconds: int = Field(default=300)
     litellm_model: Optional[str] = Field(
         default=None,
-        description="LiteLLM fast model name for prompt name generation and other latency-sensitive tasks.",
+        description=(
+            "LiteLLM fast model used for prompt naming, description hints, and other "
+            "latency-sensitive workflows."
+        ),
     )
     litellm_inference_model: Optional[str] = Field(
         default=None,
-        description="LiteLLM inference model for higher-quality, slower operations (configured separately from the fast model).",
+        description=(
+            "LiteLLM inference model for higher-quality, slower operations (configured "
+            "separately from the fast model)."
+        ),
     )
-    litellm_api_key: Optional[str] = Field(default=None, description="LiteLLM API key.", repr=False)
-    litellm_api_base: Optional[str] = Field(default=None, description="Optional LiteLLM API base URL override.")
+    litellm_api_key: Optional[str] = Field(
+        default=None,
+        description="LiteLLM API key.",
+        repr=False,
+    )
+    litellm_api_base: Optional[str] = Field(
+        default=None,
+        description="Optional LiteLLM API base URL override.",
+    )
     litellm_api_version: Optional[str] = Field(
         default=None,
         description="Optional LiteLLM API version (useful for Azure OpenAI).",
     )
     litellm_drop_params: Optional[List[str]] = Field(
         default=None,
-        description="Optional list of LiteLLM parameters to drop before forwarding requests (see https://docs.litellm.ai/docs/completion/drop_params).",
+        description=(
+            "Optional LiteLLM parameters to drop before forwarding requests (see "
+            "https://docs.litellm.ai/docs/completion/drop_params)."
+        ),
     )
     litellm_reasoning_effort: Optional[str] = Field(
         default=None,
-        description="Optional reasoning effort level for OpenAI reasoning models (minimal, medium, high).",
+        description=(
+            "Optional reasoning effort level for OpenAI reasoning models (minimal, "
+            "medium, high)."
+        ),
     )
     litellm_stream: bool = Field(
         default=False,
@@ -144,7 +156,10 @@ class PromptManagerSettings(BaseSettings):
     )
     litellm_workflow_models: Optional[Dict[str, Literal["fast", "inference"]]] = Field(
         default=None,
-        description="Workflow-specific LiteLLM routing overrides mapping identifiers to 'fast' or 'inference'.",
+        description=(
+            "Workflow-specific LiteLLM routing overrides mapping identifiers to "
+            "'fast' or 'inference'."
+        ),
     )
     quick_actions: Optional[list[dict[str, object]]] = Field(
         default=None,
@@ -156,7 +171,10 @@ class PromptManagerSettings(BaseSettings):
     )
     categories: Optional[list[dict[str, object]]] = Field(
         default=None,
-        description="Optional inline list of prompt category definitions sourced from environment variables or JSON config.",
+        description=(
+            "Inline list of prompt category definitions sourced from environment "
+            "variables or JSON config."
+        ),
     )
     theme_mode: Literal["light", "dark"] = Field(
         default=DEFAULT_THEME_MODE,
@@ -164,17 +182,25 @@ class PromptManagerSettings(BaseSettings):
     )
     chat_user_bubble_color: str = Field(
         default=DEFAULT_CHAT_USER_BUBBLE_COLOR,
-        description="Hex colour used when rendering user chat messages within the transcript tab.",
+        description=(
+            "Hex colour used when rendering user chat messages within the transcript tab."
+        ),
     )
 
-    chat_colors: ChatColors = Field(default_factory=ChatColors, description="Colour palette for chat bubbles.")
+    chat_colors: ChatColors = Field(
+        default_factory=ChatColors,
+        description="Colour palette for chat bubbles.",
+    )
     embedding_backend: str = Field(
         default=DEFAULT_EMBEDDING_BACKEND,
-        description="Embedding backend to use (deterministic, litellm, sentence-transformers).",
+        description="Embedding backend to use (deterministic, LiteLLM, sentence-transformers).",
     )
     embedding_model: Optional[str] = Field(
         default=None,
-        description="Model name for embedding backend (required for litellm/sentence-transformers).",
+        description=(
+            "Model name for the embedding backend (required for LiteLLM and "
+            "sentence-transformers)."
+        ),
     )
     embedding_device: Optional[str] = Field(
         default=None,
@@ -203,10 +229,24 @@ class PromptManagerSettings(BaseSettings):
                 "litellm_model": ["LITELLM_MODEL", "litellm_model"],
                 "litellm_inference_model": ["LITELLM_INFERENCE_MODEL", "litellm_inference_model"],
                 "litellm_api_key": ["LITELLM_API_KEY", "litellm_api_key", "AZURE_OPENAI_API_KEY"],
-                "litellm_api_base": ["LITELLM_API_BASE", "litellm_api_base", "AZURE_OPENAI_ENDPOINT"],
-                "litellm_api_version": ["LITELLM_API_VERSION", "litellm_api_version", "AZURE_OPENAI_API_VERSION"],
-                "litellm_drop_params": ["LITELLM_DROP_PARAMS", "litellm_drop_params"],
-                "litellm_reasoning_effort": ["LITELLM_REASONING_EFFORT", "litellm_reasoning_effort"],
+                "litellm_api_base": [
+                    "LITELLM_API_BASE",
+                    "litellm_api_base",
+                    "AZURE_OPENAI_ENDPOINT",
+                ],
+                "litellm_api_version": [
+                    "LITELLM_API_VERSION",
+                    "litellm_api_version",
+                    "AZURE_OPENAI_API_VERSION",
+                ],
+                "litellm_drop_params": [
+                    "LITELLM_DROP_PARAMS",
+                    "litellm_drop_params",
+                ],
+                "litellm_reasoning_effort": [
+                    "LITELLM_REASONING_EFFORT",
+                    "litellm_reasoning_effort",
+                ],
                 "litellm_stream": ["LITELLM_STREAM", "litellm_stream"],
                 "litellm_workflow_models": ["LITELLM_WORKFLOW_MODELS", "litellm_workflow_models"],
                 "embedding_backend": ["EMBEDDING_BACKEND", "embedding_backend"],
@@ -268,10 +308,10 @@ class PromptManagerSettings(BaseSettings):
             value = parsed
         if isinstance(value, list):
             cleaned: list[dict[str, object]] = []
-            entries = cast(Sequence[object], value)
+            entries = cast("Sequence[object]", value)
             for entry in entries:
                 if isinstance(entry, Mapping):
-                    entry_mapping = cast(Mapping[object, object], entry)
+                    entry_mapping = cast("Mapping[object, object]", entry)
                     cleaned.append({str(key): entry_mapping[key] for key in entry_mapping})
             return cleaned or None
         raise ValueError("categories must be provided as a list of objects")
@@ -363,11 +403,11 @@ class PromptManagerSettings(BaseSettings):
         if not isinstance(value, list):
             raise ValueError("quick_actions must be a list of action definitions")
         normalised: list[dict[str, object]] = []
-        entries = cast(Sequence[object], value)
+        entries = cast("Sequence[object]", value)
         for entry in entries:
             if not isinstance(entry, Mapping):
                 raise ValueError("quick_actions items must be objects")
-            entry_mapping = cast(Mapping[object, object], entry)
+            entry_mapping = cast("Mapping[object, object]", entry)
             normalised.append({str(key): entry_mapping[key] for key in entry_mapping})
         return normalised
 
@@ -385,16 +425,18 @@ class PromptManagerSettings(BaseSettings):
                 items = [item.strip() for item in stripped.split(",") if item.strip()]
             else:
                 if isinstance(parsed, Sequence) and not isinstance(parsed, (str, bytes, bytearray)):
-                    sequence = cast(Sequence[object], parsed)
+                    sequence = cast("Sequence[object]", parsed)
                     items = [str(item).strip() for item in sequence if str(item).strip()]
                 else:
                     items = [str(parsed).strip()]
             return items or None
         if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-            sequence_value = cast(Sequence[object], value)
+            sequence_value = cast("Sequence[object]", value)
             items = [str(item).strip() for item in sequence_value if str(item).strip()]
             return items or None
-        raise ValueError("litellm_drop_params must be a list, comma-separated string, or JSON array")
+        raise ValueError(
+            "litellm_drop_params must be a list, comma-separated string, or JSON array"
+        )
 
     @field_validator("litellm_reasoning_effort", mode="before")
     def _normalise_reasoning_effort(cls, value: object) -> Optional[str]:
@@ -422,8 +464,10 @@ class PromptManagerSettings(BaseSettings):
                     "litellm_workflow_models must be a JSON object mapping workflow to model tier"
                 ) from exc
         if not isinstance(value, Mapping):
-            raise ValueError("litellm_workflow_models must be a mapping of workflow names to model tiers")
-        mapping_value = cast(Mapping[object, object], value)
+            raise ValueError(
+                "litellm_workflow_models must be a mapping of workflow names to model tiers"
+            )
+        mapping_value = cast("Mapping[object, object]", value)
         cleaned: Dict[str, Literal["fast", "inference"]] = {}
         for raw_key, raw_value in mapping_value.items():
             key = str(raw_key).strip()
@@ -475,16 +519,37 @@ class PromptManagerSettings(BaseSettings):
                 "redis_dsn": ["REDIS_DSN", "redis_dsn"],
                 "cache_ttl_seconds": ["CACHE_TTL_SECONDS", "cache_ttl_seconds"],
                 "litellm_model": ["LITELLM_MODEL", "litellm_model"],
-                "litellm_inference_model": ["LITELLM_INFERENCE_MODEL", "litellm_inference_model"],
-                "litellm_api_key": ["LITELLM_API_KEY", "litellm_api_key", "AZURE_OPENAI_API_KEY"],
-                "litellm_api_base": ["LITELLM_API_BASE", "litellm_api_base", "AZURE_OPENAI_ENDPOINT"],
-                "litellm_api_version": ["LITELLM_API_VERSION", "litellm_api_version", "AZURE_OPENAI_API_VERSION"],
-                "litellm_workflow_models": ["LITELLM_WORKFLOW_MODELS", "litellm_workflow_models"],
+                "litellm_inference_model": [
+                    "LITELLM_INFERENCE_MODEL",
+                    "litellm_inference_model",
+                ],
+                "litellm_api_key": [
+                    "LITELLM_API_KEY",
+                    "litellm_api_key",
+                    "AZURE_OPENAI_API_KEY",
+                ],
+                "litellm_api_base": [
+                    "LITELLM_API_BASE",
+                    "litellm_api_base",
+                    "AZURE_OPENAI_ENDPOINT",
+                ],
+                "litellm_api_version": [
+                    "LITELLM_API_VERSION",
+                    "litellm_api_version",
+                    "AZURE_OPENAI_API_VERSION",
+                ],
+                "litellm_workflow_models": [
+                    "LITELLM_WORKFLOW_MODELS",
+                    "litellm_workflow_models",
+                ],
                 "embedding_backend": ["EMBEDDING_BACKEND", "embedding_backend"],
                 "embedding_model": ["EMBEDDING_MODEL", "embedding_model"],
                 "embedding_device": ["EMBEDDING_DEVICE", "embedding_device"],
                 "quick_actions": ["QUICK_ACTIONS", "quick_actions"],
-                "litellm_reasoning_effort": ["LITELLM_REASONING_EFFORT", "litellm_reasoning_effort"],
+                "litellm_reasoning_effort": [
+                    "LITELLM_REASONING_EFFORT",
+                    "litellm_reasoning_effort",
+                ],
                 "litellm_stream": ["LITELLM_STREAM", "litellm_stream"],
             }
             for field, keys in mapping.items():
@@ -535,7 +600,7 @@ class PromptManagerSettings(BaseSettings):
                     continue
                 try:
                     raw_contents = path.read_text(encoding="utf-8")
-                except OSError as exc:  # pragma: no cover - filesystem failure is environment-specific
+                except OSError as exc:  # pragma: no cover - filesystem failure is env-specific
                     raise SettingsError(f"Unable to read configuration file: {path}") from exc
                 try:
                     data = json.loads(raw_contents)
@@ -546,7 +611,7 @@ class PromptManagerSettings(BaseSettings):
                 if not isinstance(data, dict):
                     message = f"Configuration file {path} must contain a JSON object"
                     raise SettingsError(message)
-                mapping_data = cast(Mapping[object, Any], data)
+                mapping_data = cast("Mapping[object, Any]", data)
                 data_dict: Dict[str, Any] = {str(key): value for key, value in mapping_data.items()}
                 mapped: Dict[str, Any] = {}
                 if "database_path" in data_dict and "db_path" not in data_dict:
