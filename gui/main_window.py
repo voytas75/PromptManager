@@ -1,6 +1,7 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.15.69 - 2025-11-29 - Toggle inline markdown rendering with a checkbox for output/chat.
   v0.15.68 - 2025-11-29 - Embed result actions inside the output text area with overlay controls.
   v0.15.67 - 2025-11-29 - Move result action buttons inside the output tab.
   v0.15.66 - 2025-11-29 - Add Enhanced Prompt Workbench launcher and wiring.
@@ -124,7 +125,6 @@ from .dialogs import (
     CatalogPreviewDialog,
     CategoryManagerDialog,
     InfoDialog,
-    MarkdownPreviewDialog,
     PromptDialog,
     PromptMaintenanceDialog,
     PromptVersionHistoryDialog,
@@ -1061,6 +1061,8 @@ class MainWindow(QMainWindow):
         self._streaming_buffer: list[str] = []
         self._stream_prompt_id: uuid.UUID | None = None
         self._stream_control_state: dict[str, bool] = {}
+        self._raw_result_text: str = ""
+        self._render_markdown_checkbox: QCheckBox | None = None
         self._suppress_query_signal = False
         self._quick_shortcuts: list[QShortcut] = []
         self._template_preview: TemplatePreviewWidget | None = None
@@ -1265,9 +1267,6 @@ class MainWindow(QMainWindow):
             self._on_copy_result_to_text_window_clicked
         )  # type: ignore[arg-type]
 
-        self._render_markdown_button = QPushButton("Render Output", self)
-        self._render_markdown_button.setEnabled(False)
-        self._render_markdown_button.clicked.connect(self._on_render_markdown_clicked)  # type: ignore[arg-type]
         self._save_button = QPushButton("Save Result", self)
         self._save_button.clicked.connect(self._on_save_result_clicked)  # type: ignore[arg-type]
 
@@ -1405,8 +1404,9 @@ class MainWindow(QMainWindow):
         output_tab_layout.setContentsMargins(0, 0, 0, 0)
         output_tab_layout.setSpacing(8)
 
-        self._result_text = QPlainTextEdit(self)
+        self._result_text = QTextEdit(self)
         self._result_text.setReadOnly(True)
+        self._result_text.setAcceptRichText(True)
         self._result_text.setPlaceholderText("Run a prompt to see output here.")
         self._result_text.viewport().installEventFilter(self)
         self._result_text.installEventFilter(self)
@@ -1426,8 +1426,14 @@ class MainWindow(QMainWindow):
         output_layout.addWidget(self._result_meta)
         output_layout.addWidget(self._result_tabs, 1)
 
-        render_actions_layout = FlowLayout(spacing=8)
-        render_actions_layout.addWidget(self._render_markdown_button)
+        render_actions_layout = QHBoxLayout()
+        render_actions_layout.setContentsMargins(0, 0, 0, 0)
+        render_actions_layout.setSpacing(8)
+        self._render_markdown_checkbox = QCheckBox("Render Markdown", self)
+        self._render_markdown_checkbox.setChecked(True)
+        self._render_markdown_checkbox.stateChanged.connect(self._on_render_markdown_toggled)  # type: ignore[arg-type]
+        render_actions_layout.addWidget(self._render_markdown_checkbox)
+        render_actions_layout.addStretch(1)
         output_layout.addLayout(render_actions_layout)
         self._workspace_splitter.addWidget(output_panel)
         self._workspace_splitter.addWidget(query_panel)
@@ -1621,6 +1627,51 @@ class MainWindow(QMainWindow):
                 if event.type() in {QEvent.Resize, QEvent.Show}:
                     self._position_result_overlay()
         return super().eventFilter(obj, event)
+
+    def _is_markdown_render_enabled(self) -> bool:
+        """Return True when the markdown rendering toggle is active."""
+
+        checkbox = self._render_markdown_checkbox
+        return bool(checkbox is None or checkbox.isChecked())
+
+    def _set_result_text_content(self, text: str) -> None:
+        """Persist the latest raw output text and refresh the view."""
+
+        self._raw_result_text = text or ""
+        self._refresh_result_text_display()
+
+    def _append_result_stream_chunk(self, chunk: str) -> None:
+        """Append streaming output and re-render according to the toggle."""
+
+        if not chunk:
+            return
+        self._raw_result_text += chunk
+        if self._result_text is None:
+            return
+        if self._is_markdown_render_enabled():
+            self._result_text.setMarkdown(self._raw_result_text)
+            cursor = self._result_text.textCursor()
+            cursor.movePosition(QTextCursor.End)
+            self._result_text.setTextCursor(cursor)
+            return
+        cursor = self._result_text.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        cursor.insertText(chunk)
+        self._result_text.setTextCursor(cursor)
+
+    def _refresh_result_text_display(self) -> None:
+        """Rerender the stored output using the active formatting mode."""
+
+        if self._result_text is None:
+            return
+        content = self._raw_result_text
+        if self._is_markdown_render_enabled():
+            self._result_text.setMarkdown(content)
+        else:
+            self._result_text.setPlainText(content)
+        cursor = self._result_text.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        self._result_text.setTextCursor(cursor)
 
     def _restore_window_geometry(self) -> None:
         """Restore window size/position from persistent settings."""
@@ -2229,7 +2280,6 @@ class MainWindow(QMainWindow):
         self._stream_prompt_id = prompt.id
         self._streaming_buffer = []
         self._stream_control_state = {
-            "render": self._render_markdown_button.isEnabled(),
             "copy": self._copy_result_button.isEnabled(),
             "copy_window": self._copy_result_to_text_window_button.isEnabled(),
             "save": self._save_button.isEnabled(),
@@ -2238,8 +2288,7 @@ class MainWindow(QMainWindow):
         }
         self._result_label.setText(f"Streaming — {prompt.name}")
         self._result_meta.setText("Receiving response…")
-        self._result_text.clear()
-        self._render_markdown_button.setEnabled(False)
+        self._set_result_text_content("")
         self._copy_result_button.setEnabled(False)
         self._copy_result_to_text_window_button.setEnabled(False)
         self._save_button.setEnabled(False)
@@ -2252,10 +2301,7 @@ class MainWindow(QMainWindow):
 
         if not self._streaming_in_progress or not chunk:
             return
-        cursor = self._result_text.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        cursor.insertText(chunk)
-        self._result_text.setTextCursor(cursor)
+        self._append_result_stream_chunk(chunk)
         self._streaming_buffer.append(chunk)
         QGuiApplication.processEvents()
 
@@ -2266,7 +2312,6 @@ class MainWindow(QMainWindow):
         self._stream_prompt_id = None
         self._streaming_buffer = []
         if self._stream_control_state:
-            self._render_markdown_button.setEnabled(self._stream_control_state.get("render", False))
             self._copy_result_button.setEnabled(self._stream_control_state.get("copy", False))
             self._copy_result_to_text_window_button.setEnabled(
                 self._stream_control_state.get("copy_window", False)
@@ -2276,7 +2321,6 @@ class MainWindow(QMainWindow):
             self._end_chat_button.setEnabled(self._stream_control_state.get("end", False))
         else:
             has_result = bool(self._last_execution and self._last_execution.result.response_text)
-            self._render_markdown_button.setEnabled(has_result)
             self._copy_result_button.setEnabled(has_result)
             self._copy_result_to_text_window_button.setEnabled(has_result)
             self._save_button.setEnabled(self._last_execution is not None)
@@ -2304,8 +2348,7 @@ class MainWindow(QMainWindow):
             meta_parts.append(f"Logged: {executed_at.strftime('%Y-%m-%d %H:%M:%S %Z')}")
         self._result_meta.setText(" | ".join(meta_parts))
         response_text = outcome.result.response_text or ""
-        self._result_text.setPlainText(response_text)
-        self._render_markdown_button.setEnabled(bool(response_text.strip()))
+        self._set_result_text_content(response_text)
         self._result_tabs.setCurrentIndex(0)
         self._copy_result_button.setEnabled(bool(outcome.result.response_text))
         self._copy_result_to_text_window_button.setEnabled(bool(outcome.result.response_text))
@@ -2323,8 +2366,7 @@ class MainWindow(QMainWindow):
         self._last_prompt_name = None
         self._result_label.setText("No prompt executed yet")
         self._result_meta.clear()
-        self._result_text.clear()
-        self._render_markdown_button.setEnabled(False)
+        self._set_result_text_content("")
         self._copy_result_button.setEnabled(False)
         self._copy_result_to_text_window_button.setEnabled(False)
         self._save_button.setEnabled(False)
@@ -2348,11 +2390,15 @@ class MainWindow(QMainWindow):
             self._chat_history_view.clear()
             self._chat_history_view.setPlaceholderText("Run a prompt to start chatting.")
             return
-        formatted = self._format_chat_history(self._chat_conversation)
+        if self._is_markdown_render_enabled():
+            markdown_transcript = self._format_chat_history_markdown(self._chat_conversation)
+            self._chat_history_view.setMarkdown(markdown_transcript or "_No messages yet._")
+            return
+        formatted = self._format_chat_history_html(self._chat_conversation)
         self._chat_history_view.setHtml(formatted)
 
-    def _format_chat_history(self, conversation: Sequence[dict[str, str]]) -> str:
-        """Return a readable transcript for the chat history tab."""
+    def _format_chat_history_html(self, conversation: Sequence[dict[str, str]]) -> str:
+        """Return a readable transcript for the chat history tab using styled HTML."""
 
         blocks: list[str] = []
         user_colour = self._chat_user_colour()
@@ -2392,6 +2438,28 @@ class MainWindow(QMainWindow):
             )
             blocks.append(block)
         return "<div>" + "".join(blocks) + "</div>"
+
+    def _format_chat_history_markdown(self, conversation: Sequence[dict[str, str]]) -> str:
+        """Return a markdown-formatted transcript for the chat history tab."""
+
+        blocks: list[str] = []
+        for message in conversation:
+            role = message.get("role", "").strip().lower()
+            content = (message.get("content", "") or "").strip()
+            if role == "user":
+                speaker = "You"
+            elif role == "assistant":
+                speaker = "Assistant"
+            elif role == "system":
+                speaker = "System"
+            else:
+                speaker = message.get("role", "Message").strip() or "Message"
+            if not content:
+                content = "_(no content)_"
+            block = f"**{speaker}:**\n\n{content}"
+            blocks.append(block)
+        separator = "\n\n---\n\n"
+        return separator.join(blocks)
 
     def _chat_user_colour(self) -> str:
         """Return the configured chat colour, falling back to the default."""
@@ -3338,31 +3406,11 @@ class MainWindow(QMainWindow):
             4000,
         )
 
-    def _on_render_markdown_clicked(self) -> None:
-        """Open a rendered markdown preview for the latest execution result."""
+    def _on_render_markdown_toggled(self, _state: int) -> None:
+        """Refresh result and chat panes when the markdown toggle changes."""
 
-        if self._last_execution is None:
-            QMessageBox.information(
-                self,
-                "No output available",
-                "Run a prompt to view rendered output.",
-            )
-            return
-        content = (self._last_execution.result.response_text or "").strip()
-        if not content:
-            QMessageBox.information(
-                self,
-                "No output available",
-                "The latest result did not include any text to render.",
-            )
-            return
-        prompt_name = self._last_prompt_name or "Prompt Output"
-        dialog = MarkdownPreviewDialog(
-            content,
-            self,
-            title=f"Rendered Output — {prompt_name}",
-        )
-        dialog.exec()
+        self._refresh_result_text_display()
+        self._refresh_chat_history_view()
 
     def _on_copy_result_clicked(self) -> None:
         """Copy the latest execution result to the clipboard."""
