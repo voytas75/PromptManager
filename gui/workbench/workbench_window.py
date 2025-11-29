@@ -1,6 +1,7 @@
 """Qt widgets for the Enhanced Prompt Workbench experience.
 
 Updates:
+  v0.1.2 - 2025-11-29 - Keep guided wizard colors in sync with the current theme palette.
   v0.1.1 - 2025-11-29 - Align guided wizard palette with the active application theme.
   v0.1.0 - 2025-11-29 - Introduce guided Workbench window, mode selector, and export dialog.
 """
@@ -15,7 +16,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from PySide6.QtCore import QPoint, Qt, Signal
+from PySide6.QtCore import QPoint, Qt, Signal, QEvent
 from PySide6.QtGui import QFont, QGuiApplication, QPalette, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import (
     QButtonGroup,
@@ -368,12 +369,7 @@ class GuidedPromptWizard(QWizard):
         super().__init__(parent)
         self._session = session
         self.setWindowTitle("Guided Prompt Wizard")
-        palette: QPalette | None = None
-        if parent is not None:
-            palette = parent.palette()
-        if palette is None:
-            app = QGuiApplication.instance()
-            palette = app.palette() if app is not None else None
+        palette = self._resolve_theme_palette(parent)
         self._goal_page = _GoalWizardPage(session)
         self._context_page = _ContextWizardPage(session)
         self._detail_page = _DetailWizardPage(session)
@@ -394,6 +390,21 @@ class GuidedPromptWizard(QWizard):
             widget.textChanged.connect(self._emit_update)  # type: ignore[arg-type]
         self.currentIdChanged.connect(lambda _: self._emit_update())  # type: ignore[arg-type]
         self._emit_update()
+
+    def changeEvent(self, event: QEvent) -> None:  # type: ignore[override]
+        super().changeEvent(event)
+        if event.type() in {QEvent.PaletteChange, QEvent.ApplicationPaletteChange}:
+            palette = self._resolve_theme_palette(self.parentWidget())
+            if palette is not None:
+                self._apply_palette(palette)
+
+    def _resolve_theme_palette(self, parent: QWidget | None) -> QPalette | None:
+        app = QGuiApplication.instance()
+        if app is not None:
+            return QPalette(app.palette())
+        if parent is not None:
+            return QPalette(parent.palette())
+        return None
 
     def _apply_palette(self, palette: QPalette) -> None:
         text_color = palette.color(QPalette.Text).name()
