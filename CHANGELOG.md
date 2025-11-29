@@ -6,6 +6,17 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.20.0] - 2025-11-29
+
+### Added
+
+- Introduced the **Enhanced Prompt Workbench**: a dedicated modal workspace with a guided wizard, block palette, improved template editing, template variable dialogs, CodexExecutor Brainstorm/Peek/Run loops, and live history/feedback logging. Launch it via the new 🆕 toolbar button to scaffold prompts from scratch, remix existing templates, or iterate through runs before exporting into the catalogue.
+
+### Changed
+
+- Template preview widget now exposes programmatic variable population/refresh hooks so the Workbench (and future tooling) can keep placeholder forms in sync without user typing.
+- Workbench runs accept empty “Test input” fields by reusing sample variable values or the prompt goal, keeping iterative flows moving without boilerplate text.
+
 ## [0.19.1] - 2025-11-29
 
 ### Added
