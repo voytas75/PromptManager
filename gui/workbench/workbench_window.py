@@ -1,6 +1,7 @@
 """Qt widgets for the Enhanced Prompt Workbench experience.
 
 Updates:
+  v0.1.18 - 2025-11-29 - Persist Workbench window geometry between sessions.
   v0.1.17 - 2025-11-29 - Stack the prompt editor above Run Output/History in the center column.
   v0.1.16 - 2025-11-29 - Relocate output/history tabs into the center column and collapse the bottom panel.
   v0.1.15 - 2025-11-29 - Move output/history tabs below the editor and persist output splitter widths.
@@ -816,6 +817,9 @@ class WorkbenchWindow(QMainWindow):
         super().closeEvent(event)
 
     def _restore_layout_state(self) -> None:
+        geometry = self._settings.value("windowGeometry")
+        if isinstance(geometry, QByteArray):
+            self.restoreGeometry(geometry)
         main_state = self._settings.value("mainSplitterState")
         if isinstance(main_state, QByteArray) and self._main_splitter is not None:
             self._main_splitter.restoreState(main_state)
@@ -824,6 +828,7 @@ class WorkbenchWindow(QMainWindow):
             self._middle_splitter.restoreState(middle_state)
 
     def _persist_layout_state(self) -> None:
+        self._settings.setValue("windowGeometry", self.saveGeometry())
         if self._main_splitter is not None:
             self._settings.setValue("mainSplitterState", self._main_splitter.saveState())
         if self._middle_splitter is not None:
