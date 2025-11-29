@@ -2,14 +2,6 @@
 
 PromptManager is a PySide6 desktop application for managing reusable AI prompts with SQLite persistence, optional Redis caching, and ChromaDB-powered semantic retrieval. This document captures the engineering conventions, environment expectations, and deep technical workflows required to extend the project safely.
 
-## Updates
-
-Updates:
-  v0.21.1 - 2025-11-29 - Documented global Qt Fusion styling and custom Guided wizard dialog.
-  v0.20.0 - 2025-11-29 - Documented the Enhanced Prompt Workbench launch path and tooling stack.
-  v0.17.4 - 2025-11-23 - Added Similar context menu action to surface embedding-based recommendations plus body-size and rating sort orders to spotlight verbose or high-quality templates inside the GUI.
-  v0.17.1 - 2025-11-23 - Added developer handbook aligned with AGENTS.md directives.
-
 ## Current Status
 
 - `models/prompt_model.Prompt` holds the canonical schema (extension slots `ext1`–`ext5`, serialization helpers, embedding document builder).

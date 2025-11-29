@@ -50,7 +50,7 @@ dev = [
 
 [tool.setuptools.packages.find]
 include = ["config*", "core*", "gui*", "models*"]
-exclude = ["tests*", "data*", "PromptManagerBlueprint.txt", "AGENTS.md"]
+exclude = ["tests*", "data*"]
 
 [tool.setuptools.package-data]
 "gui.resources" = ["*.ico"]
