@@ -1,6 +1,7 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.15.70 - 2025-11-29 - Make workspace splitter resize only the prompt input textarea.
   v0.15.69 - 2025-11-29 - Toggle inline markdown rendering with a checkbox for output/chat.
   v0.15.68 - 2025-11-29 - Embed result actions inside the output text area with overlay controls.
   v0.15.67 - 2025-11-29 - Move result action buttons inside the output tab.
@@ -1336,10 +1337,8 @@ class MainWindow(QMainWindow):
 
         self._query_input = QPlainTextEdit(self)
         self._query_input.setPlaceholderText("Paste code or text to analyse and suggest prompts…")
-        fixed_query_height = 160
-        self._query_input.setMinimumHeight(fixed_query_height)
-        self._query_input.setMaximumHeight(fixed_query_height)
-        self._query_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self._query_input.setMinimumHeight(120)
+        self._query_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self._query_input.textChanged.connect(self._on_query_text_changed)
         self._highlighter = CodeHighlighter(self._query_input.document())
 
@@ -1383,7 +1382,7 @@ class MainWindow(QMainWindow):
         query_panel_layout.setSizeConstraint(QLayout.SetMinimumSize)
         query_panel_layout.setContentsMargins(0, 0, 0, 0)
         query_panel_layout.setSpacing(8)
-        query_panel_layout.addWidget(self._query_input)
+        query_panel_layout.addWidget(self._query_input, 1)
         query_panel_layout.addLayout(actions_layout)
         query_panel_layout.addLayout(language_layout)
         query_panel_layout.addWidget(self._intent_hint)
