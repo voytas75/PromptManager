@@ -6,6 +6,6 @@ jsonschema==4.23.0
 pydantic==2.12.3
 pydantic-settings==2.2.1
 PyYAML==6.0.2
-PySide6==6.7.2
+PySide6==6.10.1
 redis==5.0.1
 litellm==1.61.15
