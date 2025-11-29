@@ -1,6 +1,7 @@
 """Qt widgets for the Enhanced Prompt Workbench experience.
 
 Updates:
+  v0.1.7 - 2025-11-29 - Force wizard/page styled backgrounds so palette colors render on Windows.
   v0.1.6 - 2025-11-29 - Apply palette snapshots to wizard styling for consistent themes.
   v0.1.5 - 2025-11-29 - Rely on native palette for wizard styling to match host themes.
   v0.1.4 - 2025-11-29 - Apply palette-aware stylesheet for portable wizard colors.
@@ -372,6 +373,7 @@ class GuidedPromptWizard(QWizard):
     def __init__(self, session: WorkbenchSession, parent: QWidget | None = None) -> None:
         self._palette_updating: bool = False
         super().__init__(parent)
+        self.setAttribute(Qt.WA_StyledBackground, True)
         self._session = session
         self.setWindowTitle("Guided Prompt Wizard")
         palette = self._resolve_theme_palette(parent)
@@ -482,9 +484,11 @@ class GuidedPromptWizard(QWizard):
                 """
             ).strip()
             self.setStyleSheet(stylesheet)
-            for page in (self._goal_page, self._context_page, self._detail_page):
+            styled_pages = (self._goal_page, self._context_page, self._detail_page)
+            for page in styled_pages:
                 page.setPalette(palette)
                 page.setAutoFillBackground(True)
+                page.setAttribute(Qt.WA_StyledBackground, True)
         finally:
             self._palette_updating = False
 
