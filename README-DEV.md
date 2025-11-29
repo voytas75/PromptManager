@@ -5,6 +5,7 @@ PromptManager is a PySide6 desktop application for managing reusable AI prompts 
 ## Updates
 
 Updates:
+  v0.21.1 - 2025-11-29 - Documented global Qt Fusion styling and custom Guided wizard dialog.
   v0.20.0 - 2025-11-29 - Documented the Enhanced Prompt Workbench launch path and tooling stack.
   v0.17.4 - 2025-11-23 - Added Similar context menu action to surface embedding-based recommendations plus body-size and rating sort orders to spotlight verbose or high-quality templates inside the GUI.
   v0.17.1 - 2025-11-23 - Added developer handbook aligned with AGENTS.md directives.
@@ -116,6 +117,8 @@ Key UI capabilities:
 - List/search/detail panes with CRUD operations, diff viewer, fork lineage, and scroll-safe prompt bodies.
 - Workspace under the toolbar supports Detect Need, Suggest Prompt, Copy Prompt flows, language auto-detection, and quick clearing.
 - Enhanced Prompt Workbench (🆕 toolbar button) launches a modal surface with a guided wizard, block palette, Template Preview integration, LiteLLM Brainstorm/Peek/Run Once helpers, variable dialogs, and export-to-repository wiring so teams can iterate on drafts without touching the main catalogue view.
+- The GUI forces Qt's **Fusion** style at startup (see `gui/application.py`) so the palette-driven theming looks identical on Windows/macOS/Linux. If you experiment with alternative styles, verify Guided mode and the Link Variable dialog still use the dark palette before committing.
+- Guided wizard now uses a custom-styled dialog (not `QWizard`) to avoid native theme overrides; adjust `GuidedPromptWizard` inside `gui/workbench/workbench_window.py` when changing layout, palette, or button flow.
 - A Template Preview frame below the workspace renders the selected prompt as a strict Jinja2 template, accepts JSON variables, and surfaces validation/missing-field issues instantly.
 - Command palette (`Ctrl+K` / `Ctrl+Shift+P`) and shortcuts (`Ctrl+1`–`Ctrl+4`) jump directly into explain/fix/document/enhance workflows.
 - Category/tag/quality filters plus taxonomy manager keep catalogues organized.
