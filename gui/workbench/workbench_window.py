@@ -420,42 +420,16 @@ class GuidedPromptWizard(QWizard):
             self.setAutoFillBackground(True)
             stylesheet = textwrap.dedent(
                 """
-                QWizard {
-                    background-color: palette(window);
-                    color: palette(window-text);
-                }
+                QWizard,
                 QWizardPage {
                     background-color: palette(window);
                     color: palette(window-text);
                 }
-                QStackedWidget { background-color: palette(base); }
-                QLabel { color: palette(window-text); }
-                QLineEdit,
-                QPlainTextEdit,
-                QComboBox {
+                QLabel {
+                    color: palette(window-text);
+                }
+                QStackedWidget {
                     background-color: palette(base);
-                    color: palette(text);
-                    border: 1px solid palette(mid);
-                }
-                QTextEdit {
-                    background-color: palette(base);
-                    color: palette(text);
-                    border: 1px solid palette(mid);
-                }
-                QPushButton {
-                    background-color: palette(button);
-                    color: palette(button-text);
-                    border: 1px solid palette(mid);
-                    border-radius: 4px;
-                    padding: 4px 10px;
-                }
-                QPushButton:hover {
-                    background-color: palette(midlight);
-                    color: palette(button-text);
-                }
-                QPushButton:pressed {
-                    background-color: palette(dark);
-                    color: palette(button-text);
                 }
                 """
             ).strip()
