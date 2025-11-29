@@ -1,6 +1,7 @@
 """Qt widgets for the Enhanced Prompt Workbench experience.
 
 Updates:
+  v0.1.11 - 2025-11-29 - Log resolved wizard palette roles for troubleshooting theme differences.
   v0.1.10 - 2025-11-29 - Style wizard footer container explicitly to match host palette.
   v0.1.9 - 2025-11-29 - Apply palette colors to wizard button boxes and buttons.
   v0.1.8 - 2025-11-29 - Enforce palette-colored wizard backgrounds via style attributes.
@@ -381,6 +382,22 @@ class GuidedPromptWizard(QWizard):
         self._session = session
         self.setWindowTitle("Guided Prompt Wizard")
         palette = self._resolve_theme_palette(parent)
+        if palette is not None:
+            logger.debug(
+                "GUIDED_WIZARD palette=%s",
+                {
+                    "window": palette.color(QPalette.Window).name(),
+                    "window_text": palette.color(QPalette.WindowText).name(),
+                    "base": palette.color(QPalette.Base).name(),
+                    "alternate": palette.color(QPalette.AlternateBase).name(),
+                    "button": palette.color(QPalette.Button).name(),
+                    "button_text": palette.color(QPalette.ButtonText).name(),
+                    "mid": palette.color(QPalette.Mid).name(),
+                    "midlight": palette.color(QPalette.Midlight).name(),
+                    "highlight": palette.color(QPalette.Highlight).name(),
+                    "highlighted_text": palette.color(QPalette.HighlightedText).name(),
+                },
+            )
         self._goal_page = _GoalWizardPage(session)
         self._context_page = _ContextWizardPage(session)
         self._detail_page = _DetailWizardPage(session)
