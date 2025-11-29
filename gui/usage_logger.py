@@ -1,8 +1,10 @@
 """Usage logging utilities for intent workspace interactions.
 
-Updates: v0.3.1 - 2025-12-08 - Remove task template logging after feature retirement.
-Updates: v0.2.0 - 2025-11-09 - Record manual save ratings alongside notes.
-Updates: v0.1.0 - 2025-11-07 - Introduce JSONL logger for detect/suggest/copy events.
+Updates:
+  v0.3.2 - 2025-11-29 - Wrap logging helpers for Ruff line-length compliance.
+  v0.3.1 - 2025-12-08 - Remove task template logging after feature retirement.
+  v0.2.0 - 2025-11-09 - Record manual save ratings alongside notes.
+  v0.1.0 - 2025-11-07 - Introduce JSONL logger for detect/suggest/copy events.
 """
 
 from __future__ import annotations
@@ -31,7 +33,8 @@ class IntentUsageLogger:
 
     def __init__(self, path: Path | str | None = None, *, enabled: bool = True) -> None:
         self._enabled = enabled
-        self._path = Path(path) if path is not None else Path("data") / "logs" / "intent_usage.jsonl"
+        default_path = Path("data") / "logs" / "intent_usage.jsonl"
+        self._path = Path(path) if path is not None else default_path
 
     @property
     def log_path(self) -> Path:
@@ -54,7 +57,14 @@ class IntentUsageLogger:
         )
         self._append(record)
 
-    def log_suggest(self, *, prediction: IntentPrediction, query_text: str, prompts: Sequence[object], fallback_used: bool) -> None:
+    def log_suggest(
+        self,
+        *,
+        prediction: IntentPrediction,
+        query_text: str,
+        prompts: Sequence[object],
+        fallback_used: bool,
+    ) -> None:
         """Log details for a suggestion event."""
 
         record = self._base_record("suggest", query_text)
@@ -177,7 +187,11 @@ class IntentUsageLogger:
                 handle.write(json.dumps(record, ensure_ascii=False))
                 handle.write("\n")
         except OSError:
-            logger.debug("Unable to write usage analytics", extra={"event": record.get("event")}, exc_info=True)
+            logger.debug(
+                "Unable to write usage analytics",
+                extra={"event": record.get("event")},
+                exc_info=True,
+            )
 
 
 __all__ = ["IntentUsageLogger"]

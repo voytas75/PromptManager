@@ -1,8 +1,10 @@
 """Execution history panel for Prompt Manager.
 
-Updates: v0.3.0 - 2025-11-12 - Display chat conversations alongside execution details.
-Updates: v0.2.0 - 2025-11-09 - Surface execution ratings in tables, details, and exports.
-Updates: v0.1.0 - 2025-11-08 - Provide filterable, editable execution history workspace.
+Updates:
+  v0.3.1 - 2025-11-29 - Wrap header description to satisfy Ruff line length.
+  v0.3.0 - 2025-11-12 - Display chat conversations alongside execution details.
+  v0.2.0 - 2025-11-09 - Surface execution ratings in tables, details, and exports.
+  v0.1.0 - 2025-11-08 - Provide filterable, editable execution history workspace.
 """
 
 from __future__ import annotations
@@ -76,7 +78,10 @@ class HistoryPanel(QWidget):
         layout = QVBoxLayout(self)
 
         header = QLabel(
-            "History of prompt executions. Filter by status, prompt, or search across request, response, and notes.",
+            (
+                "History of prompt executions. Filter by status, prompt, or search across request, "
+                "response, and notes."
+            ),
             self,
         )
         header.setWordWrap(True)

@@ -1,17 +1,19 @@
 """Settings dialog for configuring Prompt Manager runtime options.
 
-Updates: v0.2.9 - 2025-11-28 - Persist dialog geometry between sessions.
-Updates: v0.2.8 - 2025-11-23 - Surface editable LiteLLM prompt templates with reset controls.
-Updates: v0.2.7 - 2025-12-06 - Surface LiteLLM embedding model configuration.
-Updates: v0.2.6 - 2025-11-05 - Add theme mode toggle to the appearance settings.
-Updates: v0.2.5 - 2025-11-05 - Add chat appearance controls to settings dialog.
-Updates: v0.2.4 - 2025-11-05 - Add LiteLLM routing matrix for fast vs inference models.
-Updates: v0.2.3 - 2025-11-05 - Introduce LiteLLM inference model field and tabbed layout.
-Updates: v0.2.2 - 2025-11-26 - Add LiteLLM streaming toggle to runtime settings UI.
-Updates: v0.2.1 - 2025-11-17 - Remove catalogue path configuration; imports now require explicit selection.
-Updates: v0.2.0 - 2025-11-16 - Apply palette-aware border styling to match main window chrome.
-Updates: v0.1.1 - 2025-11-15 - Avoid persisting LiteLLM API secrets to disk.
-Updates: v0.1.0 - 2025-11-04 - Initial settings dialog implementation.
+Updates:
+  v0.2.10 - 2025-11-29 - Wrap quick action/parameter parsing for Ruff line length.
+  v0.2.9 - 2025-11-28 - Persist dialog geometry between sessions.
+  v0.2.8 - 2025-11-23 - Surface editable LiteLLM prompt templates with reset controls.
+  v0.2.7 - 2025-12-06 - Surface LiteLLM embedding model configuration.
+  v0.2.6 - 2025-11-05 - Add theme mode toggle to the appearance settings.
+  v0.2.5 - 2025-11-05 - Add chat appearance controls to settings dialog.
+  v0.2.4 - 2025-11-05 - Add LiteLLM routing matrix for fast vs inference models.
+  v0.2.3 - 2025-11-05 - Introduce LiteLLM inference model field and tabbed layout.
+  v0.2.2 - 2025-11-26 - Add LiteLLM streaming toggle to runtime settings UI.
+  v0.2.1 - 2025-11-17 - Remove catalogue path configuration; imports now require explicit selection.
+  v0.2.0 - 2025-11-16 - Apply palette-aware border styling to match main window chrome.
+  v0.1.1 - 2025-11-15 - Avoid persisting LiteLLM API secrets to disk.
+  v0.1.0 - 2025-11-04 - Initial settings dialog implementation.
 """
 
 from __future__ import annotations
@@ -106,7 +108,9 @@ class SettingsDialog(QDialog):
         self._litellm_drop_params = ", ".join(litellm_drop_params) if litellm_drop_params else ""
         self._litellm_reasoning_effort = (litellm_reasoning_effort or "").strip()
         self._litellm_stream = bool(litellm_stream)
-        original_actions = [dict(entry) for entry in (quick_actions or []) if isinstance(entry, dict)]
+        original_actions = [
+            dict(entry) for entry in (quick_actions or []) if isinstance(entry, dict)
+        ]
         self._original_quick_actions = original_actions
         self._quick_actions_value: list[dict[str, object]] | None = original_actions or None
         self._workflow_models: dict[str, str] = {}
@@ -349,7 +353,7 @@ class SettingsDialog(QDialog):
 
         self._quick_actions_input = QPlainTextEdit(quick_tab)
         self._quick_actions_input.setPlaceholderText(
-            "Paste JSON array of quick action definitions (identifier, title, description, optional hints)."
+            "Paste JSON array of quick actions (id, title, description, optional hints)."
         )
         if self._original_quick_actions:
             try:
@@ -535,7 +539,9 @@ class SettingsDialog(QDialog):
             return stripped or None
 
         drop_text = self._drop_params_input.text().strip()
-        drop_params = [item.strip() for item in drop_text.split(",") if item.strip()] if drop_text else None
+        drop_params = None
+        if drop_text:
+            drop_params = [item.strip() for item in drop_text.split(",") if item.strip()]
 
         workflow_models: dict[str, str] = {}
         for key, group in self._workflow_groups.items():

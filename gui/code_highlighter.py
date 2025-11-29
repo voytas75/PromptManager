@@ -1,6 +1,8 @@
 """Syntax highlighting helpers for the query workspace.
 
-Updates: v0.1.0 - 2025-11-10 - Provide keyword-based highlighting for common languages.
+Updates:
+  v0.1.1 - 2025-11-29 - Wrap highlight rule definitions to satisfy Ruff line-length rules.
+  v0.1.0 - 2025-11-10 - Provide keyword-based highlighting for common languages.
 """
 
 from __future__ import annotations
@@ -69,17 +71,26 @@ def _python_rules() -> list[_HighlightRule]:
 
 def _powershell_rules() -> list[_HighlightRule]:
     return [
-        _HighlightRule(_compile_pattern(r"\b(Get|Set|New|Invoke|Start|Stop|Test)-[A-Za-z]+"), _format("#c586c0", bold=True)),
+        _HighlightRule(
+            _compile_pattern(r"\b(Get|Set|New|Invoke|Start|Stop|Test)-[A-Za-z]+"),
+            _format("#c586c0", bold=True),
+        ),
         _HighlightRule(_compile_pattern(r"\$[A-Za-z_][\w:]*"), _format("#9cdcfe")),
         _HighlightRule(_compile_pattern(r"#[^\n]*"), _format("#6a9955")),
-        _HighlightRule(_compile_pattern(r"\[(string|int|bool|array|hashtable)\]"), _format("#4fc1ff")),
+        _HighlightRule(
+            _compile_pattern(r"\[(string|int|bool|array|hashtable)\]"),
+            _format("#4fc1ff"),
+        ),
     ]
 
 
 def _bash_rules() -> list[_HighlightRule]:
     return [
         _HighlightRule(_compile_pattern(r"^#!.*$"), _format("#6a9955")),
-        _HighlightRule(_compile_keywords(("if", "then", "fi", "for", "do", "done", "elif", "else", "while")), _format("#d19a66", bold=True)),
+        _HighlightRule(
+            _compile_keywords(("if", "then", "fi", "for", "do", "done", "elif", "else", "while")),
+            _format("#d19a66", bold=True),
+        ),
         _HighlightRule(_compile_pattern(r"#[^\n]*"), _format("#6a9955")),
         _HighlightRule(_compile_pattern(r"\$[A-Za-z_][\w]*"), _format("#9cdcfe")),
     ]

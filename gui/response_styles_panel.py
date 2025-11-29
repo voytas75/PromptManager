@@ -1,8 +1,10 @@
 """Prompt part management tab.
 
-Updates: v0.15.3 - 2025-11-27 - Add toast callback for clipboard operations.
-Updates: v0.15.2 - 2025-11-27 - Add prompt part classification column and rename UI strings accordingly.
-Updates: v0.15.1 - 2025-11-25 - Document module metadata for AGENTS compliance.
+Updates:
+  v0.15.4 - 2025-11-29 - Shorten export alert copy to satisfy Ruff line length.
+  v0.15.3 - 2025-11-27 - Add toast callback for clipboard operations.
+  v0.15.2 - 2025-11-27 - Add prompt part classification column and rename UI strings accordingly.
+  v0.15.1 - 2025-11-25 - Document module metadata for AGENTS compliance.
 """
 
 from __future__ import annotations
@@ -251,7 +253,11 @@ class ResponseStylesPanel(QWidget):
 
     def _on_export_clicked(self) -> None:
         if not self._styles:
-            QMessageBox.information(self, "Export prompt parts", "There are no prompt parts to export yet.")
+            QMessageBox.information(
+                self,
+                "Export prompt parts",
+                "No prompt parts are available to export.",
+            )
             return
         path, _ = QFileDialog.getSaveFileName(
             self,

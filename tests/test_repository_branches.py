@@ -1,6 +1,8 @@
 """Additional PromptRepository branch coverage tests.
 
-Updates: v0.1.0 - 2025-10-30 - Add error-path coverage for repository helpers.
+Updates:
+  v0.1.1 - 2025-11-29 - Import Any for fake connections and wrap long test helpers.
+  v0.1.0 - 2025-10-30 - Add error-path coverage for repository helpers.
 """
 
 from __future__ import annotations
@@ -9,7 +11,7 @@ import sqlite3
 import uuid
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -373,7 +375,9 @@ def test_repository_backfills_category_slugs(tmp_path: Path) -> None:
                 example_output, last_modified, version, author, quality_score, usage_count,
                 rating_count, rating_sum, related_prompts, created_at, modified_by,
                 is_active, source, checksum, ext1, ext2, ext3, ext4, ext5
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            ) VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            );
             """,
             (
                 str(uuid.uuid4()),
@@ -405,7 +409,7 @@ def test_repository_backfills_category_slugs(tmp_path: Path) -> None:
                 None,
             ),
         )
-    repo = PromptRepository(str(db_path))
+    PromptRepository(str(db_path))
     with sqlite3.connect(db_path) as conn:
         columns = {row[1] for row in conn.execute("PRAGMA table_info(prompts);").fetchall()}
         assert "category_slug" in columns
@@ -453,7 +457,10 @@ def test_user_profile_roundtrip(tmp_path: Path) -> None:
     assert refreshed.username == "tester"
 
 
-def test_repository_update_category_sql_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_repository_update_category_sql_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     repo = PromptRepository(str(tmp_path / "repo.db"))
     category = PromptCategory(slug="docs", label="Docs", description="Docs")
     repo.create_category(category)

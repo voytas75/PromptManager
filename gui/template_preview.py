@@ -1,16 +1,18 @@
 """Workspace template preview widget with live variable validation.
 
-Updates: v0.2.0 - 2025-11-27 - Persist template variables and schema settings per prompt using QSettings.
-Updates: v0.1.9 - 2025-11-27 - Expose run trigger for external shortcuts and publish run state changes.
-Updates: v0.1.8 - 2025-11-27 - Move schema toggle controls above editors and collapse the schema panel when hidden.
-Updates: v0.1.7 - 2025-11-27 - Make the variables/schema editors and rendered preview vertically resizable.
-Updates: v0.1.6 - 2025-11-27 - Consolidate template status messaging into the footer label only.
-Updates: v0.1.5 - 2025-11-27 - Persist splitter sizes for the status and preview panes.
-Updates: v0.1.4 - 2025-11-27 - Add contextual hints for template syntax errors.
-Updates: v0.1.3 - 2025-11-27 - Keep raw templates visible while surfacing parse/render errors.
-Updates: v0.1.2 - 2025-11-27 - Make rendered prompt view resizable with a splitter.
-Updates: v0.1.1 - 2025-11-27 - Capture variables with multiline editors sized to four lines.
-Updates: v0.1.0 - 2025-11-25 - Add dynamic Jinja2 preview with custom filters and schema validation.
+Updates:
+  v0.2.1 - 2025-11-29 - Wrap schema persistence logic to satisfy Ruff line length.
+  v0.2.0 - 2025-11-27 - Persist template variables and schema settings per prompt using QSettings.
+  v0.1.9 - 2025-11-27 - Expose run trigger for external shortcuts and publish run state changes.
+  v0.1.8 - 2025-11-27 - Move schema toggles above editors and collapse the panel when hidden.
+  v0.1.7 - 2025-11-27 - Make the variables/schema editors and rendered preview vertically resizable.
+  v0.1.6 - 2025-11-27 - Consolidate template status messaging into the footer label only.
+  v0.1.5 - 2025-11-27 - Persist splitter sizes for the status and preview panes.
+  v0.1.4 - 2025-11-27 - Add contextual hints for template syntax errors.
+  v0.1.3 - 2025-11-27 - Keep raw templates visible while surfacing parse/render errors.
+  v0.1.2 - 2025-11-27 - Make rendered prompt view resizable with a splitter.
+  v0.1.1 - 2025-11-27 - Capture variables with multiline editors sized to four lines.
+  v0.1.0 - 2025-11-25 - Add dynamic Jinja2 preview with custom filters and schema validation.
 """
 
 from __future__ import annotations
@@ -409,8 +411,9 @@ class TemplatePreviewWidget(QWidget):
                         widget.setPlainText(str(value))
             if isinstance(schema_text, str) and self._schema_input.toPlainText() != schema_text:
                 self._schema_input.setPlainText(schema_text)
-            if isinstance(schema_visible, bool) and self._schema_toggle.isChecked() != schema_visible:
-                self._schema_toggle.setChecked(schema_visible)
+            if isinstance(schema_visible, bool):
+                if self._schema_toggle.isChecked() != schema_visible:
+                    self._schema_toggle.setChecked(schema_visible)
             if isinstance(schema_mode_value, str):
                 index = self._schema_mode.findData(schema_mode_value)
                 if index >= 0 and index != self._schema_mode.currentIndex():

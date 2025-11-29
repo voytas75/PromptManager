@@ -1,4 +1,8 @@
-"""Tests for LiteLLM-backed scenario generation utilities."""
+"""Tests for LiteLLM-backed scenario generation utilities.
+
+Updates:
+  v0.1.1 - 2025-11-29 - Wrap scenario fixture strings for Ruff line length compliance.
+"""
 
 from __future__ import annotations
 
@@ -48,7 +52,12 @@ def test_extract_candidates_supports_multiple_payload_shapes() -> None:
 def test_extract_candidates_strips_markdown_code_fences() -> None:
     """Scenario responses wrapped in Markdown fences should be cleaned."""
 
-    fenced = """```json\nInitiate collaborative prompt refinement.\nGuide multi-role experts to iterate on drafts.\n```"""
+    fenced = (
+        "```json\n"
+        "Initiate collaborative prompt refinement.\n"
+        "Guide multi-role experts to iterate on drafts.\n"
+        "```"
+    )
 
     assert _extract_candidates(fenced) == [
         "Initiate collaborative prompt refinement.",
@@ -59,15 +68,17 @@ def test_extract_candidates_strips_markdown_code_fences() -> None:
 def test_extract_candidates_handles_partial_json_arrays() -> None:
     """Truncated JSON arrays should still produce clean scenario entries."""
 
-    response = """
-    [
-    "Draft detailed, stepwise chronicles for fictional world-building or simulation-based technical processes.",
-    "Summarise tactical response options across distributed operations.",
-    ]
-    """
+    response = (
+        "\n[\n"
+        '"Draft detailed, stepwise chronicles for fictional world-building or '
+        'simulation-based technical processes.",\n'
+        '"Summarise tactical response options across distributed operations.",\n'
+        "]\n"
+    )
 
     assert _extract_candidates(response) == [
-        "Draft detailed, stepwise chronicles for fictional world-building or simulation-based technical processes.",
+        "Draft detailed, stepwise chronicles for fictional world-building "
+        "or simulation-based technical processes.",
         "Summarise tactical response options across distributed operations.",
     ]
 
@@ -83,7 +94,10 @@ def test_generate_invokes_litellm_with_drop_params(monkeypatch: pytest.MonkeyPat
 
         return _completion, RuntimeError
 
-    def fake_apply_drop_params(request: dict[str, Any], drop_params: Sequence[str]) -> tuple[str, ...]:
+    def fake_apply_drop_params(
+        request: dict[str, Any],
+        drop_params: Sequence[str],
+    ) -> tuple[str, ...]:
         captured["request_before_drop"] = dict(request)
         for key in list(request.keys()):
             if key in drop_params:
@@ -103,7 +117,10 @@ def test_generate_invokes_litellm_with_drop_params(monkeypatch: pytest.MonkeyPat
         return {"choices": [{"message": {"content": '["Duplicate", "* Keep concise "]'}}]}
 
     monkeypatch.setattr("core.scenario_generation.get_completion", fake_get_completion)
-    monkeypatch.setattr("core.scenario_generation.apply_configured_drop_params", fake_apply_drop_params)
+    monkeypatch.setattr(
+        "core.scenario_generation.apply_configured_drop_params",
+        fake_apply_drop_params,
+    )
     monkeypatch.setattr(
         "core.scenario_generation.call_completion_with_fallback",
         fake_call_completion,
@@ -127,7 +144,8 @@ def test_generate_invokes_litellm_with_drop_params(monkeypatch: pytest.MonkeyPat
     assert "api_key" not in captured["request_after_drop"]
     assert captured["pre_dropped"] == ("api_key",)
     assert captured["request_after_drop"]["messages"][0]["content"] == "Use the template"
-    assert captured["request_after_drop"]["messages"][1]["content"].startswith("Return up to 5 scenarios")
+    messages = captured["request_after_drop"]["messages"]
+    assert messages[1]["content"].startswith("Return up to 5 scenarios")
 
 
 def test_generate_requires_context(monkeypatch: pytest.MonkeyPatch) -> None:

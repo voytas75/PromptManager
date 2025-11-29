@@ -1,10 +1,12 @@
 """
 noxfile.py - Nox sessions for Prompt Manager
 
-Updates: v0.2.2 - 2025-11-11 - Switch type checker session from mypy to pyright.
-Updates: v0.2.1 - 2025-11-07 - Document dev extra prerequisite for automation sessions.
-Updates: v0.2.0 - 2025-10-30 - Switch sessions to host interpreter and add tool detection
-Updates: v0.1.0 - 2025-10-30 - Initial scaffold of fmt/lint/tests/type-check sessions
+Updates:
+  v0.2.3 - 2025-11-29 - Convert missing-tool warning to f-string for Ruff UP031.
+  v0.2.2 - 2025-11-11 - Switch type checker session from mypy to pyright.
+  v0.2.1 - 2025-11-07 - Document dev extra prerequisite for automation sessions.
+  v0.2.0 - 2025-10-30 - Switch sessions to host interpreter and add tool detection
+  v0.1.0 - 2025-10-30 - Initial scaffold of fmt/lint/tests/type-check sessions
 
 Install the project with `pip install .[dev]` to provide pytest/pyright/black before
 running these sessions. This file defines automation sessions:
@@ -30,9 +32,8 @@ def _ensure_tool(session: nox.Session, command: str, *version_args: str) -> None
         session.run(*args, external=True)
     except Exception as exc:  # noqa: BLE001
         session.error(
-            "Required tool '%s' is missing or not executable. Install it in the host "
-            "environment before running this session. Original error: %s"
-            % (command, exc)
+            f"Required tool '{command}' is missing or not executable. Install it in the host "
+            f"environment before running this session. Original error: {exc}"
         )
 
 # Directories to operate on

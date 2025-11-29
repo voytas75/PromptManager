@@ -1,13 +1,14 @@
 """Helpers for accessing bundled GUI resources.
 
-Updates: v0.1.1 - 2025-11-05 - Ship stylised Prompt Manager icon and expose loader.
-Updates: v0.1.0 - 2025-11-05 - Provide accessor for packaged application icon.
+Updates:
+  v0.1.2 - 2025-11-29 - Remove unused Optional import flagged by Ruff.
+  v0.1.1 - 2025-11-05 - Ship stylised Prompt Manager icon and expose loader.
+  v0.1.0 - 2025-11-05 - Provide accessor for packaged application icon.
 """
 
 from __future__ import annotations
 
 import importlib.resources as importlib_resources
-from typing import Optional
 
 from PySide6.QtGui import QIcon
 

@@ -1,6 +1,8 @@
 """Tests covering single-user profile persistence and personalisation.
 
-Updates: v0.1.0 - 2025-11-11 - Introduce coverage for profile tracking and suggestion biasing.
+Updates:
+  v0.1.1 - 2025-11-29 - Add strict flag to zip usage for Ruff B905 compliance.
+  v0.1.0 - 2025-11-11 - Introduce coverage for profile tracking and suggestion biasing.
 """
 
 from __future__ import annotations
@@ -23,7 +25,7 @@ class _NoopCollection:
         metadatas: list[dict[str, Any]],
         embeddings: list[list[float]] | None = None,  # noqa: ARG002
     ) -> None:
-        self._records = dict(zip(ids, metadatas))
+        self._records = dict(zip(ids, metadatas, strict=False))
 
     def upsert(
         self,

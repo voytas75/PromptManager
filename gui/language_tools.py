@@ -1,6 +1,8 @@
 """Heuristic language detection utilities for the Prompt Manager workspace.
 
-Updates: v0.1.0 - 2025-11-10 - Introduce lightweight language detection for query input.
+Updates:
+  v0.1.1 - 2025-11-29 - Wrap detection result creation for Ruff line-length compliance.
+  v0.1.0 - 2025-11-10 - Introduce lightweight language detection for query input.
 """
 
 from __future__ import annotations
@@ -150,7 +152,11 @@ def detect_language(text: str) -> DetectedLanguage:
         return DetectedLanguage(code="plain", name=_LANGUAGE_ALIASES["plain"], confidence=0.0)
 
     confidence = min(1.0, 0.3 + (best_score / max(len(lowered) / 40.0, 1.0)))
-    return DetectedLanguage(code=best_code, name=_LANGUAGE_ALIASES[best_code], confidence=confidence)
+    return DetectedLanguage(
+        code=best_code,
+        name=_LANGUAGE_ALIASES[best_code],
+        confidence=confidence,
+    )
 
 
 __all__ = ["DetectedLanguage", "detect_language"]

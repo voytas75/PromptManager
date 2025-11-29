@@ -1,6 +1,8 @@
 """Prompt version history dialog tests.
 
-Updates: v0.1.0 - 2025-11-22 - Ensure prompt body tab is default selection.
+Updates:
+  v0.1.1 - 2025-11-29 - Wrap tab title comprehension for Ruff line length.
+  v0.1.0 - 2025-11-22 - Ensure prompt body tab is default selection.
 """
 
 from __future__ import annotations
@@ -36,7 +38,9 @@ def _prompt_stub() -> SimpleNamespace:
 def test_version_history_dialog_defaults_to_body_tab(qt_app: QApplication) -> None:
     dialog = PromptVersionHistoryDialog(_ManagerStub(), _prompt_stub())
     try:
-        tab_titles = [dialog._tab_widget.tabText(index) for index in range(dialog._tab_widget.count())]
+        tab_titles = [
+            dialog._tab_widget.tabText(index) for index in range(dialog._tab_widget.count())
+        ]
         assert tab_titles[0] == "Prompt body"
         assert tab_titles[1] == "Diff vs previous"
         assert tab_titles[2] == "Diff vs current"

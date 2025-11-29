@@ -233,7 +233,12 @@ class _RecordingRepository:
         self._version_index[version.id] = version
         return version
 
-    def list_prompt_versions(self, prompt_id: uuid.UUID, *, limit: int | None = None) -> builtins.list[PromptVersion]:
+    def list_prompt_versions(
+        self,
+        prompt_id: uuid.UUID,
+        *,
+        limit: int | None = None,
+    ) -> builtins.list[PromptVersion]:
         versions = list(self._versions.get(prompt_id, []))
         versions.sort(key=lambda version: version.version_number, reverse=True)
         if limit is not None:
@@ -252,7 +257,11 @@ class _RecordingRepository:
             return None
         return max(versions, key=lambda version: version.version_number)
 
-    def record_prompt_fork(self, source_prompt_id: uuid.UUID, child_prompt_id: uuid.UUID) -> PromptForkLink:
+    def record_prompt_fork(
+        self,
+        source_prompt_id: uuid.UUID,
+        child_prompt_id: uuid.UUID,
+    ) -> PromptForkLink:
         self._fork_counter += 1
         link = PromptForkLink(
             id=self._fork_counter,
@@ -647,7 +656,9 @@ def test_generate_prompt_name_requires_configured_generator() -> None:
 def test_generate_prompt_description_requires_configured_generator() -> None:
     manager = _build_manager()
     with pytest.raises(DescriptionGenerationError):
-        manager.generate_prompt_description("Provide summary for this context.", allow_fallback=False)
+        manager.generate_prompt_description(
+            "Provide summary for this context.", allow_fallback=False
+        )
 
 
 def test_generate_prompt_description_uses_generator() -> None:

@@ -1,6 +1,8 @@
 """Analytics dashboard panel wiring for the Prompt Manager GUI.
 
-Updates: v0.1.0 - 2025-11-28 - Introduce dashboard tab with charts and CSV export.
+Updates:
+  v0.1.1 - 2025-11-29 - Wrap analytics strings to satisfy Ruff line-length rules.
+  v0.1.0 - 2025-11-28 - Introduce dashboard tab with charts and CSV export.
 """
 
 from __future__ import annotations
@@ -86,7 +88,7 @@ class AnalyticsDashboardPanel(QWidget):
         header = QLabel(
             (
                 "Explore execution, benchmark, and embedding metrics. "
-                "Adjust the look-back window, dataset, and chart style to inspect performance trends."
+                "Adjust the look-back window, dataset, and chart style to review performance."
             ),
             self,
         )
@@ -304,15 +306,21 @@ class AnalyticsDashboardPanel(QWidget):
         rows: list[list[str]]
         if dataset_key == "usage":
             headers = ["Prompt", "Usage Count", "Success Rate", "Last Used"]
-            rows = [
-                [
-                    entry.name,
-                    str(entry.usage_count),
-                    self._format_pct(entry.success_rate),
-                    entry.last_executed_at.isoformat(timespec="seconds") if entry.last_executed_at else "n/a",
-                ]
-                for entry in snapshot.usage_frequency
-            ]
+            rows = []
+            for entry in snapshot.usage_frequency:
+                last_used = (
+                    entry.last_executed_at.isoformat(timespec="seconds")
+                    if entry.last_executed_at
+                    else "n/a"
+                )
+                rows.append(
+                    [
+                        entry.name,
+                        str(entry.usage_count),
+                        self._format_pct(entry.success_rate),
+                        last_used,
+                    ]
+                )
         elif dataset_key == "model_costs":
             headers = ["Model", "Runs", "Prompt Tokens", "Completion Tokens", "Total Tokens"]
             rows = [
@@ -327,16 +335,22 @@ class AnalyticsDashboardPanel(QWidget):
             ]
         elif dataset_key == "benchmark":
             headers = ["Model", "Runs", "Success Rate", "Avg Duration (ms)", "Tokens"]
-            rows = [
-                [
-                    entry.model,
-                    str(entry.run_count),
-                    self._format_pct(entry.success_rate),
-                    f"{entry.average_duration_ms:.0f}" if entry.average_duration_ms is not None else "n/a",
-                    str(entry.total_tokens),
-                ]
-                for entry in snapshot.benchmark_stats
-            ]
+            rows = []
+            for entry in snapshot.benchmark_stats:
+                duration = (
+                    f"{entry.average_duration_ms:.0f}"
+                    if entry.average_duration_ms is not None
+                    else "n/a"
+                )
+                rows.append(
+                    [
+                        entry.model,
+                        str(entry.run_count),
+                        self._format_pct(entry.success_rate),
+                        duration,
+                        str(entry.total_tokens),
+                    ]
+                )
         elif dataset_key == "intent":
             headers = ["Date", "Success Rate", "Success", "Total"]
             rows = [
@@ -354,10 +368,13 @@ class AnalyticsDashboardPanel(QWidget):
             if report is None:
                 rows = [["Status", "Embedding diagnostics unavailable"]]
             else:
+                backend_status = "ok" if report.backend_ok else "error"
+                chroma_status = "ok" if report.chroma_ok else "error"
+                dimension = report.backend_dimension or report.inferred_dimension or "n/a"
                 rows = [
-                    ["Backend", f"{'ok' if report.backend_ok else 'error'} - {report.backend_message}"],
-                    ["Dimension", str(report.backend_dimension or report.inferred_dimension or 'n/a')],
-                    ["Chroma", f"{'ok' if report.chroma_ok else 'error'} - {report.chroma_message}"],
+                    ["Backend", f"{backend_status} - {report.backend_message}"],
+                    ["Dimension", str(dimension)],
+                    ["Chroma", f"{chroma_status} - {report.chroma_message}"],
                     ["Stored count", str(report.prompts_with_embeddings)],
                     ["Repository prompts", str(report.repository_total)],
                     ["Missing", str(len(report.missing_prompts))],
@@ -383,13 +400,18 @@ class AnalyticsDashboardPanel(QWidget):
             if report.consistent_counts is False
             else "unknown"
         )
-        self._embedding_summary.setText(
-            
-                f"Embedding backend: {'ok' if report.backend_ok else 'error'} ({report.backend_message}). "
-                f"Chroma: {'ok' if report.chroma_ok else 'error'} ({report.chroma_message}). "
-                f"Vectors stored {report.prompts_with_embeddings}/{report.repository_total} ({consistent})."
-            
+        backend_descriptor = "ok" if report.backend_ok else "error"
+        chroma_descriptor = "ok" if report.chroma_ok else "error"
+        vector_summary = (
+            f"Vectors stored {report.prompts_with_embeddings}/"
+            f"{report.repository_total} ({consistent})."
         )
+        summary = (
+            f"Embedding backend: {backend_descriptor} ({report.backend_message}). "
+            f"Chroma: {chroma_descriptor} ({report.chroma_message}). "
+            f"{vector_summary}"
+        )
+        self._embedding_summary.setText(summary)
 
     def _export_csv(self) -> None:
         snapshot = self._snapshot

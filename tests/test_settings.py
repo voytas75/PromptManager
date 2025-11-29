@@ -1,10 +1,12 @@
 """Tests for configuration loading and validation logic.
 
-Updates: v0.1.4 - 2025-11-05 - Cover LiteLLM inference model configuration.
-Updates: v0.1.3 - 2025-11-15 - Warn and ignore LiteLLM API secrets supplied via JSON configuration.
-Updates: v0.1.2 - 2025-11-14 - Cover LiteLLM API key loading from JSON configuration.
-Updates: v0.1.1 - 2025-11-03 - Add precedence test using example template.
-Updates: v0.1.0 - 2025-11-03 - Cover JSON/env precedence and validation errors.
+Updates:
+  v0.1.5 - 2025-11-29 - Wrap embedding backend tests for Ruff line length.
+  v0.1.4 - 2025-11-05 - Cover LiteLLM inference model configuration.
+  v0.1.3 - 2025-11-15 - Warn and ignore LiteLLM API secrets supplied via JSON configuration.
+  v0.1.2 - 2025-11-14 - Cover LiteLLM API key loading from JSON configuration.
+  v0.1.1 - 2025-11-03 - Add precedence test using example template.
+  v0.1.0 - 2025-11-03 - Cover JSON/env precedence and validation errors.
 """
 
 from __future__ import annotations
@@ -242,7 +244,10 @@ def test_embedding_backend_requires_model(monkeypatch) -> None:
         load_settings()
 
 
-def test_embedding_backend_defaults_to_configured_constant_when_missing(monkeypatch, tmp_path) -> None:
+def test_embedding_backend_defaults_to_configured_constant_when_missing(
+    monkeypatch,
+    tmp_path,
+) -> None:
     tmp_config = tmp_path / "config.json"
     tmp_config.write_text("{}", encoding="utf-8")
     monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(tmp_config))
@@ -266,7 +271,8 @@ def test_embedding_backend_respects_explicit_embedding_model(monkeypatch, tmp_pa
 
 def test_embedding_model_auto_switches_backend(monkeypatch, tmp_path) -> None:
     config_path = tmp_path / "config.json"
-    config_path.write_text(json.dumps({"embedding_model": "text-embedding-3-small"}), encoding="utf-8")
+    payload = {"embedding_model": "text-embedding-3-small"}
+    config_path.write_text(json.dumps(payload), encoding="utf-8")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
 

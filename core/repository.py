@@ -1,6 +1,7 @@
 """SQLite-backed repository for persistent prompt storage.
 
 Updates:
+  v0.10.5 - 2025-11-29 - Gate Sequence import for typing-only usage and wrap fork queries.
   v0.10.4 - 2025-11-29 - Gate typing-only imports and add repository logger.
   v0.10.3 - 2025-11-28 - Add usage and benchmark analytics queries.
   v0.10.2 - 2025-11-28 - Add category aggregation helpers for maintenance.
@@ -24,11 +25,13 @@ import json
 import logging
 import sqlite3
 import uuid
-from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 from models.category_model import PromptCategory, slugify_category
 from models.prompt_model import (
@@ -727,8 +730,8 @@ class PromptRepository:
                 row = conn.execute(
                     (
                         "SELECT fork_id, source_prompt_id, child_prompt_id, created_at "
-                        "FROM prompt_forks WHERE child_prompt_id = ? ORDER BY datetime(created_at) DESC "
-                        "LIMIT 1;"
+                        "FROM prompt_forks WHERE child_prompt_id = ? "
+                        "ORDER BY datetime(created_at) DESC LIMIT 1;"
                     ),
                     (_stringify_uuid(prompt_id),),
                 ).fetchone()
@@ -747,7 +750,8 @@ class PromptRepository:
                 cursor = conn.execute(
                     (
                         "SELECT fork_id, source_prompt_id, child_prompt_id, created_at "
-                        "FROM prompt_forks WHERE source_prompt_id = ? ORDER BY datetime(created_at) DESC;"
+                        "FROM prompt_forks WHERE source_prompt_id = ? "
+                        "ORDER BY datetime(created_at) DESC;"
                     ),
                     (_stringify_uuid(prompt_id),),
                 )

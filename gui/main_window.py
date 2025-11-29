@@ -1,6 +1,7 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.15.65 - 2025-11-29 - Remove QModelIndex default construction for Ruff B008 compliance.
   v0.15.64 - 2025-11-29 - Added prompt template editor dialog shortcut.
   v0.15.63 - 2025-11-28 - Added analytics dashboard tab with CSV export.
   v0.15.62 - 2025-11-28 - Enabled ShareText publishing plus clipboard copy.
@@ -363,8 +364,8 @@ class PromptListModel(QAbstractListModel):
         super().__init__(parent)
         self._prompts: list[Prompt] = list(prompts or [])
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802 - Qt API
-        if parent.isValid():
+    def rowCount(self, parent: QModelIndex | None = None) -> int:  # noqa: N802 - Qt API
+        if parent is not None and parent.isValid():
             return 0
         return len(self._prompts)
 

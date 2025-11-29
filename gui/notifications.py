@@ -1,8 +1,10 @@
 """Qt helpers for surfacing core notification events in the GUI.
 
-Updates: v0.2.0 - 2025-11-28 - Add background task center with progress indicators and live feed.
-Updates: v0.1.1 - 2025-11-27 - Add toast confirmation for copying notification details.
-Updates: v0.1.0 - 2025-11-11 - Introduce notification bridge and history dialog.
+Updates:
+  v0.2.1 - 2025-11-29 - Wrap notification dialog initializer for Ruff line length.
+  v0.2.0 - 2025-11-28 - Add background task center with progress indicators and live feed.
+  v0.1.1 - 2025-11-27 - Add toast confirmation for copying notification details.
+  v0.1.0 - 2025-11-11 - Introduce notification bridge and history dialog.
 """
 
 from __future__ import annotations
@@ -53,7 +55,11 @@ class QtNotificationBridge(QObject):
 class NotificationHistoryDialog(QDialog):
     """Modal dialog presenting recent notification events."""
 
-    def __init__(self, notifications: Sequence[Notification], parent: QObject | None = None) -> None:
+    def __init__(
+        self,
+        notifications: Sequence[Notification],
+        parent: QObject | None = None,
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Notifications")
         self.resize(520, 360)

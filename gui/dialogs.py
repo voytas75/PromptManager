@@ -1,56 +1,58 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
-Updates: v0.11.13 - 2025-11-28 - Keep maintenance dialog button pinned below the scroll surface.
-Updates: v0.11.12 - 2025-11-28 - Add backup snapshot action to the maintenance dialog.
-Updates: v0.11.11 - 2025-11-28 - Make maintenance dialog vertically scrollable with shorter default height.
-Updates: v0.11.10 - 2025-11-28 - Add prompt body diff tab comparing selected versions to the current prompt.
-Updates: v0.11.9 - 2025-11-28 - Add category health analytics table to the maintenance dialog.
-Updates: v0.11.8 - 2025-11-27 - Show toast confirmations for dialog copy actions.
-Updates: v0.11.7 - 2025-11-27 - Add copy prompt body control to the version history dialog.
-Updates: v0.11.6 - 2025-11-27 - Add prompt part selector to response style dialog and rename copy to prompt parts.
-Updates: v0.11.5 - 2025-11-27 - Add import fallback for processing indicator in test harnesses.
-Updates: v0.11.4 - 2025-11-27 - Ensure clearing scenarios removes persisted metadata.
-Updates: v0.11.3 - 2025-11-27 - Add busy indicators to prompt metadata generators.
-Updates: v0.11.2 - 2025-11-22 - Allow selecting prompt categories from the registry list.
-Updates: v0.11.1 - 2025-11-22 - Add execute-as-context shortcut to the prompt dialog.
-Updates: v0.11.0 - 2025-11-22 - Add prompt category management dialog with create/edit workflows.
-Updates: v0.10.8 - 2025-11-22 - Surface prompt versions and quick access to history inside the edit dialog.
-Updates: v0.10.7 - 2025-11-22 - Add structure-only refinement action to the prompt dialog.
-Updates: v0.10.6 - 2025-11-22 - Add prompt body tab to version history dialog.
-Updates: v0.10.5 - 2025-11-22 - Redesign prompt dialog layout for taller editing surface.
-Updates: v0.10.4 - 2025-11-22 - Align example section toggles with the active theme palette.
-Updates: v0.10.3 - 2025-11-22 - Add author input to prompt create/edit workflows.
-Updates: v0.10.2 - 2025-11-22 - Default prompt versions to integer labels for new entries.
-Updates: v0.10.1 - 2025-11-22 - Replace prompt refined alert with resizable, scrollable dialog.
-Updates: v0.10.0 - 2025-11-22 - Add prompt version history dialog for diffing/restoring snapshots.
-Updates: v0.9.2 - 2025-12-08 - Resolve Info dialog version label from package metadata or pyproject.
-Updates: v0.9.1 - 2025-12-08 - Remove task template dialog and references.
-Updates: v0.9.0 - 2025-12-06 - Add PromptNote dialog and auto-generated note metadata.
-Updates: v0.8.15 - 2025-12-06 - Add PromptNote dialog and auto-generated note metadata.
-Updates: v0.8.14 - 2025-12-06 - Auto-generate required response style fields from a pasted phrase.
-Updates: v0.8.13 - 2025-12-05 - Add ResponseStyle editor dialog for CRUD workflows.
-Updates: v0.8.12 - 2025-11-05 - Display application icon and credit source in info dialog.
-Updates: v0.8.11 - 2025-11-05 - Add SQLite repository maintenance actions to maintenance dialog.
-Updates: v0.8.10 - 2025-11-05 - Add ChromaDB integrity verification action to maintenance dialog.
-Updates: v0.8.9 - 2025-11-05 - Add ChromaDB maintenance actions to the maintenance dialog.
-Updates: v0.8.8 - 2025-11-30 - Restore catalogue preview dialog for GUI import workflows.
-Updates: v0.8.7 - 2025-11-30 - Remove catalogue preview dialog after retiring import workflow.
-Updates: v0.8.6 - 2025-11-27 - Support pre-filling prompts when duplicating entries.
-Updates: v0.8.5 - 2025-11-26 - Add application info dialog.
-Updates: v0.8.4 - 2025-11-25 - Add prompt maintenance overview stats panel.
-Updates: v0.8.3 - 2025-11-19 - Add scenario generation controls and persistence to the prompt dialog.
-Updates: v0.8.2 - 2025-11-17 - Add Apply workflow so prompt edits can be persisted without closing the dialog.
-Updates: v0.8.1 - 2025-11-16 - Add destructive delete control and metadata suggestion helpers to the prompt dialog.
-Updates: v0.8.0 - 2025-11-16 - Add task template editor dialog.
-Updates: v0.7.2 - 2025-11-02 - Collapse example sections when empty and expand on demand.
-Updates: v0.7.1 - 2025-11-02 - Increase default prompt dialog size for edit and creation workflows.
-Updates: v0.7.0 - 2025-11-16 - Add markdown preview dialog for rendered execution output.
-Updates: v0.6.0 - 2025-11-15 - Add prompt engineering refinement button to prompt dialog.
-Updates: v0.5.0 - 2025-11-09 - Capture execution ratings alongside optional notes.
-Updates: v0.4.0 - 2025-11-08 - Add execution Save Result dialog with optional notes.
-Updates: v0.3.0 - 2025-11-06 - Add catalogue preview dialog with diff summary output.
-Updates: v0.2.0 - 2025-11-05 - Add prompt name suggestion based on context.
-Updates: v0.1.0 - 2025-11-04 - Implement create/edit prompt dialog backed by Prompt dataclass.
+Updates:
+  v0.11.14 - 2025-11-29 - Shorten update summaries and wrap maintenance tooltips.
+  v0.11.13 - 2025-11-28 - Keep maintenance button pinned below scroll surface.
+  v0.11.12 - 2025-11-28 - Add backup snapshot action to the maintenance dialog.
+  v0.11.11 - 2025-11-28 - Make maintenance dialog scrollable with shorter default height.
+  v0.11.10 - 2025-11-28 - Add prompt body diff tab for comparing selected versions.
+  v0.11.9 - 2025-11-28 - Add category health analytics table to maintenance dialog.
+  v0.11.8 - 2025-11-27 - Show toast confirmations for dialog copy actions.
+  v0.11.7 - 2025-11-27 - Add copy prompt body control to version history dialog.
+  v0.11.6 - 2025-11-27 - Add prompt part selector to response style dialog and rename copy action.
+  v0.11.5 - 2025-11-27 - Add import fallback for processing indicator in test harnesses.
+  v0.11.4 - 2025-11-27 - Ensure clearing scenarios removes persisted metadata.
+  v0.11.3 - 2025-11-27 - Add busy indicators to prompt metadata generators.
+  v0.11.2 - 2025-11-22 - Allow selecting prompt categories from the registry list.
+  v0.11.1 - 2025-11-22 - Add execute-as-context shortcut to the prompt dialog.
+  v0.11.0 - 2025-11-22 - Add prompt category management dialog with create/edit workflows.
+  v0.10.8 - 2025-11-22 - Surface prompt versions and quick history access inside edit dialog.
+  v0.10.7 - 2025-11-22 - Add structure-only refinement action to the prompt dialog.
+  v0.10.6 - 2025-11-22 - Add prompt body tab to version history dialog.
+  v0.10.5 - 2025-11-22 - Redesign prompt dialog layout for taller editing surface.
+  v0.10.4 - 2025-11-22 - Align example section toggles with the active theme palette.
+  v0.10.3 - 2025-11-22 - Add author input to prompt create/edit workflows.
+  v0.10.2 - 2025-11-22 - Default prompt versions to integer labels for new entries.
+  v0.10.1 - 2025-11-22 - Replace prompt refined alert with resizable, scrollable dialog.
+  v0.10.0 - 2025-11-22 - Add prompt version history dialog for diffing or restoring snapshots.
+  v0.9.2 - 2025-12-08 - Resolve info dialog version label from metadata or pyproject.
+  v0.9.1 - 2025-12-08 - Remove task template dialog and references.
+  v0.9.0 - 2025-12-06 - Add PromptNote dialog and auto-generated note metadata.
+  v0.8.15 - 2025-12-06 - Add PromptNote dialog and auto-generated note metadata.
+  v0.8.14 - 2025-12-06 - Auto-generate required response style fields from pasted text.
+  v0.8.13 - 2025-12-05 - Add ResponseStyle editor dialog for CRUD workflows.
+  v0.8.12 - 2025-11-05 - Display application icon and credit source in info dialog.
+  v0.8.11 - 2025-11-05 - Add SQLite maintenance actions to the maintenance dialog.
+  v0.8.10 - 2025-11-05 - Add ChromaDB integrity verification action to maintenance dialog.
+  v0.8.9 - 2025-11-05 - Add ChromaDB maintenance actions to the maintenance dialog.
+  v0.8.8 - 2025-11-30 - Restore catalogue preview dialog for GUI import workflows.
+  v0.8.7 - 2025-11-30 - Remove catalogue preview dialog after retiring import workflow.
+  v0.8.6 - 2025-11-27 - Support pre-filling prompts when duplicating entries.
+  v0.8.5 - 2025-11-26 - Add application info dialog.
+  v0.8.4 - 2025-11-25 - Add prompt maintenance overview stats panel.
+  v0.8.3 - 2025-11-19 - Add scenario generation controls and persistence to prompt dialog.
+  v0.8.2 - 2025-11-17 - Add Apply workflow so prompt edits persist without closing dialog.
+  v0.8.1 - 2025-11-16 - Add destructive delete control and metadata suggestion helpers.
+  v0.8.0 - 2025-11-16 - Add task template editor dialog.
+  v0.7.2 - 2025-11-02 - Collapse example sections when empty and expand on demand.
+  v0.7.1 - 2025-11-02 - Increase default prompt dialog size for edit and creation workflows.
+  v0.7.0 - 2025-11-16 - Add markdown preview dialog for rendered execution output.
+  v0.6.0 - 2025-11-15 - Add prompt engineering refinement button to prompt dialog.
+  v0.5.0 - 2025-11-09 - Capture execution ratings alongside optional notes.
+  v0.4.0 - 2025-11-08 - Add execution Save Result dialog with optional notes.
+  v0.3.0 - 2025-11-06 - Add catalogue preview dialog with diff summary output.
+  v0.2.0 - 2025-11-05 - Add prompt name suggestion based on context.
+  v0.1.0 - 2025-11-04 - Implement create/edit prompt dialog backed by Prompt dataclass.
 """
 
 from __future__ import annotations
@@ -331,7 +333,13 @@ class CollapsibleTextSection(QWidget):
 class PromptRefinedDialog(QDialog):
     """Modal dialog presenting prompt refinement output in a resizable view."""
 
-    def __init__(self, content: str, parent: QWidget | None = None, *, title: str = "Prompt refined") -> None:
+    def __init__(
+        self,
+        content: str,
+        parent: QWidget | None = None,
+        *,
+        title: str = "Prompt refined",
+    ) -> None:
         """Initialize the dialog with the refinement summary content.
 
         Args:
@@ -609,7 +617,9 @@ class PromptDialog(QDialog):
         self._generate_category_button.clicked.connect(self._on_generate_category_clicked)  # type: ignore[arg-type]
         if self._category_generator is None:
             self._generate_category_button.setEnabled(False)
-            self._generate_category_button.setToolTip("Category suggestions require the main application context.")
+            self._generate_category_button.setToolTip(
+                "Category suggestions require the main app context."
+            )
         category_container_layout.addWidget(self._generate_category_button)
         metadata_layout.addWidget(category_container, 1, 1)
 
@@ -626,7 +636,9 @@ class PromptDialog(QDialog):
         self._generate_tags_button.clicked.connect(self._on_generate_tags_clicked)  # type: ignore[arg-type]
         if self._tags_generator is None:
             self._generate_tags_button.setEnabled(False)
-            self._generate_tags_button.setToolTip("Tag suggestions require the main application context.")
+            self._generate_tags_button.setToolTip(
+                "Tag suggestions require the main app context."
+            )
         tags_container_layout.addWidget(self._generate_tags_button)
         metadata_layout.addWidget(tags_container, 1, 2)
         metadata_layout.setColumnStretch(0, 1)
@@ -692,7 +704,7 @@ class PromptDialog(QDialog):
         self._generate_scenarios_button.clicked.connect(self._on_generate_scenarios_clicked)  # type: ignore[arg-type]
         if self._scenario_generator is None:
             self._generate_scenarios_button.setToolTip(
-                "Generate heuristic scenarios based on the prompt body. Configure LiteLLM for AI assistance."
+                "Generate heuristic scenarios from the prompt body. Configure LiteLLM for AI help."
             )
         scenarios_layout.addWidget(self._generate_scenarios_button, alignment=Qt.AlignRight)
         form_layout.addRow("Scenarios", scenarios_container)
@@ -1309,7 +1321,9 @@ class PromptDialog(QDialog):
             return
         label_text = (version or "").strip() or "Not yet saved"
         self._version_label.setText(label_text)
-        history_available = self._source_prompt is not None and self._version_history_handler is not None
+        history_available = (
+            self._source_prompt is not None and self._version_history_handler is not None
+        )
         self._version_history_button.setVisible(history_available)
         self._version_history_button.setEnabled(history_available)
 
@@ -1607,18 +1621,33 @@ class PromptMaintenanceDialog(QDialog):
         chroma_actions_layout.setContentsMargins(0, 0, 0, 0)
         chroma_actions_layout.setSpacing(12)
 
-        self._chroma_compact_button = QPushButton("Compact Persistent Store", chroma_actions_container)
-        self._chroma_compact_button.setToolTip("Reclaim disk space by vacuuming the Chroma SQLite store.")
+        self._chroma_compact_button = QPushButton(
+            "Compact Persistent Store",
+            chroma_actions_container,
+        )
+        self._chroma_compact_button.setToolTip(
+            "Reclaim disk space by vacuuming the Chroma SQLite store."
+        )
         self._chroma_compact_button.clicked.connect(self._on_chroma_compact_clicked)  # type: ignore[arg-type]
         chroma_actions_layout.addWidget(self._chroma_compact_button)
 
-        self._chroma_optimize_button = QPushButton("Optimize Persistent Store", chroma_actions_container)
-        self._chroma_optimize_button.setToolTip("Refresh query statistics to improve Chroma performance.")
+        self._chroma_optimize_button = QPushButton(
+            "Optimize Persistent Store",
+            chroma_actions_container,
+        )
+        self._chroma_optimize_button.setToolTip(
+            "Refresh query statistics to improve Chroma performance."
+        )
         self._chroma_optimize_button.clicked.connect(self._on_chroma_optimize_clicked)  # type: ignore[arg-type]
         chroma_actions_layout.addWidget(self._chroma_optimize_button)
 
-        self._chroma_verify_button = QPushButton("Verify Index Integrity", chroma_actions_container)
-        self._chroma_verify_button.setToolTip("Run integrity checks against the Chroma index files.")
+        self._chroma_verify_button = QPushButton(
+            "Verify Index Integrity",
+            chroma_actions_container,
+        )
+        self._chroma_verify_button.setToolTip(
+            "Run integrity checks against the Chroma index files."
+        )
         self._chroma_verify_button.clicked.connect(self._on_chroma_verify_clicked)  # type: ignore[arg-type]
         chroma_actions_layout.addWidget(self._chroma_verify_button)
 
@@ -1664,8 +1693,13 @@ class PromptMaintenanceDialog(QDialog):
         storage_actions_layout.setContentsMargins(0, 0, 0, 0)
         storage_actions_layout.setSpacing(12)
 
-        self._sqlite_compact_button = QPushButton("Compact Database", storage_actions_container)
-        self._sqlite_compact_button.setToolTip("Run VACUUM on the prompt database to reclaim space.")
+        self._sqlite_compact_button = QPushButton(
+            "Compact Database",
+            storage_actions_container,
+        )
+        self._sqlite_compact_button.setToolTip(
+            "Run VACUUM on the prompt database to reclaim space."
+        )
         self._sqlite_compact_button.clicked.connect(self._on_sqlite_compact_clicked)  # type: ignore[arg-type]
         storage_actions_layout.addWidget(self._sqlite_compact_button)
 
@@ -1674,8 +1708,13 @@ class PromptMaintenanceDialog(QDialog):
         self._sqlite_optimize_button.clicked.connect(self._on_sqlite_optimize_clicked)  # type: ignore[arg-type]
         storage_actions_layout.addWidget(self._sqlite_optimize_button)
 
-        self._sqlite_verify_button = QPushButton("Verify Index Integrity", storage_actions_container)
-        self._sqlite_verify_button.setToolTip("Run integrity checks against the prompt database indexes.")
+        self._sqlite_verify_button = QPushButton(
+            "Verify Index Integrity",
+            storage_actions_container,
+        )
+        self._sqlite_verify_button.setToolTip(
+            "Run integrity checks against the prompt database indexes."
+        )
         self._sqlite_verify_button.clicked.connect(self._on_sqlite_verify_clicked)  # type: ignore[arg-type]
         storage_actions_layout.addWidget(self._sqlite_verify_button)
 
@@ -1689,14 +1728,20 @@ class PromptMaintenanceDialog(QDialog):
         reset_layout = QVBoxLayout(reset_tab)
 
         reset_intro = QLabel(
-            "Use these actions to clear application data while leaving configuration and settings untouched.",
+            (
+                "Use these actions to clear application data while leaving configuration "
+                "and settings untouched."
+            ),
             reset_tab,
         )
         reset_intro.setWordWrap(True)
         reset_layout.addWidget(reset_intro)
 
         reset_warning = QLabel(
-            "<b>Warning:</b> these operations permanently delete existing prompts, histories, and embeddings.",
+            (
+                "<b>Warning:</b> these operations permanently delete existing prompts, "
+                "histories, and embeddings."
+            ),
             reset_tab,
         )
         reset_warning.setWordWrap(True)
@@ -1708,7 +1753,9 @@ class PromptMaintenanceDialog(QDialog):
         reset_buttons_layout.setSpacing(8)
 
         snapshot_button = QPushButton("Create Backup Snapshot", reset_buttons_container)
-        snapshot_button.setToolTip("Zip the SQLite database, Chroma store, and manifest before running resets.")
+        snapshot_button.setToolTip(
+            "Zip the SQLite database, Chroma store, and manifest before running resets."
+        )
         snapshot_button.clicked.connect(self._on_snapshot_clicked)  # type: ignore[arg-type]
         reset_buttons_layout.addWidget(snapshot_button)
 
@@ -1718,13 +1765,16 @@ class PromptMaintenanceDialog(QDialog):
         reset_buttons_layout.addWidget(reset_sqlite_button)
 
         reset_chroma_button = QPushButton("Clear Embedding Store", reset_buttons_container)
-        reset_chroma_button.setToolTip("Remove all vectors from the ChromaDB collection used for semantic search.")
+        reset_chroma_button.setToolTip(
+            "Remove all vectors from the ChromaDB collection used for semantic search."
+        )
         reset_chroma_button.clicked.connect(self._on_reset_chroma_clicked)  # type: ignore[arg-type]
         reset_buttons_layout.addWidget(reset_chroma_button)
 
         reset_all_button = QPushButton("Reset Application Data", reset_buttons_container)
         reset_all_button.setToolTip(
-            "Clear prompts, histories, embeddings, and usage logs in one step. Settings remain unchanged."
+            "Clear prompts, histories, embeddings, and usage logs in one step. "
+            "Settings remain unchanged."
         )
         reset_all_button.clicked.connect(self._on_reset_application_clicked)  # type: ignore[arg-type]
         reset_buttons_layout.addWidget(reset_all_button)
@@ -2187,7 +2237,8 @@ class PromptMaintenanceDialog(QDialog):
             lines.append(details["error"])
         elif not lines and stats.get("info_error"):
             lines.append(f"Unable to fetch stats: {stats['info_error']}")
-        self._redis_stats_view.setPlainText("\n".join(lines) if lines else "No Redis statistics available.")
+        redis_text = "\n".join(lines) if lines else "No Redis statistics available."
+        self._redis_stats_view.setPlainText(redis_text)
 
     def _refresh_chroma_info(self) -> None:
         """Update the ChromaDB tab with vector store information."""
@@ -2234,7 +2285,8 @@ class PromptMaintenanceDialog(QDialog):
             value = stats.get(key)
             if value is not None:
                 lines.append(f"{label}: {value}")
-        self._chroma_stats_view.setPlainText("\n".join(lines) if lines else "No ChromaDB statistics available.")
+        chroma_text = "\n".join(lines) if lines else "No ChromaDB statistics available."
+        self._chroma_stats_view.setPlainText(chroma_text)
 
     def _refresh_storage_info(self) -> None:
         """Update the SQLite tab with repository information."""
@@ -2284,7 +2336,8 @@ class PromptMaintenanceDialog(QDialog):
             healthy = False
             stats_lines.append(f"Executions: error ({exc})")
 
-        self._storage_stats_view.setPlainText("\n".join(stats_lines) if stats_lines else "No SQLite statistics available.")
+        storage_text = "\n".join(stats_lines) if stats_lines else "No SQLite statistics available."
+        self._storage_stats_view.setPlainText(storage_text)
 
         if healthy:
             self._storage_status_label.setText("Status: ready")
@@ -2373,7 +2426,8 @@ class CategoryEditorDialog(QDialog):
         self._parent_input.setText(category.parent_slug or "")
         self._color_input.setText(category.color or "")
         self._icon_input.setText(category.icon or "")
-        self._min_quality_input.setText("" if category.min_quality is None else str(category.min_quality))
+        min_quality = "" if category.min_quality is None else str(category.min_quality)
+        self._min_quality_input.setText(min_quality)
         self._tags_input.setText(", ".join(category.default_tags))
 
     def _on_accept(self) -> None:
@@ -2423,9 +2477,11 @@ class CategoryManagerDialog(QDialog):
         self._manager = manager
         self._has_changes = False
         self._categories: list[PromptCategory] = []
+        self._settings = QSettings("PromptManager", "CategoryManagerDialog")
         self.setWindowTitle("Manage Categories")
         self.resize(760, 520)
         self._build_ui()
+        self._restore_window_size()
         self._load_categories()
 
     @property
@@ -2474,7 +2530,13 @@ class CategoryManagerDialog(QDialog):
         self._refresh_button = QPushButton("Refresh", self)
         self._refresh_button.clicked.connect(self._on_refresh_clicked)  # type: ignore[arg-type]
         button_row.addWidget(self._refresh_button)
-        outer_layout.addLayout(button_row)
+        layout.addLayout(button_row)
+
+        close_buttons = QDialogButtonBox(QDialogButtonBox.Close, self)
+        close_buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
+        layout.addWidget(close_buttons)
+
+        self._update_button_states()
 
     def _restore_window_size(self) -> None:
         width = self._settings.value("width", type=int)
@@ -2486,12 +2548,6 @@ class CategoryManagerDialog(QDialog):
         self._settings.setValue("width", self.width())
         self._settings.setValue("height", self.height())
         super().closeEvent(event)
-
-        close_buttons = QDialogButtonBox(QDialogButtonBox.Close, self)
-        close_buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
-        layout.addWidget(close_buttons)
-
-        self._update_button_states()
 
     def _load_categories(self) -> None:
         """Populate table with repository categories."""
@@ -2650,7 +2706,10 @@ class SaveResultDialog(QDialog):
         layout = QVBoxLayout(self)
 
         message = QLabel(
-            "Add an optional summary or notes for this execution. The note will be stored with the history entry.",
+            (
+                "Add an optional summary or notes for this execution. "
+                "The note will be stored with the history entry."
+            ),
             self,
         )
         message.setWordWrap(True)
@@ -2701,7 +2760,7 @@ class SaveResultDialog(QDialog):
 
 
 class ResponseStyleDialog(QDialog):
-    """Modal dialog for creating or editing prompt parts (response styles, system sections, etc.)."""
+    """Modal dialog for creating or editing prompt parts such as response styles."""
 
     _PROMPT_PART_PRESETS: Sequence[str] = (
         "Response Style",
@@ -2771,20 +2830,25 @@ class ResponseStyleDialog(QDialog):
         layout.addWidget(QLabel("Prompt snippet*", self))
         self._phrase_input = QPlainTextEdit(self)
         self._phrase_input.setPlaceholderText(
-            "Paste the prompt fragment, response style, or reusable instructions you want to capture…"
+            "Paste the prompt fragment, response style, or reusable instructions "
+            "you want to capture…"
         )
         self._phrase_input.setFixedHeight(100)
         layout.addWidget(self._phrase_input)
 
         layout.addWidget(QLabel("Description*", self))
         self._description_input = QPlainTextEdit(self)
-        self._description_input.setPlaceholderText("Explain the target tone, audience, or behaviour.")
+        self._description_input.setPlaceholderText(
+            "Explain the target tone, audience, or behaviour."
+        )
         self._description_input.setFixedHeight(80)
         layout.addWidget(self._description_input)
 
         layout.addWidget(QLabel("Format instructions", self))
         self._format_input = QPlainTextEdit(self)
-        self._format_input.setPlaceholderText("Outline formatting requirements such as bullet lists or tables.")
+        self._format_input.setPlaceholderText(
+            "Outline formatting requirements such as bullet lists or tables."
+        )
         self._format_input.setFixedHeight(80)
         layout.addWidget(self._format_input)
 
@@ -2826,7 +2890,11 @@ class ResponseStyleDialog(QDialog):
 
         phrase = self._phrase_input.toPlainText().strip()
         if not phrase:
-            QMessageBox.warning(self, "Missing snippet", "Paste a prompt snippet before saving the entry.")
+            QMessageBox.warning(
+                self,
+                "Missing snippet",
+                "Paste a prompt snippet before saving the entry.",
+            )
             return
 
         prompt_part = self._prompt_part_input.currentText().strip() or "Response Style"
@@ -2931,7 +2999,13 @@ class PromptNoteDialog(QDialog):
 class MarkdownPreviewDialog(QDialog):
     """Display markdown content rendered in a read-only viewer."""
 
-    def __init__(self, markdown_text: str, parent: QWidget | None, *, title: str = "Rendered Output") -> None:
+    def __init__(
+        self,
+        markdown_text: str,
+        parent: QWidget | None,
+        *,
+        title: str = "Rendered Output",
+    ) -> None:
         super().__init__(parent)
         self._markdown_text = markdown_text
         self.setWindowTitle(title)
@@ -3141,7 +3215,10 @@ class PromptVersionHistoryDialog(QDialog):
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
         header = QLabel(
-            "Every save creates a version. Select an entry to inspect the snapshot, diff against the prior version, or restore it.",
+            (
+                "Every save creates a version. Select an entry to inspect the snapshot, "
+                "diff against the prior version, or restore it."
+            ),
             self,
         )
         header.setWordWrap(True)
@@ -3208,16 +3285,18 @@ class PromptVersionHistoryDialog(QDialog):
         self._versions = versions
         self._table.setRowCount(len(versions))
         for row, version in enumerate(versions):
+            timestamp = self._format_timestamp(version.created_at)
             self._table.setItem(row, 0, QTableWidgetItem(f"v{version.version_number}"))
-            self._table.setItem(row, 1, QTableWidgetItem(self._format_timestamp(version.created_at)))
+            self._table.setItem(row, 1, QTableWidgetItem(timestamp))
             message = version.commit_message or "Auto-snapshot"
             self._table.setItem(row, 2, QTableWidgetItem(message))
         if versions:
             self._table.selectRow(0)
         else:
             self._body_view.setPlainText(self._BODY_PLACEHOLDER)
-            self._diff_view.setPlainText("No versions have been recorded for this prompt yet.")
-            self._current_diff_view.setPlainText("No versions have been recorded for this prompt yet.")
+            empty_message = "No versions have been recorded for this prompt yet."
+            self._diff_view.setPlainText(empty_message)
+            self._current_diff_view.setPlainText(empty_message)
             self._snapshot_view.clear()
 
     def _on_selection_changed(self) -> None:

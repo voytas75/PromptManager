@@ -1,6 +1,8 @@
 """Command palette dialog and utilities for quick actions.
 
-Updates: v0.1.0 - 2025-11-10 - Introduce keyboard-driven quick action palette.
+Updates:
+  v0.1.1 - 2025-11-29 - Wrap help dialog description builder for Ruff line length.
+  v0.1.0 - 2025-11-10 - Introduce keyboard-driven quick action palette.
 """
 
 from __future__ import annotations
@@ -168,10 +170,11 @@ class CommandPaletteDialog(QDialog):
         self.accept()
 
     def _show_help(self) -> None:
-        help_text = "\n".join(
-            f"{action.title}: {action.description}" + (f" [{action.shortcut}]" if action.shortcut else "")
-            for action in self._actions
-        )
+        help_lines: list[str] = []
+        for action in self._actions:
+            shortcut_hint = f" [{action.shortcut}]" if action.shortcut else ""
+            help_lines.append(f"{action.title}: {action.description}{shortcut_hint}")
+        help_text = "\n".join(help_lines)
         help_dialog = QDialog(self)
         help_dialog.setWindowTitle("Quick Actions Help")
         layout = QVBoxLayout(help_dialog)
