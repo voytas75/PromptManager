@@ -1409,6 +1409,7 @@ class MainWindow(QMainWindow):
         self._result_text.setReadOnly(True)
         self._result_text.setPlaceholderText("Run a prompt to see output here.")
         self._result_text.viewport().installEventFilter(self)
+        self._result_text.installEventFilter(self)
         output_tab_layout.addWidget(self._result_text, 1)
 
         self._build_result_actions_overlay()
@@ -1575,7 +1576,7 @@ class MainWindow(QMainWindow):
             return
         if self._result_actions_overlay is not None:
             self._result_actions_overlay.deleteLater()
-        overlay_parent = self._result_text.viewport()
+        overlay_parent = self._result_text
         overlay = QWidget(overlay_parent)
         overlay.setObjectName("resultActionsOverlay")
         overlay.setAttribute(Qt.WA_StyledBackground, True)
@@ -1602,21 +1603,23 @@ class MainWindow(QMainWindow):
         desired_width = overlay.width()
         desired_height = overlay.height()
         margin = 12
-        x = viewport.width() - desired_width - margin
-        y = viewport.height() - desired_height - margin
-        if x < margin:
-            x = max(0, viewport.width() - desired_width)
-        if y < margin:
-            y = max(0, viewport.height() - desired_height)
+        viewport_geometry = viewport.geometry()
+        x = viewport_geometry.x() + viewport_geometry.width() - desired_width - margin
+        y = viewport_geometry.y() + viewport_geometry.height() - desired_height - margin
+        if x < viewport_geometry.x():
+            x = viewport_geometry.x() + max(0, viewport_geometry.width() - desired_width)
+        if y < viewport_geometry.y():
+            y = viewport_geometry.y() + max(0, viewport_geometry.height() - desired_height)
         overlay.move(x, y)
         overlay.raise_()
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:
         """Respond to viewport events so overlays stay aligned."""
 
-        if self._result_text is not None and obj is self._result_text.viewport():
-            if event.type() in {QEvent.Resize, QEvent.Show}:
-                self._position_result_overlay()
+        if self._result_text is not None:
+            if obj in {self._result_text.viewport(), self._result_text}:
+                if event.type() in {QEvent.Resize, QEvent.Show}:
+                    self._position_result_overlay()
         return super().eventFilter(obj, event)
 
     def _restore_window_geometry(self) -> None:
