@@ -1,6 +1,7 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.15.67 - 2025-11-29 - Move result action buttons inside the output tab.
   v0.15.66 - 2025-11-29 - Add Enhanced Prompt Workbench launcher and wiring.
   v0.15.65 - 2025-11-29 - Remove QModelIndex default construction for Ruff B008 compliance.
   v0.15.64 - 2025-11-29 - Added prompt template editor dialog shortcut.
@@ -1395,10 +1396,26 @@ class MainWindow(QMainWindow):
         self._result_meta.setStyleSheet("color: #5b5b5b; font-style: italic;")
 
         self._result_tabs = QTabWidget(self)
+        output_tab = QWidget(self)
+        output_tab_layout = QVBoxLayout(output_tab)
+        output_tab_layout.setContentsMargins(0, 0, 0, 0)
+        output_tab_layout.setSpacing(8)
+
         self._result_text = QPlainTextEdit(self)
         self._result_text.setReadOnly(True)
         self._result_text.setPlaceholderText("Run a prompt to see output here.")
-        self._result_tabs.addTab(self._result_text, "Output")
+        output_tab_layout.addWidget(self._result_text, 1)
+
+        primary_result_actions = QHBoxLayout()
+        primary_result_actions.setContentsMargins(0, 0, 0, 0)
+        primary_result_actions.setSpacing(8)
+        primary_result_actions.addWidget(self._save_button)
+        primary_result_actions.addWidget(self._copy_result_button)
+        primary_result_actions.addWidget(self._copy_result_to_text_window_button)
+        primary_result_actions.addStretch(1)
+        output_tab_layout.addLayout(primary_result_actions)
+
+        self._result_tabs.addTab(output_tab, "Output")
 
         self._chat_history_view = QTextEdit(self)
         self._chat_history_view.setReadOnly(True)
@@ -1410,12 +1427,9 @@ class MainWindow(QMainWindow):
         output_layout.addWidget(self._result_meta)
         output_layout.addWidget(self._result_tabs, 1)
 
-        result_actions_layout = FlowLayout(spacing=8)
-        result_actions_layout.addWidget(self._save_button)
-        result_actions_layout.addWidget(self._copy_result_button)
-        result_actions_layout.addWidget(self._copy_result_to_text_window_button)
-        result_actions_layout.addWidget(self._render_markdown_button)
-        output_layout.addLayout(result_actions_layout)
+        render_actions_layout = FlowLayout(spacing=8)
+        render_actions_layout.addWidget(self._render_markdown_button)
+        output_layout.addLayout(render_actions_layout)
         self._workspace_splitter.addWidget(output_panel)
         self._workspace_splitter.addWidget(query_panel)
         self._workspace_splitter.setStretchFactor(0, 5)
