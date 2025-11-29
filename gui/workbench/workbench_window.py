@@ -58,6 +58,18 @@ from .session import WorkbenchExecutionRecord, WorkbenchSession, WorkbenchVariab
 logger = logging.getLogger("prompt_manager.gui.workbench")
 
 
+def _inherit_palette(widget: QWidget) -> None:
+    parent = widget.parent()
+    palette = parent.palette() if isinstance(parent, QWidget) else None
+    if palette is None:
+        app = QGuiApplication.instance()
+        palette = app.palette() if app is not None else None
+    if palette is None:
+        return
+    widget.setPalette(palette)
+    widget.setAutoFillBackground(True)
+
+
 _BLOCK_SNIPPETS: Mapping[str, str] = {
     "System Role": textwrap.dedent(
         """### System Role\nYou are a meticulous assistant that follows instructions exactly."""
@@ -135,6 +147,7 @@ class WorkbenchModeDialog(QDialog):
 
     def __init__(self, prompts: Sequence[Prompt], parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        _inherit_palette(self)
         self._prompts = list(prompts)
         self._selection = ModeSelection(WorkbenchMode.GUIDED, None)
         self.setWindowTitle("Start a New Prompt")
@@ -242,6 +255,7 @@ class VariableCaptureDialog(QDialog):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
+        _inherit_palette(self)
         self.setWindowTitle("Configure Variable")
         self._build_ui(name or "")
 
@@ -424,6 +438,7 @@ class WorkbenchExportDialog(QDialog):
 
     def __init__(self, session: WorkbenchSession, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        _inherit_palette(self)
         self.setWindowTitle("Export Prompt")
         self._build_ui(session)
 
