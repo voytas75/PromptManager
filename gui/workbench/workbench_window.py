@@ -419,6 +419,15 @@ class GuidedPromptWizard(QWizard):
         try:
             self.setPalette(palette)
             self.setAutoFillBackground(True)
+            palette_snapshot = {
+                "window": palette.color(QPalette.Window).name(),
+                "window_text": palette.color(QPalette.WindowText).name(),
+                "base": palette.color(QPalette.Base).name(),
+                "button": palette.color(QPalette.Button).name(),
+                "mid": palette.color(QPalette.Mid).name(),
+                "highlight": palette.color(QPalette.Highlight).name(),
+            }
+            logger.debug("GUIDED_PALETTE snapshot=%s", palette_snapshot)
             self.setStyleSheet("")
             for page in (self._goal_page, self._context_page, self._detail_page):
                 page.setPalette(palette)
