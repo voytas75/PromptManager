@@ -1,5 +1,6 @@
 """Qt application helpers for Prompt Manager GUI.
 
+Updates: v0.1.3 - 2025-11-29 - Apply Fusion style globally and log active GUI style for debugging.
 Updates: v0.1.2 - 2025-11-05 - Apply packaged application icon for desktop builds.
 Updates: v0.1.1 - 2025-11-05 - Detect display server before forcing offscreen backend.
 Updates: v0.1.0 - 2025-11-04 - Provide QApplication factory and launch routine.
@@ -7,6 +8,7 @@ Updates: v0.1.0 - 2025-11-04 - Provide QApplication factory and launch routine.
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
 from typing import TYPE_CHECKING
@@ -24,6 +26,7 @@ if TYPE_CHECKING:
     from core import PromptManager
 
 _DISPLAY_ENV_VARS = ("DISPLAY", "WAYLAND_DISPLAY", "MIR_SOCKET")
+logger = logging.getLogger("prompt_manager.gui.application")
 
 
 def _should_force_offscreen(env: MutableMapping[str, str]) -> bool:
@@ -54,6 +57,8 @@ def create_qapplication(argv: Sequence[str] | None = None) -> QApplication:
     fusion = QStyleFactory.create("Fusion")
     if fusion is not None:
         app.setStyle(fusion)
+    style_name = app.style().metaObject().className()
+    logger.debug("GUI_STYLE active_style=%s", style_name)
     return app
 
 
