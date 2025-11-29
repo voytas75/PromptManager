@@ -400,13 +400,21 @@ class GuidedPromptWizard(QWizard):
         window_color = palette.color(QPalette.Window).name()
         base_color = palette.color(QPalette.Base).name()
         alt_base_color = palette.color(QPalette.AlternateBase).name()
+        button_color = palette.color(QPalette.Button).name()
+        button_text = palette.color(QPalette.ButtonText).name()
+        hover_color = palette.color(QPalette.Highlight).name()
+        hover_text = palette.color(QPalette.HighlightedText).name()
         self.setPalette(palette)
+        self.setAutoFillBackground(True)
         self.setStyleSheet(
             "QWizard { background-color: %s; color: %s; }"
             "QWizardPage { background-color: %s; color: %s; }"
             "QLabel { color: %s; }"
             "QLineEdit, QPlainTextEdit, QComboBox { background-color: %s; color: %s; border: 1px solid %s; }"
             "QTextEdit { background-color: %s; color: %s; border: 1px solid %s; }"
+            "QPushButton { background-color: %s; color: %s; border: 1px solid %s; border-radius: 4px; padding: 4px 10px; }"
+            "QPushButton:hover { background-color: %s; color: %s; }"
+            "QPushButton:pressed { background-color: %s; color: %s; }"
             % (
                 window_color,
                 text_color,
@@ -419,6 +427,13 @@ class GuidedPromptWizard(QWizard):
                 base_color,
                 text_color,
                 alt_base_color,
+                button_color,
+                button_text,
+                button_color,
+                hover_color,
+                hover_text,
+                hover_color,
+                hover_text,
             )
         )
         for page in (self._goal_page, self._context_page, self._detail_page):
