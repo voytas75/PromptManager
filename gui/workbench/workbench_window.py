@@ -1,6 +1,7 @@
 """Qt widgets for the Enhanced Prompt Workbench experience.
 
 Updates:
+  v0.1.12 - 2025-11-29 - Force Fusion style for wizard to ensure palette-driven theming on Windows.
   v0.1.11 - 2025-11-29 - Log resolved wizard palette roles for troubleshooting theme differences.
   v0.1.10 - 2025-11-29 - Style wizard footer container explicitly to match host palette.
   v0.1.9 - 2025-11-29 - Apply palette colors to wizard button boxes and buttons.
@@ -55,6 +56,7 @@ from PySide6.QtWidgets import (
     QWizard,
     QWizardPage,
 )
+from PySide6.QtWidgets import QStyleFactory
 
 from core import PromptManager, PromptManagerError
 from core.execution import CodexExecutionResult, CodexExecutor, ExecutionError
@@ -381,6 +383,9 @@ class GuidedPromptWizard(QWizard):
         self.setAttribute(Qt.WA_StyledBackground, True)
         self._session = session
         self.setWindowTitle("Guided Prompt Wizard")
+        fusion_style = QStyleFactory.create("Fusion")
+        if fusion_style is not None:
+            self.setStyle(fusion_style)
         palette = self._resolve_theme_palette(parent)
         if palette is not None:
             logger.debug(
