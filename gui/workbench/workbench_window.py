@@ -383,9 +383,6 @@ class GuidedPromptWizard(QWizard):
         self.setAttribute(Qt.WA_StyledBackground, True)
         self._session = session
         self.setWindowTitle("Guided Prompt Wizard")
-        fusion_style = QStyleFactory.create("Fusion")
-        if fusion_style is not None:
-            self.setStyle(fusion_style)
         palette = self._resolve_theme_palette(parent)
         if palette is not None:
             logger.debug(
