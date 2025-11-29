@@ -12,7 +12,7 @@ import sys
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QStyleFactory
 
 from .main_window import MainWindow
 from .resources import load_application_icon
@@ -50,7 +50,11 @@ def create_qapplication(argv: Sequence[str] | None = None) -> QApplication:
 
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
-    return QApplication(list(argv or []))
+    app = QApplication(list(argv or []))
+    fusion = QStyleFactory.create("Fusion")
+    if fusion is not None:
+        app.setStyle(fusion)
+    return app
 
 
 def launch_prompt_manager(
