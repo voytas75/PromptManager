@@ -2,6 +2,20 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+# Changelog
+
+All notable changes to **Prompt Manager** will be documented in this file.
+
+## [0.19.1] - 2025-11-29
+
+### Added
+
+- Added a dedicated Prompt Template Editor dialog (available from the main toolbar) with per-workflow editors, inline validation, and reset controls so operators can adjust LiteLLM system prompts without opening the full settings surface.
+
+### Changed
+
+- Settings application logic now supports partial updates, enabling focused dialogs (like the new template editor) to persist their data without clobbering unrelated runtime options.
+
 ## [0.19.0] - 2025-11-28
 
 ### Added

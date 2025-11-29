@@ -1,5 +1,6 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
+Updates: v0.15.64 - 2025-11-29 - Add prompt template editor dialog with toolbar shortcut and partial settings handling.
 Updates: v0.15.63 - 2025-11-28 - Add analytics dashboard tab with charts and CSV export.
 Updates: v0.15.62 - 2025-11-28 - Share prompts via ShareText and copy the share link to the clipboard.
 Updates: v0.15.61 - 2025-11-28 - Refresh prompt list and re-enable sorting when the search query is cleared via the inline icon.
@@ -212,6 +213,7 @@ from .notes_panel import NotesPanel
 from .notifications import BackgroundTaskCenterDialog, QtNotificationBridge
 from .processing_indicator import ProcessingIndicator
 from .response_styles_panel import ResponseStylesPanel
+from .prompt_templates_dialog import PromptTemplateEditorDialog
 from .settings_dialog import SettingsDialog, persist_settings_to_config
 from .template_preview import TemplatePreviewWidget
 from .toast import show_toast
@@ -239,7 +241,9 @@ class _PromptLoadResult:
     search_error: Optional[str]
 
 
-def _match_category_label(value: Optional[str], categories: Sequence[PromptCategory]) -> Optional[str]:
+def _match_category_label(
+    value: Optional[str], categories: Sequence[PromptCategory]
+) -> Optional[str]:
     """Return the canonical category label matching *value* via exact, slug, or fuzzy match."""
 
     text = (value or "").strip()
@@ -342,7 +346,9 @@ def _store_execute_context_history(settings: QSettings, history: Sequence[str]) 
         logger.warning("Unable to sync execute-context history list", exc_info=True)
 
 
-def _load_filter_preferences(settings: QSettings) -> Tuple[Optional[str], Optional[str], Optional[float], Optional[str]]:
+def _load_filter_preferences(
+    settings: QSettings,
+) -> Tuple[Optional[str], Optional[str], Optional[float], Optional[str]]:
     """Return persisted filter selections (category, tag, quality, sort)."""
 
     def _clean_text(value: object) -> Optional[str]:
@@ -722,9 +728,7 @@ class PromptDetailWidget(QWidget):
             self._examples.clear()
         record_payload = prompt.to_record()
         metadata_extra = {
-            key: value
-            for key, value in prompt.to_metadata().items()
-            if key not in record_payload
+            key: value for key, value in prompt.to_metadata().items() if key not in record_payload
         }
         if metadata_extra:
             record_payload["metadata_extra"] = metadata_extra
@@ -821,15 +825,16 @@ class PromptDetailWidget(QWidget):
             safe_value = safe_value.replace("\n", "<br/>")
         color = self._label_color()
         return (
-            f'<span style="font-style: italic; color: {color};">{safe_label}:</span> '
-            f"{safe_value}"
+            f'<span style="font-style: italic; color: {color};">{safe_label}:</span> {safe_value}'
         )
 
     def _label_color(self) -> str:
         """Return a label colour with ≥4.5 contrast for the current palette."""
 
         background = self.palette().color(QPalette.Window)
-        background_lum = self._relative_luminance(background.redF(), background.greenF(), background.blueF())
+        background_lum = self._relative_luminance(
+            background.redF(), background.greenF(), background.blueF()
+        )
         light_candidates = ["#0b1120", "#111827"]
         dark_candidates = ["#f8fafc", "#e5e7eb"]
         preferred = light_candidates if background_lum >= 0.5 else dark_candidates
@@ -961,9 +966,7 @@ class PromptDetailWidget(QWidget):
         """Display lineage/version info beneath the description."""
 
         if text:
-            self._lineage_label.setText(
-                self._format_label_value("Lineage", text, multiline=True)
-            )
+            self._lineage_label.setText(self._format_label_value("Lineage", text, multiline=True))
             self._lineage_label.setVisible(True)
         else:
             self._lineage_label.clear()
@@ -973,7 +976,9 @@ class PromptDetailWidget(QWidget):
 class FlowLayout(QLayout):
     """Layout that arranges widgets left-to-right and wraps on overflow."""
 
-    def __init__(self, parent: Optional[QWidget] = None, *, margin: int = 0, spacing: int = -1) -> None:
+    def __init__(
+        self, parent: Optional[QWidget] = None, *, margin: int = 0, spacing: int = -1
+    ) -> None:
         super().__init__(parent)
         if parent is not None:
             self.setContentsMargins(margin, margin, margin, margin)
@@ -1146,7 +1151,9 @@ class MainWindow(QMainWindow):
                 self._sort_order = PromptSortOrder(stored_sort_value)
             except ValueError:
                 logger.warning("Unknown stored sort order: %s", stored_sort_value)
-        self._last_execute_context_task: str = _load_last_execute_context_task(self._layout_settings)
+        self._last_execute_context_task: str = _load_last_execute_context_task(
+            self._layout_settings
+        )
         self._execute_context_history_limit = _EXECUTE_CONTEXT_HISTORY_LIMIT
         history_entries = _load_execute_context_history(
             self._layout_settings,
@@ -1247,6 +1254,11 @@ class MainWindow(QMainWindow):
         self._info_button.clicked.connect(self._on_info_clicked)  # type: ignore[arg-type]
         controls_layout.addWidget(self._info_button)
 
+        self._templates_button = QPushButton("Prompt Templates", self)
+        self._templates_button.setToolTip("Edit LiteLLM system prompt overrides")
+        self._templates_button.clicked.connect(self._on_prompt_templates_clicked)  # type: ignore[arg-type]
+        controls_layout.addWidget(self._templates_button)
+
         self._settings_button = QPushButton("Settings", self)
         self._settings_button.clicked.connect(self._on_settings_clicked)  # type: ignore[arg-type]
         controls_layout.addWidget(self._settings_button)
@@ -1311,7 +1323,9 @@ class MainWindow(QMainWindow):
         self._copy_result_button.clicked.connect(self._on_copy_result_clicked)  # type: ignore[arg-type]
 
         self._copy_result_to_text_window_button = QPushButton("Copy to Text Window", self)
-        self._copy_result_to_text_window_button.clicked.connect(self._on_copy_result_to_text_window_clicked)  # type: ignore[arg-type]
+        self._copy_result_to_text_window_button.clicked.connect(
+            self._on_copy_result_to_text_window_clicked
+        )  # type: ignore[arg-type]
 
         self._render_markdown_button = QPushButton("Render Output", self)
         self._render_markdown_button.setEnabled(False)
@@ -1369,7 +1383,11 @@ class MainWindow(QMainWindow):
         for label, order in self._SORT_OPTIONS:
             self._sort_combo.addItem(label, order.value)
         default_sort_index = next(
-            (index for index, (_, option) in enumerate(self._SORT_OPTIONS) if option is self._sort_order),
+            (
+                index
+                for index, (_, option) in enumerate(self._SORT_OPTIONS)
+                if option is self._sort_order
+            ),
             0,
         )
         self._sort_combo.setCurrentIndex(default_sort_index)
@@ -1544,7 +1562,9 @@ class MainWindow(QMainWindow):
         self._template_detail_widget = PromptDetailWidget(preview_list_splitter)
         self._template_detail_widget.delete_requested.connect(self._on_delete_clicked)  # type: ignore[arg-type]
         self._template_detail_widget.edit_requested.connect(self._on_edit_clicked)  # type: ignore[arg-type]
-        self._template_detail_widget.version_history_requested.connect(self._open_version_history_dialog)  # type: ignore[arg-type]
+        self._template_detail_widget.version_history_requested.connect(
+            self._open_version_history_dialog
+        )  # type: ignore[arg-type]
         self._template_detail_widget.fork_requested.connect(self._on_fork_clicked)  # type: ignore[arg-type]
         self._template_detail_widget.refresh_scenarios_requested.connect(  # type: ignore[arg-type]
             partial(self._handle_refresh_scenarios_request, self._template_detail_widget)
@@ -2004,7 +2024,9 @@ class MainWindow(QMainWindow):
         if order is PromptSortOrder.QUALITY_DESC:
 
             def quality_key(prompt: Prompt) -> tuple[float, str, str]:
-                quality = prompt.quality_score if prompt.quality_score is not None else float("-inf")
+                quality = (
+                    prompt.quality_score if prompt.quality_score is not None else float("-inf")
+                )
                 return (-quality, prompt.name.casefold(), str(prompt.id))
 
             return sorted(prompts, key=quality_key)
@@ -2406,7 +2428,9 @@ class MainWindow(QMainWindow):
         if app is None:
             return
 
-        theme = (mode or self._runtime_settings.get("theme_mode") or DEFAULT_THEME_MODE).strip().lower()
+        theme = (
+            (mode or self._runtime_settings.get("theme_mode") or DEFAULT_THEME_MODE).strip().lower()
+        )
         if theme not in {"light", "dark"}:
             theme = DEFAULT_THEME_MODE
 
@@ -2640,9 +2664,7 @@ class MainWindow(QMainWindow):
             ),
         ]
 
-    def _build_quick_actions(
-        self, custom_actions: Optional[object]
-    ) -> List[QuickAction]:
+    def _build_quick_actions(self, custom_actions: Optional[object]) -> List[QuickAction]:
         actions_by_id: Dict[str, QuickAction] = {
             action.identifier: action for action in self._default_quick_actions()
         }
@@ -2651,11 +2673,7 @@ class MainWindow(QMainWindow):
 
         data: Iterable[dict[str, Any]]
         if isinstance(custom_actions, list):
-            data = [
-                entry
-                for entry in custom_actions
-                if isinstance(entry, dict)
-            ]
+            data = [entry for entry in custom_actions if isinstance(entry, dict)]
         else:
             logger.warning("Ignoring invalid quick_actions settings value: %s", custom_actions)
             return list(actions_by_id.values())
@@ -2834,7 +2852,9 @@ class MainWindow(QMainWindow):
         )
         self._update_intent_hint(current_prompts)
         label = prediction.label.value.replace("_", " ").title()
-        self.statusBar().showMessage(f"Detected intent: {label} ({int(prediction.confidence * 100)}%)", 5000)
+        self.statusBar().showMessage(
+            f"Detected intent: {label} ({int(prediction.confidence * 100)}%)", 5000
+        )
         self._usage_logger.log_detect(prediction=prediction, query_text=text)
 
     def _on_suggest_prompt_clicked(self) -> None:
@@ -2939,7 +2959,9 @@ class MainWindow(QMainWindow):
 
         follow_up = self._query_input.toPlainText().strip()
         if not follow_up:
-            self.statusBar().showMessage("Type a follow-up message before continuing the chat.", 4000)
+            self.statusBar().showMessage(
+                "Type a follow-up message before continuing the chat.", 4000
+            )
             return
 
         prompt_id = self._chat_prompt_id
@@ -3767,7 +3789,9 @@ class MainWindow(QMainWindow):
                 updated,
             )
         except PromptNotFoundError:
-            self._show_error("Prompt missing", "The prompt cannot be located. Refresh and try again.")
+            self._show_error(
+                "Prompt missing", "The prompt cannot be located. Refresh and try again."
+            )
             self._load_prompts()
             return
         except PromptStorageError as exc:
@@ -3998,6 +4022,25 @@ class MainWindow(QMainWindow):
         updates = dialog.result_settings()
         self._apply_settings(updates)
 
+    def _on_prompt_templates_clicked(self) -> None:
+        """Open the lightweight prompt template editor dialog."""
+
+        dialog = PromptTemplateEditorDialog(
+            self,
+            templates=self._runtime_settings.get("prompt_templates"),
+        )
+        if dialog.exec() != QDialog.Accepted:
+            return
+        overrides = dialog.result_templates()
+        cleaned_overrides: Optional[dict[str, str]] = overrides or None
+        current_templates = self._runtime_settings.get("prompt_templates")
+        normalised_current = current_templates or None
+        if normalised_current == cleaned_overrides:
+            self._show_toast("Prompt templates are already up to date.")
+            return
+        self._apply_settings({"prompt_templates": cleaned_overrides})
+        self._show_toast("Prompt templates updated.")
+
     def _on_exit_clicked(self) -> None:
         """Close the application via the toolbar exit control."""
 
@@ -4008,85 +4051,127 @@ class MainWindow(QMainWindow):
     def _apply_settings(self, updates: dict[str, Optional[object]]) -> None:
         """Persist settings, refresh catalogue, and update name generator."""
 
-        self._runtime_settings["litellm_model"] = updates.get("litellm_model")
-        self._runtime_settings["litellm_inference_model"] = updates.get("litellm_inference_model")
-        self._runtime_settings["litellm_api_key"] = updates.get("litellm_api_key")
-        self._runtime_settings["litellm_api_base"] = updates.get("litellm_api_base")
-        self._runtime_settings["litellm_api_version"] = updates.get("litellm_api_version")
-        self._runtime_settings["litellm_reasoning_effort"] = updates.get("litellm_reasoning_effort")
-        embedding_model_value = updates.get("embedding_model")
-        embedding_backend_value = updates.get("embedding_backend") or DEFAULT_EMBEDDING_BACKEND
-        self._runtime_settings["embedding_backend"] = embedding_backend_value
-        self._runtime_settings["embedding_model"] = embedding_model_value or DEFAULT_EMBEDDING_MODEL
-        drop_params_value = updates.get("litellm_drop_params")
-        if isinstance(drop_params_value, list):
-            cleaned_drop_params = [str(item).strip() for item in drop_params_value if str(item).strip()]
-        elif isinstance(drop_params_value, str):
-            cleaned_drop_params = [part.strip() for part in drop_params_value.split(",") if part.strip()]
-        else:
-            cleaned_drop_params = None
-        self._runtime_settings["litellm_drop_params"] = cleaned_drop_params
-        stream_value = updates.get("litellm_stream")
-        stream_flag = bool(stream_value)
-        self._runtime_settings["litellm_stream"] = stream_flag
-        workflow_models_value = updates.get("litellm_workflow_models")
-        if isinstance(workflow_models_value, dict):
-            cleaned_workflow_models = {
+        if not updates:
+            return
+
+        runtime = self._runtime_settings
+
+        simple_keys = (
+            "litellm_model",
+            "litellm_inference_model",
+            "litellm_api_key",
+            "litellm_api_base",
+            "litellm_api_version",
+            "litellm_reasoning_effort",
+        )
+        for key in simple_keys:
+            if key in updates:
+                runtime[key] = updates.get(key)
+
+        if "embedding_backend" in updates or "embedding_model" in updates:
+            backend_value = (
+                updates.get("embedding_backend") or runtime.get("embedding_backend")
+            ) or DEFAULT_EMBEDDING_BACKEND
+            model_value = (
+                updates.get("embedding_model") or runtime.get("embedding_model")
+            ) or DEFAULT_EMBEDDING_MODEL
+            runtime["embedding_backend"] = backend_value
+            runtime["embedding_model"] = model_value
+        embedding_backend_value = runtime.get("embedding_backend", DEFAULT_EMBEDDING_BACKEND)
+
+        cleaned_drop_params: Optional[list[str]] = runtime.get("litellm_drop_params")  # type: ignore[assignment]
+        if "litellm_drop_params" in updates:
+            drop_params_value = updates.get("litellm_drop_params")
+            if isinstance(drop_params_value, list):
+                cleaned_drop_params = [
+                    str(item).strip() for item in drop_params_value if str(item).strip()
+                ]
+            elif isinstance(drop_params_value, str):
+                cleaned_drop_params = [
+                    part.strip() for part in drop_params_value.split(",") if part.strip()
+                ]
+            else:
+                cleaned_drop_params = None
+            runtime["litellm_drop_params"] = cleaned_drop_params
+
+        stream_flag = bool(runtime.get("litellm_stream"))
+        if "litellm_stream" in updates:
+            stream_flag = bool(updates.get("litellm_stream"))
+            runtime["litellm_stream"] = stream_flag
+
+        def _normalise_workflows(value: Optional[object]) -> Optional[dict[str, str]]:
+            if not isinstance(value, dict):
+                return None
+            return {
                 str(key): "inference"
-                for key, value in workflow_models_value.items()
-                if isinstance(value, str) and value.strip().lower() == "inference"
+                for key, route in value.items()
+                if isinstance(route, str) and route.strip().lower() == "inference"
             }
-        else:
-            cleaned_workflow_models = None
-        self._runtime_settings["litellm_workflow_models"] = cleaned_workflow_models
-        quick_actions_value = updates.get("quick_actions")
-        if isinstance(quick_actions_value, list):
+
+        cleaned_workflow_models = _normalise_workflows(runtime.get("litellm_workflow_models"))
+        if "litellm_workflow_models" in updates:
+            cleaned_workflow_models = _normalise_workflows(updates.get("litellm_workflow_models"))
+            runtime["litellm_workflow_models"] = cleaned_workflow_models
+
+        cleaned_quick_actions: Optional[list[dict[str, object]]] = None
+        existing_quick_actions = runtime.get("quick_actions")
+        if isinstance(existing_quick_actions, list):
             cleaned_quick_actions = [
-                dict(entry) for entry in quick_actions_value if isinstance(entry, dict)
+                dict(entry) for entry in existing_quick_actions if isinstance(entry, dict)
             ]
-        else:
-            cleaned_quick_actions = None
-        self._runtime_settings["quick_actions"] = cleaned_quick_actions
-        color_value = updates.get("chat_user_bubble_color")
-        if isinstance(color_value, str):
-            candidate_color = QColor(color_value)
-            if candidate_color.isValid():
-                chat_colour = candidate_color.name().lower()
+        if "quick_actions" in updates:
+            quick_actions_value = updates.get("quick_actions")
+            if isinstance(quick_actions_value, list):
+                cleaned_quick_actions = [
+                    dict(entry) for entry in quick_actions_value if isinstance(entry, dict)
+                ]
+            else:
+                cleaned_quick_actions = None
+            runtime["quick_actions"] = cleaned_quick_actions
+
+        chat_colour = runtime.get("chat_user_bubble_color", DEFAULT_CHAT_USER_BUBBLE_COLOR)
+        if "chat_user_bubble_color" in updates:
+            color_value = updates.get("chat_user_bubble_color")
+            if isinstance(color_value, str) and QColor(color_value).isValid():
+                chat_colour = QColor(color_value).name().lower()
             else:
                 chat_colour = DEFAULT_CHAT_USER_BUBBLE_COLOR
-        else:
-            chat_colour = DEFAULT_CHAT_USER_BUBBLE_COLOR
-        self._runtime_settings["chat_user_bubble_color"] = chat_colour
+            runtime["chat_user_bubble_color"] = chat_colour
 
-        # --------------------------------------------------
-        # Chat colour palette (dict with user/assistant keys)
-        # --------------------------------------------------
-        chat_colors_value = updates.get("chat_colors")
-        palette_input = chat_colors_value if isinstance(chat_colors_value, dict) else None
-        cleaned_palette = normalise_chat_palette(palette_input)
-        self._runtime_settings["chat_colors"] = cleaned_palette or None
+        cleaned_palette = normalise_chat_palette(
+            runtime.get("chat_colors") if isinstance(runtime.get("chat_colors"), dict) else None
+        )
+        if "chat_colors" in updates:
+            palette_input = (
+                updates.get("chat_colors") if isinstance(updates.get("chat_colors"), dict) else None
+            )
+            cleaned_palette = normalise_chat_palette(palette_input)
+            runtime["chat_colors"] = cleaned_palette or None
 
-        theme_value = updates.get("theme_mode")
-        if isinstance(theme_value, str):
-            theme_choice = theme_value.strip().lower()
-            if theme_choice not in {"light", "dark"}:
-                theme_choice = self._runtime_settings.get("theme_mode", DEFAULT_THEME_MODE)
-        else:
-            theme_choice = self._runtime_settings.get("theme_mode", DEFAULT_THEME_MODE)
+        theme_choice = runtime.get("theme_mode", DEFAULT_THEME_MODE)
+        if "theme_mode" in updates:
+            theme_value = updates.get("theme_mode")
+            if isinstance(theme_value, str) and theme_value.strip().lower() in {"light", "dark"}:
+                theme_choice = theme_value.strip().lower()
+            else:
+                theme_choice = DEFAULT_THEME_MODE
+            runtime["theme_mode"] = theme_choice
         if theme_choice not in {"light", "dark"}:
             theme_choice = DEFAULT_THEME_MODE
-        self._runtime_settings["theme_mode"] = theme_choice
-        prompt_templates_value = updates.get("prompt_templates")
-        if isinstance(prompt_templates_value, dict):
-            cleaned_prompt_templates = {
-                str(key): value.strip()
-                for key, value in prompt_templates_value.items()
-                if isinstance(value, str) and value.strip()
-            }
-            prompt_templates_payload: Optional[dict[str, str]] = cleaned_prompt_templates or None
-        else:
-            prompt_templates_payload = None
-        self._runtime_settings["prompt_templates"] = prompt_templates_payload
+
+        prompt_templates_payload: Optional[dict[str, str]] = runtime.get("prompt_templates")  # type: ignore[assignment]
+        if "prompt_templates" in updates:
+            prompt_templates_value = updates.get("prompt_templates")
+            if isinstance(prompt_templates_value, dict):
+                cleaned_prompt_templates = {
+                    str(key): value.strip()
+                    for key, value in prompt_templates_value.items()
+                    if isinstance(value, str) and value.strip()
+                }
+                prompt_templates_payload = cleaned_prompt_templates or None
+            else:
+                prompt_templates_payload = None
+            runtime["prompt_templates"] = prompt_templates_payload
         persist_settings_to_config(
             {
                 "litellm_model": self._runtime_settings.get("litellm_model"),
@@ -4142,7 +4227,9 @@ class MainWindow(QMainWindow):
                         update=prompt_templates_payload
                     )
                 else:
-                    self._settings.prompt_templates = PromptTemplateOverrides(**prompt_templates_payload)
+                    self._settings.prompt_templates = PromptTemplateOverrides(
+                        **prompt_templates_payload
+                    )
             else:
                 self._settings.prompt_templates = PromptTemplateOverrides()
 
@@ -4199,7 +4286,9 @@ class MainWindow(QMainWindow):
             "litellm_workflow_models": dict(settings.litellm_workflow_models)
             if settings and settings.litellm_workflow_models
             else None,
-            "embedding_backend": settings.embedding_backend if settings else DEFAULT_EMBEDDING_BACKEND,
+            "embedding_backend": settings.embedding_backend
+            if settings
+            else DEFAULT_EMBEDDING_BACKEND,
             "embedding_model": settings.embedding_model if settings else DEFAULT_EMBEDDING_MODEL,
             "quick_actions": derived_quick_actions,
             "chat_user_bubble_color": (
@@ -4275,7 +4364,9 @@ class MainWindow(QMainWindow):
                 if isinstance(color_value, str) and color_value.strip():
                     runtime["chat_user_bubble_color"] = color_value.strip()
                 palette_value = data.get("chat_colors")
-                palette = normalise_chat_palette(palette_value if isinstance(palette_value, dict) else None)
+                palette = normalise_chat_palette(
+                    palette_value if isinstance(palette_value, dict) else None
+                )
                 if palette:
                     runtime["chat_colors"] = palette
                 theme_value = data.get("theme_mode")
@@ -4285,7 +4376,9 @@ class MainWindow(QMainWindow):
         if isinstance(raw_colour, str):
             candidate_colour = QColor(raw_colour)
             runtime["chat_user_bubble_color"] = (
-                candidate_colour.name().lower() if candidate_colour.isValid() else DEFAULT_CHAT_USER_BUBBLE_COLOR
+                candidate_colour.name().lower()
+                if candidate_colour.isValid()
+                else DEFAULT_CHAT_USER_BUBBLE_COLOR
             )
         else:
             runtime["chat_user_bubble_color"] = DEFAULT_CHAT_USER_BUBBLE_COLOR
@@ -4413,7 +4506,10 @@ class MainWindow(QMainWindow):
             message = self._format_notification_message(notification)
             duration = 0 if notification.status is NotificationStatus.STARTED else 5000
             self.statusBar().showMessage(message, duration)
-        if notification.task_id and notification.status in {NotificationStatus.SUCCEEDED, NotificationStatus.FAILED}:
+        if notification.task_id and notification.status in {
+            NotificationStatus.SUCCEEDED,
+            NotificationStatus.FAILED,
+        }:
             toast_duration = 3500 if notification.status is NotificationStatus.SUCCEEDED else 4500
             self._show_toast(self._format_notification_message(notification), toast_duration)
 
