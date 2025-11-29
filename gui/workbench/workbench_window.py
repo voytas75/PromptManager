@@ -535,6 +535,14 @@ class GuidedPromptWizard(QWizard):
                 for button in button_box.findChildren(QPushButton):
                     button.setPalette(palette)
                     button.setAutoFillBackground(True)
+                footer_panel = button_box.parentWidget()
+                if footer_panel is not None:
+                    footer_panel.setPalette(palette)
+                    footer_panel.setAutoFillBackground(True)
+                    footer_panel.setAttribute(Qt.WA_StyledBackground, True)
+                    footer_panel.setStyleSheet(
+                        f"background-color: {window_color}; border-top: 1px solid {mid_color};"
+                    )
             footer_container = self.findChild(QWidget, "qt_wizard_button_widget")
             if footer_container is not None:
                 footer_container.setPalette(palette)
