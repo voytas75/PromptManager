@@ -1,6 +1,7 @@
 """Workspace template preview widget with live variable validation.
 
 Updates:
+  v0.2.2 - 2025-11-29 - Allow programmatic variable population and refresh hooks for external editors.
   v0.2.1 - 2025-11-29 - Wrap schema persistence logic to satisfy Ruff line length.
   v0.2.0 - 2025-11-27 - Persist template variables and schema settings per prompt using QSettings.
   v0.1.9 - 2025-11-27 - Expose run trigger for external shortcuts and publish run state changes.
@@ -260,6 +261,36 @@ class TemplatePreviewWidget(QWidget):
             if text:
                 values[name] = text
         return values
+
+    def apply_variable_values(self, values: Mapping[str, object]) -> None:
+        """Populate variable editors from ``values`` without manual typing."""
+
+        if not values:
+            return
+
+        updated = False
+        for name, value in values.items():
+            widget = self._variable_inputs.get(name)
+            if widget is None:
+                continue
+            setter = getattr(widget, "setPlainText", None)
+            if setter is None:
+                continue
+            blocker = getattr(widget, "blockSignals", None)
+            if callable(blocker):  # pragma: no cover - exercised in GUI runtime
+                blocker(True)
+            setter("" if value is None else str(value))
+            if callable(blocker):  # pragma: no cover - exercised in GUI runtime
+                blocker(False)
+            updated = True
+
+        if updated:
+            self._update_preview()
+
+    def refresh_preview(self) -> None:
+        """Recompute preview and validation state after external changes."""
+
+        self._update_preview()
 
     def _update_preview(self) -> None:
         self._last_rendered_text = ""

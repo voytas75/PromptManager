@@ -1,6 +1,7 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.15.66 - 2025-11-29 - Add Enhanced Prompt Workbench launcher and wiring.
   v0.15.65 - 2025-11-29 - Remove QModelIndex default construction for Ruff B008 compliance.
   v0.15.64 - 2025-11-29 - Added prompt template editor dialog shortcut.
   v0.15.63 - 2025-11-28 - Added analytics dashboard tab with CSV export.
@@ -137,6 +138,7 @@ from .settings_dialog import SettingsDialog, persist_settings_to_config
 from .template_preview import TemplatePreviewWidget
 from .toast import show_toast
 from .usage_logger import IntentUsageLogger
+from .workbench.workbench_window import WorkbenchModeDialog, WorkbenchWindow
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from collections.abc import Iterable, Mapping, Sequence
@@ -1063,6 +1065,7 @@ class MainWindow(QMainWindow):
         self._template_run_shortcut_button: QPushButton | None = None
         self._template_transition_indicator: ProcessingIndicator | None = None
         self._share_providers: dict[str, ShareProvider] = {}
+        self._workbench_windows: list[WorkbenchWindow] = []
         self._register_share_provider(ShareTextProvider())
         self._layout_settings = QSettings("PromptManager", "MainWindow")
         (
@@ -1158,6 +1161,11 @@ class MainWindow(QMainWindow):
         self._add_button = QPushButton("Add", self)
         self._add_button.clicked.connect(self._on_add_clicked)  # type: ignore[arg-type]
         controls_layout.addWidget(self._add_button)
+
+        self._workbench_button = QPushButton("🆕 New", self)
+        self._workbench_button.setToolTip("Open the Enhanced Prompt Workbench.")
+        self._workbench_button.clicked.connect(self._on_workbench_clicked)  # type: ignore[arg-type]
+        controls_layout.addWidget(self._workbench_button)
 
         self._import_button = QPushButton("Import", self)
         self._import_button.clicked.connect(self._on_import_clicked)  # type: ignore[arg-type]
@@ -3675,6 +3683,39 @@ class MainWindow(QMainWindow):
             return
         self._load_prompts()
         self._select_prompt(created.id)
+
+    def _on_workbench_clicked(self) -> None:
+        """Launch the Enhanced Prompt Workbench with the desired starting mode."""
+
+        try:
+            templates = self._manager.repository.list(limit=200)
+        except RepositoryError as exc:
+            logger.warning("Unable to load templates for workbench: %s", exc)
+            templates = []
+        dialog = WorkbenchModeDialog(templates, self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        selection = dialog.result_selection()
+        window = WorkbenchWindow(
+            self._manager,
+            mode=selection.mode,
+            template_prompt=selection.template_prompt,
+            parent=self,
+        )
+        self._workbench_windows.append(window)
+
+        window.destroyed.connect(  # type: ignore[arg-type]
+            lambda *_: self._remove_workbench_window(window)
+        )
+        window.show()
+
+    def _remove_workbench_window(self, window: WorkbenchWindow) -> None:
+        """Remove closed workbench windows from the tracking list."""
+
+        try:
+            self._workbench_windows.remove(window)
+        except ValueError:
+            return
 
     def _on_edit_clicked(self) -> None:
         """Open the edit dialog for the selected prompt and persist changes."""

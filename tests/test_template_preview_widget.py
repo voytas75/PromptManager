@@ -132,6 +132,7 @@ TemplatePreviewWidget = _TEMPLATE_PREVIEW_MODULE.TemplatePreviewWidget
 class _DummyTextEdit:
     def __init__(self, text: str = "") -> None:
         self._text = text
+        self.blocked = False
 
     def setPlainText(self, text: str) -> None:
         self._text = text
@@ -141,6 +142,9 @@ class _DummyTextEdit:
 
     def toPlainText(self) -> str:
         return self._text
+
+    def blockSignals(self, value: bool) -> None:  # pragma: no cover - behaviour tracked externally
+        self.blocked = bool(value)
 
 
 class _DummyLabel:
@@ -244,3 +248,32 @@ def test_preview_displays_template_text_when_rendering_fails() -> None:
 
     assert widget._rendered_view.toPlainText() == "{{ invalid syntax }}"
     assert widget._status_label.text_value == "boom"
+
+
+def test_apply_variable_values_populates_matching_inputs() -> None:
+    widget = _make_preview()
+    editor = _DummyTextEdit()
+    widget._variable_inputs = {"customer": editor}
+    invoked: dict[str, int] = {"count": 0}
+
+    def _stub_update(self: TemplatePreviewWidget) -> None:
+        invoked["count"] += 1
+
+    widget._update_preview = types.MethodType(_stub_update, widget)
+    widget.apply_variable_values({"customer": "ACME Corp", "missing": "skip"})
+
+    assert editor.toPlainText() == "ACME Corp"
+    assert invoked["count"] == 1
+
+
+def test_refresh_preview_invokes_internal_update() -> None:
+    widget = _make_preview()
+    invoked: dict[str, int] = {"count": 0}
+
+    def _stub_update(self: TemplatePreviewWidget) -> None:
+        invoked["count"] += 1
+
+    widget._update_preview = types.MethodType(_stub_update, widget)
+    widget.refresh_preview()
+
+    assert invoked["count"] == 1
