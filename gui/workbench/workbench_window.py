@@ -395,15 +395,31 @@ class GuidedPromptWizard(QWizard):
         self.currentIdChanged.connect(lambda _: self._emit_update())  # type: ignore[arg-type]
         self._emit_update()
 
-    def _apply_palette(self, palette: QPalette) -> None:
+def _apply_palette(self, palette: QPalette) -> None:
         text_color = palette.color(QPalette.Text).name()
         window_color = palette.color(QPalette.Window).name()
+        base_color = palette.color(QPalette.Base).name()
+        alt_base_color = palette.color(QPalette.AlternateBase).name()
         self.setPalette(palette)
         self.setStyleSheet(
             "QWizard { background-color: %s; color: %s; }"
             "QWizardPage { background-color: %s; color: %s; }"
             "QLabel { color: %s; }"
-            % (window_color, text_color, window_color, text_color, text_color)
+            "QLineEdit, QPlainTextEdit, QComboBox { background-color: %s; color: %s; border: 1px solid %s; }"
+            "QTextEdit { background-color: %s; color: %s; border: 1px solid %s; }"
+            % (
+                window_color,
+                text_color,
+                window_color,
+                text_color,
+                text_color,
+                base_color,
+                text_color,
+                alt_base_color,
+                base_color,
+                text_color,
+                alt_base_color,
+            )
         )
         for page in (self._goal_page, self._context_page, self._detail_page):
             page.setPalette(palette)
