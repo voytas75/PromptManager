@@ -466,8 +466,12 @@ class GuidedPromptWizard(QWizard):
                     background-color: {base_color};
                 }}
                 QWizard QDialogButtonBox {{
-                    background-color: {window_color};
+                    background-color: {window_color} !important;
                     border-top: 1px solid {mid_color};
+                }}
+                QWizard QDialogButtonBox QWidget {{
+                    background-color: {window_color} !important;
+                    color: {window_text};
                 }}
                 QLineEdit,
                 QPlainTextEdit,
