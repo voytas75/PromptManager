@@ -1,6 +1,7 @@
 """Qt widgets for the Enhanced Prompt Workbench experience.
 
 Updates:
+  v0.1.1 - 2025-11-29 - Align guided wizard palette with the active application theme.
   v0.1.0 - 2025-11-29 - Introduce guided Workbench window, mode selector, and export dialog.
 """
 
@@ -353,6 +354,9 @@ class GuidedPromptWizard(QWizard):
         super().__init__(parent)
         self._session = session
         self.setWindowTitle("Guided Prompt Wizard")
+        if parent is not None:
+            self.setPalette(parent.palette())
+            self.setStyleSheet(parent.styleSheet())
         self._goal_page = _GoalWizardPage(session)
         self._context_page = _ContextWizardPage(session)
         self._detail_page = _DetailWizardPage(session)
