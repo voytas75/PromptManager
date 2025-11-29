@@ -17,8 +17,8 @@ Updates: v0.1.0 - 2025-11-04 - Initial settings dialog implementation.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping, Sequence
 from functools import partial
-from typing import Dict, Mapping, Optional, Sequence
 
 from PySide6.QtCore import QEvent, QSettings, Qt
 from PySide6.QtGui import QColor, QGuiApplication, QPalette
@@ -66,21 +66,21 @@ class SettingsDialog(QDialog):
         self,
         parent=None,
         *,
-        litellm_model: Optional[str] = None,
-        litellm_inference_model: Optional[str] = None,
-        litellm_api_key: Optional[str] = None,
-        litellm_api_base: Optional[str] = None,
-        litellm_api_version: Optional[str] = None,
-        litellm_drop_params: Optional[Sequence[str]] = None,
-        litellm_reasoning_effort: Optional[str] = None,
-        litellm_stream: Optional[bool] = None,
-        litellm_workflow_models: Optional[Mapping[str, str]] = None,
-        embedding_model: Optional[str] = None,
-        quick_actions: Optional[list[dict[str, object]]] = None,
-        chat_user_bubble_color: Optional[str] = None,
-        theme_mode: Optional[str] = None,
-        chat_colors: Optional[dict[str, str]] = None,
-        prompt_templates: Optional[dict[str, str]] = None,
+        litellm_model: str | None = None,
+        litellm_inference_model: str | None = None,
+        litellm_api_key: str | None = None,
+        litellm_api_base: str | None = None,
+        litellm_api_version: str | None = None,
+        litellm_drop_params: Sequence[str] | None = None,
+        litellm_reasoning_effort: str | None = None,
+        litellm_stream: bool | None = None,
+        litellm_workflow_models: Mapping[str, str] | None = None,
+        embedding_model: str | None = None,
+        quick_actions: list[dict[str, object]] | None = None,
+        chat_user_bubble_color: str | None = None,
+        theme_mode: str | None = None,
+        chat_colors: dict[str, str] | None = None,
+        prompt_templates: dict[str, str] | None = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Prompt Manager Settings")
@@ -105,7 +105,7 @@ class SettingsDialog(QDialog):
         self._litellm_stream = bool(litellm_stream)
         original_actions = [dict(entry) for entry in (quick_actions or []) if isinstance(entry, dict)]
         self._original_quick_actions = original_actions
-        self._quick_actions_value: Optional[list[dict[str, object]]] = original_actions or None
+        self._quick_actions_value: list[dict[str, object]] | None = original_actions or None
         self._workflow_models: dict[str, str] = {}
         if litellm_workflow_models:
             for key, value in litellm_workflow_models.items():
@@ -129,14 +129,14 @@ class SettingsDialog(QDialog):
         if not QColor(assistant_initial).isValid():
             assistant_initial = DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR
         self._assistant_bubble_color = QColor(assistant_initial).name().lower()
-        self._chat_color_input: Optional[QLineEdit] = None
-        self._chat_color_preview: Optional[QLabel] = None
-        self._chat_colors_value: Optional[dict[str, str]] = None
+        self._chat_color_input: QLineEdit | None = None
+        self._chat_color_preview: QLabel | None = None
+        self._chat_colors_value: dict[str, str] | None = None
         self._theme_mode = "dark" if (theme_mode or "").strip().lower() == "dark" else "light"
-        self._theme_combo: Optional[QComboBox] = None
-        self._prompt_template_inputs: Dict[str, QPlainTextEdit] = {}
-        self._prompt_templates_value: Optional[dict[str, str]] = None
-        self._prompt_template_initials: Dict[str, str] = {}
+        self._theme_combo: QComboBox | None = None
+        self._prompt_template_inputs: dict[str, QPlainTextEdit] = {}
+        self._prompt_templates_value: dict[str, str] | None = None
+        self._prompt_template_initials: dict[str, str] = {}
         provided_templates = prompt_templates or {}
         for key in PROMPT_TEMPLATE_KEYS:
             incoming = provided_templates.get(key)
@@ -313,7 +313,7 @@ class SettingsDialog(QDialog):
         colors_form = QFormLayout(colors_tab)
         colors_form.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
 
-        self._color_buttons: Dict[str, QPushButton] = {}
+        self._color_buttons: dict[str, QPushButton] = {}
 
         def _make_color_row(key: str, label: str, default_hex: str) -> None:
             btn = QPushButton(colors_tab)
@@ -524,10 +524,10 @@ class SettingsDialog(QDialog):
             "assistant": _btn_hex("assistant", DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR),
         }
 
-    def result_settings(self) -> dict[str, Optional[object]]:
+    def result_settings(self) -> dict[str, object | None]:
         """Return cleaned settings data."""
 
-        def _clean(value: str) -> Optional[str]:
+        def _clean(value: str) -> str | None:
             stripped = value.strip()
             return stripped or None
 

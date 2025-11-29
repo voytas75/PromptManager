@@ -6,9 +6,9 @@ Updates: v0.1.0 - 2025-11-28 - Introduce dashboard tab with charts and CSV expor
 from __future__ import annotations
 
 import csv
-from datetime import datetime, timezone
+from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import List, Optional, Sequence
 
 from PySide6.QtCharts import (
     QBarCategoryAxis,
@@ -23,6 +23,7 @@ from PySide6.QtCharts import (
 from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import (
+    QComboBox,
     QFileDialog,
     QHBoxLayout,
     QLabel,
@@ -33,10 +34,10 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
-    QComboBox,
 )
 
 from core import AnalyticsSnapshot, PromptManager, build_analytics_snapshot, snapshot_dataset_rows
+
 from .processing_indicator import ProcessingIndicator
 
 
@@ -54,14 +55,14 @@ class AnalyticsDashboardPanel(QWidget):
     def __init__(
         self,
         manager: PromptManager,
-        parent: Optional[QWidget] = None,
+        parent: QWidget | None = None,
         *,
-        usage_log_path: Optional[Path] = None,
+        usage_log_path: Path | None = None,
     ) -> None:
         super().__init__(parent)
         self._manager = manager
         self._usage_log_path = usage_log_path
-        self._snapshot: Optional[AnalyticsSnapshot] = None
+        self._snapshot: AnalyticsSnapshot | None = None
         self._chart_view = QChartView(self)
         self._dataset_combo = QComboBox(self)
         self._chart_type_combo = QComboBox(self)
@@ -172,7 +173,7 @@ class AnalyticsDashboardPanel(QWidget):
             return
         self._snapshot = snapshot
         self._update_visuals()
-        now_local = datetime.now(timezone.utc).astimezone()
+        now_local = datetime.now(UTC).astimezone()
         self._status_label.setText(f"Refreshed at {now_local.strftime('%Y-%m-%d %H:%M:%S %Z')}")
         self._persist_preferences(window_days, prompt_limit)
 
@@ -205,8 +206,8 @@ class AnalyticsDashboardPanel(QWidget):
             self._chart_view.setChart(chart)
             return
 
-        labels: List[str] = []
-        values: List[float] = []
+        labels: list[str] = []
+        values: list[float] = []
         if dataset_key == "usage":
             for entry in snapshot.usage_frequency:
                 labels.append(entry.name)
@@ -296,8 +297,8 @@ class AnalyticsDashboardPanel(QWidget):
             self._table.setColumnCount(0)
             return
 
-        headers: List[str]
-        rows: List[List[str]]
+        headers: list[str]
+        rows: list[list[str]]
         if dataset_key == "usage":
             headers = ["Prompt", "Usage Count", "Success Rate", "Last Used"]
             rows = [
@@ -380,11 +381,11 @@ class AnalyticsDashboardPanel(QWidget):
             else "unknown"
         )
         self._embedding_summary.setText(
-            (
+            
                 f"Embedding backend: {'ok' if report.backend_ok else 'error'} ({report.backend_message}). "
                 f"Chroma: {'ok' if report.chroma_ok else 'error'} ({report.chroma_message}). "
                 f"Vectors stored {report.prompts_with_embeddings}/{report.repository_total} ({consistent})."
-            )
+            
         )
 
     def _export_csv(self) -> None:
@@ -418,7 +419,7 @@ class AnalyticsDashboardPanel(QWidget):
 
     @staticmethod
     def _write_csv(path: Path, rows: Sequence[dict[str, object]]) -> None:
-        headers: List[str] = []
+        headers: list[str] = []
         seen: set[str] = set()
         for row in rows:
             for key in row.keys():
@@ -434,7 +435,7 @@ class AnalyticsDashboardPanel(QWidget):
                 writer.writerow({header: row.get(header, "") for header in headers})
 
     @staticmethod
-    def _format_pct(value: Optional[float]) -> str:
+    def _format_pct(value: float | None) -> str:
         if value is None:
             return "n/a"
         return f"{value * 100:.1f}%"

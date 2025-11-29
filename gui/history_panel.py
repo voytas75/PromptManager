@@ -9,10 +9,11 @@ from __future__ import annotations
 
 import csv
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, List, Optional
+from typing import Any
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -54,18 +55,18 @@ class HistoryPanel(QWidget):
     def __init__(
         self,
         manager: PromptManager,
-        parent: Optional[QWidget] = None,
+        parent: QWidget | None = None,
         *,
         limit: int = 100,
-        on_note_updated: Optional[Callable[[uuid.UUID, str], None]] = None,
-        on_export: Optional[Callable[[int, str], None]] = None,
+        on_note_updated: Callable[[uuid.UUID, str], None] | None = None,
+        on_export: Callable[[int, str], None] | None = None,
     ) -> None:
         super().__init__(parent)
         self._manager = manager
         self._limit = max(1, limit)
         self._note_callback = on_note_updated
         self._export_callback = on_export
-        self._rows: List[_ExecutionRow] = []
+        self._rows: list[_ExecutionRow] = []
         self._build_ui()
         self.refresh()
 
@@ -178,7 +179,7 @@ class HistoryPanel(QWidget):
             limit=self._limit,
         )
 
-        rows: List[_ExecutionRow] = []
+        rows: list[_ExecutionRow] = []
         for entry in entries:
             name = self._resolve_prompt_name(entry.prompt_id)
             rows.append(_ExecutionRow(entry, name))
@@ -263,7 +264,7 @@ class HistoryPanel(QWidget):
             detail_lines.append("")
         detail_lines.append("Response:")
         detail_lines.append(execution.response_text or "(empty)")
-        conversation_lines: List[str] = []
+        conversation_lines: list[str] = []
         if execution.metadata:
             raw_conversation = execution.metadata.get("conversation")
             if isinstance(raw_conversation, list):
@@ -289,7 +290,7 @@ class HistoryPanel(QWidget):
     def _format_timestamp(value: datetime) -> str:
         return value.astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
 
-    def _selected_row(self) -> Optional[int]:
+    def _selected_row(self) -> int | None:
         indexes = self._table.selectionModel().selectedRows()
         if not indexes:
             return None
@@ -384,10 +385,10 @@ class HistoryPanel(QWidget):
         return len(self._rows)
 
     @staticmethod
-    def _format_conversation(messages: List[Any]) -> List[str]:
+    def _format_conversation(messages: list[Any]) -> list[str]:
         """Convert stored chat messages into plain text lines."""
 
-        lines: List[str] = []
+        lines: list[str] = []
         for message in messages:
             if not isinstance(message, dict):
                 continue

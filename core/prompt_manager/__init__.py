@@ -1,43 +1,45 @@
 """Prompt Manager package façade and orchestration layer.
 
-Updates: v0.14.4 - 2025-02-14 - Add embedding diagnostics helper for CLI integration.
-Updates: v0.14.3 - 2025-11-28 - Add data snapshot helper for maintenance workflows.
-Updates: v0.14.2 - 2025-11-28 - Add execution benchmarks, scenario refresh APIs, and category health analytics.
-Updates: v0.14.1 - 2025-11-24 - Add LiteLLM category suggestion workflow with classifier fallback.
-Updates: v0.14.0 - 2025-11-22 - Add category registry, CRUD APIs, and prompt slugging.
-Updates: v0.13.21 - 2025-11-23 - Support configurable system prompt templates across workflows.
-Updates: v0.13.20 - 2025-11-22 - Keep prompt schema versions in sync with committed history numbers.
-Updates: v0.13.19 - 2025-11-22 - Add structure-only prompt refinement workflow and GUI hook.
-Updates: v0.13.18 - 2025-11-22 - Seed first prompt version when history is missing.
-Updates: v0.13.17 - 2025-11-22 - Skip version bumps when prompt body is unchanged.
-Updates: v0.13.16 - 2025-11-22 - Add prompt versioning, diffing, and forking workflows.
-Updates: v0.13.15 - 2025-12-08 - Remove task template APIs and diagnostics wiring.
-Updates: v0.13.14 - 2025-12-07 - Add embedding rebuild helper for CLI workflows.
-Updates: v0.13.13 - 2025-12-06 - Add PromptNote CRUD APIs and Notes GUI wiring.
-Updates: v0.13.12 - 2025-12-05 - Add ResponseStyle persistence and CRUD APIs.
-Updates: v0.13.11 - 2025-11-05 - Support LiteLLM workflow routing between fast and inference models.
-Updates: v0.13.10 - 2025-11-05 - Add SQLite repository maintenance helpers.
-Updates: v0.13.9 - 2025-11-05 - Add ChromaDB integrity verification helper.
-Updates: v0.13.8 - 2025-11-05 - Add ChromaDB persistence maintenance helpers.
-Updates: v0.13.7 - 2025-11-30 - Add data reset helpers for maintenance workflows.
-Updates: v0.13.6 - 2025-11-26 - Track LiteLLM streaming configuration and expose runtime toggle.
-Updates: v0.13.5 - 2025-11-26 - Support LiteLLM streaming execution with optional callbacks.
-Updates: v0.13.4 - 2025-11-25 - Expose prompt catalogue statistics for maintenance surfaces.
-Updates: v0.13.3 - 2025-11-19 - Add prompt scenario generation workflow and GUI integration.
-Updates: v0.13.2 - 2025-11-16 - Add task template CRUD APIs and apply workflow.
-Updates: v0.12.0 - 2025-11-15 - Add LiteLLM-backed prompt engineering workflow.
-Updates: v0.11.0 - 2025-11-12 - Add multi-turn chat execution with conversation history logging.
-Updates: v0.10.0 - 2025-11-11 - Emit notifications for managed LLM and embedding tasks.
-Updates: v0.9.0 - 2025-11-11 - Track single-user preferences and personalise intent suggestions.
-Updates: v0.8.0 - 2025-11-09 - Capture prompt ratings from executions and update quality scores.
-Updates: v0.7.0 - 2025-11-08 - Integrate prompt execution pipeline with history logging.
-Updates: v0.6.0 - 2025-11-06 - Add intent-aware search suggestions and ranking helpers.
-Updates: v0.5.0 - 2025-11-05 - Integrate LiteLLM name generator and catalogue seeding.
-Updates: v0.4.1 - 2025-11-05 - Add lifecycle shutdown hooks and mute Chroma telemetry.
-Updates: v0.4.0 - 2025-11-05 - Add embedding provider with background sync and retry handling.
-Updates: v0.3.0 - 2025-11-03 - Require explicit DB path; accept resolved settings inputs.
-Updates: v0.2.0 - 2025-10-31 - Add SQLite repository integration with ChromaDB/Redis sync.
-Updates: v0.1.0 - 2025-10-30 - Initial PromptManager with CRUD and search support.
+Updates:
+  v0.14.5 - 2025-11-29 - Reformat header/imports and wrap CLI analytics summaries.
+  v0.14.4 - 2025-02-14 - Add embedding diagnostics helper for CLI integration.
+  v0.14.3 - 2025-11-28 - Add data snapshot helper for maintenance workflows.
+  v0.14.2 - 2025-11-28 - Add benchmarks, scenario refresh APIs, and category health stats.
+  v0.14.1 - 2025-11-24 - Add LiteLLM category suggestion workflow with classifier fallback.
+  v0.14.0 - 2025-11-22 - Add category registry, CRUD APIs, and prompt slugging.
+  v0.13.21 - 2025-11-23 - Support configurable system prompt templates across workflows.
+  v0.13.20 - 2025-11-22 - Keep prompt schema versions aligned with committed history.
+  v0.13.19 - 2025-11-22 - Add structure-only prompt refinement workflow and GUI hook.
+  v0.13.18 - 2025-11-22 - Seed first prompt version when history is missing.
+  v0.13.17 - 2025-11-22 - Skip version bumps when prompt body is unchanged.
+  v0.13.16 - 2025-11-22 - Add prompt versioning, diffing, and forking workflows.
+  v0.13.15 - 2025-12-08 - Remove task template APIs and diagnostics wiring.
+  v0.13.14 - 2025-12-07 - Add embedding rebuild helper for CLI workflows.
+  v0.13.13 - 2025-12-06 - Add PromptNote CRUD APIs and Notes GUI wiring.
+  v0.13.12 - 2025-12-05 - Add ResponseStyle persistence and CRUD APIs.
+  v0.13.11 - 2025-11-05 - Support LiteLLM workflow routing between fast/inference models.
+  v0.13.10 - 2025-11-05 - Add SQLite repository maintenance helpers.
+  v0.13.9 - 2025-11-05 - Add ChromaDB integrity verification helper.
+  v0.13.8 - 2025-11-05 - Add ChromaDB persistence maintenance helpers.
+  v0.13.7 - 2025-11-30 - Add data reset helpers for maintenance workflows.
+  v0.13.6 - 2025-11-26 - Track LiteLLM streaming configuration and expose runtime toggle.
+  v0.13.5 - 2025-11-26 - Support LiteLLM streaming execution with optional callbacks.
+  v0.13.4 - 2025-11-25 - Expose prompt catalogue statistics for maintenance surfaces.
+  v0.13.3 - 2025-11-19 - Add prompt scenario generation workflow and GUI integration.
+  v0.13.2 - 2025-11-16 - Add task template CRUD APIs and apply workflow.
+  v0.12.0 - 2025-11-15 - Add LiteLLM-backed prompt engineering workflow.
+  v0.11.0 - 2025-11-12 - Add multi-turn chat execution with conversation history logging.
+  v0.10.0 - 2025-11-11 - Emit notifications for managed LLM and embedding tasks.
+  v0.9.0 - 2025-11-11 - Track single-user preferences and personalise intent suggestions.
+  v0.8.0 - 2025-11-09 - Capture prompt ratings from executions and update quality scores.
+  v0.7.0 - 2025-11-08 - Integrate prompt execution pipeline with history logging.
+  v0.6.0 - 2025-11-06 - Add intent-aware search suggestions and ranking helpers.
+  v0.5.0 - 2025-11-05 - Integrate LiteLLM name generator and catalogue seeding.
+  v0.4.1 - 2025-11-05 - Add lifecycle shutdown hooks and mute Chroma telemetry.
+  v0.4.0 - 2025-11-05 - Add embedding provider with background sync and retry handling.
+  v0.3.0 - 2025-11-03 - Require explicit DB path; accept resolved settings inputs.
+  v0.2.0 - 2025-10-31 - Add SQLite repository integration with ChromaDB/Redis sync.
+  v0.1.0 - 2025-10-30 - Initial PromptManager with CRUD and search support.
 """
 
 from __future__ import annotations
@@ -51,28 +53,14 @@ import shutil
 import sqlite3
 import uuid
 import zipfile
+from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from dataclasses import asdict, dataclass, replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from importlib import metadata as importlib_metadata
 from pathlib import Path
-from types import TracebackType
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Mapping,
-    MutableMapping,
-    Optional,
-    Protocol,
-    Sequence,
-    Tuple,
-    Union,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import chromadb
-from chromadb.api import ClientAPI
 from chromadb.errors import ChromaError
 
 # ---------------------------------------------------------------------------
@@ -85,136 +73,6 @@ from chromadb.errors import ChromaError
 # across sub‑modules once the split is complete.
 # ---------------------------------------------------------------------------
 from config import LITELLM_ROUTED_WORKFLOWS
-
-os.environ.setdefault("CHROMA_TELEMETRY_IMPLEMENTATION", "none")
-os.environ.setdefault("CHROMA_ANONYMIZED_TELEMETRY", "0")
-
-
-def _mute_posthog_capture() -> None:
-    try:
-        import posthog  # type: ignore
-    except Exception:
-        return
-
-    def _noop_capture(*_: Any, **__: Any) -> None:
-        return None
-
-    try:
-        posthog.capture = _noop_capture  # type: ignore[attr-defined]
-    except Exception:
-        pass
-
-    try:
-        posthog.disabled = True  # type: ignore[attr-defined]
-    except Exception:
-        pass
-
-
-_mute_posthog_capture()
-
-
-def _normalise_conversation(
-    messages: Optional[Sequence[Mapping[str, str]]],
-) -> List[Dict[str, str]]:
-    """Return a sanitised copy of conversation messages for execution and logging."""
-
-    normalised: List[Dict[str, str]] = []
-    if not messages:
-        return normalised
-    for index, message in enumerate(messages):
-        role = str(message.get("role", "")).strip()
-        if not role:
-            raise PromptExecutionError(f"Conversation entry {index} is missing a role.")
-        content = message.get("content")
-        if content is None:
-            raise PromptExecutionError(f"Conversation entry {index} is missing content.")
-        normalised.append({"role": role, "content": str(content)})
-    return normalised
-
-
-def _coerce_int(value: Any) -> Optional[int]:
-    """Return an integer representation when conversion succeeds."""
-
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _parse_timestamp(value: Any) -> Optional[datetime]:
-    """Return a timezone-aware datetime when parsing succeeds."""
-
-    if value is None:
-        return None
-    if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
-    try:
-        parsed = datetime.fromisoformat(str(value))
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed
-
-
-try:
-    from redis.exceptions import RedisError as _RedisErrorType
-except ImportError:  # pragma: no cover - redis optional during development
-    _RedisErrorType = Exception
-
-RedisError = _RedisErrorType
-
-
-# ---------------------------------------------------------------------------
-# Protocols for optional dependencies to keep type hints precise without
-# importing heavy runtime modules when they are absent in development.
-# ---------------------------------------------------------------------------
-RedisValue = Union[str, bytes, memoryview]
-
-
-class RedisConnectionPoolProtocol(Protocol):
-    """Subset of redis-py connection pool used for diagnostics."""
-
-    connection_kwargs: Mapping[str, Any]
-
-    def disconnect(self) -> None:
-        """Close all pooled connections."""
-
-
-class RedisClientProtocol(Protocol):
-    """Subset of redis-py client behaviour used within the manager."""
-
-    connection_pool: Optional[RedisConnectionPoolProtocol]
-
-    def ping(self) -> bool: ...
-
-    def dbsize(self) -> int: ...
-
-    def info(self) -> Mapping[str, Any]: ...
-
-    def get(self, name: str) -> Optional[RedisValue]: ...
-
-    def setex(self, name: str, time: int, value: RedisValue) -> bool: ...
-
-    def delete(self, *names: str) -> int: ...
-
-    def close(self) -> None: ...
-
-
-class CollectionProtocol(Protocol):
-    """Minimal Chroma collection surface consumed by the manager."""
-
-    def count(self) -> int: ...
-
-    def delete(self, **kwargs: Any) -> Any: ...
-
-    def upsert(self, **kwargs: Any) -> Any: ...
-
-    def query(self, **kwargs: Any) -> Mapping[str, Any]: ...
-
-    def peek(self, **kwargs: Any) -> Any: ...
-
-
 from models.category_model import PromptCategory, slugify_category
 from models.prompt_model import (
     ExecutionStatus,
@@ -224,17 +82,13 @@ from models.prompt_model import (
     PromptVersion,
     UserProfile,
 )
-from models.prompt_note import PromptNote
-from models.response_style import ResponseStyle
+from models.prompt_note import PromptNote  # noqa: TCH001
+from models.response_style import ResponseStyle  # noqa: TCH001
 from prompt_templates import DEFAULT_PROMPT_TEMPLATES, PROMPT_TEMPLATE_KEYS
 
 from ..category_registry import CategoryRegistry
 from ..embedding import EmbeddingGenerationError, EmbeddingProvider, EmbeddingSyncWorker
-
-# Re‑export shared exception classes from centralised module to preserve the
-# original import path ``core.prompt_manager.PromptManagerError`` etc. during
-# the deprecation window.
-from ..exceptions import (  # noqa: F401 – re-export for backward compatibility
+from ..exceptions import (
     CategoryError,
     CategoryNotFoundError,
     CategoryStorageError,
@@ -288,6 +142,146 @@ from ..repository import (
     RepositoryNotFoundError,
 )
 from ..scenario_generation import LiteLLMScenarioGenerator, ScenarioGenerationError
+from .engineering import PromptEngineerFacade
+from .execution import ExecutionResult, PromptExecutor
+from .storage import PromptStorage
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from types import TracebackType
+
+    from chromadb.api import ClientAPI
+else:  # pragma: no cover - typing fallback
+    ClientAPI = Any  # type: ignore[assignment]
+    TracebackType = type(None)
+
+os.environ.setdefault("CHROMA_TELEMETRY_IMPLEMENTATION", "none")
+os.environ.setdefault("CHROMA_ANONYMIZED_TELEMETRY", "0")
+
+
+def _mute_posthog_capture() -> None:
+    try:
+        import posthog  # type: ignore
+    except Exception:
+        return
+
+    def _noop_capture(*_: Any, **__: Any) -> None:
+        return None
+
+    try:
+        posthog.capture = _noop_capture  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
+    try:
+        posthog.disabled = True  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
+
+_mute_posthog_capture()
+
+
+def _normalise_conversation(
+    messages: Sequence[Mapping[str, str]] | None,
+) -> list[dict[str, str]]:
+    """Return a sanitised copy of conversation messages for execution and logging."""
+
+    normalised: list[dict[str, str]] = []
+    if not messages:
+        return normalised
+    for index, message in enumerate(messages):
+        role = str(message.get("role", "")).strip()
+        if not role:
+            raise PromptExecutionError(f"Conversation entry {index} is missing a role.")
+        content = message.get("content")
+        if content is None:
+            raise PromptExecutionError(f"Conversation entry {index} is missing content.")
+        normalised.append({"role": role, "content": str(content)})
+    return normalised
+
+
+def _coerce_int(value: Any) -> int | None:
+    """Return an integer representation when conversion succeeds."""
+
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_timestamp(value: Any) -> datetime | None:
+    """Return a timezone-aware datetime when parsing succeeds."""
+
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
+    try:
+        parsed = datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed
+
+
+try:
+    from redis.exceptions import RedisError as _RedisErrorType
+except ImportError:  # pragma: no cover - redis optional during development
+    _RedisErrorType = Exception
+
+RedisError = _RedisErrorType
+
+
+# ---------------------------------------------------------------------------
+# Protocols for optional dependencies to keep type hints precise without
+# importing heavy runtime modules when they are absent in development.
+# ---------------------------------------------------------------------------
+RedisValue = str | bytes | memoryview
+
+
+class RedisConnectionPoolProtocol(Protocol):
+    """Subset of redis-py connection pool used for diagnostics."""
+
+    connection_kwargs: Mapping[str, Any]
+
+    def disconnect(self) -> None:
+        """Close all pooled connections."""
+
+
+class RedisClientProtocol(Protocol):
+    """Subset of redis-py client behaviour used within the manager."""
+
+    connection_pool: RedisConnectionPoolProtocol | None
+
+    def ping(self) -> bool: ...
+
+    def dbsize(self) -> int: ...
+
+    def info(self) -> Mapping[str, Any]: ...
+
+    def get(self, name: str) -> RedisValue | None: ...
+
+    def setex(self, name: str, time: int, value: RedisValue) -> bool: ...
+
+    def delete(self, *names: str) -> int: ...
+
+    def close(self) -> None: ...
+
+
+class CollectionProtocol(Protocol):
+    """Minimal Chroma collection surface consumed by the manager."""
+
+    def count(self) -> int: ...
+
+    def delete(self, **kwargs: Any) -> Any: ...
+
+    def upsert(self, **kwargs: Any) -> Any: ...
+
+    def query(self, **kwargs: Any) -> Mapping[str, Any]: ...
+
+    def peek(self, **kwargs: Any) -> Any: ...
+
 
 logger = logging.getLogger(__name__)
 
@@ -333,7 +327,7 @@ __all__ = [
 ]
 
 
-def _normalize_prompt_body(body: Optional[str]) -> str:
+def _normalize_prompt_body(body: str | None) -> str:
     """Return canonical prompt body text for change detection comparisons."""
 
     if body is None:
@@ -341,7 +335,7 @@ def _normalize_prompt_body(body: Optional[str]) -> str:
     return body.replace("\r\n", "\n")
 
 
-_CATEGORY_DEFAULT_MAP: Dict[IntentLabel, str] = {
+_CATEGORY_DEFAULT_MAP: dict[IntentLabel, str] = {
     IntentLabel.ANALYSIS: "Code Analysis",
     IntentLabel.DEBUG: "Reasoning / Debugging",
     IntentLabel.REFACTOR: "Refactoring",
@@ -366,8 +360,8 @@ _CATEGORY_INSIGHT_KEY = "category_insight"
 
 
 def _match_category_label(
-    candidate: Optional[str], categories: Sequence[PromptCategory]
-) -> Optional[str]:
+    candidate: str | None, categories: Sequence[PromptCategory]
+) -> str | None:
     """Return the stored category label that best matches *candidate*."""
 
     if not candidate:
@@ -391,32 +385,32 @@ class PromptManager:
     def __init__(
         self,
         chroma_path: str,
-        db_path: Union[str, Path, None] = None,
+        db_path: str | Path | None = None,
         collection_name: str = "prompt_manager",
         cache_ttl_seconds: int = 300,
-        redis_client: Optional[RedisClientProtocol] = None,
-        chroma_client: Optional[ClientAPI] = None,
-        embedding_function: Optional[Any] = None,
-        repository: Optional[PromptRepository] = None,
-        category_definitions: Optional[Sequence[PromptCategory]] = None,
-        embedding_provider: Optional[EmbeddingProvider] = None,
-        embedding_worker: Optional[EmbeddingSyncWorker] = None,
+        redis_client: RedisClientProtocol | None = None,
+        chroma_client: ClientAPI | None = None,
+        embedding_function: Any | None = None,
+        repository: PromptRepository | None = None,
+        category_definitions: Sequence[PromptCategory] | None = None,
+        embedding_provider: EmbeddingProvider | None = None,
+        embedding_worker: EmbeddingSyncWorker | None = None,
         enable_background_sync: bool = True,
-        name_generator: Optional[LiteLLMNameGenerator] = None,
-        description_generator: Optional[LiteLLMDescriptionGenerator] = None,
-        scenario_generator: Optional[LiteLLMScenarioGenerator] = None,
-        category_generator: Optional[LiteLLMCategoryGenerator] = None,
-        prompt_engineer: Optional[PromptEngineer] = None,
-        structure_prompt_engineer: Optional[PromptEngineer] = None,
-        fast_model: Optional[str] = None,
-        inference_model: Optional[str] = None,
-        workflow_models: Optional[Mapping[str, Optional[str]]] = None,
-        intent_classifier: Optional[IntentClassifier] = None,
-        notification_center: Optional[NotificationCenter] = None,
-        executor: Optional[CodexExecutor] = None,
-        user_profile: Optional[UserProfile] = None,
-        history_tracker: Optional[HistoryTracker] = None,
-        prompt_templates: Optional[Mapping[str, object]] = None,
+        name_generator: LiteLLMNameGenerator | None = None,
+        description_generator: LiteLLMDescriptionGenerator | None = None,
+        scenario_generator: LiteLLMScenarioGenerator | None = None,
+        category_generator: LiteLLMCategoryGenerator | None = None,
+        prompt_engineer: PromptEngineer | None = None,
+        structure_prompt_engineer: PromptEngineer | None = None,
+        fast_model: str | None = None,
+        inference_model: str | None = None,
+        workflow_models: Mapping[str, str | None] | None = None,
+        intent_classifier: IntentClassifier | None = None,
+        notification_center: NotificationCenter | None = None,
+        executor: CodexExecutor | None = None,
+        user_profile: UserProfile | None = None,
+        history_tracker: HistoryTracker | None = None,
+        prompt_templates: Mapping[str, object] | None = None,
     ) -> None:
         """Initialise the manager with data backends.
 
@@ -428,8 +422,8 @@ class PromptManager:
             redis_client: Optional Redis client instance for caching.
             chroma_client: Optional preconfigured Chroma client.
             embedding_function: Optional embedding function for Chroma.
-            repository: Optional preconfigured repository instance (e.g. for testing).
-            category_definitions: Optional sequence of PromptCategory defaults to seed into the repository.
+            repository: Optional preconfigured repository instance (for example, in tests).
+            category_definitions: Optional PromptCategory defaults for seeding the repository.
             fast_model: LiteLLM fast-tier model identifier configured for workflows.
             inference_model: LiteLLM inference-tier model identifier configured for workflows.
             workflow_models: Mapping of workflow identifiers to routing tiers.
@@ -447,9 +441,9 @@ class PromptManager:
 
         self._closed = False
         self._cache_ttl_seconds = cache_ttl_seconds
-        self._redis_client: Optional[RedisClientProtocol] = redis_client
+        self._redis_client: RedisClientProtocol | None = redis_client
         self._chroma_client: Any
-        self._collection: Optional[CollectionProtocol] = None
+        self._collection: CollectionProtocol | None = None
         resolved_db_path = Path(db_path).expanduser() if db_path is not None else None
         resolved_chroma_path = Path(chroma_path).expanduser()
         self._db_path = resolved_db_path
@@ -504,15 +498,15 @@ class PromptManager:
         self._category_generator = category_generator
         self._prompt_engineer = prompt_engineer
         self._prompt_structure_engineer = structure_prompt_engineer or prompt_engineer
-        self._litellm_fast_model: Optional[str] = self._normalise_model_identifier(fast_model)
+        self._litellm_fast_model: str | None = self._normalise_model_identifier(fast_model)
         if self._litellm_fast_model is None and getattr(name_generator, "model", None):
             self._litellm_fast_model = self._normalise_model_identifier(
-                getattr(name_generator, "model")
+                name_generator.model
             )
-        self._litellm_inference_model: Optional[str] = self._normalise_model_identifier(
+        self._litellm_inference_model: str | None = self._normalise_model_identifier(
             inference_model
         )
-        self._litellm_workflow_models: Dict[str, str] = {}
+        self._litellm_workflow_models: dict[str, str] = {}
         if workflow_models:
             for key, value in workflow_models.items():
                 key_str = str(key).strip()
@@ -524,8 +518,8 @@ class PromptManager:
                 if choice == "inference":
                     self._litellm_workflow_models[key_str] = "inference"
         self._litellm_stream: bool = False
-        self._litellm_drop_params: Optional[Sequence[str]] = None
-        self._litellm_reasoning_effort: Optional[str] = None
+        self._litellm_drop_params: Sequence[str] | None = None
+        self._litellm_reasoning_effort: str | None = None
         for candidate in (
             name_generator,
             scenario_generator,
@@ -534,7 +528,7 @@ class PromptManager:
             category_generator,
         ):
             if candidate is not None and getattr(candidate, "drop_params", None):
-                raw_params = cast("Sequence[str]", getattr(candidate, "drop_params"))
+                raw_params = cast("Sequence[str]", candidate.drop_params)
                 self._litellm_drop_params = tuple(str(param) for param in raw_params)
                 break
         for candidate in (
@@ -549,7 +543,7 @@ class PromptManager:
                 if self._litellm_stream:
                     break
         if executor is not None and getattr(executor, "reasoning_effort", None):
-            effort = getattr(executor, "reasoning_effort")
+            effort = executor.reasoning_effort
             self._litellm_reasoning_effort = str(effort) if effort else None
         self._intent_classifier = intent_classifier or IntentClassifier()
         self._executor = executor
@@ -561,17 +555,17 @@ class PromptManager:
             self._executor.stream = self._litellm_stream
         self._history_tracker = history_tracker
         if user_profile is not None:
-            self._user_profile: Optional[UserProfile] = user_profile
+            self._user_profile: UserProfile | None = user_profile
         else:
             try:
                 self._user_profile = self._repository.get_user_profile()
             except RepositoryError:
                 logger.warning("Unable to load persisted user profile", exc_info=True)
                 self._user_profile = None
-        self._prompt_templates: Dict[str, str] = self._normalise_prompt_templates(prompt_templates)
+        self._prompt_templates: dict[str, str] = self._normalise_prompt_templates(prompt_templates)
 
     @staticmethod
-    def _normalise_model_identifier(value: Optional[str]) -> Optional[str]:
+    def _normalise_model_identifier(value: str | None) -> str | None:
         """Return a stripped model identifier when provided."""
 
         if value is None:
@@ -649,7 +643,7 @@ class PromptManager:
         """Intent-aware search recommendations returned to callers."""
 
         prediction: IntentPrediction
-        prompts: List[Prompt]
+        prompts: list[Prompt]
         fallback_used: bool = False
 
     @dataclass(slots=True)
@@ -657,8 +651,8 @@ class PromptManager:
         """Aggregate data returned after executing a prompt."""
 
         result: CodexExecutionResult
-        history_entry: Optional[PromptExecution]
-        conversation: List[Dict[str, str]]
+        history_entry: PromptExecution | None
+        conversation: list[dict[str, str]]
 
     @dataclass(slots=True)
     class BenchmarkRun:
@@ -667,17 +661,17 @@ class PromptManager:
         prompt_id: uuid.UUID
         prompt_name: str
         model: str
-        duration_ms: Optional[int]
+        duration_ms: int | None
         usage: Mapping[str, Any]
         response_preview: str
-        error: Optional[str]
-        history: Optional[PromptExecutionAnalytics]
+        error: str | None
+        history: PromptExecutionAnalytics | None
 
     @dataclass(slots=True)
     class BenchmarkReport:
         """Structured response returned by benchmark_prompts."""
 
-        runs: List["PromptManager.BenchmarkRun"]
+        runs: list[PromptManager.BenchmarkRun]
 
     @dataclass(slots=True)
     class EmbeddingDimensionMismatch:
@@ -700,16 +694,16 @@ class PromptManager:
 
         backend_ok: bool
         backend_message: str
-        backend_dimension: Optional[int]
-        inferred_dimension: Optional[int]
+        backend_dimension: int | None
+        inferred_dimension: int | None
         chroma_ok: bool
         chroma_message: str
-        chroma_count: Optional[int]
+        chroma_count: int | None
         repository_total: int
         prompts_with_embeddings: int
-        missing_prompts: List["PromptManager.MissingEmbedding"]
-        mismatched_prompts: List["PromptManager.EmbeddingDimensionMismatch"]
-        consistent_counts: Optional[bool]
+        missing_prompts: list[PromptManager.MissingEmbedding]
+        mismatched_prompts: list[PromptManager.EmbeddingDimensionMismatch]
+        consistent_counts: bool | None
 
     @dataclass(slots=True)
     class CategoryHealth:
@@ -719,8 +713,8 @@ class PromptManager:
         label: str
         total_prompts: int
         active_prompts: int
-        success_rate: Optional[float]
-        last_executed_at: Optional[datetime]
+        success_rate: float | None
+        last_executed_at: datetime | None
 
     @dataclass(slots=True)
     class PromptVersionDiff:
@@ -729,7 +723,7 @@ class PromptManager:
         prompt_id: uuid.UUID
         base_version: PromptVersion
         target_version: PromptVersion
-        changed_fields: Dict[str, Dict[str, Any]]
+        changed_fields: dict[str, dict[str, Any]]
         body_diff: str
 
     @property
@@ -746,7 +740,7 @@ class PromptManager:
         return self._repository
 
     @property
-    def db_path(self) -> Optional[Path]:
+    def db_path(self) -> Path | None:
         """Return the configured SQLite database path."""
 
         return self._db_path
@@ -764,29 +758,29 @@ class PromptManager:
         return self._logs_path
 
     @property
-    def intent_classifier(self) -> Optional[IntentClassifier]:
+    def intent_classifier(self) -> IntentClassifier | None:
         """Expose the configured intent classifier for tooling hooks."""
 
         return self._intent_classifier
 
     @property
-    def executor(self) -> Optional[CodexExecutor]:
+    def executor(self) -> CodexExecutor | None:
         """Return the configured prompt executor."""
 
         return self._executor
 
-    def set_executor(self, executor: Optional[CodexExecutor]) -> None:
+    def set_executor(self, executor: CodexExecutor | None) -> None:
         """Assign or replace the Codex executor at runtime."""
 
         self._executor = executor
 
     @property
-    def history_tracker(self) -> Optional[HistoryTracker]:
+    def history_tracker(self) -> HistoryTracker | None:
         """Expose the execution history tracker if configured."""
 
         return self._history_tracker
 
-    def set_history_tracker(self, tracker: Optional[HistoryTracker]) -> None:
+    def set_history_tracker(self, tracker: HistoryTracker | None) -> None:
         """Assign or replace the history tracker at runtime."""
 
         self._history_tracker = tracker
@@ -798,27 +792,27 @@ class PromptManager:
         return self._notification_center
 
     @property
-    def user_profile(self) -> Optional[UserProfile]:
+    def user_profile(self) -> UserProfile | None:
         """Return the stored single-user profile when available."""
 
         return self._user_profile
 
     @property
-    def prompt_engineer(self) -> Optional[PromptEngineer]:
+    def prompt_engineer(self) -> PromptEngineer | None:
         """Return the configured prompt engineering helper, if any."""
 
         return self._prompt_engineer
 
     @property
-    def prompt_structure_engineer(self) -> Optional[PromptEngineer]:
+    def prompt_structure_engineer(self) -> PromptEngineer | None:
         """Return the configured structure-only prompt engineering helper."""
 
         return self._prompt_structure_engineer or self._prompt_engineer
 
-    def get_redis_details(self) -> Dict[str, Any]:
+    def get_redis_details(self) -> dict[str, Any]:
         """Return connection and usage details for the configured Redis cache."""
 
-        details: Dict[str, Any] = {"enabled": self._redis_client is not None}
+        details: dict[str, Any] = {"enabled": self._redis_client is not None}
         client = self._redis_client
         if client is None:
             return details
@@ -829,10 +823,16 @@ class PromptManager:
             return details
         details["status"] = "online" if ping_ok else "offline"
 
-        connection: Dict[str, Any] = {}
-        pool = cast("Optional[RedisConnectionPoolProtocol]", getattr(client, "connection_pool", None))
+        connection: dict[str, Any] = {}
+        pool = cast(
+            "RedisConnectionPoolProtocol | None",
+            getattr(client, "connection_pool", None),
+        )
         if pool is not None:
-            kwargs = cast("Mapping[str, Any]", getattr(pool, "connection_kwargs", {}) or {})
+            kwargs = cast(
+                "Mapping[str, Any]",
+                getattr(pool, "connection_kwargs", {}) or {},
+            )
             host = kwargs.get("host") or kwargs.get("unix_socket_path")
             if host:
                 connection["host"] = host
@@ -847,9 +847,9 @@ class PromptManager:
         if connection:
             details["connection"] = connection
 
-        stats: Dict[str, Any] = {}
-        hits: Optional[int] = None
-        misses: Optional[int] = None
+        stats: dict[str, Any] = {}
+        hits: int | None = None
+        misses: int | None = None
 
         try:
             dbsize = client.dbsize()
@@ -858,7 +858,7 @@ class PromptManager:
         if dbsize is not None:
             stats["keys"] = int(dbsize)
 
-        info_data: Optional[Mapping[str, Any]] = None
+        info_data: Mapping[str, Any] | None = None
         try:
             info_data = client.info()
         except RedisError as exc:
@@ -887,10 +887,10 @@ class PromptManager:
             details["stats"] = stats
         return details
 
-    def get_chroma_details(self) -> Dict[str, Any]:
+    def get_chroma_details(self) -> dict[str, Any]:
         """Return filesystem and collection metrics for the configured Chroma store."""
 
-        details: Dict[str, Any] = {"enabled": self._collection is not None}
+        details: dict[str, Any] = {"enabled": self._collection is not None}
         details["path"] = self._chroma_path
         details["collection"] = self._collection_name
         collection = self._collection
@@ -945,7 +945,7 @@ class PromptManager:
             raise PromptStorageError("Unable to reset Chroma vector store") from exc
         logger.info("Chroma vector store reset completed.")
 
-    def rebuild_embeddings(self, *, reset_store: bool = False) -> Tuple[int, int]:
+    def rebuild_embeddings(self, *, reset_store: bool = False) -> tuple[int, int]:
         """Regenerate embeddings for all prompts and persist them to Chroma.
 
         Args:
@@ -1050,7 +1050,7 @@ class PromptManager:
         if not db_path.exists():
             raise PromptStorageError(f"Chroma persistence database missing at {db_path}.")
 
-        diagnostics: List[str] = []
+        diagnostics: list[str] = []
         self._persist_chroma_client()
         try:
             with sqlite3.connect(str(db_path), timeout=60.0) as connection:
@@ -1130,7 +1130,7 @@ class PromptManager:
         """Run integrity checks against the SQLite prompt repository."""
 
         db_path = self._resolve_repository_path()
-        diagnostics: List[str] = []
+        diagnostics: list[str] = []
         try:
             with sqlite3.connect(str(db_path), timeout=60.0) as connection:
                 integrity_rows = connection.execute("PRAGMA integrity_check;").fetchall()
@@ -1163,14 +1163,14 @@ class PromptManager:
         )
         return summary
 
-    def create_data_snapshot(self, destination: Union[str, Path]) -> Path:
+    def create_data_snapshot(self, destination: str | Path) -> Path:
         """Zip the SQLite repository, Chroma store, and a manifest for backups."""
 
         db_path = self._resolve_repository_path()
         chroma_path = Path(self._chroma_path).expanduser()
         self._persist_chroma_client()
 
-        timestamp_label = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        timestamp_label = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
         target = Path(destination).expanduser()
         if target.exists() and target.is_dir():
             target.mkdir(parents=True, exist_ok=True)
@@ -1196,7 +1196,7 @@ class PromptManager:
         logger.info("Snapshot archive created at %s", archive_path)
         return archive_path
 
-    def clear_usage_logs(self, logs_path: Optional[Union[str, Path]] = None) -> None:
+    def clear_usage_logs(self, logs_path: str | Path | None = None) -> None:
         """Remove persisted usage analytics logs while keeping settings intact."""
 
         path = Path(logs_path) if logs_path is not None else self._logs_path
@@ -1232,23 +1232,23 @@ class PromptManager:
         except RepositoryError as exc:
             raise PromptStorageError("Unable to compute prompt catalogue statistics") from exc
 
-    def _build_snapshot_manifest(self, db_path: Path, chroma_path: Path) -> Dict[str, Any]:
+    def _build_snapshot_manifest(self, db_path: Path, chroma_path: Path) -> dict[str, Any]:
         sqlite_stat = db_path.stat()
-        sqlite_info: Dict[str, Any] = {
+        sqlite_info: dict[str, Any] = {
             "path": str(db_path),
             "size_bytes": sqlite_stat.st_size,
-            "modified_at": datetime.fromtimestamp(sqlite_stat.st_mtime, timezone.utc).isoformat(),
+            "modified_at": datetime.fromtimestamp(sqlite_stat.st_mtime, UTC).isoformat(),
             "sha256": self._hash_file(db_path),
         }
 
-        chroma_info: Dict[str, Any] = {
+        chroma_info: dict[str, Any] = {
             "path": str(chroma_path),
             "exists": chroma_path.exists(),
         }
         if chroma_path.exists():
             size_bytes = 0
             file_count = 0
-            latest_mtime: Optional[float] = None
+            latest_mtime: float | None = None
             for entry in chroma_path.rglob("*"):
                 if entry.is_symlink():
                     continue
@@ -1259,14 +1259,21 @@ class PromptManager:
                 if entry.is_file():
                     size_bytes += stat.st_size
                     file_count += 1
-                    latest_mtime = stat.st_mtime if latest_mtime is None else max(latest_mtime, stat.st_mtime)
+                    latest_mtime = (
+                        stat.st_mtime
+                        if latest_mtime is None
+                        else max(latest_mtime, stat.st_mtime)
+                    )
             chroma_info["size_bytes"] = size_bytes
             chroma_info["files"] = file_count
             if latest_mtime is not None:
-                chroma_info["modified_at"] = datetime.fromtimestamp(latest_mtime, timezone.utc).isoformat()
+                chroma_info["modified_at"] = datetime.fromtimestamp(
+                    latest_mtime,
+                    UTC,
+                ).isoformat()
 
-        manifest: Dict[str, Any] = {
-            "created_at": datetime.now(timezone.utc).isoformat(),
+        manifest: dict[str, Any] = {
+            "created_at": datetime.now(UTC).isoformat(),
             "version": self._package_version(),
             "sqlite": sqlite_info,
             "chroma": chroma_info,
@@ -1293,7 +1300,7 @@ class PromptManager:
                 digest.update(chunk)
         return digest.hexdigest()
 
-    def _serialise_catalogue_stats(self) -> Optional[Dict[str, Any]]:
+    def _serialise_catalogue_stats(self) -> dict[str, Any] | None:
         try:
             stats = self.get_prompt_catalogue_stats()
         except PromptManagerError:
@@ -1305,13 +1312,13 @@ class PromptManager:
         return payload
 
     @staticmethod
-    def _package_version() -> Optional[str]:
+    def _package_version() -> str | None:
         try:
             return importlib_metadata.version("prompt-manager")
         except importlib_metadata.PackageNotFoundError:
             return None
 
-    def get_category_health(self) -> List["PromptManager.CategoryHealth"]:
+    def get_category_health(self) -> list[PromptManager.CategoryHealth]:
         """Return prompt and execution health metrics for each category."""
 
         try:
@@ -1321,20 +1328,29 @@ class PromptManager:
             raise PromptStorageError("Unable to compute category health metrics") from exc
 
         categories = {
-            category.slug: category for category in self._category_registry.all(include_archived=True)
+            category.slug: category
+            for category in self._category_registry.all(include_archived=True)
         }
-        slug_keys = set(prompt_counts.keys()) | set(execution_stats.keys()) | set(categories.keys())
+        slug_keys = (
+            set(prompt_counts.keys())
+            | set(execution_stats.keys())
+            | set(categories.keys())
+        )
         if not slug_keys:
             slug_keys.add("")
 
-        results: List[PromptManager.CategoryHealth] = []
+        results: list[PromptManager.CategoryHealth] = []
         for slug in sorted(slug_keys or {""}):
             category = categories.get(slug)
-            label = category.label if category else ((slug.replace("-", " ").title()) if slug else "Uncategorised")
+            label = (
+                category.label
+                if category
+                else (slug.replace("-", " ").title() if slug else "Uncategorised")
+            )
             counts = prompt_counts.get(slug, {"total_prompts": 0, "active_prompts": 0})
             stats = execution_stats.get(slug)
-            success_rate: Optional[float] = None
-            last_executed_at: Optional[datetime] = None
+            success_rate: float | None = None
+            last_executed_at: datetime | None = None
             if stats:
                 total_runs = int(stats.get("total_runs", 0) or 0)
                 success_runs = int(stats.get("success_runs", 0) or 0)
@@ -1353,7 +1369,7 @@ class PromptManager:
 
         return results
 
-    def refresh_user_profile(self) -> Optional[UserProfile]:
+    def refresh_user_profile(self) -> UserProfile | None:
         """Reload the persisted profile from the repository."""
 
         try:
@@ -1390,7 +1406,7 @@ class PromptManager:
         context: str,
         *,
         allow_fallback: bool = True,
-        prompt: Optional[Prompt] = None,
+        prompt: Prompt | None = None,
     ) -> str:
         """Return a prompt description using LiteLLM with an optional deterministic fallback."""
 
@@ -1429,7 +1445,7 @@ class PromptManager:
                 raise DescriptionGenerationError(str(exc)) from exc
         return summary
 
-    def generate_prompt_scenarios(self, context: str, *, max_scenarios: int = 3) -> List[str]:
+    def generate_prompt_scenarios(self, context: str, *, max_scenarios: int = 3) -> list[str]:
         """Return usage scenarios for a prompt via the configured LiteLLM helper."""
 
         if self._scenario_generator is None:
@@ -1475,7 +1491,7 @@ class PromptManager:
             )
         scenarios = self.generate_prompt_scenarios(context_source, max_scenarios=max_scenarios)
         prompt.scenarios = list(scenarios)
-        ext5_payload: Optional[MutableMapping[str, Any]]
+        ext5_payload: MutableMapping[str, Any] | None
         if isinstance(prompt.ext5, MutableMapping):
             ext5_payload = prompt.ext5
         elif isinstance(prompt.ext5, Mapping):
@@ -1491,7 +1507,7 @@ class PromptManager:
             if not ext5_payload:
                 ext5_payload = None
         prompt.ext5 = ext5_payload
-        prompt.last_modified = datetime.now(timezone.utc)
+        prompt.last_modified = datetime.now(UTC)
         try:
             return self.update_prompt(prompt)
         except PromptManagerError as exc:
@@ -1501,7 +1517,7 @@ class PromptManager:
         self,
         *,
         sample_text: str = "Prompt Manager diagnostics probe",
-    ) -> "PromptManager.EmbeddingDiagnostics":
+    ) -> PromptManager.EmbeddingDiagnostics:
         """Return embedding backend health and stored vector consistency details."""
 
         provider = getattr(self, "_embedding_provider", None)
@@ -1510,7 +1526,7 @@ class PromptManager:
 
         backend_ok = True
         backend_message = "Embedding backend reachable."
-        backend_dimension: Optional[int] = None
+        backend_dimension: int | None = None
         try:
             probe_vector = provider.embed(sample_text)
             backend_dimension = len(probe_vector)
@@ -1526,7 +1542,7 @@ class PromptManager:
 
         chroma_ok = False
         chroma_message = "Chroma collection unavailable."
-        chroma_count: Optional[int] = None
+        chroma_count: int | None = None
         try:
             collection = self.collection
         except PromptManagerError as exc:
@@ -1544,10 +1560,10 @@ class PromptManager:
         except RepositoryError as exc:
             raise PromptStorageError("Unable to load prompts for embedding diagnostics") from exc
 
-        missing_prompts: List[PromptManager.MissingEmbedding] = []
-        mismatched: List[PromptManager.EmbeddingDimensionMismatch] = []
+        missing_prompts: list[PromptManager.MissingEmbedding] = []
+        mismatched: list[PromptManager.EmbeddingDimensionMismatch] = []
         prompts_with_embeddings = 0
-        inferred_dimension: Optional[int] = None
+        inferred_dimension: int | None = None
         reference_dimension = backend_dimension if backend_dimension else None
 
         for prompt in prompts:
@@ -1583,7 +1599,7 @@ class PromptManager:
                     )
                 )
 
-        consistent_counts: Optional[bool] = None
+        consistent_counts: bool | None = None
         if chroma_count is not None:
             consistent_counts = chroma_count == prompts_with_embeddings
 
@@ -1690,7 +1706,7 @@ class PromptManager:
         self,
         prompt: Prompt,
         *,
-        previous_prompt: Optional[Prompt],
+        previous_prompt: Prompt | None,
     ) -> None:
         """Capture LiteLLM-backed category drift metadata on the prompt."""
 
@@ -1729,13 +1745,16 @@ class PromptManager:
             self._set_category_insight_metadata(prompt, None)
             return
 
-        suggestion_label = _match_category_label(suggestion_raw, categories) or (suggestion_raw or "").strip()
+        suggestion_label = (
+            _match_category_label(suggestion_raw, categories)
+            or (suggestion_raw or "").strip()
+        )
         if not suggestion_label:
             self._set_category_insight_metadata(prompt, None)
             return
 
         current_label = (prompt.category or "").strip()
-        timestamp = datetime.now(timezone.utc).isoformat()
+        timestamp = datetime.now(UTC).isoformat()
         labels_match = current_label and suggestion_label.lower() == current_label.lower()
 
         previous_insight = self._extract_category_insight(previous_prompt)
@@ -1754,7 +1773,7 @@ class PromptManager:
                 self._set_category_insight_metadata(prompt, None)
             return
 
-        insight: Dict[str, Any] = {
+        insight: dict[str, Any] = {
             "status": "suggested",
             "suggested_label": suggestion_label,
             "suggestion_raw": suggestion_raw,
@@ -1776,7 +1795,7 @@ class PromptManager:
         return ""
 
     @staticmethod
-    def _extract_category_insight(prompt: Optional[Prompt]) -> Optional[Dict[str, Any]]:
+    def _extract_category_insight(prompt: Prompt | None) -> dict[str, Any] | None:
         """Return the stored category insight mapping, if present."""
 
         if prompt is None:
@@ -1791,13 +1810,13 @@ class PromptManager:
 
     def _build_category_adoption_insight(
         self,
-        previous_prompt: Optional[Prompt],
-        previous_insight: Optional[Mapping[str, Any]],
+        previous_prompt: Prompt | None,
+        previous_insight: Mapping[str, Any] | None,
         suggestion_label: str,
         suggestion_raw: str,
         current_label: str,
         timestamp: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Return metadata describing an accepted LiteLLM category suggestion."""
 
         if previous_prompt is None or previous_insight is None:
@@ -1823,12 +1842,12 @@ class PromptManager:
     @staticmethod
     def _set_category_insight_metadata(
         prompt: Prompt,
-        insight: Optional[Mapping[str, Any]],
+        insight: Mapping[str, Any] | None,
     ) -> None:
         """Persist or clear category insight metadata on the prompt record."""
 
         if isinstance(prompt.ext2, MutableMapping):
-            metadata: Dict[str, Any] = dict(prompt.ext2)
+            metadata: dict[str, Any] = dict(prompt.ext2)
         elif isinstance(prompt.ext2, Mapping):
             metadata = dict(prompt.ext2)
         else:
@@ -1842,10 +1861,10 @@ class PromptManager:
         metadata[_CATEGORY_INSIGHT_KEY] = dict(insight)
         prompt.ext2 = metadata
 
-    def _build_description_fallback(self, context: str, prompt: Optional[Prompt]) -> str:
+    def _build_description_fallback(self, context: str, prompt: Prompt | None) -> str:
         """Return a deterministic summary derived from prompt metadata and context."""
 
-        segments: List[str] = []
+        segments: list[str] = []
         if prompt is not None:
             name = (prompt.name or "").strip()
             category = (prompt.category or "").strip() or "General"
@@ -1876,12 +1895,12 @@ class PromptManager:
         prompt: Prompt,
         *,
         stream_enabled: bool,
-        executor_model: Optional[str],
+        executor_model: str | None,
         conversation_length: int,
         request_text: str,
         response_text: str,
-        response_style: Optional[Mapping[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        response_style: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Return structured metadata describing the execution context."""
 
         prompt_metadata = {
@@ -1898,7 +1917,7 @@ class PromptManager:
             "request_chars": len(request_text or ""),
             "response_chars": len(response_text or ""),
         }
-        context: Dict[str, Any] = {
+        context: dict[str, Any] = {
             "prompt": prompt_metadata,
             "execution": execution_metadata,
         }
@@ -1910,11 +1929,11 @@ class PromptManager:
         self,
         prompt_text: str,
         *,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        category: Optional[str] = None,
-        tags: Optional[Sequence[str]] = None,
-        negative_constraints: Optional[Sequence[str]] = None,
+        name: str | None = None,
+        description: str | None = None,
+        category: str | None = None,
+        tags: Sequence[str] | None = None,
+        negative_constraints: Sequence[str] | None = None,
     ) -> PromptRefinement:
         """Improve a prompt using the configured prompt engineer."""
 
@@ -1923,7 +1942,8 @@ class PromptManager:
         engineer = self._prompt_structure_engineer or self._prompt_engineer
         if engineer is None:
             raise PromptEngineeringUnavailable(
-                "Prompt engineering is not configured. Set PROMPT_MANAGER_LITELLM_MODEL to enable refinement."
+                "Prompt engineering is not configured. Set PROMPT_MANAGER_LITELLM_MODEL "
+                "to enable refinement."
             )
         task_id = f"prompt-refine:{uuid.uuid4()}"
         metadata = {
@@ -1958,10 +1978,10 @@ class PromptManager:
         self,
         prompt_text: str,
         *,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        category: Optional[str] = None,
-        tags: Optional[Sequence[str]] = None,
+        name: str | None = None,
+        description: str | None = None,
+        category: str | None = None,
+        tags: Sequence[str] | None = None,
     ) -> PromptRefinement:
         """Reformat a prompt to improve structure without changing intent."""
 
@@ -1970,7 +1990,8 @@ class PromptManager:
         engineer = self._prompt_structure_engineer or self._prompt_engineer
         if engineer is None:
             raise PromptEngineeringUnavailable(
-                "Prompt engineering is not configured. Set PROMPT_MANAGER_LITELLM_MODEL to enable refinement."
+                "Prompt engineering is not configured. Set PROMPT_MANAGER_LITELLM_MODEL "
+                "to enable refinement."
             )
         task_id = f"prompt-structure-refine:{uuid.uuid4()}"
         metadata = {
@@ -2004,10 +2025,10 @@ class PromptManager:
         prompt_id: uuid.UUID,
         request_text: str,
         *,
-        conversation: Optional[Sequence[Mapping[str, str]]] = None,
-        stream: Optional[bool] = None,
-        on_stream: Optional[Callable[[str], None]] = None,
-    ) -> "PromptManager.ExecutionOutcome":
+        conversation: Sequence[Mapping[str, str]] | None = None,
+        stream: bool | None = None,
+        on_stream: Callable[[str], None] | None = None,
+    ) -> PromptManager.ExecutionOutcome:
         """Execute a prompt via LiteLLM and persist the outcome when configured."""
 
         if not request_text.strip():
@@ -2104,11 +2125,11 @@ class PromptManager:
         prompt_ids: Sequence[uuid.UUID],
         request_text: str,
         *,
-        models: Optional[Sequence[str]] = None,
+        models: Sequence[str] | None = None,
         persist_history: bool = False,
-        history_window_days: Optional[int] = 30,
+        history_window_days: int | None = 30,
         trend_window: int = 5,
-    ) -> "PromptManager.BenchmarkReport":
+    ) -> PromptManager.BenchmarkReport:
         """Execute prompts across one or more models and return benchmark data."""
 
         if not prompt_ids:
@@ -2171,11 +2192,12 @@ class PromptManager:
             if base_model and base_model == model_name:
                 return cast("CodexExecutor", base_executor)
             raise PromptExecutionUnavailable(
-                "Configured executor does not support switching models; specify the configured model only."
+                "Configured executor does not support switching models; specify the configured "
+                "model only."
             )
 
         tracker = self._history_tracker
-        prompt_analytics: Dict[uuid.UUID, Optional[PromptExecutionAnalytics]] = {}
+        prompt_analytics: dict[uuid.UUID, PromptExecutionAnalytics | None] = {}
         if tracker is not None:
             for prompt in prompts:
                 try:
@@ -2278,11 +2300,11 @@ class PromptManager:
         request_text: str,
         response_text: str,
         *,
-        duration_ms: Optional[int] = None,
-        usage: Optional[Mapping[str, Any]] = None,
-        metadata: Optional[Mapping[str, Any]] = None,
-        rating: Optional[float] = None,
-        context_metadata: Optional[Mapping[str, Any]] = None,
+        duration_ms: int | None = None,
+        usage: Mapping[str, Any] | None = None,
+        metadata: Mapping[str, Any] | None = None,
+        rating: float | None = None,
+        context_metadata: Mapping[str, Any] | None = None,
     ) -> PromptExecution:
         """Persist a manual prompt execution entry (e.g., from GUI Save Result)."""
 
@@ -2291,7 +2313,7 @@ class PromptManager:
             raise PromptExecutionUnavailable(
                 "Execution history is not configured; cannot save results manually."
             )
-        payload_metadata: Dict[str, Any] = {"manual": True}
+        payload_metadata: dict[str, Any] = {"manual": True}
         if metadata:
             payload_metadata.update(dict(metadata))
         if usage:
@@ -2315,7 +2337,7 @@ class PromptManager:
         return execution
 
     def update_execution_note(
-        self, execution_id: uuid.UUID, note: Optional[str]
+        self, execution_id: uuid.UUID, note: str | None
     ) -> PromptExecution:
         """Update the note metadata for a history entry."""
 
@@ -2329,7 +2351,7 @@ class PromptManager:
         except HistoryTrackerError as exc:
             raise PromptHistoryError(str(exc)) from exc
 
-    def list_recent_executions(self, *, limit: int = 20) -> List[PromptExecution]:
+    def list_recent_executions(self, *, limit: int = 20) -> list[PromptExecution]:
         """Return recently logged executions if history tracking is enabled."""
 
         tracker = self._history_tracker
@@ -2346,7 +2368,7 @@ class PromptManager:
         prompt_id: uuid.UUID,
         *,
         limit: int = 20,
-    ) -> List[PromptExecution]:
+    ) -> list[PromptExecution]:
         """Return execution history for a specific prompt."""
 
         tracker = self._history_tracker
@@ -2365,17 +2387,17 @@ class PromptManager:
     def query_executions(
         self,
         *,
-        status: Optional[Union[ExecutionStatus, str]] = None,
-        prompt_id: Optional[uuid.UUID] = None,
-        search: Optional[str] = None,
-        limit: Optional[int] = None,
-    ) -> List[PromptExecution]:
+        status: ExecutionStatus | str | None = None,
+        prompt_id: uuid.UUID | None = None,
+        search: str | None = None,
+        limit: int | None = None,
+    ) -> list[PromptExecution]:
         """Return executions filtered by status, prompt, and search term."""
 
         tracker = self._history_tracker
         if tracker is None:
             return []
-        status_filter: Optional[ExecutionStatus] = None
+        status_filter: ExecutionStatus | None = None
         if isinstance(status, ExecutionStatus):
             status_filter = status
         elif isinstance(status, str):
@@ -2397,10 +2419,10 @@ class PromptManager:
     def get_execution_analytics(
         self,
         *,
-        window_days: Optional[int] = 30,
+        window_days: int | None = 30,
         prompt_limit: int = 5,
         trend_window: int = 5,
-    ) -> Optional[ExecutionAnalytics]:
+    ) -> ExecutionAnalytics | None:
         """Return aggregated execution analytics for downstream consumers."""
 
         tracker = self._history_tracker
@@ -2417,23 +2439,23 @@ class PromptManager:
 
     def set_name_generator(
         self,
-        model: Optional[str],
-        api_key: Optional[str],
-        api_base: Optional[str],
-        api_version: Optional[str],
+        model: str | None,
+        api_key: str | None,
+        api_base: str | None,
+        api_version: str | None,
         *,
-        inference_model: Optional[str] = None,
-        workflow_models: Optional[Mapping[str, Optional[str]]] = None,
-        drop_params: Optional[Sequence[str]] = None,
-        reasoning_effort: Optional[str] = None,
-        stream: Optional[bool] = None,
-        prompt_templates: Optional[Mapping[str, object]] = None,
+        inference_model: str | None = None,
+        workflow_models: Mapping[str, str | None] | None = None,
+        drop_params: Sequence[str] | None = None,
+        reasoning_effort: str | None = None,
+        stream: bool | None = None,
+        prompt_templates: Mapping[str, object] | None = None,
     ) -> None:
         """Configure LiteLLM-backed workflows at runtime."""
 
         self._litellm_fast_model = self._normalise_model_identifier(model)
         self._litellm_inference_model = self._normalise_model_identifier(inference_model)
-        routing: Dict[str, str] = {}
+        routing: dict[str, str] = {}
         if workflow_models:
             for key, value in workflow_models.items():
                 workflow_key = str(key).strip()
@@ -2475,13 +2497,13 @@ class PromptManager:
 
         drop_params_payload = list(self._litellm_drop_params) if self._litellm_drop_params else None
 
-        def _select_model(workflow: str) -> Optional[str]:
+        def _select_model(workflow: str) -> str | None:
             selection = self._litellm_workflow_models.get(workflow, "fast")
             if selection == "inference":
                 return self._litellm_inference_model or self._litellm_fast_model
             return self._litellm_fast_model or self._litellm_inference_model
 
-        def _construct(factory: Callable[..., Any], workflow: str, **extra: Any) -> Optional[Any]:
+        def _construct(factory: Callable[..., Any], workflow: str, **extra: Any) -> Any | None:
             selected_model = _select_model(workflow)
             if not selected_model:
                 return None
@@ -2549,12 +2571,12 @@ class PromptManager:
             logger.debug("LiteLLM powered features enabled for intent classifier")
 
     @staticmethod
-    def _normalise_prompt_templates(overrides: Optional[Mapping[str, object]]) -> Dict[str, str]:
+    def _normalise_prompt_templates(overrides: Mapping[str, object] | None) -> dict[str, str]:
         """Return a cleaned mapping of workflow prompt overrides."""
 
         if not overrides:
             return {}
-        cleaned: Dict[str, str] = {}
+        cleaned: dict[str, str] = {}
         for key, text in overrides.items():
             if key not in PROMPT_TEMPLATE_KEYS:
                 continue
@@ -2572,21 +2594,21 @@ class PromptManager:
         request_text: str,
         result: CodexExecutionResult,
         *,
-        conversation: Optional[Sequence[Mapping[str, str]]] = None,
-        context_metadata: Optional[Mapping[str, Any]] = None,
-        extra_metadata: Optional[Mapping[str, Any]] = None,
-    ) -> Optional[PromptExecution]:
+        conversation: Sequence[Mapping[str, str]] | None = None,
+        context_metadata: Mapping[str, Any] | None = None,
+        extra_metadata: Mapping[str, Any] | None = None,
+    ) -> PromptExecution | None:
         """Persist a successful execution outcome when the tracker is available."""
 
         tracker = self._history_tracker
         if tracker is None:
             return None
-        usage_metadata: Dict[str, Any] = {}
+        usage_metadata: dict[str, Any] = {}
         try:
             usage_metadata = dict(result.usage)
         except Exception:  # pragma: no cover - defensive
             usage_metadata = {}
-        metadata: Dict[str, Any] = {"usage": usage_metadata}
+        metadata: dict[str, Any] = {"usage": usage_metadata}
         if conversation:
             metadata["conversation"] = list(conversation)
         if extra_metadata:
@@ -2615,16 +2637,16 @@ class PromptManager:
         request_text: str,
         error_message: str,
         *,
-        conversation: Optional[Sequence[Mapping[str, str]]] = None,
-        context_metadata: Optional[Mapping[str, Any]] = None,
-        extra_metadata: Optional[Mapping[str, Any]] = None,
-    ) -> Optional[PromptExecution]:
+        conversation: Sequence[Mapping[str, str]] | None = None,
+        context_metadata: Mapping[str, Any] | None = None,
+        extra_metadata: Mapping[str, Any] | None = None,
+    ) -> PromptExecution | None:
         """Persist a failed execution attempt when history tracking is enabled."""
 
         tracker = self._history_tracker
         if tracker is None:
             return None
-        metadata_payload: Dict[str, Any] = {}
+        metadata_payload: dict[str, Any] = {}
         if conversation:
             metadata_payload["conversation"] = list(conversation)
         if extra_metadata:
@@ -2646,7 +2668,7 @@ class PromptManager:
             )
             return None
 
-    def set_intent_classifier(self, classifier: Optional[IntentClassifier]) -> None:
+    def set_intent_classifier(self, classifier: IntentClassifier | None) -> None:
         """Replace the runtime intent classifier implementation."""
 
         self._intent_classifier = classifier
@@ -2668,7 +2690,7 @@ class PromptManager:
 
         if self._redis_client is not None:
             redis_close = cast(
-                "Optional[Callable[[], Any]]", getattr(self._redis_client, "close", None)
+                "Callable[[], Any] | None", getattr(self._redis_client, "close", None)
             )
             if callable(redis_close):
                 try:
@@ -2679,10 +2701,10 @@ class PromptManager:
                         exc_info=True,
                     )
             pool = cast(
-                "Optional[RedisConnectionPoolProtocol]",
+                "RedisConnectionPoolProtocol | None",
                 getattr(self._redis_client, "connection_pool", None),
             )
-            disconnect = cast("Optional[Callable[[], Any]]", getattr(pool, "disconnect", None))
+            disconnect = cast("Callable[[], Any] | None", getattr(pool, "disconnect", None))
             if callable(disconnect):
                 try:
                     disconnect()
@@ -2704,28 +2726,28 @@ class PromptManager:
                         exc_info=True,
                     )
 
-    def __enter__(self) -> "PromptManager":
+    def __enter__(self) -> PromptManager:
         return self
 
     def __exit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc: Optional[BaseException],
-        tb: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
     ) -> None:
         self.close()
 
     def create_prompt(
         self,
         prompt: Prompt,
-        embedding: Optional[Sequence[float]] = None,
+        embedding: Sequence[float] | None = None,
         *,
-        commit_message: Optional[str] = None,
+        commit_message: str | None = None,
     ) -> Prompt:
         """Persist a new prompt in SQLite/ChromaDB and prime the cache."""
         prompt = self._apply_category_metadata(prompt)
         self._update_category_insight(prompt, previous_prompt=None)
-        generated_embedding: Optional[List[float]] = None
+        generated_embedding: list[float] | None = None
         if embedding is not None:
             generated_embedding = list(embedding)
         else:
@@ -2796,12 +2818,12 @@ class PromptManager:
 
     # Category APIs ----------------------------------------------------- #
 
-    def list_categories(self, include_archived: bool = False) -> List[PromptCategory]:
+    def list_categories(self, include_archived: bool = False) -> list[PromptCategory]:
         """Return cached categories."""
 
         return self._category_registry.all(include_archived)
 
-    def refresh_categories(self) -> List[PromptCategory]:
+    def refresh_categories(self) -> list[PromptCategory]:
         """Reload categories from the repository."""
 
         return self._category_registry.refresh()
@@ -2810,13 +2832,13 @@ class PromptManager:
         self,
         *,
         label: str,
-        slug: Optional[str] = None,
-        description: Optional[str] = None,
-        parent_slug: Optional[str] = None,
-        color: Optional[str] = None,
-        icon: Optional[str] = None,
-        min_quality: Optional[float] = None,
-        default_tags: Optional[Sequence[str]] = None,
+        slug: str | None = None,
+        description: str | None = None,
+        parent_slug: str | None = None,
+        color: str | None = None,
+        icon: str | None = None,
+        min_quality: float | None = None,
+        default_tags: Sequence[str] | None = None,
         is_active: bool = True,
     ) -> PromptCategory:
         """Create a new category entry."""
@@ -2843,14 +2865,14 @@ class PromptManager:
         self,
         slug: str,
         *,
-        label: Optional[str] = None,
-        description: Optional[str] = None,
-        parent_slug: Optional[str] = None,
-        color: Optional[str] = None,
-        icon: Optional[str] = None,
-        min_quality: Optional[float] = None,
-        default_tags: Optional[Sequence[str]] = None,
-        is_active: Optional[bool] = None,
+        label: str | None = None,
+        description: str | None = None,
+        parent_slug: str | None = None,
+        color: str | None = None,
+        icon: str | None = None,
+        min_quality: float | None = None,
+        default_tags: Sequence[str] | None = None,
+        is_active: bool | None = None,
     ) -> PromptCategory:
         """Update the specified category."""
 
@@ -2865,7 +2887,7 @@ class PromptManager:
             min_quality=min_quality if min_quality is not None else current.min_quality,
             default_tags=list(default_tags) if default_tags is not None else current.default_tags,
             is_active=is_active if is_active is not None else current.is_active,
-            updated_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(UTC),
         )
         try:
             persisted = self._repository.update_category(updated)
@@ -2888,7 +2910,7 @@ class PromptManager:
         self._category_registry.refresh()
         return category
 
-    def resolve_category_label(self, slug: Optional[str], fallback: Optional[str] = None) -> str:
+    def resolve_category_label(self, slug: str | None, fallback: str | None = None) -> str:
         """Return the human-readable label for a slug."""
 
         category = self._category_registry.get(slug)
@@ -2899,9 +2921,9 @@ class PromptManager:
     def update_prompt(
         self,
         prompt: Prompt,
-        embedding: Optional[Sequence[float]] = None,
+        embedding: Sequence[float] | None = None,
         *,
-        commit_message: Optional[str] = None,
+        commit_message: str | None = None,
     ) -> Prompt:
         """Update an existing prompt with new metadata."""
         prompt = self._apply_category_metadata(prompt)
@@ -2914,7 +2936,7 @@ class PromptManager:
                 f"Failed to load prompt {prompt.id} for version comparison"
             ) from exc
 
-        latest_version: Optional[PromptVersion] = None
+        latest_version: PromptVersion | None = None
         has_version_history = True
         try:
             latest_version = self._repository.get_prompt_latest_version(prompt.id)
@@ -2933,7 +2955,7 @@ class PromptManager:
         )
         should_commit_version = body_changed or not has_version_history
         current_version_number = latest_version.version_number if latest_version else 0
-        target_version_number: Optional[int]
+        target_version_number: int | None
         if should_commit_version:
             target_version_number = current_version_number + 1 if current_version_number >= 0 else 1
         elif current_version_number > 0:
@@ -2945,7 +2967,7 @@ class PromptManager:
             if prompt.version != target_label:
                 prompt.version = target_label
 
-        generated_embedding: Optional[List[float]] = None
+        generated_embedding: list[float] | None = None
         if embedding is not None:
             generated_embedding = list(embedding)
         else:
@@ -2987,7 +3009,8 @@ class PromptManager:
             )
         else:
             logger.debug(
-                "Prompt body unchanged and version history already present; skipping version commit",
+                "Prompt body unchanged and version history already present; skipping version "
+                "commit",
                 extra={"prompt_id": str(updated_prompt.id)},
             )
         return updated_prompt
@@ -3018,8 +3041,8 @@ class PromptManager:
         self,
         prompt_id: uuid.UUID,
         *,
-        limit: Optional[int] = None,
-    ) -> List[PromptVersion]:
+        limit: int | None = None,
+    ) -> list[PromptVersion]:
         """Return committed versions for the specified prompt."""
 
         try:
@@ -3037,7 +3060,7 @@ class PromptManager:
         except RepositoryError as exc:
             raise PromptVersionError(f"Unable to load prompt version {version_id}") from exc
 
-    def get_latest_prompt_version(self, prompt_id: uuid.UUID) -> Optional[PromptVersion]:
+    def get_latest_prompt_version(self, prompt_id: uuid.UUID) -> PromptVersion | None:
         """Return the most recent version for the prompt, if one exists."""
 
         try:
@@ -3049,7 +3072,7 @@ class PromptManager:
         self,
         base_version_id: int,
         target_version_id: int,
-    ) -> "PromptVersionDiff":
+    ) -> PromptVersionDiff:
         """Return a structured diff between two version snapshots."""
 
         base_version = self.get_prompt_version(base_version_id)
@@ -3057,7 +3080,7 @@ class PromptManager:
         if base_version.prompt_id != target_version.prompt_id:
             raise PromptVersionError("Versions belong to different prompts")
 
-        changed_fields: Dict[str, Dict[str, Any]] = {}
+        changed_fields: dict[str, dict[str, Any]] = {}
         keys = set(base_version.snapshot.keys()) | set(target_version.snapshot.keys())
         for key in sorted(keys):
             base_value = base_version.snapshot.get(key)
@@ -3086,13 +3109,13 @@ class PromptManager:
         self,
         version_id: int,
         *,
-        commit_message: Optional[str] = None,
+        commit_message: str | None = None,
     ) -> Prompt:
         """Replace the live prompt with the contents of the specified version."""
 
         version = self.get_prompt_version(version_id)
         prompt = version.to_prompt()
-        prompt.last_modified = datetime.now(timezone.utc)
+        prompt.last_modified = datetime.now(UTC)
         message = commit_message or f"Restore version {version.version_number}"
         return self.update_prompt(prompt, commit_message=message)
 
@@ -3103,8 +3126,8 @@ class PromptManager:
         base_version_id: int,
         incoming_version_id: int,
         persist: bool = False,
-        commit_message: Optional[str] = None,
-    ) -> Tuple[Prompt, List[str]]:
+        commit_message: str | None = None,
+    ) -> tuple[Prompt, list[str]]:
         """Perform a simple three-way merge and optionally persist the result."""
 
         base_version = self.get_prompt_version(base_version_id)
@@ -3116,7 +3139,7 @@ class PromptManager:
         merged_snapshot = dict(current_prompt.to_record())
         base_snapshot = base_version.snapshot
         incoming_snapshot = incoming_version.snapshot
-        conflicts: List[str] = []
+        conflicts: list[str] = []
         merge_fields = {
             "context",
             "description",
@@ -3148,7 +3171,7 @@ class PromptManager:
                 conflicts.append(field)
 
         merged_prompt = Prompt.from_record(merged_snapshot)
-        merged_prompt.last_modified = datetime.now(timezone.utc)
+        merged_prompt.last_modified = datetime.now(UTC)
 
         if not persist:
             return merged_prompt, conflicts
@@ -3163,13 +3186,13 @@ class PromptManager:
         self,
         prompt_id: uuid.UUID,
         *,
-        name: Optional[str] = None,
-        commit_message: Optional[str] = None,
+        name: str | None = None,
+        commit_message: str | None = None,
     ) -> Prompt:
         """Create a new prompt based on the referenced prompt."""
 
         source_prompt = self.get_prompt(prompt_id)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         fork_name = name or f"{source_prompt.name} (fork)"
         related_prompts = list(source_prompt.related_prompts)
         source_id_text = str(source_prompt.id)
@@ -3202,7 +3225,7 @@ class PromptManager:
 
         return stored
 
-    def list_prompt_forks(self, prompt_id: uuid.UUID) -> List[PromptForkLink]:
+    def list_prompt_forks(self, prompt_id: uuid.UUID) -> list[PromptForkLink]:
         """Return lineage entries for children derived from the prompt."""
 
         try:
@@ -3210,7 +3233,7 @@ class PromptManager:
         except RepositoryError as exc:
             raise PromptVersionError("Unable to load prompt forks") from exc
 
-    def get_prompt_parent_fork(self, prompt_id: uuid.UUID) -> Optional[PromptForkLink]:
+    def get_prompt_parent_fork(self, prompt_id: uuid.UUID) -> PromptForkLink | None:
         """Return the recorded parent for a forked prompt, if any."""
 
         try:
@@ -3224,8 +3247,8 @@ class PromptManager:
         self,
         *,
         include_inactive: bool = False,
-        search: Optional[str] = None,
-    ) -> List[ResponseStyle]:
+        search: str | None = None,
+    ) -> list[ResponseStyle]:
         """Return stored response styles ordered by name."""
 
         try:
@@ -3278,7 +3301,7 @@ class PromptManager:
 
     # Prompt note management ------------------------------------------- #
 
-    def list_prompt_notes(self) -> List[PromptNote]:
+    def list_prompt_notes(self) -> list[PromptNote]:
         """Return stored prompt notes ordered by recency."""
 
         try:
@@ -3330,16 +3353,16 @@ class PromptManager:
         self,
         query_text: str,
         limit: int = 5,
-        where: Optional[Dict[str, Any]] = None,
-        embedding: Optional[Sequence[float]] = None,
-    ) -> List[Prompt]:
+        where: dict[str, Any] | None = None,
+        embedding: Sequence[float] | None = None,
+    ) -> list[Prompt]:
         """Search prompts semantically using a text query or embedding."""
         if not query_text and embedding is None:
             raise ValueError("query_text or embedding must be provided")
 
         collection = self.collection
 
-        query_embedding: List[float]
+        query_embedding: list[float]
         if embedding is not None:
             query_embedding = [float(value) for value in embedding]
         else:
@@ -3351,7 +3374,7 @@ class PromptManager:
         try:
             try:
                 results = cast(
-                    "Dict[str, Any]",
+                    "dict[str, Any]",
                     collection.query(
                         query_texts=None,
                         query_embeddings=[query_embedding],
@@ -3365,7 +3388,7 @@ class PromptManager:
                 # *include* parameter.  Retry without it and tolerate missing
                 # distance information.
                 results = cast(
-                    "Dict[str, Any]",
+                    "dict[str, Any]",
                     collection.query(
                         query_texts=None,
                         query_embeddings=[query_embedding],
@@ -3376,13 +3399,13 @@ class PromptManager:
         except ChromaError as exc:
             raise PromptStorageError("Failed to query prompts") from exc
 
-        prompts: List[Prompt] = []
-        ids = cast("List[str]", results.get("ids", [[]])[0])
-        documents = cast("List[str]", results.get("documents", [[]])[0])
-        metadatas = cast("List[Dict[str, Any]]", results.get("metadatas", [[]])[0])
-        distance_values: List[Optional[float]]
+        prompts: list[Prompt] = []
+        ids = cast("list[str]", results.get("ids", [[]])[0])
+        documents = cast("list[str]", results.get("documents", [[]])[0])
+        metadatas = cast("list[dict[str, Any]]", results.get("metadatas", [[]])[0])
+        distance_values: list[float | None]
         if "distances" in results:
-            distance_payload = cast("List[List[Optional[float]]]", results.get("distances", []))
+            distance_payload = cast("list[list[float | None]]", results.get("distances", []))
             distance_values = distance_payload[0] if distance_payload else []
         else:
             distance_values = []
@@ -3394,7 +3417,13 @@ class PromptManager:
 
         distances = distance_values
 
-        for prompt_id, document, metadata, distance in zip(ids, documents, metadatas, distances):
+        for prompt_id, document, metadata, distance in zip(
+            ids,
+            documents,
+            metadatas,
+            distances,
+            strict=False,
+        ):
             try:
                 prompt_uuid = uuid.UUID(prompt_id)
             except ValueError:
@@ -3430,7 +3459,7 @@ class PromptManager:
 
     def suggest_prompts(
         self, query_text: str, *, limit: int = 5
-    ) -> "PromptManager.IntentSuggestions":
+    ) -> PromptManager.IntentSuggestions:
         """Return intent-ranked prompt recommendations for the supplied query."""
 
         if limit <= 0:
@@ -3462,7 +3491,7 @@ class PromptManager:
             augmented_query_parts.append("Intent tags: " + ", ".join(prediction.tag_hints))
         augmented_query = "\n".join(augmented_query_parts)
 
-        suggestions: List[Prompt] = []
+        suggestions: list[Prompt] = []
         fallback_used = False
         try:
             raw_results = self.search_prompts(augmented_query, limit=max(limit * 2, 10))
@@ -3515,7 +3544,7 @@ class PromptManager:
             fallback_used=fallback_used,
         )
 
-    def _personalize_ranked_prompts(self, prompts: Sequence[Prompt]) -> List[Prompt]:
+    def _personalize_ranked_prompts(self, prompts: Sequence[Prompt]) -> list[Prompt]:
         """Bias prompt order using stored user preferences while preserving stability."""
 
         if not prompts:
@@ -3535,7 +3564,7 @@ class PromptManager:
         }
         tag_weights = {name: len(favorite_tags) - idx for idx, name in enumerate(favorite_tags)}
 
-        scored: List[tuple[float, int, Prompt]] = []
+        scored: list[tuple[float, int, Prompt]] = []
         for index, prompt in enumerate(prompts):
             score = 0.0
             category = (prompt.category or "").strip()
@@ -3587,7 +3616,7 @@ class PromptManager:
         prompt.rating_sum += float(rating)
         if prompt.rating_count > 0:
             prompt.quality_score = round(prompt.rating_sum / prompt.rating_count, 2)
-        prompt.last_modified = datetime.now(timezone.utc)
+        prompt.last_modified = datetime.now(UTC)
 
         try:
             self.update_prompt(prompt)
@@ -3602,8 +3631,8 @@ class PromptManager:
         self,
         prompt: Prompt,
         *,
-        commit_message: Optional[str] = None,
-        parent_version_id: Optional[int] = None,
+        commit_message: str | None = None,
+        parent_version_id: int | None = None,
     ) -> PromptVersion:
         """Persist a version snapshot for the provided prompt."""
 
@@ -3651,12 +3680,12 @@ class PromptManager:
         except RedisError as exc:  # pragma: no cover - redis not in CI
             raise PromptCacheError("Failed to write prompt to Redis") from exc
 
-    def _get_cached_prompt(self, prompt_id: uuid.UUID) -> Optional[Prompt]:
+    def _get_cached_prompt(self, prompt_id: uuid.UUID) -> Prompt | None:
         """Fetch prompt from Redis cache when available."""
         if self._redis_client is None:
             return None
         try:
-            cached_value: Optional[RedisValue] = self._redis_client.get(self._cache_key(prompt_id))
+            cached_value: RedisValue | None = self._redis_client.get(self._cache_key(prompt_id))
         except RedisError as exc:  # pragma: no cover - redis not in CI
             raise PromptCacheError("Failed to read prompt from Redis") from exc
         if not cached_value:
@@ -3693,7 +3722,7 @@ class PromptManager:
     ) -> None:
         """Persist embeddings to Chroma and refresh caches."""
 
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "ids": [str(prompt.id)],
             "documents": [prompt.document],
             "metadatas": [prompt.to_metadata()],
@@ -3752,18 +3781,3 @@ __all__ = [
     "PromptEngineeringError",
     "PromptRefinement",
 ]
-
-# Re‑export storage façade for external use
-# Engineering facade re‑exports
-from .engineering import (  # noqa: E402
-    PromptEngineerFacade,
-    PromptEngineeringError,
-    PromptRefinement,
-)
-
-# Execution facade re‑exports
-from .execution import (  # noqa: E402
-    ExecutionResult,
-    PromptExecutor,
-)
-from .storage import PromptStorage  # noqa: E402  (after __all__)

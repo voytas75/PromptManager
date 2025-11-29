@@ -7,8 +7,8 @@ Updates: v0.1.0 - 2025-11-11 - Introduce notification bridge and history dialog.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Dict, Optional, Sequence
 
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtGui import QClipboard, QGuiApplication
@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.notifications import Notification, NotificationCenter, NotificationStatus
+
 from .toast import show_toast
 
 
@@ -83,7 +84,7 @@ class NotificationHistoryDialog(QDialog):
 class BackgroundTaskItemWidget(QWidget):
     """Compact widget showing task title, message, and progress."""
 
-    def __init__(self, notification: Notification, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, notification: Notification, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 6, 8, 6)
@@ -144,12 +145,12 @@ class BackgroundTaskCenterDialog(QDialog):
 
     _HISTORY_LIMIT = 200
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Background Tasks")
         self.resize(560, 420)
 
-        self._active_items: Dict[str, _ActiveTaskEntry] = {}
+        self._active_items: dict[str, _ActiveTaskEntry] = {}
 
         layout = QVBoxLayout(self)
 

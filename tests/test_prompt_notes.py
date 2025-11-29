@@ -6,7 +6,7 @@ Updates: v0.1.0 - 2025-12-06 - Cover PromptNote dataclass and CRUD workflows.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -15,7 +15,7 @@ from models.prompt_note import PromptNote
 
 
 def _make_note(text: str = "Remember to test edge cases") -> PromptNote:
-    timestamp = datetime.now(timezone.utc)
+    timestamp = datetime.now(UTC)
     return PromptNote(id=uuid.uuid4(), note=text, created_at=timestamp, last_modified=timestamp)
 
 

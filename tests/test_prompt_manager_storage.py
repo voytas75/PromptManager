@@ -8,8 +8,9 @@ Updates: v0.1.0 - 2025-10-31 - Introduce repository and manager storage integrat
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 
@@ -47,7 +48,7 @@ def _make_prompt(name: str = "Sample Prompt") -> Prompt:
 def _make_response_style(name: str = "Concise Summary") -> ResponseStyle:
     """Return a populated ResponseStyle instance for manager tests."""
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return ResponseStyle(
         id=uuid.uuid4(),
         name=name,
@@ -66,7 +67,7 @@ def _make_response_style(name: str = "Concise Summary") -> ResponseStyle:
 
 
 def _make_prompt_note(text: str = "Investigate latency spike") -> PromptNote:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return PromptNote(id=uuid.uuid4(), note=text, created_at=now, last_modified=now)
 
 
@@ -82,13 +83,13 @@ class _FakeRedis:
     """Minimal Redis facade storing values in-memory for assertions."""
 
     def __init__(self) -> None:
-        self._store: Dict[str, bytes] = {}
+        self._store: dict[str, bytes] = {}
         self.get_calls = 0
 
     def setex(self, key: str, ttl: int, value: str) -> None:
         self._store[key] = value.encode("utf-8")
 
-    def get(self, key: str) -> Optional[bytes]:
+    def get(self, key: str) -> bytes | None:
         self.get_calls += 1
         return self._store.get(key)
 
@@ -100,14 +101,14 @@ class _FakeCollection:
     """In-memory stand-in for ChromaDB collection operations."""
 
     def __init__(self) -> None:
-        self._records: Dict[str, Dict[str, Any]] = {}
+        self._records: dict[str, dict[str, Any]] = {}
 
     def add(
         self,
         ids: list[str],
         documents: list[str],
-        metadatas: list[Dict[str, Any]],
-        embeddings: Optional[list[list[float]]] = None,
+        metadatas: list[dict[str, Any]],
+        embeddings: list[list[float]] | None = None,
     ) -> None:
         for idx, prompt_id in enumerate(ids):
             self._records[prompt_id] = {
@@ -120,8 +121,8 @@ class _FakeCollection:
         self,
         ids: list[str],
         documents: list[str],
-        metadatas: list[Dict[str, Any]],
-        embeddings: Optional[list[list[float]]] = None,
+        metadatas: list[dict[str, Any]],
+        embeddings: list[list[float]] | None = None,
     ) -> None:
         self.add(ids, documents, metadatas, embeddings)
 
@@ -131,11 +132,11 @@ class _FakeCollection:
 
     def query(
         self,
-        query_texts: Optional[list[str]],
-        query_embeddings: Optional[list[list[float]]],
+        query_texts: list[str] | None,
+        query_embeddings: list[list[float]] | None,
         n_results: int,
-        where: Optional[Dict[str, Any]],
-    ) -> Dict[str, list[list[Any]]]:
+        where: dict[str, Any] | None,
+    ) -> dict[str, list[list[Any]]]:
         prompt_ids = list(self._records.keys())[:n_results]
         documents = [self._records[prompt_id]["document"] for prompt_id in prompt_ids]
         metadatas = [self._records[prompt_id]["metadata"] for prompt_id in prompt_ids]
@@ -152,8 +153,8 @@ class _FakeChromaClient:
     def get_or_create_collection(
         self,
         name: str,
-        metadata: Dict[str, Any],
-        embedding_function: Optional[Any] = None,
+        metadata: dict[str, Any],
+        embedding_function: Any | None = None,
     ) -> _FakeCollection:
         return self._collection
 
@@ -165,18 +166,18 @@ class _FakeRepository:
     """Minimal repository stub tracking invocation counts."""
 
     def __init__(self) -> None:
-        self._store: Dict[uuid.UUID, Prompt] = {}
+        self._store: dict[uuid.UUID, Prompt] = {}
         self.get_call_count = 0
         self.fail_on_get = False
         self._profile = UserProfile.create_default()
-        self._versions: Dict[uuid.UUID, List[PromptVersion]] = {}
+        self._versions: dict[uuid.UUID, list[PromptVersion]] = {}
         self._next_version_id = 1
         base_category = PromptCategory(
             slug="general",
             label="General",
             description="General prompts",
         )
-        self._categories: Dict[str, PromptCategory] = {base_category.slug: base_category}
+        self._categories: dict[str, PromptCategory] = {base_category.slug: base_category}
 
     def add(self, prompt: Prompt) -> Prompt:
         if prompt.id in self._store:
@@ -212,7 +213,7 @@ class _FakeRepository:
         except KeyError as exc:
             raise RepositoryNotFoundError(f"Prompt {prompt_id} not found") from exc
 
-    def list_categories(self, include_archived: bool = False) -> List[PromptCategory]:
+    def list_categories(self, include_archived: bool = False) -> list[PromptCategory]:
         return [
             _clone_category(category)
             for category in self._categories.values()
@@ -244,15 +245,15 @@ class _FakeRepository:
             raise RepositoryNotFoundError(f"Category {slug} not found")
         category = _clone_category(self._categories[normalized])
         category.is_active = is_active
-        category.updated_at = datetime.now(timezone.utc)
+        category.updated_at = datetime.now(UTC)
         self._categories[normalized] = category
         return _clone_category(category)
 
     def sync_category_definitions(
         self,
         categories: Sequence[PromptCategory],
-    ) -> List[PromptCategory]:
-        created: List[PromptCategory] = []
+    ) -> list[PromptCategory]:
+        created: list[PromptCategory] = []
         for category in categories:
             slug = slugify_category(category.slug)
             if slug in self._categories:
@@ -276,8 +277,8 @@ class _FakeRepository:
         self,
         prompt: Prompt,
         *,
-        commit_message: Optional[str] = None,
-        parent_version_id: Optional[int] = None,
+        commit_message: str | None = None,
+        parent_version_id: int | None = None,
     ) -> PromptVersion:
         history = self._versions.setdefault(prompt.id, [])
         version_number = len(history) + 1
@@ -285,7 +286,7 @@ class _FakeRepository:
             id=self._next_version_id,
             prompt_id=prompt.id,
             version_number=version_number,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             parent_version_id=parent_version_id,
             commit_message=commit_message,
             snapshot=prompt.to_record(),
@@ -298,8 +299,8 @@ class _FakeRepository:
         self,
         prompt_id: uuid.UUID,
         *,
-        limit: Optional[int] = None,
-    ) -> List[PromptVersion]:
+        limit: int | None = None,
+    ) -> list[PromptVersion]:
         versions = self._versions.get(prompt_id, [])
         ordered = sorted(versions, key=lambda version: version.version_number, reverse=True)
         if limit is not None:
@@ -313,7 +314,7 @@ class _FakeRepository:
                     return version
         raise RepositoryNotFoundError(f"Prompt version {version_id} not found")
 
-    def get_prompt_latest_version(self, prompt_id: uuid.UUID) -> Optional[PromptVersion]:
+    def get_prompt_latest_version(self, prompt_id: uuid.UUID) -> PromptVersion | None:
         versions = self._versions.get(prompt_id)
         if not versions:
             return None
@@ -337,7 +338,7 @@ class _StubRedis:
         self.pool_closed = False
 
         class _Pool:
-            def __init__(self, outer: "_StubRedis") -> None:
+            def __init__(self, outer: _StubRedis) -> None:
                 self._outer = outer
 
             def disconnect(self) -> None:

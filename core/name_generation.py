@@ -1,25 +1,26 @@
 """LiteLLM-backed prompt metadata generation utilities.
 
-Updates: v0.7.6 - 2025-11-24 - Add category suggestion helper leveraging LiteLLM.
-Updates: v0.7.5 - 2025-11-23 - Allow custom system prompt overrides supplied via settings.
-Updates: v0.7.4 - 2025-11-05 - Remove explicit LiteLLM timeout to avoid premature cancellation errors.
-Updates: v0.7.3 - 2025-11-02 - Strip configured drop parameters before calling LiteLLM.
-Updates: v0.7.2 - 2025-11-17 - Retry without unsupported LiteLLM parameters when models reject them.
-Updates: v0.7.1 - 2025-11-11 - Summarise LiteLLM errors for friendlier GUI fallbacks.
-Updates: v0.7.0 - 2025-11-07 - Add description generator alongside name helper.
-Updates: v0.6.0 - 2025-11-07 - Share LiteLLM import helper with embedding adapters.
-Updates: v0.5.0 - 2025-11-05 - Introduce LiteLLM name generator with graceful fallbacks.
+Updates:
+  v0.7.7 - 2025-11-29 - Guard PromptCategory import for typing and wrap long literals.
+  v0.7.6 - 2025-11-24 - Add category suggestion helper leveraging LiteLLM.
+  v0.7.5 - 2025-11-23 - Allow custom system prompt overrides supplied via settings.
+  v0.7.4 - 2025-11-05 - Remove explicit LiteLLM timeout to avoid premature cancellation errors.
+  v0.7.3 - 2025-11-02 - Strip configured drop parameters before calling LiteLLM.
+  v0.7.2 - 2025-11-17 - Retry without unsupported LiteLLM parameters when models reject them.
+  v0.7.1 - 2025-11-11 - Summarise LiteLLM errors for friendlier GUI fallbacks.
+  v0.7.0 - 2025-11-07 - Add description generator alongside name helper.
+  v0.6.0 - 2025-11-07 - Share LiteLLM import helper with embedding adapters.
+  v0.5.0 - 2025-11-05 - Introduce LiteLLM name generator with graceful fallbacks.
 """
+
 
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Sequence
+from typing import TYPE_CHECKING
 
-logger = logging.getLogger(__name__)
-
-from models.category_model import PromptCategory
 from prompt_templates import (
     CATEGORY_GENERATION_PROMPT,
     DESCRIPTION_GENERATION_PROMPT,
@@ -31,6 +32,11 @@ from .litellm_adapter import (
     call_completion_with_fallback,
     get_completion,
 )
+
+if TYPE_CHECKING:  # pragma: no cover - imported for annotations only
+    from models.category_model import PromptCategory
+
+logger = logging.getLogger(__name__)
 
 
 class NameGenerationError(Exception):
@@ -50,12 +56,12 @@ class LiteLLMNameGenerator:
     """Generate prompt names via LiteLLM chat completion API."""
 
     model: str
-    api_key: Optional[str] = None
-    api_base: Optional[str] = None
-    timeout_seconds: Optional[float] = None
-    api_version: Optional[str] = None
-    drop_params: Optional[Sequence[str]] = None
-    system_prompt: Optional[str] = None
+    api_key: str | None = None
+    api_base: str | None = None
+    timeout_seconds: float | None = None
+    api_version: str | None = None
+    drop_params: Sequence[str] | None = None
+    system_prompt: str | None = None
 
     def generate(self, context: str) -> str:
         """Return an LLM-generated prompt name from contextual text."""
@@ -63,13 +69,16 @@ class LiteLLMNameGenerator:
         if not context.strip():
             raise NameGenerationError("Prompt context is required to generate a name.")
 
-        request: Dict[str, object] = {
+        request: dict[str, object] = {
             "model": self.model,
             "messages": [
                 {"role": "system", "content": self._system_prompt_text()},
                 {
                     "role": "user",
-                    "content": f"Suggest a concise prompt name for the following content:\n\n{context.strip()}",
+                    "content": (
+                        "Suggest a concise prompt name for the following content:\n\n"
+                        f"{context.strip()}"
+                    ),
                 },
             ],
             "temperature": 0.2,
@@ -124,18 +133,20 @@ class LiteLLMDescriptionGenerator:
     """Generate succinct prompt descriptions via LiteLLM."""
 
     model: str
-    api_key: Optional[str] = None
-    api_base: Optional[str] = None
-    timeout_seconds: Optional[float] = None
-    api_version: Optional[str] = None
-    drop_params: Optional[Sequence[str]] = None
-    system_prompt: Optional[str] = None
+    api_key: str | None = None
+    api_base: str | None = None
+    timeout_seconds: float | None = None
+    api_version: str | None = None
+    drop_params: Sequence[str] | None = None
+    system_prompt: str | None = None
 
     def generate(self, context: str) -> str:
         completion, LiteLLMException = get_completion()
         if not context.strip():
-            raise DescriptionGenerationError("Prompt context is required to generate a description.")
-        request: Dict[str, object] = {
+            raise DescriptionGenerationError(
+                "Prompt context is required to generate a description."
+            )
+        request: dict[str, object] = {
             "model": self.model,
             "messages": [
                 {"role": "system", "content": self._system_prompt_text()},
@@ -190,8 +201,15 @@ class LiteLLMDescriptionGenerator:
 
         try:
             message = response["choices"][0]["message"].get("content")  # type: ignore[index]
-        except (KeyError, IndexError, TypeError, AttributeError) as exc:  # pragma: no cover - defensive
-            raise DescriptionGenerationError("LiteLLM returned an unexpected payload structure") from exc
+        except (
+            KeyError,
+            IndexError,
+            TypeError,
+            AttributeError,
+        ) as exc:  # pragma: no cover - defensive
+            raise DescriptionGenerationError(
+                "LiteLLM returned an unexpected payload structure"
+            ) from exc
 
         if not isinstance(message, str):
             raise DescriptionGenerationError("LiteLLM returned a non‑text description.")
@@ -213,12 +231,12 @@ class LiteLLMCategoryGenerator:
     """Suggest prompt categories from the configured catalogue via LiteLLM."""
 
     model: str
-    api_key: Optional[str] = None
-    api_base: Optional[str] = None
-    timeout_seconds: Optional[float] = None
-    api_version: Optional[str] = None
-    drop_params: Optional[Sequence[str]] = None
-    system_prompt: Optional[str] = None
+    api_key: str | None = None
+    api_base: str | None = None
+    timeout_seconds: float | None = None
+    api_version: str | None = None
+    drop_params: Sequence[str] | None = None
+    system_prompt: str | None = None
     max_categories: int = 24
 
     def generate(self, context: str, *, categories: Sequence[PromptCategory]) -> str:
@@ -229,18 +247,22 @@ class LiteLLMCategoryGenerator:
         if not prompt_text:
             raise CategorySuggestionError("Prompt context is required to suggest a category.")
         if not categories:
-            raise CategorySuggestionError("At least one category is required to suggest a category.")
+            raise CategorySuggestionError(
+                "At least one category is required to suggest a category."
+            )
 
         formatted_categories = self._format_categories(categories)
-        request: Dict[str, object] = {
+        request: dict[str, object] = {
             "model": self.model,
             "messages": [
                 {"role": "system", "content": self._system_prompt_text()},
                 {
                     "role": "user",
                     "content": (
-                        "Select the single best category label from the list below that matches the prompt.\n"
-                        "Respond with the exact label text only, without numbering or explanations.\n\n"
+                        "Select the single best category label from the list below "
+                        "that matches the prompt.\n"
+                        "Respond with the exact label text only, without numbering "
+                        "or explanations.\n\n"
                         f"Categories:\n{formatted_categories}\n\nPrompt:\n{prompt_text}"
                     ),
                 },
@@ -289,7 +311,7 @@ class LiteLLMCategoryGenerator:
     def _format_categories(self, categories: Sequence[PromptCategory]) -> str:
         """Return a newline separated bullet list of categories with descriptions."""
 
-        entries: List[str] = []
+        entries: list[str] = []
         limit = max(1, self.max_categories)
         for category in list(categories)[:limit]:
             label = (category.label or category.slug or "Uncategorised").strip()

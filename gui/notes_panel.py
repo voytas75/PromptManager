@@ -7,7 +7,7 @@ Updates: v0.1.0 - 2025-12-06 - Initial implementation with CRUD actions.
 from __future__ import annotations
 
 import uuid
-from typing import Callable, List, Optional
+from collections.abc import Callable
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QGuiApplication
@@ -40,16 +40,16 @@ class NotesPanel(QWidget):
     def __init__(
         self,
         manager: PromptManager,
-        parent: Optional[QWidget] = None,
+        parent: QWidget | None = None,
         *,
-        status_callback: Optional[Callable[[str, int], None]] = None,
-        toast_callback: Optional[Callable[[str, int], None]] = None,
+        status_callback: Callable[[str, int], None] | None = None,
+        toast_callback: Callable[[str, int], None] | None = None,
     ) -> None:
         super().__init__(parent)
         self._manager = manager
         self._status_callback = status_callback
         self._toast_callback = toast_callback
-        self._notes: List[PromptNote] = []
+        self._notes: list[PromptNote] = []
         self._list = QListWidget(self)
         self._note_view = QPlainTextEdit(self)
         self._note_view.setReadOnly(True)
@@ -114,7 +114,7 @@ class NotesPanel(QWidget):
         if self._notes:
             self._list.setCurrentRow(0)
 
-    def _selected_note(self) -> Optional[PromptNote]:
+    def _selected_note(self) -> PromptNote | None:
         item = self._list.currentItem()
         if item is None:
             return None

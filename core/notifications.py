@@ -1,6 +1,8 @@
 """Application-wide notification infrastructure for long-running tasks.
 
-Updates: v0.1.0 - 2025-11-11 - Introduce notification hub with task tracking helpers.
+Updates:
+  v0.1.1 - 2025-11-29 - Reformat docstring and wrap subscription constructor signature.
+  v0.1.0 - 2025-11-11 - Introduce notification hub with task tracking helpers.
 """
 
 from __future__ import annotations
@@ -10,11 +12,12 @@ import threading
 import time
 import uuid
 from collections import deque
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Deque, Dict, Iterator, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger("prompt_manager.notifications")
 
@@ -46,12 +49,12 @@ class Notification:
     message: str
     level: NotificationLevel
     status: NotificationStatus
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    task_id: Optional[str] = None
-    duration_ms: Optional[int] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    task_id: str | None = None
+    duration_ms: int | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Return a serialisable representation of the notification."""
 
         return {
@@ -70,7 +73,11 @@ class Notification:
 class NotificationSubscription:
     """Disposable handle that removes its callback when closed."""
 
-    def __init__(self, center: "NotificationCenter", callback: Callable[[Notification], None]) -> None:
+    def __init__(
+        self,
+        center: NotificationCenter,
+        callback: Callable[[Notification], None],
+    ) -> None:
         self._center = center
         self._callback = callback
         self._closed = False
@@ -81,7 +88,7 @@ class NotificationSubscription:
         self._closed = True
         self._center.unsubscribe(self._callback)
 
-    def __enter__(self) -> "NotificationSubscription":
+    def __enter__(self) -> NotificationSubscription:
         return self
 
     def __exit__(self, *_: object) -> None:
@@ -92,9 +99,9 @@ class NotificationCenter:
     """Thread-safe publish/subscribe hub for sending notifications to listeners."""
 
     def __init__(self, history_limit: int = 200) -> None:
-        self._subscribers: List[Callable[[Notification], None]] = []
+        self._subscribers: list[Callable[[Notification], None]] = []
         self._lock = threading.RLock()
-        self._history: Deque[Notification] = deque(maxlen=history_limit)
+        self._history: deque[Notification] = deque(maxlen=history_limit)
 
     def subscribe(self, callback: Callable[[Notification], None]) -> NotificationSubscription:
         """Register *callback* to receive future notifications."""
@@ -135,7 +142,7 @@ class NotificationCenter:
             except Exception:  # pragma: no cover - defensive log to avoid cascading failures
                 logger.exception("Notification subscriber raised an exception")
 
-    def history(self) -> Tuple[Notification, ...]:
+    def history(self) -> tuple[Notification, ...]:
         """Return a snapshot of stored notifications."""
 
         with self._lock:
@@ -146,11 +153,11 @@ class NotificationCenter:
         self,
         *,
         title: str,
-        task_id: Optional[str] = None,
+        task_id: str | None = None,
         start_message: str,
         success_message: str,
-        failure_message: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        failure_message: str | None = None,
+        metadata: dict[str, Any] | None = None,
         level: NotificationLevel = NotificationLevel.INFO,
         failure_level: NotificationLevel = NotificationLevel.ERROR,
     ) -> Iterator[None]:

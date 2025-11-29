@@ -9,9 +9,10 @@ Updates:
 from __future__ import annotations
 
 import threading
+from collections.abc import Callable
 from contextlib import AbstractContextManager
 from types import TracebackType
-from typing import Callable, Optional, Type, TypeVar
+from typing import TypeVar
 
 from PySide6.QtCore import QEventLoop, Qt
 from PySide6.QtGui import QGuiApplication
@@ -26,16 +27,16 @@ class ProcessingIndicator(AbstractContextManager["ProcessingIndicator"]):
     def __init__(self, parent: QWidget, message: str, *, title: str = "Processing") -> None:
         self._dialog = _ProcessingDialog(parent, title=title, message=message)
 
-    def __enter__(self) -> "ProcessingIndicator":
+    def __enter__(self) -> ProcessingIndicator:
         self._dialog.show()
         QGuiApplication.processEvents(QEventLoop.AllEvents)
         return self
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
-        exc: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        exc_tb: TracebackType | None,
     ) -> bool:
         self._dialog.hide()
         self._dialog.deleteLater()

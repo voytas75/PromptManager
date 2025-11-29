@@ -15,8 +15,9 @@ import json
 import logging
 import uuid
 from collections import deque
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from functools import partial
 from html import escape
@@ -24,14 +25,6 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Deque,
-    Dict,
-    Iterable,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    Tuple,
 )
 
 from PySide6.QtCore import (
@@ -165,15 +158,15 @@ _FILTER_SORT_KEY = "filterSortOrder"
 class _PromptLoadResult:
     """Fetched prompt data assembled from repository and optional search."""
 
-    all_prompts: List[Prompt]
-    search_results: Optional[List[Prompt]]
+    all_prompts: list[Prompt]
+    search_results: list[Prompt] | None
     preserve_search_order: bool
-    search_error: Optional[str]
+    search_error: str | None
 
 
 def _match_category_label(
-    value: Optional[str], categories: Sequence[PromptCategory]
-) -> Optional[str]:
+    value: str | None, categories: Sequence[PromptCategory]
+) -> str | None:
     """Return the canonical category label matching *value* via exact, slug, or fuzzy match."""
 
     text = (value or "").strip()
@@ -278,10 +271,10 @@ def _store_execute_context_history(settings: QSettings, history: Sequence[str]) 
 
 def _load_filter_preferences(
     settings: QSettings,
-) -> Tuple[Optional[str], Optional[str], Optional[float], Optional[str]]:
+) -> tuple[str | None, str | None, float | None, str | None]:
     """Return persisted filter selections (category, tag, quality, sort)."""
 
-    def _clean_text(value: object) -> Optional[str]:
+    def _clean_text(value: object) -> str | None:
         if value is None:
             return None
         text = str(value).strip()
@@ -290,7 +283,7 @@ def _load_filter_preferences(
     category = _clean_text(settings.value(_FILTER_CATEGORY_KEY, None))
     tag = _clean_text(settings.value(_FILTER_TAG_KEY, None))
     raw_quality = settings.value(_FILTER_QUALITY_KEY, None)
-    quality: Optional[float] = None
+    quality: float | None = None
     if raw_quality not in {None, ""}:
         try:
             quality = float(raw_quality)
@@ -304,8 +297,8 @@ def _load_filter_preferences(
 def _store_filter_preferences(
     settings: QSettings,
     *,
-    category_slug: Optional[str],
-    tag: Optional[str],
+    category_slug: str | None,
+    tag: str | None,
     min_quality: float,
 ) -> None:
     """Persist current filter selections."""
@@ -329,7 +322,7 @@ def _store_sort_preference(settings: QSettings, sort_value: PromptSortOrder) -> 
         logger.warning("Unable to sync sort preference", exc_info=True)
 
 
-def normalise_chat_palette(palette: Optional[Mapping[str, object]]) -> dict[str, str]:
+def normalise_chat_palette(palette: Mapping[str, object] | None) -> dict[str, str]:
     """Return a validated chat palette containing user/assistant colours.
 
     Invalid entries, unsupported roles, and malformed colour values are ignored.
@@ -351,7 +344,7 @@ def normalise_chat_palette(palette: Optional[Mapping[str, object]]) -> dict[str,
     return cleaned
 
 
-def palette_differs_from_defaults(palette: Optional[Mapping[str, str]]) -> bool:
+def palette_differs_from_defaults(palette: Mapping[str, str] | None) -> bool:
     if not palette:
         return False
     defaults = _default_chat_palette()
@@ -365,16 +358,16 @@ def palette_differs_from_defaults(palette: Optional[Mapping[str, str]]) -> bool:
 class PromptListModel(QAbstractListModel):
     """List model providing prompt summaries for the QListView."""
 
-    def __init__(self, prompts: Optional[Sequence[Prompt]] = None, parent=None) -> None:
+    def __init__(self, prompts: Sequence[Prompt] | None = None, parent=None) -> None:
         super().__init__(parent)
-        self._prompts: List[Prompt] = list(prompts or [])
+        self._prompts: list[Prompt] = list(prompts or [])
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802 - Qt API
         if parent.isValid():
             return 0
         return len(self._prompts)
 
-    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> Optional[str]:  # noqa: N802
+    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> str | None:  # noqa: N802
         if not index.isValid() or index.row() >= len(self._prompts):
             return None
         prompt = self._prompts[index.row()]
@@ -390,7 +383,7 @@ class PromptListModel(QAbstractListModel):
             return f"{prompt.name}{category}{similarity_suffix}"
         return None
 
-    def prompt_at(self, row: int) -> Optional[Prompt]:
+    def prompt_at(self, row: int) -> Prompt | None:
         """Return the prompt at the given list index."""
 
         if 0 <= row < len(self._prompts):
@@ -541,7 +534,7 @@ class PromptDetailWidget(QWidget):
 
         self._full_metadata_text = ""
         self._basic_metadata_text = ""
-        self._current_prompt: Optional[Prompt] = None
+        self._current_prompt: Prompt | None = None
 
         actions_layout = QHBoxLayout()
         actions_layout.setContentsMargins(0, 0, 0, 0)
@@ -687,7 +680,7 @@ class PromptDetailWidget(QWidget):
         self._share_payload_combo.setEnabled(True)
         self._share_metadata_checkbox.setEnabled(True)
 
-    def _format_context_preview(self, context: Optional[str]) -> str:
+    def _format_context_preview(self, context: str | None) -> str:
         """Return a truncated, single-line context preview for the prompt summary."""
 
         if not context:
@@ -701,7 +694,7 @@ class PromptDetailWidget(QWidget):
         flattened = " ".join(limited.split())
         return flattened or "No prompt text provided."
 
-    def current_prompt(self) -> Optional[Prompt]:
+    def current_prompt(self) -> Prompt | None:
         """Return the currently displayed prompt, if any."""
 
         return self._current_prompt
@@ -712,7 +705,7 @@ class PromptDetailWidget(QWidget):
         title = prompt.name or "Untitled prompt"
         category = prompt.category or "Uncategorised"
         language = (prompt.language or "en").strip() or "en"
-        detail_parts: List[str] = [language.lower()]
+        detail_parts: list[str] = [language.lower()]
 
         version_raw = (prompt.version or "").strip()
         if not version_raw:
@@ -892,7 +885,7 @@ class PromptDetailWidget(QWidget):
 
         self._toggle_metadata("Metadata (All)", self._full_metadata_text)
 
-    def update_lineage_summary(self, text: Optional[str]) -> None:
+    def update_lineage_summary(self, text: str | None) -> None:
         """Display lineage/version info beneath the description."""
 
         if text:
@@ -907,12 +900,12 @@ class FlowLayout(QLayout):
     """Layout that arranges widgets left-to-right and wraps on overflow."""
 
     def __init__(
-        self, parent: Optional[QWidget] = None, *, margin: int = 0, spacing: int = -1
+        self, parent: QWidget | None = None, *, margin: int = 0, spacing: int = -1
     ) -> None:
         super().__init__(parent)
         if parent is not None:
             self.setContentsMargins(margin, margin, margin, margin)
-        self._item_list: List[QLayoutItem] = []
+        self._item_list: list[QLayoutItem] = []
         default_spacing = spacing if spacing >= 0 else self.spacing()
         self.setSpacing(default_spacing if default_spacing >= 0 else 0)
 
@@ -926,12 +919,12 @@ class FlowLayout(QLayout):
     def count(self) -> int:
         return len(self._item_list)
 
-    def itemAt(self, index: int) -> Optional[QLayoutItem]:
+    def itemAt(self, index: int) -> QLayoutItem | None:
         if 0 <= index < len(self._item_list):
             return self._item_list[index]
         return None
 
-    def takeAt(self, index: int) -> Optional[QLayoutItem]:
+    def takeAt(self, index: int) -> QLayoutItem | None:
         if 0 <= index < len(self._item_list):
             return self._item_list.pop(index)
         return None
@@ -1017,7 +1010,7 @@ class MainWindow(QMainWindow):
     def __init__(
         self,
         prompt_manager: PromptManager,
-        settings: Optional[PromptManagerSettings] = None,
+        settings: PromptManagerSettings | None = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
@@ -1033,41 +1026,41 @@ class MainWindow(QMainWindow):
             partial(self._handle_refresh_scenarios_request, self._detail_widget)
         )
         self._detail_widget.share_requested.connect(self._on_share_prompt_requested)  # type: ignore[arg-type]
-        self._all_prompts: List[Prompt] = []
-        self._current_prompts: List[Prompt] = []
+        self._all_prompts: list[Prompt] = []
+        self._current_prompts: list[Prompt] = []
         self._preserve_search_order: bool = False
         self._search_active: bool = False
-        self._suggestions: Optional[PromptManager.IntentSuggestions] = None
-        self._last_execution: Optional[PromptManager.ExecutionOutcome] = None
-        self._last_prompt_name: Optional[str] = None
-        self._chat_conversation: List[Dict[str, str]] = []
-        self._chat_prompt_id: Optional[uuid.UUID] = None
-        self._sort_combo: Optional[QComboBox] = None
+        self._suggestions: PromptManager.IntentSuggestions | None = None
+        self._last_execution: PromptManager.ExecutionOutcome | None = None
+        self._last_prompt_name: str | None = None
+        self._chat_conversation: list[dict[str, str]] = []
+        self._chat_prompt_id: uuid.UUID | None = None
+        self._sort_combo: QComboBox | None = None
         self._sort_order = PromptSortOrder.NAME_ASC
-        self._pending_category_slug: Optional[str] = None
-        self._pending_tag_value: Optional[str] = None
-        self._pending_quality_value: Optional[float] = None
+        self._pending_category_slug: str | None = None
+        self._pending_tag_value: str | None = None
+        self._pending_quality_value: float | None = None
         self._history_limit = 50
         self._runtime_settings = self._initial_runtime_settings(settings)
         self._usage_logger = IntentUsageLogger()
         self._detected_language: DetectedLanguage = detect_language("")
-        self._quick_actions: List[QuickAction] = self._build_quick_actions(
+        self._quick_actions: list[QuickAction] = self._build_quick_actions(
             self._runtime_settings.get("quick_actions")
         )
-        self._active_quick_action_id: Optional[str] = None
-        self._query_seeded_by_quick_action: Optional[str] = None
+        self._active_quick_action_id: str | None = None
+        self._query_seeded_by_quick_action: str | None = None
         self._streaming_in_progress = False
-        self._streaming_buffer: List[str] = []
-        self._stream_prompt_id: Optional[uuid.UUID] = None
-        self._stream_control_state: Dict[str, bool] = {}
+        self._streaming_buffer: list[str] = []
+        self._stream_prompt_id: uuid.UUID | None = None
+        self._stream_control_state: dict[str, bool] = {}
         self._suppress_query_signal = False
-        self._quick_shortcuts: List[QShortcut] = []
-        self._template_preview: Optional[TemplatePreviewWidget] = None
-        self._template_list_view: Optional[QListView] = None
-        self._template_detail_widget: Optional[PromptDetailWidget] = None
-        self._template_run_shortcut_button: Optional[QPushButton] = None
-        self._template_transition_indicator: Optional[ProcessingIndicator] = None
-        self._share_providers: Dict[str, ShareProvider] = {}
+        self._quick_shortcuts: list[QShortcut] = []
+        self._template_preview: TemplatePreviewWidget | None = None
+        self._template_list_view: QListView | None = None
+        self._template_detail_widget: PromptDetailWidget | None = None
+        self._template_run_shortcut_button: QPushButton | None = None
+        self._template_transition_indicator: ProcessingIndicator | None = None
+        self._share_providers: dict[str, ShareProvider] = {}
         self._register_share_provider(ShareTextProvider())
         self._layout_settings = QSettings("PromptManager", "MainWindow")
         (
@@ -1089,7 +1082,7 @@ class MainWindow(QMainWindow):
             self._layout_settings,
             limit=self._execute_context_history_limit,
         )
-        self._execute_context_history: Deque[str] = deque(
+        self._execute_context_history: deque[str] = deque(
             history_entries,
             maxlen=self._execute_context_history_limit,
         )
@@ -1097,16 +1090,16 @@ class MainWindow(QMainWindow):
         if last_history_entry.strip() and last_history_entry not in self._execute_context_history:
             self._execute_context_history.appendleft(last_history_entry)
             self._persist_execute_context_history()
-        self._main_container: Optional[QFrame] = None
-        self._main_splitter: Optional[QSplitter] = None
-        self._list_splitter: Optional[QSplitter] = None
-        self._workspace_splitter: Optional[QSplitter] = None
-        self._template_preview_splitter: Optional[QSplitter] = None
-        self._template_preview_list_splitter: Optional[QSplitter] = None
-        self._main_splitter_left_width: Optional[int] = None
+        self._main_container: QFrame | None = None
+        self._main_splitter: QSplitter | None = None
+        self._list_splitter: QSplitter | None = None
+        self._workspace_splitter: QSplitter | None = None
+        self._template_preview_splitter: QSplitter | None = None
+        self._template_preview_list_splitter: QSplitter | None = None
+        self._main_splitter_left_width: int | None = None
         self._suppress_main_splitter_sync = False
-        self._notification_history: Deque[Notification] = deque(maxlen=200)
-        self._active_notifications: Dict[str, Notification] = {}
+        self._notification_history: deque[Notification] = deque(maxlen=200)
+        self._active_notifications: dict[str, Notification] = {}
         for note in self._manager.notification_center.history():
             self._notification_history.append(note)
             self._update_active_notification(note)
@@ -1114,7 +1107,7 @@ class MainWindow(QMainWindow):
         self._notification_indicator.setObjectName("notificationIndicator")
         self._notification_indicator.setStyleSheet("color: #2f80ed; font-weight: 500;")
         self._notification_indicator.setVisible(bool(self._active_notifications))
-        self._task_center_dialog: Optional[BackgroundTaskCenterDialog] = None
+        self._task_center_dialog: BackgroundTaskCenterDialog | None = None
         self._notification_bridge = QtNotificationBridge(self._manager.notification_center, self)
         self._notification_bridge.notification_received.connect(self._handle_notification)
         self.setWindowTitle("Prompt Manager")
@@ -1583,7 +1576,7 @@ class MainWindow(QMainWindow):
     def _restore_splitter_state(self) -> None:
         """Restore splitter sizes from persisted settings."""
 
-        entries: list[tuple[str, Optional[QSplitter]]] = [
+        entries: list[tuple[str, QSplitter | None]] = [
             ("mainSplitter", self._main_splitter),
             ("listSplitter", self._list_splitter),
             ("workspaceSplitter", self._workspace_splitter),
@@ -1666,7 +1659,7 @@ class MainWindow(QMainWindow):
     def _save_splitter_state(self) -> None:
         """Persist splitter sizes for future sessions."""
 
-        entries: list[tuple[str, Optional[QSplitter]]] = [
+        entries: list[tuple[str, QSplitter | None]] = [
             ("mainSplitter", self._main_splitter),
             ("listSplitter", self._list_splitter),
             ("workspaceSplitter", self._workspace_splitter),
@@ -1781,8 +1774,8 @@ class MainWindow(QMainWindow):
 
         stripped = search_text.strip()
         all_prompts = list(self._manager.repository.list())
-        search_results: Optional[List[Prompt]] = None
-        search_error: Optional[str] = None
+        search_results: list[Prompt] | None = None
+        search_error: str | None = None
         preserve_order = False
 
         if stripped:
@@ -1889,7 +1882,7 @@ class MainWindow(QMainWindow):
             self._populate_category_filter()
 
     @staticmethod
-    def _prompt_category_slug(prompt: Prompt) -> Optional[str]:
+    def _prompt_category_slug(prompt: Prompt) -> str | None:
         """Return the prompt's category slug, deriving it when missing."""
 
         if prompt.category_slug:
@@ -1914,14 +1907,14 @@ class MainWindow(QMainWindow):
                 return 0.0
         return 0.0
 
-    def _apply_filters(self, prompts: Sequence[Prompt]) -> List[Prompt]:
+    def _apply_filters(self, prompts: Sequence[Prompt]) -> list[Prompt]:
         """Apply category, tag, and quality filters to a prompt sequence."""
 
         selected_category = self._category_filter.currentData()
         selected_tag = self._tag_filter.currentData()
         min_quality = self._quality_filter.value()
 
-        filtered: List[Prompt] = []
+        filtered: list[Prompt] = []
         for prompt in prompts:
             if selected_category:
                 prompt_slug = self._prompt_category_slug(prompt)
@@ -1936,7 +1929,7 @@ class MainWindow(QMainWindow):
             filtered.append(prompt)
         return filtered
 
-    def _sort_prompts(self, prompts: Sequence[Prompt]) -> List[Prompt]:
+    def _sort_prompts(self, prompts: Sequence[Prompt]) -> list[Prompt]:
         """Return prompts sorted according to the active sort order."""
 
         if not prompts:
@@ -2042,7 +2035,7 @@ class MainWindow(QMainWindow):
         self._update_intent_hint(prompts_to_show)
 
     @staticmethod
-    def _replace_prompt_in_collection(collection: List[Prompt], updated: Prompt) -> bool:
+    def _replace_prompt_in_collection(collection: list[Prompt], updated: Prompt) -> bool:
         """Replace a prompt in the provided collection when present."""
 
         for index, existing in enumerate(collection):
@@ -2119,7 +2112,7 @@ class MainWindow(QMainWindow):
         label_text = prediction.label.value.replace("_", " ").title()
         confidence_pct = int(round(prediction.confidence * 100))
 
-        summary_parts: List[str] = []
+        summary_parts: list[str] = []
         if prediction.label is not IntentLabel.GENERAL or prediction.category_hints:
             summary_parts.append(f"Detected intent: {label_text} ({confidence_pct}%).")
         if prediction.category_hints:
@@ -2228,7 +2221,7 @@ class MainWindow(QMainWindow):
         self._chat_prompt_id = prompt.id
         self._chat_conversation = [dict(message) for message in outcome.conversation]
         self._result_label.setText(f"Last Result — {prompt.name}")
-        meta_parts: List[str] = [f"Duration: {outcome.result.duration_ms} ms"]
+        meta_parts: list[str] = [f"Duration: {outcome.result.duration_ms} ms"]
         history_entry = outcome.history_entry
         if history_entry is not None:
             executed_at = history_entry.executed_at.astimezone()
@@ -2282,10 +2275,10 @@ class MainWindow(QMainWindow):
         formatted = self._format_chat_history(self._chat_conversation)
         self._chat_history_view.setHtml(formatted)
 
-    def _format_chat_history(self, conversation: Sequence[Dict[str, str]]) -> str:
+    def _format_chat_history(self, conversation: Sequence[dict[str, str]]) -> str:
         """Return a readable transcript for the chat history tab."""
 
-        blocks: List[str] = []
+        blocks: list[str] = []
         user_colour = self._chat_user_colour()
         user_border = QColor(user_colour).darker(115).name()
         for message in conversation:
@@ -2353,7 +2346,7 @@ class MainWindow(QMainWindow):
         fallback_colour = QColor(fallback)
         return fallback_colour.name().lower() if fallback_colour.isValid() else fallback
 
-    def _apply_theme(self, mode: Optional[str] = None) -> None:
+    def _apply_theme(self, mode: str | None = None) -> None:
         """Apply the configured theme palette across the application."""
 
         app = QGuiApplication.instance()
@@ -2505,7 +2498,7 @@ class MainWindow(QMainWindow):
             shortcut.activated.connect(lambda a=action: self._execute_quick_action(a))  # type: ignore[arg-type]
             self._quick_shortcuts.append(shortcut)
 
-    def _set_active_quick_action(self, action: Optional[QuickAction]) -> None:
+    def _set_active_quick_action(self, action: QuickAction | None) -> None:
         """Update the quick actions button label to mirror the chosen action."""
 
         if action is None:
@@ -2556,7 +2549,7 @@ class MainWindow(QMainWindow):
             self._suppress_query_signal = False
         self._query_seeded_by_quick_action = action.identifier
 
-    def _default_quick_actions(self) -> List[QuickAction]:
+    def _default_quick_actions(self) -> list[QuickAction]:
         return [
             QuickAction(
                 identifier="explain",
@@ -2599,8 +2592,8 @@ class MainWindow(QMainWindow):
             ),
         ]
 
-    def _build_quick_actions(self, custom_actions: Optional[object]) -> List[QuickAction]:
-        actions_by_id: Dict[str, QuickAction] = {
+    def _build_quick_actions(self, custom_actions: object | None) -> list[QuickAction]:
+        actions_by_id: dict[str, QuickAction] = {
             action.identifier: action for action in self._default_quick_actions()
         }
         if not custom_actions:
@@ -2626,8 +2619,8 @@ class MainWindow(QMainWindow):
         self,
         action: QuickAction,
         prompts: Iterable[Prompt],
-        ranked: List[Prompt],
-    ) -> Optional[Prompt]:
+        ranked: list[Prompt],
+    ) -> Prompt | None:
         if action.prompt_id:
             prompt_id = action.prompt_id
             try:
@@ -2656,7 +2649,7 @@ class MainWindow(QMainWindow):
             return ""
         return self._manager.generate_prompt_description(context)
 
-    def _generate_prompt_scenarios(self, context: str) -> List[str]:
+    def _generate_prompt_scenarios(self, context: str) -> list[str]:
         """Delegate scenario generation to PromptManager."""
 
         text = (context or "").strip()
@@ -2676,13 +2669,13 @@ class MainWindow(QMainWindow):
             logger.debug("PromptManager category suggestion failed", exc_info=True)
             return ""
 
-    def _generate_prompt_tags(self, context: str) -> List[str]:
+    def _generate_prompt_tags(self, context: str) -> list[str]:
         """Suggest tags using the intent classifier and language heuristics."""
 
         text = (context or "").strip()
         if not text:
             return []
-        tags: List[str] = []
+        tags: list[str] = []
         classifier = self._manager.intent_classifier
         if classifier is not None:
             prediction = classifier.classify(text)
@@ -2716,7 +2709,7 @@ class MainWindow(QMainWindow):
         for keyword, tag in keyword_tags.items():
             if keyword in lowered:
                 tags.append(tag)
-        unique: List[str] = []
+        unique: list[str] = []
         seen: set[str] = set()
         for tag in tags:
             normalized = tag.strip()
@@ -2733,10 +2726,10 @@ class MainWindow(QMainWindow):
         self,
         prompt_text: str,
         *,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        category: Optional[str] = None,
-        tags: Optional[Sequence[str]] = None,
+        name: str | None = None,
+        description: str | None = None,
+        category: str | None = None,
+        tags: Sequence[str] | None = None,
     ) -> PromptRefinement:
         """Delegate prompt refinement to PromptManager."""
 
@@ -2752,10 +2745,10 @@ class MainWindow(QMainWindow):
         self,
         prompt_text: str,
         *,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        category: Optional[str] = None,
-        tags: Optional[Sequence[str]] = None,
+        name: str | None = None,
+        description: str | None = None,
+        category: str | None = None,
+        tags: Sequence[str] | None = None,
     ) -> PromptRefinement:
         """Delegate structure-only prompt refinement to PromptManager."""
 
@@ -2849,7 +2842,7 @@ class MainWindow(QMainWindow):
             return
         note = dialog.note
         rating_value = dialog.rating
-        metadata: Dict[str, Any] = {"source": "manual-save"}
+        metadata: dict[str, Any] = {"source": "manual-save"}
         if note:
             metadata["note"] = note
         if outcome.history_entry is not None:
@@ -3182,7 +3175,7 @@ class MainWindow(QMainWindow):
                 10000,
             )
 
-    def _build_share_payload(self, prompt: Prompt) -> Optional[str]:
+    def _build_share_payload(self, prompt: Prompt) -> str | None:
         """Return the formatted share payload for the selected mode."""
 
         mode = self._detail_widget.share_payload_mode()
@@ -3222,7 +3215,7 @@ class MainWindow(QMainWindow):
     def _show_similar_prompts(self, prompt: Prompt) -> None:
         """Populate the prompt list with embedding-based recommendations."""
 
-        embedding_vector: Optional[List[float]]
+        embedding_vector: list[float] | None
         if prompt.ext4 is not None:
             try:
                 embedding_vector = [float(value) for value in prompt.ext4]
@@ -3341,7 +3334,7 @@ class MainWindow(QMainWindow):
             self._detail_widget.clear()
         self._update_intent_hint(sorted_prompts)
 
-    def _current_prompt(self) -> Optional[Prompt]:
+    def _current_prompt(self) -> Prompt | None:
         """Return the prompt currently selected in the list."""
 
         index = self._list_view.currentIndex()
@@ -3400,7 +3393,7 @@ class MainWindow(QMainWindow):
         """Show a context menu with prompt-specific actions."""
 
         index = self._list_view.indexAt(point)
-        prompt: Optional[Prompt] = None
+        prompt: Prompt | None = None
         if index.isValid():
             self._list_view.setCurrentIndex(index)
             prompt = self._model.prompt_at(index.row())
@@ -3485,8 +3478,8 @@ class MainWindow(QMainWindow):
         self,
         prompt: Prompt,
         *,
-        parent: Optional[QWidget] = None,
-        context_override: Optional[str] = None,
+        parent: QWidget | None = None,
+        context_override: str | None = None,
     ) -> None:
         """Ask for a task and run the prompt using its body as contextual input."""
 
@@ -3751,7 +3744,7 @@ class MainWindow(QMainWindow):
             return
         self._delete_prompt(prompt)
 
-    def _open_version_history_dialog(self, prompt: Optional[Prompt] = None) -> None:
+    def _open_version_history_dialog(self, prompt: Prompt | None = None) -> None:
         """Open the version history dialog for the requested or selected prompt."""
 
         if prompt is None:
@@ -3840,7 +3833,7 @@ class MainWindow(QMainWindow):
             "",
             "JSON Files (*.json);;All Files (*)",
         )
-        catalog_path: Optional[Path]
+        catalog_path: Path | None
         if file_path:
             catalog_path = Path(file_path)
         else:
@@ -3967,7 +3960,7 @@ class MainWindow(QMainWindow):
         if dialog.exec() != QDialog.Accepted:
             return
         overrides = dialog.result_templates()
-        cleaned_overrides: Optional[dict[str, str]] = overrides or None
+        cleaned_overrides: dict[str, str] | None = overrides or None
         current_templates = self._runtime_settings.get("prompt_templates")
         normalised_current = current_templates or None
         if normalised_current == cleaned_overrides:
@@ -3983,7 +3976,7 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Closing Prompt Manager…", 2000)
         self.close()
 
-    def _apply_settings(self, updates: dict[str, Optional[object]]) -> None:
+    def _apply_settings(self, updates: dict[str, object | None]) -> None:
         """Persist settings, refresh catalogue, and update name generator."""
 
         if not updates:
@@ -4014,7 +4007,7 @@ class MainWindow(QMainWindow):
             runtime["embedding_model"] = model_value
         embedding_backend_value = runtime.get("embedding_backend", DEFAULT_EMBEDDING_BACKEND)
 
-        cleaned_drop_params: Optional[list[str]] = runtime.get("litellm_drop_params")  # type: ignore[assignment]
+        cleaned_drop_params: list[str] | None = runtime.get("litellm_drop_params")  # type: ignore[assignment]
         if "litellm_drop_params" in updates:
             drop_params_value = updates.get("litellm_drop_params")
             if isinstance(drop_params_value, list):
@@ -4034,7 +4027,7 @@ class MainWindow(QMainWindow):
             stream_flag = bool(updates.get("litellm_stream"))
             runtime["litellm_stream"] = stream_flag
 
-        def _normalise_workflows(value: Optional[object]) -> Optional[dict[str, str]]:
+        def _normalise_workflows(value: object | None) -> dict[str, str] | None:
             if not isinstance(value, dict):
                 return None
             return {
@@ -4048,7 +4041,7 @@ class MainWindow(QMainWindow):
             cleaned_workflow_models = _normalise_workflows(updates.get("litellm_workflow_models"))
             runtime["litellm_workflow_models"] = cleaned_workflow_models
 
-        cleaned_quick_actions: Optional[list[dict[str, object]]] = None
+        cleaned_quick_actions: list[dict[str, object]] | None = None
         existing_quick_actions = runtime.get("quick_actions")
         if isinstance(existing_quick_actions, list):
             cleaned_quick_actions = [
@@ -4094,7 +4087,7 @@ class MainWindow(QMainWindow):
         if theme_choice not in {"light", "dark"}:
             theme_choice = DEFAULT_THEME_MODE
 
-        prompt_templates_payload: Optional[dict[str, str]] = runtime.get("prompt_templates")  # type: ignore[assignment]
+        prompt_templates_payload: dict[str, str] | None = runtime.get("prompt_templates")  # type: ignore[assignment]
         if "prompt_templates" in updates:
             prompt_templates_value = updates.get("prompt_templates")
             if isinstance(prompt_templates_value, dict):
@@ -4197,11 +4190,11 @@ class MainWindow(QMainWindow):
             self._template_preview.set_run_enabled(has_executor)
 
     def _initial_runtime_settings(
-        self, settings: Optional[PromptManagerSettings]
-    ) -> dict[str, Optional[object]]:
+        self, settings: PromptManagerSettings | None
+    ) -> dict[str, object | None]:
         """Load current settings snapshot from configuration."""
 
-        derived_quick_actions: Optional[list[dict[str, object]]]
+        derived_quick_actions: list[dict[str, object]] | None
         if settings and settings.quick_actions:
             derived_quick_actions = [dict(entry) for entry in settings.quick_actions]
         else:
@@ -4358,7 +4351,7 @@ class MainWindow(QMainWindow):
     def _update_prompt_lineage_summary(self, prompt: Prompt) -> None:
         """Fetch version/fork metadata for the detail pane."""
 
-        summary_parts: List[str] = []
+        summary_parts: list[str] = []
         try:
             parent_link = self._manager.get_prompt_parent_fork(prompt.id)
         except PromptVersionError:
@@ -4383,7 +4376,7 @@ class MainWindow(QMainWindow):
             if self._template_detail_widget is not None:
                 self._template_detail_widget.update_lineage_summary("No lineage data yet.")
 
-    def _update_template_preview(self, prompt: Optional[Prompt]) -> None:
+    def _update_template_preview(self, prompt: Prompt | None) -> None:
         """Refresh the workspace template preview widget for the selected prompt."""
 
         if self._template_preview is None:
@@ -4507,7 +4500,7 @@ class MainWindow(QMainWindow):
     def _format_timestamp(value: datetime) -> str:
         """Return a compact UTC timestamp for lineage summaries."""
 
-        return value.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        return value.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC")
 
     def _show_error(self, title: str, message: str) -> None:
         """Display an error dialog and log to status bar."""

@@ -9,9 +9,10 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
+from typing import Any
 
 from jinja2 import Environment, StrictUndefined, Template, TemplateSyntaxError, UndefinedError, meta
 from jsonschema import Draft202012Validator, exceptions as jsonschema_exceptions
@@ -38,7 +39,7 @@ def _slugify_filter(value: Any) -> str:
     return slugify_category(text) or text.replace(" ", "-").lower()
 
 
-def _json_filter(value: Any, *, indent: Optional[int] = None) -> str:
+def _json_filter(value: Any, *, indent: int | None = None) -> str:
     """Return ``value`` serialized as JSON with optional pretty printing."""
 
     return json.dumps(value, ensure_ascii=False, indent=indent)
@@ -49,8 +50,8 @@ class TemplateRenderResult:
     """Outcome of rendering a template preview."""
 
     rendered_text: str
-    errors: List[str] = field(default_factory=list)
-    missing_variables: Set[str] = field(default_factory=set)
+    errors: list[str] = field(default_factory=list)
+    missing_variables: set[str] = field(default_factory=set)
 
 
 def format_template_syntax_error(template_text: str, exc: TemplateSyntaxError) -> str:
@@ -121,7 +122,7 @@ def _extract_fragment(line_text: str, start_token: str, end_token: str) -> str:
 class TemplateRenderer:
     """Render Jinja2 templates with strict variable enforcement and custom filters."""
 
-    _SPECIAL_VARIABLES: Set[str] = {"cycler", "loop", "namespace", "super", "caller"}
+    _SPECIAL_VARIABLES: set[str] = {"cycler", "loop", "namespace", "super", "caller"}
 
     def __init__(self) -> None:
         self._env = Environment(
@@ -138,7 +139,7 @@ class TemplateRenderer:
             }
         )
 
-    def extract_variables(self, template_text: str) -> List[str]:
+    def extract_variables(self, template_text: str) -> list[str]:
         """Return sorted placeholder names referenced within ``template_text``."""
 
         if not template_text.strip():
@@ -172,7 +173,7 @@ class TemplateRenderer:
             )
 
     @staticmethod
-    def _infer_missing_variable(message: str) -> Set[str]:
+    def _infer_missing_variable(message: str) -> set[str]:
         """Best-effort extraction of undefined variable names from Jinja errors."""
 
         pattern = re.compile(r"'(?P<name>[^']+)' is undefined")
@@ -191,7 +192,7 @@ class SchemaValidationMode(Enum):
     PYDANTIC = "pydantic"
 
     @classmethod
-    def from_string(cls, value: str | None) -> "SchemaValidationMode":
+    def from_string(cls, value: str | None) -> SchemaValidationMode:
         if not value:
             return cls.NONE
         lowered = value.strip().lower()
@@ -206,9 +207,9 @@ class SchemaValidationResult:
     """Outcome of validating user variables against an optional schema."""
 
     is_valid: bool
-    errors: List[str] = field(default_factory=list)
-    field_errors: Set[str] = field(default_factory=set)
-    schema_error: Optional[str] = None
+    errors: list[str] = field(default_factory=list)
+    field_errors: set[str] = field(default_factory=set)
+    schema_error: str | None = None
 
 
 class SchemaValidator:
@@ -263,8 +264,8 @@ class SchemaValidator:
             )
 
         validator = Draft202012Validator(schema)
-        errors: List[str] = []
-        field_errors: Set[str] = set()
+        errors: list[str] = []
+        field_errors: set[str] = set()
         for error in validator.iter_errors(dict(variables)):
             path = self._format_error_path(error.path)
             errors.append(f"{path}: {error.message}" if path else error.message)
@@ -291,8 +292,8 @@ class SchemaValidator:
         try:
             model.model_validate(dict(variables))
         except ValidationError as exc:
-            messages: List[str] = []
-            field_errors: Set[str] = set()
+            messages: list[str] = []
+            field_errors: set[str] = set()
             for error in exc.errors():
                 location = ".".join(str(part) for part in error["loc"])
                 messages.append(f"{location}: {error['msg']}")
@@ -315,7 +316,7 @@ class SchemaValidator:
             raise ValueError("Schema must define object properties for Pydantic validation")
 
         required = set(schema.get("required", []))
-        fields: Dict[str, Tuple[Any, Any]] = {}
+        fields: dict[str, tuple[Any, Any]] = {}
         for name, definition in properties.items():
             if not isinstance(definition, Mapping):
                 raise ValueError(f"Schema property '{name}' must be an object definition")
@@ -346,14 +347,14 @@ class SchemaValidator:
                 if isinstance(items, Mapping)
                 else Any
             )
-            return List[item_type]  # type: ignore[index]
+            return list[item_type]  # type: ignore[index]
         if schema_type == "object":
-            return Dict[str, Any]
+            return dict[str, Any]
         return Any
 
     @staticmethod
-    def _field_constraints(definition: Mapping[str, Any]) -> Dict[str, Any]:
-        constraints: Dict[str, Any] = {}
+    def _field_constraints(definition: Mapping[str, Any]) -> dict[str, Any]:
+        constraints: dict[str, Any] = {}
         if isinstance(definition.get("minLength"), int):
             constraints["min_length"] = definition["minLength"]
         if isinstance(definition.get("maxLength"), int):

@@ -19,8 +19,9 @@ Updates: v0.14.0 – 2025‑11‑18 – Initial scaffold with proxy implementati
 from __future__ import annotations
 
 import threading
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Iterator, Optional
+from typing import Any
 
 from models.prompt_model import Prompt
 
@@ -41,7 +42,7 @@ class PromptStorage:
 
     _lock: threading.RLock
 
-    def __init__(self, db_path: Optional[str | Path] = None, *, repository: Optional[PromptRepository] = None):
+    def __init__(self, db_path: str | Path | None = None, *, repository: PromptRepository | None = None):
         self._lock = threading.RLock()
 
         if repository is not None:
@@ -59,7 +60,7 @@ class PromptStorage:
         return getattr(self._repo, item)
 
     # Example explicit wrapper – others can be added incrementally
-    def list_prompts(self, limit: Optional[int] = None) -> list[Prompt]:  # noqa: D401,E501
+    def list_prompts(self, limit: int | None = None) -> list[Prompt]:  # noqa: D401,E501
         """Return list of prompts (proxy)."""
 
         with self._lock:

@@ -8,9 +8,9 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING
 
 from core.prompt_manager import PromptHistoryError, PromptManager, PromptManagerError
 
@@ -26,11 +26,11 @@ logger = logging.getLogger("prompt_manager.analytics")
 class UsageFrequencyEntry:
     """Summarise prompt usage volume for ranking charts."""
 
-    prompt_id: "UUID"
+    prompt_id: UUID
     name: str
     usage_count: int
-    success_rate: Optional[float]
-    last_executed_at: Optional[datetime]
+    success_rate: float | None
+    last_executed_at: datetime | None
 
 
 @dataclass(slots=True)
@@ -51,7 +51,7 @@ class BenchmarkStatsEntry:
     model: str
     run_count: int
     success_rate: float
-    average_duration_ms: Optional[float]
+    average_duration_ms: float | None
     total_tokens: int
 
 
@@ -69,12 +69,12 @@ class IntentSuccessPoint:
 class AnalyticsSnapshot:
     """Container for dashboard datasets."""
 
-    execution: Optional[ExecutionAnalytics]
-    usage_frequency: List[UsageFrequencyEntry]
-    model_costs: List[ModelCostEntry]
-    benchmark_stats: List[BenchmarkStatsEntry]
-    intent_success: List[IntentSuccessPoint]
-    embedding: Optional[PromptManager.EmbeddingDiagnostics]
+    execution: ExecutionAnalytics | None
+    usage_frequency: list[UsageFrequencyEntry]
+    model_costs: list[ModelCostEntry]
+    benchmark_stats: list[BenchmarkStatsEntry]
+    intent_success: list[IntentSuccessPoint]
+    embedding: PromptManager.EmbeddingDiagnostics | None
 
 
 def build_analytics_snapshot(
@@ -82,15 +82,15 @@ def build_analytics_snapshot(
     *,
     window_days: int = 30,
     prompt_limit: int = 5,
-    usage_log_path: Optional[Path] = None,
+    usage_log_path: Path | None = None,
 ) -> AnalyticsSnapshot:
     """Collect aggregated metrics for dashboards and diagnostics outputs."""
 
-    since: Optional[datetime]
+    since: datetime | None
     if window_days <= 0:
         since = None
     else:
-        since = datetime.now(timezone.utc) - timedelta(days=window_days)
+        since = datetime.now(UTC) - timedelta(days=window_days)
 
     usage_path = (
         Path(usage_log_path)
@@ -98,7 +98,7 @@ def build_analytics_snapshot(
         else Path("data") / "logs" / "intent_usage.jsonl"
     )
 
-    execution_summary: Optional["ExecutionAnalytics"] = None
+    execution_summary: ExecutionAnalytics | None = None
     try:
         execution_summary = manager.get_execution_analytics(
             window_days=window_days if window_days > 0 else None,
@@ -113,7 +113,7 @@ def build_analytics_snapshot(
     benchmark_stats = _collect_benchmark_stats(manager, since=since)
     intent_success = _collect_intent_success_trend(usage_path, since=since)
 
-    embedding_summary: Optional[PromptManager.EmbeddingDiagnostics] = None
+    embedding_summary: PromptManager.EmbeddingDiagnostics | None = None
     try:
         embedding_summary = manager.diagnose_embeddings()
     except PromptManagerError as exc:
@@ -129,7 +129,7 @@ def build_analytics_snapshot(
     )
 
 
-def snapshot_dataset_rows(snapshot: AnalyticsSnapshot, dataset: str) -> List[Dict[str, object]]:
+def snapshot_dataset_rows(snapshot: AnalyticsSnapshot, dataset: str) -> list[dict[str, object]]:
     """Return dataset rows for CSV export based on the requested key."""
 
     key = dataset.lower()
@@ -211,8 +211,8 @@ def _collect_usage_frequency(
     manager: PromptManager,
     *,
     limit: int,
-    since: Optional[datetime],
-) -> List[UsageFrequencyEntry]:
+    since: datetime | None,
+) -> list[UsageFrequencyEntry]:
     try:
         prompts = manager.repository.list()
     except Exception as exc:  # pragma: no cover - defensive
@@ -224,9 +224,9 @@ def _collect_usage_frequency(
 
     ranked = sorted(prompts, key=lambda prompt: prompt.usage_count, reverse=True)
     top_prompts = ranked[: max(1, limit)]
-    entries: List[UsageFrequencyEntry] = []
+    entries: list[UsageFrequencyEntry] = []
     for prompt in top_prompts:
-        stats: Dict[str, object]
+        stats: dict[str, object]
         try:
             stats = manager.repository.get_prompt_execution_statistics(prompt.id, since=since)
         except Exception as exc:  # pragma: no cover - defensive
@@ -252,14 +252,14 @@ def _collect_usage_frequency(
 def _collect_model_costs(
     manager: PromptManager,
     *,
-    since: Optional[datetime],
-) -> List[ModelCostEntry]:
+    since: datetime | None,
+) -> list[ModelCostEntry]:
     try:
         rows = manager.repository.get_model_usage_breakdown(since=since)
     except Exception as exc:  # pragma: no cover - defensive
         logger.debug("Unable to compute model usage breakdown", exc_info=exc)
         return []
-    entries: List[ModelCostEntry] = []
+    entries: list[ModelCostEntry] = []
     for row in rows:
         model = str(row.get("model") or "unknown").strip() or "unknown"
         entries.append(
@@ -277,14 +277,14 @@ def _collect_model_costs(
 def _collect_benchmark_stats(
     manager: PromptManager,
     *,
-    since: Optional[datetime],
-) -> List[BenchmarkStatsEntry]:
+    since: datetime | None,
+) -> list[BenchmarkStatsEntry]:
     try:
         rows = manager.repository.get_benchmark_execution_stats(since=since)
     except Exception as exc:  # pragma: no cover - defensive
         logger.debug("Unable to compute benchmark analytics", exc_info=exc)
         return []
-    entries: List[BenchmarkStatsEntry] = []
+    entries: list[BenchmarkStatsEntry] = []
     for row in rows:
         model = str(row.get("model") or "unknown").strip() or "unknown"
         total_runs = int(row.get("total_runs", 0) or 0)
@@ -292,7 +292,7 @@ def _collect_benchmark_stats(
         success_rate = success_runs / total_runs if total_runs else 0.0
         avg_duration = row.get("avg_duration_ms")
         try:
-            avg_duration_value: Optional[float] = (
+            avg_duration_value: float | None = (
                 float(avg_duration) if avg_duration is not None else None
             )
         except (TypeError, ValueError):  # pragma: no cover - defensive
@@ -312,8 +312,8 @@ def _collect_benchmark_stats(
 def _collect_intent_success_trend(
     usage_path: Path,
     *,
-    since: Optional[datetime],
-) -> List[IntentSuccessPoint]:
+    since: datetime | None,
+) -> list[IntentSuccessPoint]:
     if not usage_path.exists():
         return []
     try:
@@ -322,7 +322,7 @@ def _collect_intent_success_trend(
         logger.debug("Unable to read usage log", exc_info=exc)
         return []
 
-    buckets: Dict[date, Dict[str, int]] = {}
+    buckets: dict[date, dict[str, int]] = {}
     for line in lines:
         if not line.strip():
             continue
@@ -342,13 +342,13 @@ def _collect_intent_success_trend(
         bucket["total"] += 1
         if payload.get("success") is True:
             bucket["success"] += 1
-    points: List[IntentSuccessPoint] = []
+    points: list[IntentSuccessPoint] = []
     for bucket_day in sorted(buckets.keys()):
         data = buckets[bucket_day]
         total = data["total"]
         success = data["success"]
         success_rate = success / total if total else 0.0
-        bucket_dt = datetime.combine(bucket_day, datetime.min.time(), tzinfo=timezone.utc)
+        bucket_dt = datetime.combine(bucket_day, datetime.min.time(), tzinfo=UTC)
         points.append(
             IntentSuccessPoint(
                 bucket=bucket_dt,
@@ -360,13 +360,13 @@ def _collect_intent_success_trend(
     return points
 
 
-def _coerce_datetime(value: object) -> Optional[datetime]:
+def _coerce_datetime(value: object) -> datetime | None:
     if value is None:
         return None
     if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
     if isinstance(value, date):
-        return datetime.combine(value, datetime.min.time(), tzinfo=timezone.utc)
+        return datetime.combine(value, datetime.min.time(), tzinfo=UTC)
     if isinstance(value, str):
         text = value.strip()
         if not text:
@@ -376,7 +376,7 @@ def _coerce_datetime(value: object) -> Optional[datetime]:
         except ValueError:
             return None
         if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=timezone.utc)
+            parsed = parsed.replace(tzinfo=UTC)
         return parsed
     return None
 

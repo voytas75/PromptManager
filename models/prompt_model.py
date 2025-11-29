@@ -18,17 +18,18 @@ import hashlib
 import json
 import re
 import uuid
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence
+from typing import Any
 
 from .category_model import slugify_category
 
 
 def _utc_now() -> datetime:
     """Return an aware UTC timestamp."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _ensure_uuid(value: Any) -> uuid.UUID:
@@ -41,13 +42,13 @@ def _ensure_uuid(value: Any) -> uuid.UUID:
 def _ensure_datetime(value: Any) -> datetime:
     """Parse incoming datetime values (isoformat strings or datetime)."""
     if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
     if value is None:
         return _utc_now()
     return datetime.fromisoformat(str(value))
 
 
-def _serialize_list(items: Optional[Iterable[Any]]) -> List[Any]:
+def _serialize_list(items: Iterable[Any] | None) -> list[Any]:
     """Normalize iterable inputs into JSON-serialisable lists."""
     if items is None:
         return []
@@ -58,10 +59,10 @@ def _serialize_list(items: Optional[Iterable[Any]]) -> List[Any]:
     return list(items)
 
 
-def _sanitize_scenarios(items: Optional[Iterable[Any]]) -> List[str]:
+def _sanitize_scenarios(items: Iterable[Any] | None) -> list[str]:
     """Return a deduplicated, trimmed list of scenario strings."""
 
-    scenarios: List[str] = []
+    scenarios: list[str] = []
     seen: set[str] = set()
     for raw in _serialize_list(items):
         text = str(raw).strip()
@@ -75,7 +76,7 @@ def _sanitize_scenarios(items: Optional[Iterable[Any]]) -> List[str]:
     return scenarios
 
 
-def _serialize_metadata(value: Optional[Any]) -> Optional[str]:
+def _serialize_metadata(value: Any | None) -> str | None:
     """Serialize complex metadata (dict/list) to JSON strings for storage."""
     if value is None:
         return None
@@ -84,7 +85,7 @@ def _serialize_metadata(value: Optional[Any]) -> Optional[str]:
     return json.dumps(value, ensure_ascii=False)
 
 
-def _deserialize_metadata(value: Optional[str]) -> Optional[Any]:
+def _deserialize_metadata(value: str | None) -> Any | None:
     """Deserialize metadata stored as JSON strings."""
     if value is None:
         return None
@@ -98,7 +99,7 @@ def _deserialize_metadata(value: Optional[str]) -> Optional[Any]:
         return value
 
 
-def _deserialize_list(value: Any) -> List[str]:
+def _deserialize_list(value: Any) -> list[str]:
     """Coerce metadata list fields into lists of strings."""
     if value is None:
         return []
@@ -154,40 +155,40 @@ class Prompt:
     name: str
     description: str
     category: str
-    category_slug: Optional[str] = None
-    tags: List[str] = field(default_factory=list)
+    category_slug: str | None = None
+    tags: list[str] = field(default_factory=list)
     language: str = "en"
-    context: Optional[str] = None
-    example_input: Optional[str] = None
-    example_output: Optional[str] = None
-    scenarios: List[str] = field(default_factory=list)
+    context: str | None = None
+    example_input: str | None = None
+    example_output: str | None = None
+    scenarios: list[str] = field(default_factory=list)
     last_modified: datetime = field(default_factory=_utc_now)
     version: str = "1"
-    author: Optional[str] = None
-    quality_score: Optional[float] = None
+    author: str | None = None
+    quality_score: float | None = None
     usage_count: int = 0
     rating_count: int = 0
     rating_sum: float = 0.0
-    related_prompts: List[str] = field(default_factory=list)
+    related_prompts: list[str] = field(default_factory=list)
     created_at: datetime = field(default_factory=_utc_now)
-    modified_by: Optional[str] = None
+    modified_by: str | None = None
     is_active: bool = True
     source: str = "local"
-    checksum: Optional[str] = None
-    ext1: Optional[str] = None
-    ext2: Optional[MutableMapping[str, Any]] = None
-    ext3: Optional[str] = None
-    ext4: Optional[Sequence[float]] = None
-    ext5: Optional[MutableMapping[str, Any]] = None
+    checksum: str | None = None
+    ext1: str | None = None
+    ext2: MutableMapping[str, Any] | None = None
+    ext3: str | None = None
+    ext4: Sequence[float] | None = None
+    ext5: MutableMapping[str, Any] | None = None
 
     # Transient search-only attribute populated at runtime; excluded from
     # persistence and comparisons.
-    similarity: Optional[float] = field(default=None, compare=False, repr=False)
+    similarity: float | None = field(default=None, compare=False, repr=False)
 
     def __post_init__(self) -> None:
         """Normalise stored scenarios and mirror them into ext5 metadata."""
 
-        ext5_mapping: Optional[MutableMapping[str, Any]]
+        ext5_mapping: MutableMapping[str, Any] | None
         if isinstance(self.ext5, MutableMapping):
             ext5_mapping = self.ext5
         elif isinstance(self.ext5, Mapping):
@@ -195,7 +196,7 @@ class Prompt:
         else:
             ext5_mapping = None
 
-        combined_sources: List[Any] = []
+        combined_sources: list[Any] = []
         if self.scenarios:
             combined_sources.extend(self.scenarios)
         if ext5_mapping is not None and "scenarios" in ext5_mapping:
@@ -237,7 +238,7 @@ class Prompt:
         ]
         return "\n".join(filter(None, sections))
 
-    def to_metadata(self) -> Dict[str, Any]:
+    def to_metadata(self) -> dict[str, Any]:
         """Return metadata dictionary compatible with ChromaDB."""
         metadata = {
             "name": self.name,
@@ -271,7 +272,7 @@ class Prompt:
         }
         return {key: value for key, value in metadata.items() if value is not None}
 
-    def to_record(self) -> Dict[str, Any]:
+    def to_record(self) -> dict[str, Any]:
         """Return a plain dictionary representation for caching."""
         record = {
             "id": str(self.id),
@@ -307,7 +308,7 @@ class Prompt:
         return record
 
     @classmethod
-    def from_record(cls, data: Mapping[str, Any]) -> "Prompt":
+    def from_record(cls, data: Mapping[str, Any]) -> Prompt:
         """Create a Prompt from a dictionary record."""
         return cls(
             id=_ensure_uuid(data.get("id") or uuid.uuid4()),
@@ -344,7 +345,7 @@ class Prompt:
         )
 
     @classmethod
-    def from_chroma(cls, record: Mapping[str, Any]) -> "Prompt":
+    def from_chroma(cls, record: Mapping[str, Any]) -> Prompt:
         """Instantiate from a ChromaDB metadata record."""
         metadata = record.get("metadata") or {}
         base = {
@@ -388,20 +389,20 @@ class PromptExecution:
     id: uuid.UUID
     prompt_id: uuid.UUID
     request_text: str
-    response_text: Optional[str] = None
+    response_text: str | None = None
     status: ExecutionStatus = ExecutionStatus.SUCCESS
-    error_message: Optional[str] = None
-    duration_ms: Optional[int] = None
+    error_message: str | None = None
+    duration_ms: int | None = None
     executed_at: datetime = field(default_factory=_utc_now)
     input_hash: str = ""
-    rating: Optional[float] = None
-    metadata: Optional[MutableMapping[str, Any]] = None
+    rating: float | None = None
+    metadata: MutableMapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if not self.input_hash:
             self.input_hash = _hash_text(self.request_text)
 
-    def to_record(self) -> Dict[str, Any]:
+    def to_record(self) -> dict[str, Any]:
         """Return a dictionary representation suitable for persistence."""
         return {
             "id": str(self.id),
@@ -418,7 +419,7 @@ class PromptExecution:
         }
 
     @classmethod
-    def from_record(cls, data: Mapping[str, Any]) -> "PromptExecution":
+    def from_record(cls, data: Mapping[str, Any]) -> PromptExecution:
         """Hydrate a PromptExecution from a mapping."""
         status_value = str(data.get("status") or ExecutionStatus.SUCCESS.value)
         try:
@@ -456,9 +457,9 @@ class PromptVersion:
     prompt_id: uuid.UUID
     version_number: int
     created_at: datetime
-    parent_version_id: Optional[int]
-    commit_message: Optional[str]
-    snapshot: Dict[str, Any]
+    parent_version_id: int | None
+    commit_message: str | None
+    snapshot: dict[str, Any]
 
     def to_prompt(self) -> Prompt:
         """Hydrate the stored snapshot into a :class:`Prompt`."""
@@ -466,7 +467,7 @@ class PromptVersion:
         return Prompt.from_record(self.snapshot)
 
     @classmethod
-    def from_row(cls, row: Mapping[str, Any]) -> "PromptVersion":
+    def from_row(cls, row: Mapping[str, Any]) -> PromptVersion:
         """Instantiate a version from a SQLite row payload."""
 
         raw_snapshot = row["snapshot_json"]
@@ -505,7 +506,7 @@ class PromptForkLink:
     created_at: datetime
 
     @classmethod
-    def from_row(cls, row: Mapping[str, Any]) -> "PromptForkLink":
+    def from_row(cls, row: Mapping[str, Any]) -> PromptForkLink:
         """Hydrate a fork link from a SQLite row payload."""
 
         return cls(
@@ -524,15 +525,15 @@ class UserProfile:
 
     id: uuid.UUID
     username: str = "default"
-    preferred_language: Optional[str] = None
+    preferred_language: str | None = None
     category_weights: MutableMapping[str, int] = field(default_factory=dict)
     tag_weights: MutableMapping[str, int] = field(default_factory=dict)
-    recent_prompts: List[str] = field(default_factory=list)
+    recent_prompts: list[str] = field(default_factory=list)
     settings: MutableMapping[str, Any] = field(default_factory=dict)
     updated_at: datetime = field(default_factory=_utc_now)
-    ext1: Optional[str] = None
-    ext2: Optional[MutableMapping[str, Any]] = None
-    ext3: Optional[MutableMapping[str, Any]] = None
+    ext1: str | None = None
+    ext2: MutableMapping[str, Any] | None = None
+    ext3: MutableMapping[str, Any] | None = None
 
     def touch(self) -> None:
         """Refresh the profile timestamp."""
@@ -561,7 +562,7 @@ class UserProfile:
 
         self.touch()
 
-    def favorite_categories(self, *, limit: int = 3) -> List[str]:
+    def favorite_categories(self, *, limit: int = 3) -> list[str]:
         """Return the most frequently used categories."""
 
         if not self.category_weights:
@@ -573,7 +574,7 @@ class UserProfile:
         )
         return [name for name, _ in ordered[:limit]]
 
-    def favorite_tags(self, *, limit: int = 5) -> List[str]:
+    def favorite_tags(self, *, limit: int = 5) -> list[str]:
         """Return the most frequently used tags."""
 
         if not self.tag_weights:
@@ -585,7 +586,7 @@ class UserProfile:
         )
         return [name for name, _ in ordered[:limit]]
 
-    def to_record(self) -> Dict[str, Any]:
+    def to_record(self) -> dict[str, Any]:
         """Serialise the profile into a plain mapping."""
 
         return {
@@ -603,7 +604,7 @@ class UserProfile:
         }
 
     @classmethod
-    def from_record(cls, data: Mapping[str, Any]) -> "UserProfile":
+    def from_record(cls, data: Mapping[str, Any]) -> UserProfile:
         """Hydrate a profile from a mapping."""
 
         settings_value = data.get("settings")
@@ -637,7 +638,7 @@ class UserProfile:
         )
 
     @classmethod
-    def create_default(cls, username: str = "default") -> "UserProfile":
+    def create_default(cls, username: str = "default") -> UserProfile:
         """Return a default profile for single-user deployments."""
 
         return cls(id=DEFAULT_PROFILE_ID, username=username)

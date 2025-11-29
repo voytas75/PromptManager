@@ -6,12 +6,14 @@ Updates: v0.1.0 - 2025-10-30 - Add unit tests for error handling and caching pat
 
 from __future__ import annotations
 
+import builtins
 import json
 import types
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Sequence
+from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 
@@ -44,11 +46,11 @@ def _clone_category(category: PromptCategory) -> PromptCategory:
 class _StubCollection:
     """Chroma collection stub with injectable behaviours."""
 
-    add_exception: Optional[BaseException] = None
-    upsert_exception: Optional[BaseException] = None
-    delete_exception: Optional[BaseException] = None
-    query_result: Optional[Dict[str, Any]] = None
-    query_exception: Optional[BaseException] = None
+    add_exception: BaseException | None = None
+    upsert_exception: BaseException | None = None
+    delete_exception: BaseException | None = None
+    query_result: dict[str, Any] | None = None
+    query_exception: BaseException | None = None
 
     def add(self, **_: Any) -> None:
         if self.add_exception:
@@ -58,7 +60,7 @@ class _StubCollection:
         if self.upsert_exception:
             raise self.upsert_exception
 
-    def delete(self, ids: List[str]) -> None:
+    def delete(self, ids: list[str]) -> None:
         if self.delete_exception:
             raise self.delete_exception
         self.deleted_ids = ids
@@ -66,11 +68,11 @@ class _StubCollection:
     def query(
         self,
         *,
-        query_texts: Optional[List[str]] = None,  # noqa: ARG002
-        query_embeddings: Optional[List[List[float]]] = None,  # noqa: ARG002
+        query_texts: list[str] | None = None,  # noqa: ARG002
+        query_embeddings: list[list[float]] | None = None,  # noqa: ARG002
         n_results: int,  # noqa: ARG002
-        where: Optional[Dict[str, Any]] = None,  # noqa: ARG002
-    ) -> Dict[str, Any]:
+        where: dict[str, Any] | None = None,  # noqa: ARG002
+    ) -> dict[str, Any]:
         if self.query_exception:
             raise self.query_exception
         if self.query_result is None:
@@ -94,20 +96,20 @@ class _RecordingRepository:
     """Repository stand-in storing prompts in memory for tests."""
 
     def __init__(self) -> None:
-        self.storage: Dict[uuid.UUID, Prompt] = {}
-        self.deleted: List[uuid.UUID] = []
+        self.storage: dict[uuid.UUID, Prompt] = {}
+        self.deleted: list[uuid.UUID] = []
         self.profile = UserProfile.create_default()
-        self._versions: Dict[uuid.UUID, List[PromptVersion]] = {}
-        self._version_index: Dict[int, PromptVersion] = {}
+        self._versions: dict[uuid.UUID, list[PromptVersion]] = {}
+        self._version_index: dict[int, PromptVersion] = {}
         self._version_counter = 0
-        self._fork_links: Dict[int, PromptForkLink] = {}
+        self._fork_links: dict[int, PromptForkLink] = {}
         self._fork_counter = 0
         base_category = PromptCategory(
             slug="general",
             label="General",
             description="General prompts",
         )
-        self._categories: Dict[str, PromptCategory] = {base_category.slug: base_category}
+        self._categories: dict[str, PromptCategory] = {base_category.slug: base_category}
 
     def add(self, prompt: Prompt) -> Prompt:
         self.storage[prompt.id] = _clone_prompt(prompt)
@@ -130,14 +132,14 @@ class _RecordingRepository:
             raise RepositoryNotFoundError("missing get")
         return _clone_prompt(self.storage[prompt_id])
 
-    def list(self, limit: Optional[int] = None) -> List[Prompt]:
+    def list(self, limit: int | None = None) -> builtins.list[Prompt]:
         values = [
             _clone_prompt(prompt)
             for prompt in self.storage.values()
         ]
         return values[:limit] if limit is not None else values
 
-    def list_categories(self, include_archived: bool = False) -> List[PromptCategory]:
+    def list_categories(self, include_archived: bool = False) -> builtins.list[PromptCategory]:
         categories = [
             _clone_category(category)
             for category in self._categories.values()
@@ -171,15 +173,15 @@ class _RecordingRepository:
             raise RepositoryNotFoundError(f"Category {slug} not found")
         category = _clone_category(self._categories[normalized])
         category.is_active = is_active
-        category.updated_at = datetime.now(timezone.utc)
+        category.updated_at = datetime.now(UTC)
         self._categories[normalized] = category
         return _clone_category(category)
 
     def sync_category_definitions(
         self,
         categories: Sequence[PromptCategory],
-    ) -> List[PromptCategory]:
-        created: List[PromptCategory] = []
+    ) -> builtins.list[PromptCategory]:
+        created: list[PromptCategory] = []
         for category in categories:
             slug = slugify_category(category.slug)
             if slug in self._categories:
@@ -210,8 +212,8 @@ class _RecordingRepository:
         self,
         prompt: Prompt,
         *,
-        commit_message: Optional[str] = None,
-        parent_version_id: Optional[int] = None,
+        commit_message: str | None = None,
+        parent_version_id: int | None = None,
     ) -> PromptVersion:
         self._version_counter += 1
         version_list = self._versions.setdefault(prompt.id, [])
@@ -220,7 +222,7 @@ class _RecordingRepository:
             id=self._version_counter,
             prompt_id=prompt.id,
             version_number=version_number,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             parent_version_id=parent_version_id,
             commit_message=commit_message,
             snapshot=prompt.to_record(),
@@ -229,7 +231,7 @@ class _RecordingRepository:
         self._version_index[version.id] = version
         return version
 
-    def list_prompt_versions(self, prompt_id: uuid.UUID, *, limit: Optional[int] = None) -> List[PromptVersion]:
+    def list_prompt_versions(self, prompt_id: uuid.UUID, *, limit: int | None = None) -> builtins.list[PromptVersion]:
         versions = list(self._versions.get(prompt_id, []))
         versions.sort(key=lambda version: version.version_number, reverse=True)
         if limit is not None:
@@ -242,7 +244,7 @@ class _RecordingRepository:
         except KeyError as exc:
             raise RepositoryNotFoundError("version missing") from exc
 
-    def get_prompt_latest_version(self, prompt_id: uuid.UUID) -> Optional[PromptVersion]:
+    def get_prompt_latest_version(self, prompt_id: uuid.UUID) -> PromptVersion | None:
         versions = self._versions.get(prompt_id)
         if not versions:
             return None
@@ -254,18 +256,18 @@ class _RecordingRepository:
             id=self._fork_counter,
             source_prompt_id=source_prompt_id,
             child_prompt_id=child_prompt_id,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         self._fork_links[link.id] = link
         return link
 
-    def get_prompt_parent_fork(self, prompt_id: uuid.UUID) -> Optional[PromptForkLink]:
+    def get_prompt_parent_fork(self, prompt_id: uuid.UUID) -> PromptForkLink | None:
         for link in self._fork_links.values():
             if link.child_prompt_id == prompt_id:
                 return link
         return None
 
-    def list_prompt_children(self, prompt_id: uuid.UUID) -> List[PromptForkLink]:
+    def list_prompt_children(self, prompt_id: uuid.UUID) -> builtins.list[PromptForkLink]:
         return [link for link in self._fork_links.values() if link.source_prompt_id == prompt_id]
 
 
@@ -275,24 +277,24 @@ class _RedisStub:
     def __init__(
         self,
         *,
-        payload: Optional[str] = None,
-        get_exception: Optional[BaseException] = None,
-        delete_exception: Optional[BaseException] = None,
-        set_exception: Optional[BaseException] = None,
+        payload: str | None = None,
+        get_exception: BaseException | None = None,
+        delete_exception: BaseException | None = None,
+        set_exception: BaseException | None = None,
     ) -> None:
         self._payload = payload
         self._get_exception = get_exception
         self._delete_exception = delete_exception
         self._set_exception = set_exception
-        self.setex_calls: List[Dict[str, Any]] = []
-        self.deleted_keys: List[str] = []
+        self.setex_calls: list[dict[str, Any]] = []
+        self.deleted_keys: list[str] = []
 
     def setex(self, key: str, ttl: int, value: str) -> None:
         self.setex_calls.append({"key": key, "ttl": ttl, "value": value})
         if self._set_exception:
             raise self._set_exception
 
-    def get(self, key: str) -> Optional[bytes]:
+    def get(self, key: str) -> bytes | None:
         if self._get_exception:
             raise self._get_exception
         self.last_get = key
@@ -318,12 +320,12 @@ def _sample_prompt() -> Prompt:
 
 def _build_manager(
     *,
-    repository: Optional[_RecordingRepository] = None,
-    collection: Optional[_StubCollection] = None,
-    redis_client: Optional[_RedisStub] = None,
-    name_generator: Optional[Any] = None,
-    description_generator: Optional[Any] = None,
-    category_generator: Optional[Any] = None,
+    repository: _RecordingRepository | None = None,
+    collection: _StubCollection | None = None,
+    redis_client: _RedisStub | None = None,
+    name_generator: Any | None = None,
+    description_generator: Any | None = None,
+    category_generator: Any | None = None,
 ) -> PromptManager:
     repo = repository or _RecordingRepository()
     coll = collection or _StubCollection()
@@ -681,7 +683,7 @@ def test_generate_prompt_description_falls_back_on_generator_failure() -> None:
 def test_generate_prompt_category_uses_llm_when_available() -> None:
     class _CategoryGenerator:
         def __init__(self) -> None:
-            self.calls: List[str] = []
+            self.calls: list[str] = []
 
         def generate(self, context: str, *, categories: Sequence[PromptCategory]) -> str:
             self.calls.append(context)
@@ -816,7 +818,7 @@ def test_update_prompt_handles_chroma_and_cache_failures() -> None:
 
 def test_suggest_prompts_handles_repository_error_on_empty_query() -> None:
     class _Repo(_RecordingRepository):
-        def list(self, limit: Optional[int] = None) -> List[Prompt]:  # type: ignore[override]
+        def list(self, limit: int | None = None) -> builtins.list[Prompt]:  # type: ignore[override]
             raise RepositoryError("list failed")
 
     manager = _build_manager(repository=_Repo())
@@ -827,7 +829,7 @@ def test_suggest_prompts_handles_repository_error_on_empty_query() -> None:
 def test_suggest_prompts_handles_initial_search_errors() -> None:
     manager = _build_manager()
 
-    def _fail_search(self: PromptManager, *_: Any, **__: Any) -> List[Prompt]:
+    def _fail_search(self: PromptManager, *_: Any, **__: Any) -> list[Prompt]:
         raise PromptManagerError("search failed")
 
     manager.search_prompts = types.MethodType(_fail_search, manager)
@@ -839,7 +841,7 @@ def test_suggest_prompts_handles_fallback_search_errors() -> None:
     manager = _build_manager()
     calls = {"count": 0}
 
-    def _search(self: PromptManager, query: str, *, limit: int = 5) -> List[Prompt]:
+    def _search(self: PromptManager, query: str, *, limit: int = 5) -> list[Prompt]:
         calls["count"] += 1
         if calls["count"] == 1:
             return []
@@ -852,12 +854,12 @@ def test_suggest_prompts_handles_fallback_search_errors() -> None:
 
 def test_suggest_prompts_raises_when_repository_fallback_fails() -> None:
     class _Repo(_RecordingRepository):
-        def list(self, limit: Optional[int] = None) -> List[Prompt]:  # type: ignore[override]
+        def list(self, limit: int | None = None) -> builtins.list[Prompt]:  # type: ignore[override]
             raise RepositoryError("list fail")
 
     manager = _build_manager(repository=_Repo())
 
-    def _empty_search(self: PromptManager, *_: Any, **__: Any) -> List[Prompt]:
+    def _empty_search(self: PromptManager, *_: Any, **__: Any) -> list[Prompt]:
         return []
 
     manager.search_prompts = types.MethodType(_empty_search, manager)
@@ -893,7 +895,7 @@ def test_update_prompt_handles_version_lookup_failures() -> None:
             super().__init__()
             self.storage[prompt.id] = _clone_prompt(prompt)
 
-        def get_prompt_latest_version(self, prompt_id: uuid.UUID) -> Optional[PromptVersion]:  # noqa: D401
+        def get_prompt_latest_version(self, prompt_id: uuid.UUID) -> PromptVersion | None:  # noqa: D401
             raise RepositoryError("version lookup failed")
 
     repo = _VersionRepo()
@@ -909,12 +911,12 @@ def test_update_prompt_skips_version_when_body_unchanged() -> None:
             super().__init__()
             self.storage[prompt.id] = _clone_prompt(prompt)
 
-        def get_prompt_latest_version(self, prompt_id: uuid.UUID) -> Optional[PromptVersion]:  # noqa: D401
+        def get_prompt_latest_version(self, prompt_id: uuid.UUID) -> PromptVersion | None:  # noqa: D401
             return PromptVersion(
                 id=1,
                 prompt_id=prompt_id,
                 version_number=0,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
                 parent_version_id=None,
                 commit_message=None,
                 snapshot=self.storage[prompt_id].to_record(),
@@ -933,12 +935,12 @@ def test_update_prompt_schedules_embedding_refresh_on_failure() -> None:
     manager = _build_manager(repository=repo)
 
     class _FailingEmbeddingProvider:
-        def embed(self, _: str) -> List[float]:
+        def embed(self, _: str) -> list[float]:
             raise EmbeddingGenerationError("fail")
 
     class _Worker:
         def __init__(self) -> None:
-            self.scheduled: List[uuid.UUID] = []
+            self.scheduled: list[uuid.UUID] = []
 
         def schedule(self, prompt_id: uuid.UUID) -> None:
             self.scheduled.append(prompt_id)

@@ -16,7 +16,7 @@ Updates: v0.1.0 - 2025-11-25 - Add dynamic Jinja2 preview with custom filters an
 from __future__ import annotations
 
 import json
-from typing import Dict, List, Mapping, Optional, Sequence, Set
+from collections.abc import Mapping, Sequence
 
 from jinja2 import TemplateSyntaxError
 from PySide6.QtCore import QSettings, Qt, Signal
@@ -50,26 +50,26 @@ class TemplatePreviewWidget(QWidget):
     _SUCCESS_COLOR = "#047857"
     _ERROR_COLOR = "#b91c1c"
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._renderer = TemplateRenderer()
         self._validator = SchemaValidator()
         self._template_text: str = ""
-        self._variable_names: List[str] = []
-        self._variable_inputs: Dict[str, QPlainTextEdit] = {}
-        self._template_parse_error: Optional[str] = None
+        self._variable_names: list[str] = []
+        self._variable_inputs: dict[str, QPlainTextEdit] = {}
+        self._template_parse_error: str | None = None
         self._schema_visible = False
         self._preview_ready = False
         self._last_rendered_text: str = ""
         self._run_enabled = False
         self._last_run_ready = False
-        self._current_prompt_id: Optional[str] = None
+        self._current_prompt_id: str | None = None
         self._state_store = QSettings("PromptManager", "TemplatePreviewState")
         self._suspend_persist = False
         self._build_ui()
         self._update_preview()
 
-    def set_template(self, template_text: str, prompt_id: Optional[str] = None) -> None:
+    def set_template(self, template_text: str, prompt_id: str | None = None) -> None:
         """Load a new template and refresh the preview state."""
 
         self._template_text = template_text or ""
@@ -248,8 +248,8 @@ class TemplatePreviewWidget(QWidget):
             self._variable_inputs[name] = field
         self._variables_layout.addStretch(1)
 
-    def _collect_variables(self) -> Dict[str, str]:
-        values: Dict[str, str] = {}
+    def _collect_variables(self) -> dict[str, str]:
+        values: dict[str, str] = {}
         for name, widget in self._variable_inputs.items():
             text = widget.toPlainText().strip()
             if text:
@@ -281,7 +281,7 @@ class TemplatePreviewWidget(QWidget):
             )
             schema_text = self._schema_input.toPlainText() if self._schema_visible else ""
             schema_result = self._validator.validate(variables, schema_text, mode=schema_mode)
-            invalid_fields: Set[str] = self._top_level_fields(schema_result.field_errors)
+            invalid_fields: set[str] = self._top_level_fields(schema_result.field_errors)
             if not schema_result.is_valid:
                 message = "; ".join(
                     schema_result.errors or [schema_result.schema_error or "Schema error"]
@@ -335,8 +335,8 @@ class TemplatePreviewWidget(QWidget):
             self._schema_panel.setVisible(self._schema_visible)
         self._update_preview()
 
-    def _top_level_fields(self, field_paths: Sequence[str]) -> Set[str]:
-        invalid: Set[str] = set()
+    def _top_level_fields(self, field_paths: Sequence[str]) -> set[str]:
+        invalid: set[str] = set()
         for path in field_paths:
             if not path:
                 continue
@@ -429,12 +429,12 @@ class TemplatePreviewWidget(QWidget):
         }
         self._state_store.setValue(key, json.dumps(state))
 
-    def _state_key(self) -> Optional[str]:
+    def _state_key(self) -> str | None:
         if not self._current_prompt_id:
             return None
         return f"prompt/{self._current_prompt_id}"
 
-    def _variable_text_payload(self) -> Dict[str, str]:
+    def _variable_text_payload(self) -> dict[str, str]:
         return {name: widget.toPlainText() for name, widget in self._variable_inputs.items()}
 
     @property

@@ -13,7 +13,7 @@ import json
 import re
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 from config.settings import (
     DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR,
@@ -27,7 +27,7 @@ from prompt_templates import (
 )
 
 
-def _normalise_drop_params(value: Optional[object]) -> Optional[list[str]]:
+def _normalise_drop_params(value: object | None) -> list[str] | None:
     if value is None:
         return None
     items: list[str]
@@ -49,7 +49,7 @@ _CHAT_PALETTE_KEYS = {"user", "assistant"}
 _CHAT_COLOR_PATTERN = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
 
 
-def _normalise_chat_palette(value: Optional[object]) -> Optional[dict[str, str]]:
+def _normalise_chat_palette(value: object | None) -> dict[str, str] | None:
     if value is None or not isinstance(value, Mapping):
         return None
     mapping = cast("Mapping[str, object]", value)
@@ -64,7 +64,7 @@ def _normalise_chat_palette(value: Optional[object]) -> Optional[dict[str, str]]
     return cleaned or None
 
 
-def _is_default_chat_palette(palette: Optional[Mapping[str, str]]) -> bool:
+def _is_default_chat_palette(palette: Mapping[str, str] | None) -> bool:
     if not palette:
         return True
     defaults = {
@@ -80,7 +80,7 @@ def _is_default_chat_palette(palette: Optional[Mapping[str, str]]) -> bool:
     return True
 
 
-def _normalise_prompt_templates(value: Optional[object]) -> Optional[dict[str, str]]:
+def _normalise_prompt_templates(value: object | None) -> dict[str, str] | None:
     if value is None or not isinstance(value, Mapping):
         return None
     template_mapping = cast("Mapping[str, object]", value)
@@ -96,7 +96,7 @@ def _normalise_prompt_templates(value: Optional[object]) -> Optional[dict[str, s
     return cleaned or None
 
 
-def persist_settings_to_config(updates: dict[str, Optional[object]]) -> None:
+def persist_settings_to_config(updates: dict[str, object | None]) -> None:
     """Persist selected settings to ``config/config.json``.
 
     Secrets (e.g. API keys) are never written to disk. ``litellm_drop_params`` values

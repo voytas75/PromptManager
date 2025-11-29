@@ -8,7 +8,8 @@ Updates: v0.1.0 - 2025-10-30 - Package scaffold.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, NoReturn, Optional, Sequence
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, NoReturn, Optional
 
 if TYPE_CHECKING:
     from config import PromptManagerSettings
@@ -30,10 +31,10 @@ except ModuleNotFoundError as exc:  # pragma: no cover - exercised via main unit
     if exc.name != "PySide6":
         raise
 
-    def _raise_create_qapplication(_: Optional[Sequence[str]] = None) -> NoReturn:
+    def _raise_create_qapplication(_: Sequence[str] | None = None) -> NoReturn:
         raise GuiDependencyError(_MISSING_PYSIDE6_MESSAGE)
 
-    def _raise_launch_prompt_manager(_: "PromptManager", __: "PromptManagerSettings | None" = None) -> NoReturn:
+    def _raise_launch_prompt_manager(_: PromptManager, __: PromptManagerSettings | None = None) -> NoReturn:
         raise GuiDependencyError(_MISSING_PYSIDE6_MESSAGE)
 
     create_qapplication = _raise_create_qapplication

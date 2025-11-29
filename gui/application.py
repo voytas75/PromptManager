@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import MutableMapping, Optional, Sequence
+from collections.abc import MutableMapping, Sequence
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
@@ -34,7 +34,7 @@ def _should_force_offscreen(env: MutableMapping[str, str]) -> bool:
     return not any(env.get(var) for var in _DISPLAY_ENV_VARS)
 
 
-def create_qapplication(argv: Optional[Sequence[str]] = None) -> QApplication:
+def create_qapplication(argv: Sequence[str] | None = None) -> QApplication:
     """Return an existing QApplication or create a new one with sensible defaults."""
 
     app = QApplication.instance()
@@ -51,7 +51,7 @@ def create_qapplication(argv: Optional[Sequence[str]] = None) -> QApplication:
 
 
 def launch_prompt_manager(
-    prompt_manager: PromptManager, settings: Optional[PromptManagerSettings] = None
+    prompt_manager: PromptManager, settings: PromptManagerSettings | None = None
 ) -> int:
     """Create the Qt event loop, show the main window, and enter the GUI."""
 

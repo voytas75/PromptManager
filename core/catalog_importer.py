@@ -14,11 +14,11 @@ import json
 import logging
 import textwrap
 import uuid
-from collections.abc import Iterable as IterableABC
+from collections.abc import Iterable as IterableABC, Sequence
 from dataclasses import dataclass, field, replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple, cast
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from pathlib import Path
@@ -27,18 +27,18 @@ from models.prompt_model import Prompt
 
 from .prompt_manager import PromptManager, PromptStorageError
 
-CatalogEntry = Dict[str, Any]
+CatalogEntry = dict[str, Any]
 
 
-def _entry_list_factory() -> List["CatalogDiffEntry"]:
+def _entry_list_factory() -> list[CatalogDiffEntry]:
     return []
 
 
-def _prompt_list_factory() -> List[Prompt]:
+def _prompt_list_factory() -> list[Prompt]:
     return []
 
 
-def _prompt_pair_list_factory() -> List[Tuple[Prompt, Prompt]]:
+def _prompt_pair_list_factory() -> list[tuple[Prompt, Prompt]]:
     return []
 
 
@@ -53,10 +53,10 @@ except ImportError:  # pragma: no cover - handled at runtime when exporting YAML
 def _now_iso() -> str:
     """Return the current UTC timestamp in ISO-8601 format."""
 
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
-def _ensure_list(value: Any) -> List[str]:
+def _ensure_list(value: Any) -> list[str]:
     if value is None:
         return []
     if isinstance(value, str):
@@ -67,7 +67,7 @@ def _ensure_list(value: Any) -> List[str]:
     return [str(value)]
 
 
-def _read_json(path: "Path") -> List[CatalogEntry]:
+def _read_json(path: Path) -> list[CatalogEntry]:
     try:
         contents = path.read_text(encoding="utf-8")
     except OSError as exc:
@@ -78,8 +78,8 @@ def _read_json(path: "Path") -> List[CatalogEntry]:
         raise ValueError(f"Invalid JSON in {path}") from exc
     if isinstance(payload, dict):
         if "prompts" in payload and isinstance(payload["prompts"], list):
-            entries: List[CatalogEntry] = []
-            raw_prompts = cast("List[object]", payload["prompts"])
+            entries: list[CatalogEntry] = []
+            raw_prompts = cast("list[object]", payload["prompts"])
             for raw_entry in raw_prompts:
                 if not isinstance(raw_entry, dict):
                     raise ValueError("Catalogue prompts must be JSON objects")
@@ -88,7 +88,7 @@ def _read_json(path: "Path") -> List[CatalogEntry]:
         return [cast("CatalogEntry", payload)]
     if isinstance(payload, list):
         entries = []
-        raw_entries = cast("List[object]", payload)
+        raw_entries = cast("list[object]", payload)
         for raw_entry in raw_entries:
             if not isinstance(raw_entry, dict):
                 raise ValueError("Prompt entries must be JSON objects")
@@ -97,11 +97,11 @@ def _read_json(path: "Path") -> List[CatalogEntry]:
     raise ValueError(f"Prompt catalogue {path} must contain a JSON object or list")
 
 
-def _load_entries_from_path(path: "Path") -> List[CatalogEntry]:
+def _load_entries_from_path(path: Path) -> list[CatalogEntry]:
     if not path.exists():
         raise FileNotFoundError(str(path))
     if path.is_dir():
-        entries: List[CatalogEntry] = []
+        entries: list[CatalogEntry] = []
         for candidate in sorted(path.glob("*.json")):
             entries.extend(_read_json(candidate))
         return entries
@@ -112,7 +112,7 @@ def _entry_to_prompt(entry: CatalogEntry) -> Prompt:
     if "name" not in entry or "description" not in entry:
         raise ValueError("Prompt catalogue entries must include 'name' and 'description'")
 
-    record: Dict[str, Any] = {
+    record: dict[str, Any] = {
         "id": entry.get("id")
         or str(
             uuid.uuid5(
@@ -148,7 +148,7 @@ def _entry_to_prompt(entry: CatalogEntry) -> Prompt:
     return Prompt.from_record(record)
 
 
-def load_prompt_catalog(catalog_path: Optional["Path"]) -> List[Prompt]:
+def load_prompt_catalog(catalog_path: Path | None) -> list[Prompt]:
     """Load prompts from a user-provided path."""
 
     if catalog_path is None:
@@ -164,7 +164,7 @@ def load_prompt_catalog(catalog_path: Optional["Path"]) -> List[Prompt]:
         logger.error("Skipping catalogue %s: %s", catalog_path, exc)
         return []
 
-    prompts: List[Prompt] = []
+    prompts: list[Prompt] = []
     for entry in entries:
         try:
             prompt = _entry_to_prompt(entry)
@@ -181,7 +181,7 @@ def _merge_prompt(existing: Prompt, incoming: Prompt) -> Prompt:
         id=existing.id,
         usage_count=existing.usage_count,
         created_at=existing.created_at,
-        last_modified=datetime.now(timezone.utc),
+        last_modified=datetime.now(UTC),
     )
 
 
@@ -208,17 +208,17 @@ class CatalogDiffEntry:
 class CatalogDiff:
     """Aggregate diff describing catalogue changes."""
 
-    entries: List[CatalogDiffEntry] = field(default_factory=_entry_list_factory)
+    entries: list[CatalogDiffEntry] = field(default_factory=_entry_list_factory)
     added: int = 0
     updated: int = 0
     skipped: int = 0
     unchanged: int = 0
-    source: Optional[str] = None
+    source: str | None = None
 
     def has_changes(self) -> bool:
         return self.added > 0 or self.updated > 0
 
-    def summary(self) -> Dict[str, int]:
+    def summary(self) -> dict[str, int]:
         return {
             "added": self.added,
             "updated": self.updated,
@@ -231,9 +231,9 @@ class CatalogDiff:
 class CatalogChangePlan:
     """Plan describing how a catalogue import should be applied."""
 
-    create: List[Prompt] = field(default_factory=_prompt_list_factory)
-    update: List[Tuple[Prompt, Prompt]] = field(default_factory=_prompt_pair_list_factory)
-    skip: List[Prompt] = field(default_factory=_prompt_list_factory)
+    create: list[Prompt] = field(default_factory=_prompt_list_factory)
+    update: list[tuple[Prompt, Prompt]] = field(default_factory=_prompt_pair_list_factory)
+    skip: list[Prompt] = field(default_factory=_prompt_list_factory)
     diff: CatalogDiff = field(default_factory=CatalogDiff)
 
 
@@ -260,7 +260,7 @@ _DIFF_FIELDS: Sequence[str] = (
 )
 
 
-def _prompt_to_catalog_dict(prompt: Prompt) -> Dict[str, Any]:
+def _prompt_to_catalog_dict(prompt: Prompt) -> dict[str, Any]:
     record = {
         "id": str(prompt.id),
         "name": prompt.name,
@@ -325,7 +325,7 @@ def _build_change_plan(
         raise PromptStorageError("Unable to inspect existing prompts") from exc
 
     plan = CatalogChangePlan()
-    existing_by_name: Dict[str, Prompt] = {
+    existing_by_name: dict[str, Prompt] = {
         prompt.name.strip().lower(): prompt for prompt in existing_prompts
     }
 
@@ -386,9 +386,9 @@ class CatalogImportResult:
     updated: int = 0
     skipped: int = 0
     errors: int = 0
-    preview: Optional[CatalogDiff] = None
+    preview: CatalogDiff | None = None
 
-    def summary(self) -> Dict[str, int]:
+    def summary(self) -> dict[str, int]:
         return {
             "added": self.added,
             "updated": self.updated,
@@ -399,7 +399,7 @@ class CatalogImportResult:
 
 def diff_prompt_catalog(
     manager: PromptManager,
-    catalog_path: Optional["Path"],
+    catalog_path: Path | None,
     *,
     overwrite: bool = True,
 ) -> CatalogDiff:
@@ -413,7 +413,7 @@ def diff_prompt_catalog(
 
 def import_prompt_catalog(
     manager: PromptManager,
-    catalog_path: Optional["Path"],
+    catalog_path: Path | None,
     *,
     overwrite: bool = True,
 ) -> CatalogImportResult:
@@ -446,11 +446,11 @@ def import_prompt_catalog(
 
 def export_prompt_catalog(
     manager: PromptManager,
-    output_path: "Path",
+    output_path: Path,
     *,
     fmt: str = "json",
     include_inactive: bool = False,
-) -> "Path":
+) -> Path:
     """Export the current prompt repository to JSON or YAML."""
 
     fmt_lower = fmt.lower()

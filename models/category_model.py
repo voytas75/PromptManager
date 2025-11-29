@@ -6,19 +6,20 @@ Updates: v0.1.0 - 2025-11-22 - Introduce PromptCategory dataclass and helpers.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, List, Mapping, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 _SLUG_PATTERN = re.compile(r"[^a-z0-9]+")
 
 
 def _utc_now() -> datetime:
     """Return an aware UTC timestamp."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
-def slugify_category(value: Optional[str]) -> str:
+def slugify_category(value: str | None) -> str:
     """Return a URL-safe slug derived from the provided value."""
 
     text = (value or "").strip().lower()
@@ -32,19 +33,19 @@ def _parse_datetime(value: Any) -> datetime:
     """Return a timezone-aware datetime from unstructured inputs."""
 
     if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
     if value is None:
         return _utc_now()
     parsed = datetime.fromisoformat(str(value))
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
+        parsed = parsed.replace(tzinfo=UTC)
     return parsed
 
 
-def _normalise_tags(value: Optional[Iterable[Any]]) -> List[str]:
+def _normalise_tags(value: Iterable[Any] | None) -> list[str]:
     """Coerce iterable tag inputs into a deduplicated list of strings."""
 
-    tags: List[str] = []
+    tags: list[str] = []
     seen: set[str] = set()
     if value is None:
         return tags
@@ -60,7 +61,7 @@ def _normalise_tags(value: Optional[Iterable[Any]]) -> List[str]:
     return tags
 
 
-def _clean_optional_text(value: Optional[str]) -> Optional[str]:
+def _clean_optional_text(value: str | None) -> str | None:
     """Strip whitespace from optional string inputs."""
     if value is None:
         return None
@@ -75,11 +76,11 @@ class PromptCategory:
     slug: str
     label: str
     description: str
-    parent_slug: Optional[str] = None
-    color: Optional[str] = None
-    icon: Optional[str] = None
-    min_quality: Optional[float] = None
-    default_tags: List[str] = field(default_factory=list)
+    parent_slug: str | None = None
+    color: str | None = None
+    icon: str | None = None
+    min_quality: float | None = None
+    default_tags: list[str] = field(default_factory=list)
     is_active: bool = True
     created_at: datetime = field(default_factory=_utc_now)
     updated_at: datetime = field(default_factory=_utc_now)
@@ -112,7 +113,7 @@ class PromptCategory:
                 self.min_quality = None
         self.default_tags = _normalise_tags(self.default_tags)
 
-    def to_record(self) -> Dict[str, Any]:
+    def to_record(self) -> dict[str, Any]:
         """Serialize the category into a plain dictionary."""
 
         return {
@@ -130,7 +131,7 @@ class PromptCategory:
         }
 
     @classmethod
-    def from_record(cls, data: Mapping[str, Any]) -> "PromptCategory":
+    def from_record(cls, data: Mapping[str, Any]) -> PromptCategory:
         """Hydrate a PromptCategory from a mapping."""
 
         return cls(
@@ -148,7 +149,7 @@ class PromptCategory:
         )
 
     @classmethod
-    def from_mapping(cls, payload: Mapping[str, Any]) -> "PromptCategory":
+    def from_mapping(cls, payload: Mapping[str, Any]) -> PromptCategory:
         """Create a category from loosely structured configuration."""
 
         if "label" not in payload and "slug" not in payload:

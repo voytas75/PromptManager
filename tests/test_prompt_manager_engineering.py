@@ -7,7 +7,7 @@ Updates: v0.1.0 - 2025-11-18 - Initial tests for prompt refinement workflow.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import pytest
 
@@ -26,8 +26,8 @@ class _StubCollection:
         self,
         ids: list[str],
         documents: list[str],
-        metadatas: list[Dict[str, Any]],
-        embeddings: Optional[list[list[float]]] = None,
+        metadatas: list[dict[str, Any]],
+        embeddings: list[list[float]] | None = None,
     ) -> None:
         return None
 
@@ -35,8 +35,8 @@ class _StubCollection:
         self,
         ids: list[str],
         documents: list[str],
-        metadatas: list[Dict[str, Any]],
-        embeddings: Optional[list[list[float]]] = None,
+        metadatas: list[dict[str, Any]],
+        embeddings: list[list[float]] | None = None,
     ) -> None:
         return None
 
@@ -48,8 +48,8 @@ class _StubChromaClient:
     def get_or_create_collection(
         self,
         name: str,
-        metadata: Dict[str, Any],
-        embedding_function: Optional[Any] = None,
+        metadata: dict[str, Any],
+        embedding_function: Any | None = None,
     ) -> _StubCollection:
         return self.collection
 
@@ -59,18 +59,18 @@ class _StubChromaClient:
 
 class _StubPromptEngineer:
     def __init__(self) -> None:
-        self.calls: list[Dict[str, Any]] = []
-        self.structure_calls: list[Dict[str, Any]] = []
+        self.calls: list[dict[str, Any]] = []
+        self.structure_calls: list[dict[str, Any]] = []
 
     def refine(
         self,
         prompt_text: str,
         *,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        category: Optional[str] = None,
-        tags: Optional[list[str]] = None,
-        negative_constraints: Optional[list[str]] = None,
+        name: str | None = None,
+        description: str | None = None,
+        category: str | None = None,
+        tags: list[str] | None = None,
+        negative_constraints: list[str] | None = None,
         structure_only: bool = False,
     ) -> PromptRefinement:
         self.calls.append(
@@ -96,11 +96,11 @@ class _StubPromptEngineer:
         self,
         prompt_text: str,
         *,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        category: Optional[str] = None,
-        tags: Optional[list[str]] = None,
-        negative_constraints: Optional[list[str]] = None,
+        name: str | None = None,
+        description: str | None = None,
+        category: str | None = None,
+        tags: list[str] | None = None,
+        negative_constraints: list[str] | None = None,
     ) -> PromptRefinement:
         payload = {
             "prompt_text": prompt_text,
@@ -124,9 +124,9 @@ class _StubPromptEngineer:
 
 def _build_manager(
     tmp_path: Path,
-    engineer: Optional[_StubPromptEngineer],
+    engineer: _StubPromptEngineer | None,
     *,
-    structure_engineer: Optional[_StubPromptEngineer] = None,
+    structure_engineer: _StubPromptEngineer | None = None,
 ) -> PromptManager:
     db_path = tmp_path / "prompt_manager.db"
     chroma_path = tmp_path / "chroma"

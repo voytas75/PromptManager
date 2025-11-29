@@ -4,13 +4,11 @@ Updates: v0.1.0 - 2025-11-27 - Provide reusable toast notifications for transien
 
 from __future__ import annotations
 
-from typing import Optional
-
-from PySide6.QtCore import QTimer, Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QLabel, QWidget
 
 
-def show_toast(parent: Optional[QWidget], message: str, duration_ms: int = 2500) -> None:
+def show_toast(parent: QWidget | None, message: str, duration_ms: int = 2500) -> None:
     """Display a brief toast message anchored to the supplied parent widget."""
 
     if parent is None or not message:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from core.embedding import EmbeddingGenerationError
 from core.prompt_manager import PromptManager
@@ -33,10 +33,10 @@ def _make_execution(prompt_id: uuid.UUID) -> PromptExecution:
 
 class _StubCollection:
     def __init__(self) -> None:
-        self.deleted_where: Optional[Dict[str, Any]] = None
-        self.upserts: list[Dict[str, Any]] = []
+        self.deleted_where: dict[str, Any] | None = None
+        self.upserts: list[dict[str, Any]] = []
 
-    def delete(self, where: Optional[Dict[str, Any]] = None, **kwargs: Any) -> None:
+    def delete(self, where: dict[str, Any] | None = None, **kwargs: Any) -> None:
         self.deleted_where = where or kwargs or {}
 
     def upsert(self, **payload: Any) -> None:
@@ -53,8 +53,8 @@ class _StubChromaClient:
         self,
         name: str,
         *,
-        metadata: Optional[Dict[str, Any]] = None,
-        embedding_function: Optional[Any] = None,
+        metadata: dict[str, Any] | None = None,
+        embedding_function: Any | None = None,
     ) -> _StubCollection:
         self._create_calls += 1
         return self.collection
@@ -72,8 +72,8 @@ class _StubChromaClientNoDelete:
         self,
         name: str,
         *,
-        metadata: Optional[Dict[str, Any]] = None,
-        embedding_function: Optional[Any] = None,
+        metadata: dict[str, Any] | None = None,
+        embedding_function: Any | None = None,
     ) -> _StubCollection:
         self._create_calls += 1
         return self.collection

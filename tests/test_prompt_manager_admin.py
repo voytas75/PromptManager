@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import builtins
 import json
 import sqlite3
 import types
 import uuid
 import zipfile
-from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from chromadb.errors import ChromaError
@@ -51,8 +53,8 @@ def _clone_category(category: PromptCategory) -> PromptCategory:
 class _InMemoryRepository:
     """Minimal in-memory repository facade for PromptManager tests."""
 
-    def __init__(self, prompts: Optional[Sequence[Prompt]] = None) -> None:
-        self.prompts: Dict[uuid.UUID, Prompt] = {}
+    def __init__(self, prompts: Sequence[Prompt] | None = None) -> None:
+        self.prompts: dict[uuid.UUID, Prompt] = {}
         for prompt in prompts or []:
             self.add(prompt)
         default_category = PromptCategory(
@@ -60,8 +62,8 @@ class _InMemoryRepository:
             label="General",
             description="General prompts",
         )
-        self.categories: Dict[str, PromptCategory] = {default_category.slug: default_category}
-        self.latest_versions: Dict[uuid.UUID, PromptVersion] = {}
+        self.categories: dict[str, PromptCategory] = {default_category.slug: default_category}
+        self.latest_versions: dict[uuid.UUID, PromptVersion] = {}
         self.reset_called = False
         self.not_found_ids: set[uuid.UUID] = set()
         self.raise_on_update = False
@@ -69,7 +71,7 @@ class _InMemoryRepository:
         self.raise_on_update_category = False
         self.raise_list_error = False
 
-    def list(self, limit: Optional[int] = None) -> List[Prompt]:
+    def list(self, limit: int | None = None) -> builtins.list[Prompt]:
         if self.raise_list_error:
             raise RepositoryError("list failed")
         values = [_clone_prompt(prompt) for prompt in self.prompts.values()]
@@ -121,13 +123,13 @@ class _InMemoryRepository:
         self.categories[normalized] = category
         return _clone_category(category)
 
-    def list_categories(self, include_archived: bool = False) -> List[PromptCategory]:
+    def list_categories(self, include_archived: bool = False) -> builtins.list[PromptCategory]:
         categories = list(self.categories.values())
         if not include_archived:
             categories = [cat for cat in categories if cat.is_active]
         return [_clone_category(cat) for cat in categories]
 
-    def get_prompt_latest_version(self, prompt_id: uuid.UUID) -> Optional[PromptVersion]:
+    def get_prompt_latest_version(self, prompt_id: uuid.UUID) -> PromptVersion | None:
         return self.latest_versions.get(prompt_id)
 
     def reset_all_data(self) -> None:
@@ -138,11 +140,11 @@ class _InMemoryRepository:
 class _CategoryRegistryStub:
     """Stub category registry exposing only the surface used in tests."""
 
-    def __init__(self, category: Optional[PromptCategory] = None) -> None:
+    def __init__(self, category: PromptCategory | None = None) -> None:
         self.category = category
         self.refresh_calls = 0
 
-    def refresh(self) -> List[PromptCategory]:
+    def refresh(self) -> list[PromptCategory]:
         self.refresh_calls += 1
         return []
 
@@ -151,7 +153,7 @@ class _CategoryRegistryStub:
             raise CategoryNotFoundError(f"{slug} missing")
         return _clone_category(self.category)
 
-    def get(self, slug: Optional[str]) -> Optional[PromptCategory]:
+    def get(self, slug: str | None) -> PromptCategory | None:
         if slug and self.category and slugify_category(slug) == self.category.slug:
             return _clone_category(self.category)
         return None
@@ -162,9 +164,9 @@ class _DummyCollection:
 
     def __init__(self) -> None:
         self.count_value = 0
-        self.count_exception: Optional[BaseException] = None
-        self.peek_calls: List[Dict[str, Any]] = []
-        self.upsert_payloads: List[Dict[str, Any]] = []
+        self.count_exception: BaseException | None = None
+        self.peek_calls: list[dict[str, Any]] = []
+        self.upsert_payloads: list[dict[str, Any]] = []
 
     def count(self) -> int:
         if self.count_exception:
@@ -177,10 +179,10 @@ class _DummyCollection:
     def upsert(self, **kwargs: Any) -> None:
         self.upsert_payloads.append(dict(kwargs))
 
-    def query(self, **_: Any) -> Mapping[str, List[List[str]]]:
+    def query(self, **_: Any) -> Mapping[str, list[list[str]]]:
         return {"ids": [[]], "documents": [[]], "metadatas": [[]]}
 
-    def peek(self, **kwargs: Any) -> List[Any]:
+    def peek(self, **kwargs: Any) -> list[Any]:
         self.peek_calls.append(dict(kwargs))
         return []
 
@@ -203,17 +205,17 @@ class _HistoryTrackerStub:
     """Record execution queries issued by PromptManager."""
 
     def __init__(self) -> None:
-        self.requests: List[Dict[str, Any]] = []
+        self.requests: list[dict[str, Any]] = []
         self.should_raise = False
 
     def query_executions(
         self,
         *,
-        status: Optional[ExecutionStatus],
-        prompt_id: Optional[uuid.UUID],
-        search: Optional[str],
-        limit: Optional[int],
-    ) -> List[str]:
+        status: ExecutionStatus | None,
+        prompt_id: uuid.UUID | None,
+        search: str | None,
+        limit: int | None,
+    ) -> list[str]:
         if self.should_raise:
             raise HistoryTrackerError("tracker failure")
         payload = {
@@ -240,18 +242,18 @@ class _RedisClientStub:
         self,
         *,
         ping_result: bool = True,
-        ping_error: Optional[BaseException] = None,
+        ping_error: BaseException | None = None,
         dbsize_value: int = 0,
-        info_payload: Optional[Mapping[str, Any]] = None,
-        info_error: Optional[BaseException] = None,
-        connection_kwargs: Optional[Mapping[str, Any]] = None,
+        info_payload: Mapping[str, Any] | None = None,
+        info_error: BaseException | None = None,
+        connection_kwargs: Mapping[str, Any] | None = None,
     ) -> None:
         self._ping_result = ping_result
         self._ping_error = ping_error
         self._dbsize_value = dbsize_value
         self._info_payload = dict(info_payload or {})
         self._info_error = info_error
-        self.connection_pool: Optional[_RedisPoolStub] = None
+        self.connection_pool: _RedisPoolStub | None = None
         if connection_kwargs is not None:
             self.connection_pool = _RedisPoolStub(**connection_kwargs)
 
@@ -268,7 +270,7 @@ class _RedisClientStub:
             raise self._info_error
         return dict(self._info_payload)
 
-    def get(self, name: str) -> Optional[bytes]:  # pragma: no cover - unused surface
+    def get(self, name: str) -> bytes | None:  # pragma: no cover - unused surface
         return None
 
     def setex(self, name: str, time: int, value: Any) -> bool:  # pragma: no cover - unused
@@ -285,7 +287,7 @@ def _make_recorder() -> type:
     """Return a recorder class capturing LiteLLM factory kwargs."""
 
     class Recorder:
-        instances: List["Recorder"] = []
+        instances: list[Recorder] = []
 
         def __init__(self, **kwargs: Any) -> None:
             self.kwargs = kwargs
@@ -300,11 +302,11 @@ def _make_recorder() -> type:
 class _ExecutorRecorder:
     """Capture CodexExecutor constructor arguments."""
 
-    instances: List["_ExecutorRecorder"] = []
+    instances: list[_ExecutorRecorder] = []
 
     def __init__(self, **kwargs: Any) -> None:
         self.kwargs = kwargs
-        self.drop_params: Optional[Sequence[str]] = kwargs.get("drop_params")
+        self.drop_params: Sequence[str] | None = kwargs.get("drop_params")
         self.reasoning_effort = kwargs.get("reasoning_effort")
         self.stream = kwargs.get("stream", False)
         _ExecutorRecorder.instances.append(self)
@@ -312,8 +314,8 @@ class _ExecutorRecorder:
 
 @pytest.fixture()
 def prompt_manager(
-    tmp_path: "Path",
-) -> tuple[PromptManager, _DummyCollection, _DummyChromaClient, "Path"]:
+    tmp_path: Path,
+) -> tuple[PromptManager, _DummyCollection, _DummyChromaClient, Path]:
     """Fixture providing a PromptManager wired to stub backends."""
 
     chroma_dir = tmp_path / "chroma"
@@ -330,7 +332,7 @@ def prompt_manager(
     return manager, collection, client, chroma_dir
 
 
-def _ensure_chroma_database(chroma_dir: "Path") -> Path:
+def _ensure_chroma_database(chroma_dir: Path) -> Path:
     """Create or return the Chroma SQLite path used for maintenance operations."""
 
     db_path = chroma_dir / "chroma.sqlite3"
@@ -592,17 +594,17 @@ def test_verify_vector_store_integrity_failure(
     _ensure_chroma_database(chroma_dir)
 
     class _IntegrityFailConnection:
-        def __enter__(self) -> "_IntegrityFailConnection":
+        def __enter__(self) -> _IntegrityFailConnection:
             return self
 
         def __exit__(self, exc_type, exc, tb) -> None:  # noqa: ANN001
             return None
 
-        def execute(self, sql: str, *args: object) -> "_IntegrityFailConnection":
+        def execute(self, sql: str, *args: object) -> _IntegrityFailConnection:
             self._last_sql = sql.lower()
             return self
 
-        def fetchall(self) -> List[tuple[str]]:
+        def fetchall(self) -> list[tuple[str]]:
             if "integrity_check" in getattr(self, "_last_sql", ""):
                 return [("not ok",)]
             return [("ok",)]
@@ -623,17 +625,17 @@ def test_verify_vector_store_quick_check_failure(
     _ensure_chroma_database(chroma_dir)
 
     class _QuickFailConnection:
-        def __enter__(self) -> "_QuickFailConnection":
+        def __enter__(self) -> _QuickFailConnection:
             return self
 
         def __exit__(self, exc_type, exc, tb) -> None:  # noqa: ANN001
             return None
 
-        def execute(self, sql: str, *args: object) -> "_QuickFailConnection":
+        def execute(self, sql: str, *args: object) -> _QuickFailConnection:
             self._last_sql = sql.lower()
             return self
 
-        def fetchall(self) -> List[tuple[str]]:
+        def fetchall(self) -> list[tuple[str]]:
             if "quick_check" in getattr(self, "_last_sql", ""):
                 return [("not ok",)]
             return [("ok",)]
@@ -685,7 +687,7 @@ def test_optimize_vector_store_handles_optimize_errors(
         def __init__(self, path: str, timeout: float = 60.0) -> None:
             self._conn = real_connect(path)
 
-        def __enter__(self) -> "_ConnectionWrapper":
+        def __enter__(self) -> _ConnectionWrapper:
             return self
 
         def __exit__(self, exc_type, exc, tb) -> None:  # noqa: ANN001
@@ -838,7 +840,7 @@ def test_repository_verification_and_maintenance(
 
 def test_snapshot_archive_includes_sqlite_and_chroma(
     prompt_manager: tuple[PromptManager, _DummyCollection, _DummyChromaClient, Path],
-    tmp_path: "Path",
+    tmp_path: Path,
 ) -> None:
     manager, _, _, chroma_dir = prompt_manager
     manager.create_prompt(_make_prompt("Snapshot prompt"))
@@ -873,7 +875,7 @@ def test_generate_prompt_name_and_scenarios(
 
     class _NameGenerator:
         def __init__(self) -> None:
-            self.calls: List[str] = []
+            self.calls: list[str] = []
 
         def generate(self, context: str) -> str:
             self.calls.append(context)
@@ -881,9 +883,9 @@ def test_generate_prompt_name_and_scenarios(
 
     class _ScenarioGenerator:
         def __init__(self) -> None:
-            self.calls: List[tuple[str, int]] = []
+            self.calls: list[tuple[str, int]] = []
 
-        def generate(self, context: str, *, max_scenarios: int) -> List[str]:
+        def generate(self, context: str, *, max_scenarios: int) -> list[str]:
             self.calls.append((context, max_scenarios))
             return ["Scenario A"]
 
@@ -908,7 +910,7 @@ def test_refresh_prompt_scenarios_updates_prompt(
         def __init__(self) -> None:
             self.calls = 0
 
-        def generate(self, context: str, *, max_scenarios: int) -> List[str]:
+        def generate(self, context: str, *, max_scenarios: int) -> list[str]:
             self.calls += 1
             base = self.calls * 10
             return [f"Scenario {base + index}" for index in range(1, max_scenarios + 1)]
@@ -961,7 +963,7 @@ def test_rebuild_embeddings_counts_success_and_failures(
         def __init__(self) -> None:
             self.calls = 0
 
-        def embed(self, text: str) -> List[float]:
+        def embed(self, text: str) -> list[float]:
             self.calls += 1
             if "Failing" in text:
                 raise EmbeddingGenerationError("boom")
@@ -986,15 +988,15 @@ def test_rebuild_embeddings_handles_reset_and_missing_prompts(
     manager._repository = repo  # type: ignore[assignment]
 
     class _EmbeddingStub:
-        def embed(self, text: str) -> List[float]:
+        def embed(self, text: str) -> list[float]:
             return [float(len(text)), 0.0]
 
-    persist_calls: List[tuple[uuid.UUID, bool]] = []
+    persist_calls: list[tuple[uuid.UUID, bool]] = []
 
     def fake_persist(prompt: Prompt, vector: Sequence[float], *, is_new: bool) -> None:
         persist_calls.append((prompt.id, is_new))
 
-    reset_called: List[bool] = []
+    reset_called: list[bool] = []
 
     def fake_reset(self: PromptManager) -> None:
         reset_called.append(True)
@@ -1045,7 +1047,7 @@ def test_suggest_prompts_handles_empty_and_fallbacks(
     manager.set_intent_classifier(_Classifier())
     call_counter = {"count": 0}
 
-    def fake_search(self: PromptManager, query_text: str, limit: int = 5) -> List[Prompt]:
+    def fake_search(self: PromptManager, query_text: str, limit: int = 5) -> list[Prompt]:
         call_counter["count"] += 1
         return [prompt_one] if call_counter["count"] == 1 else [prompt_two]
 
@@ -1072,7 +1074,7 @@ def test_log_execution_success_and_failure_paths(
 ) -> None:
     manager, _, _, _ = prompt_manager
     prompt = _make_prompt()
-    tracker_calls: Dict[str, List[Dict[str, Any]]] = {"success": [], "failure": []}
+    tracker_calls: dict[str, list[dict[str, Any]]] = {"success": [], "failure": []}
 
     class _Tracker:
         def __init__(self) -> None:
@@ -1139,13 +1141,13 @@ def test_log_execution_success_and_failure_paths(
     assert manager._log_execution_failure(prompt.id, "hello", "boom") is None
 
 
-def test_manager_initialises_litellm_defaults_from_helpers(tmp_path: "Path") -> None:
+def test_manager_initialises_litellm_defaults_from_helpers(tmp_path: Path) -> None:
     class _GeneratorStub:
         def __init__(
             self,
             *,
             stream: bool = False,
-            drop_params: Optional[Sequence[str]] = None,
+            drop_params: Sequence[str] | None = None,
         ) -> None:
             self.model = "generator-fast"
             self.drop_params = drop_params
@@ -1153,9 +1155,9 @@ def test_manager_initialises_litellm_defaults_from_helpers(tmp_path: "Path") -> 
 
     class _ExecutorStub:
         def __init__(self) -> None:
-            self.drop_params: List[str] = []
+            self.drop_params: list[str] = []
             self.stream = False
-            self.reasoning_effort: Optional[str] = None
+            self.reasoning_effort: str | None = None
 
     chroma_dir = tmp_path / "chroma"
     chroma_dir.mkdir(parents=True, exist_ok=True)
@@ -1235,7 +1237,7 @@ def test_generate_prompt_scenarios_handles_generator_failures(
     manager, _, _, _ = prompt_manager
 
     class _FailingScenarioGenerator:
-        def generate(self, *_: Any, **__: Any) -> List[str]:
+        def generate(self, *_: Any, **__: Any) -> list[str]:
             raise RuntimeError("fail")
 
     manager._scenario_generator = _FailingScenarioGenerator()
@@ -1311,7 +1313,7 @@ def test_refine_prompt_structure_uses_engineer(
 
     class _Engineer:
         def __init__(self) -> None:
-            self.calls: List[str] = []
+            self.calls: list[str] = []
 
         def refine_structure(self, text: str, **_: Any) -> PromptRefinement:
             self.calls.append(text)
@@ -1396,7 +1398,7 @@ def test_create_prompt_embeds_and_persists(
     manager._repository = repo  # type: ignore[assignment]
     prompt = _make_prompt("New Prompt")
     manager._embedding_provider = types.SimpleNamespace(embed=lambda *_: [0.1, 0.2])  # type: ignore[assignment]
-    persisted: List[uuid.UUID] = []
+    persisted: list[uuid.UUID] = []
 
     def fake_persist(prompt_obj: Prompt, vector: Sequence[float], *, is_new: bool) -> None:
         assert is_new is True
@@ -1420,11 +1422,11 @@ def test_create_prompt_schedules_worker_on_embedding_failure(
     prompt = _make_prompt("Needs Embedding")
 
     class _FailingEmbeddingProvider:
-        def embed(self, _: str) -> List[float]:
+        def embed(self, _: str) -> list[float]:
             raise EmbeddingGenerationError("fail")
 
-    scheduled: List[uuid.UUID] = []
-    cached: List[uuid.UUID] = []
+    scheduled: list[uuid.UUID] = []
+    cached: list[uuid.UUID] = []
     manager._embedding_provider = _FailingEmbeddingProvider()  # type: ignore[assignment]
     manager._embedding_worker = types.SimpleNamespace(schedule=scheduled.append)  # type: ignore[assignment]
     manager._cache_prompt = lambda prompt_obj: cached.append(prompt_obj.id)  # type: ignore[assignment]
@@ -1505,7 +1507,7 @@ def test_persist_embedding_from_worker_updates_prompt(
 ) -> None:
     manager, _, _, _ = prompt_manager
     prompt = _make_prompt()
-    called: Dict[str, Any] = {}
+    called: dict[str, Any] = {}
 
     class _Repo:
         def update(self, prompt: Prompt) -> Prompt:
@@ -1552,7 +1554,7 @@ def test_apply_rating_handles_fetch_and_update_failures(
     manager._apply_rating(prompt.id, 5.0)
 
 
-def test_clear_usage_logs_creates_and_resets(tmp_path: "Path") -> None:
+def test_clear_usage_logs_creates_and_resets(tmp_path: Path) -> None:
     manager = PromptManager(
         chroma_path=str(tmp_path / "chroma"),
         db_path=str(tmp_path / "repo.db"),

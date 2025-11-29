@@ -1,18 +1,20 @@
 """Prompt execution history tracking utilities.
 
-Updates: v0.3.1 - 2025-11-28 - Add per-prompt analytics helper for benchmarks and maintenance surfaces.
-Updates: v0.3.0 - 2025-11-24 - Persist execution context metadata (response styles, runtime config).
-Updates: v0.2.0 - 2025-11-09 - Capture optional ratings alongside execution logs.
-Updates: v0.1.0 - 2025-11-08 - Introduce HistoryTracker for execution logs.
+Updates:
+  v0.3.2 - 2025-11-29 - Reformat docstring to satisfy Ruff line length limits.
+  v0.3.1 - 2025-11-28 - Add per-prompt analytics helper for benchmarks and maintenance surfaces.
+  v0.3.0 - 2025-11-24 - Persist execution context metadata (response styles, runtime config).
+  v0.2.0 - 2025-11-09 - Capture optional ratings alongside execution logs.
+  v0.1.0 - 2025-11-08 - Introduce HistoryTracker for execution logs.
 """
 
 from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import List, Mapping, Optional
+from datetime import UTC, datetime, timedelta
 
 from models.prompt_model import ExecutionStatus, PromptExecution
 
@@ -36,10 +38,10 @@ class PromptExecutionAnalytics:
     name: str
     total_runs: int
     success_rate: float
-    average_duration_ms: Optional[float]
-    average_rating: Optional[float]
-    rating_trend: Optional[float]
-    last_executed_at: Optional[datetime]
+    average_duration_ms: float | None
+    average_rating: float | None
+    rating_trend: float | None
+    last_executed_at: datetime | None
 
 
 @dataclass(slots=True)
@@ -48,13 +50,13 @@ class ExecutionAnalytics:
 
     total_runs: int
     success_rate: float
-    average_duration_ms: Optional[float]
-    average_rating: Optional[float]
-    prompt_breakdown: List[PromptExecutionAnalytics]
-    window_start: Optional[datetime] = None
+    average_duration_ms: float | None
+    average_rating: float | None
+    prompt_breakdown: list[PromptExecutionAnalytics]
+    window_start: datetime | None = None
 
 
-def _clip(text: Optional[str], max_length: int) -> str:
+def _clip(text: str | None, max_length: int) -> str:
     """Return a whitespace-trimmed string clipped to max_length."""
     if not text:
         return ""
@@ -78,10 +80,10 @@ class HistoryTracker:
         request_text: str,
         response_text: str,
         *,
-        duration_ms: Optional[int] = None,
-        metadata: Optional[Mapping[str, object]] = None,
-        rating: Optional[float] = None,
-        context_metadata: Optional[Mapping[str, object]] = None,
+        duration_ms: int | None = None,
+        metadata: Mapping[str, object] | None = None,
+        rating: float | None = None,
+        context_metadata: Mapping[str, object] | None = None,
     ) -> PromptExecution:
         """Persist a successful execution."""
         metadata_payload: dict[str, object] = dict(metadata) if metadata else {}
@@ -104,9 +106,9 @@ class HistoryTracker:
         request_text: str,
         error_message: str,
         *,
-        duration_ms: Optional[int] = None,
-        metadata: Optional[Mapping[str, object]] = None,
-        context_metadata: Optional[Mapping[str, object]] = None,
+        duration_ms: int | None = None,
+        metadata: Mapping[str, object] | None = None,
+        context_metadata: Mapping[str, object] | None = None,
     ) -> PromptExecution:
         """Persist a failed execution attempt, including optional context metadata."""
 
@@ -134,7 +136,7 @@ class HistoryTracker:
         except RepositoryError as exc:
             raise HistoryTrackerError(f"Unable to fetch execution {execution_id}: {exc}") from exc
 
-    def list_recent(self, *, limit: int = 20) -> List[PromptExecution]:
+    def list_recent(self, *, limit: int = 20) -> list[PromptExecution]:
         """Return recent executions."""
         try:
             return self.repository.list_executions(limit=limit)
@@ -146,7 +148,7 @@ class HistoryTracker:
         prompt_id: uuid.UUID,
         *,
         limit: int = 20,
-    ) -> List[PromptExecution]:
+    ) -> list[PromptExecution]:
         """Return recent executions for a specific prompt."""
         try:
             return self.repository.list_executions_for_prompt(prompt_id, limit=limit)
@@ -157,11 +159,11 @@ class HistoryTracker:
     def query_executions(
         self,
         *,
-        status: Optional[ExecutionStatus] = None,
-        prompt_id: Optional[uuid.UUID] = None,
-        search: Optional[str] = None,
-        limit: Optional[int] = None,
-    ) -> List[PromptExecution]:
+        status: ExecutionStatus | None = None,
+        prompt_id: uuid.UUID | None = None,
+        search: str | None = None,
+        limit: int | None = None,
+    ) -> list[PromptExecution]:
         """Return executions filtered by the provided parameters."""
 
         status_value = status.value if isinstance(status, ExecutionStatus) else status
@@ -179,15 +181,15 @@ class HistoryTracker:
     def summarize(
         self,
         *,
-        window_days: Optional[int] = 30,
+        window_days: int | None = 30,
         prompt_limit: int = 5,
         trend_window: int = 5,
     ) -> ExecutionAnalytics:
         """Return aggregated execution metrics for the stored history."""
 
-        since: Optional[datetime] = None
+        since: datetime | None = None
         if window_days is not None:
-            since = datetime.now(timezone.utc) - timedelta(days=max(window_days, 0))
+            since = datetime.now(UTC) - timedelta(days=max(window_days, 0))
         try:
             summary_row, prompt_rows = self.repository.get_execution_analytics(
                 since=since,
@@ -202,7 +204,7 @@ class HistoryTracker:
         average_rating = _coerce_float(summary_row.get("avg_rating"))
         success_rate = success_runs / total_runs if total_runs else 0.0
 
-        prompt_stats: List[PromptExecutionAnalytics] = []
+        prompt_stats: list[PromptExecutionAnalytics] = []
         for row in prompt_rows:
             prompt_identifier = row.get("prompt_id")
             if not prompt_identifier:
@@ -248,14 +250,14 @@ class HistoryTracker:
         self,
         prompt_id: uuid.UUID,
         *,
-        window_days: Optional[int] = None,
+        window_days: int | None = None,
         trend_window: int = 5,
-    ) -> Optional[PromptExecutionAnalytics]:
+    ) -> PromptExecutionAnalytics | None:
         """Return aggregate execution metrics for a specific prompt."""
 
-        since: Optional[datetime] = None
+        since: datetime | None = None
         if window_days is not None:
-            since = datetime.now(timezone.utc) - timedelta(days=max(window_days, 0))
+            since = datetime.now(UTC) - timedelta(days=max(window_days, 0))
         try:
             stats = self.repository.get_prompt_execution_statistics(prompt_id, since=since)
         except RepositoryError as exc:
@@ -295,11 +297,11 @@ class HistoryTracker:
         request_text: str,
         response_text: str,
         status: ExecutionStatus,
-        duration_ms: Optional[int],
-        metadata: Optional[Mapping[str, object]],
-        error_message: Optional[str] = None,
-        executed_at: Optional[datetime] = None,
-        rating: Optional[float] = None,
+        duration_ms: int | None,
+        metadata: Mapping[str, object] | None,
+        error_message: str | None = None,
+        executed_at: datetime | None = None,
+        rating: float | None = None,
     ) -> PromptExecution:
         """Create a PromptExecution dataclass instance with sanitised payloads."""
 
@@ -312,7 +314,7 @@ class HistoryTracker:
             status=status,
             error_message=error_message.strip() if error_message else None,
             duration_ms=duration_ms,
-            executed_at=executed_at or datetime.now(timezone.utc),
+            executed_at=executed_at or datetime.now(UTC),
             metadata=execution_metadata,
             rating=rating,
         )
@@ -324,7 +326,7 @@ class HistoryTracker:
         except RepositoryError as exc:
             raise HistoryTrackerError(f"Unable to persist execution {execution.id}: {exc}") from exc
 
-    def update_note(self, execution_id: uuid.UUID, note: Optional[str]) -> PromptExecution:
+    def update_note(self, execution_id: uuid.UUID, note: str | None) -> PromptExecution:
         """Update or clear the note metadata for an execution."""
 
         try:
@@ -352,9 +354,9 @@ class HistoryTracker:
     def _compute_rating_trend(
         self,
         prompt_id: uuid.UUID,
-        baseline_average: Optional[float],
+        baseline_average: float | None,
         trend_window: int,
-    ) -> Optional[float]:
+    ) -> float | None:
         if trend_window <= 0:
             return None
         try:
@@ -375,7 +377,7 @@ class HistoryTracker:
         return recent_average - baseline_average
 
 
-def _coerce_float(value: Optional[object]) -> Optional[float]:
+def _coerce_float(value: object | None) -> float | None:
     if value is None:
         return None
     try:
@@ -384,17 +386,17 @@ def _coerce_float(value: Optional[object]) -> Optional[float]:
         return None
 
 
-def _parse_datetime(value: Optional[object]) -> Optional[datetime]:
+def _parse_datetime(value: object | None) -> datetime | None:
     if value is None:
         return None
     if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
     try:
         parsed = datetime.fromisoformat(str(value))
     except ValueError:
         return None
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
+        parsed = parsed.replace(tzinfo=UTC)
     return parsed
 
 

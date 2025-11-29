@@ -1,25 +1,27 @@
 """Shared LiteLLM adapters for Prompt Manager.
 
-Updates: v0.7.0 - 2025-11-02 - Strip configured and retry drop parameters instead of forwarding them to providers.
-Updates: v0.6.3 - 2025-11-17 - Retry completion calls without unsupported parameters when models reject them.
-Updates: v0.6.2 - 2025-11-14 - Raise actionable error when LiteLLM is missing.
-Updates: v0.6.1 - 2025-11-07 - Tolerate LiteLLM builds without embedding support.
-Updates: v0.6.0 - 2025-11-07 - Provide shared completion/embedding import helpers.
+Updates:
+  v0.7.1 - 2025-11-29 - Reformat docstring and wrap long retry diagnostics strings.
+  v0.7.0 - 2025-11-02 - Strip drop parameters before LiteLLM retries to match provider support.
+  v0.6.3 - 2025-11-17 - Retry completion calls without unsupported parameters rejected by models.
+  v0.6.2 - 2025-11-14 - Raise actionable error when LiteLLM is missing.
+  v0.6.1 - 2025-11-07 - Tolerate LiteLLM builds without embedding support.
+  v0.6.0 - 2025-11-07 - Provide shared completion/embedding import helpers.
 """
 
 from __future__ import annotations
 
 import importlib
 import logging
-from typing import Callable, Dict, Iterable, Optional, Sequence, Set, Tuple, Type
+from collections.abc import Callable, Iterable, Sequence
 
 
 class LiteLLMNotInstalledError(RuntimeError):
     """Raised when LiteLLM is not available in the current environment."""
 
-_completion: Optional[Callable[..., object]] = None
-_embedding: Optional[Callable[..., object]] = None
-_LiteLLMException: Type[Exception] = Exception
+_completion: Callable[..., object] | None = None
+_embedding: Callable[..., object] | None = None
+_LiteLLMException: type[Exception] = Exception
 
 
 def _ensure_loaded() -> None:
@@ -52,7 +54,7 @@ def _ensure_loaded() -> None:
     _LiteLLMException = LiteLLMException  # type: ignore[misc]
 
 
-def get_completion() -> Tuple[Callable[..., object], Type[Exception]]:
+def get_completion() -> tuple[Callable[..., object], type[Exception]]:
     """Return the LiteLLM completion callable and exception type."""
 
     _ensure_loaded()
@@ -60,32 +62,32 @@ def get_completion() -> Tuple[Callable[..., object], Type[Exception]]:
     return _completion, _LiteLLMException
 
 
-def get_embedding() -> Tuple[Callable[..., object], Type[Exception]]:
+def get_embedding() -> tuple[Callable[..., object], type[Exception]]:
     """Return the LiteLLM embedding callable and exception type."""
 
     _ensure_loaded()
     if _embedding is None:
         raise RuntimeError(
-            "litellm embedding API is unavailable. Install a version that exposes `litellm.embedding` "
-            "or configure a different embedding backend."
+            "litellm embedding API is unavailable. Install a version that exposes "
+            "`litellm.embedding` or configure a different embedding backend."
         )
     return _embedding, _LiteLLMException
 
 
 def call_completion_with_fallback(
-    request: Dict[str, object],
+    request: dict[str, object],
     completion: Callable[..., object],
-    lite_llm_exception: Type[Exception],
+    lite_llm_exception: type[Exception],
     *,
-    drop_candidates: Optional[Iterable[str]] = None,
-    pre_dropped: Optional[Iterable[str]] = None,
+    drop_candidates: Iterable[str] | None = None,
+    pre_dropped: Iterable[str] | None = None,
 ) -> object:
     """Invoke LiteLLM completion and retry without unsupported params if necessary."""
 
     try:
         return completion(**request)  # type: ignore[arg-type]
     except lite_llm_exception as exc:  # type: ignore[arg-type]
-        existing_drop: Set[str] = set()
+        existing_drop: set[str] = set()
         if pre_dropped:
             existing_drop.update(
                 str(item).strip() for item in pre_dropped if str(item).strip()
@@ -107,9 +109,9 @@ def call_completion_with_fallback(
 
 
 def apply_configured_drop_params(
-    request: Dict[str, object],
-    drop_params: Optional[Sequence[str]],
-) -> Tuple[str, ...]:
+    request: dict[str, object],
+    drop_params: Sequence[str] | None,
+) -> tuple[str, ...]:
     """Remove configured parameters from request dict and return the dropped set."""
 
     if not drop_params:
@@ -123,7 +125,7 @@ def apply_configured_drop_params(
         if key in request:
             request.pop(key, None)
             dropped.append(key)
-    seen: Set[str] = set()
+    seen: set[str] = set()
     ordered_unique = [item for item in dropped if not (item in seen or seen.add(item))]
     return tuple(ordered_unique)
 
@@ -131,8 +133,8 @@ def apply_configured_drop_params(
 def _detect_unsupported_parameters(
     message: str,
     parameters: Iterable[str],
-    drop_candidates: Optional[Iterable[str]] = None,
-) -> Set[str]:
+    drop_candidates: Iterable[str] | None = None,
+) -> set[str]:
     lowered = message.lower()
     indicators = (
         "not support",
@@ -146,8 +148,10 @@ def _detect_unsupported_parameters(
     if not any(token in lowered for token in indicators):
         return set()
 
-    candidates = set(drop_candidates or {"max_tokens", "max_output_tokens", "temperature", "timeout"})
-    unsupported: Set[str] = set()
+    candidates = set(
+        drop_candidates or {"max_tokens", "max_output_tokens", "temperature", "timeout"}
+    )
+    unsupported: set[str] = set()
     for key in parameters:
         if key not in candidates:
             continue

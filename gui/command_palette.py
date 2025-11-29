@@ -5,8 +5,9 @@ Updates: v0.1.0 - 2025-11-10 - Introduce keyboard-driven quick action palette.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import Any
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -31,14 +32,14 @@ class QuickAction:
     identifier: str
     title: str
     description: str
-    category_hint: Optional[str] = None
-    tag_hints: Tuple[str, ...] = ()
-    template: Optional[str] = None
-    shortcut: Optional[str] = None
-    prompt_id: Optional[str] = None
+    category_hint: str | None = None
+    tag_hints: tuple[str, ...] = ()
+    template: str | None = None
+    shortcut: str | None = None
+    prompt_id: str | None = None
 
     @classmethod
-    def from_mapping(cls, data: Mapping[str, Any]) -> "QuickAction":
+    def from_mapping(cls, data: Mapping[str, Any]) -> QuickAction:
         identifier = str(data.get("identifier") or data.get("id") or "").strip()
         title = str(data.get("title") or "").strip()
         description = str(data.get("description") or "").strip()
@@ -65,10 +66,10 @@ class QuickAction:
         )
 
 
-def rank_prompts_for_action(prompts: Iterable[Prompt], action: QuickAction) -> List[Prompt]:
+def rank_prompts_for_action(prompts: Iterable[Prompt], action: QuickAction) -> list[Prompt]:
     """Return prompts ordered by how well they match the quick action hints."""
 
-    candidates: List[Tuple[int, Prompt]] = []
+    candidates: list[tuple[int, Prompt]] = []
     tags = set(tag.lower() for tag in action.tag_hints)
     category = (action.category_hint or "").lower()
     for prompt in prompts:
@@ -94,8 +95,8 @@ class CommandPaletteDialog(QDialog):
         self.setWindowTitle("Command Palette")
         self.setModal(True)
         self._actions = list(actions)
-        self._filtered_actions: List[QuickAction] = list(actions)
-        self._selected: Optional[QuickAction] = None
+        self._filtered_actions: list[QuickAction] = list(actions)
+        self._selected: QuickAction | None = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
@@ -126,7 +127,7 @@ class CommandPaletteDialog(QDialog):
         self._search_input.setFocus(Qt.ShortcutFocusReason)
 
     @property
-    def selected_action(self) -> Optional[QuickAction]:
+    def selected_action(self) -> QuickAction | None:
         return self._selected
 
     def _populate_list(self, actions: Sequence[QuickAction]) -> None:

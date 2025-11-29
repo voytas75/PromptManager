@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Sequence
+from collections.abc import Callable, Sequence
+from typing import Any
 
 import pytest
 
@@ -72,15 +73,15 @@ def test_extract_candidates_handles_partial_json_arrays() -> None:
 def test_generate_invokes_litellm_with_drop_params(monkeypatch: pytest.MonkeyPatch) -> None:
     """LiteLLMScenarioGenerator should drop configured params and return normalised scenarios."""
 
-    captured: Dict[str, Any] = {}
+    captured: dict[str, Any] = {}
 
     def fake_get_completion() -> tuple[Callable[..., Any], type[Exception]]:
-        def _completion(**_: Any) -> Dict[str, Any]:
+        def _completion(**_: Any) -> dict[str, Any]:
             return {"choices": [{"message": {"content": '["Duplicate", "-Unique"]'}}]}
 
         return _completion, RuntimeError
 
-    def fake_apply_drop_params(request: Dict[str, Any], drop_params: Sequence[str]) -> tuple[str, ...]:
+    def fake_apply_drop_params(request: dict[str, Any], drop_params: Sequence[str]) -> tuple[str, ...]:
         captured["request_before_drop"] = dict(request)
         for key in list(request.keys()):
             if key in drop_params:
@@ -88,13 +89,13 @@ def test_generate_invokes_litellm_with_drop_params(monkeypatch: pytest.MonkeyPat
         return tuple(drop_params)
 
     def fake_call_completion(
-        request: Dict[str, Any],
+        request: dict[str, Any],
         completion: Callable[..., Any],  # noqa: ARG001
         lite_llm_exception: type[Exception],  # noqa: ARG001
         *,
         drop_candidates: Sequence[str],  # noqa: ARG001
         pre_dropped: Sequence[str],
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         captured["request_after_drop"] = dict(request)
         captured["pre_dropped"] = tuple(pre_dropped)
         return {"choices": [{"message": {"content": '["Duplicate", "* Keep concise "]'}}]}
@@ -139,19 +140,19 @@ def test_generate_raises_when_no_scenarios(monkeypatch: pytest.MonkeyPatch) -> N
     """Missing LiteLLM content should raise ScenarioGenerationError."""
 
     def fake_get_completion() -> tuple[Callable[..., Any], type[Exception]]:
-        def _completion(**_: Any) -> Dict[str, Any]:
+        def _completion(**_: Any) -> dict[str, Any]:
             return {"choices": [{"message": {"content": "[]"}}]}
 
         return _completion, RuntimeError
 
     def fake_call_completion(
-        request: Dict[str, Any],  # noqa: ARG001
+        request: dict[str, Any],  # noqa: ARG001
         completion: Callable[..., Any],  # noqa: ARG001
         lite_llm_exception: type[Exception],  # noqa: ARG001
         *,
         drop_candidates: Sequence[str],  # noqa: ARG001
         pre_dropped: Sequence[str],  # noqa: ARG001
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         return {"choices": [{"message": {"content": "[]"}}]}
 
     monkeypatch.setattr("core.scenario_generation.get_completion", fake_get_completion)

@@ -1,10 +1,12 @@
 """Embedding provider and background synchronisation helpers for Prompt Manager.
 
-Updates: v0.7.2 - 2025-12-06 - Align embedding function signatures with updated Chroma client expectations.
-Updates: v0.7.1 - 2025-11-05 - Stop forwarding LiteLLM embedding timeouts by default.
-Updates: v0.7.0 - 2025-11-11 - Publish notifications for background embedding sync progress.
-Updates: v0.6.0 - 2025-11-07 - Add configurable LiteLLM and sentence-transformer backends.
-Updates: v0.1.0 - 2025-11-05 - Introduce embedding provider with retry logic and sync worker.
+Updates:
+  v0.7.3 - 2025-11-29 - Guard Prompt import for typing and wrap logging/reporting lines.
+  v0.7.2 - 2025-12-06 - Align embedding function signatures with updated Chroma client expectations.
+  v0.7.1 - 2025-11-05 - Stop forwarding LiteLLM embedding timeouts by default.
+  v0.7.0 - 2025-11-11 - Publish notifications for background embedding sync progress.
+  v0.6.0 - 2025-11-07 - Add configurable LiteLLM and sentence-transformer backends.
+  v0.1.0 - 2025-11-05 - Introduce embedding provider with retry logic and sync worker.
 """
 
 from __future__ import annotations
@@ -15,9 +17,12 @@ import queue
 import threading
 import time
 import uuid
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple, cast
-
-from models.prompt_model import Prompt
+from collections.abc import Callable, Mapping, Sequence
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    cast,
+)
 
 from .litellm_adapter import get_embedding
 from .notifications import (
@@ -25,6 +30,9 @@ from .notifications import (
     NotificationLevel,
     notification_center as default_notification_center,
 )
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from models.prompt_model import Prompt
 
 EmbeddingFunction = Callable[[Sequence[str]], Sequence[Sequence[float]]]
 
@@ -47,8 +55,8 @@ class DefaultEmbeddingFunction:
 
     _VECTOR_LENGTH = 32
 
-    def __call__(self, input: Sequence[str]) -> List[List[float]]:
-        results: List[List[float]] = []
+    def __call__(self, input: Sequence[str]) -> list[list[float]]:
+        results: list[list[float]] = []
         for text in input:
             digest = hashlib.blake2b(text.encode("utf-8"), digest_size=self._VECTOR_LENGTH).digest()
             vector = [byte / 255.0 for byte in digest]
@@ -63,9 +71,9 @@ class LiteLLMEmbeddingFunction:
         self,
         *,
         model: str,
-        api_key: Optional[str],
-        api_base: Optional[str],
-        timeout_seconds: Optional[float] = None,
+        api_key: str | None,
+        api_base: str | None,
+        timeout_seconds: float | None = None,
     ) -> None:
         if not model:
             raise ValueError("LiteLLM embedding backend requires a model name.")
@@ -74,12 +82,12 @@ class LiteLLMEmbeddingFunction:
         self._api_base = api_base
         self._timeout_seconds = timeout_seconds
 
-    def __call__(self, input: Sequence[str]) -> List[List[float]]:
+    def __call__(self, input: Sequence[str]) -> list[list[float]]:
         embedding_fn, LiteLLMException = get_embedding()
         inputs = list(input)
         if not inputs:
             return []
-        request: Dict[str, Any] = {
+        request: dict[str, Any] = {
             "model": self._model,
             "input": inputs,
         }
@@ -97,13 +105,15 @@ class LiteLLMEmbeddingFunction:
             raise EmbeddingGenerationError(f"LiteLLM embedding request failed: {exc}") from exc
         except Exception as exc:  # pragma: no cover - defensive
             raise EmbeddingGenerationError("LiteLLM embedding request failed unexpectedly") from exc
-        vectors: List[List[float]] = []
+        vectors: list[list[float]] = []
         for index, item in enumerate(data):
             raw_vector = self._extract_embedding_vector(item, index)
             try:
                 vectors.append([float(value) for value in raw_vector])
             except (TypeError, ValueError) as exc:  # pragma: no cover - defensive
-                raise EmbeddingGenerationError("LiteLLM embedding payload contains non-numeric values") from exc
+                raise EmbeddingGenerationError(
+                    "LiteLLM embedding payload contains non-numeric values"
+                ) from exc
         if len(vectors) == 1 and len(inputs) > 1:
             # Some providers return a single vector even for batched input.
             vectors = vectors * len(inputs)
@@ -134,7 +144,7 @@ class LiteLLMEmbeddingFunction:
             payload_map = cast("Mapping[str, Any]", payload)
             data_obj: Any = payload_map["data"]
         elif hasattr(payload_obj, "data"):
-            data_obj = getattr(payload_obj, "data")
+            data_obj = payload_obj.data
         else:
             data_obj = payload_obj
         if not isinstance(data_obj, Sequence) or isinstance(data_obj, (str, bytes)):
@@ -150,14 +160,16 @@ class LiteLLMEmbeddingFunction:
             mapping_item = cast("Mapping[str, Any]", item)
             candidate = mapping_item.get("embedding")
         elif hasattr(item, "embedding"):
-            candidate = getattr(item, "embedding")
+            candidate = item.embedding
         elif hasattr(item, "model_dump"):
             try:
                 dumped = item.model_dump()
             except Exception:  # noqa: BLE001 - fallback when model_dump fails
                 dumped = None
             candidate = (
-                cast("Mapping[str, Any]", dumped).get("embedding") if isinstance(dumped, Mapping) else None
+                cast("Mapping[str, Any]", dumped).get("embedding")
+                if isinstance(dumped, Mapping)
+                else None
             )
         else:
             candidate = item
@@ -176,7 +188,7 @@ class LiteLLMEmbeddingFunction:
 class SentenceTransformersEmbeddingFunction:
     """Use sentence-transformers models for local embeddings."""
 
-    def __init__(self, model: str, *, device: Optional[str] = None) -> None:
+    def __init__(self, model: str, *, device: str | None = None) -> None:
         if not model:
             raise ValueError("sentence-transformers backend requires a model name.")
         self._model_name = model
@@ -192,7 +204,7 @@ class SentenceTransformersEmbeddingFunction:
         model: Any = sentence_transformer(self._model_name, device=self._device)
         return model
 
-    def __call__(self, input: Sequence[str]) -> List[List[float]]:
+    def __call__(self, input: Sequence[str]) -> list[list[float]]:
         inputs = list(input)
         if not inputs:
             return []
@@ -212,12 +224,12 @@ class SentenceTransformersEmbeddingFunction:
 def create_embedding_function(
     backend: str,
     *,
-    model: Optional[str],
-    api_key: Optional[str],
-    api_base: Optional[str],
-    device: Optional[str] = None,
-    timeout_seconds: Optional[float] = None,
-) -> Optional[EmbeddingFunction]:
+    model: str | None,
+    api_key: str | None,
+    api_base: str | None,
+    device: str | None = None,
+    timeout_seconds: float | None = None,
+) -> EmbeddingFunction | None:
     """Return an embedding function for the configured backend or None for the default."""
 
     backend_normalised = (backend or "deterministic").strip().lower()
@@ -240,19 +252,21 @@ class EmbeddingProvider:
 
     def __init__(
         self,
-        embedding_function: Optional[EmbeddingFunction] = None,
+        embedding_function: EmbeddingFunction | None = None,
         *,
         max_retries: int = 3,
         retry_delay_seconds: float = 0.3,
     ) -> None:
-        self._embedding_function: EmbeddingFunction = embedding_function or DefaultEmbeddingFunction()
+        self._embedding_function: EmbeddingFunction = (
+            embedding_function or DefaultEmbeddingFunction()
+        )
         self._max_retries = max(1, max_retries)
         self._retry_delay_seconds = max(0.0, retry_delay_seconds)
 
-    def embed(self, text: str) -> List[float]:
+    def embed(self, text: str) -> list[float]:
         """Return an embedding vector for the supplied text."""
 
-        last_error: Optional[Exception] = None
+        last_error: Exception | None = None
         for attempt in range(1, self._max_retries + 1):
             try:
                 vectors = self._embedding_function([text])
@@ -276,8 +290,8 @@ class EmbeddingSyncWorker:
         fetch_prompt: Callable[[uuid.UUID], Prompt],
         persist_callback: Callable[[Prompt, Sequence[float]], None],
         *,
-        notification_center: Optional[NotificationCenter] = None,
-        logger: Optional[logging.Logger] = None,
+        notification_center: NotificationCenter | None = None,
+        logger: logging.Logger | None = None,
         max_attempts: int = 3,
         retry_delay_seconds: float = 0.5,
     ) -> None:
@@ -288,7 +302,7 @@ class EmbeddingSyncWorker:
         self._logger = logger or logging.getLogger("prompt_manager.embedding_worker")
         self._max_attempts = max(1, max_attempts)
         self._retry_delay_seconds = max(0.0, retry_delay_seconds)
-        self._queue: "queue.Queue[Tuple[uuid.UUID, int]]" = queue.Queue()
+        self._queue: queue.Queue[tuple[uuid.UUID, int]] = queue.Queue()
         self._stop_event = threading.Event()
         self._thread = threading.Thread(target=self._run, name="prompt-embedding-sync", daemon=True)
         self._thread.start()
@@ -322,7 +336,11 @@ class EmbeddingSyncWorker:
         try:
             prompt = self._fetch_prompt(prompt_id)
         except Exception as exc:  # noqa: BLE001 - repository surface handles logging upstream
-            self._logger.debug("Unable to fetch prompt for embedding sync", exc_info=exc, extra={"prompt_id": str(prompt_id)})
+            self._logger.debug(
+                "Unable to fetch prompt for embedding sync",
+                exc_info=exc,
+                extra={"prompt_id": str(prompt_id)},
+            )
             self._maybe_reschedule(prompt_id, attempts)
             return
 
@@ -367,7 +385,13 @@ class EmbeddingSyncWorker:
             )
             self._maybe_reschedule(prompt_id, attempts, backoff=True)
 
-    def _maybe_reschedule(self, prompt_id: uuid.UUID, attempts: int, *, backoff: bool = False) -> None:
+    def _maybe_reschedule(
+        self,
+        prompt_id: uuid.UUID,
+        attempts: int,
+        *,
+        backoff: bool = False,
+    ) -> None:
         next_attempt = attempts + 1
         if next_attempt >= self._max_attempts:
             self._logger.error(

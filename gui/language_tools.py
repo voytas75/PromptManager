@@ -6,8 +6,8 @@ Updates: v0.1.0 - 2025-11-10 - Introduce lightweight language detection for quer
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable, List, Tuple
 
 
 @dataclass(slots=True)
@@ -23,18 +23,18 @@ class DetectedLanguage:
 class _LanguagePattern:
     code: str
     name: str
-    keyword_patterns: Tuple[re.Pattern[str], ...]
+    keyword_patterns: tuple[re.Pattern[str], ...]
     weight: float = 1.0
 
     def score(self, text: str) -> float:
         return sum(len(pattern.findall(text)) for pattern in self.keyword_patterns) * self.weight
 
 
-def _compile(patterns: Iterable[str]) -> Tuple[re.Pattern[str], ...]:
+def _compile(patterns: Iterable[str]) -> tuple[re.Pattern[str], ...]:
     return tuple(re.compile(pattern, re.IGNORECASE | re.MULTILINE) for pattern in patterns)
 
 
-_LANGUAGE_PATTERNS: List[_LanguagePattern] = [
+_LANGUAGE_PATTERNS: list[_LanguagePattern] = [
     _LanguagePattern(
         code="python",
         name="Python",

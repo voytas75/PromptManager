@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import List, Optional, Sequence
 
 logger = logging.getLogger(__name__)
 
@@ -28,10 +28,10 @@ class ScenarioGenerationError(Exception):
     """Raised when usage scenarios cannot be generated."""
 
 
-def _normalise_scenarios(candidates: Sequence[str], limit: int) -> List[str]:
+def _normalise_scenarios(candidates: Sequence[str], limit: int) -> list[str]:
     """Return up to *limit* distinct, trimmed scenario strings."""
 
-    cleaned: List[str] = []
+    cleaned: list[str] = []
     seen: set[str] = set()
     for candidate in candidates:
         text = candidate.strip()
@@ -64,7 +64,7 @@ def _strip_code_fences(response_text: str) -> str:
     return "\n".join(lines).strip()
 
 
-def _extract_candidates(response_text: str) -> List[str]:
+def _extract_candidates(response_text: str) -> list[str]:
     """Parse LiteLLM output into a list of candidate scenario strings."""
 
     response_text = _strip_code_fences(response_text)
@@ -74,7 +74,7 @@ def _extract_candidates(response_text: str) -> List[str]:
     try:
         parsed = json.loads(stripped)
     except json.JSONDecodeError:
-        cleaned: List[str] = []
+        cleaned: list[str] = []
         for line in stripped.splitlines():
             text = line.strip()
             if not text or text in {"[", "]"}:
@@ -104,15 +104,15 @@ class LiteLLMScenarioGenerator:
     """Generate prompt usage scenarios via LiteLLM chat completions."""
 
     model: str
-    api_key: Optional[str] = None
-    api_base: Optional[str] = None
-    timeout_seconds: Optional[float] = None
-    api_version: Optional[str] = None
-    drop_params: Optional[Sequence[str]] = None
+    api_key: str | None = None
+    api_base: str | None = None
+    timeout_seconds: float | None = None
+    api_version: str | None = None
+    drop_params: Sequence[str] | None = None
     default_max_scenarios: int = 3
-    system_prompt: Optional[str] = None
+    system_prompt: str | None = None
 
-    def generate(self, context: str, *, max_scenarios: Optional[int] = None) -> List[str]:
+    def generate(self, context: str, *, max_scenarios: int | None = None) -> list[str]:
         """Return a ranked list of usage scenarios for the supplied prompt body."""
 
         if not context.strip():

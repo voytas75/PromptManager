@@ -63,11 +63,16 @@ import platform
 import re
 import textwrap
 import uuid
+from collections.abc import Callable, MutableMapping, Sequence
 from copy import deepcopy
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, MutableMapping, NamedTuple, Optional, Sequence, TypeVar
+from typing import (
+    Any,
+    NamedTuple,
+    TypeVar,
+)
 
 from PySide6.QtCore import QEvent, QSettings, Qt, Signal
 from PySide6.QtGui import QGuiApplication, QPalette
@@ -193,8 +198,8 @@ def _collect_system_info() -> SystemInfo:
 
 
 def _strip_scenarios_metadata(
-    metadata: Optional[MutableMapping[str, Any]],
-) -> Optional[MutableMapping[str, Any]]:
+    metadata: MutableMapping[str, Any] | None,
+) -> MutableMapping[str, Any] | None:
     """Return a deep copy of metadata without stored usage scenarios."""
 
     if metadata is None:
@@ -209,7 +214,7 @@ class CollapsibleTextSection(QWidget):
 
     textChanged = Signal()
 
-    def __init__(self, title: str, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, title: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._title = title
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
@@ -323,7 +328,7 @@ class CollapsibleTextSection(QWidget):
 class PromptRefinedDialog(QDialog):
     """Modal dialog presenting prompt refinement output in a resizable view."""
 
-    def __init__(self, content: str, parent: Optional[QWidget] = None, *, title: str = "Prompt refined") -> None:
+    def __init__(self, content: str, parent: QWidget | None = None, *, title: str = "Prompt refined") -> None:
         """Initialize the dialog with the refinement summary content.
 
         Args:
@@ -410,7 +415,7 @@ def fallback_generate_description(context: str, *, max_length: int = 240) -> str
     return trimmed.rstrip(".") + "…"
 
 
-def fallback_generate_scenarios(context: str, *, max_items: int = 3) -> List[str]:
+def fallback_generate_scenarios(context: str, *, max_items: int = 3) -> list[str]:
     """Provide heuristic usage scenarios when LLM support is unavailable."""
 
     cleaned = context.strip()
@@ -423,7 +428,7 @@ def fallback_generate_scenarios(context: str, *, max_items: int = 3) -> List[str
     if not segments:
         segments = [cleaned]
 
-    scenarios: List[str] = []
+    scenarios: list[str] = []
     seen: set[str] = set()
     for segment in segments:
         clause = segment.rstrip(".!?")
@@ -453,20 +458,20 @@ class PromptDialog(QDialog):
     def __init__(
         self,
         parent=None,
-        prompt: Optional[Prompt] = None,
-        category_provider: Optional[Callable[[], Sequence[PromptCategory]]] = None,
-        name_generator: Optional[Callable[[str], str]] = None,
-        description_generator: Optional[Callable[[str], str]] = None,
-        category_generator: Optional[Callable[[str], str]] = None,
-        tags_generator: Optional[Callable[[str], Sequence[str]]] = None,
-        scenario_generator: Optional[Callable[[str], Sequence[str]]] = None,
-        prompt_engineer: Optional[Callable[..., PromptRefinement]] = None,
-        structure_refiner: Optional[Callable[..., PromptRefinement]] = None,
-        version_history_handler: Optional[Callable[[Prompt], None]] = None,
+        prompt: Prompt | None = None,
+        category_provider: Callable[[], Sequence[PromptCategory]] | None = None,
+        name_generator: Callable[[str], str] | None = None,
+        description_generator: Callable[[str], str] | None = None,
+        category_generator: Callable[[str], str] | None = None,
+        tags_generator: Callable[[str], Sequence[str]] | None = None,
+        scenario_generator: Callable[[str], Sequence[str]] | None = None,
+        prompt_engineer: Callable[..., PromptRefinement] | None = None,
+        structure_refiner: Callable[..., PromptRefinement] | None = None,
+        version_history_handler: Callable[[Prompt], None] | None = None,
     ) -> None:
         super().__init__(parent)
         self._source_prompt = prompt
-        self._result_prompt: Optional[Prompt] = None
+        self._result_prompt: Prompt | None = None
         self._category_provider = category_provider
         self._name_generator = name_generator
         self._description_generator = description_generator
@@ -475,17 +480,17 @@ class PromptDialog(QDialog):
         self._category_generator = category_generator
         self._tags_generator = tags_generator
         self._scenario_generator = scenario_generator
-        self._categories: List[PromptCategory] = []
+        self._categories: list[PromptCategory] = []
         self._delete_requested = False
-        self._delete_button: Optional[QPushButton] = None
-        self._apply_button: Optional[QPushButton] = None
-        self._version_label: Optional[QLabel] = None
-        self._version_history_button: Optional[QPushButton] = None
+        self._delete_button: QPushButton | None = None
+        self._apply_button: QPushButton | None = None
+        self._version_label: QLabel | None = None
+        self._version_history_button: QPushButton | None = None
         self._version_history_handler = version_history_handler
-        self._generate_category_button: Optional[QPushButton] = None
-        self._generate_tags_button: Optional[QPushButton] = None
-        self._generate_scenarios_button: Optional[QPushButton] = None
-        self._execute_context_button: Optional[QPushButton] = None
+        self._generate_category_button: QPushButton | None = None
+        self._generate_tags_button: QPushButton | None = None
+        self._generate_scenarios_button: QPushButton | None = None
+        self._execute_context_button: QPushButton | None = None
         self.setWindowTitle("Create Prompt" if prompt is None else "Edit Prompt")
         self.setMinimumSize(900, 780)
         self.resize(1100, 880)
@@ -494,7 +499,7 @@ class PromptDialog(QDialog):
             self._populate(prompt)
 
     @property
-    def result_prompt(self) -> Optional[Prompt]:
+    def result_prompt(self) -> Prompt | None:
         """Return the prompt produced by the dialog after acceptance."""
 
         return self._result_prompt
@@ -506,7 +511,7 @@ class PromptDialog(QDialog):
         return self._delete_requested
 
     @property
-    def source_prompt(self) -> Optional[Prompt]:
+    def source_prompt(self) -> Prompt | None:
         """Expose the prompt supplied to the dialog for convenience."""
 
         return self._source_prompt
@@ -857,10 +862,10 @@ class PromptDialog(QDialog):
                 "The assistant could not determine relevant tags.",
             )
 
-    def _collect_scenarios(self) -> List[str]:
+    def _collect_scenarios(self) -> list[str]:
         """Return the current scenarios listed in the dialog."""
 
-        scenarios: List[str] = []
+        scenarios: list[str] = []
         seen: set[str] = set()
         for line in self._scenarios_input.toPlainText().splitlines():
             text = line.strip()
@@ -877,7 +882,7 @@ class PromptDialog(QDialog):
         """Populate the scenarios editor with the provided entries."""
 
         sanitized = [str(item).strip() for item in scenarios if str(item).strip()]
-        unique: List[str] = []
+        unique: list[str] = []
         seen: set[str] = set()
         for scenario in sanitized:
             key = scenario.lower()
@@ -902,7 +907,7 @@ class PromptDialog(QDialog):
         if current_text:
             self._set_category_value(current_text)
 
-    def _load_categories(self) -> List[PromptCategory]:
+    def _load_categories(self) -> list[PromptCategory]:
         """Return available categories, refreshing from the provider when possible."""
 
         if self._category_provider is None:
@@ -916,7 +921,7 @@ class PromptDialog(QDialog):
         self._categories = categories
         return self._categories
 
-    def _set_category_value(self, value: Optional[str]) -> None:
+    def _set_category_value(self, value: str | None) -> None:
         """Set the category selector text while aligning with registry labels."""
 
         if self._category_input is None:
@@ -945,7 +950,7 @@ class PromptDialog(QDialog):
             self._set_category_value(resolved)
         return resolved
 
-    def _resolve_category_label(self, value: Optional[str]) -> str:
+    def _resolve_category_label(self, value: str | None) -> str:
         """Return the stored category label when the value matches an entry."""
 
         text = (value or "").strip()
@@ -960,7 +965,7 @@ class PromptDialog(QDialog):
                 return category.label
         return text
 
-    def _generate_scenarios(self, context: str) -> List[str]:
+    def _generate_scenarios(self, context: str) -> list[str]:
         """Generate scenarios using configured helpers with heuristic fallback."""
 
         context_text = context.strip()
@@ -1131,7 +1136,7 @@ class PromptDialog(QDialog):
 
     def _run_refinement(
         self,
-        handler: Optional[Callable[..., PromptRefinement]],
+        handler: Callable[..., PromptRefinement] | None,
         *,
         unavailable_title: str,
         unavailable_message: str,
@@ -1204,7 +1209,7 @@ class PromptDialog(QDialog):
             return "\n\n".join(summary_parts)
         return "The prompt has been updated with the refined version."
 
-    def _build_prompt(self) -> Optional[Prompt]:
+    def _build_prompt(self) -> Prompt | None:
         """Construct a Prompt object from the dialog inputs."""
 
         context_text = self._context_input.toPlainText().strip()
@@ -1237,7 +1242,7 @@ class PromptDialog(QDialog):
         scenarios = self._collect_scenarios()
 
         if self._source_prompt is None:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             return Prompt(
                 id=uuid.uuid4(),
                 name=name,
@@ -1269,7 +1274,7 @@ class PromptDialog(QDialog):
             example_input=example_input,
             example_output=example_output,
             scenarios=scenarios,
-            last_modified=datetime.now(timezone.utc),
+            last_modified=datetime.now(UTC),
             version=base.version,
             author=author,
             quality_score=base.quality_score,
@@ -1294,7 +1299,7 @@ class PromptDialog(QDialog):
         self._populate(prompt)
         self._refresh_execute_context_button()
 
-    def _update_version_controls(self, version: Optional[str]) -> None:
+    def _update_version_controls(self, version: str | None) -> None:
         """Refresh the version label and history button state."""
 
         if self._version_label is None or self._version_history_button is None:
@@ -1339,14 +1344,14 @@ class PromptMaintenanceDialog(QDialog):
         parent: QWidget,
         manager: PromptManager,
         *,
-        category_generator: Optional[Callable[[str], str]] = None,
-        tags_generator: Optional[Callable[[str], Sequence[str]]] = None,
+        category_generator: Callable[[str], str] | None = None,
+        tags_generator: Callable[[str], Sequence[str]] | None = None,
     ) -> None:
         super().__init__(parent)
         self._manager = manager
         self._category_generator = category_generator
         self._tags_generator = tags_generator
-        self._stats_labels: Dict[str, QLabel] = {}
+        self._stats_labels: dict[str, QLabel] = {}
         self._log_view: QPlainTextEdit
         self._redis_status_label: QLabel
         self._redis_connection_label: QLabel
@@ -1739,10 +1744,10 @@ class PromptMaintenanceDialog(QDialog):
             label.setText(value)
 
     @staticmethod
-    def _format_timestamp(value: Optional[datetime]) -> str:
+    def _format_timestamp(value: datetime | None) -> str:
         if value is None:
             return "—"
-        return value.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        return value.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC")
 
     def _refresh_catalogue_stats(self) -> None:
         try:
@@ -1792,11 +1797,11 @@ class PromptMaintenanceDialog(QDialog):
             self._category_table.setItem(row, 4, QTableWidgetItem(executed_text or "—"))
 
     def _append_log(self, message: str) -> None:
-        timestamp = datetime.now(timezone.utc).strftime("%H:%M:%S")
+        timestamp = datetime.now(UTC).strftime("%H:%M:%S")
         self._log_view.appendPlainText(f"[{timestamp}] {message}")
 
     def _append_reset_log(self, message: str) -> None:
-        timestamp = datetime.now(timezone.utc).strftime("%H:%M:%S")
+        timestamp = datetime.now(UTC).strftime("%H:%M:%S")
         self._reset_log_view.appendPlainText(f"[{timestamp}] {message}")
 
     def _confirm_destructive_action(self, prompt: str) -> bool:
@@ -1809,7 +1814,7 @@ class PromptMaintenanceDialog(QDialog):
         )
         return result == QMessageBox.Yes
 
-    def _collect_prompts(self) -> List[Prompt]:
+    def _collect_prompts(self) -> list[Prompt]:
         try:
             return self._manager.repository.list()
         except RepositoryError as exc:
@@ -1845,7 +1850,7 @@ class PromptMaintenanceDialog(QDialog):
             updated_prompt = replace(
                 prompt,
                 category=suggestion,
-                last_modified=datetime.now(timezone.utc),
+                last_modified=datetime.now(UTC),
             )
             try:
                 self._manager.update_prompt(updated_prompt)
@@ -1884,7 +1889,7 @@ class PromptMaintenanceDialog(QDialog):
             updated_prompt = replace(
                 prompt,
                 tags=tags,
-                last_modified=datetime.now(timezone.utc),
+                last_modified=datetime.now(UTC),
             )
             try:
                 self._manager.update_prompt(updated_prompt)
@@ -1900,7 +1905,7 @@ class PromptMaintenanceDialog(QDialog):
     def _on_snapshot_clicked(self) -> None:
         """Prompt for a destination and create a maintenance snapshot."""
 
-        default_name = datetime.now(timezone.utc).strftime("prompt-manager-snapshot-%Y%m%d-%H%M%S.zip")
+        default_name = datetime.now(UTC).strftime("prompt-manager-snapshot-%Y%m%d-%H%M%S.zip")
         default_path = str(Path.home() / default_name)
         path, _ = QFileDialog.getSaveFileName(
             self,
@@ -2163,7 +2168,7 @@ class PromptMaintenanceDialog(QDialog):
             self._redis_connection_label.setText("Connection: " + ", ".join(connection_parts))
 
         stats = details.get("stats", {})
-        lines: List[str] = []
+        lines: list[str] = []
         for key, label in (
             ("keys", "Keys"),
             ("used_memory_human", "Used memory"),
@@ -2218,7 +2223,7 @@ class PromptMaintenanceDialog(QDialog):
         self._chroma_path_label.setText(" | ".join(path_parts))
 
         stats = details.get("stats", {})
-        lines: List[str] = []
+        lines: list[str] = []
         for key, label in (
             ("documents", "Documents"),
             ("disk_usage_bytes", "Disk usage (bytes)"),
@@ -2241,7 +2246,7 @@ class PromptMaintenanceDialog(QDialog):
         self._storage_path_label.setText(f"Path: {db_path}" if db_path else "Path: unknown")
         self._storage_refresh_button.setEnabled(True)
 
-        stats_lines: List[str] = []
+        stats_lines: list[str] = []
         healthy = True
 
         size_bytes = None
@@ -2293,13 +2298,13 @@ class CategoryEditorDialog(QDialog):
 
     def __init__(
         self,
-        parent: Optional[QWidget] = None,
+        parent: QWidget | None = None,
         *,
-        category: Optional[PromptCategory] = None,
+        category: PromptCategory | None = None,
     ) -> None:
         super().__init__(parent)
         self._source = category
-        self._payload: Dict[str, object] = {}
+        self._payload: dict[str, object] = {}
         self.setWindowTitle("Add Category" if category is None else "Edit Category")
         self.resize(460, 360)
         self._build_ui()
@@ -2307,7 +2312,7 @@ class CategoryEditorDialog(QDialog):
             self._populate(category)
 
     @property
-    def payload(self) -> Dict[str, object]:
+    def payload(self) -> dict[str, object]:
         """Return the collected form data."""
 
         return dict(self._payload)
@@ -2382,7 +2387,7 @@ class CategoryEditorDialog(QDialog):
             return
         description = self._description_input.text().strip() or label
         min_quality_text = self._min_quality_input.text().strip()
-        min_quality: Optional[float] = None
+        min_quality: float | None = None
         if min_quality_text:
             try:
                 min_quality = float(min_quality_text)
@@ -2410,11 +2415,11 @@ class CategoryEditorDialog(QDialog):
 class CategoryManagerDialog(QDialog):
     """Provide CRUD workflows for prompt categories."""
 
-    def __init__(self, manager: PromptManager, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, manager: PromptManager, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._manager = manager
         self._has_changes = False
-        self._categories: List[PromptCategory] = []
+        self._categories: list[PromptCategory] = []
         self.setWindowTitle("Manage Categories")
         self.resize(760, 520)
         self._build_ui()
@@ -2507,7 +2512,7 @@ class CategoryManagerDialog(QDialog):
         self._table.resizeColumnsToContents()
         self._update_button_states()
 
-    def _selected_category(self) -> Optional[PromptCategory]:
+    def _selected_category(self) -> PromptCategory | None:
         """Return the currently selected category."""
 
         selected_rows = self._table.selectionModel().selectedRows()
@@ -2607,19 +2612,19 @@ class SaveResultDialog(QDialog):
 
     def __init__(
         self,
-        parent: Optional[QWidget],
+        parent: QWidget | None,
         *,
         prompt_name: str,
         default_text: str = "",
         max_chars: int = 400,
         button_text: str = "Save",
         enable_rating: bool = True,
-        initial_rating: Optional[float] = None,
+        initial_rating: float | None = None,
     ) -> None:
         super().__init__(parent)
         self._max_chars = max_chars
         self._summary = ""
-        self._rating: Optional[int] = (
+        self._rating: int | None = (
             int(initial_rating) if initial_rating is not None else None
         )
         self._enable_rating = enable_rating
@@ -2633,7 +2638,7 @@ class SaveResultDialog(QDialog):
         return self._summary
 
     @property
-    def rating(self) -> Optional[int]:
+    def rating(self) -> int | None:
         """Return the selected rating, if any."""
 
         return self._rating
@@ -2706,13 +2711,13 @@ class ResponseStyleDialog(QDialog):
 
     def __init__(
         self,
-        parent: Optional[QWidget] = None,
+        parent: QWidget | None = None,
         *,
-        style: Optional[ResponseStyle] = None,
+        style: ResponseStyle | None = None,
     ) -> None:
         super().__init__(parent)
         self._source_style = style
-        self._result_style: Optional[ResponseStyle] = None
+        self._result_style: ResponseStyle | None = None
         self.setWindowTitle("New Prompt Part" if style is None else "Edit Prompt Part")
         self.resize(640, 620)
         self._build_ui()
@@ -2720,7 +2725,7 @@ class ResponseStyleDialog(QDialog):
             self._populate(style)
 
     @property
-    def result_style(self) -> Optional[ResponseStyle]:
+    def result_style(self) -> ResponseStyle | None:
         """Return the resulting prompt part entry."""
 
         return self._result_style
@@ -2871,17 +2876,17 @@ class ResponseStyleDialog(QDialog):
             snippet = " ".join(tokens[:max_words]).title()
             if snippet:
                 return f"{snippet} Part"
-        timestamp = datetime.now(timezone.utc).strftime("%H%M%S")
+        timestamp = datetime.now(UTC).strftime("%H%M%S")
         return f"Prompt Part {timestamp}"
 
 
 class PromptNoteDialog(QDialog):
     """Modal dialog for creating or editing prompt notes."""
 
-    def __init__(self, parent: Optional[QWidget] = None, *, note: Optional[PromptNote] = None) -> None:
+    def __init__(self, parent: QWidget | None = None, *, note: PromptNote | None = None) -> None:
         super().__init__(parent)
         self._source_note = note
-        self._result_note: Optional[PromptNote] = None
+        self._result_note: PromptNote | None = None
         self.setWindowTitle("New Note" if note is None else "Edit Note")
         self.resize(520, 320)
         self._build_ui()
@@ -2889,7 +2894,7 @@ class PromptNoteDialog(QDialog):
             self._note_input.setPlainText(note.note)
 
     @property
-    def result_note(self) -> Optional[PromptNote]:
+    def result_note(self) -> PromptNote | None:
         """Return the resulting note after dialog acceptance."""
 
         return self._result_note
@@ -2923,7 +2928,7 @@ class PromptNoteDialog(QDialog):
 class MarkdownPreviewDialog(QDialog):
     """Display markdown content rendered in a read-only viewer."""
 
-    def __init__(self, markdown_text: str, parent: Optional[QWidget], *, title: str = "Rendered Output") -> None:
+    def __init__(self, markdown_text: str, parent: QWidget | None, *, title: str = "Rendered Output") -> None:
         super().__init__(parent)
         self._markdown_text = markdown_text
         self.setWindowTitle(title)
@@ -2954,7 +2959,7 @@ class InfoDialog(QDialog):
 
     _TAGLINE = "Catalog, execute, and track AI prompts from a single desktop workspace."
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("About Prompt Manager")
         self.setModal(True)
@@ -3046,7 +3051,7 @@ class InfoDialog(QDialog):
         return "dev"
 
     @staticmethod
-    def _version_from_pyproject() -> Optional[str]:
+    def _version_from_pyproject() -> str | None:
         try:
             import tomllib  # type: ignore[attr-defined]
 
@@ -3064,7 +3069,7 @@ class InfoDialog(QDialog):
         return None
 
     @staticmethod
-    def _version_from_metadata() -> Optional[str]:
+    def _version_from_metadata() -> str | None:
         try:
             from importlib.metadata import (  # type: ignore
                 PackageNotFoundError,
@@ -3082,7 +3087,7 @@ class InfoDialog(QDialog):
         return None
 
     @staticmethod
-    def _version_from_module() -> Optional[str]:
+    def _version_from_module() -> str | None:
         try:
             from importlib import import_module
 
@@ -3113,9 +3118,9 @@ class PromptVersionHistoryDialog(QDialog):
         self,
         manager: PromptManager,
         prompt: Prompt,
-        parent: Optional[QWidget] = None,
+        parent: QWidget | None = None,
         *,
-        status_callback: Optional[Callable[[str, int], None]] = None,
+        status_callback: Callable[[str, int], None] | None = None,
         limit: int = 200,
     ) -> None:
         super().__init__(parent)
@@ -3123,8 +3128,8 @@ class PromptVersionHistoryDialog(QDialog):
         self._prompt = prompt
         self._limit = max(1, limit)
         self._status_callback = status_callback or (lambda _msg, _duration=0: None)
-        self._versions: List[PromptVersion] = []
-        self.last_restored_prompt: Optional[Prompt] = None
+        self._versions: list[PromptVersion] = []
+        self.last_restored_prompt: Prompt | None = None
         self.setWindowTitle(f"{prompt.name} – Version History")
         self.resize(820, 520)
         self._build_ui()
@@ -3241,7 +3246,7 @@ class PromptVersionHistoryDialog(QDialog):
             diff_text = "Snapshots are identical."
         self._diff_view.setPlainText(diff_text)
 
-    def _selected_version(self) -> Optional[PromptVersion]:
+    def _selected_version(self) -> PromptVersion | None:
         selection = self._table.selectionModel()
         if selection is None:
             return None
@@ -3253,7 +3258,7 @@ class PromptVersionHistoryDialog(QDialog):
             return self._versions[row]
         return None
 
-    def _previous_version(self, version: PromptVersion) -> Optional[PromptVersion]:
+    def _previous_version(self, version: PromptVersion) -> PromptVersion | None:
         try:
             current_index = self._versions.index(version)
         except ValueError:
@@ -3345,7 +3350,7 @@ class PromptVersionHistoryDialog(QDialog):
 
     @staticmethod
     def _format_timestamp(value: datetime) -> str:
-        timestamp = value.astimezone(timezone.utc)
+        timestamp = value.astimezone(UTC)
         return timestamp.strftime("%Y-%m-%d %H:%M UTC")
 
 

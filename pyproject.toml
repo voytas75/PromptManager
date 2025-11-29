@@ -54,7 +54,7 @@ src = ["."]
 exclude = ["data/"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I"]
+select = ["E", "F", "I", "B", "UP"]
 extend-select = ["TCH"]
 
 [tool.ruff.lint.isort]
@@ -62,7 +62,7 @@ known-first-party = ["core", "config", "models", "gui", "tests"]
 combine-as-imports = true
 
 [tool.pytest.ini_options]
-addopts = "-q --cov=core --cov-report=xml --cov-report=term-missing"
+addopts = "-q --cov=core --cov-report=xml --cov-report=term-missing --cov-fail-under=80 --n auto"
 testpaths = ["tests"]
 
 [tool.pyright]

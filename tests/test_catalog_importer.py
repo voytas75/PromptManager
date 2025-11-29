@@ -5,9 +5,10 @@ Updates: v0.2.0 - 2025-11-30 - Ensure GUI import helpers remain functional post-
 
 from __future__ import annotations
 
+import builtins
 import json
 import uuid
-from typing import TYPE_CHECKING, Dict, List
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -27,9 +28,9 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 
 class _StubRepository:
     def __init__(self) -> None:
-        self._store: Dict[uuid.UUID, Prompt] = {}
+        self._store: dict[uuid.UUID, Prompt] = {}
 
-    def list(self, limit: int | None = None) -> List[Prompt]:
+    def list(self, limit: int | None = None) -> builtins.list[Prompt]:
         values = list(self._store.values())
         return values if limit is None else values[:limit]
 
@@ -47,8 +48,8 @@ class _StubRepository:
 class _StubManager:
     def __init__(self) -> None:
         self.repository = _StubRepository()
-        self.created: List[Prompt] = []
-        self.updated: List[Prompt] = []
+        self.created: list[Prompt] = []
+        self.updated: list[Prompt] = []
 
     def create_prompt(self, prompt: Prompt, embedding=None) -> Prompt:  # noqa: D401
         self.created.append(prompt)
@@ -64,7 +65,7 @@ def test_load_prompt_catalog_without_path_returns_empty() -> None:
     assert prompts == []
 
 
-def test_import_prompt_catalog_adds_and_updates(tmp_path: "Path") -> None:
+def test_import_prompt_catalog_adds_and_updates(tmp_path: Path) -> None:
     manager = _StubManager()
 
     catalog_path = tmp_path / "catalog.json"
@@ -110,7 +111,7 @@ def test_import_prompt_catalog_adds_and_updates(tmp_path: "Path") -> None:
     assert "logs" in refreshed_prompt.tags
 
 
-def test_diff_prompt_catalog_reports_expected_changes(tmp_path: "Path") -> None:
+def test_diff_prompt_catalog_reports_expected_changes(tmp_path: Path) -> None:
     manager = _StubManager()
 
     catalog_path = tmp_path / "catalog.json"
@@ -141,7 +142,7 @@ def test_diff_prompt_catalog_reports_expected_changes(tmp_path: "Path") -> None:
     assert "separation of concerns" in updated_diff.entries[0].diff.lower()
 
 
-def test_export_prompt_catalog_json(tmp_path: "Path") -> None:
+def test_export_prompt_catalog_json(tmp_path: Path) -> None:
     manager = _StubManager()
     prompt = Prompt(
         id=uuid.uuid4(),
@@ -161,7 +162,7 @@ def test_export_prompt_catalog_json(tmp_path: "Path") -> None:
     assert data["prompts"][0]["name"] == "Diagnostics"
 
 
-def test_export_prompt_catalog_yaml(tmp_path: "Path") -> None:
+def test_export_prompt_catalog_yaml(tmp_path: Path) -> None:
     yaml = pytest.importorskip("yaml")
     manager = _StubManager()
     prompt = Prompt(
@@ -183,7 +184,7 @@ def test_export_prompt_catalog_yaml(tmp_path: "Path") -> None:
     assert payload["prompts"][0]["category"] == "Reporting"
 
 
-def test_export_prompt_catalog_respects_inactive_flag(tmp_path: "Path") -> None:
+def test_export_prompt_catalog_respects_inactive_flag(tmp_path: Path) -> None:
     manager = _StubManager()
     active = Prompt(
         id=uuid.uuid4(),

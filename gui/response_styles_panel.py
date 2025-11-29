@@ -8,7 +8,7 @@ Updates: v0.15.1 - 2025-11-25 - Document module metadata for AGENTS compliance.
 from __future__ import annotations
 
 import uuid
-from typing import Callable, List, Optional
+from collections.abc import Callable
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QGuiApplication
@@ -41,16 +41,16 @@ class ResponseStylesPanel(QWidget):
     def __init__(
         self,
         manager: PromptManager,
-        parent: Optional[QWidget] = None,
+        parent: QWidget | None = None,
         *,
-        status_callback: Optional[Callable[[str, int], None]] = None,
-        toast_callback: Optional[Callable[[str, int], None]] = None,
+        status_callback: Callable[[str, int], None] | None = None,
+        toast_callback: Callable[[str, int], None] | None = None,
     ) -> None:
         super().__init__(parent)
         self._manager = manager
         self._status_callback = status_callback
         self._toast_callback = toast_callback
-        self._styles: List[ResponseStyle] = []
+        self._styles: list[ResponseStyle] = []
         self._list = QListWidget(self)
         self._detail_view = QPlainTextEdit(self)
         self._detail_view.setReadOnly(True)
@@ -115,7 +115,7 @@ class ResponseStylesPanel(QWidget):
         if self._styles:
             self._list.setCurrentRow(0)
 
-    def _selected_style(self) -> Optional[ResponseStyle]:
+    def _selected_style(self) -> ResponseStyle | None:
         item = self._list.currentItem()
         if item is None:
             return None
@@ -141,7 +141,7 @@ class ResponseStylesPanel(QWidget):
         self._markdown_button.setEnabled(enabled)
         self._detail_view.setPlainText(self._format_style(style))
 
-    def _format_style(self, style: Optional[ResponseStyle]) -> str:
+    def _format_style(self, style: ResponseStyle | None) -> str:
         if style is None:
             return ""
         lines = [

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from core import (
@@ -68,13 +68,13 @@ def _add_execution(
         response_text="ok",
         status=status,
         duration_ms=120,
-        executed_at=datetime.now(timezone.utc),
+        executed_at=datetime.now(UTC),
         metadata=metadata,
     )
     repository.add_execution(execution)
 
 
-def test_build_analytics_snapshot_aggregates_repository_data(tmp_path: "Path") -> None:
+def test_build_analytics_snapshot_aggregates_repository_data(tmp_path: Path) -> None:
     db_path = tmp_path / "analytics.db"
     repo = PromptRepository(str(db_path))
     prompt_a = _make_prompt("Alpha", 10)
@@ -122,10 +122,10 @@ def test_build_analytics_snapshot_aggregates_repository_data(tmp_path: "Path") -
                 average_duration_ms=140.0,
                 average_rating=4.8,
                 rating_trend=0.1,
-                last_executed_at=datetime.now(timezone.utc),
+                last_executed_at=datetime.now(UTC),
             )
         ],
-        window_start=datetime.now(timezone.utc),
+        window_start=datetime.now(UTC),
     )
 
     embedding_report = PromptManager.EmbeddingDiagnostics(

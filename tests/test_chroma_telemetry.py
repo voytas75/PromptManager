@@ -5,7 +5,7 @@ Updates: v0.1.0 - 2025-11-03 - Ensure Chroma anonymized telemetry is disabled by
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from core.prompt_manager import PromptManager
 
@@ -19,14 +19,14 @@ class _RecordingClient:
 
     def __init__(self) -> None:
         self.get_or_create_called = False
-        self.kwargs: Dict[str, Any] = {}
+        self.kwargs: dict[str, Any] = {}
 
     def get_or_create_collection(
         self,
         *,
         name: str,
-        metadata: Dict[str, Any],
-        embedding_function: Optional[Any] = None,
+        metadata: dict[str, Any],
+        embedding_function: Any | None = None,
     ) -> Any:
         self.get_or_create_called = True
         self.kwargs = {

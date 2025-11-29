@@ -1,29 +1,33 @@
 """LiteLLM-backed prompt execution helpers.
 
-Updates: v0.4.0 - 2025-11-26 - Add streaming support for LiteLLM prompt execution.
-Updates: v0.3.1 - 2025-11-05 - Rely on provider defaults instead of forcing LiteLLM timeouts.
-Updates: v0.3.0 - 2025-11-02 - Support reasoning-effort configuration and max_output_tokens for new OpenAI model families.
-Updates: v0.2.1 - 2025-11-14 - Surface missing LiteLLM dependency as ExecutionError.
-Updates: v0.2.0 - 2025-11-12 - Support multi-turn conversation payloads for LiteLLM execution.
-Updates: v0.1.0 - 2025-11-08 - Introduce CodexExecutor for running prompts via LiteLLM.
+Updates:
+  v0.4.1 - 2025-11-29 - Guard Prompt/UUID imports and wrap payload handling lines.
+  v0.4.0 - 2025-11-26 - Add streaming support for LiteLLM prompt execution.
+  v0.3.1 - 2025-11-05 - Rely on provider defaults instead of forcing LiteLLM timeouts.
+  v0.3.0 - 2025-11-02 - Support reasoning config and max-output-token flags for newer OpenAI models.
+  v0.2.1 - 2025-11-14 - Surface missing LiteLLM dependency as ExecutionError.
+  v0.2.0 - 2025-11-12 - Support multi-turn conversation payloads for LiteLLM execution.
+  v0.1.0 - 2025-11-08 - Introduce CodexExecutor for running prompts via LiteLLM.
 """
 
 from __future__ import annotations
 
 import logging
 import time
-import uuid
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Mapping, Optional, cast
-
-from models.prompt_model import Prompt
+from typing import TYPE_CHECKING, Any, cast
 
 from .litellm_adapter import (
     apply_configured_drop_params,
     call_completion_with_fallback,
     get_completion,
 )
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from uuid import UUID
+
+    from models.prompt_model import Prompt
 
 logger = logging.getLogger("prompt_manager.execution")
 
@@ -44,7 +48,7 @@ def _supports_reasoning(model: str) -> bool:
 class CodexExecutionResult:
     """Container for prompt execution responses."""
 
-    prompt_id: uuid.UUID
+    prompt_id: UUID
     request_text: str
     response_text: str
     duration_ms: int
@@ -57,14 +61,14 @@ class CodexExecutor:
     """Execute prompts against GPT-style models via LiteLLM."""
 
     model: str
-    api_key: Optional[str] = None
-    api_base: Optional[str] = None
-    api_version: Optional[str] = None
-    timeout_seconds: Optional[float] = None
+    api_key: str | None = None
+    api_base: str | None = None
+    api_version: str | None = None
+    timeout_seconds: float | None = None
     max_output_tokens: int = 1024
     temperature: float = 0.2
-    drop_params: Optional[Sequence[str]] = None
-    reasoning_effort: Optional[str] = None
+    drop_params: Sequence[str] | None = None
+    reasoning_effort: str | None = None
     stream: bool = False
 
     def execute(
@@ -72,9 +76,9 @@ class CodexExecutor:
         prompt: Prompt,
         request_text: str,
         *,
-        conversation: Optional[Sequence[Mapping[str, str]]] = None,
-        stream: Optional[bool] = None,
-        on_stream: Optional[Callable[[str], None]] = None,
+        conversation: Sequence[Mapping[str, str]] | None = None,
+        stream: bool | None = None,
+        on_stream: Callable[[str], None] | None = None,
     ) -> CodexExecutionResult:
         """Run the supplied request through LiteLLM and return the response."""
 
@@ -108,7 +112,7 @@ class CodexExecutor:
 
         stream_enabled = self.stream if stream is None else stream
 
-        request: Dict[str, Any] = {
+        request: dict[str, Any] = {
             "model": self.model,
             "messages": payload_messages,
             "temperature": self.temperature,
@@ -123,7 +127,7 @@ class CodexExecutor:
             request["api_base"] = self.api_base
         if self.api_version:
             request["api_version"] = self.api_version
-        reasoning_payload: Optional[Dict[str, str]] = None
+        reasoning_payload: dict[str, str] | None = None
         if self.reasoning_effort and _supports_reasoning(self.model):
             reasoning_payload = {"effort": self.reasoning_effort}
             request["reasoning"] = reasoning_payload
@@ -170,9 +174,9 @@ class CodexExecutor:
             raise ExecutionError("Unexpected error while calling LiteLLM") from exc
         duration_ms = int((time.perf_counter() - started) * 1000)
 
-        usage: Dict[str, Any]
+        usage: dict[str, Any]
         response_text: str
-        raw_payload: Dict[str, Any]
+        raw_payload: dict[str, Any]
 
         if stream_enabled:
             if not isinstance(response, Iterable):  # pragma: no cover - defensive
@@ -191,7 +195,9 @@ class CodexExecutor:
                 if not isinstance(serialised_response, Mapping):  # pragma: no cover - defensive
                     raise ExecutionError("LiteLLM returned an unexpected payload")
                 payload_mapping = cast("Mapping[str, Any]", serialised_response)
-            payload_dict: Dict[str, Any] = {str(key): value for key, value in payload_mapping.items()}
+            payload_dict: dict[str, Any] = {
+                str(key): value for key, value in payload_mapping.items()
+            }
             response_text = _extract_completion_text(payload_dict).strip()
             usage_value = payload_dict.get("usage")
             if isinstance(usage_value, Mapping):
@@ -258,12 +264,12 @@ def _extract_completion_text(payload: Mapping[str, Any]) -> str:
 
 def _consume_streaming_response(
     stream: Iterable[Any],
-    on_stream: Optional[Callable[[str], None]] = None,
-) -> tuple[str, Dict[str, Any], Dict[str, Any]]:
+    on_stream: Callable[[str], None] | None = None,
+) -> tuple[str, dict[str, Any], dict[str, Any]]:
     """Aggregate LiteLLM streaming chunks into final response text and metadata."""
 
     accumulated: list[str] = []
-    usage: Dict[str, Any] = {}
+    usage: dict[str, Any] = {}
     serialised_chunks: list[Any] = []
 
     for chunk in stream:
@@ -282,7 +288,7 @@ def _consume_streaming_response(
             usage = dict(chunk_usage)
 
     final_text = "".join(accumulated)
-    raw_payload: Dict[str, Any] = {
+    raw_payload: dict[str, Any] = {
         "streamed": True,
         "chunks": serialised_chunks,
     }
@@ -347,10 +353,10 @@ def _extract_stream_text(payload: Any) -> str:
     return ""
 
 
-def _extract_stream_usage(payload: Any) -> Dict[str, Any]:
+def _extract_stream_usage(payload: Any) -> dict[str, Any]:
     """Return usage metadata from a streaming payload if present."""
 
-    empty: Dict[str, Any] = {}
+    empty: dict[str, Any] = {}
     if not isinstance(payload, Mapping):
         return empty
     usage_value = cast("Mapping[str, Any]", payload).get("usage")

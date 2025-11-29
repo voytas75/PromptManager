@@ -6,7 +6,7 @@ Updates: v0.1.0 - 2025-12-05 - Cover ResponseStyle dataclass and CRUD workflows.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -17,7 +17,7 @@ from models.response_style import ResponseStyle
 def _make_response_style(name: str = "Friendly Reviewer") -> ResponseStyle:
     """Return a populated ResponseStyle instance for tests."""
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return ResponseStyle(
         id=uuid.uuid4(),
         name=name,

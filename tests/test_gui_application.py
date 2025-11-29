@@ -18,7 +18,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 
 
 @pytest.fixture()
-def stub_qt(monkeypatch: pytest.MonkeyPatch) -> "Iterator[None]":
+def stub_qt(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Provide minimal PySide6 stubs so gui.application can be imported."""
 
     qt_core = types.ModuleType("PySide6.QtCore")
@@ -38,7 +38,7 @@ def stub_qt(monkeypatch: pytest.MonkeyPatch) -> "Iterator[None]":
             type(self)._instance = self
 
         @classmethod
-        def instance(cls) -> "_QApplication | None":
+        def instance(cls) -> _QApplication | None:
             return cls._instance
 
         @staticmethod

@@ -18,13 +18,15 @@ Updates: v0.1.0 - 2025-10-31 - Introduce PromptRepository syncing Prompt datacla
 
 from __future__ import annotations
 
+import builtins
 import json
 import sqlite3
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
+from typing import Any
 
 from models.category_model import PromptCategory, slugify_category
 from models.prompt_model import (
@@ -52,7 +54,7 @@ class PromptCatalogueStats:
     prompts_without_tags: int
     average_tags_per_prompt: float
     stale_prompts: int
-    last_modified_at: Optional[datetime]
+    last_modified_at: datetime | None
 
 
 class RepositoryError(Exception):
@@ -78,14 +80,14 @@ def _connect(db_path: Path) -> sqlite3.Connection:
     return conn
 
 
-def _json_dumps(value: Optional[Any]) -> Optional[str]:
+def _json_dumps(value: Any | None) -> str | None:
     """Serialize arbitrary values to JSON strings (or None)."""
     if value is None:
         return None
     return json.dumps(value, ensure_ascii=False)
 
 
-def _json_loads_list(value: Optional[str]) -> List[str]:
+def _json_loads_list(value: str | None) -> list[str]:
     """Deserialize JSON-encoded lists stored in SQLite into Python lists."""
     if value is None:
         return []
@@ -100,7 +102,7 @@ def _json_loads_list(value: Optional[str]) -> List[str]:
     return [str(parsed)]
 
 
-def _json_loads_optional(value: Optional[str]) -> Optional[Any]:
+def _json_loads_optional(value: str | None) -> Any | None:
     """Deserialize JSON strings while tolerating plain-text fallbacks."""
     if value is None:
         return None
@@ -112,7 +114,7 @@ def _json_loads_optional(value: Optional[str]) -> Optional[Any]:
         return value
 
 
-def _json_loads_dict(value: Optional[str]) -> Dict[str, Any]:
+def _json_loads_dict(value: str | None) -> dict[str, Any]:
     """Deserialize JSON strings into dictionaries."""
 
     if value is None or value in ("", "null"):
@@ -133,11 +135,11 @@ def _prompt_snapshot_json(prompt: Prompt) -> str:
     return json.dumps(record, ensure_ascii=False, sort_keys=True)
 
 
-def _parse_optional_datetime(value: Any) -> Optional[datetime]:
+def _parse_optional_datetime(value: Any) -> datetime | None:
     """Return a timezone-aware datetime parsed from SQLite rows when possible."""
 
     if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
     if isinstance(value, str):
         text = value.strip()
         if not text:
@@ -147,7 +149,7 @@ def _parse_optional_datetime(value: Any) -> Optional[datetime]:
         except ValueError:
             return None
         if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=timezone.utc)
+            parsed = parsed.replace(tzinfo=UTC)
         return parsed
     return None
 
@@ -258,14 +260,14 @@ class PromptRepository:
 
         total = 0
         active = 0
-        categories: Set[str] = set()
-        tags: Set[str] = set()
+        categories: set[str] = set()
+        tags: set[str] = set()
         missing_category = 0
         missing_tags = 0
         tag_total = 0
         stale_count = 0
-        latest_modified: Optional[datetime] = None
-        now = datetime.now(timezone.utc)
+        latest_modified: datetime | None = None
+        now = datetime.now(UTC)
         stale_cutoff = now - timedelta(days=30)
 
         try:
@@ -383,11 +385,11 @@ class PromptRepository:
 
     # Category management ------------------------------------------------ #
 
-    def list_categories(self, include_archived: bool = False) -> List[PromptCategory]:
+    def list_categories(self, include_archived: bool = False) -> builtins.list[PromptCategory]:
         """Return all stored categories."""
 
         query = "SELECT * FROM prompt_categories"
-        params: List[Any] = []
+        params: list[Any] = []
         if not include_archived:
             query += " WHERE is_active = 1"
         query += " ORDER BY label COLLATE NOCASE;"
@@ -503,7 +505,7 @@ class PromptRepository:
                     SET is_active = ?, updated_at = ?
                     WHERE slug = ?;
                     """,
-                    (int(is_active), datetime.now(timezone.utc).isoformat(), slugify_category(slug)),
+                    (int(is_active), datetime.now(UTC).isoformat(), slugify_category(slug)),
                 )
                 if cursor.rowcount == 0:
                     raise RepositoryNotFoundError(f"Category {slug} not found")
@@ -522,11 +524,11 @@ class PromptRepository:
     def sync_category_definitions(
         self,
         categories: Sequence[PromptCategory],
-    ) -> List[PromptCategory]:
+    ) -> builtins.list[PromptCategory]:
         """Ensure the provided categories exist; return any newly created ones."""
 
         existing = {category.slug for category in self.list_categories(include_archived=True)}
-        created: List[PromptCategory] = []
+        created: list[PromptCategory] = []
         for category in categories:
             if category.slug in existing:
                 continue
@@ -549,13 +551,13 @@ class PromptRepository:
         self,
         prompt: Prompt,
         *,
-        commit_message: Optional[str] = None,
-        parent_version_id: Optional[int] = None,
+        commit_message: str | None = None,
+        parent_version_id: int | None = None,
     ) -> PromptVersion:
         """Persist a snapshot of the prompt for version history tracking."""
 
         snapshot_json = _prompt_snapshot_json(prompt)
-        timestamp = datetime.now(timezone.utc).isoformat()
+        timestamp = datetime.now(UTC).isoformat()
 
         try:
             with _connect(self._db_path) as conn:
@@ -601,15 +603,15 @@ class PromptRepository:
         self,
         prompt_id: uuid.UUID,
         *,
-        limit: Optional[int] = None,
-    ) -> List[PromptVersion]:
+        limit: int | None = None,
+    ) -> builtins.list[PromptVersion]:
         """Return stored versions for a prompt ordered by newest first."""
 
         query = (
             "SELECT version_id, prompt_id, parent_version, version_number, created_at, commit_message, snapshot_json "
             "FROM prompt_versions WHERE prompt_id = ? ORDER BY version_number DESC"
         )
-        params: List[Any] = [str(prompt_id)]
+        params: list[Any] = [str(prompt_id)]
         if limit is not None:
             query += " LIMIT ?"
             params.append(int(limit))
@@ -641,7 +643,7 @@ class PromptRepository:
 
         return PromptVersion.from_row(row)
 
-    def get_prompt_latest_version(self, prompt_id: uuid.UUID) -> Optional[PromptVersion]:
+    def get_prompt_latest_version(self, prompt_id: uuid.UUID) -> PromptVersion | None:
         """Return the most recent version entry for the given prompt, if any."""
 
         try:
@@ -665,7 +667,7 @@ class PromptRepository:
     ) -> PromptForkLink:
         """Persist lineage information between a prompt and its fork."""
 
-        timestamp = datetime.now(timezone.utc).isoformat()
+        timestamp = datetime.now(UTC).isoformat()
         try:
             with _connect(self._db_path) as conn:
                 cursor = conn.execute(
@@ -691,7 +693,7 @@ class PromptRepository:
 
         return PromptForkLink.from_row(row)
 
-    def get_prompt_parent_fork(self, prompt_id: uuid.UUID) -> Optional[PromptForkLink]:
+    def get_prompt_parent_fork(self, prompt_id: uuid.UUID) -> PromptForkLink | None:
         """Return the lineage entry that links the prompt to its source."""
 
         try:
@@ -708,7 +710,7 @@ class PromptRepository:
             return None
         return PromptForkLink.from_row(row)
 
-    def list_prompt_children(self, prompt_id: uuid.UUID) -> List[PromptForkLink]:
+    def list_prompt_children(self, prompt_id: uuid.UUID) -> builtins.list[PromptForkLink]:
         """Return lineage entries for prompts forked from the provided prompt."""
 
         try:
@@ -724,7 +726,7 @@ class PromptRepository:
 
         return [PromptForkLink.from_row(row) for row in rows]
 
-    def list(self, limit: Optional[int] = None) -> List[Prompt]:
+    def list(self, limit: int | None = None) -> builtins.list[Prompt]:
         """Return prompts ordered by most recently modified."""
         # For deterministic unit tests ensure stable ordering when a small
         # *limit* is requested – return oldest first so callers get predictable
@@ -777,8 +779,8 @@ class PromptRepository:
     def list_executions(
         self,
         *,
-        limit: Optional[int] = None,
-    ) -> List[PromptExecution]:
+        limit: int | None = None,
+    ) -> builtins.list[PromptExecution]:
         """Return executions ordered by most recent first."""
         clause = "ORDER BY datetime(executed_at) DESC"
         if limit is not None:
@@ -796,11 +798,11 @@ class PromptRepository:
         self,
         prompt_id: uuid.UUID,
         *,
-        limit: Optional[int] = None,
-    ) -> List[PromptExecution]:
+        limit: int | None = None,
+    ) -> builtins.list[PromptExecution]:
         """Return execution history for a given prompt."""
         clause = "WHERE prompt_id = ? ORDER BY datetime(executed_at) DESC"
-        params: List[Any] = [str(prompt_id)]
+        params: list[Any] = [str(prompt_id)]
         if limit is not None:
             clause += f" LIMIT {int(limit)}"
         query = f"SELECT * FROM prompt_executions {clause};"
@@ -815,17 +817,17 @@ class PromptRepository:
     def list_executions_filtered(
         self,
         *,
-        status: Optional[str] = None,
-        prompt_id: Optional[uuid.UUID] = None,
-        search: Optional[str] = None,
-        limit: Optional[int] = None,
+        status: str | None = None,
+        prompt_id: uuid.UUID | None = None,
+        search: str | None = None,
+        limit: int | None = None,
         order_desc: bool = True,
-    ) -> List[PromptExecution]:
+    ) -> builtins.list[PromptExecution]:
         """Return executions filtered by status, prompt, and search term."""
 
         query = "SELECT * FROM prompt_executions"
-        conditions: List[str] = []
-        params: List[Any] = []
+        conditions: list[str] = []
+        params: list[Any] = []
 
         if status:
             conditions.append("status = ?")
@@ -863,14 +865,14 @@ class PromptRepository:
     def get_execution_analytics(
         self,
         *,
-        since: Optional[datetime] = None,
+        since: datetime | None = None,
         limit: int = 5,
-    ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+    ) -> tuple[dict[str, Any], builtins.list[dict[str, Any]]]:
         """Return overall and per-prompt execution aggregates."""
 
         limit_value = max(1, int(limit)) if limit else 5
-        filters: List[str] = []
-        params: List[Any] = []
+        filters: list[str] = []
+        params: list[Any] = []
         if since is not None:
             filters.append("datetime(executed_at) >= ?")
             params.append(since.isoformat())
@@ -903,7 +905,7 @@ class PromptRepository:
             "LIMIT ?;"
         )
 
-        def _row_to_dict(row: Optional[sqlite3.Row]) -> Dict[str, Any]:
+        def _row_to_dict(row: sqlite3.Row | None) -> dict[str, Any]:
             if row is None:
                 return {}
             return {key: row[key] for key in row.keys()}
@@ -924,12 +926,12 @@ class PromptRepository:
     def get_model_usage_breakdown(
         self,
         *,
-        since: Optional[datetime] = None,
-    ) -> List[Dict[str, Any]]:
+        since: datetime | None = None,
+    ) -> builtins.list[dict[str, Any]]:
         """Return aggregated token usage grouped by model identifier."""
 
         filters = ["metadata IS NOT NULL", "json_valid(metadata)"]
-        params: List[Any] = []
+        params: list[Any] = []
         if since is not None:
             filters.append("datetime(executed_at) >= ?")
             params.append(since.isoformat())
@@ -957,7 +959,7 @@ class PromptRepository:
                 rows = conn.execute(query, params).fetchall()
         except sqlite3.Error as exc:
             raise RepositoryError("Failed to compute model usage breakdown") from exc
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
         for row in rows:
             results.append({key: row[key] for key in row.keys()})
         return results
@@ -965,8 +967,8 @@ class PromptRepository:
     def get_benchmark_execution_stats(
         self,
         *,
-        since: Optional[datetime] = None,
-    ) -> List[Dict[str, Any]]:
+        since: datetime | None = None,
+    ) -> builtins.list[dict[str, Any]]:
         """Return aggregated metrics for persisted benchmark executions."""
 
         filters = [
@@ -974,7 +976,7 @@ class PromptRepository:
             "json_valid(metadata)",
             "COALESCE(json_extract(metadata, '$.benchmark'), 0) = 1",
         ]
-        params: List[Any] = []
+        params: list[Any] = []
         if since is not None:
             filters.append("datetime(executed_at) >= ?")
             params.append(since.isoformat())
@@ -1002,7 +1004,7 @@ class PromptRepository:
                 rows = conn.execute(query, params).fetchall()
         except sqlite3.Error as exc:
             raise RepositoryError("Failed to compute benchmark execution stats") from exc
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
         for row in rows:
             results.append({key: row[key] for key in row.keys()})
         return results
@@ -1011,12 +1013,12 @@ class PromptRepository:
         self,
         prompt_id: uuid.UUID,
         *,
-        since: Optional[datetime] = None,
-    ) -> Dict[str, Any]:
+        since: datetime | None = None,
+    ) -> dict[str, Any]:
         """Return aggregate execution metrics for a single prompt."""
 
         filters = ["prompt_id = ?"]
-        params: List[Any] = [str(prompt_id)]
+        params: list[Any] = [str(prompt_id)]
         if since is not None:
             filters.append("datetime(executed_at) >= ?")
             params.append(since.isoformat())
@@ -1035,7 +1037,7 @@ class PromptRepository:
             f"{where_clause};"
         )
 
-        def _row_to_dict(row: Optional[sqlite3.Row]) -> Dict[str, Any]:
+        def _row_to_dict(row: sqlite3.Row | None) -> dict[str, Any]:
             if row is None:
                 return {}
             return {key: row[key] for key in row.keys()}
@@ -1047,7 +1049,7 @@ class PromptRepository:
             raise RepositoryError("Failed to compute prompt execution statistics") from exc
         return _row_to_dict(row)
 
-    def get_category_prompt_counts(self) -> Dict[str, Dict[str, Any]]:
+    def get_category_prompt_counts(self) -> dict[str, dict[str, Any]]:
         """Return prompt totals per category (active/inactive)."""
 
         query = (
@@ -1063,7 +1065,7 @@ class PromptRepository:
                 rows = conn.execute(query).fetchall()
         except sqlite3.Error as exc:
             raise RepositoryError("Failed to compute category prompt counts") from exc
-        counts: Dict[str, Dict[str, Any]] = {}
+        counts: dict[str, dict[str, Any]] = {}
         for row in rows:
             slug = row["slug"] if row["slug"] is not None else ""
             counts[str(slug)] = {
@@ -1072,7 +1074,7 @@ class PromptRepository:
             }
         return counts
 
-    def get_category_execution_statistics(self) -> Dict[str, Dict[str, Any]]:
+    def get_category_execution_statistics(self) -> dict[str, dict[str, Any]]:
         """Return execution aggregates grouped by prompt category."""
 
         query = (
@@ -1090,7 +1092,7 @@ class PromptRepository:
                 rows = conn.execute(query).fetchall()
         except sqlite3.Error as exc:
             raise RepositoryError("Failed to compute category execution statistics") from exc
-        stats: Dict[str, Dict[str, Any]] = {}
+        stats: dict[str, dict[str, Any]] = {}
         for row in rows:
             slug = row["slug"] if row["slug"] is not None else ""
             stats[str(slug)] = {
@@ -1120,7 +1122,7 @@ class PromptRepository:
             raise RepositoryError(f"Failed to update execution {execution.id}") from exc
         return execution
 
-    def _prompt_to_row(self, prompt: Prompt) -> Dict[str, Any]:
+    def _prompt_to_row(self, prompt: Prompt) -> dict[str, Any]:
         """Convert Prompt into SQLite-friendly mapping."""
         return {
             "id": str(prompt.id),
@@ -1156,7 +1158,7 @@ class PromptRepository:
 
     def _row_to_prompt(self, row: sqlite3.Row) -> Prompt:
         """Transform a SQLite row into a Prompt dataclass."""
-        record: Dict[str, Any] = {
+        record: dict[str, Any] = {
             "id": row["id"],
             "name": row["name"],
             "description": row["description"],
@@ -1189,7 +1191,7 @@ class PromptRepository:
         }
         return Prompt.from_record(record)
 
-    def _execution_to_row(self, execution: PromptExecution) -> Dict[str, Any]:
+    def _execution_to_row(self, execution: PromptExecution) -> dict[str, Any]:
         """Convert PromptExecution into SQLite-compatible mapping."""
         record = execution.to_record()
         record["metadata"] = _json_dumps(record["metadata"])
@@ -1197,7 +1199,7 @@ class PromptRepository:
 
     def _row_to_execution(self, row: sqlite3.Row) -> PromptExecution:
         """Hydrate PromptExecution from a SQLite row."""
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "id": row["id"],
             "prompt_id": row["prompt_id"],
             "request_text": row["request_text"],
@@ -1212,7 +1214,7 @@ class PromptRepository:
         }
         return PromptExecution.from_record(payload)
 
-    def _category_to_row(self, category: PromptCategory) -> Dict[str, Any]:
+    def _category_to_row(self, category: PromptCategory) -> dict[str, Any]:
         """Serialize a PromptCategory into SQLite-friendly mapping."""
 
         return {
@@ -1232,7 +1234,7 @@ class PromptRepository:
     def _row_to_category(self, row: sqlite3.Row) -> PromptCategory:
         """Hydrate PromptCategory from SQLite row."""
 
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "slug": row["slug"],
             "label": row["label"],
             "description": row["description"],
@@ -1260,7 +1262,7 @@ class PromptRepository:
             (label, slug),
         )
 
-    def _user_profile_to_row(self, profile: UserProfile) -> Dict[str, Any]:
+    def _user_profile_to_row(self, profile: UserProfile) -> dict[str, Any]:
         """Serialize UserProfile to SQLite row mapping."""
 
         record = profile.to_record()
@@ -1281,7 +1283,7 @@ class PromptRepository:
     def _row_to_user_profile(self, row: sqlite3.Row) -> UserProfile:
         """Hydrate UserProfile from SQLite row."""
 
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "id": row["id"],
             "username": row["username"],
             "preferred_language": row["preferred_language"],
@@ -1311,7 +1313,7 @@ class PromptRepository:
         self,
         conn: sqlite3.Connection,
         prompt_id: uuid.UUID,
-    ) -> Optional[int]:
+    ) -> int | None:
         """Return the version_id for the latest version of a prompt."""
 
         row = conn.execute(
@@ -1551,7 +1553,7 @@ class PromptRepository:
         if existing_profile is None:
             conn.execute(
                 "INSERT INTO user_profile (id, username, updated_at) VALUES (?, ?, ?);",
-                (str(DEFAULT_PROFILE_ID), "default", datetime.now(timezone.utc).isoformat()),
+                (str(DEFAULT_PROFILE_ID), "default", datetime.now(UTC).isoformat()),
             )
 
     def _backfill_category_slugs(self, conn: sqlite3.Connection) -> None:
@@ -1588,7 +1590,7 @@ class PromptRepository:
                 conn.execute("DELETE FROM user_profile;")
                 conn.execute(
                     "INSERT INTO user_profile (id, username, updated_at) VALUES (?, ?, ?);",
-                    (str(DEFAULT_PROFILE_ID), "default", datetime.now(timezone.utc).isoformat()),
+                    (str(DEFAULT_PROFILE_ID), "default", datetime.now(UTC).isoformat()),
                 )
         except sqlite3.Error as exc:
             raise RepositoryError("Failed to reset repository data") from exc
@@ -1639,7 +1641,7 @@ class PromptRepository:
         profile.record_prompt_usage(prompt, max_recent=max_recent)
         return self.save_user_profile(profile)
 
-    def _response_style_to_row(self, style: ResponseStyle) -> Dict[str, Any]:
+    def _response_style_to_row(self, style: ResponseStyle) -> dict[str, Any]:
         """Serialise ResponseStyle into SQLite-compatible mapping."""
 
         record = style.to_record()
@@ -1667,7 +1669,7 @@ class PromptRepository:
     def _row_to_response_style(self, row: sqlite3.Row) -> ResponseStyle:
         """Hydrate ResponseStyle from SQLite row."""
 
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             column: row[column]
             for column in row.keys()
         }
@@ -1680,7 +1682,7 @@ class PromptRepository:
         payload.setdefault("prompt_part", "Response Style")
         return ResponseStyle.from_record(payload)
 
-    def _note_to_row(self, note: PromptNote) -> Dict[str, Any]:
+    def _note_to_row(self, note: PromptNote) -> dict[str, Any]:
         """Serialise PromptNote to SQLite mapping."""
 
         record = note.to_record()
@@ -1694,7 +1696,7 @@ class PromptRepository:
     def _row_to_note(self, row: sqlite3.Row) -> PromptNote:
         """Hydrate PromptNote from SQLite row."""
 
-        payload: Dict[str, Any] = {column: row[column] for column in row.keys()}
+        payload: dict[str, Any] = {column: row[column] for column in row.keys()}
         return PromptNote.from_record(payload)
 
     # Response style helpers -------------------------------------------- #
@@ -1756,13 +1758,13 @@ class PromptRepository:
         self,
         *,
         include_inactive: bool = False,
-        search: Optional[str] = None,
-    ) -> List[ResponseStyle]:
+        search: str | None = None,
+    ) -> builtins.list[ResponseStyle]:
         """Return stored response styles ordered by case-insensitive name."""
 
         query = "SELECT * FROM response_styles"
-        clauses: List[str] = []
-        params: List[Any] = []
+        clauses: list[str] = []
+        params: list[Any] = []
         if not include_inactive:
             clauses.append("is_active = 1")
         if search:
@@ -1845,7 +1847,7 @@ class PromptRepository:
             raise RepositoryNotFoundError(f"Prompt note {note_id} not found")
         return self._row_to_note(row)
 
-    def list_prompt_notes(self) -> List[PromptNote]:
+    def list_prompt_notes(self) -> builtins.list[PromptNote]:
         """Return stored prompt notes ordered by modification time."""
 
         try:
@@ -1871,7 +1873,7 @@ class PromptRepository:
         if deleted == 0:
             raise RepositoryNotFoundError(f"Prompt note {note_id} not found")
 
-    def get_prompts_for_ids(self, prompt_ids: Sequence[uuid.UUID]) -> List[Prompt]:
+    def get_prompts_for_ids(self, prompt_ids: Sequence[uuid.UUID]) -> builtins.list[Prompt]:
         """Return prompts that match provided identifiers in input order."""
 
         if not prompt_ids:
@@ -1885,7 +1887,7 @@ class PromptRepository:
         except sqlite3.Error as exc:
             raise RepositoryError("Failed to load prompts for identifiers") from exc
         prompt_map = {row["id"]: self._row_to_prompt(row) for row in rows}
-        ordered: List[Prompt] = []
+        ordered: list[Prompt] = []
         for pid in ids:
             prompt = prompt_map.get(pid)
             if prompt:

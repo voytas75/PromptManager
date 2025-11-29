@@ -7,9 +7,10 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Iterable, List, Protocol, Sequence, TypeVar
+from typing import Protocol, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -144,12 +145,12 @@ class IntentPrediction:
     label: IntentLabel
     confidence: float
     rationale: str | None = None
-    category_hints: List[str] = field(default_factory=list)
-    tag_hints: List[str] = field(default_factory=list)
-    language_hints: List[str] = field(default_factory=list)
+    category_hints: list[str] = field(default_factory=list)
+    tag_hints: list[str] = field(default_factory=list)
+    language_hints: list[str] = field(default_factory=list)
 
     @classmethod
-    def general(cls) -> "IntentPrediction":
+    def general(cls) -> IntentPrediction:
         return cls(IntentLabel.GENERAL, confidence=0.0)
 
 
@@ -175,7 +176,7 @@ class IntentClassifier:
 
         confidence = min(0.9, 0.35 + (best_score * 0.15)) if best_score else 0.25
 
-        language_hints: List[str] = []
+        language_hints: list[str] = []
         for language, candidates in _LANGUAGE_HINTS.items():
             if _collect_keywords(candidates, lower):
                 language_hints.append(language)
@@ -212,12 +213,12 @@ def rank_by_hints(
     *,
     category_hints: Sequence[str],
     tag_hints: Sequence[str],
-) -> List[PromptLike]:
+) -> list[PromptLike]:
     """Return prompts ordered by category/tag hints while preserving stability."""
 
-    matched: List[PromptLike] = []
-    secondary: List[PromptLike] = []
-    remainder: List[PromptLike] = []
+    matched: list[PromptLike] = []
+    secondary: list[PromptLike] = []
+    remainder: list[PromptLike] = []
 
     normalized_categories = {hint.lower() for hint in category_hints}
     normalized_tags = {hint.lower() for hint in tag_hints}

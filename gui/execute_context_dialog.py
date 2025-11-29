@@ -5,7 +5,7 @@ Updates: v0.1.0 - 2025-11-26 - Add execute-as-context history picker dialog.
 
 from __future__ import annotations
 
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QTextCursor
@@ -37,7 +37,7 @@ class ExecuteContextDialog(QDialog):
         self.resize(520, 420)
         self._history: Sequence[str] = history or ()
         self._description_input: QPlainTextEdit
-        self._history_list: Optional[QListWidget] = None
+        self._history_list: QListWidget | None = None
         self._build_ui(last_task)
 
     def task_text(self) -> str:

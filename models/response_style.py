@@ -7,9 +7,9 @@ Updates: v0.1.0 - 2025-12-05 - Introduce ResponseStyle dataclass for formatting 
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Dict, List, Mapping, MutableMapping, Optional
+from typing import TYPE_CHECKING, Any
 
 from .prompt_model import (
     _deserialize_metadata,
@@ -18,6 +18,9 @@ from .prompt_model import (
     _serialize_list,
     _utc_now,
 )
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from datetime import datetime
 
 
 @dataclass(slots=True)
@@ -28,30 +31,30 @@ class ResponseStyle:
     name: str
     description: str
     prompt_part: str = "Response Style"
-    tone: Optional[str] = None
-    voice: Optional[str] = None
-    format_instructions: Optional[str] = None
-    guidelines: Optional[str] = None
-    tags: List[str] = field(default_factory=list)
-    examples: List[str] = field(default_factory=list)
-    metadata: Optional[MutableMapping[str, Any]] = None
+    tone: str | None = None
+    voice: str | None = None
+    format_instructions: str | None = None
+    guidelines: str | None = None
+    tags: list[str] = field(default_factory=list)
+    examples: list[str] = field(default_factory=list)
+    metadata: MutableMapping[str, Any] | None = None
     is_active: bool = True
     version: str = "1.0"
     created_at: datetime = field(default_factory=_utc_now)
     last_modified: datetime = field(default_factory=_utc_now)
-    ext1: Optional[str] = None
-    ext2: Optional[MutableMapping[str, Any]] = None
-    ext3: Optional[MutableMapping[str, Any]] = None
+    ext1: str | None = None
+    ext2: MutableMapping[str, Any] | None = None
+    ext3: MutableMapping[str, Any] | None = None
 
     def touch(self) -> None:
         """Refresh the modification timestamp."""
 
         self.last_modified = _utc_now()
 
-    def to_record(self) -> Dict[str, Any]:
+    def to_record(self) -> dict[str, Any]:
         """Return a serialisable mapping suitable for SQLite persistence."""
 
-        metadata_payload: Optional[Dict[str, Any]]
+        metadata_payload: dict[str, Any] | None
         if isinstance(self.metadata, Mapping):
             metadata_payload = dict(self.metadata)
         else:
@@ -79,7 +82,7 @@ class ResponseStyle:
         }
 
     @classmethod
-    def from_record(cls, data: Mapping[str, Any]) -> "ResponseStyle":
+    def from_record(cls, data: Mapping[str, Any]) -> ResponseStyle:
         """Hydrate a ResponseStyle from a mapping."""
 
         metadata_value = data.get("metadata")

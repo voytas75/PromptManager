@@ -8,7 +8,7 @@ from __future__ import annotations
 import sqlite3
 import uuid
 from dataclasses import replace
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -271,7 +271,7 @@ def test_category_update_propagates_prompt_label(tmp_path: Path) -> None:
     updated_category = replace(
         category,
         label="Quality Checks",
-        updated_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(UTC),
     )
     repo.update_category(updated_category)
 
@@ -298,7 +298,7 @@ def test_prompt_catalogue_stats_cover_edge_cases(tmp_path: Path) -> None:
     stale.category = ""
     stale.tags = []
     stale.is_active = False
-    stale.last_modified = datetime.now(timezone.utc) - timedelta(days=45)
+    stale.last_modified = datetime.now(UTC) - timedelta(days=45)
 
     repo.add(recent)
     repo.add(stale)
@@ -382,7 +382,7 @@ def test_repository_backfills_category_slugs(tmp_path: Path) -> None:
                 "",
                 "",
                 "",
-                datetime.now(timezone.utc).isoformat(),
+                datetime.now(UTC).isoformat(),
                 "1.0",
                 None,
                 None,
@@ -390,7 +390,7 @@ def test_repository_backfills_category_slugs(tmp_path: Path) -> None:
                 0,
                 0.0,
                 "[]",
-                datetime.now(timezone.utc).isoformat(),
+                datetime.now(UTC).isoformat(),
                 None,
                 1,
                 "local",

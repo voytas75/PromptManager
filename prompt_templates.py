@@ -6,8 +6,6 @@ Updates: v0.1.0 - 2025-11-23 - Centralise prompt template defaults for runtime o
 
 from __future__ import annotations
 
-from typing import Dict
-
 NAME_GENERATION_PROMPT = (
     "You generate concise, descriptive prompt names for a prompt catalogue. "
     "Return a title of at most 5 words. Avoid punctuation except spaces."
@@ -83,7 +81,7 @@ PROMPT_TEMPLATE_KEYS = (
     "category_generation",
 )
 
-PROMPT_TEMPLATE_LABELS: Dict[str, str] = {
+PROMPT_TEMPLATE_LABELS: dict[str, str] = {
     "name_generation": "Prompt name suggestions",
     "description_generation": "Prompt description synthesis",
     "scenario_generation": "Scenario drafting",
@@ -91,7 +89,7 @@ PROMPT_TEMPLATE_LABELS: Dict[str, str] = {
     "category_generation": "Prompt category suggestions",
 }
 
-PROMPT_TEMPLATE_DESCRIPTIONS: Dict[str, str] = {
+PROMPT_TEMPLATE_DESCRIPTIONS: dict[str, str] = {
     "name_generation": "LLM system prompt used when generating names for new prompts.",
     "description_generation": "LLM system prompt used to auto-summarise prompt descriptions.",
     "scenario_generation": "LLM system prompt used to draft usage scenarios for prompts.",
@@ -99,7 +97,7 @@ PROMPT_TEMPLATE_DESCRIPTIONS: Dict[str, str] = {
     "category_generation": "LLM system prompt used to classify prompts into catalogue categories.",
 }
 
-DEFAULT_PROMPT_TEMPLATES: Dict[str, str] = {
+DEFAULT_PROMPT_TEMPLATES: dict[str, str] = {
     "name_generation": NAME_GENERATION_PROMPT,
     "description_generation": DESCRIPTION_GENERATION_PROMPT,
     "scenario_generation": SCENARIO_GENERATION_PROMPT,
@@ -114,12 +112,12 @@ def get_default_prompt(key: str) -> str:
     return DEFAULT_PROMPT_TEMPLATES.get(key, "")
 
 
-def normalise_prompt_templates(value: Dict[str, str] | None) -> Dict[str, str]:
+def normalise_prompt_templates(value: dict[str, str] | None) -> dict[str, str]:
     """Return a cleaned mapping of prompt overrides keyed by workflow."""
 
     if not value:
         return {}
-    cleaned: Dict[str, str] = {}
+    cleaned: dict[str, str] = {}
     for key, text in value.items():
         if key not in PROMPT_TEMPLATE_KEYS:
             continue

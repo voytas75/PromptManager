@@ -15,8 +15,9 @@ import logging
 import os
 import re
 from collections import OrderedDict
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Mapping, Optional, Sequence, Tuple, Type, cast
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 from pydantic_settings import (
@@ -25,7 +26,7 @@ from pydantic_settings import (
     SettingsConfigDict,
 )
 
-LITELLM_ROUTED_WORKFLOWS: "OrderedDict[str, str]" = OrderedDict(
+LITELLM_ROUTED_WORKFLOWS: OrderedDict[str, str] = OrderedDict(
     [
         ("name_generation", "Prompt name suggestions"),
         ("description_generation", "Prompt description synthesis"),
@@ -36,7 +37,7 @@ LITELLM_ROUTED_WORKFLOWS: "OrderedDict[str, str]" = OrderedDict(
     ]
 )
 
-LITELLM_ROUTING_OPTIONS: Tuple[str, str] = ("fast", "inference")
+LITELLM_ROUTING_OPTIONS: tuple[str, str] = ("fast", "inference")
 
 DEFAULT_THEME_MODE = "light"
 DEFAULT_CHAT_USER_BUBBLE_COLOR = "#e6f0ff"
@@ -76,23 +77,23 @@ _THEME_CHOICES = {"light", "dark"}
 class PromptTemplateOverrides(BaseModel):
     """User supplied overrides for the core LiteLLM system prompts."""
 
-    name_generation: Optional[str] = Field(
+    name_generation: str | None = Field(
         default=None,
         description="System prompt text for the name generation workflow.",
     )
-    description_generation: Optional[str] = Field(
+    description_generation: str | None = Field(
         default=None,
         description="System prompt text for the description generation workflow.",
     )
-    scenario_generation: Optional[str] = Field(
+    scenario_generation: str | None = Field(
         default=None,
         description="System prompt text for the scenario generation workflow.",
     )
-    prompt_engineering: Optional[str] = Field(
+    prompt_engineering: str | None = Field(
         default=None,
         description="System prompt text for the prompt engineering workflow.",
     )
-    category_generation: Optional[str] = Field(
+    category_generation: str | None = Field(
         default=None,
         description="System prompt text for the category suggestion workflow.",
     )
@@ -107,43 +108,43 @@ class PromptManagerSettings(BaseSettings):
 
     db_path: Path = Field(default=Path("data") / "prompt_manager.db")
     chroma_path: Path = Field(default=Path("data") / "chromadb")
-    redis_dsn: Optional[str] = None
+    redis_dsn: str | None = None
     cache_ttl_seconds: int = Field(default=300)
-    litellm_model: Optional[str] = Field(
+    litellm_model: str | None = Field(
         default=None,
         description=(
             "LiteLLM fast model used for prompt naming, description hints, and other "
             "latency-sensitive workflows."
         ),
     )
-    litellm_inference_model: Optional[str] = Field(
+    litellm_inference_model: str | None = Field(
         default=None,
         description=(
             "LiteLLM inference model for higher-quality, slower operations (configured "
             "separately from the fast model)."
         ),
     )
-    litellm_api_key: Optional[str] = Field(
+    litellm_api_key: str | None = Field(
         default=None,
         description="LiteLLM API key.",
         repr=False,
     )
-    litellm_api_base: Optional[str] = Field(
+    litellm_api_base: str | None = Field(
         default=None,
         description="Optional LiteLLM API base URL override.",
     )
-    litellm_api_version: Optional[str] = Field(
+    litellm_api_version: str | None = Field(
         default=None,
         description="Optional LiteLLM API version (useful for Azure OpenAI).",
     )
-    litellm_drop_params: Optional[List[str]] = Field(
+    litellm_drop_params: list[str] | None = Field(
         default=None,
         description=(
             "Optional LiteLLM parameters to drop before forwarding requests (see "
             "https://docs.litellm.ai/docs/completion/drop_params)."
         ),
     )
-    litellm_reasoning_effort: Optional[str] = Field(
+    litellm_reasoning_effort: str | None = Field(
         default=None,
         description=(
             "Optional reasoning effort level for OpenAI reasoning models (minimal, "
@@ -154,22 +155,22 @@ class PromptManagerSettings(BaseSettings):
         default=False,
         description="Enable streaming responses when executing prompts via LiteLLM.",
     )
-    litellm_workflow_models: Optional[Dict[str, Literal["fast", "inference"]]] = Field(
+    litellm_workflow_models: dict[str, Literal["fast", "inference"]] | None = Field(
         default=None,
         description=(
             "Workflow-specific LiteLLM routing overrides mapping identifiers to "
             "'fast' or 'inference'."
         ),
     )
-    quick_actions: Optional[list[dict[str, object]]] = Field(
+    quick_actions: list[dict[str, object]] | None = Field(
         default=None,
         description="Optional list of custom quick action definitions for the command palette.",
     )
-    categories_path: Optional[Path] = Field(
+    categories_path: Path | None = Field(
         default=None,
         description="Optional JSON file containing additional prompt category definitions.",
     )
-    categories: Optional[list[dict[str, object]]] = Field(
+    categories: list[dict[str, object]] | None = Field(
         default=None,
         description=(
             "Inline list of prompt category definitions sourced from environment "
@@ -195,14 +196,14 @@ class PromptManagerSettings(BaseSettings):
         default=DEFAULT_EMBEDDING_BACKEND,
         description="Embedding backend to use (deterministic, LiteLLM, sentence-transformers).",
     )
-    embedding_model: Optional[str] = Field(
+    embedding_model: str | None = Field(
         default=None,
         description=(
             "Model name for the embedding backend (required for LiteLLM and "
             "sentence-transformers)."
         ),
     )
-    embedding_device: Optional[str] = Field(
+    embedding_device: str | None = Field(
         default=None,
         description="Preferred device identifier for local embedding backends (e.g. cpu, cuda).",
     )
@@ -278,7 +279,7 @@ class PromptManagerSettings(BaseSettings):
         return value
 
     @field_validator("redis_dsn", mode="before")
-    def _trim_redis_dsn(cls, value: Optional[str]) -> Optional[str]:
+    def _trim_redis_dsn(cls, value: str | None) -> str | None:
         """Normalise Redis DSN values by stripping whitespace and empty strings."""
         if value is None:
             return None
@@ -286,7 +287,7 @@ class PromptManagerSettings(BaseSettings):
         return stripped or None
 
     @field_validator("categories_path", mode="before")
-    def _normalise_categories_path(cls, value: Any) -> Optional[Path]:
+    def _normalise_categories_path(cls, value: Any) -> Path | None:
         """Coerce optional category file path into a Path."""
 
         if value in (None, ""):
@@ -295,7 +296,7 @@ class PromptManagerSettings(BaseSettings):
         return path.resolve()
 
     @field_validator("categories", mode="before")
-    def _parse_categories(cls, value: Any) -> Optional[list[dict[str, object]]]:
+    def _parse_categories(cls, value: Any) -> list[dict[str, object]] | None:
         """Ensure inline categories are represented as a list of mappings."""
 
         if value in (None, "", []):
@@ -326,14 +327,14 @@ class PromptManagerSettings(BaseSettings):
         "embedding_device",
         mode="before",
     )
-    def _strip_strings(cls, value: Optional[str]) -> Optional[str]:
+    def _strip_strings(cls, value: str | None) -> str | None:
         if value is None:
             return None
         stripped = value.strip()
         return stripped or None
 
     @field_validator("embedding_backend", mode="before")
-    def _normalise_embedding_backend(cls, value: Optional[str]) -> str:
+    def _normalise_embedding_backend(cls, value: str | None) -> str:
         if value is None:
             return DEFAULT_EMBEDDING_BACKEND
         backend = str(value).strip().lower()
@@ -346,7 +347,7 @@ class PromptManagerSettings(BaseSettings):
         raise ValueError(f"Unsupported embedding backend '{value}'")
 
     @field_validator("theme_mode", mode="before")
-    def _normalise_theme_mode(cls, value: Optional[str]) -> str:
+    def _normalise_theme_mode(cls, value: str | None) -> str:
         if value is None:
             return DEFAULT_THEME_MODE
         text = str(value).strip().lower()
@@ -355,7 +356,7 @@ class PromptManagerSettings(BaseSettings):
         return text
 
     @field_validator("chat_user_bubble_color", mode="before")
-    def _normalise_chat_colour(cls, value: Optional[str]) -> str:
+    def _normalise_chat_colour(cls, value: str | None) -> str:
         if value is None:
             return DEFAULT_CHAT_USER_BUBBLE_COLOR
         text = str(value).strip()
@@ -370,7 +371,7 @@ class PromptManagerSettings(BaseSettings):
         return text.lower()
 
     @model_validator(mode="after")
-    def _validate_embedding_configuration(self) -> "PromptManagerSettings":
+    def _validate_embedding_configuration(self) -> PromptManagerSettings:
         backend = self.embedding_backend
         model = self.embedding_model
 
@@ -391,7 +392,7 @@ class PromptManagerSettings(BaseSettings):
         return self
 
     @field_validator("quick_actions", mode="before")
-    def _validate_quick_actions(cls, value: object) -> Optional[list[dict[str, object]]]:
+    def _validate_quick_actions(cls, value: object) -> list[dict[str, object]] | None:
         if value in (None, "", []):
             return None
         if isinstance(value, str):
@@ -412,7 +413,7 @@ class PromptManagerSettings(BaseSettings):
         return normalised
 
     @field_validator("litellm_drop_params", mode="before")
-    def _normalise_drop_params(cls, value: object) -> Optional[List[str]]:
+    def _normalise_drop_params(cls, value: object) -> list[str] | None:
         if value in (None, "", [], ()):  # type: ignore[comparison-overlap]
             return None
         if isinstance(value, str):
@@ -439,7 +440,7 @@ class PromptManagerSettings(BaseSettings):
         )
 
     @field_validator("litellm_reasoning_effort", mode="before")
-    def _normalise_reasoning_effort(cls, value: object) -> Optional[str]:
+    def _normalise_reasoning_effort(cls, value: object) -> str | None:
         if value in (None, ""):
             return None
         effort = str(value).strip().lower()
@@ -450,7 +451,7 @@ class PromptManagerSettings(BaseSettings):
     @field_validator("litellm_workflow_models", mode="before")
     def _normalise_workflow_models(
         cls, value: object
-    ) -> Optional[Dict[str, Literal["fast", "inference"]]]:
+    ) -> dict[str, Literal["fast", "inference"]] | None:
         if value in (None, "", {}, ()):  # type: ignore[comparison-overlap]
             return None
         if isinstance(value, str):
@@ -468,7 +469,7 @@ class PromptManagerSettings(BaseSettings):
                 "litellm_workflow_models must be a mapping of workflow names to model tiers"
             )
         mapping_value = cast("Mapping[object, object]", value)
-        cleaned: Dict[str, Literal["fast", "inference"]] = {}
+        cleaned: dict[str, Literal["fast", "inference"]] = {}
         for raw_key, raw_value in mapping_value.items():
             key = str(raw_key).strip()
             if key not in LITELLM_ROUTED_WORKFLOWS:
@@ -488,12 +489,12 @@ class PromptManagerSettings(BaseSettings):
     @classmethod
     def settings_customise_sources(
         cls,
-        settings_cls: Type[BaseSettings],
+        settings_cls: type[BaseSettings],
         init_settings: PydanticBaseSettingsSource,
         env_settings: PydanticBaseSettingsSource,
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
-    ) -> Tuple[
+    ) -> tuple[
         PydanticBaseSettingsSource,
         PydanticBaseSettingsSource,
         PydanticBaseSettingsSource,
@@ -508,9 +509,9 @@ class PromptManagerSettings(BaseSettings):
             4. File secrets.
         """
         # Compose an environment source that also considers aliases explicitly
-        def env_with_aliases(_: BaseSettings | None = None) -> Dict[str, Any]:
-            data: Dict[str, Any] = {}
-            config_dict = cast("Dict[str, Any]", cls.model_config)
+        def env_with_aliases(_: BaseSettings | None = None) -> dict[str, Any]:
+            data: dict[str, Any] = {}
+            config_dict = cast("dict[str, Any]", cls.model_config)
             prefix = str(config_dict.get("env_prefix", ""))
             # Collect both alias and field-name keys from environment
             mapping = {
@@ -580,11 +581,11 @@ class PromptManagerSettings(BaseSettings):
     @classmethod
     def _json_config_settings_source(
         cls,
-        _: Type[BaseSettings],
+        _: type[BaseSettings],
     ) -> PydanticBaseSettingsSource:
         """Return settings extracted from an optional JSON config file."""
 
-        def _loader(_: BaseSettings | None = None) -> Dict[str, Any]:
+        def _loader(_: BaseSettings | None = None) -> dict[str, Any]:
             explicit_path = os.getenv("PROMPT_MANAGER_CONFIG_JSON")
             candidates: list[Path] = []
             if explicit_path:
@@ -612,8 +613,8 @@ class PromptManagerSettings(BaseSettings):
                     message = f"Configuration file {path} must contain a JSON object"
                     raise SettingsError(message)
                 mapping_data = cast("Mapping[object, Any]", data)
-                data_dict: Dict[str, Any] = {str(key): value for key, value in mapping_data.items()}
-                mapped: Dict[str, Any] = {}
+                data_dict: dict[str, Any] = {str(key): value for key, value in mapping_data.items()}
+                mapped: dict[str, Any] = {}
                 if "database_path" in data_dict and "db_path" not in data_dict:
                     mapped["db_path"] = data_dict["database_path"]
                 disallowed_secret_keys = {

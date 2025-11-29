@@ -5,8 +5,8 @@ Updates: v0.1.0 - 2025-11-29 - Introduce dedicated prompt template editor dialog
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from functools import partial
-from typing import Dict, Mapping, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -35,22 +35,22 @@ class PromptTemplateEditorDialog(QDialog):
 
     def __init__(
         self,
-        parent: Optional[QWidget] = None,
+        parent: QWidget | None = None,
         *,
-        templates: Optional[Mapping[str, str]] = None,
+        templates: Mapping[str, str] | None = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Prompt Template Overrides")
         self.setMinimumSize(720, 640)
 
-        self._defaults: Dict[str, str] = dict(DEFAULT_PROMPT_TEMPLATES)
-        self._initial_overrides: Dict[str, str] = {
+        self._defaults: dict[str, str] = dict(DEFAULT_PROMPT_TEMPLATES)
+        self._initial_overrides: dict[str, str] = {
             key: value.strip()
             for key, value in (templates or {}).items()
             if isinstance(value, str) and value.strip()
         }
-        self._editors: Dict[str, QPlainTextEdit] = {}
-        self._status_labels: Dict[str, QLabel] = {}
+        self._editors: dict[str, QPlainTextEdit] = {}
+        self._status_labels: dict[str, QLabel] = {}
 
         layout = QVBoxLayout(self)
         scroll_area = QScrollArea(self)
@@ -165,10 +165,10 @@ class PromptTemplateEditorDialog(QDialog):
             return
         self.accept()
 
-    def result_templates(self) -> Dict[str, str]:
+    def result_templates(self) -> dict[str, str]:
         """Return normalised overrides excluding defaults."""
 
-        payload: Dict[str, str] = {}
+        payload: dict[str, str] = {}
         for key, editor in self._editors.items():
             text = editor.toPlainText().strip()
             default_text = self._defaults.get(key, "")

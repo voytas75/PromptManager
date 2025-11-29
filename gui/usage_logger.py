@@ -10,9 +10,9 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from datetime import datetime, timezone
+from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional, Sequence
 
 from core.intent_classifier import IntentPrediction
 
@@ -20,7 +20,7 @@ logger = logging.getLogger("prompt_manager.gui.usage")
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 class IntentUsageLogger:
@@ -94,8 +94,8 @@ class IntentUsageLogger:
         *,
         prompt_name: str,
         success: bool,
-        duration_ms: Optional[int],
-        error: Optional[str] = None,
+        duration_ms: int | None,
+        error: str | None = None,
     ) -> None:
         """Log prompt execution outcomes."""
 
@@ -120,7 +120,7 @@ class IntentUsageLogger:
         }
         self._append(record)
 
-    def log_save(self, *, prompt_name: str, note_length: int, rating: Optional[float] = None) -> None:
+    def log_save(self, *, prompt_name: str, note_length: int, rating: float | None = None) -> None:
         """Log that a prompt result was manually saved."""
 
         record = {

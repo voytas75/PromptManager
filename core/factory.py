@@ -1,23 +1,23 @@
 """Factories for constructing PromptManager instances from validated settings.
 
-Updates: v0.7.4 - 2025-11-24 - Wire LiteLLM category suggestion helper into manager construction.
-Updates: v0.7.3 - 2025-11-05 - Support LiteLLM workflow routing across fast/inference models.
-Updates: v0.7.2 - 2025-11-26 - Wire LiteLLM streaming flag into executor construction.
-Updates: v0.7.1 - 2025-11-19 - Configure LiteLLM scenario generator for prompt metadata enrichment.
-Updates: v0.7.0 - 2025-11-15 - Wire prompt engineer construction into manager factory.
-Updates: v0.6.1 - 2025-11-07 - Add configurable embedding backends via settings.
-Updates: v0.6.0 - 2025-11-06 - Wire intent classifier for hybrid retrieval suggestions.
-Updates: v0.5.0 - 2025-11-05 - Add LiteLLM name generator wiring.
-Updates: v0.1.0 - 2025-11-03 - Added build_prompt_manager helper for GUI/bootstrap reuse.
+Updates:
+  v0.7.5 - 2025-11-29 - Move config imports behind type checks and wrap long strings.
+  v0.7.4 - 2025-11-24 - Wire LiteLLM category suggestion helper into manager construction.
+  v0.7.3 - 2025-11-05 - Support LiteLLM workflow routing across fast/inference models.
+  v0.7.2 - 2025-11-26 - Wire LiteLLM streaming flag into executor construction.
+  v0.7.1 - 2025-11-19 - Configure LiteLLM scenario generator for prompt metadata enrichment.
+  v0.7.0 - 2025-11-15 - Wire prompt engineer construction into manager factory.
+  v0.6.1 - 2025-11-07 - Add configurable embedding backends via settings.
+  v0.6.0 - 2025-11-06 - Wire intent classifier for hybrid retrieval suggestions.
+  v0.5.0 - 2025-11-05 - Add LiteLLM name generator wiring.
+  v0.1.0 - 2025-11-03 - Added build_prompt_manager helper for GUI/bootstrap reuse.
 """
+
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, cast
-
-from config import PromptManagerSettings
-from config.settings import PromptTemplateOverrides
+from collections.abc import Callable, Mapping
+from typing import TYPE_CHECKING, Any, cast
 
 from .category_registry import load_category_definitions
 from .embedding import EmbeddingProvider, EmbeddingSyncWorker, create_embedding_function
@@ -28,7 +28,6 @@ from .name_generation import (
     LiteLLMCategoryGenerator,
     LiteLLMDescriptionGenerator,
     LiteLLMNameGenerator,
-    NameGenerationError,
 )
 from .notifications import NotificationCenter, notification_center as default_notification_center
 from .prompt_engineering import PromptEngineer
@@ -44,29 +43,34 @@ except ImportError:  # pragma: no cover - redis optional dependency
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from chromadb.api import ClientAPI
     from redis import Redis
+
+    from config import PromptManagerSettings
+    from config.settings import PromptTemplateOverrides
 else:  # pragma: no cover - typing only
-    ClientAPI = Any  # type: ignore[misc,assignment]
-    Redis = Any  # type: ignore[misc,assignment]
+    ClientAPI = Any
+    PromptManagerSettings = Any
+    PromptTemplateOverrides = Any
+    Redis = Any
 
 
 def _resolve_redis_client(
-    redis_dsn: Optional[str],
-    redis_client: Optional["Redis"],
-) -> Optional["Redis"]:
+    redis_dsn: str | None,
+    redis_client: Redis | None,
+) -> Redis | None:
     """Create a Redis client when a DSN is provided but no client supplied."""
     if redis_client is not None or not redis_dsn:
         return redis_client
     if redis is None:
         raise PromptCacheError("Redis DSN provided but redis package is not installed")
-    from_url = cast("Callable[[str], Redis]", getattr(redis, "from_url"))
+    from_url = cast("Callable[[str], Redis]", redis.from_url)
     return from_url(redis_dsn)
 
 
 def _resolve_embedding_components(
     settings: PromptManagerSettings,
-    embedding_function: Optional[Any],
-    embedding_provider: Optional[EmbeddingProvider],
-) -> Tuple[Optional[Any], EmbeddingProvider]:
+    embedding_function: Any | None,
+    embedding_provider: EmbeddingProvider | None,
+) -> tuple[Any | None, EmbeddingProvider]:
     """Return embedding function/provider pair respecting overrides and settings."""
 
     resolved_function = embedding_function
@@ -89,15 +93,15 @@ def _resolve_embedding_components(
 def build_prompt_manager(
     settings: PromptManagerSettings,
     *,
-    redis_client: Optional["Redis"] = None,
-    chroma_client: Optional["ClientAPI"] = None,
-    embedding_function: Optional[Any] = None,
-    repository: Optional[PromptRepository] = None,
-    embedding_provider: Optional[EmbeddingProvider] = None,
-    embedding_worker: Optional[EmbeddingSyncWorker] = None,
+    redis_client: Redis | None = None,
+    chroma_client: ClientAPI | None = None,
+    embedding_function: Any | None = None,
+    repository: PromptRepository | None = None,
+    embedding_provider: EmbeddingProvider | None = None,
+    embedding_worker: EmbeddingSyncWorker | None = None,
     enable_background_sync: bool = True,
-    notification_center: Optional[NotificationCenter] = None,
-    prompt_engineer: Optional[PromptEngineer] = None,
+    notification_center: NotificationCenter | None = None,
+    prompt_engineer: PromptEngineer | None = None,
 ) -> PromptManager:
     """Return a PromptManager configured from validated settings."""
     resolved_redis = _resolve_redis_client(settings.redis_dsn, redis_client)
@@ -111,9 +115,13 @@ def build_prompt_manager(
     scenario_generator = None
     category_generator = None
     resolved_prompt_engineer = prompt_engineer
-    structure_prompt_engineer: Optional[PromptEngineer] = None
-    prompt_template_overrides: Dict[str, str] = {}
-    templates_source: Optional[PromptTemplateOverrides] = getattr(settings, "prompt_templates", None)
+    structure_prompt_engineer: PromptEngineer | None = None
+    prompt_template_overrides: dict[str, str] = {}
+    templates_source: PromptTemplateOverrides | None = getattr(
+        settings,
+        "prompt_templates",
+        None,
+    )
     if templates_source is not None:
         template_mapping: Mapping[str, object]
         try:
@@ -127,7 +135,7 @@ def build_prompt_manager(
                     prompt_template_overrides[str(key)] = stripped
 
     workflow_models_setting = getattr(settings, "litellm_workflow_models", None)
-    workflow_routing: Dict[str, str] = {}
+    workflow_routing: dict[str, str] = {}
     workflow_models_mapping: Mapping[str, object]
     if isinstance(workflow_models_setting, Mapping):
         workflow_models_mapping = cast("Mapping[str, object]", workflow_models_setting)
@@ -142,13 +150,13 @@ def build_prompt_manager(
     fast_model = getattr(settings, "litellm_model", None)
     inference_model = getattr(settings, "litellm_inference_model", None)
 
-    def _select_model(workflow: str) -> Optional[str]:
+    def _select_model(workflow: str) -> str | None:
         selection = workflow_routing.get(workflow, "fast")
         if selection == "inference":
             return inference_model or fast_model
         return fast_model or inference_model
 
-    def _construct(factory: Callable[..., Any], workflow: str, **extra: Any) -> Optional[Any]:
+    def _construct(factory: Callable[..., Any], workflow: str, **extra: Any) -> Any | None:
         model_name = _select_model(workflow)
         if not model_name:
             return None
@@ -163,7 +171,8 @@ def build_prompt_manager(
             )
         except RuntimeError as exc:
             raise NameGenerationError(
-                "LiteLLM is required for configured prompt workflows. Install litellm and configure credentials."
+                "LiteLLM is required for configured prompt workflows. "
+                "Install litellm and configure credentials."
             ) from exc
 
     name_generator = _construct(
@@ -214,7 +223,7 @@ def build_prompt_manager(
         stream=settings.litellm_stream,
     )
 
-    manager_kwargs: Dict[str, Any] = {
+    manager_kwargs: dict[str, Any] = {
         "chroma_path": str(settings.chroma_path),
         "db_path": str(settings.db_path),
         "cache_ttl_seconds": settings.cache_ttl_seconds,

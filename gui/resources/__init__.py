@@ -12,7 +12,7 @@ from typing import Optional
 from PySide6.QtGui import QIcon
 
 
-def load_application_icon() -> Optional[QIcon]:
+def load_application_icon() -> QIcon | None:
     """Return the application icon packaged with the GUI, if available."""
     try:
         icon_resource = importlib_resources.files(__name__).joinpath("prompt_manager.ico")

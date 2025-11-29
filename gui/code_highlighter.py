@@ -6,8 +6,8 @@ Updates: v0.1.0 - 2025-11-10 - Provide keyword-based highlighting for common lan
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable, List
 
 from PySide6.QtGui import QColor, QFont, QSyntaxHighlighter, QTextCharFormat
 
@@ -35,7 +35,7 @@ def _compile_pattern(pattern: str) -> re.Pattern[str]:
     return re.compile(pattern, re.IGNORECASE)
 
 
-def _python_rules() -> List[_HighlightRule]:
+def _python_rules() -> list[_HighlightRule]:
     return [
         _HighlightRule(_compile_keywords(
             (
@@ -64,7 +64,7 @@ def _python_rules() -> List[_HighlightRule]:
     ]
 
 
-def _powershell_rules() -> List[_HighlightRule]:
+def _powershell_rules() -> list[_HighlightRule]:
     return [
         _HighlightRule(_compile_pattern(r"\b(Get|Set|New|Invoke|Start|Stop|Test)-[A-Za-z]+"), _format("#c586c0", bold=True)),
         _HighlightRule(_compile_pattern(r"\$[A-Za-z_][\w:]*"), _format("#9cdcfe")),
@@ -73,7 +73,7 @@ def _powershell_rules() -> List[_HighlightRule]:
     ]
 
 
-def _bash_rules() -> List[_HighlightRule]:
+def _bash_rules() -> list[_HighlightRule]:
     return [
         _HighlightRule(_compile_pattern(r"^#!.*$"), _format("#6a9955")),
         _HighlightRule(_compile_keywords(("if", "then", "fi", "for", "do", "done", "elif", "else", "while")), _format("#d19a66", bold=True)),
@@ -82,7 +82,7 @@ def _bash_rules() -> List[_HighlightRule]:
     ]
 
 
-def _markdown_rules() -> List[_HighlightRule]:
+def _markdown_rules() -> list[_HighlightRule]:
     return [
         _HighlightRule(_compile_pattern(r"(^|\n)#{1,6}[^\n]*"), _format("#dcdcaa", bold=True)),
         _HighlightRule(_compile_pattern(r"\*\*[^\*]+\*\*"), _format("#c586c0")),
@@ -91,7 +91,7 @@ def _markdown_rules() -> List[_HighlightRule]:
     ]
 
 
-def _json_rules() -> List[_HighlightRule]:
+def _json_rules() -> list[_HighlightRule]:
     return [
         _HighlightRule(_compile_pattern(r"\"[^\"]+\"(?=\s*:)"), _format("#9cdcfe")),
         _HighlightRule(_compile_pattern(r"\b(true|false|null)\b"), _format("#569cd6")),
@@ -99,7 +99,7 @@ def _json_rules() -> List[_HighlightRule]:
     ]
 
 
-def _yaml_rules() -> List[_HighlightRule]:
+def _yaml_rules() -> list[_HighlightRule]:
     return [
         _HighlightRule(_compile_pattern(r"^\s*\w+:"), _format("#9cdcfe", bold=True)),
         _HighlightRule(_compile_pattern(r"^\s*-\s"), _format("#ce9178", bold=True)),
@@ -123,7 +123,7 @@ class CodeHighlighter(QSyntaxHighlighter):
     def __init__(self, document) -> None:  # type: ignore[override]
         super().__init__(document)
         self._language = "plain"
-        self._rules: List[_HighlightRule] = []
+        self._rules: list[_HighlightRule] = []
 
     @property
     def language(self) -> str:

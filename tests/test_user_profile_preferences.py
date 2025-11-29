@@ -6,7 +6,7 @@ Updates: v0.1.0 - 2025-11-11 - Introduce coverage for profile tracking and sugge
 from __future__ import annotations
 
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any
 
 from core.prompt_manager import PromptManager
 from core.repository import PromptRepository
@@ -20,8 +20,8 @@ class _NoopCollection:
         self,
         ids: list[str],
         documents: list[str],
-        metadatas: list[Dict[str, Any]],
-        embeddings: Optional[list[list[float]]] = None,  # noqa: ARG002
+        metadatas: list[dict[str, Any]],
+        embeddings: list[list[float]] | None = None,  # noqa: ARG002
     ) -> None:
         self._records = dict(zip(ids, metadatas))
 
@@ -29,8 +29,8 @@ class _NoopCollection:
         self,
         ids: list[str],
         documents: list[str],
-        metadatas: list[Dict[str, Any]],
-        embeddings: Optional[list[list[float]]] = None,  # noqa: ARG002
+        metadatas: list[dict[str, Any]],
+        embeddings: list[list[float]] | None = None,  # noqa: ARG002
     ) -> None:
         self.add(ids, documents, metadatas, embeddings)
 
@@ -39,11 +39,11 @@ class _NoopCollection:
 
     def query(
         self,
-        query_texts: Optional[list[str]],  # noqa: ARG002
-        query_embeddings: Optional[list[list[float]]],  # noqa: ARG002
+        query_texts: list[str] | None,  # noqa: ARG002
+        query_embeddings: list[list[float]] | None,  # noqa: ARG002
         n_results: int,  # noqa: ARG002
-        where: Optional[Dict[str, Any]],  # noqa: ARG002
-    ) -> Dict[str, list[list[Any]]]:
+        where: dict[str, Any] | None,  # noqa: ARG002
+    ) -> dict[str, list[list[Any]]]:
         return {"ids": [[]], "documents": [[]], "metadatas": [[]]}
 
 

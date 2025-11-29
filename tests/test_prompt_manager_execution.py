@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import pytest
 
@@ -27,14 +27,14 @@ class _StubEmbeddingProvider:
 
 class _StubChromaCollection:
     def __init__(self) -> None:
-        self.calls: Dict[str, list[str]] = {}
+        self.calls: dict[str, list[str]] = {}
 
     def add(
         self,
         ids: list[str],
         documents: list[str],
-        metadatas: list[Dict[str, Any]],
-        embeddings: Optional[list[list[float]]] = None,
+        metadatas: list[dict[str, Any]],
+        embeddings: list[list[float]] | None = None,
     ) -> None:
         self.calls["add"] = ids
 
@@ -42,8 +42,8 @@ class _StubChromaCollection:
         self,
         ids: list[str],
         documents: list[str],
-        metadatas: list[Dict[str, Any]],
-        embeddings: Optional[list[list[float]]] = None,
+        metadatas: list[dict[str, Any]],
+        embeddings: list[list[float]] | None = None,
     ) -> None:
         self.calls["upsert"] = ids
 
@@ -55,8 +55,8 @@ class _StubChromaClient:
     def get_or_create_collection(
         self,
         name: str,
-        metadata: Dict[str, Any],
-        embedding_function: Optional[Any] = None,
+        metadata: dict[str, Any],
+        embedding_function: Any | None = None,
     ) -> _StubChromaCollection:
         return self.collection
 
@@ -66,9 +66,9 @@ class _StubChromaClient:
 
 class _StubExecutor:
     def __init__(self) -> None:
-        self.called_with: Optional[str] = None
+        self.called_with: str | None = None
         self.conversation_length: int = 0
-        self.stream_flag: Optional[bool] = None
+        self.stream_flag: bool | None = None
         self.model = "gpt-fast"
         self.api_key = "test"
         self.api_base = None
@@ -86,7 +86,7 @@ class _StubExecutor:
         request_text: str,
         *,
         conversation=None,
-        stream: Optional[bool] = None,
+        stream: bool | None = None,
         on_stream=None,
     ) -> CodexExecutionResult:
         self.called_with = request_text
@@ -110,7 +110,7 @@ class _FailingExecutor:
         request_text: str,
         *,
         conversation=None,
-        stream: Optional[bool] = None,
+        stream: bool | None = None,
         on_stream=None,
     ) -> CodexExecutionResult:
         raise ExecutionError("model timeout")
@@ -227,7 +227,7 @@ def test_execute_prompt_supports_conversation(tmp_path: Path) -> None:
 def test_execute_prompt_streams_to_callback(tmp_path: Path) -> None:
     class _StreamingExecutor:
         def __init__(self) -> None:
-            self.stream_flag: Optional[bool] = None
+            self.stream_flag: bool | None = None
 
         def execute(  # type: ignore[override]
             self,
@@ -235,7 +235,7 @@ def test_execute_prompt_streams_to_callback(tmp_path: Path) -> None:
             request_text: str,
             *,
             conversation=None,
-            stream: Optional[bool] = None,
+            stream: bool | None = None,
             on_stream=None,
         ) -> CodexExecutionResult:
             self.stream_flag = stream

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -28,7 +28,7 @@ def test_helper_functions_cover_edge_cases() -> None:
     ensured = _ensure_datetime(naive_dt)
     assert ensured.tzinfo is not None
     auto_now = _ensure_datetime(None)
-    assert auto_now.tzinfo == timezone.utc
+    assert auto_now.tzinfo == UTC
 
     assert _serialize_list(["a", "b"]) == ["a", "b"]
     assert _serialize_list({"a", "b"})  # set coverage

@@ -7,14 +7,14 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Dict
+from datetime import UTC, datetime
+from typing import Any
 
 
 def _utc_now() -> datetime:
     """Return an aware UTC timestamp."""
 
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 @dataclass(slots=True)
@@ -31,7 +31,7 @@ class PromptNote:
 
         self.last_modified = _utc_now()
 
-    def to_record(self) -> Dict[str, Any]:
+    def to_record(self) -> dict[str, Any]:
         """Return a mapping suitable for SQLite persistence."""
 
         return {
@@ -42,7 +42,7 @@ class PromptNote:
         }
 
     @classmethod
-    def from_record(cls, data: Dict[str, Any]) -> "PromptNote":
+    def from_record(cls, data: dict[str, Any]) -> PromptNote:
         """Hydrate a PromptNote from a stored mapping."""
 
         created_raw = data.get("created_at")
@@ -50,9 +50,9 @@ class PromptNote:
         created_at = datetime.fromisoformat(str(created_raw)) if created_raw else _utc_now()
         last_modified = datetime.fromisoformat(str(last_raw)) if last_raw else created_at
         if created_at.tzinfo is None:
-            created_at = created_at.replace(tzinfo=timezone.utc)
+            created_at = created_at.replace(tzinfo=UTC)
         if last_modified.tzinfo is None:
-            last_modified = last_modified.replace(tzinfo=timezone.utc)
+            last_modified = last_modified.replace(tzinfo=UTC)
         return cls(
             id=uuid.UUID(str(data.get("id") or uuid.uuid4())),
             note=str(data.get("note") or "").strip(),

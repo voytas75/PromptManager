@@ -1,9 +1,11 @@
 """Lightweight integration checks for main module.
 
-Updates: v0.5.0 - 2025-11-28 - Cover analytics diagnostics CLI path and export flags.
-Updates: v0.4.0 - 2025-11-30 - Remove catalogue import command coverage.
-Updates: v0.3.0 - 2025-11-15 - Cover enhanced --print-settings summary and masked API keys.
-Updates: v0.2.0 - 2025-11-05 - Add coverage for GUI dependency fallback.
+Updates:
+  v0.5.1 - 2025-11-29 - Extend entrypoint guard stub for analytics helpers.
+  v0.5.0 - 2025-11-28 - Cover analytics diagnostics CLI path and export flags.
+  v0.4.0 - 2025-11-30 - Remove catalogue import command coverage.
+  v0.3.0 - 2025-11-15 - Cover enhanced --print-settings summary and masked API keys.
+  v0.2.0 - 2025-11-05 - Add coverage for GUI dependency fallback.
 """
 
 from __future__ import annotations
@@ -13,7 +15,7 @@ import logging
 import sys
 import types
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -103,7 +105,7 @@ class _DummyManager:
 
 
 def _build_execution_analytics(total_runs: int = 5) -> ExecutionAnalytics:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     prompt_stats = PromptExecutionAnalytics(
         prompt_id=uuid.uuid4(),
         name="Prompt Alpha",
@@ -125,7 +127,7 @@ def _build_execution_analytics(total_runs: int = 5) -> ExecutionAnalytics:
 
 
 def _build_dummy_snapshot() -> SimpleNamespace:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return SimpleNamespace(
         execution=_build_execution_analytics(),
         usage_frequency=[
@@ -515,6 +517,8 @@ def test_main_entrypoint_guard_executes(
     core_stub.build_prompt_manager = lambda settings: dummy_manager
     core_stub.export_prompt_catalog = lambda *args, **kwargs: Path("export.json")
     core_stub.PromptManagerError = RuntimeError
+    core_stub.build_analytics_snapshot = lambda *args, **kwargs: SimpleNamespace()
+    core_stub.snapshot_dataset_rows = lambda *args, **kwargs: []
 
     monkeypatch.setitem(sys.modules, "config", config_stub)
     monkeypatch.setitem(sys.modules, "core", core_stub)

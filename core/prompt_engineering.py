@@ -1,19 +1,28 @@
 """LiteLLM-backed prompt engineering utilities for refining prompts.
 
-Updates: v0.1.4 - 2025-11-23 - Allow overriding the system prompt via settings.
-Updates: v0.1.3 - 2025-11-22 - Add structure-only refinement mode with targeted instructions.
-Updates: v0.1.2 - 2025-11-05 - Stop forwarding LiteLLM timeout parameter to avoid premature failures.
-Updates: v0.1.1 - 2025-11-02 - Drop configured LiteLLM parameters locally before refinement calls.
-Updates: v0.1.0 - 2025-11-15 - Introduce prompt refinement helper using meta-prompt rules.
+Updates:
+  v0.1.5 - 2025-11-29 - Reformat payload builders and guard long literals.
+  v0.1.4 - 2025-11-23 - Allow overriding the system prompt via settings.
+  v0.1.3 - 2025-11-22 - Add structure-only refinement mode with targeted instructions.
+  v0.1.2 - 2025-11-05 - Stop forwarding LiteLLM timeout parameter to avoid premature failures.
+  v0.1.1 - 2025-11-02 - Drop configured LiteLLM parameters locally before refinement calls.
+  v0.1.0 - 2025-11-15 - Introduce prompt refinement helper using meta-prompt rules.
 """
+
 
 from __future__ import annotations
 
 import json
 import logging
+from collections.abc import (
+    Iterable,
+    Iterable as IterableABC,
+    Mapping,
+    Sequence,
+    Sequence as SequenceABC,
+)
 from dataclasses import dataclass
-from collections.abc import Iterable as IterableABC, Sequence as SequenceABC
-from typing import Any, Iterable, Mapping, Optional, Sequence, cast
+from typing import Any, cast
 
 from prompt_templates import PROMPT_ENGINEERING_PROMPT
 
@@ -39,10 +48,10 @@ class PromptRefinement:
     checklist: Sequence[str]
     warnings: Sequence[str]
     confidence: float
-    raw_response: Optional[dict[str, Any]] = None
+    raw_response: dict[str, Any] | None = None
 
 
-def _format_list(items: Optional[Iterable[Any]]) -> list[str]:
+def _format_list(items: Iterable[Any] | None) -> list[str]:
     """Normalise iterable inputs into a list of trimmed strings."""
 
     if not items:
@@ -71,25 +80,25 @@ class PromptEngineer:
     """Refine prompts using the meta-prompt ruleset via LiteLLM."""
 
     model: str
-    api_key: Optional[str] = None
-    api_base: Optional[str] = None
-    api_version: Optional[str] = None
+    api_key: str | None = None
+    api_base: str | None = None
+    api_version: str | None = None
     temperature: float = 0.25
     top_p: float = 0.9
-    timeout_seconds: Optional[float] = None
+    timeout_seconds: float | None = None
     max_tokens: int = 1200
-    drop_params: Optional[Sequence[str]] = None
-    system_prompt: Optional[str] = None
+    drop_params: Sequence[str] | None = None
+    system_prompt: str | None = None
 
     def refine(
         self,
         prompt_text: str,
         *,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        category: Optional[str] = None,
-        tags: Optional[Sequence[str]] = None,
-        negative_constraints: Optional[Sequence[str]] = None,
+        name: str | None = None,
+        description: str | None = None,
+        category: str | None = None,
+        tags: Sequence[str] | None = None,
+        negative_constraints: Sequence[str] | None = None,
         structure_only: bool = False,
     ) -> PromptRefinement:
         """Return a refined prompt and supporting analysis via LiteLLM."""
@@ -150,7 +159,13 @@ class PromptEngineer:
                 request,
                 completion,
                 LiteLLMException,
-                drop_candidates={"max_tokens", "max_output_tokens", "temperature", "timeout", "top_p"},
+                drop_candidates={
+                    "max_tokens",
+                    "max_output_tokens",
+                    "temperature",
+                    "timeout",
+                    "top_p",
+                },
                 pre_dropped=dropped_params,
             )
         except LiteLLMException as exc:  # type: ignore[arg-type]
@@ -178,9 +193,9 @@ class PromptEngineer:
             confidence = 0.0
         confidence = max(0.0, min(confidence, 1.0))
 
-        raw_response: Optional[dict[str, Any]] = None
+        raw_response: dict[str, Any] | None = None
         if isinstance(response, Mapping):
-            response_mapping = cast(Mapping[str, Any], response)
+            response_mapping = cast("Mapping[str, Any]", response)
             raw_response = {str(key): value for key, value in response_mapping.items()}
 
         logger.debug(
@@ -205,11 +220,11 @@ class PromptEngineer:
         self,
         prompt_text: str,
         *,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        category: Optional[str] = None,
-        tags: Optional[Sequence[str]] = None,
-        negative_constraints: Optional[Sequence[str]] = None,
+        name: str | None = None,
+        description: str | None = None,
+        category: str | None = None,
+        tags: Sequence[str] | None = None,
+        negative_constraints: Sequence[str] | None = None,
     ) -> PromptRefinement:
         """Return a refinement focused on formatting and structural improvements."""
 
@@ -232,11 +247,11 @@ class PromptEngineer:
         self,
         prompt_text: str,
         *,
-        name: Optional[str],
-        description: Optional[str],
-        category: Optional[str],
-        tags: Optional[Sequence[str]],
-        negative_constraints: Optional[Sequence[str]],
+        name: str | None,
+        description: str | None,
+        category: str | None,
+        tags: Sequence[str] | None,
+        negative_constraints: Sequence[str] | None,
         structure_only: bool,
     ) -> str:
         """Compose the user instruction message for LiteLLM."""
@@ -254,7 +269,9 @@ class PromptEngineer:
                 sections.append(f"Tags: {formatted_tags}")
         if negative_constraints:
             blocked = ", ".join(
-                constraint.strip() for constraint in negative_constraints if constraint and str(constraint).strip()
+                constraint.strip()
+                for constraint in negative_constraints
+                if constraint and str(constraint).strip()
             )
             if blocked:
                 sections.append(f"Negative Constraints: {blocked}")
@@ -263,27 +280,29 @@ class PromptEngineer:
         if structure_only:
             sections.append(
                 "\n### Tasks\n"
-                "1. Reorganise the prompt into clearly labelled sections (context, instructions,"
-                " constraints, output format) using consistent headings or delimiters.\n"
-                "2. Keep the original wording and requirements intact; only adjust ordering,"
-                " grouping, and formatting for clarity.\n"
-                "3. Highlight any missing structural components (e.g., output contract) in the warnings list."
+                "1. Reorganise the prompt into clearly labelled sections (context, instructions, "
+                "constraints, and output format) using consistent headings or delimiters.\n"
+                "2. Keep the original wording and requirements intact; only adjust ordering and "
+                "grouping for clarity.\n"
+                "3. Highlight missing structural components (for example, the output contract) in "
+                "the warnings list."
             )
             sections.append(
-                "Do not add new requirements or examples beyond light reformatting."
-                " If information is missing, call it out in warnings rather than inventing details."
+                "Do not add new requirements or examples beyond light reformatting. "
+                "If information is missing, call it out in warnings rather than inventing details."
             )
         else:
             sections.append(
                 "\n### Tasks\n"
                 "1. Identify gaps or violations of the meta-prompt rules.\n"
-                "2. Produce an improved prompt that retains the author's intent, integrates explicit"
-                " instructions, context, and guardrails, and specifies the output contract.\n"
-                "3. Note any residual risks, missing information, or follow-up questions in the warnings list."
+                "2. Produce an improved prompt that retains the author's intent and integrates "
+                "explicit instructions, context, guardrails, plus the output contract.\n"
+                "3. Note residual risks, missing information, or follow-up questions in the "
+                "warnings list."
             )
             sections.append(
-                "Ensure the improved prompt is ready for production use, uses deterministic language,"
-                " and includes explicit delimiters or sections where appropriate."
+                "Ensure the improved prompt is production-ready, uses deterministic language, and "
+                "includes explicit delimiters or sections where appropriate."
             )
         return "\n".join(sections)
 
@@ -291,7 +310,7 @@ class PromptEngineer:
     def _extract_message(response: Any) -> str:
         """Extract the primary message content from the LiteLLM response payload."""
 
-        def _normalise_content(value: Any) -> Optional[str]:
+        def _normalise_content(value: Any) -> str | None:
             if value is None:
                 return None
             if isinstance(value, str):
@@ -307,7 +326,7 @@ class PromptEngineer:
                 return None
             if isinstance(value, IterableABC) and not isinstance(value, (bytes, bytearray, str)):
                 parts: list[str] = []
-                iterable_value = cast(Iterable[Any], value)
+                iterable_value = cast("Iterable[Any]", value)
                 for item in iterable_value:
                     normalised = _normalise_content(item)
                     if normalised:
@@ -326,7 +345,7 @@ class PromptEngineer:
                 return None
             return text or None
 
-        def _extract_from_choice(choice: Any) -> Optional[str]:
+        def _extract_from_choice(choice: Any) -> str | None:
             mapping_choice = _as_mapping(choice)
             if mapping_choice is not None:
                 message = mapping_choice.get("message")
@@ -338,11 +357,11 @@ class PromptEngineer:
                     return _normalise_content(text)
             else:
                 if hasattr(choice, "message"):
-                    normalised = _normalise_content(getattr(choice, "message"))
+                    normalised = _normalise_content(choice.message)
                     if normalised:
                         return normalised
                 if hasattr(choice, "text"):
-                    normalised = _normalise_content(getattr(choice, "text"))
+                    normalised = _normalise_content(choice.text)
                     if normalised:
                         return normalised
             return None
@@ -352,9 +371,12 @@ class PromptEngineer:
         if response_mapping is not None:
             choices_value = response_mapping.get("choices")
         elif hasattr(response, "choices"):
-            choices_value = getattr(response, "choices")
-        elif isinstance(response, SequenceABC) and not isinstance(response, (bytes, bytearray, str)):
-            choices_value = cast(Sequence[Any], response)
+            choices_value = response.choices
+        elif isinstance(response, SequenceABC) and not isinstance(
+            response,
+            (bytes, bytearray, str),
+        ):
+            choices_value = cast("Sequence[Any]", response)
 
         choices_sequence: Sequence[Any] = ()
         if isinstance(choices_value, Mapping):
@@ -362,7 +384,7 @@ class PromptEngineer:
         elif isinstance(choices_value, SequenceABC) and not isinstance(
             choices_value, (bytes, bytearray, str)
         ):
-            choices_sequence = cast(Sequence[Any], choices_value)
+            choices_sequence = cast("Sequence[Any]", choices_value)
 
         for choice in choices_sequence:
             content = _extract_from_choice(choice)
@@ -373,9 +395,10 @@ class PromptEngineer:
             return response
 
         snippet = _summarise_response_for_error(response)
-        raise PromptEngineeringError(
-            "LiteLLM response did not include message content." + (f" Payload: {snippet}" if snippet else "")
-        )
+        message = "LiteLLM response did not include message content."
+        if snippet:
+            message += f" Payload: {snippet}"
+        raise PromptEngineeringError(message)
 
     def _system_prompt_text(self) -> str:
         """Return the configured system prompt or the default meta-prompt."""
@@ -383,11 +406,11 @@ class PromptEngineer:
         return (self.system_prompt or PROMPT_ENGINEERING_PROMPT).strip()
 
 
-def _as_mapping(value: Any) -> Optional[Mapping[str, Any]]:
+def _as_mapping(value: Any) -> Mapping[str, Any] | None:
     """Return a mapping view for dynamic LiteLLM payload objects when possible."""
 
     if isinstance(value, Mapping):
-        return cast(Mapping[str, Any], value)
+        return cast("Mapping[str, Any]", value)
     for attr in ("model_dump", "dict"):
         candidate = getattr(value, attr, None)
         if callable(candidate):
@@ -396,7 +419,7 @@ def _as_mapping(value: Any) -> Optional[Mapping[str, Any]]:
             except Exception:  # pragma: no cover - best effort normalisation
                 continue
             if isinstance(result, Mapping):
-                return cast(Mapping[str, Any], result)
+                return cast("Mapping[str, Any]", result)
     return None
 
 
@@ -425,7 +448,7 @@ def _parse_refinement_payload(text: str) -> dict[str, Any]:
     try:
         parsed = json.loads(stripped)
         if isinstance(parsed, Mapping):
-            parsed_mapping = cast(Mapping[str, Any], parsed)
+            parsed_mapping = cast("Mapping[str, Any]", parsed)
             return {str(key): value for key, value in parsed_mapping.items()}
     except json.JSONDecodeError:
         pass
@@ -439,7 +462,7 @@ def _parse_refinement_payload(text: str) -> dict[str, Any]:
         except json.JSONDecodeError:
             continue
         if isinstance(parsed_obj, Mapping):
-            parsed_mapping = cast(Mapping[str, Any], parsed_obj)
+            parsed_mapping = cast("Mapping[str, Any]", parsed_obj)
             return {str(key): value for key, value in parsed_mapping.items()}
     raise ValueError("unable to parse prompt engineering payload")
 

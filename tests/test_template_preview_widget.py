@@ -1,6 +1,8 @@
 """Tests for template preview widget error fallbacks.
 
-Updates: v0.1.0 - 2025-11-27 - Ensure parse/render errors keep raw template text visible.
+Updates:
+  v0.1.1 - 2025-11-29 - Extend preview helper with persistence/run state fields.
+  v0.1.0 - 2025-11-27 - Ensure parse/render errors keep raw template text visible.
 """
 
 from __future__ import annotations
@@ -45,7 +47,7 @@ def _load_with_qt_stubs() -> types.ModuleType:
         def __init__(self, *_: object, **__: object) -> None:
             self._slots: list[Any] = []
 
-        def __get__(self, instance: object, owner: type | None = None) -> "_Signal":
+        def __get__(self, instance: object, owner: type | None = None) -> _Signal:
             return self
 
         def connect(self, slot: Any) -> None:  # pragma: no cover - stub only
@@ -178,8 +180,27 @@ def _make_preview() -> TemplatePreviewWidget:
     widget._template_hint = _DummyLabel()
     widget._run_button = _DummyButton()
     widget._run_enabled = False
+    widget._last_run_ready = False
     widget._last_rendered_text = ""
     widget._preview_ready = False
+    widget._current_prompt_id = None
+    widget._suspend_persist = False
+    widget._state_store = types.SimpleNamespace(value=lambda *_: None, setValue=lambda *_: None)
+
+    class _DummyToggle:
+        def __init__(self) -> None:
+            self.checked = False
+
+        def isChecked(self) -> bool:
+            return self.checked
+
+        def setChecked(self, value: bool) -> None:
+            self.checked = bool(value)
+
+        def setText(self, _: str) -> None:
+            return
+
+    widget._schema_toggle = _DummyToggle()
 
     def _show_message_item(self: TemplatePreviewWidget, text: str, _: str) -> None:
         self._last_message = text

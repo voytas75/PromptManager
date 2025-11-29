@@ -1,19 +1,25 @@
 """Prompt category registry helpers and defaults.
 
-Updates: v0.1.0 - 2025-11-22 - Introduce PromptCategory registry and defaults.
+Updates:
+  v0.1.1 - 2025-11-29 - Wrap long defaults and type-only Path import.
+  v0.1.0 - 2025-11-22 - Introduce PromptCategory registry and defaults.
 """
+
 
 from __future__ import annotations
 
 import json
 import logging
-from pathlib import Path
-from typing import List, Mapping, MutableMapping, Optional, Sequence, cast
+from collections.abc import Mapping, MutableMapping, Sequence
+from typing import TYPE_CHECKING, cast
 
 from models.category_model import PromptCategory, slugify_category
 
 from .exceptions import CategoryError, CategoryNotFoundError, CategoryStorageError
 from .repository import PromptRepository, RepositoryError
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +48,10 @@ DEFAULT_CATEGORY_DEFINITIONS: Sequence[Mapping[str, str]] = (
     {
         "slug": "refactoring",
         "label": "Refactoring",
-        "description": "Improving structure, readability, and maintainability without changing behaviour.",
+        "description": (
+            "Improving structure, readability, and maintainability "
+            "without changing behaviour."
+        ),
         "color": "#7c3aed",
         "icon": "mdi-code-json",
         "parent_slug": "code-analysis",
@@ -72,10 +81,10 @@ DEFAULT_CATEGORY_DEFINITIONS: Sequence[Mapping[str, str]] = (
 
 
 def load_category_definitions(
-    inline_definitions: Optional[Sequence[Mapping[str, object]]] = None,
+    inline_definitions: Sequence[Mapping[str, object]] | None = None,
     *,
-    path: Optional[Path] = None,
-) -> List[PromptCategory]:
+    path: Path | None = None,
+) -> list[PromptCategory]:
     """Return PromptCategory definitions from defaults plus overrides."""
 
     catalog: MutableMapping[str, PromptCategory] = {
@@ -83,7 +92,7 @@ def load_category_definitions(
         for entry in DEFAULT_CATEGORY_DEFINITIONS
     }
 
-    payloads: List[Mapping[str, object]] = []
+    payloads: list[Mapping[str, object]] = []
     if path is not None:
         try:
             text = path.expanduser().read_text(encoding="utf-8")
@@ -125,7 +134,7 @@ class CategoryRegistry:
     def __init__(
         self,
         repository: PromptRepository,
-        defaults: Optional[Sequence[PromptCategory]] = None,
+        defaults: Sequence[PromptCategory] | None = None,
     ) -> None:
         self._repository = repository
         self._defaults = list(defaults or [])
@@ -138,7 +147,7 @@ class CategoryRegistry:
                 raise CategoryStorageError("Unable to seed default categories") from exc
         self.refresh()
 
-    def refresh(self) -> List[PromptCategory]:
+    def refresh(self) -> list[PromptCategory]:
         """Reload categories from the repository."""
 
         try:
@@ -151,20 +160,20 @@ class CategoryRegistry:
         }
         return categories
 
-    def all(self, include_archived: bool = False) -> List[PromptCategory]:
+    def all(self, include_archived: bool = False) -> list[PromptCategory]:
         """Return cached categories."""
 
         source = self._all if include_archived else self._active
         return list(source.values())
 
-    def get(self, slug: Optional[str]) -> Optional[PromptCategory]:
+    def get(self, slug: str | None) -> PromptCategory | None:
         """Return category by slug, if available."""
 
         if not slug:
             return None
         return self._all.get(slugify_category(slug))
 
-    def find_by_label(self, label: Optional[str]) -> Optional[PromptCategory]:
+    def find_by_label(self, label: str | None) -> PromptCategory | None:
         """Return the first category matching a label (case-insensitive)."""
 
         if not label:
@@ -177,10 +186,10 @@ class CategoryRegistry:
 
     def ensure(
         self,
-        slug: Optional[str],
+        slug: str | None,
         *,
-        label: Optional[str],
-        description: Optional[str] = None,
+        label: str | None,
+        description: str | None = None,
     ) -> PromptCategory:
         """Return an existing category or create a new placeholder."""
 

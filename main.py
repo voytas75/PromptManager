@@ -1,22 +1,24 @@
 """Application entry point for Prompt Manager.
 
-Updates: v0.8.1 - 2025-11-28 - Add analytics diagnostics target with dashboard export.
-Updates: v0.8.0 - 2025-02-14 - Add embedding diagnostics CLI command.
-Updates: v0.7.9 - 2025-11-28 - Add benchmark and scenario refresh CLI commands.
-Updates: v0.7.8 - 2025-12-07 - Add CLI command to rebuild embeddings from scratch.
-Updates: v0.7.7 - 2025-11-05 - Surface LiteLLM workflow routing details in CLI summaries.
-Updates: v0.7.6 - 2025-11-05 - Expand CLI settings summary to list fast and inference LiteLLM models.
-Updates: v0.7.5 - 2025-11-30 - Remove catalogue import command and startup messaging.
-Updates: v0.7.4 - 2025-11-26 - Surface LiteLLM streaming configuration in CLI summaries.
-Updates: v0.7.3 - 2025-11-17 - Require explicit catalogue paths; skip built-in seeding on startup.
-Updates: v0.7.2 - 2025-11-15 - Extend --print-settings with health checks and masked secret output.
-Updates: v0.7.1 - 2025-11-14 - Simplify GUI dependency guidance for unified installs.
-Updates: v0.7.0 - 2025-11-07 - Add semantic suggestion CLI to verify embedding backends.
-Updates: v0.4.1 - 2025-11-05 - Launch GUI by default and add --no-gui flag.
-Updates: v0.4.0 - 2025-11-05 - Ensure manager shutdown occurs on exit and update GUI guidance.
-Updates: v0.3.0 - 2025-11-05 - Gracefully handle missing GUI dependencies.
-Updates: v0.2.0 - 2025-11-04 - Add optional PySide6 GUI launcher toggle.
-Updates: v0.1.0 - 2025-10-30 - Initial CLI bootstrap loading settings and building services.
+Updates:
+  v0.8.2 - 2025-11-29 - Reformat CLI summary output and modernise type hints.
+  v0.8.1 - 2025-11-28 - Add analytics diagnostics target with dashboard export.
+  v0.8.0 - 2025-02-14 - Add embedding diagnostics CLI command.
+  v0.7.9 - 2025-11-28 - Add benchmark and scenario refresh CLI commands.
+  v0.7.8 - 2025-12-07 - Add CLI command to rebuild embeddings from scratch.
+  v0.7.7 - 2025-11-05 - Surface LiteLLM workflow routing details in CLI summaries.
+  v0.7.6 - 2025-11-05 - Expand CLI settings summary to list fast and inference models.
+  v0.7.5 - 2025-11-30 - Remove catalogue import command and startup messaging.
+  v0.7.4 - 2025-11-26 - Surface LiteLLM streaming configuration in CLI summaries.
+  v0.7.3 - 2025-11-17 - Require explicit catalogue paths; skip built-in seeding.
+  v0.7.2 - 2025-11-15 - Extend --print-settings with health checks and masked output.
+  v0.7.1 - 2025-11-14 - Simplify GUI dependency guidance for unified installs.
+  v0.7.0 - 2025-11-07 - Add semantic suggestion CLI to verify embedding backends.
+  v0.4.1 - 2025-11-05 - Launch GUI by default and add --no-gui flag.
+  v0.4.0 - 2025-11-05 - Ensure manager shutdown occurs on exit and update GUI guidance.
+  v0.3.0 - 2025-11-05 - Gracefully handle missing GUI dependencies.
+  v0.2.0 - 2025-11-04 - Add optional PySide6 GUI launcher toggle.
+  v0.1.0 - 2025-10-30 - Initial CLI bootstrap loading settings and building services.
 """
 
 from __future__ import annotations
@@ -31,7 +33,10 @@ import textwrap
 import uuid
 from collections import Counter
 from pathlib import Path
-from typing import Callable, Mapping, Optional, Sequence, cast
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from collections.abc import Callable, Mapping, Sequence
 
 from config import (
     DEFAULT_EMBEDDING_BACKEND,
@@ -41,6 +46,7 @@ from config import (
     load_settings,
 )
 from core import (
+    PromptHistoryError,
     PromptManagerError,
     build_analytics_snapshot,
     build_prompt_manager,
@@ -49,7 +55,7 @@ from core import (
 )
 
 
-def _mask_secret(value: Optional[str]) -> str:
+def _mask_secret(value: str | None) -> str:
     """Return masked representation of secret values."""
 
     if not value:
@@ -62,7 +68,12 @@ def _mask_secret(value: Optional[str]) -> str:
     return f"set ({prefix}...{suffix})"
 
 
-def _describe_path(path_value: object, *, expect_directory: bool, allow_missing_file: bool = False) -> str:
+def _describe_path(
+    path_value: object,
+    *,
+    expect_directory: bool,
+    allow_missing_file: bool = False,
+) -> str:
     """Return a human-readable description of a configured filesystem path."""
 
     try:
@@ -128,14 +139,27 @@ def _print_settings_summary(settings: PromptManagerSettings) -> None:
     embedding_backend = getattr(settings, "embedding_backend", None)
     embedding_model = getattr(settings, "embedding_model", None)
 
+    db_path_desc = _describe_path(
+        settings.db_path,
+        expect_directory=False,
+        allow_missing_file=True,
+    )
+    chroma_path_desc = _describe_path(settings.chroma_path, expect_directory=True)
+    default_model = (
+        "(auto)"
+        if embedding_backend == "litellm" and litellm_model
+        else DEFAULT_EMBEDDING_MODEL
+    )
+    resolved_model = embedding_model or default_model
+
     def _format_tier(value: str) -> str:
         return "Inference" if value == "inference" else "Fast"
 
     lines = [
         "Prompt Manager configuration summary",
         "------------------------------------",
-        f"Database path: {_describe_path(settings.db_path, expect_directory=False, allow_missing_file=True)}",
-        f"Chroma directory: {_describe_path(settings.chroma_path, expect_directory=True)}",
+        f"Database path: {db_path_desc}",
+        f"Chroma directory: {chroma_path_desc}",
         f"Redis DSN: {redis_dsn or 'not set'}",
         f"Cache TTL (seconds): {getattr(settings, 'cache_ttl_seconds', 'n/a')}",
         "",
@@ -163,13 +187,13 @@ def _print_settings_summary(settings: PromptManagerSettings) -> None:
         "Embedding configuration",
         "-----------------------",
         f"Backend: {embedding_backend or DEFAULT_EMBEDDING_BACKEND}",
-        f"Model: {embedding_model or ('(auto)' if embedding_backend == 'litellm' and litellm_model else DEFAULT_EMBEDDING_MODEL)}",
+        f"Model: {resolved_model}",
         ]
     )
     print("\n".join(lines))
 
 
-def _setup_logging(logging_conf_path: Optional[Path]) -> None:
+def _setup_logging(logging_conf_path: Path | None) -> None:
     """Configure logging from a dictConfig file when present."""
     # Default to config/logging.conf if not provided
     path = logging_conf_path or Path("config/logging.conf")
@@ -184,7 +208,7 @@ def _setup_logging(logging_conf_path: Optional[Path]) -> None:
     )
 
 
-def _resolve_export_format(path: Path, explicit_format: Optional[str]) -> str:
+def _resolve_export_format(path: Path, explicit_format: str | None) -> str:
     if explicit_format:
         return explicit_format.lower()
     suffix = path.suffix.lower()
@@ -318,9 +342,10 @@ def _run_benchmark(manager, args: argparse.Namespace, logger: logging.Logger) ->
     for run in report.runs:
         status = "ERROR" if run.error else "OK"
         usage_parts = []
-        prompt_tokens = run.usage.get("prompt_tokens") if isinstance(run.usage, dict) else None
-        completion_tokens = run.usage.get("completion_tokens") if isinstance(run.usage, dict) else None
-        total_tokens = run.usage.get("total_tokens") if isinstance(run.usage, dict) else None
+        usage_map = run.usage if isinstance(run.usage, dict) else {}
+        prompt_tokens = usage_map.get("prompt_tokens")
+        completion_tokens = usage_map.get("completion_tokens")
+        total_tokens = usage_map.get("total_tokens")
         if prompt_tokens is not None:
             usage_parts.append(f"prompt={prompt_tokens}")
         if completion_tokens is not None:
@@ -342,11 +367,19 @@ def _run_benchmark(manager, args: argparse.Namespace, logger: logging.Logger) ->
         if run.history:
             history = run.history
             success_rate = f"{history.success_rate * 100:.1f}%" if history.success_rate else "0%"
-            avg_duration = f"{history.average_duration_ms:.0f} ms" if history.average_duration_ms else "n/a"
-            avg_rating = f"{history.average_rating:.1f}" if history.average_rating is not None else "n/a"
+            avg_duration = (
+                f"{history.average_duration_ms:.0f} ms"
+                if history.average_duration_ms
+                else "n/a"
+            )
+            avg_rating = (
+                f"{history.average_rating:.1f}"
+                if history.average_rating is not None
+                else "n/a"
+            )
             print(
-                "  history: runs=%s, success_rate=%s, avg_duration=%s, avg_rating=%s"
-                % (history.total_runs, success_rate, avg_duration, avg_rating)
+                f"  history: runs={history.total_runs}, success_rate={success_rate}, "
+                f"avg_duration={avg_duration}, avg_rating={avg_rating}"
             )
         if run.error is None and not run.response_preview:
             print("  preview: (empty response)")
@@ -356,7 +389,7 @@ def _run_benchmark(manager, args: argparse.Namespace, logger: logging.Logger) ->
 
 def _run_refresh_scenarios(manager, args: argparse.Namespace, logger: logging.Logger) -> int:
     try:
-        prompt_id = uuid.UUID(str(getattr(args, "prompt_id")))
+        prompt_id = uuid.UUID(str(args.prompt_id))
     except (ValueError, TypeError) as exc:
         logger.error("Invalid prompt id: %s", exc)
         return 5
@@ -411,12 +444,8 @@ def _run_embedding_diagnostics(
 
     missing_count = len(report.missing_prompts)
     print(
-        "Repository: %s prompts (%s with embeddings, missing=%s)"
-        % (
-            report.repository_total,
-            report.prompts_with_embeddings,
-            missing_count,
-        )
+        f"Repository: {report.repository_total} prompts "
+        f"({report.prompts_with_embeddings} with embeddings, missing={missing_count})"
     )
 
     if report.consistent_counts is None:
@@ -426,8 +455,8 @@ def _run_embedding_diagnostics(
     else:
         chroma_value = report.chroma_count if report.chroma_count is not None else "unknown"
         print(
-            "Vector store consistency: MISMATCH (Chroma=%s, stored embeddings=%s)"
-            % (chroma_value, report.prompts_with_embeddings)
+            f"Vector store consistency: MISMATCH (Chroma={chroma_value}, "
+            f"stored embeddings={report.prompts_with_embeddings})"
         )
 
     if missing_count:
@@ -481,7 +510,7 @@ def _run_analytics_diagnostics(
         usage_log_path=usage_log_path,
     )
 
-    def _pct(value: Optional[float]) -> str:
+    def _pct(value: float | None) -> str:
         if value is None:
             return "n/a"
         return f"{value * 100:.1f}%"
@@ -528,7 +557,8 @@ def _run_analytics_diagnostics(
                 )
                 print(
                     f"  - {prompt_stats.name}: runs={prompt_stats.total_runs}, "
-                    f"success={_pct(prompt_stats.success_rate)}, duration={avg_duration_prompt}, rating={avg_rating_prompt}"
+                    f"success={_pct(prompt_stats.success_rate)}, "
+                    f"duration={avg_duration_prompt}, rating={avg_rating_prompt}"
                 )
 
     if snapshot.usage_frequency:
@@ -536,14 +566,16 @@ def _run_analytics_diagnostics(
         for entry in snapshot.usage_frequency:
             last_used = entry.last_executed_at.isoformat() if entry.last_executed_at else "n/a"
             print(
-                f"  - {entry.name}: counter={entry.usage_count}, success={_pct(entry.success_rate)}, last_used={last_used}"
+                f"  - {entry.name}: counter={entry.usage_count}, "
+                f"success={_pct(entry.success_rate)}, last_used={last_used}"
             )
 
     if snapshot.model_costs:
         print("\nModel cost breakdown (tokens):")
         for entry in snapshot.model_costs:
             print(
-                f"  - {entry.model}: runs={entry.run_count}, prompt={entry.prompt_tokens}, completion={entry.completion_tokens}, total={entry.total_tokens}"
+                f"  - {entry.model}: runs={entry.run_count}, prompt={entry.prompt_tokens}, "
+                f"completion={entry.completion_tokens}, total={entry.total_tokens}"
             )
 
     if snapshot.benchmark_stats:
@@ -555,26 +587,42 @@ def _run_analytics_diagnostics(
                 else "n/a"
             )
             print(
-                f"  - {entry.model}: runs={entry.run_count}, success={_pct(entry.success_rate)}, duration={avg_duration}, tokens={entry.total_tokens}"
+                f"  - {entry.model}: runs={entry.run_count}, "
+                f"success={_pct(entry.success_rate)}, duration={avg_duration}, "
+                f"tokens={entry.total_tokens}"
             )
 
     if snapshot.intent_success:
         print("\nIntent workspace execution success:")
         for point in snapshot.intent_success[-10:]:
             print(
-                f"  - {point.bucket.date().isoformat()}: {_pct(point.success_rate)} ({point.success}/{point.total})"
+                f"  - {point.bucket.date().isoformat()}: {_pct(point.success_rate)} "
+                f"({point.success}/{point.total})"
             )
 
     embedding = snapshot.embedding
     if embedding is not None:
         print("\nEmbedding diagnostics summary:")
-        print(f"  backend: {'ok' if embedding.backend_ok else 'error'} ({embedding.backend_message})")
-        print(f"  dimension: {embedding.backend_dimension or embedding.inferred_dimension or 'n/a'}")
-        print(f"  chroma: {'ok' if embedding.chroma_ok else 'error'} ({embedding.chroma_message})")
+        print(
+            f"  backend: {'ok' if embedding.backend_ok else 'error'} "
+            f"({embedding.backend_message})"
+        )
+        print(
+            "  dimension: {value}".format(
+                value=embedding.backend_dimension
+                or embedding.inferred_dimension
+                or "n/a",
+            )
+        )
+        print(
+            f"  chroma: {'ok' if embedding.chroma_ok else 'error'} "
+            f"({embedding.chroma_message})"
+        )
         if embedding.consistent_counts is not None:
             status = "matched" if embedding.consistent_counts else "mismatch"
             print(
-                f"  vectors stored: {embedding.prompts_with_embeddings} / repository {embedding.repository_total} (chroma {status})"
+                f"  vectors stored: {embedding.prompts_with_embeddings} / "
+                f"repository {embedding.repository_total} (chroma {status})"
             )
 
     export_path = getattr(args, "export_csv", None)
@@ -598,7 +646,7 @@ def _run_analytics_diagnostics(
     return 0
 
 
-def _format_metric(value: Optional[float], *, suffix: str = "") -> str:
+def _format_metric(value: float | None, *, suffix: str = "") -> str:
     if value is None:
         return "n/a"
     formatted = f"{value:.2f}" if abs(value) < 1000 else f"{value:.0f}"
@@ -657,12 +705,12 @@ def _run_history_analytics(manager, args: argparse.Namespace, logger: logging.Lo
                 else "n/a"
             )
             lines.append(
-                (
+                
                     f"{index}. {stats.name} — runs:{stats.total_runs} "
                     f"success:{stats.success_rate * 100:.1f}% "
                     f"avg_rating:{avg_rating} trend:{trend} latency:{latency} "
                     f"last:{last_run}"
-                )
+                
             )
 
     print("\n".join(lines))
@@ -853,7 +901,10 @@ def parse_args() -> argparse.Namespace:
         "--model",
         dest="models",
         action="append",
-        help="Model identifier to benchmark (repeatable). Defaults to configured fast/inference models.",
+        help=(
+            "Model identifier to benchmark (repeatable). "
+            "Defaults to configured fast/inference models."
+        ),
     )
     benchmark_parser.add_argument(
         "--history-window",
@@ -920,7 +971,10 @@ def parse_args() -> argparse.Namespace:
         "--usage-log",
         type=Path,
         default=None,
-        help="Path to the intent usage log for analytics exports (defaults to data/logs/intent_usage.jsonl).",
+        help=(
+            "Path to the intent usage log for analytics exports "
+            "(defaults to data/logs/intent_usage.jsonl)."
+        ),
     )
     diagnostics_parser.add_argument(
         "--dataset",
@@ -1029,20 +1083,22 @@ def main() -> int:
                 )
                 return 4
             try:
-                launch_gui_callable = getattr(gui_module, "launch_prompt_manager")
+                launch_gui_callable = gui_module.launch_prompt_manager
             except AttributeError:
                 logger.error(
                     "GUI module is missing the launch_prompt_manager entry point. "
-                    "Reinstall dependencies with `pip install -r requirements.txt` or launch without --gui."
+                    "Reinstall dependencies with `pip install -r requirements.txt` "
+                    "or launch without --gui."
                 )
                 return 4
             if not callable(launch_gui_callable):
                 logger.error(
                     "GUI module launch_prompt_manager entry point is not callable. "
-                    "Reinstall dependencies with `pip install -r requirements.txt` or launch without --gui."
+                    "Reinstall dependencies with `pip install -r requirements.txt` "
+                    "or launch without --gui."
                 )
                 return 4
-            launch_callable = cast("Callable[[object, Optional[object]], int]", launch_gui_callable)
+            launch_callable = cast("Callable[[object, object | None], int]", launch_gui_callable)
 
             dependency_error_type = getattr(gui_module, "GuiDependencyError", RuntimeError)
             if not isinstance(dependency_error_type, type) or not issubclass(

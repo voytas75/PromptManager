@@ -12,7 +12,7 @@ import sites.
 
 from __future__ import annotations
 
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
 from ..prompt_engineering import PromptEngineer, PromptEngineeringError, PromptRefinement
 
@@ -26,7 +26,7 @@ __all__ = [
 class PromptEngineerFacade:
     """Facade over :class:`core.prompt_engineering.PromptEngineer`."""
 
-    def __init__(self, *, engineer: Optional[PromptEngineer] = None, model_name: Optional[str] = None) -> None:
+    def __init__(self, *, engineer: PromptEngineer | None = None, model_name: str | None = None) -> None:
         if engineer is not None:
             self._engineer = engineer
         elif model_name is not None:
@@ -38,11 +38,11 @@ class PromptEngineerFacade:
         self,
         prompt_text: str,
         *,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        category: Optional[str] = None,
-        tags: Optional[Sequence[str]] = None,
-        negative_constraints: Optional[Sequence[str]] = None,
+        name: str | None = None,
+        description: str | None = None,
+        category: str | None = None,
+        tags: Sequence[str] | None = None,
+        negative_constraints: Sequence[str] | None = None,
         structure_only: bool = False,
     ) -> PromptRefinement:
         """Refine a prompt using the underlying engineer."""
@@ -61,11 +61,11 @@ class PromptEngineerFacade:
         self,
         prompt_text: str,
         *,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        category: Optional[str] = None,
-        tags: Optional[Sequence[str]] = None,
-        negative_constraints: Optional[Sequence[str]] = None,
+        name: str | None = None,
+        description: str | None = None,
+        category: str | None = None,
+        tags: Sequence[str] | None = None,
+        negative_constraints: Sequence[str] | None = None,
     ) -> PromptRefinement:
         """Run structure-only refinement via :meth:`PromptEngineer.refine_structure`."""
 
