@@ -409,6 +409,7 @@ class GuidedPromptWizard(QWizard):
         self.setStyleSheet(
             "QWizard { background-color: %s; color: %s; }"
             "QWizardPage { background-color: %s; color: %s; }"
+            "QStackedWidget { background-color: %s; }"
             "QLabel { color: %s; }"
             "QLineEdit, QPlainTextEdit, QComboBox { background-color: %s; color: %s; border: 1px solid %s; }"
             "QTextEdit { background-color: %s; color: %s; border: 1px solid %s; }"
@@ -420,6 +421,7 @@ class GuidedPromptWizard(QWizard):
                 text_color,
                 window_color,
                 text_color,
+                window_color,
                 text_color,
                 base_color,
                 text_color,
