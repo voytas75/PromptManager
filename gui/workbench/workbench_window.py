@@ -1,6 +1,7 @@
 """Qt widgets for the Enhanced Prompt Workbench experience.
 
 Updates:
+  v0.1.15 - 2025-11-29 - Move output/history tabs below the editor and persist output splitter widths.
   v0.1.14 - 2025-11-29 - Replace QWizard with custom-styled dialog to control Guided mode appearance.
   v0.1.13 - 2025-11-29 - Manually paint wizard background with palette colors to avoid OS tinting.
   v0.1.12 - 2025-11-29 - Force Fusion style for wizard to ensure palette-driven theming on Windows.
@@ -28,8 +29,16 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from PySide6.QtCore import QPoint, Qt, Signal, QEvent
-from PySide6.QtGui import QFont, QGuiApplication, QPalette, QPainter, QPaintEvent, QTextCharFormat, QTextCursor
+from PySide6.QtCore import QByteArray, QPoint, QSettings, Qt, Signal, QEvent
+from PySide6.QtGui import (
+    QCloseEvent,
+    QGuiApplication,
+    QPalette,
+    QPainter,
+    QPaintEvent,
+    QTextCharFormat,
+    QTextCursor,
+)
 from PySide6.QtWidgets import (
     QButtonGroup,
     QDialog,
@@ -664,6 +673,7 @@ class WorkbenchWindow(QMainWindow):
         super().__init__(parent)
         self._manager = prompt_manager
         self._session = WorkbenchSession()
+        self._settings = QSettings("PromptManager", "WorkbenchWindow")
         self._executor: CodexExecutor | None = prompt_manager.executor
         self._history_tracker: HistoryTracker | None = prompt_manager.history_tracker
         self._suppress_editor_signal = False
@@ -705,15 +715,25 @@ class WorkbenchWindow(QMainWindow):
         container_layout.setSpacing(8)
         self.setCentralWidget(container)
 
-        self._summary_label = QLabel("", container)
+        self._content_splitter = QSplitter(Qt.Vertical, container)
+        self._content_splitter.setChildrenCollapsible(False)
+        container_layout.addWidget(self._content_splitter, 1)
+
+        top_panel = QWidget(self._content_splitter)
+        top_panel_layout = QVBoxLayout(top_panel)
+        top_panel_layout.setContentsMargins(0, 0, 0, 0)
+        top_panel_layout.setSpacing(8)
+
+        self._summary_label = QLabel("", top_panel)
         self._summary_label.setWordWrap(True)
         self._summary_label.setStyleSheet("font-weight: 500;")
-        container_layout.addWidget(self._summary_label)
+        top_panel_layout.addWidget(self._summary_label)
 
-        splitter = QSplitter(Qt.Horizontal, container)
-        container_layout.addWidget(splitter, 1)
+        self._main_splitter = QSplitter(Qt.Horizontal, top_panel)
+        self._main_splitter.setChildrenCollapsible(False)
+        top_panel_layout.addWidget(self._main_splitter, 1)
 
-        palette_frame = QFrame(splitter)
+        palette_frame = QFrame(self._main_splitter)
         palette_layout = QVBoxLayout(palette_frame)
         palette_layout.setContentsMargins(8, 8, 8, 8)
         palette_layout.addWidget(QLabel("Guidance blocks", palette_frame))
@@ -725,7 +745,7 @@ class WorkbenchWindow(QMainWindow):
         self._palette_list.itemDoubleClicked.connect(self._insert_block)  # type: ignore[arg-type]
         palette_layout.addWidget(self._palette_list, 1)
 
-        editor_frame = QFrame(splitter)
+        editor_frame = QFrame(self._main_splitter)
         editor_layout = QVBoxLayout(editor_frame)
         editor_layout.setContentsMargins(8, 8, 8, 8)
         self._editor = WorkbenchPromptEditor(editor_frame)
@@ -734,11 +754,14 @@ class WorkbenchWindow(QMainWindow):
         self._editor.variableActivated.connect(self._open_variable_editor)
         editor_layout.addWidget(self._editor, 1)
 
-        right_splitter = QSplitter(Qt.Vertical, splitter)
+        right_panel = QWidget(self._main_splitter)
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(8, 8, 8, 8)
+        right_layout.setSpacing(8)
 
-        preview_container = QWidget(right_splitter)
+        preview_container = QWidget(right_panel)
         preview_layout = QVBoxLayout(preview_container)
-        preview_layout.setContentsMargins(8, 8, 8, 8)
+        preview_layout.setContentsMargins(0, 0, 0, 0)
         self._preview = TemplatePreviewWidget(preview_container)
         self._preview.set_run_enabled(self._executor is not None)
         self._preview.run_requested.connect(self._handle_preview_run)  # type: ignore[arg-type]
@@ -748,39 +771,61 @@ class WorkbenchWindow(QMainWindow):
         self._test_input.setPlaceholderText("Provide user input to test this prompt…")
         self._test_input.setFixedHeight(120)
         preview_layout.addWidget(self._test_input)
+        right_layout.addWidget(preview_container, 1)
 
-        output_container = QWidget(right_splitter)
-        output_layout = QVBoxLayout(output_container)
+        output_panel = QFrame(self._content_splitter)
+        output_layout = QVBoxLayout(output_panel)
         output_layout.setContentsMargins(8, 8, 8, 8)
-        self._output_tabs = QTabWidget(output_container)
-        self._output_view = QTextEdit(output_container)
+        output_layout.setSpacing(6)
+        output_title = QLabel("Workbench Output", output_panel)
+        output_title.setStyleSheet("font-weight: 500;")
+        output_layout.addWidget(output_title)
+        self._output_tabs = QTabWidget(output_panel)
+        self._output_view = QTextEdit(output_panel)
         self._output_view.setReadOnly(True)
         self._output_tabs.addTab(self._output_view, "Run Output")
-        self._history_list = QListWidget(output_container)
+        self._history_list = QListWidget(output_panel)
         self._output_tabs.addTab(self._history_list, "History")
         output_layout.addWidget(self._output_tabs, 1)
 
         feedback_row = QHBoxLayout()
         feedback_row.setSpacing(6)
-        feedback_row.addWidget(QLabel("Was the last run helpful?", output_container))
-        self._thumbs_up = QToolButton(output_container)
+        feedback_row.addWidget(QLabel("Was the last run helpful?", output_panel))
+        self._thumbs_up = QToolButton(output_panel)
         self._thumbs_up.setText("👍")
         self._thumbs_up.clicked.connect(lambda: self._record_rating(1.0))
         feedback_row.addWidget(self._thumbs_up)
-        self._thumbs_down = QToolButton(output_container)
+        self._thumbs_down = QToolButton(output_panel)
         self._thumbs_down.setText("👎")
         self._thumbs_down.clicked.connect(lambda: self._record_rating(0.0))
         feedback_row.addWidget(self._thumbs_down)
-        feedback_row.addWidget(QLabel("Feedback", output_container))
-        self._feedback_input = QLineEdit(output_container)
+        feedback_row.addWidget(QLabel("Feedback", output_panel))
+        self._feedback_input = QLineEdit(output_panel)
         feedback_row.addWidget(self._feedback_input, 1)
-        apply_feedback = QPushButton("Save", output_container)
+        apply_feedback = QPushButton("Save", output_panel)
         apply_feedback.clicked.connect(self._apply_feedback)
         feedback_row.addWidget(apply_feedback)
         output_layout.addLayout(feedback_row)
 
         self._status = QStatusBar(self)
         self.setStatusBar(self._status)
+        self._restore_layout_state()
+
+    def closeEvent(self, event: QCloseEvent) -> None:  # type: ignore[override]
+        self._persist_layout_state()
+        super().closeEvent(event)
+
+    def _restore_layout_state(self) -> None:
+        content_state = self._settings.value("contentSplitterState")
+        if isinstance(content_state, QByteArray):
+            self._content_splitter.restoreState(content_state)
+        main_state = self._settings.value("mainSplitterState")
+        if isinstance(main_state, QByteArray):
+            self._main_splitter.restoreState(main_state)
+
+    def _persist_layout_state(self) -> None:
+        self._settings.setValue("contentSplitterState", self._content_splitter.saveState())
+        self._settings.setValue("mainSplitterState", self._main_splitter.saveState())
 
     def _load_initial_state(self, mode: str, template_prompt: Prompt | None) -> None:
         if mode == WorkbenchMode.TEMPLATE and template_prompt is not None:
