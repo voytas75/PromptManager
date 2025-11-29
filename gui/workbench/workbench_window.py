@@ -1,6 +1,7 @@
 """Qt widgets for the Enhanced Prompt Workbench experience.
 
 Updates:
+  v0.1.17 - 2025-11-29 - Stack the prompt editor above Run Output/History in the center column.
   v0.1.16 - 2025-11-29 - Relocate output/history tabs into the center column and collapse the bottom panel.
   v0.1.15 - 2025-11-29 - Move output/history tabs below the editor and persist output splitter widths.
   v0.1.14 - 2025-11-29 - Replace QWizard with custom-styled dialog to control Guided mode appearance.
@@ -680,7 +681,7 @@ class WorkbenchWindow(QMainWindow):
         self._suppress_editor_signal = False
         self._active_refinement_target: str | None = None
         self._main_splitter: QSplitter | None = None
-        self._workspace_splitter: QSplitter | None = None
+        self._middle_splitter: QSplitter | None = None
         self._build_ui()
         self._load_initial_state(mode, template_prompt)
 
@@ -739,11 +740,30 @@ class WorkbenchWindow(QMainWindow):
         self._palette_list.itemDoubleClicked.connect(self._insert_block)  # type: ignore[arg-type]
         palette_layout.addWidget(self._palette_list, 1)
 
-        output_panel = QFrame(self._main_splitter)
+        middle_panel = QWidget(self._main_splitter)
+        middle_layout = QVBoxLayout(middle_panel)
+        middle_layout.setContentsMargins(8, 8, 8, 8)
+        middle_layout.setSpacing(8)
+        self._middle_splitter = QSplitter(Qt.Vertical, middle_panel)
+        self._middle_splitter.setChildrenCollapsible(False)
+        middle_layout.addWidget(self._middle_splitter, 1)
+
+        editor_container = QWidget(self._middle_splitter)
+        editor_container_layout = QVBoxLayout(editor_container)
+        editor_container_layout.setContentsMargins(0, 0, 0, 0)
+        editor_container_layout.setSpacing(6)
+        editor_container_layout.addWidget(QLabel("Prompt Draft", editor_container))
+        self._editor = WorkbenchPromptEditor(editor_container)
+        self._editor.setPlaceholderText("Use the wizard or block palette to start…")
+        self._editor.textChanged.connect(self._on_editor_changed)  # type: ignore[arg-type]
+        self._editor.variableActivated.connect(self._open_variable_editor)
+        editor_container_layout.addWidget(self._editor, 1)
+
+        output_panel = QFrame(self._middle_splitter)
         output_layout = QVBoxLayout(output_panel)
-        output_layout.setContentsMargins(8, 8, 8, 8)
+        output_layout.setContentsMargins(0, 0, 0, 0)
         output_layout.setSpacing(6)
-        output_title = QLabel("Workbench Output", output_panel)
+        output_title = QLabel("Run Output & History", output_panel)
         output_title.setStyleSheet("font-weight: 500;")
         output_layout.addWidget(output_title)
         self._output_tabs = QTabWidget(output_panel)
@@ -773,37 +793,19 @@ class WorkbenchWindow(QMainWindow):
         feedback_row.addWidget(apply_feedback)
         output_layout.addLayout(feedback_row)
 
-        workspace_panel = QWidget(self._main_splitter)
-        workspace_layout = QVBoxLayout(workspace_panel)
-        workspace_layout.setContentsMargins(8, 8, 8, 8)
-        workspace_layout.setSpacing(8)
-        self._workspace_splitter = QSplitter(Qt.Vertical, workspace_panel)
-        self._workspace_splitter.setChildrenCollapsible(False)
-        workspace_layout.addWidget(self._workspace_splitter, 1)
-
-        editor_container = QWidget(self._workspace_splitter)
-        editor_container_layout = QVBoxLayout(editor_container)
-        editor_container_layout.setContentsMargins(0, 0, 0, 0)
-        editor_container_layout.setSpacing(0)
-        self._editor = WorkbenchPromptEditor(editor_container)
-        self._editor.setPlaceholderText("Use the wizard or block palette to start…")
-        self._editor.textChanged.connect(self._on_editor_changed)  # type: ignore[arg-type]
-        self._editor.variableActivated.connect(self._open_variable_editor)
-        editor_container_layout.addWidget(self._editor, 1)
-
-        preview_container = QWidget(self._workspace_splitter)
-        preview_layout = QVBoxLayout(preview_container)
-        preview_layout.setContentsMargins(0, 0, 0, 0)
-        preview_layout.setSpacing(8)
-        self._preview = TemplatePreviewWidget(preview_container)
+        right_panel = QWidget(self._main_splitter)
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(8, 8, 8, 8)
+        right_layout.setSpacing(8)
+        self._preview = TemplatePreviewWidget(right_panel)
         self._preview.set_run_enabled(self._executor is not None)
         self._preview.run_requested.connect(self._handle_preview_run)  # type: ignore[arg-type]
-        preview_layout.addWidget(self._preview, 1)
-        preview_layout.addWidget(QLabel("Test input", preview_container))
-        self._test_input = QPlainTextEdit(preview_container)
+        right_layout.addWidget(self._preview, 1)
+        right_layout.addWidget(QLabel("Test input", right_panel))
+        self._test_input = QPlainTextEdit(right_panel)
         self._test_input.setPlaceholderText("Provide user input to test this prompt…")
         self._test_input.setFixedHeight(120)
-        preview_layout.addWidget(self._test_input)
+        right_layout.addWidget(self._test_input)
 
         self._status = QStatusBar(self)
         self.setStatusBar(self._status)
@@ -817,15 +819,15 @@ class WorkbenchWindow(QMainWindow):
         main_state = self._settings.value("mainSplitterState")
         if isinstance(main_state, QByteArray) and self._main_splitter is not None:
             self._main_splitter.restoreState(main_state)
-        workspace_state = self._settings.value("workspaceSplitterState")
-        if isinstance(workspace_state, QByteArray) and self._workspace_splitter is not None:
-            self._workspace_splitter.restoreState(workspace_state)
+        middle_state = self._settings.value("middleSplitterState")
+        if isinstance(middle_state, QByteArray) and self._middle_splitter is not None:
+            self._middle_splitter.restoreState(middle_state)
 
     def _persist_layout_state(self) -> None:
         if self._main_splitter is not None:
             self._settings.setValue("mainSplitterState", self._main_splitter.saveState())
-        if self._workspace_splitter is not None:
-            self._settings.setValue("workspaceSplitterState", self._workspace_splitter.saveState())
+        if self._middle_splitter is not None:
+            self._settings.setValue("middleSplitterState", self._middle_splitter.saveState())
 
     def _load_initial_state(self, mode: str, template_prompt: Prompt | None) -> None:
         if mode == WorkbenchMode.TEMPLATE and template_prompt is not None:
