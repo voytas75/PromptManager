@@ -9,13 +9,16 @@ import importlib
 import os
 import sys
 import types
-from collections.abc import Iterator
+from typing import TYPE_CHECKING
 
 import pytest
 
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from collections.abc import Iterator
+
 
 @pytest.fixture()
-def stub_qt(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+def stub_qt(monkeypatch: pytest.MonkeyPatch) -> "Iterator[None]":
     """Provide minimal PySide6 stubs so gui.application can be imported."""
 
     qt_core = types.ModuleType("PySide6.QtCore")

@@ -7,8 +7,7 @@ import sqlite3
 import types
 import uuid
 import zipfile
-from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence
 
 import pytest
 from chromadb.errors import ChromaError
@@ -36,6 +35,9 @@ from core.repository import PromptRepository, RepositoryError, RepositoryNotFoun
 from models.category_model import PromptCategory, slugify_category
 from models.prompt_model import ExecutionStatus, Prompt, PromptExecution, PromptVersion
 from prompt_templates import DEFAULT_PROMPT_TEMPLATES
+
+if TYPE_CHECKING:  # pragma: no cover - typing helpers
+    from pathlib import Path
 
 
 def _clone_prompt(prompt: Prompt) -> Prompt:
@@ -309,7 +311,9 @@ class _ExecutorRecorder:
 
 
 @pytest.fixture()
-def prompt_manager(tmp_path: Path) -> tuple[PromptManager, _DummyCollection, _DummyChromaClient, Path]:
+def prompt_manager(
+    tmp_path: "Path",
+) -> tuple[PromptManager, _DummyCollection, _DummyChromaClient, "Path"]:
     """Fixture providing a PromptManager wired to stub backends."""
 
     chroma_dir = tmp_path / "chroma"
@@ -326,7 +330,7 @@ def prompt_manager(tmp_path: Path) -> tuple[PromptManager, _DummyCollection, _Du
     return manager, collection, client, chroma_dir
 
 
-def _ensure_chroma_database(chroma_dir: Path) -> Path:
+def _ensure_chroma_database(chroma_dir: "Path") -> Path:
     """Create or return the Chroma SQLite path used for maintenance operations."""
 
     db_path = chroma_dir / "chroma.sqlite3"
@@ -406,12 +410,6 @@ def test_set_name_generator_configures_workflows(
     assert manager._executor is executor_factory.instances[0]
     assert manager._executor.drop_params == ["api_key"]
     assert manager._executor.stream is True
-
-
-def test_set_name_generator_without_models_resets_state(
-    prompt_manager: tuple[PromptManager, _DummyCollection, _DummyChromaClient, Path],
-) -> None:
-    manager, _, _, _ = prompt_manager
     manager._name_generator = object()
     manager._litellm_drop_params = ("api_key",)
     manager._litellm_reasoning_effort = "high"
@@ -767,7 +765,7 @@ def test_query_executions_handles_filters(
     manager.set_history_tracker(tracker)
 
     first = manager.query_executions(status="unknown", search="logs", limit=5)
-    second = manager.query_executions(status=ExecutionStatus.SUCCESS)
+    manager.query_executions(status=ExecutionStatus.SUCCESS)
     tracker.should_raise = True
     fallback = manager.query_executions(status=ExecutionStatus.FAILED)
 
@@ -796,12 +794,16 @@ def test_fallback_category_uses_classifier_hints(
             return prediction
 
     manager.set_intent_classifier(_Classifier())
-    assert (
-        manager._fallback_category_from_context("Investigate bug", categories) == "Reasoning / Debugging"
-    )
+    assert manager._fallback_category_from_context(
+        "Investigate bug",
+        categories,
+    ) == "Reasoning / Debugging"
 
     manager.set_intent_classifier(None)
-    assert manager._fallback_category_from_context("Document the feature", categories) == "Documentation"
+    assert manager._fallback_category_from_context(
+        "Document the feature",
+        categories,
+    ) == "Documentation"
 
 
 def test_build_description_fallback_composes_segments(
@@ -836,7 +838,7 @@ def test_repository_verification_and_maintenance(
 
 def test_snapshot_archive_includes_sqlite_and_chroma(
     prompt_manager: tuple[PromptManager, _DummyCollection, _DummyChromaClient, Path],
-    tmp_path: Path,
+    tmp_path: "Path",
 ) -> None:
     manager, _, _, chroma_dir = prompt_manager
     manager.create_prompt(_make_prompt("Snapshot prompt"))
@@ -1137,9 +1139,14 @@ def test_log_execution_success_and_failure_paths(
     assert manager._log_execution_failure(prompt.id, "hello", "boom") is None
 
 
-def test_manager_initialises_litellm_defaults_from_helpers(tmp_path: Path) -> None:
+def test_manager_initialises_litellm_defaults_from_helpers(tmp_path: "Path") -> None:
     class _GeneratorStub:
-        def __init__(self, *, stream: bool = False, drop_params: Optional[Sequence[str]] = None) -> None:
+        def __init__(
+            self,
+            *,
+            stream: bool = False,
+            drop_params: Optional[Sequence[str]] = None,
+        ) -> None:
             self.model = "generator-fast"
             self.drop_params = drop_params
             self.stream = stream
@@ -1286,23 +1293,6 @@ def test_set_category_active_handles_missing_entries(
 
     with pytest.raises(CategoryNotFoundError):
         manager.set_category_active("missing", True)
-
-
-def test_set_name_generator_without_models_resets_state(
-    prompt_manager: tuple[PromptManager, _DummyCollection, _DummyChromaClient, Path],
-) -> None:
-    manager, _, _, _ = prompt_manager
-    manager._litellm_drop_params = ("api_key",)
-    manager._litellm_stream = True
-    manager._litellm_reasoning_effort = "high"
-    manager._executor = types.SimpleNamespace(drop_params=[], stream=False, reasoning_effort=None)
-    manager.set_name_generator(None, None, None, None)
-    assert manager._executor is None
-    assert manager._litellm_drop_params is None
-    assert manager._litellm_stream is False
-    assert manager._litellm_reasoning_effort is None
-
-
 def test_refine_prompt_structure_validation(
     prompt_manager: tuple[PromptManager, _DummyCollection, _DummyChromaClient, Path],
 ) -> None:
@@ -1386,7 +1376,11 @@ def test_execute_prompt_success_and_failure_logging(
     manager._log_execution_success = lambda *args, **kwargs: None  # type: ignore[assignment]
     manager._log_execution_failure = lambda *args, **kwargs: None  # type: ignore[assignment]
     manager.increment_usage = lambda *_: None  # type: ignore[assignment]
-    outcome = manager.execute_prompt(prompt.id, "Run task", conversation=[{"role": "user", "content": "hi"}])
+    outcome = manager.execute_prompt(
+        prompt.id,
+        "Run task",
+        conversation=[{"role": "user", "content": "hi"}],
+    )
     assert outcome.result.response_text == "world"
 
     executor.raise_error = True
@@ -1558,7 +1552,7 @@ def test_apply_rating_handles_fetch_and_update_failures(
     manager._apply_rating(prompt.id, 5.0)
 
 
-def test_clear_usage_logs_creates_and_resets(tmp_path: Path) -> None:
+def test_clear_usage_logs_creates_and_resets(tmp_path: "Path") -> None:
     manager = PromptManager(
         chroma_path=str(tmp_path / "chroma"),
         db_path=str(tmp_path / "repo.db"),

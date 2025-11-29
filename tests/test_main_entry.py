@@ -12,10 +12,10 @@ import json
 import logging
 import sys
 import types
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
-import uuid
 
 import pytest
 
@@ -536,7 +536,11 @@ def test_main_entrypoint_guard_executes(
     assert dummy_manager.closed is True
 
 
-def test_usage_report_command(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
+def test_usage_report_command(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
     log_path = tmp_path / "intent_usage.jsonl"
     entries = [
         {
@@ -576,7 +580,10 @@ def test_usage_report_command(monkeypatch: pytest.MonkeyPatch, capsys: pytest.Ca
     assert manager.closed is True
 
 
-def test_catalog_export_command(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+def test_catalog_export_command(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     monkeypatch.setattr(
         "sys.argv",
         ["prompt-manager", "catalog-export", "out.json"],

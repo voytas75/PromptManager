@@ -7,8 +7,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from pathlib import Path
-from typing import Dict, List
+from typing import TYPE_CHECKING, Dict, List
 
 import pytest
 
@@ -21,6 +20,9 @@ from core.catalog_importer import (
     load_prompt_catalog,
 )
 from models.prompt_model import Prompt
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from pathlib import Path
 
 
 class _StubRepository:
@@ -62,7 +64,7 @@ def test_load_prompt_catalog_without_path_returns_empty() -> None:
     assert prompts == []
 
 
-def test_import_prompt_catalog_adds_and_updates(tmp_path: Path) -> None:
+def test_import_prompt_catalog_adds_and_updates(tmp_path: "Path") -> None:
     manager = _StubManager()
 
     catalog_path = tmp_path / "catalog.json"
@@ -108,7 +110,7 @@ def test_import_prompt_catalog_adds_and_updates(tmp_path: Path) -> None:
     assert "logs" in refreshed_prompt.tags
 
 
-def test_diff_prompt_catalog_reports_expected_changes(tmp_path: Path) -> None:
+def test_diff_prompt_catalog_reports_expected_changes(tmp_path: "Path") -> None:
     manager = _StubManager()
 
     catalog_path = tmp_path / "catalog.json"
@@ -139,7 +141,7 @@ def test_diff_prompt_catalog_reports_expected_changes(tmp_path: Path) -> None:
     assert "separation of concerns" in updated_diff.entries[0].diff.lower()
 
 
-def test_export_prompt_catalog_json(tmp_path: Path) -> None:
+def test_export_prompt_catalog_json(tmp_path: "Path") -> None:
     manager = _StubManager()
     prompt = Prompt(
         id=uuid.uuid4(),
@@ -159,7 +161,7 @@ def test_export_prompt_catalog_json(tmp_path: Path) -> None:
     assert data["prompts"][0]["name"] == "Diagnostics"
 
 
-def test_export_prompt_catalog_yaml(tmp_path: Path) -> None:
+def test_export_prompt_catalog_yaml(tmp_path: "Path") -> None:
     yaml = pytest.importorskip("yaml")
     manager = _StubManager()
     prompt = Prompt(
@@ -181,7 +183,7 @@ def test_export_prompt_catalog_yaml(tmp_path: Path) -> None:
     assert payload["prompts"][0]["category"] == "Reporting"
 
 
-def test_export_prompt_catalog_respects_inactive_flag(tmp_path: Path) -> None:
+def test_export_prompt_catalog_respects_inactive_flag(tmp_path: "Path") -> None:
     manager = _StubManager()
     active = Prompt(
         id=uuid.uuid4(),

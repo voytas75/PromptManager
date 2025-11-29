@@ -2,16 +2,22 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any
 import uuid
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING, Any
 
-import pytest
-
-from core import AnalyticsSnapshot, PromptManager, PromptRepository, build_analytics_snapshot, snapshot_dataset_rows
+from core import (
+    AnalyticsSnapshot,
+    PromptManager,
+    PromptRepository,
+    build_analytics_snapshot,
+    snapshot_dataset_rows,
+)
 from core.history_tracker import ExecutionAnalytics, PromptExecutionAnalytics
 from models.prompt_model import ExecutionStatus, Prompt, PromptExecution
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from pathlib import Path
 
 
 class _StubAnalyticsManager:
@@ -68,7 +74,7 @@ def _add_execution(
     repository.add_execution(execution)
 
 
-def test_build_analytics_snapshot_aggregates_repository_data(tmp_path: Path) -> None:
+def test_build_analytics_snapshot_aggregates_repository_data(tmp_path: "Path") -> None:
     db_path = tmp_path / "analytics.db"
     repo = PromptRepository(str(db_path))
     prompt_a = _make_prompt("Alpha", 10)

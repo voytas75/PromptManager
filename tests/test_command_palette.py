@@ -26,7 +26,11 @@ def _make_prompt(name: str, category: str, tags: list[str]) -> Prompt:
 def test_rank_prompts_prioritises_category_and_tags() -> None:
     prompts = [
         _make_prompt("General Helper", "General", ["misc"]),
-        _make_prompt("Debug Trace Investigator", "Reasoning / Debugging", ["debugging", "incident-response"]),
+        _make_prompt(
+            "Debug Trace Investigator",
+            "Reasoning / Debugging",
+            ["debugging", "incident-response"],
+        ),
         _make_prompt("Refactor Navigator", "Refactoring", ["refactor"]),
     ]
 

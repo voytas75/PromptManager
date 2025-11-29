@@ -117,7 +117,9 @@ def test_prompt_engineer_supports_object_choices(monkeypatch: pytest.MonkeyPatch
     assert result.improved_prompt == "Improved prompt"
 
 
-def test_prompt_engineer_supports_structured_message_content(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_prompt_engineer_supports_structured_message_content(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     payload = {
         "analysis": "analysis",
         "improved_prompt": "Improved structured",

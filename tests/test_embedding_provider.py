@@ -133,7 +133,13 @@ def test_embedding_sync_worker_stops_after_max_attempts() -> None:
 
 
 def test_create_embedding_function_returns_none_for_default() -> None:
-    assert create_embedding_function("deterministic", model=None, api_key=None, api_base=None) is None
+    result = create_embedding_function(
+        "deterministic",
+        model=None,
+        api_key=None,
+        api_base=None,
+    )
+    assert result is None
 
 
 def test_create_embedding_function_rejects_unknown_backend() -> None:
@@ -193,7 +199,9 @@ def test_sentence_transformers_embedding_function_encodes(monkeypatch: pytest.Mo
     assert vectors == [[5.0], [6.0]]
 
 
-def test_litellm_embedding_function_accepts_object_response(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_litellm_embedding_function_accepts_object_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     class _DataEntry:
         def __init__(self) -> None:
             self.embedding = [0.4, 0.5]
