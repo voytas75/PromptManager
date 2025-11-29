@@ -1,6 +1,7 @@
 """Qt widgets for the Enhanced Prompt Workbench experience.
 
 Updates:
+  v0.1.19 - 2025-11-29 - Fix toast calls to pass the parent widget first.
   v0.1.18 - 2025-11-29 - Persist Workbench window geometry between sessions.
   v0.1.17 - 2025-11-29 - Stack the prompt editor above Run Output/History in the center column.
   v0.1.16 - 2025-11-29 - Relocate output/history tabs into the center column and collapse the bottom panel.
@@ -888,7 +889,7 @@ class WorkbenchWindow(QMainWindow):
         wizard = GuidedPromptWizard(self._session, self)
         wizard.updated.connect(self._handle_wizard_update)
         if wizard.exec() == QDialog.Accepted and not initial:
-            show_toast("Wizard applied to prompt.", parent=self)
+            show_toast(self, "Wizard applied to prompt.")
 
     def _handle_wizard_update(self, payload: Mapping[str, Any]) -> None:
         constraints = payload.get("constraints") or []
@@ -914,7 +915,7 @@ class WorkbenchWindow(QMainWindow):
             return
         self._session.link_variable(variable.name, sample_value=variable.sample_value, description=variable.description)
         self._preview.apply_variable_values({variable.name: variable.sample_value or ""})
-        show_toast(f"Variable '{variable.name}' updated.", parent=self)
+        show_toast(self, f"Variable '{variable.name}' updated.")
 
     def _link_variable(self) -> None:
         cursor = self._editor.textCursor()
@@ -934,7 +935,7 @@ class WorkbenchWindow(QMainWindow):
             description=variable.description,
         )
         self._preview.apply_variable_values({stored.name: stored.sample_value or ""})
-        show_toast(f"Variable '{stored.name}' saved.", parent=self)
+        show_toast(self, f"Variable '{stored.name}' saved.")
 
     def _validate_template(self) -> None:
         self._preview.refresh_preview()
@@ -1122,7 +1123,7 @@ class WorkbenchWindow(QMainWindow):
             QMessageBox.critical(self, "Export failed", str(exc))
             return
         self._persist_history(created)
-        show_toast(f"Prompt '{created.name}' saved.", parent=self)
+        show_toast(self, f"Prompt '{created.name}' saved.")
         self._session.clear_history()
         self._update_history()
 
