@@ -1,6 +1,7 @@
 """Qt widgets for the Enhanced Prompt Workbench experience.
 
 Updates:
+  v0.1.3 - 2025-11-29 - Prevent guided wizard palette updates from re-triggering change events.
   v0.1.2 - 2025-11-29 - Keep guided wizard colors in sync with the current theme palette.
   v0.1.1 - 2025-11-29 - Align guided wizard palette with the active application theme.
   v0.1.0 - 2025-11-29 - Introduce guided Workbench window, mode selector, and export dialog.
@@ -366,6 +367,7 @@ class GuidedPromptWizard(QWizard):
     updated = Signal(dict)
 
     def __init__(self, session: WorkbenchSession, parent: QWidget | None = None) -> None:
+        self._palette_updating: bool = False
         super().__init__(parent)
         self._session = session
         self.setWindowTitle("Guided Prompt Wizard")
@@ -393,6 +395,8 @@ class GuidedPromptWizard(QWizard):
 
     def changeEvent(self, event: QEvent) -> None:  # type: ignore[override]
         super().changeEvent(event)
+        if self._palette_updating:
+            return
         if event.type() in {QEvent.PaletteChange, QEvent.ApplicationPaletteChange}:
             palette = self._resolve_theme_palette(self.parentWidget())
             if palette is not None:
@@ -407,17 +411,21 @@ class GuidedPromptWizard(QWizard):
         return None
 
     def _apply_palette(self, palette: QPalette) -> None:
-        text_color = palette.color(QPalette.Text).name()
-        window_color = palette.color(QPalette.Window).name()
-        base_color = palette.color(QPalette.Base).name()
-        alt_base_color = palette.color(QPalette.AlternateBase).name()
-        button_color = palette.color(QPalette.Button).name()
-        button_text = palette.color(QPalette.ButtonText).name()
-        hover_color = palette.color(QPalette.Highlight).name()
-        hover_text = palette.color(QPalette.HighlightedText).name()
-        self.setPalette(palette)
-        self.setAutoFillBackground(True)
-        self.setStyleSheet(
+        if self._palette_updating:
+            return
+        self._palette_updating = True
+        try:
+            text_color = palette.color(QPalette.Text).name()
+            window_color = palette.color(QPalette.Window).name()
+            base_color = palette.color(QPalette.Base).name()
+            alt_base_color = palette.color(QPalette.AlternateBase).name()
+            button_color = palette.color(QPalette.Button).name()
+            button_text = palette.color(QPalette.ButtonText).name()
+            hover_color = palette.color(QPalette.Highlight).name()
+            hover_text = palette.color(QPalette.HighlightedText).name()
+            self.setPalette(palette)
+            self.setAutoFillBackground(True)
+            self.setStyleSheet(
             "QWizard { background-color: %s; color: %s; }"
             "QWizardPage { background-color: %s; color: %s; }"
             "QStackedWidget { background-color: %s; }"
@@ -449,9 +457,11 @@ class GuidedPromptWizard(QWizard):
                 hover_text,
             )
         )
-        for page in (self._goal_page, self._context_page, self._detail_page):
-            page.setPalette(palette)
-            page.setAutoFillBackground(True)
+            for page in (self._goal_page, self._context_page, self._detail_page):
+                page.setPalette(palette)
+                page.setAutoFillBackground(True)
+        finally:
+            self._palette_updating = False
 
     def _emit_update(self) -> None:
         variables: dict[str, WorkbenchVariable] = {}
