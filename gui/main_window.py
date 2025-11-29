@@ -1,93 +1,12 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
-Updates: v0.15.64 - 2025-11-29 - Add prompt template editor dialog with toolbar shortcut and partial settings handling.
-Updates: v0.15.63 - 2025-11-28 - Add analytics dashboard tab with charts and CSV export.
-Updates: v0.15.62 - 2025-11-28 - Share prompts via ShareText and copy the share link to the clipboard.
-Updates: v0.15.61 - 2025-11-28 - Refresh prompt list and re-enable sorting when the search query is cleared via the inline icon.
-Updates: v0.15.60 - 2025-11-28 - Add background task center with progress bars and completion toasts.
-Updates: v0.15.59 - 2025-11-28 - Add Refresh Scenarios action to prompt detail views and wire persistence to LiteLLM.
-Updates: v0.15.58 - 2025-11-28 - Show a busy indicator while running prompt searches.
-Updates: v0.15.57 - 2025-11-27 - Switch back to the Prompts tab after running templates and show a busy indicator while switching.
-Updates: v0.15.56 - 2025-11-27 - Add Template tab run shortcut and toast notifications for copy actions.
-Updates: v0.15.55 - 2025-11-27 - Wire Template tab detail actions to the shared prompt handlers.
-Updates: v0.15.54 - 2025-11-27 - Rename Response Styles tab to Prompt Parts and surface prompt part metadata.
-Updates: v0.15.53 - 2025-11-27 - Persist Template tab splitter layouts and rename the tab to Template.
-Updates: v0.15.52 - 2025-11-27 - Allow resizing between template list and detail panes with a splitter.
-Updates: v0.15.51 - 2025-11-27 - Show modal processing indicator when persisting prompt edits.
-Updates: v0.15.50 - 2025-11-26 - Surface execute-context prompt text in the workspace and keep output mirrored across tabs.
-Updates: v0.15.49 - 2025-11-26 - Swap chat transcript above paste-text input to mirror chat layouts.
-Updates: v0.15.48 - 2025-11-26 - Add execute-as-context dialog with history picker and persistence.
-Updates: v0.15.47 - 2025-11-24 - Add creation date and usage count prompt sorting options.
-Updates: v0.15.46 - 2025-11-24 - Use LiteLLM category suggestions with classifier fallback.
-Updates: v0.15.45 - 2025-11-24 - Inline prompt tags with the header and remove standalone tag label.
-Updates: v0.15.44 - 2025-11-23 - Add rating-based sorting to the prompt list.
-Updates: v0.15.43 - 2025-11-23 - Add prompt body size sorting to the list view.
-Updates: v0.15.42 - 2025-11-23 - Add similar prompt recommendations from the context menu.
-Updates: v0.15.41 - 2025-11-22 - Compact prompt header summary with inline metadata and shorter context preview.
-Updates: v0.15.40 - 2025-11-22 - Remember the last execute-as-context task text between runs.
-Updates: v0.15.39 - 2025-11-22 - Add execute-as-context actions for prompts in the list and editor dialogs.
-Updates: v0.15.38 - 2025-11-22 - Add workspace clear control to reset input, output, and chat panes.
-Updates: v0.15.37 - 2025-11-22 - Add category manager dialog and registry-backed filters.
-Updates: v0.15.36 - 2025-11-22 - Compact prompt detail view with inline italic labels and single version source.
-Updates: v0.15.35 - 2025-11-22 - Align version display with schema metadata in the prompt summary pane.
-Updates: v0.15.34 - 2025-11-22 - Add headings to the prompt summary view and truncate body previews.
-Updates: v0.15.33 - 2025-11-22 - Add structure-only prompt refinement action to the editor dialog.
-Updates: v0.15.32 - 2025-11-22 - Ensure forked prompts edit the stored entry so saves succeed.
-Updates: v0.15.31 - 2025-12-08 - Remove deprecated task template controls; quick actions now seed the workspace exclusively.
-Updates: v0.15.30 - 2025-12-06 - Surface LiteLLM embedding configuration in the settings dialog and runtime state.
-Updates: v0.15.29 - 2025-11-19 - Preserve semantic search ordering when filters update live results.
-Updates: v0.15.28 - 2025-11-19 - Remove the Diff tab and supporting preview logic from the result pane.
-Updates: v0.15.27 - 2025-12-06 - Move Response Styles into dedicated tab with full CRUD preview/export actions.
-Updates: v0.15.26 - 2025-12-06 - Add Notes tab with single-field prompt notes CRUD.
-Updates: v0.15.24 - 2025-12-03 - Apply assistant chat bubble colour from settings in the transcript view.
-Updates: v0.15.23 - 2025-12-02 - Pass theme mode to settings dialog so selection persists.
-Updates: v0.15.22 - 2025-11-05 - Add light/dark theme runtime toggle with palette updates.
-Updates: v0.15.21 - 2025-11-05 - Honour configurable chat bubble colour from settings.
-Updates: v0.15.20 - 2025-11-05 - Highlight user chat messages with tinted transcript rows.
-Updates: v0.15.19 - 2025-11-05 - Run Prompt falls back to Execute Prompt when the workspace is empty.
-Updates: v0.15.18 - 2025-11-05 - Persist LiteLLM routing selections and forward them to runtime configuration.
-Updates: v0.15.17 - 2025-12-01 - Pass LiteLLM streaming flag into settings dialog so checkbox reflects configuration.
-Updates: v0.15.16 - 2025-11-30 - Keep catalogue import controls while CLI command is removed.
-Updates: v0.15.15 - 2025-11-30 - Remove catalogue import controls from the toolbar.
-Updates: v0.15.14 - 2025-11-28 - Add exit toolbar icon and shortcut for graceful shutdown.
-Updates: v0.15.12 - 2025-11-26 - Add LiteLLM streaming toggle with incremental output updates.
-Updates: v0.15.11 - 2025-11-27 - Add prompt duplication to the context menu.
-Updates: v0.15.10 - 2025-11-26 - Add context menu execution action for prompts.
-Updates: v0.15.9 - 2025-11-26 - Add application info dialog accessible from the toolbar.
-Updates: v0.15.8 - 2025-11-26 - Add prompt list context menu with edit/copy/description actions.
-Updates: v0.15.7 - 2025-11-24 - Add copy-to-text-window action for prompt output.
-Updates: v0.15.6 - 2025-11-04 - Prevent spin box arrows from obscuring the quality filter entry on Windows.
-Updates: v0.15.5 - 2025-11-20 - Add prompt sorting controls with alphabetical default ordering.
-Updates: v0.15.4 - 2025-11-19 - Add scenario generation controls and display to prompt workflows.
-Updates: v0.15.3 - 2025-11-18 - Rename the workspace tab from Result to Prompts for clarity.
-Updates: v0.15.2 - 2025-11-18 - Reflect selected quick action in the toolbar button label and refresh the workspace when switching actions.
-Updates: v0.15.1 - 2025-11-04 - Add close affordance and toggle behaviour for prompt metadata panel.
-Updates: v0.15.0 - 2025-11-04 - Keep prompt browser width fixed when resizing the main window.
-Updates: v0.14.9 - 2025-11-17 - Add basic/all metadata buttons to reveal prompt details on demand.
-Updates: v0.14.8 - 2025-11-16 - Add maintenance dialog for batch metadata suggestions.
-Updates: v0.14.7 - 2025-11-16 - Move prompt edit/delete controls into the detail pane.
-Updates: v0.14.6 - 2025-11-16 - Stack workspace vertically so result tabs consume remaining height.
-Updates: v0.14.5 - 2025-11-02 - Persist main window geometry across sessions.
-Updates: v0.14.4 - 2025-11-02 - Enable double-click editing for prompts in the list view.
-Updates: v0.14.3 - 2025-11-02 - Stabilise query workspace layout by fixing editor height and wrapping detection hints.
-Updates: v0.14.2 - 2025-11-02 - Persist splitter sizes so panel layout is restored between sessions.
-Updates: v0.14.1 - 2025-11-02 - Allow action toolbar buttons to wrap on resize for responsive layouts.
-Updates: v0.14.0 - 2025-11-02 - Rework layout to align query editor with output and expand prompt browsing area.
-Updates: v0.13.1 - 2025-11-16 - Add palette-aware border styling to the primary window frame.
-Updates: v0.13.0 - 2025-11-16 - Add rendered markdown preview for prompt execution output.
-Updates: v0.12.0 - 2025-11-15 - Wire prompt engineering refinement into prompt editor dialogs.
-Updates: v0.11.0 - 2025-11-12 - Add multi-turn chat controls and conversation history display.
-Updates: v0.10.0 - 2025-11-11 - Surface notification centre with task status indicator and history dialog.
-Updates: v0.9.0 - 2025-11-10 - Introduce command palette quick actions with keyboard shortcuts.
-Updates: v0.8.0 - 2025-11-10 - Add language detection and syntax highlighting to the query workspace.
-Updates: v0.7.0 - 2025-11-10 - Add diff preview tab alongside generated output for prompt executions.
-Updates: v0.6.0 - 2025-11-09 - Add execution rating workflow and display aggregated prompt scores.
-Updates: v0.5.1 - 2025-11-09 - Wrap prompt details in a scroll area to avoid Wayland resize crashes.
-Updates: v0.5.0 - 2025-11-08 - Add prompt execution workflow with result pane.
-Updates: v0.4.0 - 2025-11-07 - Add intent workspace with detect/suggest/copy actions and usage logging.
-Updates: v0.3.0 - 2025-11-06 - Surface intent-aware search hints and recommendations.
-Updates: v0.2.0 - 2025-11-05 - Add catalogue filters, LiteLLM name generation, and settings UI.
-Updates: v0.1.0 - 2025-11-04 - Provide list/search/detail panes with CRUD controls.
+Updates:
+  v0.15.64 - 2025-11-29 - Added prompt template editor dialog shortcut.
+  v0.15.63 - 2025-11-28 - Added analytics dashboard tab with CSV export.
+  v0.15.62 - 2025-11-28 - Enabled ShareText publishing plus clipboard copy.
+  v0.15.61 - 2025-11-28 - Improved prompt list refresh when clearing search.
+  v0.15.60 - 2025-11-28 - Introduced background task center with toasts.
+  v0.15.59 - 2025-11-28 - Wired Refresh Scenarios action to LiteLLM.
 """
 
 from __future__ import annotations
@@ -97,13 +16,23 @@ import logging
 import uuid
 from collections import deque
 from dataclasses import dataclass
-from collections.abc import Mapping
-from functools import partial
 from datetime import datetime, timezone
 from enum import Enum
+from functools import partial
 from html import escape
 from pathlib import Path
-from typing import Any, Deque, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Deque,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+)
 
 from PySide6.QtCore import (
     QAbstractListModel,
@@ -118,7 +47,6 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import (
     QColor,
-    QCursor,
     QGuiApplication,
     QKeySequence,
     QPalette,
@@ -180,18 +108,16 @@ from core import (
     PromptNotFoundError,
     PromptStorageError,
     PromptVersionError,
-    ShareProviderError,
     RepositoryError,
     ScenarioGenerationError,
+    ShareProviderError,
     diff_prompt_catalog,
     export_prompt_catalog,
     import_prompt_catalog,
 )
 from core.notifications import Notification, NotificationStatus
-from core.prompt_engineering import PromptRefinement
 from core.sharing import ShareProvider, ShareTextProvider, format_prompt_for_share
 from models.category_model import PromptCategory, slugify_category
-from models.prompt_model import Prompt
 
 from .analytics_panel import AnalyticsDashboardPanel
 from .code_highlighter import CodeHighlighter
@@ -212,12 +138,16 @@ from .language_tools import DetectedLanguage, detect_language
 from .notes_panel import NotesPanel
 from .notifications import BackgroundTaskCenterDialog, QtNotificationBridge
 from .processing_indicator import ProcessingIndicator
-from .response_styles_panel import ResponseStylesPanel
 from .prompt_templates_dialog import PromptTemplateEditorDialog
+from .response_styles_panel import ResponseStylesPanel
 from .settings_dialog import SettingsDialog, persist_settings_to_config
 from .template_preview import TemplatePreviewWidget
 from .toast import show_toast
 from .usage_logger import IntentUsageLogger
+
+if TYPE_CHECKING:  # pragma: no cover - typing helpers
+    from core.prompt_engineering import PromptRefinement
+    from models.prompt_model import Prompt
 
 logger = logging.getLogger(__name__)
 
@@ -2385,8 +2315,10 @@ class MainWindow(QMainWindow):
             escaped_content = escape(content).replace("\n", "<br>")
             block = (
                 '<div style="margin-bottom: 12px;">'
-                f'<div style="font-weight: 600; color: #1f2933; margin-bottom: 4px;">{escape(speaker)}:</div>'
-                f'<div style="{bubble_style} white-space: pre-wrap; line-height: 1.45;">{escaped_content}</div>'
+                f'<div style="font-weight: 600; color: #1f2933; '
+                f'margin-bottom: 4px;">{escape(speaker)}:</div>'
+                f'<div style="{bubble_style} white-space: pre-wrap; '
+                f'line-height: 1.45;">{escaped_content}</div>'
                 "</div>"
             )
             blocks.append(block)
@@ -2647,7 +2579,10 @@ class MainWindow(QMainWindow):
             QuickAction(
                 identifier="add-comments",
                 title="Add Comments",
-                description="Jump to documentation prompts that generate docstrings and commentary.",
+                description=(
+                    "Jump to documentation prompts that generate docstrings "
+                    "and commentary."
+                ),
                 category_hint="Documentation",
                 tag_hints=("documentation", "docstrings"),
                 template="Add detailed docstrings and inline comments explaining this code:\n",
