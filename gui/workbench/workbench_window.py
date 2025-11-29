@@ -1,6 +1,7 @@
 """Qt widgets for the Enhanced Prompt Workbench experience.
 
 Updates:
+  v0.1.4 - 2025-11-29 - Apply palette-aware stylesheet for portable wizard colors.
   v0.1.3 - 2025-11-29 - Prevent guided wizard palette updates from re-triggering change events.
   v0.1.2 - 2025-11-29 - Keep guided wizard colors in sync with the current theme palette.
   v0.1.1 - 2025-11-29 - Align guided wizard palette with the active application theme.
@@ -415,48 +416,50 @@ class GuidedPromptWizard(QWizard):
             return
         self._palette_updating = True
         try:
-            text_color = palette.color(QPalette.Text).name()
-            window_color = palette.color(QPalette.Window).name()
-            base_color = palette.color(QPalette.Base).name()
-            alt_base_color = palette.color(QPalette.AlternateBase).name()
-            button_color = palette.color(QPalette.Button).name()
-            button_text = palette.color(QPalette.ButtonText).name()
-            hover_color = palette.color(QPalette.Highlight).name()
-            hover_text = palette.color(QPalette.HighlightedText).name()
             self.setPalette(palette)
             self.setAutoFillBackground(True)
-            self.setStyleSheet(
-            "QWizard { background-color: %s; color: %s; }"
-            "QWizardPage { background-color: %s; color: %s; }"
-            "QStackedWidget { background-color: %s; }"
-            "QLabel { color: %s; }"
-            "QLineEdit, QPlainTextEdit, QComboBox { background-color: %s; color: %s; border: 1px solid %s; }"
-            "QTextEdit { background-color: %s; color: %s; border: 1px solid %s; }"
-            "QPushButton { background-color: %s; color: %s; border: 1px solid %s; border-radius: 4px; padding: 4px 10px; }"
-            "QPushButton:hover { background-color: %s; color: %s; }"
-            "QPushButton:pressed { background-color: %s; color: %s; }"
-            % (
-                window_color,
-                text_color,
-                window_color,
-                text_color,
-                window_color,
-                text_color,
-                base_color,
-                text_color,
-                alt_base_color,
-                base_color,
-                text_color,
-                alt_base_color,
-                button_color,
-                button_text,
-                button_color,
-                hover_color,
-                hover_text,
-                hover_color,
-                hover_text,
-            )
-        )
+            stylesheet = textwrap.dedent(
+                """
+                QWizard {
+                    background-color: palette(window);
+                    color: palette(window-text);
+                }
+                QWizardPage {
+                    background-color: palette(window);
+                    color: palette(window-text);
+                }
+                QStackedWidget { background-color: palette(base); }
+                QLabel { color: palette(window-text); }
+                QLineEdit,
+                QPlainTextEdit,
+                QComboBox {
+                    background-color: palette(base);
+                    color: palette(text);
+                    border: 1px solid palette(mid);
+                }
+                QTextEdit {
+                    background-color: palette(base);
+                    color: palette(text);
+                    border: 1px solid palette(mid);
+                }
+                QPushButton {
+                    background-color: palette(button);
+                    color: palette(button-text);
+                    border: 1px solid palette(mid);
+                    border-radius: 4px;
+                    padding: 4px 10px;
+                }
+                QPushButton:hover {
+                    background-color: palette(midlight);
+                    color: palette(button-text);
+                }
+                QPushButton:pressed {
+                    background-color: palette(dark);
+                    color: palette(button-text);
+                }
+                """
+            ).strip()
+            self.setStyleSheet(stylesheet)
             for page in (self._goal_page, self._context_page, self._detail_page):
                 page.setPalette(palette)
                 page.setAutoFillBackground(True)
