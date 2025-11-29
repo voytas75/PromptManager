@@ -1,6 +1,7 @@
 """Qt widgets for the Enhanced Prompt Workbench experience.
 
 Updates:
+  v0.1.9 - 2025-11-29 - Apply palette colors to wizard button boxes and buttons.
   v0.1.8 - 2025-11-29 - Enforce palette-colored wizard backgrounds via style attributes.
   v0.1.7 - 2025-11-29 - Force wizard/page styled backgrounds so palette colors render on Windows.
   v0.1.6 - 2025-11-29 - Apply palette snapshots to wizard styling for consistent themes.
@@ -476,18 +477,18 @@ class GuidedPromptWizard(QWizard):
                     color: {window_text};
                     border: 1px solid {mid_color};
                 }}
-                QPushButton {{
+                QDialogButtonBox QPushButton {{
                     background-color: {button_color};
                     color: {button_text};
                     border: 1px solid {mid_color};
                     border-radius: 4px;
                     padding: 4px 10px;
                 }}
-                QPushButton:hover {{
+                QDialogButtonBox QPushButton:hover {{
                     background-color: {highlight_color};
                     color: {window_text};
                 }}
-                QPushButton:pressed {{
+                QDialogButtonBox QPushButton:pressed {{
                     background-color: {mid_color};
                     color: {window_text};
                 }}
@@ -509,6 +510,9 @@ class GuidedPromptWizard(QWizard):
                 button_box.setPalette(palette)
                 button_box.setAutoFillBackground(True)
                 button_box.setAttribute(Qt.WA_StyledBackground, True)
+                for button in button_box.findChildren(QPushButton):
+                    button.setPalette(palette)
+                    button.setAutoFillBackground(True)
         finally:
             self._palette_updating = False
 
