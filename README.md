@@ -9,10 +9,14 @@ python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install -r requirements.txt
+
+# Optional editable install for contributors
+pip install -e .
 ```
 
 - Python 3.12 or newer is required (3.13 when available).
 - Dependencies are pinned in `requirements.txt`; no extras are needed for the base app.
+- The app can also be launched as a module after installation: `python -m main`.
 
 ## Quick Start
 

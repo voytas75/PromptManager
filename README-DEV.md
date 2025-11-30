@@ -26,6 +26,9 @@ source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 
+# Install dev extras (ruff, pyright, pytest, nox, etc.)
+pip install -e .[dev]
+
 # Optional developer extras
 pip install ruff black pytest pyright nox
 nox -s all
