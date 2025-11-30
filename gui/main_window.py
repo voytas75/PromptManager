@@ -1,6 +1,7 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.15.74 - 2025-11-30 - Extract execution and chat controller plus delegate workspace actions.
   v0.15.73 - 2025-11-30 - Extract widgets, list model, and layout persistence modules.
   v0.15.72 - 2025-11-30 - Extract result overlay and share workflow helpers into modules.
   v0.15.71 - 2025-11-30 - Add workspace result sharing via overlay action button.
@@ -28,7 +29,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
 from functools import partial
-from html import escape
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -94,7 +94,6 @@ from config import (
 from core import (
     IntentLabel,
     NameGenerationError,
-    PromptExecutionError,
     PromptExecutionUnavailable,
     PromptHistoryError,
     PromptManager,
@@ -115,6 +114,7 @@ from models.category_model import PromptCategory, slugify_category
 from .analytics_panel import AnalyticsDashboardPanel
 from .code_highlighter import CodeHighlighter
 from .command_palette import CommandPaletteDialog, QuickAction, rank_prompts_for_action
+from .controllers.execution_controller import ExecutionController
 from .dialogs import (
     CatalogPreviewDialog,
     CategoryManagerDialog,
@@ -177,7 +177,6 @@ def _match_category_label(
     value: str | None, categories: Sequence[PromptCategory]
 ) -> str | None:
     """Return the canonical category label matching *value* via exact, slug, or fuzzy match."""
-
     text = (value or "").strip()
     if not text:
         return None
@@ -217,7 +216,6 @@ def normalise_chat_palette(palette: Mapping[str, object] | None) -> dict[str, st
     Invalid entries, unsupported roles, and malformed colour values are ignored.
     Hex codes are normalised to lowercase ``#rrggbb`` strings for consistency.
     """
-
     cleaned: dict[str, str] = {}
     if not palette:
         return cleaned
@@ -277,6 +275,7 @@ class MainWindow(QMainWindow):
         settings: PromptManagerSettings | None = None,
         parent=None,
     ) -> None:
+        """Initialise widgets, state, and helper controllers for the GUI."""
         super().__init__(parent)
         self._manager = prompt_manager
         self._settings = settings
@@ -295,10 +294,6 @@ class MainWindow(QMainWindow):
         self._preserve_search_order: bool = False
         self._search_active: bool = False
         self._suggestions: PromptManager.IntentSuggestions | None = None
-        self._last_execution: PromptManager.ExecutionOutcome | None = None
-        self._last_prompt_name: str | None = None
-        self._chat_conversation: list[dict[str, str]] = []
-        self._chat_prompt_id: uuid.UUID | None = None
         self._sort_combo: QComboBox | None = None
         self._sort_order = PromptSortOrder.NAME_ASC
         self._pending_category_slug: str | None = None
@@ -313,11 +308,7 @@ class MainWindow(QMainWindow):
         )
         self._active_quick_action_id: str | None = None
         self._query_seeded_by_quick_action: str | None = None
-        self._streaming_in_progress = False
-        self._streaming_buffer: list[str] = []
-        self._stream_prompt_id: uuid.UUID | None = None
-        self._stream_control_state: dict[str, bool] = {}
-        self._raw_result_text: str = ""
+        self._execution_controller: ExecutionController | None = None
         self._render_markdown_checkbox: QCheckBox | None = None
         self._suppress_query_signal = False
         self._quick_shortcuts: list[QShortcut] = []
@@ -388,6 +379,31 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Prompt Manager")
         self._restore_window_geometry()
         self._build_ui()
+        self._execution_controller = ExecutionController(
+            manager=self._manager,
+            runtime_settings=self._runtime_settings,
+            usage_logger=self._usage_logger,
+            share_controller=self._share_controller,
+            query_input=self._query_input,
+            result_label=self._result_label,
+            result_meta=self._result_meta,
+            result_tabs=self._result_tabs,
+            result_text=self._result_text,
+            chat_history_view=self._chat_history_view,
+            render_markdown_checkbox=self._render_markdown_checkbox,
+            copy_result_button=self._copy_result_button,
+            copy_result_to_text_window_button=self._copy_result_to_text_window_button,
+            save_button=self._save_button,
+            share_result_button=self._share_result_button,
+            continue_chat_button=self._continue_chat_button,
+            end_chat_button=self._end_chat_button,
+            status_callback=self._show_status_message,
+            clear_status_callback=self.statusBar().clearMessage,
+            error_callback=self._show_error,
+            toast_callback=self._show_toast,
+            settings=self._settings,
+        )
+        self._execution_controller.notify_share_providers_changed()
         self._refresh_theme_styles()
         self._apply_theme()
         self._restore_splitter_state()
@@ -399,7 +415,6 @@ class MainWindow(QMainWindow):
 
     def _build_ui(self) -> None:
         """Create the main layout with list/search/detail panes."""
-
         container = QFrame(self)
         container.setObjectName("mainContainer")
         self._main_container = container
@@ -848,73 +863,8 @@ class MainWindow(QMainWindow):
         self._continue_chat_button.setEnabled(False)
         self._end_chat_button.setEnabled(False)
 
-    def _is_markdown_render_enabled(self) -> bool:
-        """Return True when the markdown rendering toggle is active."""
-
-        checkbox = self._render_markdown_checkbox
-        return bool(checkbox is None or checkbox.isChecked())
-
-    def _set_result_text_content(self, text: str) -> None:
-        """Persist the latest raw output text and refresh the view."""
-
-        self._raw_result_text = text or ""
-        self._refresh_result_text_display()
-        self._update_result_share_button_state()
-
-    def _update_result_share_button_state(self) -> None:
-        """Enable or disable the result share action based on availability."""
-
-        button = self._share_result_button
-        if button is None:
-            return
-        if self._streaming_in_progress:
-            button.setEnabled(False)
-            return
-        button.setEnabled(self._can_share_result())
-
-    def _can_share_result(self) -> bool:
-        """Return True when the workspace output can be shared."""
-
-        if not self._share_controller.has_providers():
-            return False
-        return bool((self._raw_result_text or "").strip())
-
-    def _append_result_stream_chunk(self, chunk: str) -> None:
-        """Append streaming output and re-render according to the toggle."""
-
-        if not chunk:
-            return
-        self._raw_result_text += chunk
-        if self._result_text is None:
-            return
-        if self._is_markdown_render_enabled():
-            self._result_text.setMarkdown(self._raw_result_text)
-            cursor = self._result_text.textCursor()
-            cursor.movePosition(QTextCursor.End)
-            self._result_text.setTextCursor(cursor)
-            return
-        cursor = self._result_text.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        cursor.insertText(chunk)
-        self._result_text.setTextCursor(cursor)
-
-    def _refresh_result_text_display(self) -> None:
-        """Rerender the stored output using the active formatting mode."""
-
-        if self._result_text is None:
-            return
-        content = self._raw_result_text
-        if self._is_markdown_render_enabled():
-            self._result_text.setMarkdown(content)
-        else:
-            self._result_text.setPlainText(content)
-        cursor = self._result_text.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        self._result_text.setTextCursor(cursor)
-
     def _restore_window_geometry(self) -> None:
         """Restore window size/position from persistent settings."""
-
         stored = self._layout_settings.value("windowGeometry")
         if isinstance(stored, QByteArray):
             if not self.restoreGeometry(stored):
@@ -941,7 +891,6 @@ class MainWindow(QMainWindow):
 
     def _restore_splitter_state(self) -> None:
         """Restore splitter sizes from persisted settings."""
-
         entries: list[tuple[str, QSplitter | None]] = [
             ("mainSplitter", self._main_splitter),
             ("listSplitter", self._list_splitter),
@@ -973,7 +922,6 @@ class MainWindow(QMainWindow):
 
     def _capture_main_splitter_left_width(self) -> None:
         """Record the current width of the left pane for resize management."""
-
         if self._main_splitter is None:
             return
         sizes = self._main_splitter.sizes()
@@ -983,7 +931,6 @@ class MainWindow(QMainWindow):
 
     def _enforce_main_splitter_left_width(self) -> None:
         """Ensure left pane width stays constant when the window is resized."""
-
         if self._main_splitter is None:
             return
         if self._main_splitter_left_width is None:
@@ -1014,7 +961,6 @@ class MainWindow(QMainWindow):
 
     def _on_main_splitter_moved(self, _position: int, _index: int) -> None:
         """Update stored left pane width when the splitter is dragged."""
-
         if self._suppress_main_splitter_sync or self._main_splitter is None:
             return
         sizes = self._main_splitter.sizes()
@@ -1024,7 +970,6 @@ class MainWindow(QMainWindow):
 
     def _save_splitter_state(self) -> None:
         """Persist splitter sizes for future sessions."""
-
         entries: list[tuple[str, QSplitter | None]] = [
             ("mainSplitter", self._main_splitter),
             ("listSplitter", self._list_splitter),
@@ -1044,13 +989,11 @@ class MainWindow(QMainWindow):
 
     def _save_window_geometry(self) -> None:
         """Persist window size/position to settings."""
-
         geometry = self.saveGeometry()
         self._layout_settings.setValue("windowGeometry", geometry)
 
     def _persist_last_execute_context_task(self, task_text: str) -> None:
         """Persist the most recent execute-context task text."""
-
         if not task_text:
             _store_last_execute_context_task(self._layout_settings, "")
             return
@@ -1058,12 +1001,10 @@ class MainWindow(QMainWindow):
 
     def _persist_execute_context_history(self) -> None:
         """Persist execute-context task history entries."""
-
         _store_execute_context_history(self._layout_settings, tuple(self._execute_context_history))
 
     def _record_execute_context_task(self, task_text: str) -> None:
         """Insert *task_text* into the recent execute-context history."""
-
         if not task_text.strip():
             return
         entries: list[str] = [task_text]
@@ -1078,7 +1019,6 @@ class MainWindow(QMainWindow):
 
     def _persist_filter_preferences(self) -> None:
         """Persist the current category, tag, and quality filters."""
-
         category_value = self._category_filter.currentData()
         tag_value = self._tag_filter.currentData()
         min_quality = self._quality_filter.value()
@@ -1091,25 +1031,21 @@ class MainWindow(QMainWindow):
 
     def _persist_sort_preference(self) -> None:
         """Persist the currently selected sort order."""
-
         _store_sort_preference(self._layout_settings, self._sort_order)
 
     def showEvent(self, event: QShowEvent) -> None:  # type: ignore[override]
         """Ensure splitter state is captured once the window is visible."""
-
         super().showEvent(event)
         self._capture_main_splitter_left_width()
         self._enforce_main_splitter_left_width()
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # type: ignore[override]
         """Keep splitter stable when the window resizes."""
-
         super().resizeEvent(event)
         self._enforce_main_splitter_left_width()
 
     def _load_prompts(self, search_text: str = "") -> None:
         """Populate the list model from the repository or semantic search."""
-
         try:
             result = self._fetch_prompt_load_result(search_text)
         except RepositoryError as exc:
@@ -1119,7 +1055,6 @@ class MainWindow(QMainWindow):
 
     def _load_prompts_with_indicator(self, search_text: str) -> None:
         """Fetch prompts on a worker thread while displaying a busy dialog."""
-
         if self._search_button is not None:
             self._search_button.setEnabled(False)
         try:
@@ -1137,7 +1072,6 @@ class MainWindow(QMainWindow):
 
     def _fetch_prompt_load_result(self, search_text: str) -> _PromptLoadResult:
         """Return prompt data queried from the repository and optional search."""
-
         stripped = search_text.strip()
         all_prompts = list(self._manager.repository.list())
         search_results: list[Prompt] | None = None
@@ -1161,7 +1095,6 @@ class MainWindow(QMainWindow):
 
     def _apply_prompt_load_result(self, result: _PromptLoadResult) -> None:
         """Update UI models based on fetched prompt data."""
-
         self._all_prompts = list(result.all_prompts)
         self._preserve_search_order = result.preserve_search_order
         self._populate_filters(self._all_prompts)
@@ -1199,13 +1132,11 @@ class MainWindow(QMainWindow):
 
     def _populate_filters(self, prompts: Sequence[Prompt]) -> None:
         """Refresh category and tag filters based on available prompts."""
-
         self._populate_category_filter()
         self._populate_tag_filter(prompts)
 
     def _populate_category_filter(self) -> None:
         """Populate the category filter from the registry."""
-
         categories = self._manager.list_categories()
         current_category = self._category_filter.currentData()
         target_category = current_category or self._pending_category_slug
@@ -1222,7 +1153,6 @@ class MainWindow(QMainWindow):
 
     def _populate_tag_filter(self, prompts: Sequence[Prompt]) -> None:
         """Populate the tag filter options."""
-
         tags = sorted({tag for prompt in prompts for tag in prompt.tags})
         current_tag = self._tag_filter.currentData()
         target_tag = current_tag or self._pending_tag_value
@@ -1239,7 +1169,6 @@ class MainWindow(QMainWindow):
 
     def _on_manage_categories_clicked(self) -> None:
         """Open the category management dialog."""
-
         dialog = CategoryManagerDialog(self._manager, self)
         dialog.exec()
         if dialog.has_changes:
@@ -1250,7 +1179,6 @@ class MainWindow(QMainWindow):
     @staticmethod
     def _prompt_category_slug(prompt: Prompt) -> str | None:
         """Return the prompt's category slug, deriving it when missing."""
-
         if prompt.category_slug:
             return prompt.category_slug
         return slugify_category(prompt.category)
@@ -1258,14 +1186,12 @@ class MainWindow(QMainWindow):
     @staticmethod
     def _prompt_body_length(prompt: Prompt) -> int:
         """Return the length of the prompt body used for embedding/search."""
-
         payload = prompt.context or prompt.description or ""
         return len(payload)
 
     @staticmethod
     def _prompt_average_rating(prompt: Prompt) -> float:
         """Return the average rating for a prompt, defaulting to zero."""
-
         if prompt.rating_count and prompt.rating_sum is not None:
             try:
                 return float(prompt.rating_sum) / float(prompt.rating_count)
@@ -1275,7 +1201,6 @@ class MainWindow(QMainWindow):
 
     def _apply_filters(self, prompts: Sequence[Prompt]) -> list[Prompt]:
         """Apply category, tag, and quality filters to a prompt sequence."""
-
         selected_category = self._category_filter.currentData()
         selected_tag = self._tag_filter.currentData()
         min_quality = self._quality_filter.value()
@@ -1297,7 +1222,6 @@ class MainWindow(QMainWindow):
 
     def _sort_prompts(self, prompts: Sequence[Prompt]) -> list[Prompt]:
         """Return prompts sorted according to the active sort order."""
-
         if not prompts:
             return []
 
@@ -1360,13 +1284,11 @@ class MainWindow(QMainWindow):
 
     def _on_filters_changed(self, *_: object) -> None:
         """Refresh the prompt list when filter widgets change."""
-
         self._refresh_filtered_view(preserve_order=self._preserve_search_order)
         self._persist_filter_preferences()
 
     def _on_sort_changed(self, index: int) -> None:
         """Re-sort the prompt list when the sort selection changes."""
-
         if self._sort_combo is None or index < 0:
             return
         raw_order = self._sort_combo.itemData(index)
@@ -1403,7 +1325,6 @@ class MainWindow(QMainWindow):
     @staticmethod
     def _replace_prompt_in_collection(collection: list[Prompt], updated: Prompt) -> bool:
         """Replace a prompt in the provided collection when present."""
-
         for index, existing in enumerate(collection):
             if existing.id == updated.id:
                 collection[index] = updated
@@ -1412,7 +1333,6 @@ class MainWindow(QMainWindow):
 
     def _refresh_prompt_after_rating(self, prompt_id: uuid.UUID) -> None:
         """Refresh prompt collections and UI after capturing a rating."""
-
         try:
             updated_prompt = self._manager.get_prompt(prompt_id)
         except PromptManagerError:
@@ -1449,7 +1369,6 @@ class MainWindow(QMainWindow):
 
     def _handle_refresh_scenarios_request(self, detail_widget: PromptDetailWidget) -> None:
         """Regenerate persisted scenarios for the currently displayed prompt."""
-
         prompt = detail_widget.current_prompt()
         if prompt is None:
             return
@@ -1467,7 +1386,6 @@ class MainWindow(QMainWindow):
 
     def _update_intent_hint(self, prompts: Sequence[Prompt]) -> None:
         """Update the hint label with detected intent context and matches."""
-
         if self._suggestions is None:
             self._intent_hint.clear()
             self._intent_hint.setVisible(False)
@@ -1504,240 +1422,8 @@ class MainWindow(QMainWindow):
         self._intent_hint.setText(message)
         self._intent_hint.setVisible(True)
 
-    def _is_streaming_enabled(self) -> bool:
-        """Return whether streaming responses are enabled in runtime settings."""
-
-        value = self._runtime_settings.get("litellm_stream")
-        if value is None and self._settings is not None:
-            return bool(getattr(self._settings, "litellm_stream", False))
-        return bool(value)
-
-    def _begin_streaming_run(self, prompt: Prompt) -> None:
-        """Prepare UI state for an in-flight streaming execution."""
-
-        self._streaming_in_progress = True
-        self._stream_prompt_id = prompt.id
-        self._streaming_buffer = []
-        self._stream_control_state = {
-            "copy": self._copy_result_button.isEnabled(),
-            "copy_window": self._copy_result_to_text_window_button.isEnabled(),
-            "save": self._save_button.isEnabled(),
-            "share": self._share_result_button.isEnabled(),
-            "continue": self._continue_chat_button.isEnabled(),
-            "end": self._end_chat_button.isEnabled(),
-        }
-        self._result_label.setText(f"Streaming — {prompt.name}")
-        self._result_meta.setText("Receiving response…")
-        self._set_result_text_content("")
-        self._copy_result_button.setEnabled(False)
-        self._copy_result_to_text_window_button.setEnabled(False)
-        self._save_button.setEnabled(False)
-        self._share_result_button.setEnabled(False)
-        self._continue_chat_button.setEnabled(False)
-        self._end_chat_button.setEnabled(False)
-        self.statusBar().showMessage(f"Streaming '{prompt.name}'…", 0)
-
-    def _handle_stream_chunk(self, chunk: str) -> None:
-        """Append a streaming chunk to the output pane as it arrives."""
-
-        if not self._streaming_in_progress or not chunk:
-            return
-        self._append_result_stream_chunk(chunk)
-        self._streaming_buffer.append(chunk)
-        QGuiApplication.processEvents()
-
-    def _end_streaming_run(self) -> None:
-        """Reset streaming state after execution completes or fails."""
-
-        self._streaming_in_progress = False
-        self._stream_prompt_id = None
-        self._streaming_buffer = []
-        if self._stream_control_state:
-            self._copy_result_button.setEnabled(self._stream_control_state.get("copy", False))
-            self._copy_result_to_text_window_button.setEnabled(
-                self._stream_control_state.get("copy_window", False)
-            )
-            self._save_button.setEnabled(self._stream_control_state.get("save", False))
-            self._share_result_button.setEnabled(self._stream_control_state.get("share", False))
-            self._continue_chat_button.setEnabled(self._stream_control_state.get("continue", False))
-            self._end_chat_button.setEnabled(self._stream_control_state.get("end", False))
-        else:
-            has_result = bool(self._last_execution and self._last_execution.result.response_text)
-            self._copy_result_button.setEnabled(has_result)
-            self._copy_result_to_text_window_button.setEnabled(has_result)
-            self._save_button.setEnabled(self._last_execution is not None)
-            self._share_result_button.setEnabled(self._can_share_result())
-            self._continue_chat_button.setEnabled(self._last_execution is not None)
-            self._end_chat_button.setEnabled(bool(self._chat_conversation))
-        self._stream_control_state = {}
-        self.statusBar().clearMessage()
-
-    def _display_execution_result(
-        self,
-        prompt: Prompt,
-        outcome: PromptManager.ExecutionOutcome,
-    ) -> None:
-        """Render the most recent execution result in the result pane."""
-
-        self._last_execution = outcome
-        self._last_prompt_name = prompt.name
-        self._chat_prompt_id = prompt.id
-        self._chat_conversation = [dict(message) for message in outcome.conversation]
-        self._result_label.setText(f"Last Result — {prompt.name}")
-        meta_parts: list[str] = [f"Duration: {outcome.result.duration_ms} ms"]
-        history_entry = outcome.history_entry
-        if history_entry is not None:
-            executed_at = history_entry.executed_at.astimezone()
-            meta_parts.append(f"Logged: {executed_at.strftime('%Y-%m-%d %H:%M:%S %Z')}")
-        self._result_meta.setText(" | ".join(meta_parts))
-        response_text = outcome.result.response_text or ""
-        self._set_result_text_content(response_text)
-        self._result_tabs.setCurrentIndex(0)
-        self._copy_result_button.setEnabled(bool(outcome.result.response_text))
-        self._copy_result_to_text_window_button.setEnabled(bool(outcome.result.response_text))
-        self._save_button.setEnabled(True)
-        self._share_result_button.setEnabled(self._can_share_result())
-        self._continue_chat_button.setEnabled(True)
-        self._end_chat_button.setEnabled(True)
-        self._refresh_chat_history_view()
-        self._query_input.clear()
-        self._query_input.setFocus(Qt.ShortcutFocusReason)
-
-    def _clear_execution_result(self) -> None:
-        """Reset the result pane to its default state."""
-
-        self._last_execution = None
-        self._last_prompt_name = None
-        self._result_label.setText("No prompt executed yet")
-        self._result_meta.clear()
-        self._set_result_text_content("")
-        self._copy_result_button.setEnabled(False)
-        self._copy_result_to_text_window_button.setEnabled(False)
-        self._save_button.setEnabled(False)
-        self._share_result_button.setEnabled(False)
-        self._reset_chat_session()
-
-    def _reset_chat_session(self, *, clear_view: bool = True) -> None:
-        """Disable chat continuation controls and optionally clear the transcript."""
-
-        self._chat_prompt_id = None
-        self._chat_conversation = []
-        self._continue_chat_button.setEnabled(False)
-        self._end_chat_button.setEnabled(False)
-        if clear_view:
-            self._chat_history_view.clear()
-            self._chat_history_view.setPlaceholderText("Run a prompt to start chatting.")
-
-    def _refresh_chat_history_view(self) -> None:
-        """Render the active conversation into the chat tab."""
-
-        if not self._chat_conversation:
-            self._chat_history_view.clear()
-            self._chat_history_view.setPlaceholderText("Run a prompt to start chatting.")
-            return
-        if self._is_markdown_render_enabled():
-            markdown_transcript = self._format_chat_history_markdown(self._chat_conversation)
-            self._chat_history_view.setMarkdown(markdown_transcript or "_No messages yet._")
-            return
-        formatted = self._format_chat_history_html(self._chat_conversation)
-        self._chat_history_view.setHtml(formatted)
-
-    def _format_chat_history_html(self, conversation: Sequence[dict[str, str]]) -> str:
-        """Return a readable transcript for the chat history tab using styled HTML."""
-
-        blocks: list[str] = []
-        user_colour = self._chat_user_colour()
-        user_border = QColor(user_colour).darker(115).name()
-        for message in conversation:
-            role = message.get("role", "").strip().lower()
-            content = message.get("content", "")
-            if role == "user":
-                speaker = "You"
-                bubble_style = (
-                    f"background-color: {user_colour}; border: 1px solid {user_border}; "
-                    "border-radius: 8px; padding: 8px;"
-                )
-            elif role == "assistant":
-                speaker = "Assistant"
-                assistant_colour = self._chat_assistant_colour()
-                assistant_border = QColor(assistant_colour).darker(115).name()
-                bubble_style = (
-                    f"background-color: {assistant_colour}; border: 1px solid {assistant_border}; "
-                    "border-radius: 8px; padding: 8px;"
-                )
-            elif role == "system":
-                speaker = "System"
-                bubble_style = "background-color: #f0f4f8; border-radius: 8px; padding: 8px;"
-            else:
-                speaker = message.get("role", "Message")
-                bubble_style = "background-color: #f6f7fb; border-radius: 8px; padding: 8px;"
-
-            escaped_content = escape(content).replace("\n", "<br>")
-            block = (
-                '<div style="margin-bottom: 12px;">'
-                f'<div style="font-weight: 600; color: #1f2933; '
-                f'margin-bottom: 4px;">{escape(speaker)}:</div>'
-                f'<div style="{bubble_style} white-space: pre-wrap; '
-                f'line-height: 1.45;">{escaped_content}</div>'
-                "</div>"
-            )
-            blocks.append(block)
-        return "<div>" + "".join(blocks) + "</div>"
-
-    def _format_chat_history_markdown(self, conversation: Sequence[dict[str, str]]) -> str:
-        """Return a markdown-formatted transcript for the chat history tab."""
-
-        blocks: list[str] = []
-        for message in conversation:
-            role = message.get("role", "").strip().lower()
-            content = (message.get("content", "") or "").strip()
-            if role == "user":
-                speaker = "You"
-            elif role == "assistant":
-                speaker = "Assistant"
-            elif role == "system":
-                speaker = "System"
-            else:
-                speaker = message.get("role", "Message").strip() or "Message"
-            if not content:
-                content = "_(no content)_"
-            block = f"**{speaker}:**\n\n{content}"
-            blocks.append(block)
-        separator = "\n\n---\n\n"
-        return separator.join(blocks)
-
-    def _chat_user_colour(self) -> str:
-        """Return the configured chat colour, falling back to the default."""
-
-        fallback = DEFAULT_CHAT_USER_BUBBLE_COLOR
-        value = self._runtime_settings.get("chat_user_bubble_color")
-        if isinstance(value, str):
-            candidate = QColor(value)
-            if candidate.isValid():
-                fallback = candidate.name().lower()
-        return self._chat_palette_colour("user", fallback)
-
-    def _chat_assistant_colour(self) -> str:
-        """Return the assistant chat bubble colour from the configured palette."""
-
-        return self._chat_palette_colour("assistant", DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR)
-
-    def _chat_palette_colour(self, role: str, fallback: str) -> str:
-        """Look up ``role`` in the configured palette with sane fallbacks."""
-
-        palette_value = self._runtime_settings.get("chat_colors")
-        if isinstance(palette_value, dict):
-            candidate_value = palette_value.get(role)
-            if isinstance(candidate_value, str):
-                candidate = QColor(candidate_value)
-                if candidate.isValid():
-                    return candidate.name().lower()
-        fallback_colour = QColor(fallback)
-        return fallback_colour.name().lower() if fallback_colour.isValid() else fallback
-
     def _apply_theme(self, mode: str | None = None) -> None:
         """Apply the configured theme palette across the application."""
-
         app = QGuiApplication.instance()
         if app is None:
             return
@@ -1782,7 +1468,6 @@ class MainWindow(QMainWindow):
 
     def _refresh_theme_styles(self) -> None:
         """Update widgets styled using palette-derived colours."""
-
         container = self._main_container
         if container is None:
             return
@@ -1804,7 +1489,6 @@ class MainWindow(QMainWindow):
 
     def _on_query_text_changed(self) -> None:
         """Update language detection and syntax highlighting as the user types."""
-
         text = self._query_input.toPlainText()
         self._update_detected_language(text)
         if self._suppress_query_signal:
@@ -1813,7 +1497,6 @@ class MainWindow(QMainWindow):
 
     def _update_detected_language(self, text: str, *, force: bool = False) -> None:
         """Detect the language for `text` and refresh UI elements when it changes."""
-
         detection = detect_language(text)
         if not force and detection.code == self._detected_language.code:
             return
@@ -1889,7 +1572,6 @@ class MainWindow(QMainWindow):
 
     def _set_active_quick_action(self, action: QuickAction | None) -> None:
         """Update the quick actions button label to mirror the chosen action."""
-
         if action is None:
             self._active_quick_action_id = None
             self._quick_actions_button.setText(self._quick_actions_button_default_text)
@@ -1906,7 +1588,6 @@ class MainWindow(QMainWindow):
 
     def _sync_active_quick_action_button(self) -> None:
         """Ensure the button reflects the stored active quick action identifier."""
-
         if not self._active_quick_action_id:
             self._set_active_quick_action(None)
             return
@@ -1919,7 +1600,6 @@ class MainWindow(QMainWindow):
 
     def _apply_quick_action_template(self, action: QuickAction) -> None:
         """Populate the workspace with the action template when appropriate."""
-
         template = action.template
         if not template:
             return
@@ -2026,21 +1706,18 @@ class MainWindow(QMainWindow):
 
     def _generate_prompt_name(self, context: str) -> str:
         """Delegate name generation to PromptManager, surfacing errors."""
-
         if not context.strip():
             return ""
         return self._manager.generate_prompt_name(context)
 
     def _generate_prompt_description(self, context: str) -> str:
         """Delegate description generation to PromptManager."""
-
         if not context.strip():
             return ""
         return self._manager.generate_prompt_description(context)
 
     def _generate_prompt_scenarios(self, context: str) -> list[str]:
         """Delegate scenario generation to PromptManager."""
-
         text = (context or "").strip()
         if not text:
             return []
@@ -2048,7 +1725,6 @@ class MainWindow(QMainWindow):
 
     def _generate_prompt_category(self, context: str) -> str:
         """Suggest a category using LiteLLM when configured, else fallback heuristics."""
-
         text = (context or "").strip()
         if not text:
             return ""
@@ -2060,7 +1736,6 @@ class MainWindow(QMainWindow):
 
     def _generate_prompt_tags(self, context: str) -> list[str]:
         """Suggest tags using the intent classifier and language heuristics."""
-
         text = (context or "").strip()
         if not text:
             return []
@@ -2121,7 +1796,6 @@ class MainWindow(QMainWindow):
         tags: Sequence[str] | None = None,
     ) -> PromptRefinement:
         """Delegate prompt refinement to PromptManager."""
-
         return self._manager.refine_prompt_text(
             prompt_text,
             name=name,
@@ -2140,7 +1814,6 @@ class MainWindow(QMainWindow):
         tags: Sequence[str] | None = None,
     ) -> PromptRefinement:
         """Delegate structure-only prompt refinement to PromptManager."""
-
         return self._manager.refine_prompt_structure(
             prompt_text,
             name=name,
@@ -2151,7 +1824,6 @@ class MainWindow(QMainWindow):
 
     def _on_detect_intent_clicked(self) -> None:
         """Run intent detection on the free-form query input."""
-
         text = self._query_input.toPlainText().strip()
         if not text:
             self.statusBar().showMessage("Paste some text or code to analyse.", 4000)
@@ -2176,7 +1848,6 @@ class MainWindow(QMainWindow):
 
     def _on_suggest_prompt_clicked(self) -> None:
         """Generate prompt suggestions from the free-form query input."""
-
         query = self._query_input.toPlainText().strip() or self._search_input.text().strip()
         if not query:
             self.statusBar().showMessage("Provide text or use search to fetch suggestions.", 4000)
@@ -2207,8 +1878,12 @@ class MainWindow(QMainWindow):
 
     def _on_save_result_clicked(self) -> None:
         """Persist the latest execution result with optional user notes."""
-
-        if self._last_execution is None:
+        controller = self._execution_controller
+        if controller is None:
+            self._show_error("Workspace unavailable", "Execution controller is not ready.")
+            return
+        outcome = controller.last_execution
+        if outcome is None:
             self.statusBar().showMessage("Run a prompt before saving the result.", 3000)
             return
         prompt = self._current_prompt()
@@ -2217,8 +1892,6 @@ class MainWindow(QMainWindow):
         if prompt is None:
             self.statusBar().showMessage("Select a prompt to associate with the result.", 3000)
             return
-
-        outcome = self._last_execution
         default_summary = outcome.result.response_text[:200] if outcome.result.response_text else ""
         dialog = SaveResultDialog(
             self,
@@ -2269,90 +1942,22 @@ class MainWindow(QMainWindow):
 
     def _on_continue_chat_clicked(self) -> None:
         """Send a follow-up message within the active chat session."""
-
-        if not self._chat_conversation or self._chat_prompt_id is None:
-            self.statusBar().showMessage("Run a prompt to start a chat before continuing.", 4000)
+        controller = self._execution_controller
+        if controller is None:
+            self._show_error("Workspace unavailable", "Execution controller is not ready.")
             return
-
-        follow_up = self._query_input.toPlainText().strip()
-        if not follow_up:
-            self.statusBar().showMessage(
-                "Type a follow-up message before continuing the chat.", 4000
-            )
-            return
-
-        prompt_id = self._chat_prompt_id
-        try:
-            prompt = self._manager.get_prompt(prompt_id)
-        except (PromptNotFoundError, PromptManagerError) as exc:
-            self._show_error("Prompt unavailable", str(exc))
-            self._reset_chat_session()
-            return
-
-        streaming_enabled = self._is_streaming_enabled()
-        callback = self._handle_stream_chunk if streaming_enabled else None
-        if streaming_enabled:
-            self._begin_streaming_run(prompt)
-        try:
-            outcome = self._manager.execute_prompt(
-                prompt.id,
-                follow_up,
-                conversation=self._chat_conversation,
-                stream=streaming_enabled,
-                on_stream=callback,
-            )
-        except PromptExecutionUnavailable as exc:
-            if streaming_enabled:
-                self._end_streaming_run()
-            self._continue_chat_button.setEnabled(False)
-            self._usage_logger.log_execute(
-                prompt_name=prompt.name,
-                success=False,
-                duration_ms=None,
-                error=str(exc),
-            )
-            self._show_error("Prompt execution unavailable", str(exc))
-            return
-        except (PromptExecutionError, PromptManagerError) as exc:
-            if streaming_enabled:
-                self._end_streaming_run()
-            self._usage_logger.log_execute(
-                prompt_name=prompt.name,
-                success=False,
-                duration_ms=None,
-                error=str(exc),
-            )
-            self._show_error("Continue chat failed", str(exc))
-            return
-        finally:
-            if streaming_enabled and self._streaming_in_progress:
-                self._end_streaming_run()
-
-        self._display_execution_result(prompt, outcome)
-        self._usage_logger.log_execute(
-            prompt_name=prompt.name,
-            success=True,
-            duration_ms=outcome.result.duration_ms,
-        )
-        self.statusBar().showMessage(
-            f"Continued chat with '{prompt.name}' in {outcome.result.duration_ms} ms.",
-            5000,
-        )
+        controller.continue_chat()
 
     def _on_end_chat_clicked(self) -> None:
         """Terminate the active chat session without clearing the transcript."""
-
-        if not self._chat_conversation:
-            self.statusBar().showMessage("There is no active chat session to end.", 4000)
+        controller = self._execution_controller
+        if controller is None:
+            self._show_error("Workspace unavailable", "Execution controller is not ready.")
             return
-        self._chat_prompt_id = None
-        self._continue_chat_button.setEnabled(False)
-        self._end_chat_button.setEnabled(False)
-        self.statusBar().showMessage("Chat session ended. Conversation preserved in history.", 5000)
+        controller.end_chat()
 
     def _set_workspace_text(self, text: str, *, focus: bool = False) -> None:
         """Populate the paste-text workspace with *text* and optionally focus the field."""
-
         if self._query_input is None:
             return
         self._query_input.setPlainText(text)
@@ -2362,79 +1967,8 @@ class MainWindow(QMainWindow):
         if focus:
             self._query_input.setFocus(Qt.ShortcutFocusReason)
 
-    def _execute_prompt_with_text(
-        self,
-        prompt: Prompt,
-        request_text: str,
-        *,
-        status_prefix: str,
-        empty_text_message: str,
-        keep_text_after: bool,
-    ) -> None:
-        """Execute a prompt with the supplied request payload and handle outcomes."""
-
-        trimmed = request_text.strip()
-        if not trimmed:
-            self.statusBar().showMessage(empty_text_message, 4000)
-            return
-
-        streaming_enabled = self._is_streaming_enabled()
-        callback = self._handle_stream_chunk if streaming_enabled else None
-        if streaming_enabled:
-            self._begin_streaming_run(prompt)
-        try:
-            outcome = self._manager.execute_prompt(
-                prompt.id,
-                trimmed,
-                stream=streaming_enabled,
-                on_stream=callback,
-            )
-        except PromptExecutionUnavailable as exc:
-            if streaming_enabled:
-                self._end_streaming_run()
-            self._run_button.setEnabled(False)
-            if self._template_preview is not None:
-                self._template_preview.set_run_enabled(False)
-            self._usage_logger.log_execute(
-                prompt_name=prompt.name,
-                success=False,
-                duration_ms=None,
-                error=str(exc),
-            )
-            self._show_error("Prompt execution unavailable", str(exc))
-            return
-        except (PromptExecutionError, PromptManagerError) as exc:
-            if streaming_enabled:
-                self._end_streaming_run()
-            self._usage_logger.log_execute(
-                prompt_name=prompt.name,
-                success=False,
-                duration_ms=None,
-                error=str(exc),
-            )
-            self._show_error("Prompt execution failed", str(exc))
-            return
-        finally:
-            if streaming_enabled and self._streaming_in_progress:
-                self._end_streaming_run()
-
-        self._display_execution_result(prompt, outcome)
-        if keep_text_after:
-            self._set_workspace_text(request_text, focus=True)
-
-        self._usage_logger.log_execute(
-            prompt_name=prompt.name,
-            success=True,
-            duration_ms=outcome.result.duration_ms,
-        )
-        self.statusBar().showMessage(
-            f"{status_prefix} '{prompt.name}' in {outcome.result.duration_ms} ms.",
-            5000,
-        )
-
     def _on_run_prompt_clicked(self) -> None:
         """Execute the selected prompt, seeding from the workspace or the prompt body."""
-
         prompt = self._current_prompt()
         if prompt is None:
             prompts = self._model.prompts()
@@ -2446,7 +1980,11 @@ class MainWindow(QMainWindow):
         if not request_text.strip():
             self._execute_prompt_from_context_menu(prompt)
             return
-        self._execute_prompt_with_text(
+        controller = self._execution_controller
+        if controller is None:
+            self._show_error("Workspace unavailable", "Execution controller is not ready.")
+            return
+        controller.execute_prompt_with_text(
             prompt,
             request_text,
             status_prefix="Executed",
@@ -2456,12 +1994,12 @@ class MainWindow(QMainWindow):
 
     def _on_clear_workspace_clicked(self) -> None:
         """Clear the workspace editor, output tab, and chat transcript."""
-
-        if self._streaming_in_progress:
-            self._end_streaming_run()
+        controller = self._execution_controller
+        if controller is not None:
+            controller.abort_streaming()
+            controller.clear_execution_result()
 
         self._query_input.clear()
-        self._clear_execution_result()
         self._result_tabs.setCurrentIndex(0)
         self._intent_hint.clear()
         self._intent_hint.setVisible(False)
@@ -2469,17 +2007,14 @@ class MainWindow(QMainWindow):
 
     def _handle_note_update(self, execution_id: uuid.UUID, note: str) -> None:
         """Record analytics when execution notes are edited."""
-
         self._usage_logger.log_note_edit(note_length=len(note))
 
     def _handle_history_export(self, entries: int, path: str) -> None:
         """Record analytics when history is exported."""
-
         self._usage_logger.log_history_export(entries=entries, path=path)
 
     def _on_copy_prompt_clicked(self) -> None:
         """Copy the currently selected prompt body to the clipboard."""
-
         prompt = self._current_prompt()
         if prompt is None:
             prompts = self._model.prompts()
@@ -2491,7 +2026,6 @@ class MainWindow(QMainWindow):
 
     def _copy_prompt_to_clipboard(self, prompt: Prompt) -> None:
         """Copy a prompt's primary text to the clipboard with status feedback."""
-
         payload = prompt.context or prompt.description
         if not payload:
             self.statusBar().showMessage("Selected prompt does not include a body to copy.", 3000)
@@ -2503,13 +2037,12 @@ class MainWindow(QMainWindow):
 
     def _register_share_provider(self, provider: ShareProvider) -> None:
         """Store a share provider so it can be shown in the share menu."""
-
         self._share_controller.register_provider(provider)
-        self._update_result_share_button_state()
+        if self._execution_controller is not None:
+            self._execution_controller.notify_share_providers_changed()
 
     def _on_share_prompt_requested(self) -> None:
         """Display provider choices and initiate the share workflow."""
-
         prompt = self._detail_widget.current_prompt()
         if prompt is None:
             self.statusBar().showMessage("Select a prompt to share first.", 4000)
@@ -2521,19 +2054,17 @@ class MainWindow(QMainWindow):
 
     def _on_share_result_clicked(self) -> None:
         """Display provider choices for sharing the latest output text."""
-
-        payload = self._raw_result_text or ""
-        if not payload.strip():
-            self.statusBar().showMessage("Run a prompt to produce output before sharing.", 4000)
+        controller = self._execution_controller
+        if controller is None:
+            self._show_error("Workspace unavailable", "Execution controller is not ready.")
             return
         provider_name = self._share_controller.choose_provider(self._share_result_button)
         if not provider_name:
             return
-        self._share_result_text(provider_name, payload)
+        controller.share_result_text(provider_name)
 
     def _share_prompt(self, provider_name: str, prompt: Prompt) -> None:
         """Share *prompt* using the requested provider and copy the share link."""
-
         payload = self._build_share_payload(prompt)
         if payload is None:
             return
@@ -2548,7 +2079,6 @@ class MainWindow(QMainWindow):
 
     def _build_share_payload(self, prompt: Prompt) -> str | None:
         """Return the formatted share payload for the selected mode."""
-
         mode = self._detail_widget.share_payload_mode()
         include_description = mode in {"body_description", "body_description_scenarios"}
         include_scenarios = mode == "body_description_scenarios"
@@ -2566,22 +2096,8 @@ class MainWindow(QMainWindow):
             return None
         return payload
 
-    def _share_result_text(self, provider_name: str, payload: str) -> None:
-        """Share the latest workspace response using the requested provider."""
-
-        prompt_label = self._last_prompt_name or "Workspace Result"
-        self._share_controller.share_payload(
-            provider_name,
-            payload,
-            prompt=None,
-            prompt_name=prompt_label,
-            indicator_title="Sharing Result",
-            error_title="Unable to share result",
-        )
-
     def _show_prompt_description(self, prompt: Prompt) -> None:
         """Display the prompt description in a dialog for quick reference."""
-
         description = (prompt.description or "").strip()
         if not description:
             QMessageBox.information(
@@ -2598,7 +2114,6 @@ class MainWindow(QMainWindow):
 
     def _show_similar_prompts(self, prompt: Prompt) -> None:
         """Populate the prompt list with embedding-based recommendations."""
-
         embedding_vector: list[float] | None
         if prompt.ext4 is not None:
             try:
@@ -2648,44 +2163,27 @@ class MainWindow(QMainWindow):
 
     def _on_render_markdown_toggled(self, _state: int) -> None:
         """Refresh result and chat panes when the markdown toggle changes."""
-
-        self._refresh_result_text_display()
-        self._refresh_chat_history_view()
+        if self._execution_controller is not None:
+            self._execution_controller.refresh_rendering()
 
     def _on_copy_result_clicked(self) -> None:
         """Copy the latest execution result to the clipboard."""
-
-        if self._last_execution is None:
-            self.statusBar().showMessage("Run a prompt to generate a result first.", 3000)
+        controller = self._execution_controller
+        if controller is None:
+            self._show_error("Workspace unavailable", "Execution controller is not ready.")
             return
-        response = self._last_execution.result.response_text
-        if not response:
-            self.statusBar().showMessage("Latest result is empty; nothing to copy.", 3000)
-            return
-        clipboard = QGuiApplication.clipboard()
-        clipboard.setText(response)
-        self._show_toast("Prompt result copied to the clipboard.")
+        controller.copy_result_to_clipboard()
 
     def _on_copy_result_to_text_window_clicked(self) -> None:
         """Populate the workspace text window with the latest execution result."""
-
-        if self._last_execution is None:
-            self.statusBar().showMessage("Run a prompt to generate a result first.", 3000)
+        controller = self._execution_controller
+        if controller is None:
+            self._show_error("Workspace unavailable", "Execution controller is not ready.")
             return
-        response = self._last_execution.result.response_text
-        if not response:
-            self.statusBar().showMessage("Latest result is empty; nothing to copy.", 3000)
-            return
-        self._query_input.setPlainText(response)
-        cursor = self._query_input.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        self._query_input.setTextCursor(cursor)
-        self._query_input.setFocus(Qt.ShortcutFocusReason)
-        self._show_toast("Prompt result copied to the text window.")
+        controller.copy_result_to_workspace()
 
     def _apply_suggestions(self, suggestions: PromptManager.IntentSuggestions) -> None:
         """Apply intent suggestions to the list view and update filters."""
-
         self._suggestions = suggestions
         self._current_prompts = list(suggestions.prompts)
         filtered = self._apply_filters(self._current_prompts)
@@ -2700,7 +2198,6 @@ class MainWindow(QMainWindow):
 
     def _current_prompt(self) -> Prompt | None:
         """Return the prompt currently selected in the list."""
-
         index = self._list_view.currentIndex()
         if not index.isValid():
             return None
@@ -2708,7 +2205,6 @@ class MainWindow(QMainWindow):
 
     def _on_search_changed(self, text: str) -> None:
         """Refresh list + sorting when the inline clear action removes the query."""
-
         if text.strip():
             return
 
@@ -2722,13 +2218,11 @@ class MainWindow(QMainWindow):
 
     def _on_search_button_clicked(self) -> None:
         """Run the prompt search explicitly via the Search button."""
-
         text = self._search_input.text() if self._search_input is not None else ""
         self._handle_search_request(text, use_indicator=True)
 
     def _handle_search_request(self, text: str, *, use_indicator: bool) -> None:
         """Normalize search input handling and trigger prompt loads."""
-
         stripped = text.strip()
         self._search_active = bool(stripped)
 
@@ -2747,7 +2241,6 @@ class MainWindow(QMainWindow):
 
     def _on_prompt_double_clicked(self, index: QModelIndex) -> None:
         """Open the edit dialog when a prompt is double-clicked."""
-
         if not index.isValid():
             return
         self._list_view.setCurrentIndex(index)
@@ -2755,7 +2248,6 @@ class MainWindow(QMainWindow):
 
     def _on_prompt_context_menu(self, point: QPoint) -> None:
         """Show a context menu with prompt-specific actions."""
-
         index = self._list_view.indexAt(point)
         prompt: Prompt | None = None
         if index.isValid():
@@ -2817,7 +2309,6 @@ class MainWindow(QMainWindow):
 
     def _execute_prompt_from_context_menu(self, prompt: Prompt) -> None:
         """Populate the workspace with the prompt body and execute immediately."""
-
         raw_payload = prompt.context or prompt.description or ""
         if not raw_payload.strip():
             self.statusBar().showMessage(
@@ -2830,7 +2321,11 @@ class MainWindow(QMainWindow):
         cursor.movePosition(QTextCursor.End)
         self._query_input.setTextCursor(cursor)
         self._query_input.setFocus(Qt.ShortcutFocusReason)
-        self._execute_prompt_with_text(
+        controller = self._execution_controller
+        if controller is None:
+            self._show_error("Workspace unavailable", "Execution controller is not ready.")
+            return
+        controller.execute_prompt_with_text(
             prompt,
             raw_payload,
             status_prefix="Executed",
@@ -2846,7 +2341,6 @@ class MainWindow(QMainWindow):
         context_override: str | None = None,
     ) -> None:
         """Ask for a task and run the prompt using its body as contextual input."""
-
         context_text = context_override if context_override is not None else prompt.context or ""
         cleaned_context = context_text.strip()
         if not cleaned_context:
@@ -2879,8 +2373,12 @@ class MainWindow(QMainWindow):
             f"Task:\n{cleaned_task}\n\n"
             f"Context:\n{cleaned_context}"
         )
+        controller = self._execution_controller
+        if controller is None:
+            self._show_error("Workspace unavailable", "Execution controller is not ready.")
+            return
         try:
-            self._execute_prompt_with_text(
+            controller.execute_prompt_with_text(
                 prompt,
                 request_payload,
                 status_prefix="Executed context",
@@ -2896,7 +2394,6 @@ class MainWindow(QMainWindow):
         variables: dict[str, str],
     ) -> None:
         """Execute the selected prompt using the rendered template preview text."""
-
         prompt = self._current_prompt()
         if prompt is None:
             self._show_status_message("Select a prompt before running from the preview.", 4000)
@@ -2913,7 +2410,11 @@ class MainWindow(QMainWindow):
         if self._tab_widget.currentIndex() != 0:
             self._show_template_transition_indicator()
             self._tab_widget.setCurrentIndex(0)
-        self._execute_prompt_with_text(
+        controller = self._execution_controller
+        if controller is None:
+            self._show_error("Workspace unavailable", "Execution controller is not ready.")
+            return
+        controller.execute_prompt_with_text(
             prompt,
             payload,
             status_prefix="Executed preview",
@@ -2923,7 +2424,6 @@ class MainWindow(QMainWindow):
 
     def _duplicate_prompt(self, prompt: Prompt) -> None:
         """Open a creation dialog with the selected prompt pre-filled and persist the copy."""
-
         dialog = PromptDialog(
             self,
             name_generator=self._generate_prompt_name,
@@ -2960,7 +2460,6 @@ class MainWindow(QMainWindow):
 
     def _fork_prompt(self, prompt: Prompt) -> None:
         """Fork the selected prompt and allow optional edits before saving."""
-
         try:
             forked = self._manager.fork_prompt(prompt.id)
         except PromptManagerError as exc:
@@ -3000,12 +2499,10 @@ class MainWindow(QMainWindow):
 
     def _on_refresh_clicked(self) -> None:
         """Reload catalogue data, respecting the current search text."""
-
         self._load_prompts(self._search_input.text())
 
     def _on_add_clicked(self) -> None:
         """Open the creation dialog and persist a new prompt."""
-
         dialog = PromptDialog(
             self,
             category_provider=self._manager.list_categories,
@@ -3040,7 +2537,6 @@ class MainWindow(QMainWindow):
 
     def _on_workbench_clicked(self) -> None:
         """Launch the Enhanced Prompt Workbench with the desired starting mode."""
-
         try:
             templates = self._manager.repository.list(limit=200)
         except RepositoryError as exc:
@@ -3065,7 +2561,6 @@ class MainWindow(QMainWindow):
 
     def _remove_workbench_window(self, window: WorkbenchWindow) -> None:
         """Remove closed workbench windows from the tracking list."""
-
         try:
             self._workbench_windows.remove(window)
         except ValueError:
@@ -3073,7 +2568,6 @@ class MainWindow(QMainWindow):
 
     def _on_edit_clicked(self) -> None:
         """Open the edit dialog for the selected prompt and persist changes."""
-
         prompt = self._current_prompt()
         if prompt is None:
             return
@@ -3127,7 +2621,6 @@ class MainWindow(QMainWindow):
 
     def _on_fork_clicked(self) -> None:
         """Handle toolbar fork button taps."""
-
         prompt = self._current_prompt()
         if prompt is None:
             return
@@ -3135,7 +2628,6 @@ class MainWindow(QMainWindow):
 
     def _on_delete_clicked(self) -> None:
         """Remove the selected prompt after confirmation."""
-
         prompt = self._current_prompt()
         if prompt is None:
             return
@@ -3143,7 +2635,6 @@ class MainWindow(QMainWindow):
 
     def _open_version_history_dialog(self, prompt: Prompt | None = None) -> None:
         """Open the version history dialog for the requested or selected prompt."""
-
         if prompt is None:
             prompt = self._current_prompt()
         if prompt is None:
@@ -3164,7 +2655,6 @@ class MainWindow(QMainWindow):
 
     def _on_prompt_applied(self, prompt: Prompt, dialog: PromptDialog) -> None:
         """Persist prompt edits triggered via the Apply button."""
-
         try:
             stored = ProcessingIndicator(dialog, "Saving prompt changes…").run(
                 self._manager.update_prompt,
@@ -3189,7 +2679,6 @@ class MainWindow(QMainWindow):
 
     def _connect_prompt_dialog_signals(self, dialog: PromptDialog) -> None:
         """Wire shared signal handlers for prompt dialogs."""
-
         dialog.execute_context_requested.connect(  # type: ignore[arg-type]
             lambda prompt, context_text, dlg=dialog: self._execute_prompt_as_context(
                 prompt,
@@ -3200,7 +2689,6 @@ class MainWindow(QMainWindow):
 
     def _delete_prompt(self, prompt: Prompt, *, skip_confirmation: bool = False) -> None:
         """Delete the provided prompt and refresh listings."""
-
         if not skip_confirmation:
             confirmation = QMessageBox.question(
                 self,
@@ -3223,7 +2711,6 @@ class MainWindow(QMainWindow):
 
     def _on_import_clicked(self) -> None:
         """Preview catalogue diff and optionally apply updates."""
-
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Select catalogue file",
@@ -3269,7 +2756,6 @@ class MainWindow(QMainWindow):
 
     def _on_export_clicked(self) -> None:
         """Export current prompts to JSON or YAML."""
-
         default_path = str(Path.home() / "prompt_catalog.json")
         file_path, selected_filter = QFileDialog.getSaveFileName(
             self,
@@ -3294,7 +2780,6 @@ class MainWindow(QMainWindow):
 
     def _on_maintenance_clicked(self) -> None:
         """Open the maintenance dialog for batch metadata helpers."""
-
         dialog = PromptMaintenanceDialog(
             self,
             self._manager,
@@ -3306,7 +2791,6 @@ class MainWindow(QMainWindow):
 
     def _on_maintenance_applied(self, message: str) -> None:
         """Refresh listings after maintenance tasks run."""
-
         selected = self._current_prompt()
         selected_id = selected.id if selected else None
         self._load_prompts(self._search_input.text())
@@ -3317,13 +2801,11 @@ class MainWindow(QMainWindow):
 
     def _on_info_clicked(self) -> None:
         """Display application metadata and system characteristics."""
-
         dialog = InfoDialog(self)
         dialog.exec()
 
     def _on_settings_clicked(self) -> None:
         """Open configuration dialog and apply updates."""
-
         dialog = SettingsDialog(
             self,
             litellm_model=self._runtime_settings.get("litellm_model"),
@@ -3349,7 +2831,6 @@ class MainWindow(QMainWindow):
 
     def _on_prompt_templates_clicked(self) -> None:
         """Open the lightweight prompt template editor dialog."""
-
         dialog = PromptTemplateEditorDialog(
             self,
             templates=self._runtime_settings.get("prompt_templates"),
@@ -3368,14 +2849,12 @@ class MainWindow(QMainWindow):
 
     def _on_exit_clicked(self) -> None:
         """Close the application via the toolbar exit control."""
-
         logger.info("Exit control activated; closing Prompt Manager.")
         self.statusBar().showMessage("Closing Prompt Manager…", 2000)
         self.close()
 
     def _apply_settings(self, updates: dict[str, object | None]) -> None:
         """Persist settings, refresh catalogue, and update name generator."""
-
         if not updates:
             return
 
@@ -3562,7 +3041,8 @@ class MainWindow(QMainWindow):
         self._register_quick_shortcuts()
         self._sync_active_quick_action_button()
         self._apply_theme(theme_choice)
-        self._refresh_chat_history_view()
+        if self._execution_controller is not None:
+            self._execution_controller.refresh_chat_history_view()
 
         try:
             self._manager.set_name_generator(
@@ -3590,7 +3070,6 @@ class MainWindow(QMainWindow):
         self, settings: PromptManagerSettings | None
     ) -> dict[str, object | None]:
         """Load current settings snapshot from configuration."""
-
         derived_quick_actions: list[dict[str, object]] | None
         if settings and settings.quick_actions:
             derived_quick_actions = [dict(entry) for entry in settings.quick_actions]
@@ -3719,17 +3198,17 @@ class MainWindow(QMainWindow):
 
     def _on_selection_changed(self, *_: object) -> None:
         """Update the detail panel to reflect the new selection."""
-
         prompt = self._current_prompt()
         if prompt is None:
             self._detail_widget.clear()
-            self._reset_chat_session()
+            if self._execution_controller is not None:
+                self._execution_controller.handle_prompt_selection_change(None)
             self._update_template_preview(None)
             if self._template_detail_widget is not None:
                 self._template_detail_widget.clear()
             return
-        if self._chat_prompt_id and prompt.id != self._chat_prompt_id:
-            self._reset_chat_session()
+        if self._execution_controller is not None:
+            self._execution_controller.handle_prompt_selection_change(prompt.id)
         self._detail_widget.display_prompt(prompt)
         if self._template_detail_widget is not None:
             self._template_detail_widget.display_prompt(prompt)
@@ -3738,7 +3217,6 @@ class MainWindow(QMainWindow):
 
     def _select_prompt(self, prompt_id: uuid.UUID) -> None:
         """Highlight the given prompt in the list view when present."""
-
         for row, prompt in enumerate(self._model.prompts()):
             if prompt.id == prompt_id:
                 index = self._model.index(row, 0)
@@ -3747,7 +3225,6 @@ class MainWindow(QMainWindow):
 
     def _update_prompt_lineage_summary(self, prompt: Prompt) -> None:
         """Fetch version/fork metadata for the detail pane."""
-
         summary_parts: list[str] = []
         try:
             parent_link = self._manager.get_prompt_parent_fork(prompt.id)
@@ -3775,7 +3252,6 @@ class MainWindow(QMainWindow):
 
     def _update_template_preview(self, prompt: Prompt | None) -> None:
         """Refresh the workspace template preview widget for the selected prompt."""
-
         if self._template_preview is None:
             return
         if prompt is None:
@@ -3786,13 +3262,11 @@ class MainWindow(QMainWindow):
 
     def _on_template_run_state_changed(self, can_run: bool) -> None:
         """Synchronise the Template tab shortcut button with preview availability."""
-
         if self._template_run_shortcut_button is not None:
             self._template_run_shortcut_button.setEnabled(can_run)
 
     def _on_template_tab_run_clicked(self) -> None:
         """Invoke the template preview execution shortcut."""
-
         if self._template_preview is None:
             return
         if not self._template_preview.request_run():
@@ -3800,7 +3274,6 @@ class MainWindow(QMainWindow):
 
     def _show_template_transition_indicator(self) -> None:
         """Display a busy dialog while switching from Template to Prompts."""
-
         if self._template_transition_indicator is not None:
             return
         indicator = ProcessingIndicator(self, "Opening Prompts tab…", title="Switching Tabs")
@@ -3809,7 +3282,6 @@ class MainWindow(QMainWindow):
 
     def _hide_template_transition_indicator(self) -> None:
         """Dismiss the template transition indicator if it is visible."""
-
         indicator = self._template_transition_indicator
         if indicator is None:
             return
@@ -3818,7 +3290,6 @@ class MainWindow(QMainWindow):
 
     def _handle_notification(self, notification: Notification) -> None:
         """React to notification updates published by the core manager."""
-
         self._register_notification(notification, show_status=True)
 
     def _register_notification(self, notification: Notification, *, show_status: bool) -> None:
@@ -3875,6 +3346,7 @@ class MainWindow(QMainWindow):
         return self._task_center_dialog
 
     def closeEvent(self, event) -> None:  # type: ignore[override]
+        """Persist layout before closing and dispose transient dialogs."""
         self._save_window_geometry()
         self._save_splitter_state()
         if hasattr(self, "_notification_bridge"):
@@ -3887,7 +3359,6 @@ class MainWindow(QMainWindow):
     @staticmethod
     def _truncate_text(value: str, limit: int = 160) -> str:
         """Return the provided text truncated with an ellipsis if needed."""
-
         text = value.strip()
         if len(text) <= limit:
             return text
@@ -3896,23 +3367,19 @@ class MainWindow(QMainWindow):
     @staticmethod
     def _format_timestamp(value: datetime) -> str:
         """Return a compact UTC timestamp for lineage summaries."""
-
         return value.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC")
 
     def _show_error(self, title: str, message: str) -> None:
         """Display an error dialog and log to status bar."""
-
         QMessageBox.critical(self, title, message)
         self.statusBar().showMessage(message, 5000)
 
     def _show_status_message(self, message: str, duration_ms: int = 3000) -> None:
         """Show a transient status bar message."""
-
         self.statusBar().showMessage(message, duration_ms)
 
     def _show_toast(self, message: str, duration_ms: int = 2500) -> None:
         """Display a toast anchored to the main window."""
-
         show_toast(self, message, duration_ms)
 
 
