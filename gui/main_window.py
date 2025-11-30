@@ -1073,6 +1073,7 @@ class MainWindow(QMainWindow):
         self._template_run_shortcut_button: QPushButton | None = None
         self._template_transition_indicator: ProcessingIndicator | None = None
         self._share_providers: dict[str, ShareProvider] = {}
+        self._share_result_button: QPushButton | None = None
         self._workbench_windows: list[WorkbenchWindow] = []
         self._register_share_provider(ShareTextProvider())
         self._layout_settings = QSettings("PromptManager", "MainWindow")
