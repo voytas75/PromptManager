@@ -19,7 +19,7 @@ classifiers = [
     "Topic :: Text Processing :: Linguistic",
 ]
 dependencies = [
-    "chromadb==1.3.5",
+    "chromadb>=1.3.5",
     "numpy>=2.0.0,<3",
     "Jinja2==3.1.6",
     "jsonschema==4.25.1",
@@ -63,11 +63,21 @@ exclude = ["data/"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
-extend-select = ["TC", "TCH"]
+extend-select = ["TC", "TCH", "D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.lint.isort]
 known-first-party = ["core", "config", "models", "gui", "tests"]
 combine-as-imports = true
+
+[tool.ruff.format]
+line-length = 100
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+docstring-code-format = false
 
 [tool.pytest.ini_options]
 # Keep only general options here, e.g.,
