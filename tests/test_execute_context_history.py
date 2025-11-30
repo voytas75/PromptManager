@@ -1,22 +1,22 @@
 """Tests for settings/persistence helpers.
 
-Updates: v0.3.0 - 2025-11-26 - Cover filter preference helpers for category/tag/sort persistence.
-Updates: v0.2.0 - 2025-11-26 - Cover history load/store helpers and trimming logic.
-Updates: v0.1.0 - 2025-11-22 - Cover helper functions that load/store the last task text.
+Updates:
+  v0.3.1 - 2025-11-30 - Point helpers to layout_state module exports.
+  v0.3.0 - 2025-11-26 - Cover filter preference helpers for category/tag/sort persistence.
+  v0.2.0 - 2025-11-26 - Cover history load/store helpers and trimming logic.
+  v0.1.0 - 2025-11-22 - Cover helper functions that load/store the last task text.
 """
-
 from __future__ import annotations
 
 import json
 
-from gui.main_window import (
+from gui.layout_state import (
     _EXECUTE_CONTEXT_HISTORY_KEY,
     _EXECUTE_CONTEXT_TASK_KEY,
     _FILTER_CATEGORY_KEY,
     _FILTER_QUALITY_KEY,
     _FILTER_SORT_KEY,
     _FILTER_TAG_KEY,
-    PromptSortOrder,
     _load_execute_context_history,
     _load_filter_preferences,
     _load_last_execute_context_task,
@@ -25,6 +25,7 @@ from gui.main_window import (
     _store_last_execute_context_task,
     _store_sort_preference,
 )
+from gui.main_window import PromptSortOrder
 
 
 class _FakeSettings:
@@ -43,6 +44,7 @@ class _FakeSettings:
 
 
 def test_load_last_execute_context_task_returns_trimmed_value() -> None:
+    """Trim whitespace when loading the last recorded execute-context task."""
     settings = _FakeSettings()
     settings.values[_EXECUTE_CONTEXT_TASK_KEY] = "  Summarise logs  "
 
@@ -50,6 +52,7 @@ def test_load_last_execute_context_task_returns_trimmed_value() -> None:
 
 
 def test_store_last_execute_context_task_persists_text_and_syncs() -> None:
+    """Persist last task text and sync the settings store."""
     settings = _FakeSettings()
 
     _store_last_execute_context_task(settings, "Investigate timeouts")
@@ -59,6 +62,7 @@ def test_store_last_execute_context_task_persists_text_and_syncs() -> None:
 
 
 def test_load_execute_context_history_preserves_whitespace() -> None:
+    """Keep intentional whitespace and drop illegal entries when loading history."""
     settings = _FakeSettings()
     settings.values[_EXECUTE_CONTEXT_HISTORY_KEY] = json.dumps(
         ["  Summarise logs  ", "Summarise logs", "Investigate outages", " "]
@@ -70,6 +74,7 @@ def test_load_execute_context_history_preserves_whitespace() -> None:
 
 
 def test_load_execute_context_history_handles_invalid_payload() -> None:
+    """Return an empty list when execute-context history JSON is invalid."""
     settings = _FakeSettings()
     settings.values[_EXECUTE_CONTEXT_HISTORY_KEY] = "{"  # invalid JSON
 
@@ -77,6 +82,7 @@ def test_load_execute_context_history_handles_invalid_payload() -> None:
 
 
 def test_store_execute_context_history_preserves_whitespace_and_limits() -> None:
+    """Persist a deduplicated execute-context history payload and sync settings."""
     settings = _FakeSettings()
 
     _store_execute_context_history(
@@ -90,6 +96,7 @@ def test_store_execute_context_history_preserves_whitespace_and_limits() -> None
 
 
 def test_load_filter_preferences_returns_trimmed_state() -> None:
+    """Load filters and convert numbers from strings when the payload is valid."""
     settings = _FakeSettings()
     settings.values[_FILTER_CATEGORY_KEY] = "  incident_response  "
     settings.values[_FILTER_TAG_KEY] = "  outages  "
@@ -105,6 +112,7 @@ def test_load_filter_preferences_returns_trimmed_state() -> None:
 
 
 def test_load_filter_preferences_handles_invalid_quality() -> None:
+    """Ignore invalid quality inputs and return defaults for the rest."""
     settings = _FakeSettings()
     settings.values[_FILTER_QUALITY_KEY] = "fast"
 
@@ -115,6 +123,7 @@ def test_load_filter_preferences_handles_invalid_quality() -> None:
 
 
 def test_store_filter_preferences_persists_values_and_syncs() -> None:
+    """Persist filter settings and ensure the store is synced."""
     settings = _FakeSettings()
 
     _store_filter_preferences(
@@ -131,6 +140,7 @@ def test_store_filter_preferences_persists_values_and_syncs() -> None:
 
 
 def test_store_sort_preference_persists_value() -> None:
+    """Persist the sort order using the enum value representation."""
     settings = _FakeSettings()
 
     _store_sort_preference(settings, PromptSortOrder.USAGE_DESC)
