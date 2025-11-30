@@ -1,6 +1,7 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.15.71 - 2025-11-30 - Add workspace result sharing via overlay action button.
   v0.15.70 - 2025-11-29 - Make workspace splitter resize only the prompt input textarea.
   v0.15.69 - 2025-11-29 - Toggle inline markdown rendering with a checkbox for output/chat.
   v0.15.68 - 2025-11-29 - Embed result actions inside the output text area with overlay controls.
@@ -1271,6 +1272,9 @@ class MainWindow(QMainWindow):
         self._save_button = QPushButton("Save Result", self)
         self._save_button.clicked.connect(self._on_save_result_clicked)  # type: ignore[arg-type]
 
+        self._share_result_button = QPushButton("Share Result", self)
+        self._share_result_button.clicked.connect(self._on_share_result_clicked)  # type: ignore[arg-type]
+
         self._intent_hint = QLabel("", self)
         self._intent_hint.setObjectName("intentHintLabel")
         self._intent_hint.setStyleSheet("color: #5b5b5b; font-style: italic;")
@@ -1571,6 +1575,7 @@ class MainWindow(QMainWindow):
         self._copy_result_button.setEnabled(False)
         self._copy_result_to_text_window_button.setEnabled(False)
         self._save_button.setEnabled(False)
+        self._share_result_button.setEnabled(False)
         self._continue_chat_button.setEnabled(False)
         self._end_chat_button.setEnabled(False)
 
@@ -1591,6 +1596,7 @@ class MainWindow(QMainWindow):
         overlay_layout.addWidget(self._save_button)
         overlay_layout.addWidget(self._copy_result_button)
         overlay_layout.addWidget(self._copy_result_to_text_window_button)
+        overlay_layout.addWidget(self._share_result_button)
         self._result_actions_overlay = overlay
         overlay.show()
         self._position_result_overlay()
@@ -1638,6 +1644,23 @@ class MainWindow(QMainWindow):
 
         self._raw_result_text = text or ""
         self._refresh_result_text_display()
+        self._update_result_share_button_state()
+
+    def _update_result_share_button_state(self) -> None:
+        """Enable or disable the result share action based on availability."""
+
+        button = self._share_result_button
+        if button is None:
+            return
+        if self._streaming_in_progress:
+            button.setEnabled(False)
+            return
+        button.setEnabled(self._can_share_result())
+
+    def _can_share_result(self) -> bool:
+        """Return True when the workspace output can be shared."""
+
+        return bool(self._share_providers and (self._raw_result_text or "").strip())
 
     def _append_result_stream_chunk(self, chunk: str) -> None:
         """Append streaming output and re-render according to the toggle."""
@@ -2282,6 +2305,7 @@ class MainWindow(QMainWindow):
             "copy": self._copy_result_button.isEnabled(),
             "copy_window": self._copy_result_to_text_window_button.isEnabled(),
             "save": self._save_button.isEnabled(),
+            "share": self._share_result_button.isEnabled(),
             "continue": self._continue_chat_button.isEnabled(),
             "end": self._end_chat_button.isEnabled(),
         }
@@ -2291,6 +2315,7 @@ class MainWindow(QMainWindow):
         self._copy_result_button.setEnabled(False)
         self._copy_result_to_text_window_button.setEnabled(False)
         self._save_button.setEnabled(False)
+        self._share_result_button.setEnabled(False)
         self._continue_chat_button.setEnabled(False)
         self._end_chat_button.setEnabled(False)
         self.statusBar().showMessage(f"Streaming '{prompt.name}'…", 0)
@@ -2316,6 +2341,7 @@ class MainWindow(QMainWindow):
                 self._stream_control_state.get("copy_window", False)
             )
             self._save_button.setEnabled(self._stream_control_state.get("save", False))
+            self._share_result_button.setEnabled(self._stream_control_state.get("share", False))
             self._continue_chat_button.setEnabled(self._stream_control_state.get("continue", False))
             self._end_chat_button.setEnabled(self._stream_control_state.get("end", False))
         else:
@@ -2323,6 +2349,7 @@ class MainWindow(QMainWindow):
             self._copy_result_button.setEnabled(has_result)
             self._copy_result_to_text_window_button.setEnabled(has_result)
             self._save_button.setEnabled(self._last_execution is not None)
+            self._share_result_button.setEnabled(self._can_share_result())
             self._continue_chat_button.setEnabled(self._last_execution is not None)
             self._end_chat_button.setEnabled(bool(self._chat_conversation))
         self._stream_control_state = {}
@@ -2352,6 +2379,7 @@ class MainWindow(QMainWindow):
         self._copy_result_button.setEnabled(bool(outcome.result.response_text))
         self._copy_result_to_text_window_button.setEnabled(bool(outcome.result.response_text))
         self._save_button.setEnabled(True)
+        self._share_result_button.setEnabled(self._can_share_result())
         self._continue_chat_button.setEnabled(True)
         self._end_chat_button.setEnabled(True)
         self._refresh_chat_history_view()
@@ -2369,6 +2397,7 @@ class MainWindow(QMainWindow):
         self._copy_result_button.setEnabled(False)
         self._copy_result_to_text_window_button.setEnabled(False)
         self._save_button.setEnabled(False)
+        self._share_result_button.setEnabled(False)
         self._reset_chat_session()
 
     def _reset_chat_session(self, *, clear_view: bool = True) -> None:
@@ -3259,6 +3288,7 @@ class MainWindow(QMainWindow):
         """Store a share provider so it can be shown in the share menu."""
 
         self._share_providers[provider.info.name] = provider
+        self._update_result_share_button_state()
 
     def _on_share_prompt_requested(self) -> None:
         """Display provider choices and initiate the share workflow."""
@@ -3276,47 +3306,54 @@ class MainWindow(QMainWindow):
             action = menu.addAction(provider.info.label)
             action.setData(provider.info.name)
             action.setToolTip(provider.info.description)
+        # QMenu.exec_ synchronously returns the triggered action (Qt for Python docs:
+        # https://doc.qt.io/qtforpython-6/PySide6/QtWidgets/QMenu).
         chosen = menu.exec_(button.mapToGlobal(button.rect().bottomLeft()))
         if chosen is None:
             return
         provider_name = str(chosen.data())
         self._share_prompt(provider_name, prompt)
 
+    def _on_share_result_clicked(self) -> None:
+        """Display provider choices for sharing the latest output text."""
+
+        if not self._share_providers:
+            self._show_error("Sharing unavailable", "No share providers are configured.")
+            return
+        payload = self._raw_result_text or ""
+        if not payload.strip():
+            self.statusBar().showMessage("Run a prompt to produce output before sharing.", 4000)
+            return
+        button = self._share_result_button
+        if button is None:
+            return
+        menu = QMenu(self)
+        for provider in self._share_providers.values():
+            action = menu.addAction(provider.info.label)
+            action.setData(provider.info.name)
+            action.setToolTip(provider.info.description)
+        # QMenu.exec_ synchronously returns the chosen QAction (see
+        # https://doc.qt.io/qtforpython-6/PySide6/QtWidgets/QMenu).
+        chosen = menu.exec_(button.mapToGlobal(button.rect().bottomLeft()))
+        if chosen is None:
+            return
+        provider_name = str(chosen.data())
+        self._share_result_text(provider_name, payload)
+
     def _share_prompt(self, provider_name: str, prompt: Prompt) -> None:
         """Share *prompt* using the requested provider and copy the share link."""
 
-        provider = self._share_providers.get(provider_name)
-        if provider is None:
-            self._show_error("Sharing unavailable", "Selected share provider is not registered.")
-            return
         payload = self._build_share_payload(prompt)
         if payload is None:
             return
-        indicator = ProcessingIndicator(
-            self,
-            f"Sharing via {provider.info.label}…",
-            title="Sharing Prompt",
-        )
-        try:
-            result = indicator.run(provider.share, payload, prompt)
-        except ShareProviderError as exc:
-            self._show_error("Unable to share prompt", str(exc))
-            return
-        clipboard = QGuiApplication.clipboard()
-        clipboard.setText(result.url)
-        message = f"{result.provider.label} link copied to clipboard."
-        self._show_toast(message)
-        self.statusBar().showMessage(message, 5000)
-        self._usage_logger.log_share(
-            provider=result.provider.name,
+        self._share_payload_via_provider(
+            provider_name,
+            payload,
+            prompt=prompt,
             prompt_name=prompt.name,
-            payload_chars=result.payload_chars,
+            indicator_title="Sharing Prompt",
+            error_title="Unable to share prompt",
         )
-        if result.delete_url:
-            self.statusBar().showMessage(
-                f"Delete this share later via: {result.delete_url}",
-                10000,
-            )
 
     def _build_share_payload(self, prompt: Prompt) -> str | None:
         """Return the formatted share payload for the selected mode."""
@@ -3337,6 +3374,66 @@ class MainWindow(QMainWindow):
             self._show_error("Unable to share prompt", "Share payload is empty.")
             return None
         return payload
+
+    def _share_result_text(self, provider_name: str, payload: str) -> None:
+        """Share the latest workspace response using the requested provider."""
+
+        prompt_label = self._last_prompt_name or "Workspace Result"
+        self._share_payload_via_provider(
+            provider_name,
+            payload,
+            prompt=None,
+            prompt_name=prompt_label,
+            indicator_title="Sharing Result",
+            error_title="Unable to share result",
+        )
+
+    def _share_payload_via_provider(
+        self,
+        provider_name: str,
+        payload: str,
+        *,
+        prompt: Prompt | None,
+        prompt_name: str | None,
+        indicator_title: str,
+        error_title: str,
+    ) -> None:
+        """Execute a share operation via :class:`ShareProvider` helpers."""
+
+        provider = self._share_providers.get(provider_name)
+        if provider is None:
+            self._show_error("Sharing unavailable", "Selected share provider is not registered.")
+            return
+        payload_text = payload or ""
+        if not payload_text.strip():
+            self._show_error(error_title, "Share payload is empty.")
+            return
+        indicator = ProcessingIndicator(
+            self,
+            f"Sharing via {provider.info.label}…",
+            title=indicator_title,
+        )
+        try:
+            result = indicator.run(provider.share, payload_text, prompt)
+        except ShareProviderError as exc:
+            self._show_error(error_title, str(exc))
+            return
+        clipboard = QGuiApplication.clipboard()
+        clipboard.setText(result.url)
+        message = f"{result.provider.label} link copied to clipboard."
+        self._show_toast(message)
+        self.statusBar().showMessage(message, 5000)
+        prompt_label = prompt_name or getattr(prompt, "name", "Result Output")
+        self._usage_logger.log_share(
+            provider=result.provider.name,
+            prompt_name=prompt_label,
+            payload_chars=result.payload_chars,
+        )
+        if result.delete_url:
+            self.statusBar().showMessage(
+                f"Delete this share later via: {result.delete_url}",
+                10000,
+            )
 
     def _show_prompt_description(self, prompt: Prompt) -> None:
         """Display the prompt description in a dialog for quick reference."""
