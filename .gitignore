@@ -10,6 +10,7 @@ output*.ps1
 output*.py
 bing*.json
 result*
+!gui/result_overlay.py
 *.sqlite3
 *.bin
 *.pdf
