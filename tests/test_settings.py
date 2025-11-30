@@ -1,6 +1,7 @@
 """Tests for configuration loading and validation logic.
 
 Updates:
+  v0.1.6 - 2025-11-30 - Cover routing for category suggestion workflow.
   v0.1.5 - 2025-11-29 - Wrap embedding backend tests for Ruff line length.
   v0.1.4 - 2025-11-05 - Cover LiteLLM inference model configuration.
   v0.1.3 - 2025-11-15 - Warn and ignore LiteLLM API secrets supplied via JSON configuration.
@@ -163,6 +164,27 @@ def test_litellm_workflow_models_strip_fast_entries(monkeypatch, tmp_path) -> No
         "scenario_generation": "inference",
         "prompt_structure_refinement": "inference",
     }
+
+
+def test_litellm_workflow_models_include_category_generation(monkeypatch, tmp_path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "litellm_model": "gpt-4o-mini",
+                "litellm_workflow_models": {
+                    "category_generation": "inference",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
+
+    settings = load_settings()
+
+    assert settings.litellm_workflow_models == {"category_generation": "inference"}
 
 
 def test_reasoning_effort_normalised(monkeypatch, tmp_path) -> None:

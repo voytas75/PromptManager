@@ -1,6 +1,7 @@
 """Settings management utilities for Prompt Manager configuration.
 
 Updates:
+  v0.5.2 - 2025-11-30 - Add category suggestion workflow to LiteLLM routing.
   v0.5.1 - 2025-11-23 - Added prompt template override settings.
   v0.5.0 - 2025-11-22 - Added structure-only prompt refinement routing.
   v0.4.9 - 2025-12-06 - Required LiteLLM-backed embeddings with UI fields.
@@ -32,6 +33,7 @@ LITELLM_ROUTED_WORKFLOWS: OrderedDict[str, str] = OrderedDict(
         ("description_generation", "Prompt description synthesis"),
         ("scenario_generation", "Scenario drafting"),
         ("prompt_engineering", "Prompt refinement"),
+        ("category_generation", "Prompt category suggestions"),
         ("prompt_structure_refinement", "Prompt structure refinement"),
         ("prompt_execution", "Prompt execution"),
     ]
