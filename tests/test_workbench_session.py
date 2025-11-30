@@ -10,6 +10,7 @@ from gui.workbench.session import WorkbenchSession
 
 
 def test_update_from_wizard_populates_sections() -> None:
+    """Populate session template fields when wizard data is provided."""
     session = WorkbenchSession()
     session.update_from_wizard(
         prompt_name="Draft",
@@ -26,6 +27,7 @@ def test_update_from_wizard_populates_sections() -> None:
 
 
 def test_variable_payload_prefers_sample_value() -> None:
+    """Ensure variable payload uses sample values when available."""
     session = WorkbenchSession()
     variable = session.link_variable("topic", sample_value="LLMs", description="Subject")
     variable.last_test_value = "fallback"
@@ -36,6 +38,7 @@ def test_variable_payload_prefers_sample_value() -> None:
 
 
 def test_build_prompt_uses_goal_as_description() -> None:
+    """Copy the goal statement to prompt description when building prompts."""
     session = WorkbenchSession()
     session.prompt_name = "Workbench Draft"
     session.goal_statement = "Generate FAQs"
@@ -50,6 +53,7 @@ def test_build_prompt_uses_goal_as_description() -> None:
 
 
 def test_suggest_refinement_target_flags_constraints() -> None:
+    """Suggest 'constraints' when responses exceed configured limits."""
     session = WorkbenchSession()
     session.constraints = ["Limit to 10 words"]
     response = "This answer is definitely longer than we expected " * 5

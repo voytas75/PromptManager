@@ -20,7 +20,6 @@ from core.templating import SchemaValidator, TemplateRenderResult
 
 def _load_template_preview_module() -> types.ModuleType:
     """Import template preview module, falling back to PySide6 stubs when absent."""
-
     try:
         import PySide6  # noqa: F401  # pragma: no cover - import guard only
     except ImportError:
@@ -223,6 +222,7 @@ def _make_preview() -> TemplatePreviewWidget:
 
 
 def test_preview_displays_template_text_when_parse_error_occurs() -> None:
+    """Display raw template text when parsing fails so users can edit it."""
     widget = _make_preview()
     widget._template_text = "RAW TEMPLATE"
     widget._template_parse_error = "syntax issue"
@@ -234,6 +234,7 @@ def test_preview_displays_template_text_when_parse_error_occurs() -> None:
 
 
 def test_preview_displays_template_text_when_rendering_fails() -> None:
+    """Show raw template text when rendering raises errors."""
     widget = _make_preview()
     widget._template_text = "{{ invalid syntax }}"
     widget._template_parse_error = None
@@ -251,6 +252,7 @@ def test_preview_displays_template_text_when_rendering_fails() -> None:
 
 
 def test_apply_variable_values_populates_matching_inputs() -> None:
+    """Inject supplied variable values into matching input widgets."""
     widget = _make_preview()
     editor = _DummyTextEdit()
     widget._variable_inputs = {"customer": editor}
@@ -267,6 +269,7 @@ def test_apply_variable_values_populates_matching_inputs() -> None:
 
 
 def test_refresh_preview_invokes_internal_update() -> None:
+    """Ensure refresh_preview proxies to the internal update routine."""
     widget = _make_preview()
     invoked: dict[str, int] = {"count": 0}
 

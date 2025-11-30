@@ -1,6 +1,7 @@
 """Intent classification helpers for intent-aware prompt suggestions.
 
 Updates:
+  v0.6.2 - 2025-11-30 - Remove extraneous docstring spacing to satisfy Ruff D202.
   v0.6.1 - 2025-11-29 - Adopt PEP 695 generics and gate typing-only imports for Ruff.
   v0.6.0 - 2025-11-06 - Provide rule-based classifier aligned with hybrid retrieval plan.
 """
@@ -155,6 +156,7 @@ class IntentPrediction:
 
     @classmethod
     def general(cls) -> IntentPrediction:
+        """Return a baseline prediction representing a general intent."""
         return cls(IntentLabel.GENERAL, confidence=0.0)
 
 
@@ -163,7 +165,6 @@ class IntentClassifier:
 
     def classify(self, query: str) -> IntentPrediction:
         """Return intent prediction for the supplied query text."""
-
         stripped = query.strip()
         if not stripped:
             return IntentPrediction.general()
@@ -214,15 +215,15 @@ class PromptLikeProtocol(Protocol):
 
     @property
     def id(self) -> object:  # pragma: no cover - attribute hints only
-        ...
+        """Return the identifier for the prompt-like instance."""
 
     @property
     def category(self) -> str:  # pragma: no cover - attribute hints only
-        ...
+        """Return the category slug associated with the prompt-like instance."""
 
     @property
     def tags(self) -> Sequence[str]:  # pragma: no cover - attribute hints only
-        ...
+        """Return the tag sequence for the prompt-like instance."""
 
 
 def rank_by_hints[PromptLikeT: PromptLikeProtocol](
@@ -232,7 +233,6 @@ def rank_by_hints[PromptLikeT: PromptLikeProtocol](
     tag_hints: Sequence[str],
 ) -> list[PromptLikeT]:
     """Return prompts ordered by category/tag hints while preserving stability."""
-
     matched: list[PromptLikeT] = []
     secondary: list[PromptLikeT] = []
     remainder: list[PromptLikeT] = []

@@ -20,6 +20,7 @@ def _load_usage_logger():
 
 
 def test_usage_logger_writes_jsonl(tmp_path) -> None:
+    """Ensure usage logger writes detect/suggest/copy events to JSONL."""
     IntentUsageLogger = _load_usage_logger()
     path = tmp_path / "intent_usage.jsonl"
     logger = IntentUsageLogger(path=path)
