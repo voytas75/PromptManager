@@ -1,9 +1,11 @@
 """Qt application helpers for Prompt Manager GUI.
 
-Updates: v0.1.3 - 2025-11-29 - Apply Fusion style globally and log active GUI style for debugging.
-Updates: v0.1.2 - 2025-11-05 - Apply packaged application icon for desktop builds.
-Updates: v0.1.1 - 2025-11-05 - Detect display server before forcing offscreen backend.
-Updates: v0.1.0 - 2025-11-04 - Provide QApplication factory and launch routine.
+Updates:
+  v0.1.4 - 2025-11-30 - Make Fusion style optional for stubbed Qt environments.
+  v0.1.3 - 2025-11-29 - Apply Fusion style globally and log active GUI style for debugging.
+  v0.1.2 - 2025-11-05 - Apply packaged application icon for desktop builds.
+  v0.1.1 - 2025-11-05 - Detect display server before forcing offscreen backend.
+  v0.1.0 - 2025-11-04 - Provide QApplication factory and launch routine.
 """
 
 from __future__ import annotations
@@ -11,10 +13,16 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QStyleFactory
+
+try:  # pragma: no cover - guard for stubbed PySide6 modules during tests
+    from PySide6.QtWidgets import QApplication, QStyleFactory
+except ImportError:  # pragma: no cover - stub environments may omit QStyleFactory
+    from PySide6.QtWidgets import QApplication
+
+    QStyleFactory = None  # type: ignore[assignment]
 
 from .main_window import MainWindow
 from .resources import load_application_icon
@@ -54,10 +62,18 @@ def create_qapplication(argv: Sequence[str] | None = None) -> QApplication:
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
     app = QApplication(list(argv or []))
-    fusion = QStyleFactory.create("Fusion")
+    fusion: Any | None = None
+    if QStyleFactory is not None:  # pragma: no branch - branch depends on import success
+        fusion = QStyleFactory.create("Fusion")
     if fusion is not None:
         app.setStyle(fusion)
-    style_name = app.style().metaObject().className()
+    style_name = "<unknown>"
+    style_getter = getattr(app, "style", None)
+    if callable(style_getter):  # pragma: no branch - depends on Qt stubs
+        try:
+            style_name = style_getter().metaObject().className()
+        except AttributeError:  # pragma: no cover - stubbed Qt lacks metaObject
+            style_name = "<unavailable>"
     logger.debug("GUI_STYLE active_style=%s", style_name)
     return app
 

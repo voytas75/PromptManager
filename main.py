@@ -1,6 +1,7 @@
 """Application entry point for Prompt Manager.
 
 Updates:
+  v0.8.3 - 2025-11-30 - Restore stdout messaging for CLI commands and relax history imports.
   v0.8.2 - 2025-11-29 - Reformat CLI summary output and modernise type hints.
   v0.8.1 - 2025-11-28 - Add analytics diagnostics target with dashboard export.
   v0.8.0 - 2025-02-14 - Add embedding diagnostics CLI command.
@@ -45,14 +46,21 @@ from config import (
     PromptManagerSettings,
     load_settings,
 )
-from core import (
-    PromptHistoryError,
-    PromptManagerError,
-    build_analytics_snapshot,
-    build_prompt_manager,
-    export_prompt_catalog,
-    snapshot_dataset_rows,
-)
+import core as core_services
+
+PromptManagerError = core_services.PromptManagerError
+build_prompt_manager = core_services.build_prompt_manager
+build_analytics_snapshot = core_services.build_analytics_snapshot
+export_prompt_catalog = core_services.export_prompt_catalog
+snapshot_dataset_rows = core_services.snapshot_dataset_rows
+PromptHistoryError = getattr(core_services, "PromptHistoryError", PromptManagerError)
+
+
+def _print_and_log(logger: logging.Logger, level: int, message: str) -> None:
+    """Log a message and mirror it to stdout for CLI expectations."""
+
+    logger.log(level, message)
+    print(message)
 
 
 def _mask_secret(value: str | None) -> str:
@@ -146,9 +154,7 @@ def _print_settings_summary(settings: PromptManagerSettings) -> None:
     )
     chroma_path_desc = _describe_path(settings.chroma_path, expect_directory=True)
     default_model = (
-        "(auto)"
-        if embedding_backend == "litellm" and litellm_model
-        else DEFAULT_EMBEDDING_MODEL
+        "(auto)" if embedding_backend == "litellm" and litellm_model else DEFAULT_EMBEDDING_MODEL
     )
     resolved_model = embedding_model or default_model
 
@@ -183,11 +189,11 @@ def _print_settings_summary(settings: PromptManagerSettings) -> None:
 
     lines.extend(
         [
-        "",
-        "Embedding configuration",
-        "-----------------------",
-        f"Backend: {embedding_backend or DEFAULT_EMBEDDING_BACKEND}",
-        f"Model: {resolved_model}",
+            "",
+            "Embedding configuration",
+            "-----------------------",
+            f"Backend: {embedding_backend or DEFAULT_EMBEDDING_BACKEND}",
+            f"Model: {resolved_model}",
         ]
     )
     print("\n".join(lines))
@@ -228,9 +234,11 @@ def _run_catalog_export(manager, args: argparse.Namespace, logger: logging.Logge
             include_inactive=getattr(args, "include_inactive", False),
         )
     except Exception as exc:
-        logger.error("Failed to export catalogue: %s", exc)
+        message = f"Failed to export catalogue: {exc}"
+        _print_and_log(logger, logging.ERROR, message)
         return 6
-    logger.info("Prompt catalogue exported to %s (%s)", resolved, fmt)
+    message = f"Prompt catalogue exported to {resolved} ({fmt})"
+    _print_and_log(logger, logging.INFO, message)
     return 0
 
 
@@ -368,14 +376,10 @@ def _run_benchmark(manager, args: argparse.Namespace, logger: logging.Logger) ->
             history = run.history
             success_rate = f"{history.success_rate * 100:.1f}%" if history.success_rate else "0%"
             avg_duration = (
-                f"{history.average_duration_ms:.0f} ms"
-                if history.average_duration_ms
-                else "n/a"
+                f"{history.average_duration_ms:.0f} ms" if history.average_duration_ms else "n/a"
             )
             avg_rating = (
-                f"{history.average_rating:.1f}"
-                if history.average_rating is not None
-                else "n/a"
+                f"{history.average_rating:.1f}" if history.average_rating is not None else "n/a"
             )
             print(
                 f"  history: runs={history.total_runs}, success_rate={success_rate}, "
@@ -420,9 +424,7 @@ def _run_diagnostics(manager, args: argparse.Namespace, logger: logging.Logger) 
     return 5
 
 
-def _run_embedding_diagnostics(
-    manager, args: argparse.Namespace, logger: logging.Logger
-) -> int:
+def _run_embedding_diagnostics(manager, args: argparse.Namespace, logger: logging.Logger) -> int:
     sample_text = getattr(args, "sample_text", "Prompt Manager diagnostics probe")
     try:
         report = manager.diagnose_embeddings(sample_text=sample_text)
@@ -437,9 +439,7 @@ def _run_embedding_diagnostics(
     print(f"Backend: {backend_status} (dimension={dimension_text}) - {report.backend_message}")
 
     chroma_status = "OK" if report.chroma_ok else "ERROR"
-    chroma_count_text = (
-        str(report.chroma_count) if report.chroma_count is not None else "unknown"
-    )
+    chroma_count_text = str(report.chroma_count) if report.chroma_count is not None else "unknown"
     print(f"Chroma: {chroma_status} (documents={chroma_count_text}) - {report.chroma_message}")
 
     missing_count = len(report.missing_prompts)
@@ -496,9 +496,7 @@ def _run_embedding_diagnostics(
     return 0
 
 
-def _run_analytics_diagnostics(
-    manager, args: argparse.Namespace, logger: logging.Logger
-) -> int:
+def _run_analytics_diagnostics(manager, args: argparse.Namespace, logger: logging.Logger) -> int:
     window_days = max(0, int(getattr(args, "window_days", 30) or 0))
     prompt_limit = max(1, int(getattr(args, "prompt_limit", 5) or 1))
     usage_log_path = getattr(args, "usage_log", None)
@@ -527,14 +525,12 @@ def _run_analytics_diagnostics(
             else "n/a"
         )
         avg_rating = (
-            f"{execution.average_rating:.2f}"
-            if execution.average_rating is not None
-            else "n/a"
+            f"{execution.average_rating:.2f}" if execution.average_rating is not None else "n/a"
         )
         print(
             textwrap.dedent(
                 f"""
-                Execution summary (last {window_days or 'all'} days)
+                Execution summary (last {window_days or "all"} days)
                   runs: {execution.total_runs}
                   success rate: {_pct(execution.success_rate)}
                   average duration: {avg_duration}
@@ -604,20 +600,14 @@ def _run_analytics_diagnostics(
     if embedding is not None:
         print("\nEmbedding diagnostics summary:")
         print(
-            f"  backend: {'ok' if embedding.backend_ok else 'error'} "
-            f"({embedding.backend_message})"
+            f"  backend: {'ok' if embedding.backend_ok else 'error'} ({embedding.backend_message})"
         )
         print(
             "  dimension: {value}".format(
-                value=embedding.backend_dimension
-                or embedding.inferred_dimension
-                or "n/a",
+                value=embedding.backend_dimension or embedding.inferred_dimension or "n/a",
             )
         )
-        print(
-            f"  chroma: {'ok' if embedding.chroma_ok else 'error'} "
-            f"({embedding.chroma_message})"
-        )
+        print(f"  chroma: {'ok' if embedding.chroma_ok else 'error'} ({embedding.chroma_message})")
         if embedding.consistent_counts is not None:
             status = "matched" if embedding.consistent_counts else "mismatch"
             print(
@@ -668,11 +658,16 @@ def _run_history_analytics(manager, args: argparse.Namespace, logger: logging.Lo
             trend_window=trend_window,
         )
     except PromptHistoryError as exc:
-        logger.error("Unable to compute execution analytics: %s", exc)
+        message = f"Unable to compute execution analytics: {exc}"
+        _print_and_log(logger, logging.ERROR, message)
         return 7
 
     if analytics is None or analytics.total_runs == 0:
-        logger.info("No execution history available for the requested window.")
+        _print_and_log(
+            logger,
+            logging.INFO,
+            "No execution history available for the requested window.",
+        )
         return 0
 
     window_label = (
@@ -705,12 +700,12 @@ def _run_history_analytics(manager, args: argparse.Namespace, logger: logging.Lo
                 else "n/a"
             )
             lines.append(
-                
+                (
                     f"{index}. {stats.name} — runs:{stats.total_runs} "
                     f"success:{stats.success_rate * 100:.1f}% "
                     f"avg_rating:{avg_rating} trend:{trend} latency:{latency} "
                     f"last:{last_run}"
-                
+                )
             )
 
     print("\n".join(lines))
@@ -723,14 +718,18 @@ def _run_reembed(manager, logger: logging.Logger) -> int:
     try:
         successes, failures = manager.rebuild_embeddings(reset_store=True)
     except PromptManagerError as exc:
-        logger.error("Failed to rebuild embeddings: %s", exc)
+        _print_and_log(logger, logging.ERROR, f"Failed to rebuild embeddings: {exc}")
         return 7
 
     if failures:
-        logger.error("Embedding rebuild skipped %s prompt(s).", failures)
+        _print_and_log(
+            logger,
+            logging.ERROR,
+            f"Embedding rebuild skipped {failures} prompt(s).",
+        )
         return 7
 
-    logger.info("Rebuilt embeddings for %s prompt(s).", successes)
+    _print_and_log(logger, logging.INFO, f"Rebuilt embeddings for {successes} prompt(s).")
     return 0
 
 
@@ -764,7 +763,7 @@ def _run_suggest(manager, args: argparse.Namespace, logger: logging.Logger) -> i
         print(
             textwrap.dedent(
                 f"""\
-                {index}. {prompt.name} [{prompt.category or 'Uncategorised'}]
+                {index}. {prompt.name} [{prompt.category or "Uncategorised"}]
                    Quality: {quality}  Tags: {tags}
                    Description: {prompt.description}
                 """
@@ -1069,8 +1068,16 @@ def main() -> int:
             return result
 
         # Minimal interactive stub to verify bootstrap until GUI arrives
-        logger.info("Prompt Manager ready. Database at %s", settings.db_path)
-        logger.info("ChromaDB at %s", settings.chroma_path)
+        _print_and_log(
+            logger,
+            logging.INFO,
+            f"Prompt Manager ready. Database at {settings.db_path}",
+        )
+        _print_and_log(
+            logger,
+            logging.INFO,
+            f"ChromaDB at {settings.chroma_path}",
+        )
         launch_requested = args.gui if args.gui is not None else True
         if launch_requested:
             try:

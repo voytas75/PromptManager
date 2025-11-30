@@ -1,6 +1,7 @@
 """Prompt Manager package façade and orchestration layer.
 
 Updates:
+  v0.14.6 - 2025-11-30 - Ensure Chroma directories exist and stabilise Chroma client bootstrap.
   v0.14.5 - 2025-11-29 - Reformat header/imports and wrap CLI analytics summaries.
   v0.14.4 - 2025-02-14 - Add embedding diagnostics helper for CLI integration.
   v0.14.3 - 2025-11-28 - Add data snapshot helper for maintenance workflows.
@@ -446,6 +447,7 @@ class PromptManager:
         self._collection: CollectionProtocol | None = None
         resolved_db_path = Path(db_path).expanduser() if db_path is not None else None
         resolved_chroma_path = Path(chroma_path).expanduser()
+        resolved_chroma_path.mkdir(parents=True, exist_ok=True)
         self._db_path = resolved_db_path
         self._chroma_path = str(resolved_chroma_path)
         self._collection_name = collection_name
@@ -459,6 +461,7 @@ class PromptManager:
         # Disable Chroma anonymized telemetry to avoid noisy PostHog errors in some environments
         # and respect privacy defaults. Use persistent client at the configured path.
         if chroma_client is None:
+            chroma_settings: Any | None = None
             try:
                 from chromadb.config import Settings as ChromaSettings
 
@@ -467,13 +470,28 @@ class PromptManager:
                     is_persistent=True,
                     persist_directory=str(resolved_chroma_path),
                 )
-                self._chroma_client = cast("Any", chromadb.Client(chroma_settings))
-            except Exception:
-                # Fallback to legacy PersistentClient signature if settings import or usage fails
-                self._chroma_client = cast(
-                    "Any",
-                    chromadb.PersistentClient(path=str(resolved_chroma_path)),
+            except Exception:  # pragma: no cover - defensive guard for optional dependency
+                chroma_settings = None
+
+            persistent_kwargs: dict[str, Any] = {"path": str(resolved_chroma_path)}
+            if chroma_settings is not None:
+                persistent_kwargs["settings"] = chroma_settings
+            try:
+                try:
+                    persistent_client = chromadb.PersistentClient(**persistent_kwargs)
+                except TypeError as exc:
+                    if "unexpected keyword argument 'settings'" not in str(exc):
+                        raise
+                    persistent_kwargs.pop("settings", None)
+                    persistent_client = chromadb.PersistentClient(**persistent_kwargs)
+            except ChromaError as exc:
+                logger.warning(
+                    "Chroma persistent client unavailable, using in-memory fallback: %s",
+                    exc,
                 )
+                self._chroma_client = cast("Any", chromadb.EphemeralClient())
+            else:
+                self._chroma_client = cast("Any", persistent_client)
         else:
             self._chroma_client = cast("Any", chroma_client)
         self._initialise_chroma_collection()
@@ -500,9 +518,7 @@ class PromptManager:
         self._prompt_structure_engineer = structure_prompt_engineer or prompt_engineer
         self._litellm_fast_model: str | None = self._normalise_model_identifier(fast_model)
         if self._litellm_fast_model is None and getattr(name_generator, "model", None):
-            self._litellm_fast_model = self._normalise_model_identifier(
-                name_generator.model
-            )
+            self._litellm_fast_model = self._normalise_model_identifier(name_generator.model)
         self._litellm_inference_model: str | None = self._normalise_model_identifier(
             inference_model
         )
@@ -1260,9 +1276,7 @@ class PromptManager:
                     size_bytes += stat.st_size
                     file_count += 1
                     latest_mtime = (
-                        stat.st_mtime
-                        if latest_mtime is None
-                        else max(latest_mtime, stat.st_mtime)
+                        stat.st_mtime if latest_mtime is None else max(latest_mtime, stat.st_mtime)
                     )
             chroma_info["size_bytes"] = size_bytes
             chroma_info["files"] = file_count
@@ -1331,11 +1345,7 @@ class PromptManager:
             category.slug: category
             for category in self._category_registry.all(include_archived=True)
         }
-        slug_keys = (
-            set(prompt_counts.keys())
-            | set(execution_stats.keys())
-            | set(categories.keys())
-        )
+        slug_keys = set(prompt_counts.keys()) | set(execution_stats.keys()) | set(categories.keys())
         if not slug_keys:
             slug_keys.add("")
 
@@ -1746,8 +1756,7 @@ class PromptManager:
             return
 
         suggestion_label = (
-            _match_category_label(suggestion_raw, categories)
-            or (suggestion_raw or "").strip()
+            _match_category_label(suggestion_raw, categories) or (suggestion_raw or "").strip()
         )
         if not suggestion_label:
             self._set_category_insight_metadata(prompt, None)
@@ -2336,9 +2345,7 @@ class PromptManager:
             self._apply_rating(prompt_id, rating)
         return execution
 
-    def update_execution_note(
-        self, execution_id: uuid.UUID, note: str | None
-    ) -> PromptExecution:
+    def update_execution_note(self, execution_id: uuid.UUID, note: str | None) -> PromptExecution:
         """Update the note metadata for a history entry."""
 
         tracker = self._history_tracker

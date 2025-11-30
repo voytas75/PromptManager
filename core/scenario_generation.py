@@ -1,9 +1,11 @@
 """LiteLLM-backed prompt scenario generation utilities.
 
-Updates: v0.1.3 - 2025-11-27 - Strip Markdown code fences before parsing scenarios.
-Updates: v0.1.2 - 2025-11-23 - Support configurable system prompt overrides.
-Updates: v0.1.1 - 2025-11-05 - Remove explicit LiteLLM timeout to rely on provider defaults.
-Updates: v0.1.0 - 2025-11-19 - Introduce scenario generator for prompt usage guidance.
+Updates:
+  v0.1.4 - 2025-11-30 - Align LiteLLM request prompt text with CLI contract.
+  v0.1.3 - 2025-11-27 - Strip Markdown code fences before parsing scenarios.
+  v0.1.2 - 2025-11-23 - Support configurable system prompt overrides.
+  v0.1.1 - 2025-11-05 - Remove explicit LiteLLM timeout to rely on provider defaults.
+  v0.1.0 - 2025-11-19 - Introduce scenario generator for prompt usage guidance.
 """
 
 from __future__ import annotations
@@ -38,7 +40,7 @@ def _normalise_scenarios(candidates: Sequence[str], limit: int) -> list[str]:
         text = candidate.strip()
         if not text:
             continue
-        if text.startswith(('-', '*')):
+        if text.startswith(("-", "*")):
             text = text[1:].strip()
         key = text.lower()
         if key in seen:
@@ -133,10 +135,10 @@ class LiteLLMScenarioGenerator:
                     # legitimately appear inside *context*.  ``str.format`` would treat any
                     # ``{`` / ``}`` pairs in the prompt body as replacement fields and raise
                     # a ``ValueError`` like "expected ':' after conversion specifier".  An
-                    # f‑string is evaluated prior to concatenation, so braces inside
+                    # f-string is evaluated prior to concatenation, so braces inside
                     # *context* remain intact.
                     "content": (
-                        f"Return up to {limit} usage scenarios for this prompt.\n\n"
+                        f"Return up to {limit} scenarios for this prompt.\n\n"
                         f"Prompt:\n{context.strip()}"
                     ),
                 },
