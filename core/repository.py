@@ -90,7 +90,6 @@ def _connect(db_path: Path) -> sqlite3.Connection:
 
 def _stringify_uuid(value: uuid.UUID | str) -> str:
     """Return a canonical UUID string for storage."""
-
     if isinstance(value, uuid.UUID):
         return str(value)
     return str(uuid.UUID(str(value)))
@@ -133,7 +132,6 @@ def _json_loads_optional(value: str | None) -> Any | None:
 
 def _json_loads_dict(value: str | None) -> dict[str, Any]:
     """Deserialize JSON strings into dictionaries."""
-
     if value is None or value in ("", "null"):
         return {}
     try:
@@ -148,14 +146,12 @@ def _json_loads_dict(value: str | None) -> dict[str, Any]:
 
 def _prompt_snapshot_json(prompt: Prompt) -> str:
     """Return a canonical JSON payload describing the prompt state."""
-
     record = prompt.to_record()
     return json.dumps(record, ensure_ascii=False, sort_keys=True)
 
 
 def _parse_optional_datetime(value: Any) -> datetime | None:
     """Return a timezone-aware datetime parsed from SQLite rows when possible."""
-
     if isinstance(value, datetime):
         return value if value.tzinfo else value.replace(tzinfo=UTC)
     if isinstance(value, str):
@@ -275,7 +271,6 @@ class PromptRepository:
 
     def get_prompt_catalogue_stats(self) -> PromptCatalogueStats:
         """Return aggregate prompt statistics for maintenance workflows."""
-
         total = 0
         active = 0
         categories: set[str] = set()
@@ -405,7 +400,6 @@ class PromptRepository:
 
     def list_categories(self, include_archived: bool = False) -> list[PromptCategory]:
         """Return all stored categories."""
-
         query = "SELECT * FROM prompt_categories"
         params: list[Any] = []
         if not include_archived:
@@ -420,7 +414,6 @@ class PromptRepository:
 
     def get_category(self, slug: str) -> PromptCategory:
         """Return a category by slug."""
-
         try:
             with _connect(self._db_path) as conn:
                 row = conn.execute(
@@ -435,7 +428,6 @@ class PromptRepository:
 
     def create_category(self, category: PromptCategory) -> PromptCategory:
         """Persist a new category definition."""
-
         payload = self._category_to_row(category)
         try:
             with _connect(self._db_path) as conn:
@@ -477,7 +469,6 @@ class PromptRepository:
 
     def update_category(self, category: PromptCategory) -> PromptCategory:
         """Update an existing category definition."""
-
         payload = self._category_to_row(category)
         slug = payload.pop("slug")
         try:
@@ -514,7 +505,6 @@ class PromptRepository:
 
     def set_category_active(self, slug: str, is_active: bool) -> PromptCategory:
         """Enable or disable a category."""
-
         try:
             with _connect(self._db_path) as conn:
                 cursor = conn.execute(
@@ -544,7 +534,6 @@ class PromptRepository:
         categories: Sequence[PromptCategory],
     ) -> list[PromptCategory]:
         """Ensure the provided categories exist; return any newly created ones."""
-
         existing = {category.slug for category in self.list_categories(include_archived=True)}
         created: list[PromptCategory] = []
         for category in categories:
@@ -556,7 +545,6 @@ class PromptRepository:
 
     def update_prompt_category_labels(self, slug: str, label: str) -> None:
         """Rename prompt records linked to the specified category slug."""
-
         try:
             with _connect(self._db_path) as conn:
                 self._update_prompt_labels_for_category(conn, slugify_category(slug), label)
@@ -573,7 +561,6 @@ class PromptRepository:
         parent_version_id: int | None = None,
     ) -> PromptVersion:
         """Persist a snapshot of the prompt for version history tracking."""
-
         snapshot_json = _prompt_snapshot_json(prompt)
         timestamp = datetime.now(UTC).isoformat()
 
@@ -626,7 +613,6 @@ class PromptRepository:
         limit: int | None = None,
     ) -> list[PromptVersion]:
         """Return stored versions for a prompt ordered by newest first."""
-
         query = (
             "SELECT version_id, prompt_id, parent_version, version_number, created_at, "
             "commit_message, snapshot_json FROM prompt_versions WHERE prompt_id = ? "
@@ -648,7 +634,6 @@ class PromptRepository:
 
     def get_prompt_version(self, version_id: int) -> PromptVersion:
         """Return a specific prompt version by identifier."""
-
         try:
             with _connect(self._db_path) as conn:
                 row = conn.execute(
@@ -668,7 +653,6 @@ class PromptRepository:
 
     def get_prompt_latest_version(self, prompt_id: uuid.UUID) -> PromptVersion | None:
         """Return the most recent version entry for the given prompt, if any."""
-
         try:
             with _connect(self._db_path) as conn:
                 row = conn.execute(
@@ -692,7 +676,6 @@ class PromptRepository:
         child_prompt_id: uuid.UUID,
     ) -> PromptForkLink:
         """Persist lineage information between a prompt and its fork."""
-
         timestamp = datetime.now(UTC).isoformat()
         try:
             with _connect(self._db_path) as conn:
@@ -727,7 +710,6 @@ class PromptRepository:
 
     def get_prompt_parent_fork(self, prompt_id: uuid.UUID) -> PromptForkLink | None:
         """Return the lineage entry that links the prompt to its source."""
-
         try:
             with _connect(self._db_path) as conn:
                 row = conn.execute(
@@ -747,7 +729,6 @@ class PromptRepository:
 
     def list_prompt_children(self, prompt_id: uuid.UUID) -> list[PromptForkLink]:
         """Return lineage entries for prompts forked from the provided prompt."""
-
         try:
             with _connect(self._db_path) as conn:
                 cursor = conn.execute(
@@ -862,7 +843,6 @@ class PromptRepository:
         order_desc: bool = True,
     ) -> list[PromptExecution]:
         """Return executions filtered by status, prompt, and search term."""
-
         query = "SELECT * FROM prompt_executions"
         conditions: list[str] = []
         params: list[Any] = []
@@ -907,7 +887,6 @@ class PromptRepository:
         limit: int = 5,
     ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         """Return overall and per-prompt execution aggregates."""
-
         limit_value = max(1, int(limit)) if limit else 5
         filters: list[str] = []
         params: list[Any] = []
@@ -967,7 +946,6 @@ class PromptRepository:
         since: datetime | None = None,
     ) -> list[dict[str, Any]]:
         """Return aggregated token usage grouped by model identifier."""
-
         filters = ["metadata IS NOT NULL", "json_valid(metadata)"]
         params: list[Any] = []
         if since is not None:
@@ -1009,7 +987,6 @@ class PromptRepository:
         since: datetime | None = None,
     ) -> list[dict[str, Any]]:
         """Return aggregated metrics for persisted benchmark executions."""
-
         filters = [
             "metadata IS NOT NULL",
             "json_valid(metadata)",
@@ -1055,7 +1032,6 @@ class PromptRepository:
         since: datetime | None = None,
     ) -> dict[str, Any]:
         """Return aggregate execution metrics for a single prompt."""
-
         filters = ["prompt_id = ?"]
         params: list[Any] = [_stringify_uuid(prompt_id)]
         if since is not None:
@@ -1090,7 +1066,6 @@ class PromptRepository:
 
     def get_category_prompt_counts(self) -> dict[str, dict[str, Any]]:
         """Return prompt totals per category (active/inactive)."""
-
         query = (
             "SELECT "
             "category_slug AS slug, "
@@ -1115,7 +1090,6 @@ class PromptRepository:
 
     def get_category_execution_statistics(self) -> dict[str, dict[str, Any]]:
         """Return execution aggregates grouped by prompt category."""
-
         query = (
             "SELECT "
             "p.category_slug AS slug, "
@@ -1255,7 +1229,6 @@ class PromptRepository:
 
     def _category_to_row(self, category: PromptCategory) -> dict[str, Any]:
         """Serialize a PromptCategory into SQLite-friendly mapping."""
-
         return {
             "slug": category.slug,
             "label": category.label,
@@ -1272,7 +1245,6 @@ class PromptRepository:
 
     def _row_to_category(self, row: sqlite3.Row) -> PromptCategory:
         """Hydrate PromptCategory from SQLite row."""
-
         payload: dict[str, Any] = {
             "slug": row["slug"],
             "label": row["label"],
@@ -1295,7 +1267,6 @@ class PromptRepository:
         label: str,
     ) -> None:
         """Propagate category label updates to prompt records."""
-
         conn.execute(
             "UPDATE prompts SET category = ? WHERE category_slug = ?;",
             (label, slug),
@@ -1303,7 +1274,6 @@ class PromptRepository:
 
     def _user_profile_to_row(self, profile: UserProfile) -> dict[str, Any]:
         """Serialize UserProfile to SQLite row mapping."""
-
         record = profile.to_record()
         return {
             "id": record["id"],
@@ -1321,7 +1291,6 @@ class PromptRepository:
 
     def _row_to_user_profile(self, row: sqlite3.Row) -> UserProfile:
         """Hydrate UserProfile from SQLite row."""
-
         payload: dict[str, Any] = {
             "id": row["id"],
             "username": row["username"],
@@ -1339,7 +1308,6 @@ class PromptRepository:
 
     def _next_version_number(self, conn: sqlite3.Connection, prompt_id: uuid.UUID) -> int:
         """Return the next version number for the given prompt."""
-
         row = conn.execute(
             (
                 "SELECT COALESCE(MAX(version_number), 0) AS current FROM prompt_versions "
@@ -1357,7 +1325,6 @@ class PromptRepository:
         prompt_id: uuid.UUID,
     ) -> int | None:
         """Return the version_id for the latest version of a prompt."""
-
         row = conn.execute(
             (
                 "SELECT version_id FROM prompt_versions WHERE prompt_id = ? "
@@ -1609,7 +1576,6 @@ class PromptRepository:
 
     def _backfill_category_slugs(self, conn: sqlite3.Connection) -> None:
         """Populate missing prompt category slugs for legacy records."""
-
         try:
             cursor = conn.execute(
                 "SELECT id, category FROM prompts WHERE (category_slug IS NULL OR "
@@ -1629,7 +1595,6 @@ class PromptRepository:
 
     def reset_all_data(self) -> None:
         """Clear all persisted prompts, executions, and user profile data."""
-
         try:
             with _connect(self._db_path) as conn:
                 conn.execute("DELETE FROM prompt_versions;")
@@ -1650,7 +1615,6 @@ class PromptRepository:
 
     def get_user_profile(self) -> UserProfile:
         """Return the single stored user profile, creating a default if missing."""
-
         try:
             with _connect(self._db_path) as conn:
                 cursor = conn.execute("SELECT * FROM user_profile LIMIT 1;")
@@ -1666,7 +1630,6 @@ class PromptRepository:
 
     def save_user_profile(self, profile: UserProfile) -> UserProfile:
         """Insert or update the singleton user profile."""
-
         payload = self._user_profile_to_row(profile)
         assignments = ", ".join(
             f"{column} = excluded.{column}" for column in self._PROFILE_COLUMNS if column != "id"
@@ -1687,14 +1650,12 @@ class PromptRepository:
 
     def record_user_prompt_usage(self, prompt: Prompt, *, max_recent: int = 20) -> UserProfile:
         """Update stored profile preferences using a prompt usage event."""
-
         profile = self.get_user_profile()
         profile.record_prompt_usage(prompt, max_recent=max_recent)
         return self.save_user_profile(profile)
 
     def _response_style_to_row(self, style: ResponseStyle) -> dict[str, Any]:
         """Serialise ResponseStyle into SQLite-compatible mapping."""
-
         record = style.to_record()
         return {
             "id": record["id"],
@@ -1719,7 +1680,6 @@ class PromptRepository:
 
     def _row_to_response_style(self, row: sqlite3.Row) -> ResponseStyle:
         """Hydrate ResponseStyle from SQLite row."""
-
         payload: dict[str, Any] = {
             column: row[column]
             for column in row.keys()
@@ -1735,7 +1695,6 @@ class PromptRepository:
 
     def _note_to_row(self, note: PromptNote) -> dict[str, Any]:
         """Serialise PromptNote to SQLite mapping."""
-
         record = note.to_record()
         return {
             "id": record["id"],
@@ -1746,7 +1705,6 @@ class PromptRepository:
 
     def _row_to_note(self, row: sqlite3.Row) -> PromptNote:
         """Hydrate PromptNote from SQLite row."""
-
         payload: dict[str, Any] = {column: row[column] for column in row.keys()}
         return PromptNote.from_record(payload)
 
@@ -1754,7 +1712,6 @@ class PromptRepository:
 
     def add_response_style(self, style: ResponseStyle) -> ResponseStyle:
         """Insert a new response style record."""
-
         payload = self._response_style_to_row(style)
         placeholders = ", ".join(f":{column}" for column in self._RESPONSE_STYLE_COLUMNS)
         query = (
@@ -1772,7 +1729,6 @@ class PromptRepository:
 
     def update_response_style(self, style: ResponseStyle) -> ResponseStyle:
         """Update an existing response style record."""
-
         payload = self._response_style_to_row(style)
         assignments = ", ".join(
             f"{column} = :{column}"
@@ -1791,7 +1747,6 @@ class PromptRepository:
 
     def get_response_style(self, style_id: uuid.UUID) -> ResponseStyle:
         """Return a response style by identifier."""
-
         try:
             with _connect(self._db_path) as conn:
                 cursor = conn.execute(
@@ -1812,7 +1767,6 @@ class PromptRepository:
         search: str | None = None,
     ) -> list[ResponseStyle]:
         """Return stored response styles ordered by case-insensitive name."""
-
         query = "SELECT * FROM response_styles"
         clauses: list[str] = []
         params: list[Any] = []
@@ -1836,7 +1790,6 @@ class PromptRepository:
 
     def delete_response_style(self, style_id: uuid.UUID) -> None:
         """Delete a stored response style."""
-
         try:
             with _connect(self._db_path) as conn:
                 deleted = conn.execute(
@@ -1852,7 +1805,6 @@ class PromptRepository:
 
     def add_prompt_note(self, note: PromptNote) -> PromptNote:
         """Insert a new prompt note."""
-
         payload = self._note_to_row(note)
         column_list = ", ".join(self._NOTE_COLUMNS)
         placeholders = ", ".join(f":{column}" for column in self._NOTE_COLUMNS)
@@ -1868,7 +1820,6 @@ class PromptRepository:
 
     def update_prompt_note(self, note: PromptNote) -> PromptNote:
         """Update an existing prompt note."""
-
         payload = self._note_to_row(note)
         assignments = ", ".join(
             f"{column} = :{column}" for column in self._NOTE_COLUMNS if column != "id"
@@ -1885,7 +1836,6 @@ class PromptRepository:
 
     def get_prompt_note(self, note_id: uuid.UUID) -> PromptNote:
         """Return a prompt note by identifier."""
-
         try:
             with _connect(self._db_path) as conn:
                 cursor = conn.execute(
@@ -1901,7 +1851,6 @@ class PromptRepository:
 
     def list_prompt_notes(self) -> list[PromptNote]:
         """Return stored prompt notes ordered by modification time."""
-
         try:
             with _connect(self._db_path) as conn:
                 rows = conn.execute(
@@ -1913,7 +1862,6 @@ class PromptRepository:
 
     def delete_prompt_note(self, note_id: uuid.UUID) -> None:
         """Delete a prompt note."""
-
         try:
             with _connect(self._db_path) as conn:
                 deleted = conn.execute(
@@ -1927,7 +1875,6 @@ class PromptRepository:
 
     def get_prompts_for_ids(self, prompt_ids: Sequence[uuid.UUID]) -> list[Prompt]:
         """Return prompts that match provided identifiers in input order."""
-
         if not prompt_ids:
             return []
         ids = [_stringify_uuid(pid) for pid in prompt_ids]
