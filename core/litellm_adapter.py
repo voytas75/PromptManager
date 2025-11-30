@@ -30,7 +30,6 @@ _LiteLLMException: type[Exception] = Exception
 
 def _ensure_loaded() -> None:
     """Import LiteLLM helpers lazily to keep the dependency optional."""
-
     global _completion, _embedding, _LiteLLMException
     if _completion is not None:
         return
@@ -60,7 +59,6 @@ def _ensure_loaded() -> None:
 
 def get_completion() -> tuple[Callable[..., object], type[Exception]]:
     """Return the LiteLLM completion callable and exception type."""
-
     _ensure_loaded()
     assert _completion is not None  # pragma: no cover - defensive
     return _completion, _LiteLLMException
@@ -68,7 +66,6 @@ def get_completion() -> tuple[Callable[..., object], type[Exception]]:
 
 def get_embedding() -> tuple[Callable[..., object], type[Exception]]:
     """Return the LiteLLM embedding callable and exception type."""
-
     _ensure_loaded()
     if _embedding is None:
         raise RuntimeError(
@@ -87,7 +84,6 @@ def call_completion_with_fallback(
     pre_dropped: Iterable[str] | None = None,
 ) -> object:
     """Invoke LiteLLM completion and retry without unsupported params if necessary."""
-
     try:
         return completion(**request)  # type: ignore[arg-type]
     except lite_llm_exception as exc:  # type: ignore[arg-type]
@@ -117,7 +113,6 @@ def apply_configured_drop_params(
     drop_params: Sequence[str] | None,
 ) -> tuple[str, ...]:
     """Remove configured parameters from request dict and return the dropped set."""
-
     if not drop_params:
         return tuple()
 

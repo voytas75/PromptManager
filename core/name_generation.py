@@ -126,7 +126,6 @@ class LiteLLMNameGenerator:
 
     def _system_prompt_text(self) -> str:
         """Return the configured or default system prompt."""
-
         return (self.system_prompt or NAME_GENERATION_PROMPT).strip()
 
 
@@ -143,6 +142,7 @@ class LiteLLMDescriptionGenerator:
     system_prompt: str | None = None
 
     def generate(self, context: str) -> str:
+        """Return a succinct description for the prompt *context* text."""
         completion, LiteLLMException = get_completion()
         if not context.strip():
             raise DescriptionGenerationError(
@@ -224,7 +224,6 @@ class LiteLLMDescriptionGenerator:
 
     def _system_prompt_text(self) -> str:
         """Return the configured or default description system prompt."""
-
         return (self.system_prompt or DESCRIPTION_GENERATION_PROMPT).strip()
 
 
@@ -243,7 +242,6 @@ class LiteLLMCategoryGenerator:
 
     def generate(self, context: str, *, categories: Sequence[PromptCategory]) -> str:
         """Return the label of the best-fit category for the supplied prompt."""
-
         completion, LiteLLMException = get_completion()
         prompt_text = context.strip()
         if not prompt_text:
@@ -312,7 +310,6 @@ class LiteLLMCategoryGenerator:
 
     def _format_categories(self, categories: Sequence[PromptCategory]) -> str:
         """Return a newline separated bullet list of categories with descriptions."""
-
         entries: list[str] = []
         limit = max(1, self.max_categories)
         for category in list(categories)[:limit]:
@@ -326,13 +323,11 @@ class LiteLLMCategoryGenerator:
 
     def _system_prompt_text(self) -> str:
         """Return the configured or default category system prompt."""
-
         return (self.system_prompt or CATEGORY_GENERATION_PROMPT).strip()
 
 
 def _summarise_litellm_error(exc: Exception) -> str:
     """Return a concise, user-friendly message for LiteLLM failures."""
-
     text = str(exc).strip()
     if not text:
         return "LiteLLM request failed."
