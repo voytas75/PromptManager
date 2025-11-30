@@ -14,6 +14,7 @@ Usage (internal):
     >>> prompt = storage.get("prompt_123")
 
 Updates:
+  v0.14.2 - 2025-11-30 - Document façade helpers for lint compliance.
   v0.14.1 - 2025-11-29 - Move typing-only imports behind TYPE_CHECKING and wrap init.
   v0.14.0 - 2025-11-18 - Initial scaffold with proxy implementation.
 """
@@ -52,6 +53,7 @@ class PromptStorage:
         *,
         repository: PromptRepository | None = None,
     ) -> None:
+        """Initialise the storage wrapper with either an existing repo or DB path."""
         self._lock = threading.RLock()
 
         if repository is not None:
@@ -66,19 +68,21 @@ class PromptStorage:
     # ------------------------------------------------------------------
 
     def __getattr__(self, item: str) -> Any:  # noqa: D401,E501  (simple delegation)
+        """Delegate attribute lookups to the underlying repository."""
         return getattr(self._repo, item)
 
     # Example explicit wrapper – others can be added incrementally
     def list_prompts(self, limit: int | None = None) -> list[Prompt]:  # noqa: D401,E501
         """Return list of prompts (proxy)."""
-
         with self._lock:
             return self._repo.list(limit=limit)
 
     # Implementing *iter* provides transparent iteration support
     def __iter__(self) -> Iterator[Prompt]:  # noqa: D401
+        """Iterate over stored prompts via the proxy wrapper."""
         return iter(self.list_prompts())
 
     # Length for convenience
     def __len__(self) -> int:  # noqa: D401
+        """Return the number of prompts exposed by the proxy."""
         return len(self.list_prompts())

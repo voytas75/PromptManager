@@ -1,6 +1,7 @@
 """High-level analytics aggregation helpers for dashboards and diagnostics.
 
 Updates:
+  v0.1.2 - 2025-11-30 - Move typing-only imports into TYPE_CHECKING for lint compliance.
   v0.1.1 - 2025-11-30 - Fix function docstring spacing for lint compliance.
   v0.1.0 - 2025-11-28 - Introduce analytics snapshot builder for CLI and GUI surfaces.
 """
@@ -10,7 +11,6 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from collections.abc import Mapping
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 from core.prompt_manager import PromptHistoryError, PromptManager, PromptManagerError
 
 if TYPE_CHECKING:  # pragma: no cover - type hints only
+    from collections.abc import Mapping
     from uuid import UUID
 
     from core.history_tracker import ExecutionAnalytics

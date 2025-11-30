@@ -7,6 +7,7 @@ implementation so that we may later introduce alternative execution back-ends
 (streaming, batch, mock for testing) without touching calling code.
 
 Updates:
+  v0.14.3 - 2025-11-30 - Document initializer and tighten docstring spacing.
   v0.14.2 - 2025-11-29 - Move typing-only imports behind TYPE_CHECKING for Ruff.
   v0.14.1 - 2025-11-27 - Align façade with CodexExecutor prompt-centric API.
   v0.14.0 - 2025-11-18 - Initial scaffold with proxy implementation.
@@ -51,6 +52,7 @@ class PromptExecutor:
         reasoning_effort: str | None = None,
         stream: bool = False,
     ) -> None:
+        """Initialise executor façade with optional LiteLLM tuning parameters."""
         self._executor = CodexExecutor(
             model=model,
             api_key=api_key,
@@ -74,7 +76,6 @@ class PromptExecutor:
         on_stream: Callable[[str], None] | None = None,
     ) -> ExecutionResult:
         """Run ``request_text`` against ``prompt`` via LiteLLM."""
-
         return self._executor.execute(
             prompt,
             request_text,
@@ -85,7 +86,6 @@ class PromptExecutor:
 
     def save_transcript(self, conversation: Iterable[str], path: str | Path) -> None:
         """Persist a plain-text transcript for debugging sessions."""
-
         resolved_path = Path(path)
         resolved_path.parent.mkdir(parents=True, exist_ok=True)
         lines = [str(line) for line in conversation]

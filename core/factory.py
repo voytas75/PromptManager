@@ -1,6 +1,7 @@
 """Factories for constructing PromptManager instances from validated settings.
 
 Updates:
+  v0.7.6 - 2025-11-30 - Remove docstring padding for Ruff compliance.
   v0.7.5 - 2025-11-29 - Move config imports behind type checks and wrap long strings.
   v0.7.4 - 2025-11-24 - Wire LiteLLM category suggestion helper into manager construction.
   v0.7.3 - 2025-11-05 - Support LiteLLM workflow routing across fast/inference models.
@@ -72,7 +73,6 @@ def _resolve_embedding_components(
     embedding_provider: EmbeddingProvider | None,
 ) -> tuple[Any | None, EmbeddingProvider]:
     """Return embedding function/provider pair respecting overrides and settings."""
-
     resolved_function = embedding_function
     if resolved_function is None:
         try:
@@ -89,6 +89,7 @@ def _resolve_embedding_components(
     if embedding_provider is not None:
         return resolved_function, embedding_provider
     return resolved_function, EmbeddingProvider(resolved_function)
+
 
 def build_prompt_manager(
     settings: PromptManagerSettings,

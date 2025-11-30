@@ -1,6 +1,8 @@
 """Prompt sharing helpers for external paste services.
 
-Updates: v0.1.0 - 2025-11-28 - Add ShareText provider and prompt formatting helper.
+Updates:
+  v0.1.1 - 2025-11-30 - Document ShareText provider methods for lint compliance.
+  v0.1.0 - 2025-11-28 - Add ShareText provider and prompt formatting helper.
 """
 
 from __future__ import annotations
@@ -58,7 +60,6 @@ def format_prompt_for_share(
     include_metadata: bool = True,
 ) -> str:
     """Return a readable text payload for uploading to sharing services."""
-
     lines: list[str] = []
     title = prompt.name.strip() if prompt.name else "Untitled prompt"
     lines.append(f"# {title}")
@@ -114,6 +115,7 @@ class ShareTextProvider:
     _USER_AGENT = "PromptManager/PromptShare"
 
     def __init__(self, *, expiry: str = "1M", timeout: float = 15.0) -> None:
+        """Configure ShareText client defaults such as paste expiry and timeout."""
         self._expiry = expiry
         self._timeout = timeout
         self.info = ShareProviderInfo(
@@ -123,6 +125,7 @@ class ShareTextProvider:
         )
 
     def share(self, payload: str, prompt: Prompt | None = None) -> ShareResult:
+        """Upload *payload* to ShareText and return the share metadata."""
         body = json.dumps(
             {"text": payload, "expiry": self._expiry},
             ensure_ascii=False,

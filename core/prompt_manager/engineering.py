@@ -1,6 +1,7 @@
 """Prompt engineering helpers façade.
 
 Updates:
+  v0.14.4 - 2025-11-30 - Document initializer and tighten docstring spacing.
   v0.14.3 - 2025-11-29 - Gate typing imports and wrap long initializer signature.
   v0.14.2 - 2025-11-27 - Align façade signature with PromptEngineer implementation.
   v0.14.1 - 2025-11-25 - Add module history metadata per AGENTS guidelines.
@@ -37,6 +38,7 @@ class PromptEngineerFacade:
         engineer: PromptEngineer | None = None,
         model_name: str | None = None,
     ) -> None:
+        """Initialise the facade, creating an engine when only *model_name* is provided."""
         if engineer is not None:
             self._engineer = engineer
         elif model_name is not None:
@@ -56,7 +58,6 @@ class PromptEngineerFacade:
         structure_only: bool = False,
     ) -> PromptRefinement:
         """Refine a prompt using the underlying engineer."""
-
         return self._engineer.refine(
             prompt_text,
             name=name,
@@ -78,7 +79,6 @@ class PromptEngineerFacade:
         negative_constraints: Sequence[str] | None = None,
     ) -> PromptRefinement:
         """Run structure-only refinement via :meth:`PromptEngineer.refine_structure`."""
-
         return self._engineer.refine_structure(
             prompt_text,
             name=name,
