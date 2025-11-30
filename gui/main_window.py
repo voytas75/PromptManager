@@ -54,25 +54,18 @@ from PySide6.QtGui import (
     QTextCursor,
 )
 from PySide6.QtWidgets import (
-    QAbstractItemView,
     QCheckBox,
     QDialog,
     QFileDialog,
     QFrame,
-    QHBoxLayout,
     QLabel,
-    QLayout,
     QListView,
     QMainWindow,
     QMenu,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
-    QSizePolicy,
     QSplitter,
-    QTabWidget,
-    QTextEdit,
-    QVBoxLayout,
     QWidget,
 )
 
@@ -106,7 +99,6 @@ from core.notifications import Notification, NotificationStatus
 from core.sharing import ShareProvider, ShareTextProvider, format_prompt_for_share
 from models.category_model import PromptCategory, slugify_category
 
-from .analytics_panel import AnalyticsDashboardPanel
 from .code_highlighter import CodeHighlighter
 from .command_palette import CommandPaletteDialog, QuickAction, rank_prompts_for_action
 from .controllers.execution_controller import ExecutionController
@@ -120,7 +112,6 @@ from .dialogs import (
     SaveResultDialog,
 )
 from .execute_context_dialog import ExecuteContextDialog
-from .history_panel import HistoryPanel
 from .language_tools import DetectedLanguage, detect_language
 from .layout_state import (
     _EXECUTE_CONTEXT_HISTORY_LIMIT,
@@ -132,19 +123,16 @@ from .layout_state import (
     _store_last_execute_context_task,
     _store_sort_preference,
 )
-from .notes_panel import NotesPanel
+from .main_view_builder import MainViewCallbacks, MainViewComponents, build_main_view
 from .notifications import BackgroundTaskCenterDialog, QtNotificationBridge
 from .processing_indicator import ProcessingIndicator
 from .prompt_list_model import PromptListModel
 from .prompt_templates_dialog import PromptTemplateEditorDialog
-from .response_styles_panel import ResponseStylesPanel
-from .result_overlay import ResultActionsOverlay
 from .settings_dialog import SettingsDialog, persist_settings_to_config
 from .share_controller import ShareController
-from .template_preview import TemplatePreviewWidget
 from .toast import show_toast
 from .usage_logger import IntentUsageLogger
-from .widgets import FlowLayout, PromptDetailWidget, PromptFilterPanel, PromptToolbar
+from .widgets import PromptDetailWidget, PromptFilterPanel, PromptToolbar
 from .workbench.workbench_window import WorkbenchModeDialog, WorkbenchWindow
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
@@ -152,6 +140,9 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
 
     from core.prompt_engineering import PromptRefinement
     from models.prompt_model import Prompt
+
+    from .result_overlay import ResultActionsOverlay
+    from .template_preview import TemplatePreviewWidget
 
 logger = logging.getLogger(__name__)
 
@@ -306,6 +297,7 @@ class MainWindow(QMainWindow):
         self._query_seeded_by_quick_action: str | None = None
         self._execution_controller: ExecutionController | None = None
         self._render_markdown_checkbox: QCheckBox | None = None
+        self._query_input: QPlainTextEdit | None = None
         self._suppress_query_signal = False
         self._quick_shortcuts: list[QShortcut] = []
         self._template_preview: TemplatePreviewWidget | None = None
@@ -411,345 +403,64 @@ class MainWindow(QMainWindow):
 
     def _build_ui(self) -> None:
         """Create the main layout with list/search/detail panes."""
-        container = QFrame(self)
-        container.setObjectName("mainContainer")
-        self._main_container = container
-        layout = QVBoxLayout(container)
-        layout.setContentsMargins(12, 12, 12, 12)
-
-        toolbar = PromptToolbar(self)
-        toolbar.search_requested.connect(self._on_search_button_clicked)
-        toolbar.search_text_changed.connect(self._on_search_changed)
-        toolbar.refresh_requested.connect(self._on_refresh_clicked)
-        toolbar.add_requested.connect(self._on_add_clicked)
-        toolbar.workbench_requested.connect(self._on_workbench_clicked)
-        toolbar.import_requested.connect(self._on_import_clicked)
-        toolbar.export_requested.connect(self._on_export_clicked)
-        toolbar.maintenance_requested.connect(self._on_maintenance_clicked)
-        toolbar.notifications_requested.connect(self._on_notifications_clicked)
-        toolbar.info_requested.connect(self._on_info_clicked)
-        toolbar.templates_requested.connect(self._on_prompt_templates_clicked)
-        toolbar.settings_requested.connect(self._on_settings_clicked)
-        toolbar.exit_requested.connect(self._on_exit_clicked)
-        layout.addWidget(toolbar)
-        self._toolbar = toolbar
-
-        language_layout = QHBoxLayout()
-        language_layout.setContentsMargins(0, 0, 0, 0)
-        self._language_label = QLabel(self)
-        self._language_label.setObjectName("detectedLanguageLabel")
-        language_layout.addWidget(self._language_label)
-        language_layout.addStretch(1)
-
-        actions_layout = FlowLayout(spacing=8)
-
-        self._quick_actions_button = QPushButton("Quick Actions", self)
-        self._quick_actions_button.clicked.connect(self._show_command_palette)  # type: ignore[arg-type]
-        self._quick_actions_button_default_text = self._quick_actions_button.text()
-        self._quick_actions_button_default_tooltip = "Open the command palette for quick actions."
-        self._quick_actions_button.setToolTip(self._quick_actions_button_default_tooltip)
-        actions_layout.addWidget(self._quick_actions_button)
-
-        self._detect_button = QPushButton("Detect Need", self)
-        self._detect_button.clicked.connect(self._on_detect_intent_clicked)  # type: ignore[arg-type]
-        actions_layout.addWidget(self._detect_button)
-
-        self._suggest_button = QPushButton("Suggest Prompt", self)
-        self._suggest_button.clicked.connect(self._on_suggest_prompt_clicked)  # type: ignore[arg-type]
-        actions_layout.addWidget(self._suggest_button)
-
-        self._run_button = QPushButton("Run Prompt", self)
-        self._run_button.clicked.connect(self._on_run_prompt_clicked)  # type: ignore[arg-type]
-        actions_layout.addWidget(self._run_button)
-
-        self._clear_button = QPushButton("Clear", self)
-        self._clear_button.setToolTip("Clear the workspace input, output, and chat panes.")
-        self._clear_button.clicked.connect(self._on_clear_workspace_clicked)  # type: ignore[arg-type]
-        actions_layout.addWidget(self._clear_button)
-
-        self._continue_chat_button = QPushButton("Continue Chat", self)
-        self._continue_chat_button.clicked.connect(self._on_continue_chat_clicked)  # type: ignore[arg-type]
-        actions_layout.addWidget(self._continue_chat_button)
-
-        self._end_chat_button = QPushButton("End Chat", self)
-        self._end_chat_button.clicked.connect(self._on_end_chat_clicked)  # type: ignore[arg-type]
-        actions_layout.addWidget(self._end_chat_button)
-
-        self._copy_button = QPushButton("Copy Prompt", self)
-        self._copy_button.clicked.connect(self._on_copy_prompt_clicked)  # type: ignore[arg-type]
-        actions_layout.addWidget(self._copy_button)
-
-        self._copy_result_button = QPushButton("Copy Result", self)
-        self._copy_result_button.clicked.connect(self._on_copy_result_clicked)  # type: ignore[arg-type]
-
-        self._copy_result_to_text_window_button = QPushButton("Copy to Text Window", self)
-        self._copy_result_to_text_window_button.clicked.connect(
-            self._on_copy_result_to_text_window_clicked
-        )  # type: ignore[arg-type]
-
-        self._save_button = QPushButton("Save Result", self)
-        self._save_button.clicked.connect(self._on_save_result_clicked)  # type: ignore[arg-type]
-
-        self._share_result_button = QPushButton("Share Result", self)
-        self._share_result_button.clicked.connect(self._on_share_result_clicked)  # type: ignore[arg-type]
-
-        self._intent_hint = QLabel("", self)
-        self._intent_hint.setObjectName("intentHintLabel")
-        self._intent_hint.setStyleSheet("color: #5b5b5b; font-style: italic;")
-        self._intent_hint.setWordWrap(True)
-        self._intent_hint.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
-        self._intent_hint.setVisible(False)
-
-        filter_panel = PromptFilterPanel(
-            sort_options=[(label, order.value) for label, order in self._SORT_OPTIONS],
-            parent=self,
+        callbacks = MainViewCallbacks(
+            search_requested=self._on_search_button_clicked,
+            search_text_changed=self._on_search_changed,
+            refresh_requested=self._on_refresh_clicked,
+            add_requested=self._on_add_clicked,
+            workbench_requested=self._on_workbench_clicked,
+            import_requested=self._on_import_clicked,
+            export_requested=self._on_export_clicked,
+            maintenance_requested=self._on_maintenance_clicked,
+            notifications_requested=self._on_notifications_clicked,
+            info_requested=self._on_info_clicked,
+            templates_requested=self._on_prompt_templates_clicked,
+            settings_requested=self._on_settings_clicked,
+            exit_requested=self._on_exit_clicked,
+            show_command_palette=self._show_command_palette,
+            detect_intent_clicked=self._on_detect_intent_clicked,
+            suggest_prompt_clicked=self._on_suggest_prompt_clicked,
+            run_prompt_clicked=self._on_run_prompt_clicked,
+            clear_workspace_clicked=self._on_clear_workspace_clicked,
+            continue_chat_clicked=self._on_continue_chat_clicked,
+            end_chat_clicked=self._on_end_chat_clicked,
+            copy_prompt_clicked=self._on_copy_prompt_clicked,
+            copy_result_clicked=self._on_copy_result_clicked,
+            copy_result_to_text_window_clicked=self._on_copy_result_to_text_window_clicked,
+            save_result_clicked=self._on_save_result_clicked,
+            share_result_clicked=self._on_share_result_clicked,
+            filters_changed=self._on_filters_changed,
+            sort_changed=self._on_sort_changed,
+            manage_categories_clicked=self._on_manage_categories_clicked,
+            query_text_changed=self._on_query_text_changed,
+            tab_changed=self._on_tab_changed,
+            selection_changed=self._on_selection_changed,
+            prompt_double_clicked=self._on_prompt_double_clicked,
+            prompt_context_menu=self._on_prompt_context_menu,
+            render_markdown_toggled=self._on_render_markdown_toggled,
+            template_preview_run_requested=self._on_template_preview_run_requested,
+            template_preview_run_state_changed=self._on_template_run_state_changed,
+            template_tab_run_clicked=self._on_template_tab_run_clicked,
         )
-        filter_panel.filters_changed.connect(self._on_filters_changed)
-        filter_panel.sort_changed.connect(self._on_sort_changed)
-        filter_panel.manage_categories_requested.connect(self._on_manage_categories_clicked)
-        layout.addWidget(filter_panel)
-        self._filter_panel = filter_panel
-        if self._pending_quality_value is not None:
-            filter_panel.set_min_quality(self._pending_quality_value)
-            self._pending_quality_value = None
-        filter_panel.set_sort_value(self._sort_order.value)
-
-        self._query_input = QPlainTextEdit(self)
-        self._query_input.setPlaceholderText("Paste code or text to analyse and suggest prompts…")
-        self._query_input.setMinimumHeight(120)
-        self._query_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self._query_input.textChanged.connect(self._on_query_text_changed)
-        self._highlighter = CodeHighlighter(self._query_input.document())
-
-        self._tab_widget = QTabWidget(self)
-        self._tab_widget.currentChanged.connect(self._on_tab_changed)  # type: ignore[arg-type]
-
-        result_tab = QWidget(self)
-        result_tab_layout = QVBoxLayout(result_tab)
-        result_tab_layout.setContentsMargins(0, 0, 0, 0)
-
-        self._main_splitter = QSplitter(Qt.Horizontal, result_tab)
-        self._main_splitter.splitterMoved.connect(self._on_main_splitter_moved)  # type: ignore[arg-type]
-
-        self._list_splitter = QSplitter(Qt.Vertical, self._main_splitter)
-
-        self._list_view = QListView(self._list_splitter)
-        self._list_view.setModel(self._model)
-        self._list_view.setSelectionMode(QAbstractItemView.SingleSelection)
-        self._list_view.selectionModel().selectionChanged.connect(self._on_selection_changed)  # type: ignore[arg-type]
-        self._list_view.doubleClicked.connect(self._on_prompt_double_clicked)  # type: ignore[arg-type]
-        self._list_view.setContextMenuPolicy(Qt.CustomContextMenu)
-        self._list_view.customContextMenuRequested.connect(self._on_prompt_context_menu)
-        self._list_splitter.addWidget(self._list_view)
-
-        self._list_splitter.addWidget(self._detail_widget)
-        self._list_splitter.setStretchFactor(0, 5)
-        self._list_splitter.setStretchFactor(1, 2)
-        self._main_splitter.addWidget(self._list_splitter)
-
-        workspace_panel = QWidget(self._main_splitter)
-        workspace_layout = QVBoxLayout(workspace_panel)
-        workspace_layout.setContentsMargins(0, 0, 0, 0)
-
-        self._workspace_splitter = QSplitter(Qt.Vertical, workspace_panel)
-        self._workspace_splitter.setChildrenCollapsible(False)
-        workspace_layout.addWidget(self._workspace_splitter, 1)
-
-        query_panel = QWidget(self._workspace_splitter)
-        query_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        query_panel_layout = QVBoxLayout(query_panel)
-        query_panel_layout.setSizeConstraint(QLayout.SetMinimumSize)
-        query_panel_layout.setContentsMargins(0, 0, 0, 0)
-        query_panel_layout.setSpacing(8)
-        query_panel_layout.addWidget(self._query_input, 1)
-        query_panel_layout.addLayout(actions_layout)
-        query_panel_layout.addLayout(language_layout)
-        query_panel_layout.addWidget(self._intent_hint)
-
-        output_panel = QWidget(self._workspace_splitter)
-        output_layout = QVBoxLayout(output_panel)
-        output_layout.setContentsMargins(0, 0, 0, 0)
-        output_layout.setSpacing(8)
-
-        self._result_label = QLabel("No prompt executed yet", self)
-        self._result_label.setObjectName("resultTitle")
-        self._result_meta = QLabel("", self)
-        self._result_meta.setStyleSheet("color: #5b5b5b; font-style: italic;")
-
-        self._result_tabs = QTabWidget(self)
-        output_tab = QWidget(self)
-        output_tab_layout = QVBoxLayout(output_tab)
-        output_tab_layout.setContentsMargins(0, 0, 0, 0)
-        output_tab_layout.setSpacing(8)
-
-        self._result_text = QTextEdit(self)
-        self._result_text.setReadOnly(True)
-        self._result_text.setAcceptRichText(True)
-        self._result_text.setPlaceholderText("Run a prompt to see output here.")
-        self._result_text.viewport().installEventFilter(self)
-        self._result_text.installEventFilter(self)
-        output_tab_layout.addWidget(self._result_text, 1)
-
-        self._result_overlay = ResultActionsOverlay(self._result_text)
-        self._result_overlay.rebuild(
-            [
-                self._save_button,
-                self._copy_result_button,
-                self._copy_result_to_text_window_button,
-                self._share_result_button,
-            ]
-        )
-
-        self._result_tabs.addTab(output_tab, "Output")
-
-        self._chat_history_view = QTextEdit(self)
-        self._chat_history_view.setReadOnly(True)
-        self._chat_history_view.setAcceptRichText(True)
-        self._chat_history_view.setPlaceholderText("Run a prompt to start chatting.")
-        self._result_tabs.addTab(self._chat_history_view, "Chat")
-
-        output_layout.addWidget(self._result_label)
-        output_layout.addWidget(self._result_meta)
-        output_layout.addWidget(self._result_tabs, 1)
-
-        render_actions_layout = QHBoxLayout()
-        render_actions_layout.setContentsMargins(0, 0, 0, 0)
-        render_actions_layout.setSpacing(8)
-        self._render_markdown_checkbox = QCheckBox("Render Markdown", self)
-        self._render_markdown_checkbox.setChecked(True)
-        self._render_markdown_checkbox.stateChanged.connect(self._on_render_markdown_toggled)  # type: ignore[arg-type]
-        render_actions_layout.addWidget(self._render_markdown_checkbox)
-        render_actions_layout.addStretch(1)
-        output_layout.addLayout(render_actions_layout)
-        self._workspace_splitter.addWidget(output_panel)
-        self._workspace_splitter.addWidget(query_panel)
-        self._workspace_splitter.setStretchFactor(0, 5)
-        self._workspace_splitter.setStretchFactor(1, 3)
-        self._main_splitter.addWidget(workspace_panel)
-        self._main_splitter.setStretchFactor(0, 0)
-        self._main_splitter.setStretchFactor(1, 1)
-
-        result_tab_layout.addWidget(self._main_splitter)
-
-        self._history_panel = HistoryPanel(
-            self._manager,
-            self,
-            limit=self._history_limit,
-            on_note_updated=self._handle_note_update,
-            on_export=self._handle_history_export,
-        )
-
-        self._notes_panel = NotesPanel(
-            self._manager,
-            self,
-            status_callback=self._show_status_message,
-            toast_callback=self._show_toast,
-        )
-
-        self._response_styles_panel = ResponseStylesPanel(
-            self._manager,
-            self,
-            status_callback=self._show_status_message,
-            toast_callback=self._show_toast,
-        )
-
         usage_log_path = getattr(self._usage_logger, "log_path", None)
-        self._analytics_panel = AnalyticsDashboardPanel(
-            self._manager,
-            self,
+        components = build_main_view(
+            parent=self,
+            model=self._model,
+            detail_widget=self._detail_widget,
+            manager=self._manager,
+            history_limit=self._history_limit,
+            sort_options=[(label, order.value) for label, order in self._SORT_OPTIONS],
+            callbacks=callbacks,
+            status_callback=self._show_status_message,
+            toast_callback=self._show_toast,
+            event_filter_target=self,
             usage_log_path=usage_log_path,
+            history_note_callback=self._handle_note_update,
+            history_export_callback=self._handle_history_export,
         )
-
-        self._tab_widget.addTab(result_tab, "Prompts")
-        self._tab_widget.addTab(self._history_panel, "History")
-        self._tab_widget.addTab(self._notes_panel, "Notes")
-        self._tab_widget.addTab(self._response_styles_panel, "Prompt Parts")
-        self._tab_widget.addTab(self._analytics_panel, "Analytics")
-
-        preview_tab = QWidget(self)
-        preview_layout = QVBoxLayout(preview_tab)
-        preview_layout.setContentsMargins(12, 12, 12, 12)
-        preview_layout.setSpacing(8)
-        preview_splitter = QSplitter(Qt.Horizontal, preview_tab)
-        preview_splitter.setChildrenCollapsible(False)
-        self._template_preview_splitter = preview_splitter
-
-        preview_list_panel = QWidget(preview_splitter)
-        preview_list_layout = QVBoxLayout(preview_list_panel)
-        preview_list_layout.setContentsMargins(0, 0, 0, 0)
-        preview_list_layout.setSpacing(6)
-        preview_hint = QLabel(
-            (
-                "Select a prompt to inspect variables and render it as a Jinja2 template. "
-                "Selections stay in sync with the main Prompts tab."
-            ),
-            preview_list_panel,
-        )
-        preview_hint.setWordWrap(True)
-        preview_hint.setStyleSheet("color: #4b5563;")
-        preview_list_layout.addWidget(preview_hint)
-        preview_list_splitter = QSplitter(Qt.Vertical, preview_list_panel)
-        preview_list_splitter.setChildrenCollapsible(False)
-        self._template_preview_list_splitter = preview_list_splitter
-        self._template_list_view = QListView(preview_list_splitter)
-        self._template_list_view.setModel(self._model)
-        self._template_list_view.setSelectionMode(QAbstractItemView.SingleSelection)
-        self._template_list_view.setSelectionModel(self._list_view.selectionModel())
-        self._template_list_view.doubleClicked.connect(self._on_prompt_double_clicked)  # type: ignore[arg-type]
-        preview_list_splitter.addWidget(self._template_list_view)
-        self._template_detail_widget = PromptDetailWidget(preview_list_splitter)
-        self._template_detail_widget.delete_requested.connect(self._on_delete_clicked)  # type: ignore[arg-type]
-        self._template_detail_widget.edit_requested.connect(self._on_edit_clicked)  # type: ignore[arg-type]
-        self._template_detail_widget.version_history_requested.connect(
-            self._open_version_history_dialog
-        )  # type: ignore[arg-type]
-        self._template_detail_widget.fork_requested.connect(self._on_fork_clicked)  # type: ignore[arg-type]
-        self._template_detail_widget.refresh_scenarios_requested.connect(  # type: ignore[arg-type]
-            partial(self._handle_refresh_scenarios_request, self._template_detail_widget)
-        )
-        preview_list_splitter.addWidget(self._template_detail_widget)
-        preview_list_splitter.setStretchFactor(0, 1)
-        preview_list_splitter.setStretchFactor(1, 2)
-        preview_list_layout.addWidget(preview_list_splitter, 1)
-
-        preview_render_panel = QWidget(preview_splitter)
-        preview_render_layout = QVBoxLayout(preview_render_panel)
-        preview_render_layout.setContentsMargins(0, 0, 0, 0)
-        preview_render_layout.setSpacing(8)
-        self._template_preview = TemplatePreviewWidget(preview_render_panel)
-        self._template_preview.clear_template()
-        self._template_preview.run_requested.connect(  # type: ignore[arg-type]
-            self._on_template_preview_run_requested
-        )
-        self._template_preview.run_state_changed.connect(  # type: ignore[arg-type]
-            self._on_template_run_state_changed
-        )
-        preview_render_layout.addWidget(self._template_preview)
-
-        preview_splitter.addWidget(preview_list_panel)
-        preview_splitter.addWidget(preview_render_panel)
-        preview_splitter.setStretchFactor(0, 1)
-        preview_splitter.setStretchFactor(1, 2)
-        preview_layout.addWidget(preview_splitter, 1)
-
-        template_actions = QHBoxLayout()
-        template_actions.setContentsMargins(0, 0, 0, 0)
-        template_actions.setSpacing(8)
-        template_actions.addStretch(1)
-        run_shortcut = QPushButton("Run Rendered Template", preview_tab)
-        run_shortcut.setEnabled(False)
-        run_shortcut.setToolTip("Execute the rendered template using the selected prompt.")
-        run_shortcut.clicked.connect(self._on_template_tab_run_clicked)  # type: ignore[arg-type]
-        template_actions.addWidget(run_shortcut)
-        self._template_run_shortcut_button = run_shortcut
-        preview_layout.addLayout(template_actions)
-        self._tab_widget.addTab(preview_tab, "Template")
-
-        layout.addWidget(self._tab_widget, stretch=1)
-
+        self._assign_main_view_components(components)
         self._update_detected_language(self._query_input.toPlainText(), force=True)
-
-        self.setCentralWidget(container)
+        self.setCentralWidget(self._main_container)
 
         has_executor = self._manager.executor is not None
         self._run_button.setEnabled(has_executor)
@@ -761,6 +472,73 @@ class MainWindow(QMainWindow):
         self._share_result_button.setEnabled(False)
         self._continue_chat_button.setEnabled(False)
         self._end_chat_button.setEnabled(False)
+
+    def _assign_main_view_components(self, components: MainViewComponents) -> None:
+        """Store widget references built by ``build_main_view``."""
+        self._main_container = components.container
+        self._toolbar = components.toolbar
+        self._language_label = components.language_label
+        self._quick_actions_button = components.quick_actions_button
+        self._quick_actions_button_default_text = (
+            components.quick_actions_button_default_text
+        )
+        self._quick_actions_button_default_tooltip = (
+            components.quick_actions_button_default_tooltip
+        )
+        self._quick_actions_button.setToolTip(self._quick_actions_button_default_tooltip)
+        self._detect_button = components.detect_button
+        self._suggest_button = components.suggest_button
+        self._run_button = components.run_button
+        self._clear_button = components.clear_button
+        self._continue_chat_button = components.continue_chat_button
+        self._end_chat_button = components.end_chat_button
+        self._copy_button = components.copy_button
+        self._copy_result_button = components.copy_result_button
+        self._copy_result_to_text_window_button = (
+            components.copy_result_to_text_window_button
+        )
+        self._save_button = components.save_button
+        self._share_result_button = components.share_result_button
+        self._intent_hint = components.intent_hint
+        self._filter_panel = components.filter_panel
+        if self._pending_quality_value is not None:
+            self._filter_panel.set_min_quality(self._pending_quality_value)
+            self._pending_quality_value = None
+        self._filter_panel.set_sort_value(self._sort_order.value)
+        self._query_input = components.query_input
+        self._highlighter = CodeHighlighter(self._query_input.document())
+        self._tab_widget = components.tab_widget
+        self._main_splitter = components.main_splitter
+        self._main_splitter.splitterMoved.connect(self._on_main_splitter_moved)  # type: ignore[arg-type]
+        self._list_splitter = components.list_splitter
+        self._list_view = components.list_view
+        self._workspace_splitter = components.workspace_splitter
+        self._result_label = components.result_label
+        self._result_meta = components.result_meta
+        self._result_tabs = components.result_tabs
+        self._result_text = components.result_text
+        self._result_overlay = components.result_overlay
+        self._chat_history_view = components.chat_history_view
+        self._render_markdown_checkbox = components.render_markdown_checkbox
+        self._history_panel = components.history_panel
+        self._notes_panel = components.notes_panel
+        self._response_styles_panel = components.response_styles_panel
+        self._analytics_panel = components.analytics_panel
+        self._template_preview_splitter = components.template_preview_splitter
+        self._template_preview_list_splitter = components.template_preview_list_splitter
+        self._template_list_view = components.template_list_view
+        self._template_detail_widget = components.template_detail_widget
+        self._template_preview = components.template_preview
+        self._template_run_shortcut_button = components.template_run_shortcut_button
+        self._template_detail_widget.delete_requested.connect(self._on_delete_clicked)  # type: ignore[arg-type]
+        self._template_detail_widget.edit_requested.connect(self._on_edit_clicked)  # type: ignore[arg-type]
+        self._template_detail_widget.version_history_requested.connect(
+            self._open_version_history_dialog
+        )  # type: ignore[arg-type]
+        self._template_detail_widget.fork_requested.connect(self._on_fork_clicked)  # type: ignore[arg-type]
+        self._template_detail_widget.refresh_scenarios_requested.connect(  # type: ignore[arg-type]
+            partial(self._handle_refresh_scenarios_request, self._template_detail_widget)
+        )
 
     def _restore_window_geometry(self) -> None:
         """Restore window size/position from persistent settings."""
