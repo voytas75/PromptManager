@@ -12,8 +12,9 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import Any, cast
 
 from prompt_templates import SCENARIO_GENERATION_PROMPT
 
@@ -22,9 +23,6 @@ from .litellm_adapter import (
     call_completion_with_fallback,
     get_completion,
 )
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
 
 
 class ScenarioGenerationError(Exception):
@@ -75,7 +73,7 @@ def _extract_candidates(response_text: str) -> list[str]:
     if not stripped:
         return []
     try:
-        parsed = json.loads(stripped)
+        payload: object = json.loads(stripped)
     except json.JSONDecodeError:
         cleaned: list[str] = []
         for line in stripped.splitlines():
@@ -93,13 +91,15 @@ def _extract_candidates(response_text: str) -> list[str]:
             if text:
                 cleaned.append(text)
         return cleaned
-    if isinstance(parsed, list):
-        return [str(item) for item in parsed]
-    if isinstance(parsed, str):
-        return [parsed]
-    if isinstance(parsed, dict):
-        return [str(value) for value in parsed.values()]
-    return [str(parsed)]
+    if isinstance(payload, list):
+        items = cast("Sequence[object]", payload)
+        return [str(item) for item in items]
+    if isinstance(payload, str):
+        return [payload]
+    if isinstance(payload, dict):
+        mapping_payload = cast("Mapping[str, object]", payload)
+        return [str(value) for value in mapping_payload.values()]
+    return [str(payload)]
 
 
 @dataclass(slots=True)
@@ -175,10 +175,25 @@ class LiteLLMScenarioGenerator:
         except Exception as exc:  # pragma: no cover - defensive
             raise ScenarioGenerationError("Unexpected error while calling LiteLLM") from exc
 
-        try:
-            message = response["choices"][0]["message"]["content"]
-        except (KeyError, IndexError, TypeError) as exc:  # pragma: no cover - defensive
-            raise ScenarioGenerationError("LiteLLM returned an unexpected payload") from exc
+        if not isinstance(response, Mapping):
+            raise ScenarioGenerationError("LiteLLM returned an unexpected payload")
+        response_mapping = cast("Mapping[str, Any]", response)
+        choices_value = response_mapping.get("choices")
+        if not isinstance(choices_value, Sequence) or not choices_value:
+            raise ScenarioGenerationError("LiteLLM returned an unexpected payload")
+        choices_seq = cast("Sequence[Any]", choices_value)
+        first_choice = choices_seq[0]
+        if not isinstance(first_choice, Mapping):
+            raise ScenarioGenerationError("LiteLLM returned an unexpected payload")
+        first_mapping = cast("Mapping[str, Any]", first_choice)
+        message_value = first_mapping.get("message")
+        if not isinstance(message_value, Mapping):
+            raise ScenarioGenerationError("LiteLLM returned an unexpected payload")
+        message_mapping = cast("Mapping[str, Any]", message_value)
+        content_value = message_mapping.get("content")
+        if content_value is None:
+            raise ScenarioGenerationError("LiteLLM response is missing content")
+        message = content_value
 
         candidates = _extract_candidates(str(message))
         scenarios = _normalise_scenarios(candidates, limit)
