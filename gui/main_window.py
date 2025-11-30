@@ -1,6 +1,7 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.15.72 - 2025-11-30 - Extract result overlay and share workflow helpers into modules.
   v0.15.71 - 2025-11-30 - Add workspace result sharing via overlay action button.
   v0.15.70 - 2025-11-29 - Make workspace splitter resize only the prompt input textarea.
   v0.15.69 - 2025-11-29 - Toggle inline markdown rendering with a checkbox for output/chat.
@@ -36,7 +37,6 @@ from typing import (
 from PySide6.QtCore import (
     QAbstractListModel,
     QByteArray,
-    QEvent,
     QModelIndex,
     QObject,
     QPoint,
@@ -111,7 +111,6 @@ from core import (
     PromptVersionError,
     RepositoryError,
     ScenarioGenerationError,
-    ShareProviderError,
     diff_prompt_catalog,
     export_prompt_catalog,
     import_prompt_catalog,
@@ -140,7 +139,9 @@ from .notifications import BackgroundTaskCenterDialog, QtNotificationBridge
 from .processing_indicator import ProcessingIndicator
 from .prompt_templates_dialog import PromptTemplateEditorDialog
 from .response_styles_panel import ResponseStylesPanel
+from .result_overlay import ResultActionsOverlay
 from .settings_dialog import SettingsDialog, persist_settings_to_config
+from .share_controller import ShareController
 from .template_preview import TemplatePreviewWidget
 from .toast import show_toast
 from .usage_logger import IntentUsageLogger
@@ -1072,7 +1073,14 @@ class MainWindow(QMainWindow):
         self._template_detail_widget: PromptDetailWidget | None = None
         self._template_run_shortcut_button: QPushButton | None = None
         self._template_transition_indicator: ProcessingIndicator | None = None
-        self._share_providers: dict[str, ShareProvider] = {}
+        self._result_overlay: ResultActionsOverlay | None = None
+        self._share_controller = ShareController(
+            self,
+            toast_callback=self._show_toast,
+            status_callback=self.statusBar().showMessage,
+            error_callback=self._show_error,
+            usage_logger=self._usage_logger,
+        )
         self._share_result_button: QPushButton | None = None
         self._workbench_windows: list[WorkbenchWindow] = []
         self._register_share_provider(ShareTextProvider())
@@ -1112,7 +1120,6 @@ class MainWindow(QMainWindow):
         self._template_preview_list_splitter: QSplitter | None = None
         self._main_splitter_left_width: int | None = None
         self._suppress_main_splitter_sync = False
-        self._result_actions_overlay: QWidget | None = None
         self._notification_history: deque[Notification] = deque(maxlen=200)
         self._active_notifications: dict[str, Notification] = {}
         for note in self._manager.notification_center.history():
@@ -1416,7 +1423,15 @@ class MainWindow(QMainWindow):
         self._result_text.installEventFilter(self)
         output_tab_layout.addWidget(self._result_text, 1)
 
-        self._build_result_actions_overlay()
+        self._result_overlay = ResultActionsOverlay(self._result_text)
+        self._result_overlay.rebuild(
+            [
+                self._save_button,
+                self._copy_result_button,
+                self._copy_result_to_text_window_button,
+                self._share_result_button,
+            ]
+        )
 
         self._result_tabs.addTab(output_tab, "Output")
 
@@ -1580,60 +1595,6 @@ class MainWindow(QMainWindow):
         self._continue_chat_button.setEnabled(False)
         self._end_chat_button.setEnabled(False)
 
-    def _build_result_actions_overlay(self) -> None:
-        """Create the floating overlay that hosts result action buttons."""
-
-        if self._result_text is None:
-            return
-        if self._result_actions_overlay is not None:
-            self._result_actions_overlay.deleteLater()
-        overlay_parent = self._result_text
-        overlay = QWidget(overlay_parent)
-        overlay.setObjectName("resultActionsOverlay")
-        overlay.setAttribute(Qt.WA_StyledBackground, True)
-        overlay_layout = QHBoxLayout(overlay)
-        overlay_layout.setContentsMargins(8, 8, 8, 8)
-        overlay_layout.setSpacing(8)
-        overlay_layout.addWidget(self._save_button)
-        overlay_layout.addWidget(self._copy_result_button)
-        overlay_layout.addWidget(self._copy_result_to_text_window_button)
-        overlay_layout.addWidget(self._share_result_button)
-        self._result_actions_overlay = overlay
-        overlay.show()
-        self._position_result_overlay()
-
-    def _position_result_overlay(self) -> None:
-        """Anchor the result action overlay to the bottom-right of the viewport."""
-
-        if self._result_text is None or self._result_actions_overlay is None:
-            return
-        viewport = self._result_text.viewport()
-        overlay = self._result_actions_overlay
-        if viewport is None or overlay is None:
-            return
-        overlay.adjustSize()
-        desired_width = overlay.width()
-        desired_height = overlay.height()
-        margin = 12
-        viewport_geometry = viewport.geometry()
-        x = viewport_geometry.x() + viewport_geometry.width() - desired_width - margin
-        y = viewport_geometry.y() + viewport_geometry.height() - desired_height - margin
-        if x < viewport_geometry.x():
-            x = viewport_geometry.x() + max(0, viewport_geometry.width() - desired_width)
-        if y < viewport_geometry.y():
-            y = viewport_geometry.y() + max(0, viewport_geometry.height() - desired_height)
-        overlay.move(x, y)
-        overlay.raise_()
-
-    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
-        """Respond to viewport events so overlays stay aligned."""
-
-        if self._result_text is not None:
-            if obj in {self._result_text.viewport(), self._result_text}:
-                if event.type() in {QEvent.Resize, QEvent.Show}:
-                    self._position_result_overlay()
-        return super().eventFilter(obj, event)
-
     def _is_markdown_render_enabled(self) -> bool:
         """Return True when the markdown rendering toggle is active."""
 
@@ -1661,7 +1622,9 @@ class MainWindow(QMainWindow):
     def _can_share_result(self) -> bool:
         """Return True when the workspace output can be shared."""
 
-        return bool(self._share_providers and (self._raw_result_text or "").strip())
+        if not self._share_controller.has_providers():
+            return False
+        return bool((self._raw_result_text or "").strip())
 
     def _append_result_stream_chunk(self, chunk: str) -> None:
         """Append streaming output and re-render according to the toggle."""
@@ -3288,7 +3251,7 @@ class MainWindow(QMainWindow):
     def _register_share_provider(self, provider: ShareProvider) -> None:
         """Store a share provider so it can be shown in the share menu."""
 
-        self._share_providers[provider.info.name] = provider
+        self._share_controller.register_provider(provider)
         self._update_result_share_button_state()
 
     def _on_share_prompt_requested(self) -> None:
@@ -3298,47 +3261,21 @@ class MainWindow(QMainWindow):
         if prompt is None:
             self.statusBar().showMessage("Select a prompt to share first.", 4000)
             return
-        if not self._share_providers:
-            self._show_error("Sharing unavailable", "No share providers are configured.")
+        provider_name = self._share_controller.choose_provider(self._detail_widget.share_button())
+        if not provider_name:
             return
-        button = self._detail_widget.share_button()
-        menu = QMenu(self)
-        for provider in self._share_providers.values():
-            action = menu.addAction(provider.info.label)
-            action.setData(provider.info.name)
-            action.setToolTip(provider.info.description)
-        # QMenu.exec_ synchronously returns the triggered action (Qt for Python docs:
-        # https://doc.qt.io/qtforpython-6/PySide6/QtWidgets/QMenu).
-        chosen = menu.exec_(button.mapToGlobal(button.rect().bottomLeft()))
-        if chosen is None:
-            return
-        provider_name = str(chosen.data())
         self._share_prompt(provider_name, prompt)
 
     def _on_share_result_clicked(self) -> None:
         """Display provider choices for sharing the latest output text."""
 
-        if not self._share_providers:
-            self._show_error("Sharing unavailable", "No share providers are configured.")
-            return
         payload = self._raw_result_text or ""
         if not payload.strip():
             self.statusBar().showMessage("Run a prompt to produce output before sharing.", 4000)
             return
-        button = self._share_result_button
-        if button is None:
+        provider_name = self._share_controller.choose_provider(self._share_result_button)
+        if not provider_name:
             return
-        menu = QMenu(self)
-        for provider in self._share_providers.values():
-            action = menu.addAction(provider.info.label)
-            action.setData(provider.info.name)
-            action.setToolTip(provider.info.description)
-        # QMenu.exec_ synchronously returns the chosen QAction (see
-        # https://doc.qt.io/qtforpython-6/PySide6/QtWidgets/QMenu).
-        chosen = menu.exec_(button.mapToGlobal(button.rect().bottomLeft()))
-        if chosen is None:
-            return
-        provider_name = str(chosen.data())
         self._share_result_text(provider_name, payload)
 
     def _share_prompt(self, provider_name: str, prompt: Prompt) -> None:
@@ -3347,7 +3284,7 @@ class MainWindow(QMainWindow):
         payload = self._build_share_payload(prompt)
         if payload is None:
             return
-        self._share_payload_via_provider(
+        self._share_controller.share_payload(
             provider_name,
             payload,
             prompt=prompt,
@@ -3380,7 +3317,7 @@ class MainWindow(QMainWindow):
         """Share the latest workspace response using the requested provider."""
 
         prompt_label = self._last_prompt_name or "Workspace Result"
-        self._share_payload_via_provider(
+        self._share_controller.share_payload(
             provider_name,
             payload,
             prompt=None,
@@ -3388,53 +3325,6 @@ class MainWindow(QMainWindow):
             indicator_title="Sharing Result",
             error_title="Unable to share result",
         )
-
-    def _share_payload_via_provider(
-        self,
-        provider_name: str,
-        payload: str,
-        *,
-        prompt: Prompt | None,
-        prompt_name: str | None,
-        indicator_title: str,
-        error_title: str,
-    ) -> None:
-        """Execute a share operation via :class:`ShareProvider` helpers."""
-
-        provider = self._share_providers.get(provider_name)
-        if provider is None:
-            self._show_error("Sharing unavailable", "Selected share provider is not registered.")
-            return
-        payload_text = payload or ""
-        if not payload_text.strip():
-            self._show_error(error_title, "Share payload is empty.")
-            return
-        indicator = ProcessingIndicator(
-            self,
-            f"Sharing via {provider.info.label}…",
-            title=indicator_title,
-        )
-        try:
-            result = indicator.run(provider.share, payload_text, prompt)
-        except ShareProviderError as exc:
-            self._show_error(error_title, str(exc))
-            return
-        clipboard = QGuiApplication.clipboard()
-        clipboard.setText(result.url)
-        message = f"{result.provider.label} link copied to clipboard."
-        self._show_toast(message)
-        self.statusBar().showMessage(message, 5000)
-        prompt_label = prompt_name or getattr(prompt, "name", "Result Output")
-        self._usage_logger.log_share(
-            provider=result.provider.name,
-            prompt_name=prompt_label,
-            payload_chars=result.payload_chars,
-        )
-        if result.delete_url:
-            self.statusBar().showMessage(
-                f"Delete this share later via: {result.delete_url}",
-                10000,
-            )
 
     def _show_prompt_description(self, prompt: Prompt) -> None:
         """Display the prompt description in a dialog for quick reference."""
