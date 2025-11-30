@@ -104,7 +104,6 @@ def persist_settings_to_config(updates: dict[str, object | None]) -> None:
     routing entries set to ``fast`` are omitted so only explicit ``inference``
     selections persist.
     """
-
     config_path = Path("config/config.json")
     config_data: dict[str, Any] = {}
     if config_path.exists():

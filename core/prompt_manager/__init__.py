@@ -186,7 +186,6 @@ def _normalise_conversation(
     messages: Sequence[Mapping[str, str]] | None,
 ) -> list[dict[str, str]]:
     """Return a sanitised copy of conversation messages for execution and logging."""
-
     normalised: list[dict[str, str]] = []
     if not messages:
         return normalised
@@ -203,7 +202,6 @@ def _normalise_conversation(
 
 def _coerce_int(value: Any) -> int | None:
     """Return an integer representation when conversion succeeds."""
-
     try:
         return int(value)
     except (TypeError, ValueError):
@@ -212,7 +210,6 @@ def _coerce_int(value: Any) -> int | None:
 
 def _parse_timestamp(value: Any) -> datetime | None:
     """Return a timezone-aware datetime when parsing succeeds."""
-
     if value is None:
         return None
     if isinstance(value, datetime):
@@ -330,7 +327,6 @@ __all__ = [
 
 def _normalize_prompt_body(body: str | None) -> str:
     """Return canonical prompt body text for change detection comparisons."""
-
     if body is None:
         return ""
     return body.replace("\r\n", "\n")
@@ -364,7 +360,6 @@ def _match_category_label(
     candidate: str | None, categories: Sequence[PromptCategory]
 ) -> str | None:
     """Return the stored category label that best matches *candidate*."""
-
     if not candidate:
         return None
     text = str(candidate).strip()
@@ -583,7 +578,6 @@ class PromptManager:
     @staticmethod
     def _normalise_model_identifier(value: str | None) -> str | None:
         """Return a stripped model identifier when provided."""
-
         if value is None:
             return None
         text = str(value).strip()
@@ -591,7 +585,6 @@ class PromptManager:
 
     def _apply_category_metadata(self, prompt: Prompt) -> Prompt:
         """Ensure prompt categories map to registry entries."""
-
         category_value = (prompt.category or "").strip()
         slug_candidate = prompt.category_slug or category_value
         if not slug_candidate:
@@ -614,7 +607,6 @@ class PromptManager:
 
     def _initialise_chroma_collection(self) -> None:
         """Create or refresh the Chroma collection backing prompt embeddings."""
-
         try:
             collection = cast(
                 "CollectionProtocol",
@@ -630,7 +622,6 @@ class PromptManager:
 
     def _persist_chroma_client(self) -> None:
         """Flush the Chroma client to disk when supported."""
-
         persist = getattr(self._chroma_client, "persist", None)
         if not callable(persist):
             return
@@ -641,7 +632,6 @@ class PromptManager:
 
     def _resolve_repository_path(self) -> Path:
         """Return the path to the SQLite repository, ensuring it exists."""
-
         candidate = self._db_path or getattr(self._repository, "_db_path", None)
         if candidate is None:
             raise PromptStorageError("SQLite repository path is not configured.")
@@ -745,7 +735,6 @@ class PromptManager:
     @property
     def collection(self) -> CollectionProtocol:
         """Expose the underlying Chroma collection."""
-
         if self._collection is None:
             raise PromptManagerError("Chroma collection is not initialised.")
         return self._collection
@@ -758,76 +747,63 @@ class PromptManager:
     @property
     def db_path(self) -> Path | None:
         """Return the configured SQLite database path."""
-
         return self._db_path
 
     @property
     def chroma_path(self) -> Path:
         """Return the filesystem path backing the Chroma vector store."""
-
         return Path(self._chroma_path)
 
     @property
     def logs_path(self) -> Path:
         """Return the directory where application logs are written."""
-
         return self._logs_path
 
     @property
     def intent_classifier(self) -> IntentClassifier | None:
         """Expose the configured intent classifier for tooling hooks."""
-
         return self._intent_classifier
 
     @property
     def executor(self) -> CodexExecutor | None:
         """Return the configured prompt executor."""
-
         return self._executor
 
     def set_executor(self, executor: CodexExecutor | None) -> None:
         """Assign or replace the Codex executor at runtime."""
-
         self._executor = executor
 
     @property
     def history_tracker(self) -> HistoryTracker | None:
         """Expose the execution history tracker if configured."""
-
         return self._history_tracker
 
     def set_history_tracker(self, tracker: HistoryTracker | None) -> None:
         """Assign or replace the history tracker at runtime."""
-
         self._history_tracker = tracker
 
     @property
     def notification_center(self) -> NotificationCenter:
         """Expose the notification centre for UI and tooling integrations."""
-
         return self._notification_center
 
     @property
     def user_profile(self) -> UserProfile | None:
         """Return the stored single-user profile when available."""
-
         return self._user_profile
 
     @property
     def prompt_engineer(self) -> PromptEngineer | None:
         """Return the configured prompt engineering helper, if any."""
-
         return self._prompt_engineer
 
     @property
     def prompt_structure_engineer(self) -> PromptEngineer | None:
         """Return the configured structure-only prompt engineering helper."""
-
         return self._prompt_structure_engineer or self._prompt_engineer
 
     def get_redis_details(self) -> dict[str, Any]:
         """Return connection and usage details for the configured Redis cache."""
-
         details: dict[str, Any] = {"enabled": self._redis_client is not None}
         client = self._redis_client
         if client is None:
@@ -905,7 +881,6 @@ class PromptManager:
 
     def get_chroma_details(self) -> dict[str, Any]:
         """Return filesystem and collection metrics for the configured Chroma store."""
-
         details: dict[str, Any] = {"enabled": self._collection is not None}
         details["path"] = self._chroma_path
         details["collection"] = self._collection_name
@@ -934,7 +909,6 @@ class PromptManager:
 
     def reset_prompt_repository(self) -> None:
         """Clear all prompts, executions, and profiles from SQLite storage."""
-
         reset_func = getattr(self._repository, "reset_all_data", None)
         if not callable(reset_func):
             raise PromptManagerError("Repository reset is unavailable.")
@@ -947,7 +921,6 @@ class PromptManager:
 
     def reset_vector_store(self) -> None:
         """Remove all embeddings from the Chroma vector store."""
-
         if self._collection is None:
             return
         try:
@@ -971,7 +944,6 @@ class PromptManager:
         Returns:
             Tuple of (successful_embeddings, failed_embeddings).
         """
-
         if reset_store:
             self.reset_vector_store()
 
@@ -1025,7 +997,6 @@ class PromptManager:
 
     def compact_vector_store(self) -> None:
         """Vacuum and truncate the persistent Chroma SQLite store."""
-
         db_path = Path(self._chroma_path) / "chroma.sqlite3"
         if not db_path.exists():
             raise PromptStorageError(f"Chroma persistence database missing at {db_path}.")
@@ -1040,7 +1011,6 @@ class PromptManager:
 
     def optimize_vector_store(self) -> None:
         """Refresh SQLite statistics to optimize Chroma query planning."""
-
         db_path = Path(self._chroma_path) / "chroma.sqlite3"
         if not db_path.exists():
             raise PromptStorageError(f"Chroma persistence database missing at {db_path}.")
@@ -1061,7 +1031,6 @@ class PromptManager:
 
     def verify_vector_store(self) -> str:
         """Run integrity checks against the persistent Chroma store."""
-
         db_path = Path(self._chroma_path) / "chroma.sqlite3"
         if not db_path.exists():
             raise PromptStorageError(f"Chroma persistence database missing at {db_path}.")
@@ -1114,7 +1083,6 @@ class PromptManager:
 
     def compact_repository(self) -> None:
         """Vacuum the SQLite prompt repository to reclaim disk space."""
-
         db_path = self._resolve_repository_path()
         try:
             with sqlite3.connect(str(db_path), timeout=60.0) as connection:
@@ -1126,7 +1094,6 @@ class PromptManager:
 
     def optimize_repository(self) -> None:
         """Refresh SQLite statistics for the prompt repository."""
-
         db_path = self._resolve_repository_path()
         try:
             with sqlite3.connect(str(db_path), timeout=60.0) as connection:
@@ -1144,7 +1111,6 @@ class PromptManager:
 
     def verify_repository(self) -> str:
         """Run integrity checks against the SQLite prompt repository."""
-
         db_path = self._resolve_repository_path()
         diagnostics: list[str] = []
         try:
@@ -1181,7 +1147,6 @@ class PromptManager:
 
     def create_data_snapshot(self, destination: str | Path) -> Path:
         """Zip the SQLite repository, Chroma store, and a manifest for backups."""
-
         db_path = self._resolve_repository_path()
         chroma_path = Path(self._chroma_path).expanduser()
         self._persist_chroma_client()
@@ -1214,7 +1179,6 @@ class PromptManager:
 
     def clear_usage_logs(self, logs_path: str | Path | None = None) -> None:
         """Remove persisted usage analytics logs while keeping settings intact."""
-
         path = Path(logs_path) if logs_path is not None else self._logs_path
         path = path.expanduser()
         if not path.exists():
@@ -1234,7 +1198,6 @@ class PromptManager:
 
     def reset_application_data(self, *, clear_logs: bool = True) -> None:
         """Reset prompt data, embeddings, and optional usage logs."""
-
         self.reset_prompt_repository()
         self.reset_vector_store()
         if clear_logs:
@@ -1242,7 +1205,6 @@ class PromptManager:
 
     def get_prompt_catalogue_stats(self) -> PromptCatalogueStats:
         """Return aggregate prompt statistics for maintenance workflows."""
-
         try:
             return self._repository.get_prompt_catalogue_stats()
         except RepositoryError as exc:
@@ -1334,7 +1296,6 @@ class PromptManager:
 
     def get_category_health(self) -> list[PromptManager.CategoryHealth]:
         """Return prompt and execution health metrics for each category."""
-
         try:
             prompt_counts = self._repository.get_category_prompt_counts()
             execution_stats = self._repository.get_category_execution_statistics()
@@ -1381,7 +1342,6 @@ class PromptManager:
 
     def refresh_user_profile(self) -> UserProfile | None:
         """Reload the persisted profile from the repository."""
-
         try:
             self._user_profile = self._repository.get_user_profile()
         except RepositoryError:
@@ -1419,7 +1379,6 @@ class PromptManager:
         prompt: Prompt | None = None,
     ) -> str:
         """Return a prompt description using LiteLLM with an optional deterministic fallback."""
-
         text = (context or "").strip()
         if not text:
             raise DescriptionGenerationError(
@@ -1457,7 +1416,6 @@ class PromptManager:
 
     def generate_prompt_scenarios(self, context: str, *, max_scenarios: int = 3) -> list[str]:
         """Return usage scenarios for a prompt via the configured LiteLLM helper."""
-
         if self._scenario_generator is None:
             raise ScenarioGenerationError(
                 "LiteLLM scenario generator is not configured. Set PROMPT_MANAGER_LITELLM_MODEL."
@@ -1492,7 +1450,6 @@ class PromptManager:
         max_scenarios: int = 3,
     ) -> Prompt:
         """Regenerate and persist scenarios for the specified prompt."""
-
         prompt = self.get_prompt(prompt_id)
         context_source = prompt.context or prompt.description
         if not context_source:
@@ -1529,7 +1486,6 @@ class PromptManager:
         sample_text: str = "Prompt Manager diagnostics probe",
     ) -> PromptManager.EmbeddingDiagnostics:
         """Return embedding backend health and stored vector consistency details."""
-
         provider = getattr(self, "_embedding_provider", None)
         if provider is None:
             raise PromptManagerError("Embedding provider is not configured.")
@@ -1630,7 +1586,6 @@ class PromptManager:
 
     def generate_prompt_category(self, context: str) -> str:
         """Suggest a prompt category using LiteLLM with classifier-based fallback."""
-
         text = (context or "").strip()
         if not text:
             return ""
@@ -1649,7 +1604,6 @@ class PromptManager:
 
     def _run_category_generator(self, context: str, categories: Sequence[PromptCategory]) -> str:
         """Return category suggestion from LiteLLM, logging failures for fallbacks."""
-
         if self._category_generator is None:
             return ""
         task_id = f"category-suggest:{uuid.uuid4()}"
@@ -1684,7 +1638,6 @@ class PromptManager:
         categories: Sequence[PromptCategory],
     ) -> str:
         """Return a category suggestion using heuristics and classifier hints."""
-
         classifier = self._intent_classifier
         if classifier is not None:
             prediction = classifier.classify(context)
@@ -1719,7 +1672,6 @@ class PromptManager:
         previous_prompt: Prompt | None,
     ) -> None:
         """Capture LiteLLM-backed category drift metadata on the prompt."""
-
         if self._category_generator is None:
             self._set_category_insight_metadata(prompt, None)
             return
@@ -1796,7 +1748,6 @@ class PromptManager:
     @staticmethod
     def _category_context_text(prompt: Prompt) -> str:
         """Return the most descriptive text for category inference."""
-
         for candidate in (prompt.context, prompt.description, prompt.document):
             text = (candidate or "").strip()
             if text:
@@ -1806,7 +1757,6 @@ class PromptManager:
     @staticmethod
     def _extract_category_insight(prompt: Prompt | None) -> dict[str, Any] | None:
         """Return the stored category insight mapping, if present."""
-
         if prompt is None:
             return None
         ext2 = prompt.ext2 if isinstance(prompt.ext2, Mapping) else None
@@ -1827,7 +1777,6 @@ class PromptManager:
         timestamp: str,
     ) -> dict[str, Any] | None:
         """Return metadata describing an accepted LiteLLM category suggestion."""
-
         if previous_prompt is None or previous_insight is None:
             return None
         status = str(previous_insight.get("status") or "").strip().lower()
@@ -1854,7 +1803,6 @@ class PromptManager:
         insight: Mapping[str, Any] | None,
     ) -> None:
         """Persist or clear category insight metadata on the prompt record."""
-
         if isinstance(prompt.ext2, MutableMapping):
             metadata: dict[str, Any] = dict(prompt.ext2)
         elif isinstance(prompt.ext2, Mapping):
@@ -1872,7 +1820,6 @@ class PromptManager:
 
     def _build_description_fallback(self, context: str, prompt: Prompt | None) -> str:
         """Return a deterministic summary derived from prompt metadata and context."""
-
         segments: list[str] = []
         if prompt is not None:
             name = (prompt.name or "").strip()
@@ -1911,7 +1858,6 @@ class PromptManager:
         response_style: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Return structured metadata describing the execution context."""
-
         prompt_metadata = {
             "id": str(prompt.id),
             "name": prompt.name,
@@ -1945,7 +1891,6 @@ class PromptManager:
         negative_constraints: Sequence[str] | None = None,
     ) -> PromptRefinement:
         """Improve a prompt using the configured prompt engineer."""
-
         if not prompt_text.strip():
             raise PromptEngineeringError("Prompt refinement requires non-empty prompt text.")
         engineer = self._prompt_structure_engineer or self._prompt_engineer
@@ -1993,7 +1938,6 @@ class PromptManager:
         tags: Sequence[str] | None = None,
     ) -> PromptRefinement:
         """Reformat a prompt to improve structure without changing intent."""
-
         if not prompt_text.strip():
             raise PromptEngineeringError("Prompt refinement requires non-empty prompt text.")
         engineer = self._prompt_structure_engineer or self._prompt_engineer
@@ -2039,7 +1983,6 @@ class PromptManager:
         on_stream: Callable[[str], None] | None = None,
     ) -> PromptManager.ExecutionOutcome:
         """Execute a prompt via LiteLLM and persist the outcome when configured."""
-
         if not request_text.strip():
             raise PromptExecutionError("Prompt execution requires non-empty input text.")
         if self._executor is None:
@@ -2140,7 +2083,6 @@ class PromptManager:
         trend_window: int = 5,
     ) -> PromptManager.BenchmarkReport:
         """Execute prompts across one or more models and return benchmark data."""
-
         if not prompt_ids:
             raise PromptExecutionError("At least one prompt must be provided for benchmarking.")
         text = (request_text or "").strip()
@@ -2316,7 +2258,6 @@ class PromptManager:
         context_metadata: Mapping[str, Any] | None = None,
     ) -> PromptExecution:
         """Persist a manual prompt execution entry (e.g., from GUI Save Result)."""
-
         tracker = self._history_tracker
         if tracker is None:
             raise PromptExecutionUnavailable(
@@ -2347,7 +2288,6 @@ class PromptManager:
 
     def update_execution_note(self, execution_id: uuid.UUID, note: str | None) -> PromptExecution:
         """Update the note metadata for a history entry."""
-
         tracker = self._history_tracker
         if tracker is None:
             raise PromptExecutionUnavailable(
@@ -2360,7 +2300,6 @@ class PromptManager:
 
     def list_recent_executions(self, *, limit: int = 20) -> list[PromptExecution]:
         """Return recently logged executions if history tracking is enabled."""
-
         tracker = self._history_tracker
         if tracker is None:
             return []
@@ -2377,7 +2316,6 @@ class PromptManager:
         limit: int = 20,
     ) -> list[PromptExecution]:
         """Return execution history for a specific prompt."""
-
         tracker = self._history_tracker
         if tracker is None:
             return []
@@ -2400,7 +2338,6 @@ class PromptManager:
         limit: int | None = None,
     ) -> list[PromptExecution]:
         """Return executions filtered by status, prompt, and search term."""
-
         tracker = self._history_tracker
         if tracker is None:
             return []
@@ -2431,7 +2368,6 @@ class PromptManager:
         trend_window: int = 5,
     ) -> ExecutionAnalytics | None:
         """Return aggregated execution analytics for downstream consumers."""
-
         tracker = self._history_tracker
         if tracker is None:
             return None
@@ -2459,7 +2395,6 @@ class PromptManager:
         prompt_templates: Mapping[str, object] | None = None,
     ) -> None:
         """Configure LiteLLM-backed workflows at runtime."""
-
         self._litellm_fast_model = self._normalise_model_identifier(model)
         self._litellm_inference_model = self._normalise_model_identifier(inference_model)
         routing: dict[str, str] = {}
@@ -2580,7 +2515,6 @@ class PromptManager:
     @staticmethod
     def _normalise_prompt_templates(overrides: Mapping[str, object] | None) -> dict[str, str]:
         """Return a cleaned mapping of workflow prompt overrides."""
-
         if not overrides:
             return {}
         cleaned: dict[str, str] = {}
@@ -2606,7 +2540,6 @@ class PromptManager:
         extra_metadata: Mapping[str, Any] | None = None,
     ) -> PromptExecution | None:
         """Persist a successful execution outcome when the tracker is available."""
-
         tracker = self._history_tracker
         if tracker is None:
             return None
@@ -2649,7 +2582,6 @@ class PromptManager:
         extra_metadata: Mapping[str, Any] | None = None,
     ) -> PromptExecution | None:
         """Persist a failed execution attempt when history tracking is enabled."""
-
         tracker = self._history_tracker
         if tracker is None:
             return None
@@ -2677,7 +2609,6 @@ class PromptManager:
 
     def set_intent_classifier(self, classifier: IntentClassifier | None) -> None:
         """Replace the runtime intent classifier implementation."""
-
         self._intent_classifier = classifier
 
     def close(self) -> None:
@@ -2827,12 +2758,10 @@ class PromptManager:
 
     def list_categories(self, include_archived: bool = False) -> list[PromptCategory]:
         """Return cached categories."""
-
         return self._category_registry.all(include_archived)
 
     def refresh_categories(self) -> list[PromptCategory]:
         """Reload categories from the repository."""
-
         return self._category_registry.refresh()
 
     def create_category(
@@ -2849,7 +2778,6 @@ class PromptManager:
         is_active: bool = True,
     ) -> PromptCategory:
         """Create a new category entry."""
-
         category = PromptCategory(
             slug=slug or label,
             label=label,
@@ -2882,7 +2810,6 @@ class PromptManager:
         is_active: bool | None = None,
     ) -> PromptCategory:
         """Update the specified category."""
-
         current = self._category_registry.require(slug)
         updated = replace(
             current,
@@ -2907,7 +2834,6 @@ class PromptManager:
 
     def set_category_active(self, slug: str, is_active: bool) -> PromptCategory:
         """Toggle category visibility."""
-
         try:
             category = self._repository.set_category_active(slug, is_active)
         except RepositoryNotFoundError as exc:
@@ -2919,7 +2845,6 @@ class PromptManager:
 
     def resolve_category_label(self, slug: str | None, fallback: str | None = None) -> str:
         """Return the human-readable label for a slug."""
-
         category = self._category_registry.get(slug)
         if category:
             return category.label
@@ -3051,7 +2976,6 @@ class PromptManager:
         limit: int | None = None,
     ) -> list[PromptVersion]:
         """Return committed versions for the specified prompt."""
-
         try:
             return self._repository.list_prompt_versions(prompt_id, limit=limit)
         except RepositoryError as exc:
@@ -3059,7 +2983,6 @@ class PromptManager:
 
     def get_prompt_version(self, version_id: int) -> PromptVersion:
         """Return a stored prompt version by identifier."""
-
         try:
             return self._repository.get_prompt_version(version_id)
         except RepositoryNotFoundError as exc:
@@ -3069,7 +2992,6 @@ class PromptManager:
 
     def get_latest_prompt_version(self, prompt_id: uuid.UUID) -> PromptVersion | None:
         """Return the most recent version for the prompt, if one exists."""
-
         try:
             return self._repository.get_prompt_latest_version(prompt_id)
         except RepositoryError as exc:
@@ -3081,7 +3003,6 @@ class PromptManager:
         target_version_id: int,
     ) -> PromptVersionDiff:
         """Return a structured diff between two version snapshots."""
-
         base_version = self.get_prompt_version(base_version_id)
         target_version = self.get_prompt_version(target_version_id)
         if base_version.prompt_id != target_version.prompt_id:
@@ -3119,7 +3040,6 @@ class PromptManager:
         commit_message: str | None = None,
     ) -> Prompt:
         """Replace the live prompt with the contents of the specified version."""
-
         version = self.get_prompt_version(version_id)
         prompt = version.to_prompt()
         prompt.last_modified = datetime.now(UTC)
@@ -3136,7 +3056,6 @@ class PromptManager:
         commit_message: str | None = None,
     ) -> tuple[Prompt, list[str]]:
         """Perform a simple three-way merge and optionally persist the result."""
-
         base_version = self.get_prompt_version(base_version_id)
         incoming_version = self.get_prompt_version(incoming_version_id)
         if base_version.prompt_id != prompt_id or incoming_version.prompt_id != prompt_id:
@@ -3197,7 +3116,6 @@ class PromptManager:
         commit_message: str | None = None,
     ) -> Prompt:
         """Create a new prompt based on the referenced prompt."""
-
         source_prompt = self.get_prompt(prompt_id)
         now = datetime.now(UTC)
         fork_name = name or f"{source_prompt.name} (fork)"
@@ -3234,7 +3152,6 @@ class PromptManager:
 
     def list_prompt_forks(self, prompt_id: uuid.UUID) -> list[PromptForkLink]:
         """Return lineage entries for children derived from the prompt."""
-
         try:
             return self._repository.list_prompt_children(prompt_id)
         except RepositoryError as exc:
@@ -3242,7 +3159,6 @@ class PromptManager:
 
     def get_prompt_parent_fork(self, prompt_id: uuid.UUID) -> PromptForkLink | None:
         """Return the recorded parent for a forked prompt, if any."""
-
         try:
             return self._repository.get_prompt_parent_fork(prompt_id)
         except RepositoryError as exc:
@@ -3257,7 +3173,6 @@ class PromptManager:
         search: str | None = None,
     ) -> list[ResponseStyle]:
         """Return stored response styles ordered by name."""
-
         try:
             return self._repository.list_response_styles(
                 include_inactive=include_inactive,
@@ -3268,7 +3183,6 @@ class PromptManager:
 
     def get_response_style(self, style_id: uuid.UUID) -> ResponseStyle:
         """Return a single response style by identifier."""
-
         try:
             return self._repository.get_response_style(style_id)
         except RepositoryNotFoundError as exc:
@@ -3278,7 +3192,6 @@ class PromptManager:
 
     def create_response_style(self, style: ResponseStyle) -> ResponseStyle:
         """Persist a new response style record."""
-
         style.touch()
         try:
             return self._repository.add_response_style(style)
@@ -3287,7 +3200,6 @@ class PromptManager:
 
     def update_response_style(self, style: ResponseStyle) -> ResponseStyle:
         """Update an existing response style record."""
-
         style.touch()
         try:
             return self._repository.update_response_style(style)
@@ -3298,7 +3210,6 @@ class PromptManager:
 
     def delete_response_style(self, style_id: uuid.UUID) -> None:
         """Delete a stored response style."""
-
         try:
             self._repository.delete_response_style(style_id)
         except RepositoryNotFoundError as exc:
@@ -3310,7 +3221,6 @@ class PromptManager:
 
     def list_prompt_notes(self) -> list[PromptNote]:
         """Return stored prompt notes ordered by recency."""
-
         try:
             return self._repository.list_prompt_notes()
         except RepositoryError as exc:
@@ -3318,7 +3228,6 @@ class PromptManager:
 
     def get_prompt_note(self, note_id: uuid.UUID) -> PromptNote:
         """Return a single prompt note by identifier."""
-
         try:
             return self._repository.get_prompt_note(note_id)
         except RepositoryNotFoundError as exc:
@@ -3328,7 +3237,6 @@ class PromptManager:
 
     def create_prompt_note(self, note: PromptNote) -> PromptNote:
         """Persist a new prompt note."""
-
         note.touch()
         try:
             return self._repository.add_prompt_note(note)
@@ -3337,7 +3245,6 @@ class PromptManager:
 
     def update_prompt_note(self, note: PromptNote) -> PromptNote:
         """Update an existing prompt note."""
-
         note.touch()
         try:
             return self._repository.update_prompt_note(note)
@@ -3348,7 +3255,6 @@ class PromptManager:
 
     def delete_prompt_note(self, note_id: uuid.UUID) -> None:
         """Delete a prompt note."""
-
         try:
             self._repository.delete_prompt_note(note_id)
         except RepositoryNotFoundError as exc:
@@ -3468,7 +3374,6 @@ class PromptManager:
         self, query_text: str, *, limit: int = 5
     ) -> PromptManager.IntentSuggestions:
         """Return intent-ranked prompt recommendations for the supplied query."""
-
         if limit <= 0:
             raise ValueError("limit must be a positive integer")
 
@@ -3553,7 +3458,6 @@ class PromptManager:
 
     def _personalize_ranked_prompts(self, prompts: Sequence[Prompt]) -> list[Prompt]:
         """Bias prompt order using stored user preferences while preserving stability."""
-
         if not prompts:
             return []
         profile = self._user_profile
@@ -3595,7 +3499,6 @@ class PromptManager:
 
     def _record_prompt_usage(self, prompt: Prompt) -> None:
         """Persist prompt usage into the single-user profile when possible."""
-
         try:
             profile = self._repository.record_user_prompt_usage(prompt)
         except RepositoryError:
@@ -3642,7 +3545,6 @@ class PromptManager:
         parent_version_id: int | None = None,
     ) -> PromptVersion:
         """Persist a version snapshot for the provided prompt."""
-
         try:
             return self._repository.record_prompt_version(
                 prompt,
@@ -3661,7 +3563,6 @@ class PromptManager:
         label_b: str = "after",
     ) -> str:
         """Return a unified diff for the provided text blocks."""
-
         diff = difflib.unified_diff(
             before.splitlines(),
             after.splitlines(),
@@ -3728,7 +3629,6 @@ class PromptManager:
         self, prompt: Prompt, embedding: Sequence[float], *, is_new: bool
     ) -> None:
         """Persist embeddings to Chroma and refresh caches."""
-
         payload: dict[str, Any] = {
             "ids": [str(prompt.id)],
             "documents": [prompt.document],
@@ -3750,7 +3650,6 @@ class PromptManager:
 
     def _persist_embedding_from_worker(self, prompt: Prompt, embedding: Sequence[float]) -> None:
         """Callback invoked by background worker once embedding is generated."""
-
         prompt.ext4 = list(embedding)
         try:
             self._repository.update(prompt)
