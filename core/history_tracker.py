@@ -1,6 +1,7 @@
 """Prompt execution history tracking utilities.
 
 Updates:
+  v0.3.4 - 2025-11-30 - Fix HistoryTracker docstring spacing to satisfy Ruff.
   v0.3.3 - 2025-11-29 - Move Mapping import into TYPE_CHECKING for Ruff TC003.
   v0.3.2 - 2025-11-29 - Reformat docstring to satisfy Ruff line length limits.
   v0.3.1 - 2025-11-28 - Add per-prompt analytics helper for benchmarks and maintenance surfaces.
@@ -115,7 +116,6 @@ class HistoryTracker:
         context_metadata: Mapping[str, object] | None = None,
     ) -> PromptExecution:
         """Persist a failed execution attempt, including optional context metadata."""
-
         metadata_payload: dict[str, object] = dict(metadata) if metadata else {}
         if context_metadata:
             metadata_payload["context"] = dict(context_metadata)
@@ -160,6 +160,7 @@ class HistoryTracker:
             raise HistoryTrackerError(
                 f"Unable to list executions for prompt {prompt_id}: {exc}"
             ) from exc
+
     def query_executions(
         self,
         *,
@@ -169,7 +170,6 @@ class HistoryTracker:
         limit: int | None = None,
     ) -> list[PromptExecution]:
         """Return executions filtered by the provided parameters."""
-
         status_value = status.value if isinstance(status, ExecutionStatus) else status
         search_term = search.strip() if search else None
         try:
@@ -190,7 +190,6 @@ class HistoryTracker:
         trend_window: int = 5,
     ) -> ExecutionAnalytics:
         """Return aggregated execution metrics for the stored history."""
-
         since: datetime | None = None
         if window_days is not None:
             since = datetime.now(UTC) - timedelta(days=max(window_days, 0))
@@ -258,7 +257,6 @@ class HistoryTracker:
         trend_window: int = 5,
     ) -> PromptExecutionAnalytics | None:
         """Return aggregate execution metrics for a specific prompt."""
-
         since: datetime | None = None
         if window_days is not None:
             since = datetime.now(UTC) - timedelta(days=max(window_days, 0))
@@ -308,7 +306,6 @@ class HistoryTracker:
         rating: float | None = None,
     ) -> PromptExecution:
         """Create a PromptExecution dataclass instance with sanitised payloads."""
-
         execution_metadata = dict(metadata) if metadata else None
         return PromptExecution(
             id=uuid.uuid4(),
@@ -332,7 +329,6 @@ class HistoryTracker:
 
     def update_note(self, execution_id: uuid.UUID, note: str | None) -> PromptExecution:
         """Update or clear the note metadata for an execution."""
-
         try:
             existing = self.repository.get_execution(execution_id)
         except RepositoryNotFoundError as exc:
