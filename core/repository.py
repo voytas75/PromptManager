@@ -28,7 +28,8 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -109,11 +110,12 @@ def _json_loads_list(value: str | None) -> list[str]:
     if value in ("", "null"):
         return []
     try:
-        parsed = json.loads(value)
+        parsed: object = json.loads(value)
     except json.JSONDecodeError:
         return [str(value)]  # degraded fallback
     if isinstance(parsed, list):
-        return [str(item) for item in parsed]
+        entries = cast("Sequence[object]", parsed)
+        return [str(item) for item in entries]
     return [str(parsed)]
 
 
@@ -135,11 +137,12 @@ def _json_loads_dict(value: str | None) -> dict[str, Any]:
     if value is None or value in ("", "null"):
         return {}
     try:
-        parsed = json.loads(value)
+        parsed_obj: object = json.loads(value)
     except json.JSONDecodeError:
         return {}
-    if isinstance(parsed, dict):
-        return {str(key): parsed[key] for key in parsed}
+    if isinstance(parsed_obj, dict):
+        parsed_map = cast("Mapping[str, Any]", parsed_obj)
+        return {str(key): parsed_map[key] for key in parsed_map}
     return {}
 
 

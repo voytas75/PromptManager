@@ -10,9 +10,10 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
+from collections.abc import Mapping
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from core.prompt_manager import PromptHistoryError, PromptManager, PromptManagerError
 
@@ -226,15 +227,15 @@ def _collect_usage_frequency(
     top_prompts = ranked[: max(1, limit)]
     entries: list[UsageFrequencyEntry] = []
     for prompt in top_prompts:
-        stats: dict[str, object]
+        stats: Mapping[str, Any]
         try:
             stats = manager.repository.get_prompt_execution_statistics(prompt.id, since=since)
         except Exception as exc:  # pragma: no cover - defensive
             logger.debug("Unable to load usage stats for prompt", exc_info=exc)
             stats = {}
-        total_runs = int(stats.get("total_runs", 0) or 0)
-        success_runs = int(stats.get("success_runs", 0) or 0)
-        success_rate = success_runs / total_runs if total_runs else None
+        total_runs = _coerce_int(stats.get("total_runs"), default=0)
+        success_runs = _coerce_int(stats.get("success_runs"), default=0)
+        success_rate: float | None = success_runs / total_runs if total_runs else None
         last_executed = stats.get("last_executed_at")
         timestamp = _coerce_datetime(last_executed)
         entries.append(
@@ -263,14 +264,14 @@ def _collect_model_costs(
     for row in rows:
         model = str(row.get("model") or "unknown").strip() or "unknown"
         entries.append(
-            ModelCostEntry(
-                model=model,
-                run_count=int(row.get("run_count", 0) or 0),
-                prompt_tokens=int(row.get("prompt_tokens", 0) or 0),
-                completion_tokens=int(row.get("completion_tokens", 0) or 0),
-                total_tokens=int(row.get("total_tokens", 0) or 0),
+                ModelCostEntry(
+                    model=model,
+                    run_count=_coerce_int(row.get("run_count"), default=0),
+                    prompt_tokens=_coerce_int(row.get("prompt_tokens"), default=0),
+                    completion_tokens=_coerce_int(row.get("completion_tokens"), default=0),
+                    total_tokens=_coerce_int(row.get("total_tokens"), default=0),
+                )
             )
-        )
     return entries
 
 
@@ -298,14 +299,14 @@ def _collect_benchmark_stats(
         except (TypeError, ValueError):  # pragma: no cover - defensive
             avg_duration_value = None
         entries.append(
-            BenchmarkStatsEntry(
-                model=model,
-                run_count=total_runs,
-                success_rate=success_rate,
-                average_duration_ms=avg_duration_value,
-                total_tokens=int(row.get("total_tokens", 0) or 0),
+                BenchmarkStatsEntry(
+                    model=model,
+                    run_count=total_runs,
+                    success_rate=success_rate,
+                    average_duration_ms=avg_duration_value,
+                    total_tokens=_coerce_int(row.get("total_tokens"), default=0),
             )
-        )
+            )
     return entries
 
 
@@ -372,13 +373,23 @@ def _coerce_datetime(value: object) -> datetime | None:
         if not text:
             return None
         try:
-            parsed = datetime.fromisoformat(text)
+            parsed_dt = datetime.fromisoformat(text)
         except ValueError:
             return None
-        if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=UTC)
-        return parsed
+        if parsed_dt.tzinfo is None:
+            parsed_dt = parsed_dt.replace(tzinfo=UTC)
+        return parsed_dt
     return None
+
+
+def _coerce_int(value: object | None, *, default: int = 0) -> int:
+    if value is None:
+        return default
+    coerced_value: Any = value
+    try:
+        return int(coerced_value)
+    except (TypeError, ValueError):
+        return default
 
 
 __all__ = [
