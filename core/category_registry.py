@@ -1,6 +1,7 @@
 """Prompt category registry helpers and defaults.
 
 Updates:
+  v0.1.2 - 2025-11-30 - Fix docstring spacing for Ruff compliance in registry helpers.
   v0.1.1 - 2025-11-29 - Wrap long defaults and type-only Path import.
   v0.1.0 - 2025-11-22 - Introduce PromptCategory registry and defaults.
 """
@@ -86,7 +87,6 @@ def load_category_definitions(
     path: Path | None = None,
 ) -> list[PromptCategory]:
     """Return PromptCategory definitions from defaults plus overrides."""
-
     catalog: MutableMapping[str, PromptCategory] = {
         entry["slug"]: PromptCategory.from_mapping(entry)
         for entry in DEFAULT_CATEGORY_DEFINITIONS
@@ -136,6 +136,7 @@ class CategoryRegistry:
         repository: PromptRepository,
         defaults: Sequence[PromptCategory] | None = None,
     ) -> None:
+        """Initialise the registry with repository hooks and optional defaults."""
         self._repository = repository
         self._defaults = list(defaults or [])
         self._all: dict[str, PromptCategory] = {}
@@ -149,7 +150,6 @@ class CategoryRegistry:
 
     def refresh(self) -> list[PromptCategory]:
         """Reload categories from the repository."""
-
         try:
             categories = self._repository.list_categories(include_archived=True)
         except RepositoryError as exc:
@@ -162,20 +162,17 @@ class CategoryRegistry:
 
     def all(self, include_archived: bool = False) -> list[PromptCategory]:
         """Return cached categories."""
-
         source = self._all if include_archived else self._active
         return list(source.values())
 
     def get(self, slug: str | None) -> PromptCategory | None:
         """Return category by slug, if available."""
-
         if not slug:
             return None
         return self._all.get(slugify_category(slug))
 
     def find_by_label(self, label: str | None) -> PromptCategory | None:
         """Return the first category matching a label (case-insensitive)."""
-
         if not label:
             return None
         target = label.strip().lower()
@@ -192,7 +189,6 @@ class CategoryRegistry:
         description: str | None = None,
     ) -> PromptCategory:
         """Return an existing category or create a new placeholder."""
-
         resolved_slug = slugify_category(slug or label)
         if not resolved_slug:
             raise CategoryError("Category slug cannot be empty.")
@@ -216,7 +212,6 @@ class CategoryRegistry:
 
     def require(self, slug: str) -> PromptCategory:
         """Return a category or raise if not found."""
-
         category = self.get(slug)
         if category is None:
             raise CategoryNotFoundError(f"Category '{slug}' does not exist.")

@@ -16,7 +16,6 @@ from models.response_style import ResponseStyle
 
 def _make_response_style(name: str = "Friendly Reviewer") -> ResponseStyle:
     """Return a populated ResponseStyle instance for tests."""
-
     now = datetime.now(UTC)
     return ResponseStyle(
         id=uuid.uuid4(),
@@ -38,7 +37,6 @@ def _make_response_style(name: str = "Friendly Reviewer") -> ResponseStyle:
 
 def test_response_style_roundtrip() -> None:
     """Ensure ResponseStyle serialization stays lossless."""
-
     style = _make_response_style()
     record = style.to_record()
     loaded = ResponseStyle.from_record(record)
@@ -51,7 +49,6 @@ def test_response_style_roundtrip() -> None:
 
 def test_repository_crud(tmp_path) -> None:
     """Persist response styles and verify CRUD operations."""
-
     repo = PromptRepository(str(tmp_path / "repo.db"))
     style = _make_response_style()
 
@@ -78,7 +75,6 @@ def test_repository_crud(tmp_path) -> None:
 
 def test_repository_filters_and_search(tmp_path) -> None:
     """List response styles with inactive and search filters."""
-
     repo = PromptRepository(str(tmp_path / "repo.db"))
     active = _make_response_style("Active Style")
     active.prompt_part = "Output Formatter"
