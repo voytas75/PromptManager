@@ -1,6 +1,7 @@
 """LiteLLM-backed prompt execution helpers.
 
 Updates:
+  v0.4.2 - 2025-11-30 - Fix docstring spacing for Ruff and improve helper comments.
   v0.4.1 - 2025-11-29 - Guard Prompt/UUID imports and wrap payload handling lines.
   v0.4.0 - 2025-11-26 - Add streaming support for LiteLLM prompt execution.
   v0.3.1 - 2025-11-05 - Rely on provider defaults instead of forcing LiteLLM timeouts.
@@ -38,7 +39,6 @@ class ExecutionError(Exception):
 
 def _supports_reasoning(model: str) -> bool:
     """Return True when the target model supports OpenAI reasoning payloads."""
-
     lowered = model.lower()
     reasoning_markers = ("o1", "o3", "o4", "gpt-4.1", "gpt-5")
     return any(marker in lowered for marker in reasoning_markers)
@@ -81,7 +81,6 @@ class CodexExecutor:
         on_stream: Callable[[str], None] | None = None,
     ) -> CodexExecutionResult:
         """Run the supplied request through LiteLLM and return the response."""
-
         try:
             completion, LiteLLMException = get_completion()
         except RuntimeError as exc:
@@ -235,7 +234,6 @@ __all__ = ["CodexExecutor", "CodexExecutionResult", "ExecutionError"]
 
 def _extract_completion_text(payload: Mapping[str, Any]) -> str:
     """Extract assistant content from a LiteLLM completion payload."""
-
     choices_value = payload.get("choices")
     if not isinstance(choices_value, Sequence) or not choices_value:
         raise ExecutionError("LiteLLM returned an unexpected payload")
@@ -267,7 +265,6 @@ def _consume_streaming_response(
     on_stream: Callable[[str], None] | None = None,
 ) -> tuple[str, dict[str, Any], dict[str, Any]]:
     """Aggregate LiteLLM streaming chunks into final response text and metadata."""
-
     accumulated: list[str] = []
     usage: dict[str, Any] = {}
     serialised_chunks: list[Any] = []
@@ -303,7 +300,6 @@ def _consume_streaming_response(
 
 def _serialise_chunk(chunk: Any) -> Any:
     """Best-effort conversion of LiteLLM streaming chunks into serialisable objects."""
-
     if isinstance(chunk, Mapping):
         return dict(cast("Mapping[str, Any]", chunk))
     model_dump = getattr(chunk, "model_dump", None)
@@ -323,7 +319,6 @@ def _serialise_chunk(chunk: Any) -> Any:
 
 def _extract_stream_text(payload: Any) -> str:
     """Return textual delta from a LiteLLM streaming payload when available."""
-
     if not isinstance(payload, Mapping):
         return ""
     mapping_payload = cast("Mapping[str, Any]", payload)
@@ -355,7 +350,6 @@ def _extract_stream_text(payload: Any) -> str:
 
 def _extract_stream_usage(payload: Any) -> dict[str, Any]:
     """Return usage metadata from a streaming payload if present."""
-
     empty: dict[str, Any] = {}
     if not isinstance(payload, Mapping):
         return empty
