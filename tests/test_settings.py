@@ -1,6 +1,7 @@
 """Tests for configuration loading and validation logic.
 
 Updates:
+  v0.1.7 - 2025-11-30 - Add docstrings to tests for lint compliance.
   v0.1.6 - 2025-11-30 - Cover routing for category suggestion workflow.
   v0.1.5 - 2025-11-29 - Wrap embedding backend tests for Ruff line length.
   v0.1.4 - 2025-11-05 - Cover LiteLLM inference model configuration.
@@ -73,6 +74,7 @@ def test_json_precedes_env_when_both_provided(monkeypatch, tmp_path) -> None:
 
 
 def test_json_with_litellm_api_key_is_ignored(monkeypatch, tmp_path, caplog) -> None:
+    """Ensure LiteLLM API keys present in JSON configs are ignored."""
     config_payload = {
         "litellm_model": "azure/gpt-4o",
         "litellm_api_key": "from-json",
@@ -96,6 +98,7 @@ def test_json_with_litellm_api_key_is_ignored(monkeypatch, tmp_path, caplog) -> 
 
 
 def test_litellm_settings_from_env(monkeypatch, tmp_path) -> None:
+    """Load LiteLLM configuration entirely from environment variables."""
     tmp_config = tmp_path / "config.json"
     tmp_config.write_text("{}", encoding="utf-8")
     monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(tmp_config))
@@ -120,6 +123,7 @@ def test_litellm_settings_from_env(monkeypatch, tmp_path) -> None:
 
 
 def test_litellm_inference_model_from_json(monkeypatch, tmp_path) -> None:
+    """Respect inference model overrides sourced from JSON config files."""
     config_path = tmp_path / "config.json"
     config_path.write_text(
         json.dumps(
@@ -141,6 +145,7 @@ def test_litellm_inference_model_from_json(monkeypatch, tmp_path) -> None:
 
 
 def test_litellm_workflow_models_strip_fast_entries(monkeypatch, tmp_path) -> None:
+    """Remove redundant fast-tier entries when persisting workflow models."""
     config_path = tmp_path / "config.json"
     config_path.write_text(
         json.dumps(
@@ -167,6 +172,7 @@ def test_litellm_workflow_models_strip_fast_entries(monkeypatch, tmp_path) -> No
 
 
 def test_litellm_workflow_models_include_category_generation(monkeypatch, tmp_path) -> None:
+    """Ensure category generation routing survives JSON round-trips."""
     config_path = tmp_path / "config.json"
     config_path.write_text(
         json.dumps(
@@ -188,6 +194,7 @@ def test_litellm_workflow_models_include_category_generation(monkeypatch, tmp_pa
 
 
 def test_reasoning_effort_normalised(monkeypatch, tmp_path) -> None:
+    """Normalise reasoning effort strings before storing settings."""
     config_payload = {"litellm_reasoning_effort": "Medium"}
     config_path = tmp_path / "config.json"
     config_path.write_text(json.dumps(config_payload), encoding="utf-8")
@@ -200,6 +207,7 @@ def test_reasoning_effort_normalised(monkeypatch, tmp_path) -> None:
 
 
 def test_reasoning_effort_rejects_invalid(monkeypatch, tmp_path) -> None:
+    """Reject reasoning effort values that fall outside the supported enum."""
     config_payload = {"litellm_reasoning_effort": "fast"}
     config_path = tmp_path / "config.json"
     config_path.write_text(json.dumps(config_payload), encoding="utf-8")
@@ -211,6 +219,7 @@ def test_reasoning_effort_rejects_invalid(monkeypatch, tmp_path) -> None:
 
 
 def test_litellm_settings_accept_azure_aliases(monkeypatch, tmp_path) -> None:
+    """Allow Azure-specific LiteLLM identifiers when loading from env."""
     tmp_config = tmp_path / "config.json"
     tmp_config.write_text("{}", encoding="utf-8")
     monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(tmp_config))
@@ -228,6 +237,7 @@ def test_litellm_settings_accept_azure_aliases(monkeypatch, tmp_path) -> None:
 
 
 def test_litellm_drop_params_from_json_not_overridden_by_empty_env(monkeypatch, tmp_path) -> None:
+    """Keep JSON drop params even if env variables are empty."""
     config_path = tmp_path / "config.json"
     config_path.write_text(json.dumps({"litellm_drop_params": ["max_tokens"]}), encoding="utf-8")
     monkeypatch.chdir(tmp_path)
@@ -240,6 +250,7 @@ def test_litellm_drop_params_from_json_not_overridden_by_empty_env(monkeypatch, 
 
 
 def test_litellm_stream_flag_from_env(monkeypatch, tmp_path) -> None:
+    """Read the LiteLLM streaming flag from environment variables."""
     tmp_config = tmp_path / "config.json"
     tmp_config.write_text("{}", encoding="utf-8")
     monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(tmp_config))
@@ -251,6 +262,7 @@ def test_litellm_stream_flag_from_env(monkeypatch, tmp_path) -> None:
 
 
 def test_embedding_backend_defaults_to_litellm(monkeypatch, tmp_path) -> None:
+    """Fallback to LiteLLM embeddings when no backend overrides are provided."""
     config_path = tmp_path / "config.json"
     config_path.write_text("{}", encoding="utf-8")
     monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
@@ -261,6 +273,7 @@ def test_embedding_backend_defaults_to_litellm(monkeypatch, tmp_path) -> None:
 
 
 def test_embedding_backend_requires_model(monkeypatch) -> None:
+    """Require a model name when selecting the sentence-transformers backend."""
     monkeypatch.setenv("PROMPT_MANAGER_EMBEDDING_BACKEND", "sentence-transformers")
     with pytest.raises(SettingsError):
         load_settings()
@@ -270,6 +283,7 @@ def test_embedding_backend_defaults_to_configured_constant_when_missing(
     monkeypatch,
     tmp_path,
 ) -> None:
+    """Use the configured constant when embedding settings are omitted."""
     tmp_config = tmp_path / "config.json"
     tmp_config.write_text("{}", encoding="utf-8")
     monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(tmp_config))
@@ -281,6 +295,7 @@ def test_embedding_backend_defaults_to_configured_constant_when_missing(
 
 
 def test_embedding_backend_respects_explicit_embedding_model(monkeypatch, tmp_path) -> None:
+    """Honor explicit embedding model overrides regardless of defaults."""
     tmp_config = tmp_path / "config.json"
     tmp_config.write_text("{}", encoding="utf-8")
     monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(tmp_config))
@@ -292,6 +307,7 @@ def test_embedding_backend_respects_explicit_embedding_model(monkeypatch, tmp_pa
 
 
 def test_embedding_model_auto_switches_backend(monkeypatch, tmp_path) -> None:
+    """Auto-switch the backend when a hosted embedding model is selected."""
     config_path = tmp_path / "config.json"
     payload = {"embedding_model": "text-embedding-3-small"}
     config_path.write_text(json.dumps(payload), encoding="utf-8")
@@ -305,12 +321,14 @@ def test_embedding_model_auto_switches_backend(monkeypatch, tmp_path) -> None:
 
 
 def test_embedding_backend_rejects_unknown(monkeypatch) -> None:
+    """Raise SettingsError when an unsupported backend is configured."""
     monkeypatch.setenv("PROMPT_MANAGER_EMBEDDING_BACKEND", "unsupported")
     with pytest.raises(SettingsError):
         load_settings()
 
 
 def test_json_settings_override_env(monkeypatch, tmp_path) -> None:
+    """Ensure JSON config can override environment-provided values when desired."""
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     config_path = config_dir / "config.json"
@@ -322,6 +340,7 @@ def test_json_settings_override_env(monkeypatch, tmp_path) -> None:
 
 
 def test_load_settings_raises_when_json_missing(monkeypatch, tmp_path) -> None:
+    """Raise SettingsError when the referenced JSON file cannot be found."""
     """Raise SettingsError when a JSON file path variable points to a missing file."""
     missing_path = tmp_path / "absent.json"
     monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(missing_path))
@@ -330,6 +349,7 @@ def test_load_settings_raises_when_json_missing(monkeypatch, tmp_path) -> None:
 
 
 def test_load_settings_rejects_invalid_cache_ttl(monkeypatch, tmp_path) -> None:
+    """Reject invalid cache TTL values loaded from JSON configuration."""
     """Reject non-positive cache TTL values sourced from environment variables."""
     tmp_config = tmp_path / "config.json"
     tmp_config.write_text("{}", encoding="utf-8")
@@ -340,12 +360,14 @@ def test_load_settings_rejects_invalid_cache_ttl(monkeypatch, tmp_path) -> None:
 
 
 def test_load_settings_rejects_missing_path() -> None:
+    """Require filesystem paths when loading settings without defaults."""
     """Ensure db/chroma path validators reject None values."""
     with pytest.raises(SettingsError):
         load_settings(db_path=None)
 
 
 def test_load_settings_raises_on_invalid_json(monkeypatch, tmp_path) -> None:
+    """Raise when the JSON config file cannot be parsed successfully."""
     config_path = tmp_path / "invalid.json"
     config_path.write_text("{invalid", encoding="utf-8")
     monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
@@ -355,6 +377,7 @@ def test_load_settings_raises_on_invalid_json(monkeypatch, tmp_path) -> None:
 
 
 def test_load_settings_requires_json_object(monkeypatch, tmp_path) -> None:
+    """Reject JSON configs that do not contain a top-level object."""
     config_path = tmp_path / "array.json"
     config_path.write_text(json.dumps(["not", "object"]), encoding="utf-8")
     monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))

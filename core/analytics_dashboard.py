@@ -1,6 +1,8 @@
 """High-level analytics aggregation helpers for dashboards and diagnostics.
 
-Updates: v0.1.0 - 2025-11-28 - Introduce analytics snapshot builder for CLI and GUI surfaces.
+Updates:
+  v0.1.1 - 2025-11-30 - Fix function docstring spacing for lint compliance.
+  v0.1.0 - 2025-11-28 - Introduce analytics snapshot builder for CLI and GUI surfaces.
 """
 
 from __future__ import annotations
@@ -85,7 +87,6 @@ def build_analytics_snapshot(
     usage_log_path: Path | None = None,
 ) -> AnalyticsSnapshot:
     """Collect aggregated metrics for dashboards and diagnostics outputs."""
-
     since: datetime | None
     if window_days <= 0:
         since = None
@@ -131,7 +132,6 @@ def build_analytics_snapshot(
 
 def snapshot_dataset_rows(snapshot: AnalyticsSnapshot, dataset: str) -> list[dict[str, object]]:
     """Return dataset rows for CSV export based on the requested key."""
-
     key = dataset.lower()
     if key == "usage":
         return [

@@ -1,6 +1,7 @@
 """Import, preview, and export prompt catalogues for Prompt Manager.
 
 Updates:
+  v0.7.2 - 2025-11-30 - Document diff helpers and fix docstring spacing for lint compliance.
   v0.7.1 - 2025-11-30 - Retained GUI helpers after removing the CLI command.
   v0.6.1 - 2025-11-17 - Required explicit catalogue paths; removed fallback prompts.
   v0.6.0 - 2025-11-06 - Added diff previews, export helpers, and bulk directory support.
@@ -52,7 +53,6 @@ except ImportError:  # pragma: no cover - handled at runtime when exporting YAML
 
 def _now_iso() -> str:
     """Return the current UTC timestamp in ISO-8601 format."""
-
     return datetime.now(UTC).isoformat()
 
 
@@ -150,7 +150,6 @@ def _entry_to_prompt(entry: CatalogEntry) -> Prompt:
 
 def load_prompt_catalog(catalog_path: Path | None) -> list[Prompt]:
     """Load prompts from a user-provided path."""
-
     if catalog_path is None:
         logger.debug("No prompt catalogue path provided; returning empty list.")
         return []
@@ -216,9 +215,11 @@ class CatalogDiff:
     source: str | None = None
 
     def has_changes(self) -> bool:
+        """Return True when at least one prompt will be created or updated."""
         return self.added > 0 or self.updated > 0
 
     def summary(self) -> dict[str, int]:
+        """Return a dictionary of diff counters for downstream reporting."""
         return {
             "added": self.added,
             "updated": self.updated,
@@ -389,6 +390,7 @@ class CatalogImportResult:
     preview: CatalogDiff | None = None
 
     def summary(self) -> dict[str, int]:
+        """Return aggregate counts from the previous import run."""
         return {
             "added": self.added,
             "updated": self.updated,
@@ -404,7 +406,6 @@ def diff_prompt_catalog(
     overwrite: bool = True,
 ) -> CatalogDiff:
     """Return a diff preview describing how a catalogue import would change prompts."""
-
     prompts = load_prompt_catalog(catalog_path)
     plan = _build_change_plan(manager, prompts, overwrite=overwrite)
     plan.diff.source = str(catalog_path) if catalog_path else None
@@ -418,7 +419,6 @@ def import_prompt_catalog(
     overwrite: bool = True,
 ) -> CatalogImportResult:
     """Apply catalogue changes to the repository and return a summary result."""
-
     prompts = load_prompt_catalog(catalog_path)
     plan = _build_change_plan(manager, prompts, overwrite=overwrite)
 
@@ -452,7 +452,6 @@ def export_prompt_catalog(
     include_inactive: bool = False,
 ) -> Path:
     """Export the current prompt repository to JSON or YAML."""
-
     fmt_lower = fmt.lower()
     if fmt_lower not in {"json", "yaml"}:
         raise ValueError("fmt must be 'json' or 'yaml'")

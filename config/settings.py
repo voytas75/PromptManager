@@ -1,6 +1,7 @@
 """Settings management utilities for Prompt Manager configuration.
 
 Updates:
+  v0.5.3 - 2025-11-30 - Fix validator docstring spacing for lint compliance.
   v0.5.2 - 2025-11-30 - Add category suggestion workflow to LiteLLM routing.
   v0.5.1 - 2025-11-23 - Added prompt template override settings.
   v0.5.0 - 2025-11-22 - Added structure-only prompt refinement routing.
@@ -291,7 +292,6 @@ class PromptManagerSettings(BaseSettings):
     @field_validator("categories_path", mode="before")
     def _normalise_categories_path(cls, value: Any) -> Path | None:
         """Coerce optional category file path into a Path."""
-
         if value in (None, ""):
             return None
         path = Path(str(value)).expanduser()
@@ -300,7 +300,6 @@ class PromptManagerSettings(BaseSettings):
     @field_validator("categories", mode="before")
     def _parse_categories(cls, value: Any) -> list[dict[str, object]] | None:
         """Ensure inline categories are represented as a list of mappings."""
-
         if value in (None, "", []):
             return None
         if isinstance(value, str):

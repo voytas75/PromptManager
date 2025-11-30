@@ -1,6 +1,7 @@
 """Embedding provider and background synchronisation helpers for Prompt Manager.
 
 Updates:
+  v0.7.4 - 2025-11-30 - Document embedding helpers and fix docstring spacing for lint compliance.
   v0.7.3 - 2025-11-29 - Guard Prompt import for typing and wrap logging/reporting lines.
   v0.7.2 - 2025-12-06 - Align embedding function signatures with updated Chroma client expectations.
   v0.7.1 - 2025-11-05 - Stop forwarding LiteLLM embedding timeouts by default.
@@ -56,6 +57,7 @@ class DefaultEmbeddingFunction:
     _VECTOR_LENGTH = 32
 
     def __call__(self, input: Sequence[str]) -> list[list[float]]:
+        """Return deterministic embedding vectors for each supplied input string."""
         results: list[list[float]] = []
         for text in input:
             digest = hashlib.blake2b(text.encode("utf-8"), digest_size=self._VECTOR_LENGTH).digest()
@@ -75,6 +77,7 @@ class LiteLLMEmbeddingFunction:
         api_base: str | None,
         timeout_seconds: float | None = None,
     ) -> None:
+        """Store LiteLLM credentials and request options for embedding calls."""
         if not model:
             raise ValueError("LiteLLM embedding backend requires a model name.")
         self._model = model
@@ -83,6 +86,7 @@ class LiteLLMEmbeddingFunction:
         self._timeout_seconds = timeout_seconds
 
     def __call__(self, input: Sequence[str]) -> list[list[float]]:
+        """Return embedding vectors by invoking the configured LiteLLM backend."""
         embedding_fn, LiteLLMException = get_embedding()
         inputs = list(input)
         if not inputs:
@@ -124,7 +128,6 @@ class LiteLLMEmbeddingFunction:
     @staticmethod
     def _extract_payload(response: Any) -> Any:
         """Return a JSON-like payload from LiteLLM responses."""
-
         for attr in ("model_dump", "dict", "json"):
             if hasattr(response, attr):
                 attr_func = getattr(response, attr)
@@ -138,7 +141,6 @@ class LiteLLMEmbeddingFunction:
     @staticmethod
     def _extract_data_array(payload: Any) -> Sequence[Any]:
         """Extract the embedding data array from LiteLLM responses."""
-
         payload_obj = cast("object", payload)
         if isinstance(payload, Mapping) and "data" in payload:
             payload_map = cast("Mapping[str, Any]", payload)
@@ -154,7 +156,6 @@ class LiteLLMEmbeddingFunction:
     @staticmethod
     def _extract_embedding_vector(item: Any, index: int) -> Sequence[Any]:
         """Return the embedding vector sequence from a data entry."""
-
         candidate: Any
         if isinstance(item, Mapping):
             mapping_item = cast("Mapping[str, Any]", item)
@@ -189,6 +190,7 @@ class SentenceTransformersEmbeddingFunction:
     """Use sentence-transformers models for local embeddings."""
 
     def __init__(self, model: str, *, device: str | None = None) -> None:
+        """Load a sentence-transformers model for local embedding generation."""
         if not model:
             raise ValueError("sentence-transformers backend requires a model name.")
         self._model_name = model
@@ -205,6 +207,7 @@ class SentenceTransformersEmbeddingFunction:
         return model
 
     def __call__(self, input: Sequence[str]) -> list[list[float]]:
+        """Return embeddings for the supplied text batch using the loaded model."""
         inputs = list(input)
         if not inputs:
             return []
@@ -231,7 +234,6 @@ def create_embedding_function(
     timeout_seconds: float | None = None,
 ) -> EmbeddingFunction | None:
     """Return an embedding function for the configured backend or None for the default."""
-
     backend_normalised = (backend or "deterministic").strip().lower()
     if backend_normalised in {"", "deterministic", "default"}:
         return None
@@ -257,6 +259,7 @@ class EmbeddingProvider:
         max_retries: int = 3,
         retry_delay_seconds: float = 0.3,
     ) -> None:
+        """Initialise the provider with the callable backend and retry strategy."""
         self._embedding_function: EmbeddingFunction = (
             embedding_function or DefaultEmbeddingFunction()
         )
@@ -265,7 +268,6 @@ class EmbeddingProvider:
 
     def embed(self, text: str) -> list[float]:
         """Return an embedding vector for the supplied text."""
-
         last_error: Exception | None = None
         for attempt in range(1, self._max_retries + 1):
             try:
@@ -295,6 +297,7 @@ class EmbeddingSyncWorker:
         max_attempts: int = 3,
         retry_delay_seconds: float = 0.5,
     ) -> None:
+        """Run a background thread that keeps prompt embeddings up to date."""
         self._provider = provider
         self._fetch_prompt = fetch_prompt
         self._persist_callback = persist_callback
@@ -309,12 +312,10 @@ class EmbeddingSyncWorker:
 
     def schedule(self, prompt_id: uuid.UUID) -> None:
         """Queue a prompt identifier for embedding synchronisation."""
-
         self._queue.put((prompt_id, 0))
 
     def stop(self) -> None:
         """Signal the background thread to stop and drain the queue."""
-
         self._stop_event.set()
         self._queue.put_nowait((uuid.uuid4(), self._max_attempts))  # sentinel to unblock
         self._thread.join(timeout=2.0)
