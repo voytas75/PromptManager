@@ -31,7 +31,6 @@ class ScenarioGenerationError(Exception):
 
 def _normalise_scenarios(candidates: Sequence[str], limit: int) -> list[str]:
     """Return up to *limit* distinct, trimmed scenario strings."""
-
     cleaned: list[str] = []
     seen: set[str] = set()
     for candidate in candidates:
@@ -52,7 +51,6 @@ def _normalise_scenarios(candidates: Sequence[str], limit: int) -> list[str]:
 
 def _strip_code_fences(response_text: str) -> str:
     """Remove leading/trailing Markdown code fences to aid parsing."""
-
     stripped = response_text.lstrip()
     if not stripped.startswith("```"):
         return response_text
@@ -67,7 +65,6 @@ def _strip_code_fences(response_text: str) -> str:
 
 def _extract_candidates(response_text: str) -> list[str]:
     """Parse LiteLLM output into a list of candidate scenario strings."""
-
     response_text = _strip_code_fences(response_text)
     stripped = response_text.strip()
     if not stripped:
@@ -117,7 +114,6 @@ class LiteLLMScenarioGenerator:
 
     def generate(self, context: str, *, max_scenarios: int | None = None) -> list[str]:
         """Return a ranked list of usage scenarios for the supplied prompt body."""
-
         if not context.strip():
             raise ScenarioGenerationError("Prompt context is required to generate scenarios.")
         completion, LiteLLMException = get_completion()
@@ -203,7 +199,6 @@ class LiteLLMScenarioGenerator:
 
     def _system_prompt_text(self) -> str:
         """Return the configured or default scenario template."""
-
         return (self.system_prompt or SCENARIO_GENERATION_PROMPT).strip()
 
 
