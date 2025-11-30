@@ -5,5 +5,11 @@ Updates:
 """
 from .flow_layout import FlowLayout
 from .prompt_detail_widget import PromptDetailWidget
-
-__all__ = ["FlowLayout", "PromptDetailWidget"]
+from .prompt_filter_panel import PromptFilterPanel
+from .prompt_toolbar import PromptToolbar
+__all__ = [
+    "FlowLayout",
+    "PromptDetailWidget",
+    "PromptFilterPanel",
+    "PromptToolbar",
+]

@@ -1,6 +1,7 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.15.75 - 2025-11-30 - Extract toolbar and filter panels into reusable widgets.
   v0.15.74 - 2025-11-30 - Extract execution and chat controller plus delegate workspace actions.
   v0.15.73 - 2025-11-30 - Extract widgets, list model, and layout persistence modules.
   v0.15.72 - 2025-11-30 - Extract result overlay and share workflow helpers into modules.
@@ -54,17 +55,13 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QAbstractItemView,
-    QAbstractSpinBox,
     QCheckBox,
-    QComboBox,
     QDialog,
-    QDoubleSpinBox,
     QFileDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
     QLayout,
-    QLineEdit,
     QListView,
     QMainWindow,
     QMenu,
@@ -73,10 +70,8 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QSplitter,
-    QStyle,
     QTabWidget,
     QTextEdit,
-    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -149,7 +144,7 @@ from .share_controller import ShareController
 from .template_preview import TemplatePreviewWidget
 from .toast import show_toast
 from .usage_logger import IntentUsageLogger
-from .widgets import FlowLayout, PromptDetailWidget
+from .widgets import FlowLayout, PromptDetailWidget, PromptFilterPanel, PromptToolbar
 from .workbench.workbench_window import WorkbenchModeDialog, WorkbenchWindow
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
@@ -294,7 +289,8 @@ class MainWindow(QMainWindow):
         self._preserve_search_order: bool = False
         self._search_active: bool = False
         self._suggestions: PromptManager.IntentSuggestions | None = None
-        self._sort_combo: QComboBox | None = None
+        self._toolbar: PromptToolbar | None = None
+        self._filter_panel: PromptFilterPanel | None = None
         self._sort_order = PromptSortOrder.NAME_ASC
         self._pending_category_slug: str | None = None
         self._pending_tag_value: str | None = None
@@ -421,76 +417,22 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(container)
         layout.setContentsMargins(12, 12, 12, 12)
 
-        controls_layout = QHBoxLayout()
-        controls_layout.setSpacing(8)
-
-        self._search_input = QLineEdit(self)
-        self._search_input.setPlaceholderText("Search prompts…")
-        # Display an in‑field “✕” icon that clears the current text when clicked.
-        # Qt provides this built-in via the *clearButtonEnabled* property so we
-        # do not have to manage an extra button or custom stylesheet.
-        self._search_input.setClearButtonEnabled(True)
-        self._search_input.returnPressed.connect(self._on_search_button_clicked)  # type: ignore[arg-type]
-        self._search_input.textChanged.connect(self._on_search_changed)  # type: ignore[arg-type]
-        controls_layout.addWidget(self._search_input)
-
-        self._search_button = QPushButton("Search", self)
-        self._search_button.setToolTip("Search prompts with the current query")
-        self._search_button.clicked.connect(self._on_search_button_clicked)  # type: ignore[arg-type]
-        controls_layout.addWidget(self._search_button)
-
-        self._refresh_button = QPushButton("Refresh", self)
-        self._refresh_button.clicked.connect(self._on_refresh_clicked)  # type: ignore[arg-type]
-        controls_layout.addWidget(self._refresh_button)
-
-        self._add_button = QPushButton("Add", self)
-        self._add_button.clicked.connect(self._on_add_clicked)  # type: ignore[arg-type]
-        controls_layout.addWidget(self._add_button)
-
-        self._workbench_button = QPushButton("🆕 New", self)
-        self._workbench_button.setToolTip("Open the Enhanced Prompt Workbench.")
-        self._workbench_button.clicked.connect(self._on_workbench_clicked)  # type: ignore[arg-type]
-        controls_layout.addWidget(self._workbench_button)
-
-        self._import_button = QPushButton("Import", self)
-        self._import_button.clicked.connect(self._on_import_clicked)  # type: ignore[arg-type]
-        controls_layout.addWidget(self._import_button)
-
-        self._export_button = QPushButton("Export", self)
-        self._export_button.clicked.connect(self._on_export_clicked)  # type: ignore[arg-type]
-        controls_layout.addWidget(self._export_button)
-
-        self._maintenance_button = QPushButton("Maintenance", self)
-        self._maintenance_button.clicked.connect(self._on_maintenance_clicked)  # type: ignore[arg-type]
-        controls_layout.addWidget(self._maintenance_button)
-
-        self._notifications_button = QPushButton("Notifications", self)
-        self._notifications_button.clicked.connect(self._on_notifications_clicked)  # type: ignore[arg-type]
-        controls_layout.addWidget(self._notifications_button)
-
-        self._info_button = QPushButton("Info", self)
-        self._info_button.clicked.connect(self._on_info_clicked)  # type: ignore[arg-type]
-        controls_layout.addWidget(self._info_button)
-
-        self._templates_button = QPushButton("Prompt Templates", self)
-        self._templates_button.setToolTip("Edit LiteLLM system prompt overrides")
-        self._templates_button.clicked.connect(self._on_prompt_templates_clicked)  # type: ignore[arg-type]
-        controls_layout.addWidget(self._templates_button)
-
-        self._settings_button = QPushButton("Settings", self)
-        self._settings_button.clicked.connect(self._on_settings_clicked)  # type: ignore[arg-type]
-        controls_layout.addWidget(self._settings_button)
-
-        self._exit_button = QToolButton(self)
-        self._exit_button.setIcon(self.style().standardIcon(QStyle.SP_TitleBarCloseButton))
-        self._exit_button.setToolTip("Exit Prompt Manager")
-        self._exit_button.setAccessibleName("Exit Prompt Manager")
-        self._exit_button.setAutoRaise(True)
-        self._exit_button.setCursor(Qt.PointingHandCursor)
-        self._exit_button.clicked.connect(self._on_exit_clicked)  # type: ignore[arg-type]
-        controls_layout.addWidget(self._exit_button)
-
-        layout.addLayout(controls_layout)
+        toolbar = PromptToolbar(self)
+        toolbar.search_requested.connect(self._on_search_button_clicked)
+        toolbar.search_text_changed.connect(self._on_search_changed)
+        toolbar.refresh_requested.connect(self._on_refresh_clicked)
+        toolbar.add_requested.connect(self._on_add_clicked)
+        toolbar.workbench_requested.connect(self._on_workbench_clicked)
+        toolbar.import_requested.connect(self._on_import_clicked)
+        toolbar.export_requested.connect(self._on_export_clicked)
+        toolbar.maintenance_requested.connect(self._on_maintenance_clicked)
+        toolbar.notifications_requested.connect(self._on_notifications_clicked)
+        toolbar.info_requested.connect(self._on_info_clicked)
+        toolbar.templates_requested.connect(self._on_prompt_templates_clicked)
+        toolbar.settings_requested.connect(self._on_settings_clicked)
+        toolbar.exit_requested.connect(self._on_exit_clicked)
+        layout.addWidget(toolbar)
+        self._toolbar = toolbar
 
         language_layout = QHBoxLayout()
         language_layout.setContentsMargins(0, 0, 0, 0)
@@ -558,62 +500,19 @@ class MainWindow(QMainWindow):
         self._intent_hint.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
         self._intent_hint.setVisible(False)
 
-        filter_layout = QHBoxLayout()
-        filter_layout.setSpacing(8)
-
-        self._category_filter = QComboBox(self)
-        self._category_filter.addItem("All categories", None)
-        self._category_filter.currentIndexChanged.connect(self._on_filters_changed)
-        self._manage_categories_button = QToolButton(self)
-        self._manage_categories_button.setText("Manage")
-        self._manage_categories_button.setToolTip("Manage prompt categories.")
-        self._manage_categories_button.clicked.connect(self._on_manage_categories_clicked)  # type: ignore[arg-type]
-
-        self._tag_filter = QComboBox(self)
-        self._tag_filter.addItem("All tags", None)
-        self._tag_filter.currentIndexChanged.connect(self._on_filters_changed)
-
-        self._quality_filter = QDoubleSpinBox(self)
-        self._quality_filter.setRange(0.0, 10.0)
-        self._quality_filter.setDecimals(1)
-        self._quality_filter.setSingleStep(0.1)
-        self._quality_filter.setButtonSymbols(QAbstractSpinBox.NoButtons)
-        self._quality_filter.setAlignment(Qt.AlignRight)
-        self._quality_filter.setMinimumWidth(
-            self._quality_filter.fontMetrics().horizontalAdvance("10.0") + 32
+        filter_panel = PromptFilterPanel(
+            sort_options=[(label, order.value) for label, order in self._SORT_OPTIONS],
+            parent=self,
         )
-        self._quality_filter.valueChanged.connect(self._on_filters_changed)
+        filter_panel.filters_changed.connect(self._on_filters_changed)
+        filter_panel.sort_changed.connect(self._on_sort_changed)
+        filter_panel.manage_categories_requested.connect(self._on_manage_categories_clicked)
+        layout.addWidget(filter_panel)
+        self._filter_panel = filter_panel
         if self._pending_quality_value is not None:
-            self._quality_filter.blockSignals(True)
-            self._quality_filter.setValue(self._pending_quality_value)
-            self._quality_filter.blockSignals(False)
+            filter_panel.set_min_quality(self._pending_quality_value)
             self._pending_quality_value = None
-
-        filter_layout.addWidget(QLabel("Category:", self))
-        filter_layout.addWidget(self._category_filter)
-        filter_layout.addWidget(self._manage_categories_button)
-        filter_layout.addWidget(QLabel("Tag:", self))
-        filter_layout.addWidget(self._tag_filter)
-        filter_layout.addWidget(QLabel("Quality ≥", self))
-        filter_layout.addWidget(self._quality_filter)
-        filter_layout.addWidget(QLabel("Sort:", self))
-        self._sort_combo = QComboBox(self)
-        for label, order in self._SORT_OPTIONS:
-            self._sort_combo.addItem(label, order.value)
-        default_sort_index = next(
-            (
-                index
-                for index, (_, option) in enumerate(self._SORT_OPTIONS)
-                if option is self._sort_order
-            ),
-            0,
-        )
-        self._sort_combo.setCurrentIndex(default_sort_index)
-        self._sort_combo.currentIndexChanged.connect(self._on_sort_changed)  # type: ignore[arg-type]
-        filter_layout.addWidget(self._sort_combo)
-        filter_layout.addStretch(1)
-
-        layout.addLayout(filter_layout)
+        filter_panel.set_sort_value(self._sort_order.value)
 
         self._query_input = QPlainTextEdit(self)
         self._query_input.setPlaceholderText("Paste code or text to analyse and suggest prompts…")
@@ -1019,19 +918,25 @@ class MainWindow(QMainWindow):
 
     def _persist_filter_preferences(self) -> None:
         """Persist the current category, tag, and quality filters."""
-        category_value = self._category_filter.currentData()
-        tag_value = self._tag_filter.currentData()
-        min_quality = self._quality_filter.value()
+        panel = self._filter_panel
+        if panel is None:
+            return
         _store_filter_preferences(
             self._layout_settings,
-            category_slug=category_value,
-            tag=tag_value,
-            min_quality=min_quality,
+            category_slug=panel.category_slug(),
+            tag=panel.tag_value(),
+            min_quality=panel.min_quality(),
         )
 
     def _persist_sort_preference(self) -> None:
         """Persist the currently selected sort order."""
         _store_sort_preference(self._layout_settings, self._sort_order)
+
+    def _current_search_text(self) -> str:
+        """Return the current text in the toolbar search field."""
+        if self._toolbar is None:
+            return ""
+        return self._toolbar.search_text()
 
     def showEvent(self, event: QShowEvent) -> None:  # type: ignore[override]
         """Ensure splitter state is captured once the window is visible."""
@@ -1055,8 +960,8 @@ class MainWindow(QMainWindow):
 
     def _load_prompts_with_indicator(self, search_text: str) -> None:
         """Fetch prompts on a worker thread while displaying a busy dialog."""
-        if self._search_button is not None:
-            self._search_button.setEnabled(False)
+        if self._toolbar is not None:
+            self._toolbar.set_search_enabled(False)
         try:
             result = ProcessingIndicator(self, "Searching prompts…", title="Searching Prompts").run(
                 self._fetch_prompt_load_result,
@@ -1066,8 +971,8 @@ class MainWindow(QMainWindow):
             self._show_error("Unable to load prompts", str(exc))
             return
         finally:
-            if self._search_button is not None:
-                self._search_button.setEnabled(True)
+            if self._toolbar is not None:
+                self._toolbar.set_search_enabled(True)
         self._apply_prompt_load_result(result)
 
     def _fetch_prompt_load_result(self, search_text: str) -> _PromptLoadResult:
@@ -1137,34 +1042,24 @@ class MainWindow(QMainWindow):
 
     def _populate_category_filter(self) -> None:
         """Populate the category filter from the registry."""
+        panel = self._filter_panel
+        if panel is None:
+            return
         categories = self._manager.list_categories()
-        current_category = self._category_filter.currentData()
-        target_category = current_category or self._pending_category_slug
-        self._category_filter.blockSignals(True)
-        self._category_filter.clear()
-        self._category_filter.addItem("All categories", None)
-        for category in categories:
-            self._category_filter.addItem(category.label, category.slug)
-        category_index = self._category_filter.findData(target_category)
-        self._category_filter.setCurrentIndex(category_index if category_index != -1 else 0)
-        self._category_filter.blockSignals(False)
-        if target_category and category_index != -1:
+        target_category = panel.category_slug() or self._pending_category_slug
+        panel.set_categories(categories, target_category)
+        if target_category and panel.category_slug() == target_category:
             self._pending_category_slug = None
 
     def _populate_tag_filter(self, prompts: Sequence[Prompt]) -> None:
         """Populate the tag filter options."""
+        panel = self._filter_panel
+        if panel is None:
+            return
         tags = sorted({tag for prompt in prompts for tag in prompt.tags})
-        current_tag = self._tag_filter.currentData()
-        target_tag = current_tag or self._pending_tag_value
-        self._tag_filter.blockSignals(True)
-        self._tag_filter.clear()
-        self._tag_filter.addItem("All tags", None)
-        for tag in tags:
-            self._tag_filter.addItem(tag, tag)
-        tag_index = self._tag_filter.findData(target_tag)
-        self._tag_filter.setCurrentIndex(tag_index if tag_index != -1 else 0)
-        self._tag_filter.blockSignals(False)
-        if target_tag and tag_index != -1:
+        target_tag = panel.tag_value() or self._pending_tag_value
+        panel.set_tags(tags, target_tag)
+        if target_tag and panel.tag_value() == target_tag:
             self._pending_tag_value = None
 
     def _on_manage_categories_clicked(self) -> None:
@@ -1172,7 +1067,7 @@ class MainWindow(QMainWindow):
         dialog = CategoryManagerDialog(self._manager, self)
         dialog.exec()
         if dialog.has_changes:
-            self._load_prompts(self._search_input.text())
+            self._load_prompts(self._current_search_text())
         else:
             self._populate_category_filter()
 
@@ -1201,9 +1096,10 @@ class MainWindow(QMainWindow):
 
     def _apply_filters(self, prompts: Sequence[Prompt]) -> list[Prompt]:
         """Apply category, tag, and quality filters to a prompt sequence."""
-        selected_category = self._category_filter.currentData()
-        selected_tag = self._tag_filter.currentData()
-        min_quality = self._quality_filter.value()
+        panel = self._filter_panel
+        selected_category = panel.category_slug() if panel is not None else None
+        selected_tag = panel.tag_value() if panel is not None else None
+        min_quality = panel.min_quality() if panel is not None else 0.0
 
         filtered: list[Prompt] = []
         for prompt in prompts:
@@ -1287,11 +1183,8 @@ class MainWindow(QMainWindow):
         self._refresh_filtered_view(preserve_order=self._preserve_search_order)
         self._persist_filter_preferences()
 
-    def _on_sort_changed(self, index: int) -> None:
+    def _on_sort_changed(self, raw_order: str) -> None:
         """Re-sort the prompt list when the sort selection changes."""
-        if self._sort_combo is None or index < 0:
-            return
-        raw_order = self._sort_combo.itemData(index)
         try:
             sort_order = PromptSortOrder(str(raw_order))
         except ValueError:
@@ -1338,7 +1231,7 @@ class MainWindow(QMainWindow):
         except PromptManagerError:
             return
 
-        search_text = self._search_input.text().strip()
+        search_text = self._current_search_text().strip()
         if search_text:
             self._load_prompts(search_text)
             self._select_prompt(prompt_id)
@@ -1848,7 +1741,7 @@ class MainWindow(QMainWindow):
 
     def _on_suggest_prompt_clicked(self) -> None:
         """Generate prompt suggestions from the free-form query input."""
-        query = self._query_input.toPlainText().strip() or self._search_input.text().strip()
+        query = self._query_input.toPlainText().strip() or self._current_search_text().strip()
         if not query:
             self.statusBar().showMessage("Provide text or use search to fetch suggestions.", 4000)
             return
@@ -2208,29 +2101,31 @@ class MainWindow(QMainWindow):
         if text.strip():
             return
 
-        if not self._search_active and (self._sort_combo is None or self._sort_combo.isEnabled()):
+        if not self._search_active and (
+            self._filter_panel is None or self._filter_panel.is_sort_enabled()
+        ):
             return
 
         self._search_active = False
-        if self._sort_combo is not None:
-            self._sort_combo.setEnabled(True)
+        if self._filter_panel is not None:
+            self._filter_panel.set_sort_enabled(True)
         self._load_prompts("")
 
-    def _on_search_button_clicked(self) -> None:
-        """Run the prompt search explicitly via the Search button."""
-        text = self._search_input.text() if self._search_input is not None else ""
-        self._handle_search_request(text, use_indicator=True)
+    def _on_search_button_clicked(self, text: str | None = None) -> None:
+        """Run the prompt search explicitly via the toolbar search trigger."""
+        query = text if text is not None else self._current_search_text()
+        self._handle_search_request(query, use_indicator=True)
 
     def _handle_search_request(self, text: str, *, use_indicator: bool) -> None:
         """Normalize search input handling and trigger prompt loads."""
         stripped = text.strip()
         self._search_active = bool(stripped)
 
-        # When a search query is active disable the sort combo so the user sees
-        # results strictly ordered by relevance.  Re-enable it once the query
+        # When a search query is active disable manual sorting so the user sees
+        # results strictly ordered by relevance. Re-enable it once the query
         # field is cleared so manual sorting becomes available again.
-        if self._sort_combo is not None:
-            self._sort_combo.setEnabled(not self._search_active)
+        if self._filter_panel is not None:
+            self._filter_panel.set_sort_enabled(not self._search_active)
 
         if text and len(stripped) < 2:
             return
@@ -2454,7 +2349,7 @@ class MainWindow(QMainWindow):
         except PromptStorageError as exc:
             self._show_error("Unable to duplicate prompt", str(exc))
             return
-        self._load_prompts(self._search_input.text())
+        self._load_prompts(self._current_search_text())
         self._select_prompt(created.id)
         self.statusBar().showMessage("Prompt duplicated.", 4000)
 
@@ -2493,13 +2388,13 @@ class MainWindow(QMainWindow):
             except PromptManagerError as exc:
                 self._show_error("Unable to save forked prompt", str(exc))
                 return
-        self._load_prompts(self._search_input.text())
+        self._load_prompts(self._current_search_text())
         self._select_prompt(forked.id)
         self.statusBar().showMessage("Prompt fork created.", 4000)
 
     def _on_refresh_clicked(self) -> None:
         """Reload catalogue data, respecting the current search text."""
-        self._load_prompts(self._search_input.text())
+        self._load_prompts(self._current_search_text())
 
     def _on_add_clicked(self) -> None:
         """Open the creation dialog and persist a new prompt."""
@@ -2616,7 +2511,7 @@ class MainWindow(QMainWindow):
         except PromptStorageError as exc:
             self._show_error("Unable to update prompt", str(exc))
             return
-        self._load_prompts(self._search_input.text())
+        self._load_prompts(self._current_search_text())
         self._select_prompt(stored.id)
 
     def _on_fork_clicked(self) -> None:
@@ -2647,7 +2542,7 @@ class MainWindow(QMainWindow):
         )
         dialog.exec()
         if dialog.last_restored_prompt is not None:
-            self._load_prompts(self._search_input.text())
+            self._load_prompts(self._current_search_text())
             self._select_prompt(dialog.last_restored_prompt.id)
             self.statusBar().showMessage("Prompt restored to selected version.", 4000)
         else:
@@ -2673,7 +2568,7 @@ class MainWindow(QMainWindow):
             return
 
         dialog.update_source_prompt(stored)
-        self._load_prompts(self._search_input.text())
+        self._load_prompts(self._current_search_text())
         self._select_prompt(stored.id)
         self.statusBar().showMessage("Prompt changes applied.", 4000)
 
@@ -2707,7 +2602,7 @@ class MainWindow(QMainWindow):
             self._show_error("Unable to delete prompt", str(exc))
             return
         self._detail_widget.clear()
-        self._load_prompts(self._search_input.text())
+        self._load_prompts(self._current_search_text())
 
     def _on_import_clicked(self) -> None:
         """Preview catalogue diff and optionally apply updates."""
@@ -2752,7 +2647,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Catalogue applied with errors", message)
         else:
             self.statusBar().showMessage(message, 5000)
-        self._load_prompts(self._search_input.text())
+        self._load_prompts(self._current_search_text())
 
     def _on_export_clicked(self) -> None:
         """Export current prompts to JSON or YAML."""
@@ -2793,7 +2688,7 @@ class MainWindow(QMainWindow):
         """Refresh listings after maintenance tasks run."""
         selected = self._current_prompt()
         selected_id = selected.id if selected else None
-        self._load_prompts(self._search_input.text())
+        self._load_prompts(self._current_search_text())
         if selected_id is not None:
             self._select_prompt(selected_id)
         if message:
@@ -3060,7 +2955,7 @@ class MainWindow(QMainWindow):
         except NameGenerationError as exc:
             QMessageBox.warning(self, "LiteLLM configuration", str(exc))
 
-        self._load_prompts(self._search_input.text())
+        self._load_prompts(self._current_search_text())
         has_executor = self._manager.executor is not None
         self._run_button.setEnabled(has_executor)
         if self._template_preview is not None:
