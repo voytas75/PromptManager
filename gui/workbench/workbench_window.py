@@ -34,7 +34,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from PySide6.QtCore import QByteArray, QPoint, QSettings, Qt, Signal, QEvent
+from PySide6.QtCore import QByteArray, QPoint, QSettings, Qt, Signal, QEvent, QObject
 from PySide6.QtGui import (
     QCloseEvent,
     QGuiApplication,
@@ -79,6 +79,10 @@ from models.prompt_model import Prompt
 from ..processing_indicator import ProcessingIndicator
 from ..template_preview import TemplatePreviewWidget
 from ..toast import show_toast
+
+
+class _StreamRelay(QObject):
+    chunk = Signal(str)
 from .session import WorkbenchExecutionRecord, WorkbenchSession, WorkbenchVariable
 
 logger = logging.getLogger("prompt_manager.gui.workbench")
@@ -685,6 +689,10 @@ class WorkbenchWindow(QMainWindow):
         self._active_refinement_target: str | None = None
         self._main_splitter: QSplitter | None = None
         self._middle_splitter: QSplitter | None = None
+        self._stream_relay = _StreamRelay(self)
+        self._stream_relay.chunk.connect(self._handle_stream_chunk)
+        self._streaming_active = False
+        self._streaming_buffer: list[str] = []
         self._build_ui()
         self._load_initial_state(mode, template_prompt)
 
@@ -952,6 +960,31 @@ class WorkbenchWindow(QMainWindow):
             return False
         return bool(getattr(executor, "stream", False))
 
+    def _begin_streaming_run(self, status: str) -> None:
+        self._streaming_active = True
+        self._streaming_buffer = []
+        self._output_tabs.setCurrentWidget(self._output_view)
+        self._output_view.clear()
+        self._status.showMessage(status, 0)
+
+    def _end_streaming_run(self, *, success: bool) -> None:
+        if not self._streaming_active:
+            return
+        self._streaming_active = False
+        message = "Streaming complete." if success else "Streaming interrupted."
+        self._status.showMessage(message, 4000)
+
+    def _handle_stream_chunk(self, chunk: str) -> None:
+        if not self._streaming_active or not chunk:
+            return
+        self._streaming_buffer.append(chunk)
+        cursor = self._output_view.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        cursor.insertText(chunk)
+        self._output_view.setTextCursor(cursor)
+        self._output_view.ensureCursorVisible()
+        QGuiApplication.processEvents()
+
     def _handle_preview_run(self, rendered_text: str, variables: Mapping[str, str]) -> None:
         if self._executor is None:
             self._status.showMessage("CodexExecutor is not configured.", 6000)
@@ -985,6 +1018,9 @@ class WorkbenchWindow(QMainWindow):
             self,
             "Streaming prompt…" if streaming_enabled else "Running prompt…",
         )
+        if streaming_enabled:
+            self._begin_streaming_run("Streaming preview output…")
+        stream_success = False
         try:
             result = indicator.run(
                 self._executor.execute,
@@ -992,7 +1028,9 @@ class WorkbenchWindow(QMainWindow):
                 request_text,
                 conversation=None,
                 stream=streaming_enabled,
+                on_stream=self._stream_relay.chunk.emit if streaming_enabled else None,
             )
+            stream_success = True
         except (ExecutionError, RuntimeError) as exc:
             logger.exception("Run once failed")
             self._status.showMessage(str(exc), 8000)
@@ -1005,6 +1043,9 @@ class WorkbenchWindow(QMainWindow):
             self._session.record_execution(record)
             self._update_history()
             return
+        finally:
+            if streaming_enabled:
+                self._end_streaming_run(success=stream_success)
         self._render_execution(result, request_text, variables)
         if fallback_message:
             self._status.showMessage(fallback_message, 5000)
@@ -1080,6 +1121,9 @@ class WorkbenchWindow(QMainWindow):
             self,
             f"Streaming {label}…" if streaming_enabled else f"Running {label}…",
         )
+        if streaming_enabled:
+            self._begin_streaming_run(f"Streaming {label} suggestions…")
+        stream_success = False
         try:
             result = indicator.run(
                 self._executor.execute,
@@ -1087,11 +1131,16 @@ class WorkbenchWindow(QMainWindow):
                 request_text,
                 conversation=None,
                 stream=streaming_enabled,
+                on_stream=self._stream_relay.chunk.emit if streaming_enabled else None,
             )
+            stream_success = True
         except Exception as exc:  # noqa: BLE001
             logger.exception("%s action failed", label)
             self._status.showMessage(str(exc), 8000)
             return
+        finally:
+            if streaming_enabled:
+                self._end_streaming_run(success=stream_success)
         self._output_view.setPlainText(result.response_text)
         self._status.showMessage(f"{label.title()} suggestions ready.", 6000)
 
