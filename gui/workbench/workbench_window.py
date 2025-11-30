@@ -1,6 +1,7 @@
 """Qt widgets for the Enhanced Prompt Workbench experience.
 
 Updates:
+  v0.1.20 - 2025-11-30 - Respect LiteLLM streaming flag when running prompts.
   v0.1.19 - 2025-11-29 - Fix toast calls to pass the parent widget first.
   v0.1.18 - 2025-11-29 - Persist Workbench window geometry between sessions.
   v0.1.17 - 2025-11-29 - Stack the prompt editor above Run Output/History in the center column.
@@ -945,6 +946,12 @@ class WorkbenchWindow(QMainWindow):
         if not self._preview.request_run():
             self._status.showMessage("Preview not ready for execution.", 5000)
 
+    def _is_streaming_enabled(self) -> bool:
+        executor = self._executor
+        if executor is None:
+            return False
+        return bool(getattr(executor, "stream", False))
+
     def _handle_preview_run(self, rendered_text: str, variables: Mapping[str, str]) -> None:
         if self._executor is None:
             self._status.showMessage("CodexExecutor is not configured.", 6000)
@@ -973,14 +980,18 @@ class WorkbenchWindow(QMainWindow):
                 fallback_message = "No test input supplied; using the prompt goal instead."
         prompt = self._session.build_prompt()
         prompt.context = rendered_text
-        indicator = ProcessingIndicator(self, "Running prompt…")
+        streaming_enabled = self._is_streaming_enabled()
+        indicator = ProcessingIndicator(
+            self,
+            "Streaming prompt…" if streaming_enabled else "Running prompt…",
+        )
         try:
             result = indicator.run(
                 self._executor.execute,
                 prompt,
                 request_text,
                 conversation=None,
-                stream=False,
+                stream=streaming_enabled,
             )
         except (ExecutionError, RuntimeError) as exc:
             logger.exception("Run once failed")
@@ -1064,14 +1075,18 @@ class WorkbenchWindow(QMainWindow):
             return
         prompt = self._session.build_prompt()
         request_text = f"{instruction}\n---\n{self._session.template_text.strip()}"
-        indicator = ProcessingIndicator(self, f"Running {label}…")
+        streaming_enabled = self._is_streaming_enabled()
+        indicator = ProcessingIndicator(
+            self,
+            f"Streaming {label}…" if streaming_enabled else f"Running {label}…",
+        )
         try:
             result = indicator.run(
                 self._executor.execute,
                 prompt,
                 request_text,
                 conversation=None,
-                stream=False,
+                stream=streaming_enabled,
             )
         except Exception as exc:  # noqa: BLE001
             logger.exception("%s action failed", label)
