@@ -23,7 +23,6 @@ if TYPE_CHECKING:
 
 def test_normalise_scenarios_trims_and_limits() -> None:
     """Scenarios should be deduplicated, trimmed, and limited."""
-
     candidates = [
         "  -Investigate outages  ",
         "Investigate outages",
@@ -39,7 +38,6 @@ def test_normalise_scenarios_trims_and_limits() -> None:
 
 def test_extract_candidates_supports_multiple_payload_shapes() -> None:
     """Ensure JSON arrays, dicts, and plain text inputs are parsed."""
-
     array_json = '["A", "B"]'
     dict_json = '{"first": "One", "second": "Two"}'
     plain_text = "First line\n\nSecond line"
@@ -51,7 +49,6 @@ def test_extract_candidates_supports_multiple_payload_shapes() -> None:
 
 def test_extract_candidates_strips_markdown_code_fences() -> None:
     """Scenario responses wrapped in Markdown fences should be cleaned."""
-
     fenced = (
         "```json\n"
         "Initiate collaborative prompt refinement.\n"
@@ -67,7 +64,6 @@ def test_extract_candidates_strips_markdown_code_fences() -> None:
 
 def test_extract_candidates_handles_partial_json_arrays() -> None:
     """Truncated JSON arrays should still produce clean scenario entries."""
-
     response = (
         "\n[\n"
         '"Draft detailed, stepwise chronicles for fictional world-building or '
@@ -85,7 +81,6 @@ def test_extract_candidates_handles_partial_json_arrays() -> None:
 
 def test_generate_invokes_litellm_with_drop_params(monkeypatch: pytest.MonkeyPatch) -> None:
     """LiteLLMScenarioGenerator should drop configured params and return normalised scenarios."""
-
     captured: dict[str, Any] = {}
 
     def fake_get_completion() -> tuple[Callable[..., Any], type[Exception]]:
@@ -150,7 +145,6 @@ def test_generate_invokes_litellm_with_drop_params(monkeypatch: pytest.MonkeyPat
 
 def test_generate_requires_context(monkeypatch: pytest.MonkeyPatch) -> None:
     """Empty prompts should raise errors instead of calling LiteLLM."""
-
     generator = LiteLLMScenarioGenerator(model="fast-model")
     with pytest.raises(ScenarioGenerationError):
         generator.generate("   ")
@@ -158,7 +152,6 @@ def test_generate_requires_context(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_generate_raises_when_no_scenarios(monkeypatch: pytest.MonkeyPatch) -> None:
     """Missing LiteLLM content should raise ScenarioGenerationError."""
-
     def fake_get_completion() -> tuple[Callable[..., Any], type[Exception]]:
         def _completion(**_: Any) -> dict[str, Any]:
             return {"choices": [{"message": {"content": "[]"}}]}

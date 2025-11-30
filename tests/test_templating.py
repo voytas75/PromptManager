@@ -16,7 +16,6 @@ from core.templating import (
 
 def test_template_renderer_supports_custom_filters() -> None:
     """Custom filters should be usable inside the preview templates."""
-
     renderer = TemplateRenderer()
     template = "Hello {{ name | slugify }} -- {{ summary | truncate(5) }} -- {{ data | json }}"
     result = renderer.render(
@@ -34,7 +33,6 @@ def test_template_renderer_supports_custom_filters() -> None:
 
 def test_template_renderer_reports_missing_variables() -> None:
     """Undefined placeholders should be reported as missing variables."""
-
     renderer = TemplateRenderer()
     template = "{{ customer }} ordered {{ item }}"
     result = renderer.render(template, {"customer": "Ada"})
@@ -45,7 +43,6 @@ def test_template_renderer_reports_missing_variables() -> None:
 
 def test_template_renderer_includes_hint_for_unmatched_braces() -> None:
     """Syntax errors should include helpful hints for unmatched delimiters."""
-
     renderer = TemplateRenderer()
     template = "{{ customer "
     result = renderer.render(template, {"customer": "Ada"})
@@ -56,7 +53,6 @@ def test_template_renderer_includes_hint_for_unmatched_braces() -> None:
 
 def test_schema_validator_rejects_invalid_json_payload() -> None:
     """Invalid JSON schemas are surfaced as structured validation errors."""
-
     validator = SchemaValidator()
     result = validator.validate(
         {"name": "Ada"},
@@ -69,7 +65,6 @@ def test_schema_validator_rejects_invalid_json_payload() -> None:
 
 def test_schema_validator_enforces_required_fields_json_schema() -> None:
     """JSON Schema validation flags missing required entries."""
-
     validator = SchemaValidator()
     schema = {
         "type": "object",
@@ -90,7 +85,6 @@ def test_schema_validator_enforces_required_fields_json_schema() -> None:
 
 def test_schema_validator_enforces_required_fields_pydantic() -> None:
     """Pydantic conversion enforces schema requirements and typing."""
-
     validator = SchemaValidator()
     schema = {
         "title": "PreviewVariables",
@@ -112,7 +106,6 @@ def test_schema_validator_enforces_required_fields_pydantic() -> None:
 
 def test_template_renderer_extracts_variables() -> None:
     """Variable extraction should ignore built-in placeholders."""
-
     renderer = TemplateRenderer()
     template = "{% for item in items %}{{ loop.index }} {{ item.name }}{% endfor %}"
     names = renderer.extract_variables(template)
