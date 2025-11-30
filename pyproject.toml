@@ -70,8 +70,16 @@ known-first-party = ["core", "config", "models", "gui", "tests"]
 combine-as-imports = true
 
 [tool.pytest.ini_options]
-addopts = "-q --cov=core --cov-report=xml --cov-report=term-missing --cov-fail-under=80 -n auto"
-testpaths = ["tests"]
+# Keep only general options here, e.g.,
+# addopts = "-n auto --strict-markers" 
+
+[tool.coverage.run]
+# This ensures coverage is measured for 'core' when pytest-cov runs
+source = ["core"]
+
+[tool.coverage.report]
+# This defines the minimum required coverage
+fail_under = 80
 
 [tool.pyright]
 include = ["main.py", "core", "config", "gui", "models", "tests"]
