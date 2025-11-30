@@ -53,7 +53,6 @@ class PromptRefinement:
 
 def _format_list(items: Iterable[Any] | None) -> list[str]:
     """Normalise iterable inputs into a list of trimmed strings."""
-
     if not items:
         return []
     formatted: list[str] = []
@@ -66,7 +65,6 @@ def _format_list(items: Iterable[Any] | None) -> list[str]:
 
 def _strip_code_fence(text: str) -> str:
     """Remove Markdown code fences from LiteLLM responses."""
-
     stripped = text.strip()
     if stripped.startswith("```") and stripped.endswith("```"):
         lines = stripped.splitlines()
@@ -102,7 +100,6 @@ class PromptEngineer:
         structure_only: bool = False,
     ) -> PromptRefinement:
         """Return a refined prompt and supporting analysis via LiteLLM."""
-
         base_prompt = (prompt_text or "").strip()
         if not base_prompt:
             raise PromptEngineeringError("Prompt text is required for refinement.")
@@ -227,7 +224,6 @@ class PromptEngineer:
         negative_constraints: Sequence[str] | None = None,
     ) -> PromptRefinement:
         """Return a refinement focused on formatting and structural improvements."""
-
         constraints = list(negative_constraints or [])
         constraints.append(
             "Do not introduce new instructions or change the prompt's semantic intent; "
@@ -255,7 +251,6 @@ class PromptEngineer:
         structure_only: bool,
     ) -> str:
         """Compose the user instruction message for LiteLLM."""
-
         sections: list[str] = ["### Prompt Engineering Request"]
         if name:
             sections.append(f"Prompt Name: {name.strip()}")
@@ -402,13 +397,11 @@ class PromptEngineer:
 
     def _system_prompt_text(self) -> str:
         """Return the configured system prompt or the default meta-prompt."""
-
         return (self.system_prompt or PROMPT_ENGINEERING_PROMPT).strip()
 
 
 def _as_mapping(value: Any) -> Mapping[str, Any] | None:
     """Return a mapping view for dynamic LiteLLM payload objects when possible."""
-
     if isinstance(value, Mapping):
         return cast("Mapping[str, Any]", value)
     for attr in ("model_dump", "dict"):
@@ -425,7 +418,6 @@ def _as_mapping(value: Any) -> Mapping[str, Any] | None:
 
 def _summarise_response_for_error(response: Any) -> str:
     """Return a short string describing an unexpected LiteLLM payload."""
-
     try:
         if isinstance(response, (dict, list)):
             text = json.dumps(response)
@@ -441,7 +433,6 @@ def _summarise_response_for_error(response: Any) -> str:
 
 def _parse_refinement_payload(text: str) -> dict[str, Any]:
     """Parse the refined prompt payload, tolerating leading/trailing text."""
-
     stripped = text.strip()
     if not stripped:
         raise ValueError("empty payload")

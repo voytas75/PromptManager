@@ -59,7 +59,6 @@ class Notification:
 
     def to_dict(self) -> dict[str, Any]:
         """Return a serialisable representation of the notification."""
-
         return {
             "id": str(self.id),
             "title": self.title,
@@ -81,20 +80,24 @@ class NotificationSubscription:
         center: NotificationCenter,
         callback: Callable[[Notification], None],
     ) -> None:
+        """Store *center* subscription metadata for later cleanup."""
         self._center = center
         self._callback = callback
         self._closed = False
 
     def close(self) -> None:
+        """Detach the stored callback if it is still active."""
         if self._closed:
             return
         self._closed = True
         self._center.unsubscribe(self._callback)
 
     def __enter__(self) -> NotificationSubscription:
+        """Return the subscription so it can be used as a context manager."""
         return self
 
     def __exit__(self, *_: object) -> None:
+        """Ensure the callback is removed when leaving the context."""
         self.close()
 
 
@@ -102,20 +105,19 @@ class NotificationCenter:
     """Thread-safe publish/subscribe hub for sending notifications to listeners."""
 
     def __init__(self, history_limit: int = 200) -> None:
+        """Initialise the subscriber registry and bounded history queue."""
         self._subscribers: list[Callable[[Notification], None]] = []
         self._lock = threading.RLock()
         self._history: deque[Notification] = deque(maxlen=history_limit)
 
     def subscribe(self, callback: Callable[[Notification], None]) -> NotificationSubscription:
         """Register *callback* to receive future notifications."""
-
         with self._lock:
             self._subscribers.append(callback)
         return NotificationSubscription(self, callback)
 
     def unsubscribe(self, callback: Callable[[Notification], None]) -> None:
         """Remove a previously subscribed callback if present."""
-
         with self._lock:
             try:
                 self._subscribers.remove(callback)
@@ -124,7 +126,6 @@ class NotificationCenter:
 
     def publish(self, notification: Notification) -> None:
         """Deliver *notification* to all registered subscribers."""
-
         with self._lock:
             self._history.append(notification)
             subscribers = list(self._subscribers)
@@ -147,7 +148,6 @@ class NotificationCenter:
 
     def history(self) -> tuple[Notification, ...]:
         """Return a snapshot of stored notifications."""
-
         with self._lock:
             return tuple(self._history)
 
@@ -165,7 +165,6 @@ class NotificationCenter:
         failure_level: NotificationLevel = NotificationLevel.ERROR,
     ) -> Iterator[None]:
         """Convenience context manager emitting start/success/failure events."""
-
         resolved_task_id = task_id or f"task:{uuid.uuid4()}"
         started_at = time.perf_counter()
         self.publish(
