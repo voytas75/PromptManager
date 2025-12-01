@@ -1,6 +1,8 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.15.82 - 2025-12-01 - Extract main window composition, workspace insight,
+    and action handlers for leaner MainWindow.
   v0.15.81 - 2025-12-01 - Extracted bootstrapper, binder, generation, search,
     and workspace controllers to trim MainWindow.
   v0.15.80 - 2025-12-01 - Modularized layout, workspace, template preview,
@@ -46,31 +48,32 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from core import (
-    IntentLabel,
-    PromptManager,
-    PromptManagerError,
-    PromptNotFoundError,
-    PromptStorageError,
-)
 from models.category_model import PromptCategory, slugify_category
 
 from .controllers.execution_controller import ExecutionController
 from .dialog_launcher import DialogLauncher
-from .language_tools import DetectedLanguage, detect_language
 from .main_view_binder import MainViewBinderConfig, bind_main_view
 from .main_view_builder import MainViewCallbacks, build_main_view
-from .main_window_bootstrapper import DetailWidgetCallbacks, MainWindowBootstrapper
+from .main_window_bootstrapper import DetailWidgetCallbacks
+from .main_window_composition import (
+    PromptGenerationHooks,
+    PromptSearchHooks,
+    build_main_window_composition,
+)
+from .main_window_handlers import (
+    PromptActionsHandler,
+    TemplatePreviewHandler,
+    WorkspaceInputHandler,
+)
 from .notification_controller import NotificationController
-from .prompt_generation_service import PromptGenerationService
 from .prompt_list_coordinator import PromptSortOrder
 from .prompt_list_presenter import PromptListCallbacks, PromptListPresenter
-from .prompt_search_controller import PromptSearchController
 from .quick_action_controller import QuickActionController
 from .settings_workflow import SettingsWorkflow
 from .toast import show_toast
 from .workspace_command_router import WorkspaceCommandRouter
 from .workspace_history_controller import WorkspaceHistoryController
+from .workspace_insight_controller import WorkspaceInsightController
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from collections.abc import Sequence
@@ -80,6 +83,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from PySide6.QtGui import QResizeEvent, QShowEvent
 
     from config import PromptManagerSettings
+    from core import PromptManager
     from models.prompt_model import Prompt
 
     from .catalog_workflow_controller import CatalogWorkflowController
@@ -167,7 +171,6 @@ class MainWindow(QMainWindow):
         self._execution_controller: ExecutionController | None = None
         self._history_limit = 50
         self._sort_order = PromptSortOrder.NAME_ASC
-        self._detected_language: DetectedLanguage = detect_language("")
         self._share_result_button: QPushButton | None = None
         self._query_input: QPlainTextEdit | None = None
         self._render_markdown_checkbox: QCheckBox | None = None
@@ -181,6 +184,10 @@ class MainWindow(QMainWindow):
         self._filter_panel: PromptFilterPanel | None = None
         self._main_container: QFrame | None = None
         self._notification_controller: NotificationController | None = None
+        self._prompt_actions_handler: PromptActionsHandler | None = None
+        self._workspace_input_handler: WorkspaceInputHandler | None = None
+        self._template_preview_handler: TemplatePreviewHandler | None = None
+        self._workspace_insight_controller: WorkspaceInsightController | None = None
 
         detail_callbacks = DetailWidgetCallbacks(
             delete_requested=self._on_delete_clicked,
@@ -190,7 +197,14 @@ class MainWindow(QMainWindow):
             refresh_scenarios_requested=self._handle_refresh_scenarios_request,
             share_requested=self._on_share_prompt_requested,
         )
-        bootstrapper = MainWindowBootstrapper(
+
+        def _execute_prompt_from_dialog(prompt, dialog, context):
+            self._execute_prompt_as_context(
+                prompt,
+                parent=dialog,
+                context_override=context,
+            )
+        composition = build_main_window_composition(
             parent=self,
             manager=self._manager,
             settings=settings,
@@ -198,10 +212,28 @@ class MainWindow(QMainWindow):
             toast_callback=self._show_toast,
             status_callback=self._show_status_message,
             error_callback=self._show_error,
+            prompt_generation_hooks=PromptGenerationHooks(
+                execute_prompt_as_context=_execute_prompt_from_dialog,
+                load_prompts=self._load_prompts,
+                current_search_text=self._current_search_text,
+                select_prompt=self._select_prompt,
+                delete_prompt=self._delete_prompt,
+                status_callback=self._show_status_message,
+                error_callback=self._show_error,
+                current_prompt_supplier=self._current_prompt,
+                open_version_history_dialog=self._open_version_history_dialog,
+            ),
+            prompt_search_hooks=PromptSearchHooks(
+                presenter_supplier=lambda: self._prompt_presenter,
+                filter_panel_supplier=lambda: self._filter_panel,
+                load_prompts=self._load_prompts,
+                current_search_text=self._current_search_text,
+                select_prompt=self._select_prompt,
+            ),
             share_result_button_supplier=lambda: self._share_result_button,
             execution_controller_supplier=lambda: self._execution_controller,
         )
-        bootstrap = bootstrapper.bootstrap()
+        bootstrap = composition.bootstrap
         self._model = bootstrap.model
         self._detail_widget = bootstrap.detail_widget
         self._prompt_coordinator = bootstrap.prompt_coordinator
@@ -215,34 +247,10 @@ class MainWindow(QMainWindow):
         self._appearance_controller = bootstrap.appearance_controller
         self._notification_indicator = bootstrap.notification_indicator
 
-        self._prompt_generation_service = PromptGenerationService(
-            manager=self._manager,
-            execute_context_handler=lambda prompt, dlg, context: self._execute_prompt_as_context(
-                prompt,
-                parent=dlg,
-                context_override=context,
-            ),
-            load_prompts=self._load_prompts,
-            current_search_text=self._current_search_text,
-            select_prompt=self._select_prompt,
-            delete_prompt=self._delete_prompt,
-            status_callback=self._show_status_message,
-            error_callback=self._show_error,
-            current_prompt_supplier=self._current_prompt,
-            open_version_history_dialog=self._open_version_history_dialog,
-        )
-        self._prompt_search_controller = PromptSearchController(
-            parent=self,
-            manager=self._manager,
-            presenter_supplier=lambda: self._prompt_presenter,
-            filter_panel_supplier=lambda: self._filter_panel,
-            layout_controller=self._layout_controller,
-            load_prompts=self._load_prompts,
-            current_search_text=self._current_search_text,
-            select_prompt=self._select_prompt,
-        )
+        self._prompt_generation_service = composition.prompt_generation_service
+        self._prompt_search_controller = composition.prompt_search_controller
 
-        filter_prefs = self._layout_state.load_filter_preferences()
+        filter_prefs = composition.filter_preferences
         pending_category_slug = filter_prefs.category_slug
         pending_tag_value = filter_prefs.tag
         pending_quality_value = filter_prefs.min_quality
@@ -439,8 +447,46 @@ class MainWindow(QMainWindow):
             else None,
         )
         self._workspace_router = WorkspaceCommandRouter(lambda: self._workspace_actions)
+        self._workspace_input_handler = WorkspaceInputHandler(
+            workspace_router=self._workspace_router,
+        )
+        self._template_preview_handler = TemplatePreviewHandler(
+            controller_supplier=lambda: self._template_preview_controller,
+        )
+        self._prompt_actions_handler = PromptActionsHandler(
+            parent=self,
+            manager=self._manager,
+            model_prompts_supplier=lambda: self._model.prompts(),
+            current_prompt_supplier=self._current_prompt,
+            detail_widget=self._detail_widget,
+            prompt_search_controller=self._prompt_search_controller,
+            prompt_actions_controller_supplier=lambda: self._prompt_actions_controller,
+            prompt_editor_flow_supplier=lambda: self._prompt_editor_flow,
+            catalog_controller_supplier=lambda: self._catalog_controller,
+            settings_workflow_supplier=lambda: self._settings_workflow,
+            dialog_launcher_supplier=lambda: self._dialog_launcher,
+            share_workflow_supplier=lambda: self._share_workflow,
+            load_prompts=self._load_prompts,
+            current_search_text=self._current_search_text,
+            status_callback=self._show_status_message,
+            exit_callback=self.close,
+        )
         self._appearance_controller.set_container(self._main_container)
-        self._update_detected_language(self._query_input.toPlainText(), force=True)
+        self._workspace_insight_controller = WorkspaceInsightController(
+            manager=self._manager,
+            query_input=self._query_input,
+            intent_hint_label=self._intent_hint,
+            language_label=self._language_label,
+            highlighter=self._highlighter,
+            presenter_supplier=lambda: self._prompt_presenter,
+            current_prompts_supplier=lambda: self._model.prompts(),
+            status_callback=self._show_status_message,
+            error_callback=self._show_error,
+            usage_logger=self._usage_logger,
+            quick_action_controller_supplier=lambda: self._quick_action_controller,
+            current_search_text=self._current_search_text,
+        )
+        self._workspace_insight_controller.initialise_language()
         self.setCentralWidget(self._main_container)
 
         has_executor = self._manager.executor is not None
@@ -496,75 +542,31 @@ class MainWindow(QMainWindow):
 
     def _on_manage_categories_clicked(self) -> None:
         """Open the category management dialog."""
-        self._prompt_search_controller.manage_categories()
+        handler = self._prompt_actions_handler
+        if handler is None:
+            return
+        handler.manage_categories()
 
     def _handle_refresh_scenarios_request(self, detail_widget: PromptDetailWidget) -> None:
         """Regenerate persisted scenarios for the currently displayed prompt."""
-        self._prompt_search_controller.handle_refresh_scenarios_request(detail_widget)
+        handler = self._prompt_actions_handler
+        if handler is None:
+            return
+        handler.handle_refresh_scenarios_request(detail_widget)
 
     def _update_intent_hint(self, prompts: Sequence[Prompt]) -> None:
         """Update the hint label with detected intent context and matches."""
-        presenter = self._prompt_presenter
-        suggestions = presenter.suggestions if presenter is not None else None
-        if suggestions is None:
-            self._intent_hint.clear()
-            self._intent_hint.setVisible(False)
+        controller = self._workspace_insight_controller
+        if controller is None:
             return
-
-        prompt_list = list(prompts)
-        prediction = suggestions.prediction
-        label_text = prediction.label.value.replace("_", " ").title()
-        confidence_pct = int(round(prediction.confidence * 100))
-
-        summary_parts: list[str] = []
-        if prediction.label is not IntentLabel.GENERAL or prediction.category_hints:
-            summary_parts.append(f"Detected intent: {label_text} ({confidence_pct}%).")
-        if prediction.category_hints:
-            summary_parts.append(f"Focus: {', '.join(prediction.category_hints)}")
-        if prediction.language_hints:
-            summary_parts.append(f"Lang: {', '.join(prediction.language_hints)}")
-
-        top_names = [prompt.name for prompt in prompt_list[:3]]
-        if top_names:
-            summary_parts.append(f"Top matches: {', '.join(top_names)}")
-        if suggestions.fallback_used:
-            summary_parts.append("Fallback ranking applied")
-
-        if summary_parts:
-            message = " | ".join(summary_parts)
-        elif top_names:
-            message = "Top matches: " + ", ".join(top_names)
-        else:
-            self._intent_hint.clear()
-            self._intent_hint.setVisible(False)
-            return
-
-        self._intent_hint.setText(message)
-        self._intent_hint.setVisible(True)
+        controller.update_intent_hint(prompts)
 
     def _on_query_text_changed(self) -> None:
         """Update language detection and syntax highlighting as the user types."""
-        text = self._query_input.toPlainText()
-        self._update_detected_language(text)
-        controller = self._quick_action_controller
-        if controller is not None and controller.is_workspace_signal_suppressed():
+        controller = self._workspace_insight_controller
+        if controller is None:
             return
-        if controller is not None:
-            controller.clear_workspace_seed()
-
-    def _update_detected_language(self, text: str, *, force: bool = False) -> None:
-        """Detect the language for `text` and refresh UI elements when it changes."""
-        detection = detect_language(text)
-        if not force and detection.code == self._detected_language.code:
-            return
-        self._detected_language = detection
-        if detection.confidence:
-            percentage = int(round(detection.confidence * 100))
-            self._language_label.setText(f"Language: {detection.name} ({percentage}%)")
-        else:
-            self._language_label.setText(f"Language: {detection.name}")
-        self._highlighter.set_language(detection.code)
-        self.statusBar().showMessage(f"Workspace language: {detection.name}", 3000)
+        controller.handle_query_text_changed()
 
     def _show_command_palette(self) -> None:
         if self._quick_action_controller is None:
@@ -573,54 +575,17 @@ class MainWindow(QMainWindow):
 
     def _on_detect_intent_clicked(self) -> None:
         """Run intent detection on the free-form query input."""
-        text = self._query_input.toPlainText().strip()
-        if not text:
-            self.statusBar().showMessage("Paste some text or code to analyse.", 4000)
+        controller = self._workspace_insight_controller
+        if controller is None:
             return
-        classifier = self._manager.intent_classifier
-        if classifier is None:
-            self._show_error("Intent detection unavailable", "No intent classifier is configured.")
-            return
-        prediction = classifier.classify(text)
-        current_prompts = list(self._model.prompts())
-        presenter = self._prompt_presenter
-        if presenter is not None:
-            presenter.set_intent_suggestions(
-                PromptManager.IntentSuggestions(
-                    prediction=prediction,
-                    prompts=list(current_prompts),
-                    fallback_used=False,
-                )
-            )
-        self._update_intent_hint(current_prompts)
-        label = prediction.label.value.replace("_", " ").title()
-        self.statusBar().showMessage(
-            f"Detected intent: {label} ({int(prediction.confidence * 100)}%)", 5000
-        )
-        self._usage_logger.log_detect(prediction=prediction, query_text=text)
+        controller.detect_intent()
 
     def _on_suggest_prompt_clicked(self) -> None:
         """Generate prompt suggestions from the free-form query input."""
-        query = self._query_input.toPlainText().strip() or self._current_search_text().strip()
-        if not query:
-            self.statusBar().showMessage("Provide text or use search to fetch suggestions.", 4000)
+        controller = self._workspace_insight_controller
+        if controller is None:
             return
-        try:
-            suggestions = self._manager.suggest_prompts(query, limit=20)
-        except PromptManagerError as exc:
-            self._show_error("Unable to suggest prompts", str(exc))
-            return
-        self._usage_logger.log_suggest(
-            prediction=suggestions.prediction,
-            query_text=query,
-            prompts=suggestions.prompts,
-            fallback_used=suggestions.fallback_used,
-        )
-        if self._prompt_presenter is not None:
-            self._prompt_presenter.apply_suggestions(suggestions)
-        top_name = suggestions.prompts[0].name if suggestions.prompts else None
-        if top_name:
-            self.statusBar().showMessage(f"Top suggestion: {top_name}", 5000)
+        controller.suggest_prompt()
 
     def _show_similar_prompts(self, prompt: Prompt) -> None:
         """Delegate to the presenter to display similar prompts."""
@@ -641,62 +606,87 @@ class MainWindow(QMainWindow):
 
     def _on_save_result_clicked(self) -> None:
         """Persist the latest execution result with optional user notes."""
-        self._workspace_router.save_result()
+        handler = self._workspace_input_handler
+        if handler is None:
+            return
+        handler.save_result()
 
     def _on_continue_chat_clicked(self) -> None:
         """Send a follow-up message within the active chat session."""
-        self._workspace_router.continue_chat()
+        handler = self._workspace_input_handler
+        if handler is None:
+            return
+        handler.continue_chat()
 
     def _on_end_chat_clicked(self) -> None:
         """Terminate the active chat session without clearing the transcript."""
-        self._workspace_router.end_chat()
+        handler = self._workspace_input_handler
+        if handler is None:
+            return
+        handler.end_chat()
 
     def _on_run_prompt_clicked(self) -> None:
         """Execute the selected prompt, seeding from the workspace or the prompt body."""
-        self._workspace_router.run_prompt()
+        handler = self._workspace_input_handler
+        if handler is None:
+            return
+        handler.run_prompt()
 
     def _on_clear_workspace_clicked(self) -> None:
         """Clear the workspace editor, output tab, and chat transcript."""
-        self._workspace_router.clear_workspace()
+        handler = self._workspace_input_handler
+        if handler is None:
+            return
+        handler.clear_workspace()
 
     def _handle_note_update(self, execution_id: UUID, note: str) -> None:
         """Record analytics when execution notes are edited."""
-        self._workspace_router.handle_note_update(execution_id, note)
+        handler = self._workspace_input_handler
+        if handler is None:
+            return
+        handler.handle_note_update(execution_id, note)
 
     def _handle_history_export(self, entries: int, path: str) -> None:
         """Record analytics when history is exported."""
-        self._workspace_router.handle_history_export(entries, path)
+        handler = self._workspace_input_handler
+        if handler is None:
+            return
+        handler.handle_history_export(entries, path)
 
     def _on_copy_prompt_clicked(self) -> None:
         """Copy the currently selected prompt body to the clipboard."""
-        prompt = self._current_prompt()
-        if prompt is None:
-            prompts = self._model.prompts()
-            prompt = prompts[0] if prompts else None
-        if prompt is None:
-            self.statusBar().showMessage("Select a prompt to copy first.", 3000)
+        handler = self._prompt_actions_handler
+        if handler is None:
             return
-        self._copy_prompt_to_clipboard(prompt)
+        handler.copy_prompt()
 
     def _copy_prompt_to_clipboard(self, prompt: Prompt) -> None:
         """Copy a prompt's primary text to the clipboard with status feedback."""
-        if self._prompt_actions_controller is None:
+        handler = self._prompt_actions_handler
+        if handler is None:
             return
-        self._prompt_actions_controller.copy_prompt_to_clipboard(prompt)
+        handler.copy_prompt_to_clipboard(prompt)
 
     def _on_share_prompt_requested(self) -> None:
         """Display provider choices and initiate the share workflow."""
-        self._share_workflow.share_prompt()
+        handler = self._prompt_actions_handler
+        if handler is None:
+            return
+        handler.share_prompt()
 
     def _on_share_result_clicked(self) -> None:
         """Display provider choices for sharing the latest output text."""
-        self._share_workflow.share_result()
+        handler = self._prompt_actions_handler
+        if handler is None:
+            return
+        handler.share_result()
 
     def _show_prompt_description(self, prompt: Prompt) -> None:
         """Display the prompt description in a dialog for quick reference."""
-        if self._prompt_actions_controller is None:
+        handler = self._prompt_actions_handler
+        if handler is None:
             return
-        self._prompt_actions_controller.show_prompt_description(prompt)
+        handler.show_prompt_description(prompt)
 
     def _on_render_markdown_toggled(self, _state: int) -> None:
         """Refresh result and chat panes when the markdown toggle changes."""
@@ -705,11 +695,17 @@ class MainWindow(QMainWindow):
 
     def _on_copy_result_clicked(self) -> None:
         """Copy the latest execution result to the clipboard."""
-        self._workspace_router.copy_result_to_clipboard()
+        handler = self._workspace_input_handler
+        if handler is None:
+            return
+        handler.copy_result()
 
     def _on_copy_result_to_text_window_clicked(self) -> None:
         """Populate the workspace text window with the latest execution result."""
-        self._workspace_router.copy_result_to_workspace()
+        handler = self._workspace_input_handler
+        if handler is None:
+            return
+        handler.copy_result_to_workspace()
 
     def _current_prompt(self) -> Prompt | None:
         """Return the prompt currently selected in the list."""
@@ -726,15 +722,17 @@ class MainWindow(QMainWindow):
 
     def _on_prompt_context_menu(self, point: QPoint) -> None:
         """Show a context menu with prompt-specific actions."""
-        if self._prompt_actions_controller is None:
+        handler = self._prompt_actions_handler
+        if handler is None:
             return
-        self._prompt_actions_controller.show_context_menu(point)
+        handler.show_prompt_context_menu(point)
 
     def _execute_prompt_from_context_menu(self, prompt: Prompt) -> None:
         """Populate the workspace with the prompt body and execute immediately."""
-        if self._prompt_actions_controller is None:
+        handler = self._prompt_actions_handler
+        if handler is None:
             return
-        self._prompt_actions_controller.execute_prompt_from_body(prompt)
+        handler.execute_prompt_from_body(prompt)
 
     def _execute_prompt_as_context(
         self,
@@ -744,9 +742,10 @@ class MainWindow(QMainWindow):
         context_override: str | None = None,
     ) -> None:
         """Ask for a task and run the prompt using its body as contextual input."""
-        if self._prompt_actions_controller is None:
+        handler = self._prompt_actions_handler
+        if handler is None:
             return
-        self._prompt_actions_controller.execute_prompt_as_context(
+        handler.execute_prompt_as_context(
             prompt,
             parent=parent,
             context_override=context_override,
@@ -758,130 +757,131 @@ class MainWindow(QMainWindow):
         variables: dict[str, str],
     ) -> None:
         """Execute the selected prompt using the rendered template preview text."""
-        if self._template_preview_controller is None:
+        handler = self._template_preview_handler
+        if handler is None:
             return
-        self._template_preview_controller.handle_run_requested(rendered_text, variables)
+        handler.handle_run_requested(rendered_text, variables)
 
     def _duplicate_prompt(self, prompt: Prompt) -> None:
         """Open a creation dialog with the selected prompt pre-filled and persist the copy."""
-        if self._prompt_editor_flow is None:
+        handler = self._prompt_actions_handler
+        if handler is None:
             return
-        self._prompt_editor_flow.duplicate_prompt(prompt)
+        handler.duplicate_prompt(prompt)
 
     def _fork_prompt(self, prompt: Prompt) -> None:
         """Fork the selected prompt and allow optional edits before saving."""
-        if self._prompt_editor_flow is None:
+        handler = self._prompt_actions_handler
+        if handler is None:
             return
-        self._prompt_editor_flow.fork_prompt(prompt)
+        handler.fork_prompt_direct(prompt)
 
     def _on_refresh_clicked(self) -> None:
         """Reload catalogue data, respecting the current search text."""
-        self._load_prompts(self._current_search_text())
+        handler = self._prompt_actions_handler
+        if handler is None:
+            return
+        handler.refresh_prompts()
 
     def _on_add_clicked(self) -> None:
         """Open the creation dialog and persist a new prompt."""
-        if self._prompt_editor_flow is None:
+        handler = self._prompt_actions_handler
+        if handler is None:
             return
-        self._prompt_editor_flow.create_prompt()
+        handler.add_prompt()
 
     def _on_workbench_clicked(self) -> None:
         """Launch the Enhanced Prompt Workbench with the desired starting mode."""
-        if self._dialog_launcher is None:
+        handler = self._prompt_actions_handler
+        if handler is None:
             return
-        self._dialog_launcher.open_workbench()
+        handler.open_workbench()
 
     def _on_edit_clicked(self) -> None:
         """Open the edit dialog for the selected prompt and persist changes."""
-        prompt = self._current_prompt()
-        if prompt is None:
+        handler = self._prompt_actions_handler
+        if handler is None:
             return
-        if self._prompt_editor_flow is None:
-            return
-        self._prompt_editor_flow.edit_prompt(prompt)
+        handler.edit_prompt()
 
     def _on_fork_clicked(self) -> None:
         """Handle toolbar fork button taps."""
-        prompt = self._current_prompt()
-        if prompt is None:
+        handler = self._prompt_actions_handler
+        if handler is None:
             return
-        self._fork_prompt(prompt)
+        handler.fork_prompt()
 
     def _on_delete_clicked(self) -> None:
         """Remove the selected prompt after confirmation."""
-        prompt = self._current_prompt()
-        if prompt is None:
+        handler = self._prompt_actions_handler
+        if handler is None:
             return
-        self._delete_prompt(prompt)
+        handler.delete_current_prompt()
 
     def _open_version_history_dialog(self, prompt: Prompt | None = None) -> None:
         """Open the version history dialog for the requested or selected prompt."""
-        if self._dialog_launcher is None:
+        handler = self._prompt_actions_handler
+        if handler is None:
             return
-        self._dialog_launcher.open_version_history_dialog(prompt)
+        handler.open_version_history_dialog(prompt)
 
     def _delete_prompt(self, prompt: Prompt, *, skip_confirmation: bool = False) -> None:
         """Delete the provided prompt and refresh listings."""
-        if not skip_confirmation:
-            confirmation = QMessageBox.question(
-                self,
-                "Delete prompt",
-                f"Are you sure you want to delete '{prompt.name}'?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No,
-            )
-            if confirmation != QMessageBox.Yes:
-                return
-        try:
-            self._manager.delete_prompt(prompt.id)
-        except PromptNotFoundError:
-            self._show_error("Prompt missing", "The prompt was already removed.")
-        except PromptStorageError as exc:
-            self._show_error("Unable to delete prompt", str(exc))
+        handler = self._prompt_actions_handler
+        if handler is None:
             return
-        self._detail_widget.clear()
-        self._load_prompts(self._current_search_text())
+        handler.delete_prompt(prompt, skip_confirmation=skip_confirmation)
 
     def _on_import_clicked(self) -> None:
         """Delegate to the catalogue workflow controller."""
-        if self._catalog_controller is None:
+        handler = self._prompt_actions_handler
+        if handler is None:
             return
-        self._catalog_controller.open_import_dialog()
+        handler.import_catalog()
 
     def _on_export_clicked(self) -> None:
         """Export prompts via the catalogue controller."""
-        if self._catalog_controller is None:
+        handler = self._prompt_actions_handler
+        if handler is None:
             return
-        self._catalog_controller.export_catalog()
+        handler.export_catalog()
 
     def _on_maintenance_clicked(self) -> None:
         """Open maintenance workflows via the controller."""
-        if self._catalog_controller is None:
+        handler = self._prompt_actions_handler
+        if handler is None:
             return
-        self._catalog_controller.open_maintenance_dialog()
+        handler.open_maintenance_dialog()
 
     def _on_info_clicked(self) -> None:
         """Display application metadata and system characteristics."""
-        if self._dialog_launcher is None:
+        handler = self._prompt_actions_handler
+        if handler is None:
             return
-        self._dialog_launcher.show_info_dialog()
+        handler.open_info_dialog()
 
     def _on_settings_clicked(self) -> None:
         """Open configuration dialog and apply updates."""
-        if self._settings_workflow is None:
+        handler = self._prompt_actions_handler
+        if handler is None:
             return
-        self._settings_workflow.open_settings_dialog(self._settings)
+        handler.open_settings_dialog(self._settings)
 
     def _on_prompt_templates_clicked(self) -> None:
         """Open the lightweight prompt template editor dialog."""
-        if self._settings_workflow is None:
+        handler = self._prompt_actions_handler
+        if handler is None:
             return
-        self._settings_workflow.open_prompt_templates_dialog()
+        handler.open_prompt_templates_dialog()
 
     def _on_exit_clicked(self) -> None:
         """Close the application via the toolbar exit control."""
         logger.info("Exit control activated; closing Prompt Manager.")
-        self.statusBar().showMessage("Closing Prompt Manager…", 2000)
-        self.close()
+        handler = self._prompt_actions_handler
+        if handler is None:
+            self.close()
+            return
+        handler.close_application()
 
     def _rebuild_prompt_generation_components(self) -> None:
         """Refresh prompt dialog flows after configuration or bootstrap changes."""
@@ -907,15 +907,17 @@ class MainWindow(QMainWindow):
 
     def _on_template_run_state_changed(self, can_run: bool) -> None:
         """Synchronise the Template tab shortcut button with preview availability."""
-        if self._template_preview_controller is None:
+        handler = self._template_preview_handler
+        if handler is None:
             return
-        self._template_preview_controller.handle_run_state_changed(can_run)
+        handler.handle_run_state_changed(can_run)
 
     def _on_template_tab_run_clicked(self) -> None:
         """Invoke the template preview execution shortcut."""
-        if self._template_preview_controller is None:
+        handler = self._template_preview_handler
+        if handler is None:
             return
-        self._template_preview_controller.handle_template_tab_run_clicked()
+        handler.handle_tab_run_clicked()
 
     def _on_notifications_clicked(self) -> None:
         if self._notification_controller is None:
