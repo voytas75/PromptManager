@@ -216,7 +216,7 @@ class MainWindow(QMainWindow):
             self,
             toast_callback=lambda message, duration_ms=2500: show_toast(self, message, duration_ms),
             status_callback=self.statusBar().showMessage,
-            error_callback=self._show_error,
+            error_callback=lambda title, message: self._show_error(title, message),
             usage_logger=self._usage_logger,
         )
         self._share_result_button: QPushButton | None = None
