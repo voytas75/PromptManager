@@ -1,6 +1,7 @@
 """Tests for LiteLLM-backed scenario generation utilities.
 
 Updates:
+  v0.1.2 - 2025-12-01 - Cover ModelResponse serialisation path for LiteLLM scenarios.
   v0.1.1 - 2025-11-29 - Wrap scenario fixture strings for Ruff line length compliance.
 """
 
@@ -178,3 +179,41 @@ def test_generate_raises_when_no_scenarios(monkeypatch: pytest.MonkeyPatch) -> N
 
     with pytest.raises(ScenarioGenerationError):
         generator.generate("Draft release notes.")
+
+
+def test_generate_accepts_model_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    """LiteLLMScenarioGenerator should normalise ModelResponse payloads."""
+
+    class _ModelResponse:
+        def __init__(self, payload: dict[str, Any]) -> None:
+            self._payload = payload
+
+        def model_dump(self) -> dict[str, Any]:
+            return dict(self._payload)
+
+    def fake_get_completion() -> tuple[Callable[..., Any], type[Exception]]:
+        def _completion(**_: Any) -> _ModelResponse:
+            return _ModelResponse(
+                {"choices": [{"message": {"content": '["Alpha", "Beta"]'}}]}
+            )
+
+        return _completion, RuntimeError
+
+    def fake_call_completion(
+        request: dict[str, Any],  # noqa: ARG001
+        completion: Callable[..., Any],
+        lite_llm_exception: type[Exception],  # noqa: ARG001
+        *,
+        drop_candidates: Sequence[str],  # noqa: ARG001
+        pre_dropped: Sequence[str],  # noqa: ARG001
+    ) -> _ModelResponse:
+        return completion()
+
+    monkeypatch.setattr("core.scenario_generation.get_completion", fake_get_completion)
+    monkeypatch.setattr(
+        "core.scenario_generation.call_completion_with_fallback",
+        fake_call_completion,
+    )
+
+    generator = LiteLLMScenarioGenerator(model="gpt")
+    assert generator.generate("Context text") == ["Alpha", "Beta"]

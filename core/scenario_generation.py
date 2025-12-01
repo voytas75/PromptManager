@@ -1,6 +1,7 @@
 """LiteLLM-backed prompt scenario generation utilities.
 
 Updates:
+  v0.1.5 - 2025-12-01 - Accept LiteLLM ModelResponse payloads during scenario refresh.
   v0.1.4 - 2025-11-30 - Align LiteLLM request prompt text with CLI contract.
   v0.1.3 - 2025-11-27 - Strip Markdown code fences before parsing scenarios.
   v0.1.2 - 2025-11-23 - Support configurable system prompt overrides.
@@ -22,6 +23,7 @@ from .litellm_adapter import (
     apply_configured_drop_params,
     call_completion_with_fallback,
     get_completion,
+    serialise_litellm_response,
 )
 
 
@@ -171,9 +173,9 @@ class LiteLLMScenarioGenerator:
         except Exception as exc:  # pragma: no cover - defensive
             raise ScenarioGenerationError("Unexpected error while calling LiteLLM") from exc
 
-        if not isinstance(response, Mapping):
+        response_mapping = serialise_litellm_response(response)
+        if response_mapping is None:
             raise ScenarioGenerationError("LiteLLM returned an unexpected payload")
-        response_mapping = cast("Mapping[str, Any]", response)
         choices_value = response_mapping.get("choices")
         if not isinstance(choices_value, Sequence) or not choices_value:
             raise ScenarioGenerationError("LiteLLM returned an unexpected payload")

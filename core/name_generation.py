@@ -1,6 +1,7 @@
 """LiteLLM-backed prompt metadata generation utilities.
 
 Updates:
+  v0.7.9 - 2025-12-01 - Normalise LiteLLM ModelResponse payloads before parsing text.
   v0.7.8 - 2025-11-29 - Move Sequence import behind TYPE_CHECKING per Ruff TC003.
   v0.7.7 - 2025-11-29 - Guard PromptCategory import for typing and wrap long literals.
   v0.7.6 - 2025-11-24 - Add category suggestion helper leveraging LiteLLM.
@@ -31,6 +32,7 @@ from .litellm_adapter import (
     apply_configured_drop_params,
     call_completion_with_fallback,
     get_completion,
+    serialise_litellm_response,
 )
 
 if TYPE_CHECKING:  # pragma: no cover - imported for annotations only
@@ -114,8 +116,12 @@ class LiteLLMNameGenerator:
         except Exception as exc:  # pragma: no cover - defensive
             raise NameGenerationError("Unexpected error while calling LiteLLM") from exc
 
+        payload = serialise_litellm_response(response)
+        if payload is None:
+            raise NameGenerationError("LiteLLM returned an unexpected payload")
+
         try:
-            message = response["choices"][0]["message"]["content"]
+            message = payload["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:  # pragma: no cover - defensive
             raise NameGenerationError("LiteLLM returned an unexpected payload") from exc
 
@@ -201,8 +207,12 @@ class LiteLLMDescriptionGenerator:
         # users no actionable clue), convert any structural irregularity into a
         # predictable ``DescriptionGenerationError`` with a concise message.
 
+        payload = serialise_litellm_response(response)
+        if payload is None:
+            raise DescriptionGenerationError("LiteLLM returned an unexpected payload structure")
+
         try:
-            message = response["choices"][0]["message"].get("content")  # type: ignore[index]
+            message = payload["choices"][0]["message"].get("content")  # type: ignore[index]
         except (
             KeyError,
             IndexError,
@@ -298,8 +308,12 @@ class LiteLLMCategoryGenerator:
         except Exception as exc:  # pragma: no cover - defensive
             raise CategorySuggestionError("Unexpected error while calling LiteLLM") from exc
 
+        payload = serialise_litellm_response(response)
+        if payload is None:
+            raise CategorySuggestionError("LiteLLM returned an unexpected payload")
+
         try:
-            message = response["choices"][0]["message"]["content"]
+            message = payload["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:  # pragma: no cover - defensive
             raise CategorySuggestionError("LiteLLM returned an unexpected payload") from exc
 

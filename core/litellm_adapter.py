@@ -1,6 +1,7 @@
 """Shared LiteLLM adapters for Prompt Manager.
 
 Updates:
+  v0.7.3 - 2025-12-01 - Add helper to serialise LiteLLM responses into plain dicts.
   v0.7.2 - 2025-11-29 - Gate typing-only collection imports for Ruff TC003 compliance.
   v0.7.1 - 2025-11-29 - Reformat docstring and wrap long retry diagnostics strings.
   v0.7.0 - 2025-11-02 - Strip drop parameters before LiteLLM retries to match provider support.
@@ -14,7 +15,8 @@ from __future__ import annotations
 
 import importlib
 import logging
-from typing import TYPE_CHECKING
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence
@@ -22,6 +24,8 @@ if TYPE_CHECKING:
 
 class LiteLLMNotInstalledError(RuntimeError):
     """Raised when LiteLLM is not available in the current environment."""
+
+logger = logging.getLogger("prompt_manager.litellm")
 
 _completion: Callable[..., object] | None = None
 _embedding: Callable[..., object] | None = None
@@ -101,7 +105,7 @@ def call_completion_with_fallback(
             key: value for key, value in request.items() if key not in unsupported
         }
         merged_drop = sorted(existing_drop.union(unsupported))
-        logging.getLogger("prompt_manager.litellm").info(
+        logger.info(
             "LiteLLM model rejected parameters %s; retrying request without them.",
             ", ".join(merged_drop),
         )
@@ -160,10 +164,32 @@ def _detect_unsupported_parameters(
     return unsupported
 
 
+def serialise_litellm_response(response: object) -> dict[str, Any] | None:
+    """Return a plain dictionary view of LiteLLM responses when possible."""
+
+    if isinstance(response, Mapping):
+        mapping = cast("Mapping[str, Any]", response)
+        return {str(key): value for key, value in mapping.items()}
+    for attr in ("model_dump", "dict"):
+        candidate = getattr(response, attr, None)
+        if not callable(candidate):
+            continue
+        try:
+            payload = candidate()
+        except Exception:  # pragma: no cover - best effort normalisation
+            logger.debug("Unable to serialise LiteLLM response via %s", attr, exc_info=True)
+            continue
+        if isinstance(payload, Mapping):
+            payload_mapping = cast("Mapping[str, Any]", payload)
+            return {str(key): value for key, value in payload_mapping.items()}
+    return None
+
+
 __all__ = [
     "get_completion",
     "get_embedding",
     "LiteLLMNotInstalledError",
     "call_completion_with_fallback",
     "apply_configured_drop_params",
+    "serialise_litellm_response",
 ]
