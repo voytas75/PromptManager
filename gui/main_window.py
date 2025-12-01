@@ -1,6 +1,7 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.15.78 - 2025-12-01 - Guard tab change handler until widgets are initialised.
   v0.15.77 - 2025-12-01 - Extract prompt list coordinator for loading/filtering/sorting logic.
   v0.15.76 - 2025-12-01 - Delegate layout persistence to WindowStateManager helper.
   v0.15.75 - 2025-11-30 - Extract toolbar and filter panels into reusable widgets.
@@ -26,7 +27,6 @@ from __future__ import annotations
 
 import json
 import logging
-import uuid
 from collections import deque
 from datetime import UTC, datetime
 from functools import partial
@@ -40,10 +40,8 @@ from PySide6.QtCore import QModelIndex, QPoint, QSettings, Qt
 from PySide6.QtGui import (
     QColor,
     QGuiApplication,
-    QKeySequence,
     QPalette,
     QResizeEvent,
-    QShortcut,
     QShowEvent,
     QTextCursor,
 )
@@ -60,6 +58,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QSplitter,
+    QTabWidget,
     QWidget,
 )
 
@@ -84,7 +83,6 @@ from core import (
     PromptStorageError,
     PromptVersionError,
     RepositoryError,
-    ScenarioGenerationError,
     diff_prompt_catalog,
     export_prompt_catalog,
     import_prompt_catalog,
@@ -94,13 +92,11 @@ from core.sharing import ShareProvider, ShareTextProvider, format_prompt_for_sha
 from models.category_model import PromptCategory, slugify_category
 
 from .code_highlighter import CodeHighlighter
-from .command_palette import CommandPaletteDialog, QuickAction, rank_prompts_for_action
 from .controllers.execution_controller import ExecutionController
 from .dialogs import (
     CatalogPreviewDialog,
     CategoryManagerDialog,
     InfoDialog,
-    PromptDialog,
     PromptMaintenanceDialog,
     PromptVersionHistoryDialog,
     SaveResultDialog,
@@ -111,9 +107,12 @@ from .layout_state import WindowStateManager
 from .main_view_builder import MainViewCallbacks, MainViewComponents, build_main_view
 from .notifications import BackgroundTaskCenterDialog, QtNotificationBridge
 from .processing_indicator import ProcessingIndicator
-from .prompt_list_coordinator import PromptListCoordinator, PromptLoadResult, PromptSortOrder
+from .prompt_editor_flow import PromptDialogFactory, PromptEditorFlow
+from .prompt_list_coordinator import PromptListCoordinator, PromptSortOrder
 from .prompt_list_model import PromptListModel
+from .prompt_list_presenter import PromptListCallbacks, PromptListPresenter
 from .prompt_templates_dialog import PromptTemplateEditorDialog
+from .quick_action_controller import QuickActionController
 from .settings_dialog import SettingsDialog, persist_settings_to_config
 from .share_controller import ShareController
 from .toast import show_toast
@@ -122,7 +121,8 @@ from .widgets import PromptDetailWidget, PromptFilterPanel, PromptToolbar
 from .workbench.workbench_window import WorkbenchModeDialog, WorkbenchWindow
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
-    from collections.abc import Iterable, Mapping, Sequence
+    from collections.abc import Mapping, Sequence
+    from uuid import UUID
 
     from core.prompt_engineering import PromptRefinement
     from models.prompt_model import Prompt
@@ -229,6 +229,10 @@ class MainWindow(QMainWindow):
         self._manager = prompt_manager
         self._settings = settings
         self._prompt_coordinator = PromptListCoordinator(self._manager)
+        self._prompt_presenter: PromptListPresenter | None = None
+        self._prompt_editor_factory: PromptDialogFactory | None = None
+        self._prompt_editor_flow: PromptEditorFlow | None = None
+        self._quick_action_controller: QuickActionController | None = None
         self._model = PromptListModel(parent=self)
         self._detail_widget = PromptDetailWidget(self)
         self._detail_widget.delete_requested.connect(self._on_delete_clicked)  # type: ignore[arg-type]
@@ -239,37 +243,24 @@ class MainWindow(QMainWindow):
             partial(self._handle_refresh_scenarios_request, self._detail_widget)
         )
         self._detail_widget.share_requested.connect(self._on_share_prompt_requested)  # type: ignore[arg-type]
-        self._all_prompts: list[Prompt] = []
-        self._current_prompts: list[Prompt] = []
-        self._preserve_search_order: bool = False
         self._search_active: bool = False
-        self._suggestions: PromptManager.IntentSuggestions | None = None
         self._toolbar: PromptToolbar | None = None
         self._filter_panel: PromptFilterPanel | None = None
         self._sort_order = PromptSortOrder.NAME_ASC
-        self._pending_category_slug: str | None = None
-        self._pending_tag_value: str | None = None
-        self._pending_quality_value: float | None = None
         self._history_limit = 50
         self._runtime_settings = self._initial_runtime_settings(settings)
         self._usage_logger = IntentUsageLogger()
         self._detected_language: DetectedLanguage = detect_language("")
-        self._quick_actions: list[QuickAction] = self._build_quick_actions(
-            self._runtime_settings.get("quick_actions")
-        )
-        self._active_quick_action_id: str | None = None
-        self._query_seeded_by_quick_action: str | None = None
         self._execution_controller: ExecutionController | None = None
         self._render_markdown_checkbox: QCheckBox | None = None
         self._query_input: QPlainTextEdit | None = None
-        self._suppress_query_signal = False
-        self._quick_shortcuts: list[QShortcut] = []
         self._template_preview: TemplatePreviewWidget | None = None
         self._template_list_view: QListView | None = None
         self._template_detail_widget: PromptDetailWidget | None = None
         self._template_run_shortcut_button: QPushButton | None = None
         self._template_transition_indicator: ProcessingIndicator | None = None
         self._result_overlay: ResultActionsOverlay | None = None
+        self._tab_widget: QTabWidget | None = None
         self._share_controller = ShareController(
             self,
             toast_callback=self._show_toast,
@@ -283,15 +274,10 @@ class MainWindow(QMainWindow):
         settings = QSettings("PromptManager", "MainWindow")
         self._layout_state = WindowStateManager(settings)
         filter_prefs = self._layout_state.load_filter_preferences()
-        self._pending_category_slug = filter_prefs.category_slug
-        self._pending_tag_value = filter_prefs.tag
-        self._pending_quality_value = filter_prefs.min_quality
+        pending_category_slug = filter_prefs.category_slug
+        pending_tag_value = filter_prefs.tag
+        pending_quality_value = filter_prefs.min_quality
         stored_sort_value = filter_prefs.sort_value
-        if stored_sort_value:
-            try:
-                self._sort_order = PromptSortOrder(stored_sort_value)
-            except ValueError:
-                logger.warning("Unknown stored sort order: %s", stored_sort_value)
         execute_state = self._layout_state.load_execute_context_state()
         self._last_execute_context_task = execute_state.last_task
         self._execute_context_history_limit = self._layout_state.history_limit
@@ -319,6 +305,51 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Prompt Manager")
         self._layout_state.restore_window_geometry(self)
         self._build_ui()
+        presenter_callbacks = PromptListCallbacks(
+            update_intent_hint=self._update_intent_hint,
+            select_prompt=self._select_prompt,
+            show_error=self._show_error,
+            show_status=self._show_status_message,
+            show_toast=self._show_toast,
+        )
+        self._prompt_presenter = PromptListPresenter(
+            manager=self._manager,
+            coordinator=self._prompt_coordinator,
+            model=self._model,
+            detail_widget=self._detail_widget,
+            list_view=self._list_view,
+            filter_panel=self._filter_panel,
+            toolbar=self._toolbar,
+            callbacks=presenter_callbacks,
+            parent=self,
+        )
+        self._prompt_presenter.set_pending_filter_preferences(
+            category_slug=pending_category_slug,
+            tag=pending_tag_value,
+            min_quality=pending_quality_value,
+        )
+        if stored_sort_value:
+            try:
+                self._sort_order = PromptSortOrder(stored_sort_value)
+            except ValueError:
+                logger.warning("Unknown stored sort order: %s", stored_sort_value)
+        self._prompt_presenter.set_sort_order(self._sort_order)
+        self._quick_action_controller = QuickActionController(
+            parent=self,
+            manager=self._manager,
+            presenter=self._prompt_presenter,
+            detail_widget=self._detail_widget,
+            query_input=self._query_input,
+            quick_actions_button=self._quick_actions_button,
+            button_default_text=self._quick_actions_button_default_text,
+            button_default_tooltip=self._quick_actions_button_default_tooltip,
+            status_callback=self._show_status_message,
+            error_callback=self._show_error,
+            exit_callback=self._on_exit_clicked,
+            quick_actions_config=self._runtime_settings.get("quick_actions"),
+        )
+        self._quick_action_controller.sync_button()
+        self._initialize_prompt_editor_helpers()
         self._execution_controller = ExecutionController(
             manager=self._manager,
             runtime_settings=self._runtime_settings,
@@ -350,7 +381,6 @@ class MainWindow(QMainWindow):
         self._capture_main_splitter_left_width()
         self.statusBar().addPermanentWidget(self._notification_indicator)
         self._update_notification_indicator()
-        self._register_quick_shortcuts()
         self._load_prompts()
 
     def _build_ui(self) -> None:
@@ -453,10 +483,6 @@ class MainWindow(QMainWindow):
         self._share_result_button = components.share_result_button
         self._intent_hint = components.intent_hint
         self._filter_panel = components.filter_panel
-        if self._pending_quality_value is not None:
-            self._filter_panel.set_min_quality(self._pending_quality_value)
-            self._pending_quality_value = None
-        self._filter_panel.set_sort_value(self._sort_order.value)
         self._query_input = components.query_input
         self._highlighter = CodeHighlighter(self._query_input.document())
         self._tab_widget = components.tab_widget
@@ -595,78 +621,12 @@ class MainWindow(QMainWindow):
         super().resizeEvent(event)
         self._enforce_main_splitter_left_width()
 
-    def _load_prompts(self, search_text: str = "") -> None:
-        """Populate the list model from the repository or semantic search."""
-        try:
-            result = self._prompt_coordinator.fetch_prompts(search_text)
-        except RepositoryError as exc:
-            self._show_error("Unable to load prompts", str(exc))
+    def _load_prompts(self, search_text: str = "", *, use_indicator: bool = False) -> None:
+        """Delegate prompt loading to the presenter."""
+        if self._prompt_presenter is None:
             return
-        self._apply_prompt_load_result(result)
+        self._prompt_presenter.load_prompts(search_text, use_indicator=use_indicator)
 
-    def _load_prompts_with_indicator(self, search_text: str) -> None:
-        """Fetch prompts on a worker thread while displaying a busy dialog."""
-        if self._toolbar is not None:
-            self._toolbar.set_search_enabled(False)
-        try:
-            result = ProcessingIndicator(self, "Searching prompts…", title="Searching Prompts").run(
-                self._prompt_coordinator.fetch_prompts,
-                search_text,
-            )
-        except RepositoryError as exc:
-            self._show_error("Unable to load prompts", str(exc))
-            return
-        finally:
-            if self._toolbar is not None:
-                self._toolbar.set_search_enabled(True)
-        self._apply_prompt_load_result(result)
-
-    def _apply_prompt_load_result(self, result: PromptLoadResult) -> None:
-        """Update UI models based on fetched prompt data."""
-        self._all_prompts = list(result.all_prompts)
-        self._preserve_search_order = result.preserve_search_order
-        (
-            self._pending_category_slug,
-            self._pending_tag_value,
-        ) = self._prompt_coordinator.populate_filters(
-            self._filter_panel,
-            self._all_prompts,
-            pending_category_slug=self._pending_category_slug,
-            pending_tag_value=self._pending_tag_value,
-        )
-
-        if result.search_error:
-            self._show_error("Unable to search prompts", result.search_error)
-
-        if result.search_results is not None and result.preserve_search_order:
-            # Directly display semantic search results; they already include
-            # similarity scores and are sorted by best match.
-            self._suggestions = None
-            self._current_prompts = list(result.search_results)
-
-            filtered = self._prompt_coordinator.apply_filters(
-                self._filter_panel, self._current_prompts
-            )
-            # Do **not** apply additional sorting – relevance order matters.
-            self._model.set_prompts(filtered)
-            self._list_view.clearSelection()
-            if filtered:
-                self._select_prompt(filtered[0].id)
-            else:
-                self._detail_widget.clear()
-            self._update_intent_hint(filtered)
-            return
-
-        self._suggestions = None
-        self._current_prompts = list(self._all_prompts)
-
-        filtered = self._prompt_coordinator.apply_filters(self._filter_panel, self._current_prompts)
-        sorted_prompts = self._prompt_coordinator.sort_prompts(filtered, self._sort_order)
-        self._model.set_prompts(sorted_prompts)
-        self._list_view.clearSelection()
-        if not sorted_prompts:
-            self._detail_widget.clear()
-        self._update_intent_hint(sorted_prompts)
 
     def _on_manage_categories_clicked(self) -> None:
         """Open the category management dialog."""
@@ -679,7 +639,8 @@ class MainWindow(QMainWindow):
 
     def _on_filters_changed(self, *_: object) -> None:
         """Refresh the prompt list when filter widgets change."""
-        self._refresh_filtered_view(preserve_order=self._preserve_search_order)
+        if self._prompt_presenter is not None:
+            self._prompt_presenter.refresh_filtered_view()
         self._persist_filter_preferences()
 
     def _on_sort_changed(self, raw_order: str) -> None:
@@ -689,106 +650,41 @@ class MainWindow(QMainWindow):
         except ValueError:
             logger.warning("Unknown sort order selection: %s", raw_order)
             return
-        if sort_order is self._sort_order:
+        if sort_order is self._sort_order or self._prompt_presenter is None:
             return
-        selected_prompt = self._current_prompt()
         self._sort_order = sort_order
-        filtered = self._prompt_coordinator.apply_filters(self._filter_panel, self._current_prompts)
-        sorted_prompts = self._prompt_coordinator.sort_prompts(filtered, self._sort_order)
-        self._model.set_prompts(sorted_prompts)
-        if selected_prompt and any(prompt.id == selected_prompt.id for prompt in sorted_prompts):
-            self._select_prompt(selected_prompt.id)
-        elif sorted_prompts:
-            self._select_prompt(sorted_prompts[0].id)
-        else:
-            self._detail_widget.clear()
-        self._update_intent_hint(sorted_prompts)
+        self._prompt_presenter.update_sort_order(sort_order)
         self._persist_sort_preference()
 
-    def _refresh_filtered_view(self, *, preserve_order: bool = False) -> None:
-        filtered = self._prompt_coordinator.apply_filters(self._filter_panel, self._current_prompts)
-        prompts_to_show = (
-            filtered
-            if preserve_order
-            else self._prompt_coordinator.sort_prompts(filtered, self._sort_order)
-        )
-        self._model.set_prompts(prompts_to_show)
-        self._list_view.clearSelection()
-        if not prompts_to_show:
-            self._detail_widget.clear()
-        self._update_intent_hint(prompts_to_show)
-
-    @staticmethod
-    def _replace_prompt_in_collection(collection: list[Prompt], updated: Prompt) -> bool:
-        """Replace a prompt in the provided collection when present."""
-        for index, existing in enumerate(collection):
-            if existing.id == updated.id:
-                collection[index] = updated
-                return True
-        return False
-
-    def _refresh_prompt_after_rating(self, prompt_id: uuid.UUID) -> None:
+    def _refresh_prompt_after_rating(self, prompt_id: UUID) -> None:
         """Refresh prompt collections and UI after capturing a rating."""
-        try:
-            updated_prompt = self._manager.get_prompt(prompt_id)
-        except PromptManagerError:
+        presenter = self._prompt_presenter
+        if presenter is None:
             return
-
         search_text = self._current_search_text().strip()
         if search_text:
             self._load_prompts(search_text)
             self._select_prompt(prompt_id)
             return
-
-        updated_any = self._replace_prompt_in_collection(self._all_prompts, updated_prompt)
-        if self._replace_prompt_in_collection(self._current_prompts, updated_prompt):
-            updated_any = True
-
-        if not updated_any:
-            self._load_prompts()
-            self._select_prompt(prompt_id)
-            return
-
-        filtered = self._prompt_coordinator.apply_filters(self._filter_panel, self._current_prompts)
-        sorted_prompts = self._prompt_coordinator.sort_prompts(filtered, self._sort_order)
-        self._model.set_prompts(sorted_prompts)
-        if sorted_prompts:
-            self._update_intent_hint(sorted_prompts)
-        else:
-            self._detail_widget.clear()
-            self._intent_hint.clear()
-            self._intent_hint.setVisible(False)
-
-        if any(prompt.id == prompt_id for prompt in sorted_prompts):
-            self._select_prompt(prompt_id)
-            self._detail_widget.display_prompt(updated_prompt)
+        presenter.refresh_prompt_after_rating(prompt_id)
 
     def _handle_refresh_scenarios_request(self, detail_widget: PromptDetailWidget) -> None:
         """Regenerate persisted scenarios for the currently displayed prompt."""
-        prompt = detail_widget.current_prompt()
-        if prompt is None:
+        if self._prompt_presenter is None:
             return
-        try:
-            indicator = ProcessingIndicator(self, "Refreshing scenarios…")
-            updated_prompt = indicator.run(
-                self._manager.refresh_prompt_scenarios,
-                prompt.id,
-            )
-        except (ScenarioGenerationError, PromptManagerError) as exc:
-            QMessageBox.warning(self, "Scenario refresh failed", str(exc))
-            return
-        self._refresh_prompt_after_rating(updated_prompt.id)
-        self._show_toast("Scenarios refreshed.")
+        self._prompt_presenter.handle_refresh_scenarios(detail_widget)
 
     def _update_intent_hint(self, prompts: Sequence[Prompt]) -> None:
         """Update the hint label with detected intent context and matches."""
-        if self._suggestions is None:
+        presenter = self._prompt_presenter
+        suggestions = presenter.suggestions if presenter is not None else None
+        if suggestions is None:
             self._intent_hint.clear()
             self._intent_hint.setVisible(False)
             return
 
         prompt_list = list(prompts)
-        prediction = self._suggestions.prediction
+        prediction = suggestions.prediction
         label_text = prediction.label.value.replace("_", " ").title()
         confidence_pct = int(round(prediction.confidence * 100))
 
@@ -803,7 +699,7 @@ class MainWindow(QMainWindow):
         top_names = [prompt.name for prompt in prompt_list[:3]]
         if top_names:
             summary_parts.append(f"Top matches: {', '.join(top_names)}")
-        if self._suggestions.fallback_used:
+        if suggestions.fallback_used:
             summary_parts.append("Fallback ranking applied")
 
         if summary_parts:
@@ -887,9 +783,11 @@ class MainWindow(QMainWindow):
         """Update language detection and syntax highlighting as the user types."""
         text = self._query_input.toPlainText()
         self._update_detected_language(text)
-        if self._suppress_query_signal:
+        controller = self._quick_action_controller
+        if controller is not None and controller.is_workspace_signal_suppressed():
             return
-        self._query_seeded_by_quick_action = None
+        if controller is not None:
+            controller.clear_workspace_seed()
 
     def _update_detected_language(self, text: str, *, force: bool = False) -> None:
         """Detect the language for `text` and refresh UI elements when it changes."""
@@ -906,207 +804,57 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(f"Workspace language: {detection.name}", 3000)
 
     def _show_command_palette(self) -> None:
-        dialog = CommandPaletteDialog(self._quick_actions, self)
-        if dialog.exec() != QDialog.Accepted:
+        if self._quick_action_controller is None:
             return
-        action = dialog.selected_action
-        if action is not None:
-            self._execute_quick_action(action)
+        self._quick_action_controller.show_command_palette()
 
-    def _execute_quick_action(self, action: QuickAction) -> None:
-        try:
-            prompts = self._manager.repository.list()
-        except RepositoryError as exc:
-            self._show_error("Unable to load prompts", str(exc))
-            return
-
-        self._all_prompts = prompts
-        ranked = rank_prompts_for_action(prompts, action)
-        selected_prompt = self._resolve_quick_action_prompt(action, prompts, ranked)
-
-        if selected_prompt is None:
-            self.statusBar().showMessage(
-                f"No prompts matched quick action '{action.title}'.",
-                5000,
-            )
-            return
-
-        self._suggestions = None
-        (
-            self._pending_category_slug,
-            self._pending_tag_value,
-        ) = self._prompt_coordinator.populate_filters(
-            self._filter_panel,
-            prompts,
-            pending_category_slug=self._pending_category_slug,
-            pending_tag_value=self._pending_tag_value,
-        )
-        self._current_prompts = list(prompts)
-        filtered = self._prompt_coordinator.apply_filters(self._filter_panel, self._current_prompts)
-        sorted_prompts = self._prompt_coordinator.sort_prompts(filtered, self._sort_order)
-        self._model.set_prompts(sorted_prompts)
-        self._select_prompt(selected_prompt.id)
-        self._detail_widget.display_prompt(selected_prompt)
-        self._apply_quick_action_template(action)
-        self._query_input.setFocus(Qt.ShortcutFocusReason)
-        self._set_active_quick_action(action)
-        self.statusBar().showMessage(f"Quick action applied: {action.title}", 4000)
-
-    def _register_quick_shortcuts(self) -> None:
-        for shortcut in self._quick_shortcuts:
-            shortcut.setParent(None)
-        self._quick_shortcuts.clear()
-
-        palette_shortcuts = ["Ctrl+K", "Ctrl+Shift+P"]
-        for seq in palette_shortcuts:
-            shortcut = QShortcut(QKeySequence(seq), self)
-            shortcut.activated.connect(self._show_command_palette)  # type: ignore[arg-type]
-            self._quick_shortcuts.append(shortcut)
-
-        exit_shortcut = QShortcut(QKeySequence("Ctrl+Q"), self)
-        exit_shortcut.activated.connect(self._on_exit_clicked)  # type: ignore[arg-type]
-        self._quick_shortcuts.append(exit_shortcut)
-
-        for action in self._quick_actions:
-            if not action.shortcut:
-                continue
-            shortcut = QShortcut(QKeySequence(action.shortcut), self)
-            shortcut.activated.connect(lambda a=action: self._execute_quick_action(a))  # type: ignore[arg-type]
-            self._quick_shortcuts.append(shortcut)
-
-    def _set_active_quick_action(self, action: QuickAction | None) -> None:
-        """Update the quick actions button label to mirror the chosen action."""
-        if action is None:
-            self._active_quick_action_id = None
-            self._quick_actions_button.setText(self._quick_actions_button_default_text)
-            self._quick_actions_button.setToolTip(self._quick_actions_button_default_tooltip)
-            self._query_seeded_by_quick_action = None
-            return
-
-        self._active_quick_action_id = action.identifier
-        label = action.title
-        if action.shortcut:
-            label = f"{label} ({action.shortcut})"
-        self._quick_actions_button.setText(label)
-        self._quick_actions_button.setToolTip(action.description or action.title)
-
-    def _sync_active_quick_action_button(self) -> None:
-        """Ensure the button reflects the stored active quick action identifier."""
-        if not self._active_quick_action_id:
-            self._set_active_quick_action(None)
-            return
-
-        for action in self._quick_actions:
-            if action.identifier == self._active_quick_action_id:
-                self._set_active_quick_action(action)
-                return
-        self._set_active_quick_action(None)
-
-    def _apply_quick_action_template(self, action: QuickAction) -> None:
-        """Populate the workspace with the action template when appropriate."""
-        template = action.template
-        if not template:
-            return
-
-        current_text = self._query_input.toPlainText()
-        if current_text.strip() and self._query_seeded_by_quick_action is None:
-            return
-
-        self._suppress_query_signal = True
-        try:
-            self._query_input.setPlainText(template)
-            cursor = self._query_input.textCursor()
-            cursor.movePosition(QTextCursor.End)
-            self._query_input.setTextCursor(cursor)
-        finally:
-            self._suppress_query_signal = False
-        self._query_seeded_by_quick_action = action.identifier
-
-    def _default_quick_actions(self) -> list[QuickAction]:
-        return [
-            QuickAction(
-                identifier="explain",
-                title="Explain This Code",
-                description="Select analysis prompts to describe behaviour and intent.",
-                category_hint="Code Analysis",
-                tag_hints=("analysis", "code-review"),
-                template="Explain what this code does and highlight any risks:\n",
-                shortcut="Ctrl+1",
-            ),
-            QuickAction(
-                identifier="fix-errors",
-                title="Fix Errors",
-                description="Surface debugging prompts to diagnose and resolve failures.",
-                category_hint="Reasoning / Debugging",
-                tag_hints=("debugging", "incident-response"),
-                template="Identify and fix the issues in this snippet:\n",
-                shortcut="Ctrl+2",
-            ),
-            QuickAction(
-                identifier="add-comments",
-                title="Add Comments",
-                description=(
-                    "Jump to documentation prompts that generate docstrings "
-                    "and commentary."
-                ),
-                category_hint="Documentation",
-                tag_hints=("documentation", "docstrings"),
-                template="Add detailed docstrings and inline comments explaining this code:\n",
-                shortcut="Ctrl+3",
-            ),
-            QuickAction(
-                identifier="enhance",
-                title="Suggest Improvements",
-                description="Open enhancement prompts that brainstorm new ideas or edge cases.",
-                category_hint="Enhancement",
-                tag_hints=("enhancement", "product"),
-                template="Suggest improvements, safeguards, and edge cases for this work:\n",
-                shortcut="Ctrl+4",
-            ),
-        ]
-
-    def _build_quick_actions(self, custom_actions: object | None) -> list[QuickAction]:
-        actions_by_id: dict[str, QuickAction] = {
-            action.identifier: action for action in self._default_quick_actions()
-        }
-        if not custom_actions:
-            return list(actions_by_id.values())
-
-        data: Iterable[dict[str, Any]]
-        if isinstance(custom_actions, list):
-            data = [entry for entry in custom_actions if isinstance(entry, dict)]
+    def _initialize_prompt_editor_helpers(self) -> None:
+        if self._manager.prompt_engineer is not None:
+            prompt_engineer = self._refine_prompt_body
         else:
-            logger.warning("Ignoring invalid quick_actions settings value: %s", custom_actions)
-            return list(actions_by_id.values())
+            prompt_engineer = None
+        if self._manager.prompt_structure_engineer is not None:
+            structure_refiner = self._refine_prompt_structure
+        else:
+            structure_refiner = None
 
-        for entry in data:
-            try:
-                action = QuickAction.from_mapping(entry)
-            except ValueError as exc:
-                logger.warning("Skipping invalid quick action definition: %s", exc)
-                continue
-            actions_by_id[action.identifier] = action
-        return list(actions_by_id.values())
+        def _execute_context_from_dialog(
+            prompt_obj: Prompt,
+            context_text: str,
+            dlg: QWidget | None,
+        ) -> None:
+            self._execute_prompt_as_context(
+                prompt_obj,
+                parent=dlg,
+                context_override=context_text,
+            )
 
-    def _resolve_quick_action_prompt(
-        self,
-        action: QuickAction,
-        prompts: Iterable[Prompt],
-        ranked: list[Prompt],
-    ) -> Prompt | None:
-        if action.prompt_id:
-            prompt_id = action.prompt_id
-            try:
-                target_uuid = uuid.UUID(prompt_id)
-            except ValueError:
-                for prompt in prompts:
-                    if prompt.name.lower() == prompt_id.lower():
-                        return prompt
-            else:
-                for prompt in prompts:
-                    if prompt.id == target_uuid:
-                        return prompt
-        return ranked[0] if ranked else None
+        def _reload_prompts(search_text: str) -> None:
+            self._load_prompts(search_text)
+
+        self._prompt_editor_factory = PromptDialogFactory(
+            manager=self._manager,
+            name_generator=self._generate_prompt_name,
+            description_generator=self._generate_prompt_description,
+            category_generator=self._generate_prompt_category,
+            tags_generator=self._generate_prompt_tags,
+            scenario_generator=self._generate_prompt_scenarios,
+            prompt_engineer=prompt_engineer,
+            structure_refiner=structure_refiner,
+            version_history_handler=self._open_version_history_dialog,
+            execute_context_handler=_execute_context_from_dialog,
+        )
+        self._prompt_editor_flow = PromptEditorFlow(
+            parent=self,
+            manager=self._manager,
+            dialog_factory=self._prompt_editor_factory,
+            load_prompts=_reload_prompts,
+            current_search_text=self._current_search_text,
+            select_prompt=self._select_prompt,
+            delete_prompt=self._delete_prompt,
+            status_callback=self._show_status_message,
+            error_callback=self._show_error,
+        )
 
     def _generate_prompt_name(self, context: str) -> str:
         """Delegate name generation to PromptManager, surfacing errors."""
@@ -1238,11 +986,15 @@ class MainWindow(QMainWindow):
             return
         prediction = classifier.classify(text)
         current_prompts = list(self._model.prompts())
-        self._suggestions = PromptManager.IntentSuggestions(
-            prediction=prediction,
-            prompts=list(current_prompts),
-            fallback_used=False,
-        )
+        presenter = self._prompt_presenter
+        if presenter is not None:
+            presenter.set_intent_suggestions(
+                PromptManager.IntentSuggestions(
+                    prediction=prediction,
+                    prompts=list(current_prompts),
+                    fallback_used=False,
+                )
+            )
         self._update_intent_hint(current_prompts)
         label = prediction.label.value.replace("_", " ").title()
         self.statusBar().showMessage(
@@ -1267,12 +1019,15 @@ class MainWindow(QMainWindow):
             prompts=suggestions.prompts,
             fallback_used=suggestions.fallback_used,
         )
-        self._apply_suggestions(suggestions)
+        if self._prompt_presenter is not None:
+            self._prompt_presenter.apply_suggestions(suggestions)
         top_name = suggestions.prompts[0].name if suggestions.prompts else None
         if top_name:
             self.statusBar().showMessage(f"Top suggestion: {top_name}", 5000)
 
     def _on_tab_changed(self, index: int) -> None:
+        if self._tab_widget is None:
+            return
         widget = self._tab_widget.widget(index)
         if widget is self._history_panel:
             self._history_panel.refresh()
@@ -1291,8 +1046,11 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Run a prompt before saving the result.", 3000)
             return
         prompt = self._current_prompt()
-        if prompt is None and self._current_prompts:
-            prompt = self._current_prompts[0]
+        presenter = self._prompt_presenter
+        if prompt is None and presenter is not None:
+            prompts = presenter.current_prompts
+            if prompts:
+                prompt = prompts[0]
         if prompt is None:
             self.statusBar().showMessage("Select a prompt to associate with the result.", 3000)
             return
@@ -1407,9 +1165,11 @@ class MainWindow(QMainWindow):
         self._result_tabs.setCurrentIndex(0)
         self._intent_hint.clear()
         self._intent_hint.setVisible(False)
+        if self._quick_action_controller is not None:
+            self._quick_action_controller.clear_workspace_seed()
         self.statusBar().showMessage("Workspace cleared.", 3000)
 
-    def _handle_note_update(self, execution_id: uuid.UUID, note: str) -> None:
+    def _handle_note_update(self, execution_id: UUID, note: str) -> None:
         """Record analytics when execution notes are edited."""
         self._usage_logger.log_note_edit(note_length=len(note))
 
@@ -1516,55 +1276,6 @@ class MainWindow(QMainWindow):
             description,
         )
 
-    def _show_similar_prompts(self, prompt: Prompt) -> None:
-        """Populate the prompt list with embedding-based recommendations."""
-        embedding_vector: list[float] | None
-        if prompt.ext4 is not None:
-            try:
-                embedding_vector = [float(value) for value in prompt.ext4]
-            except (TypeError, ValueError):  # pragma: no cover - defensive
-                embedding_vector = None
-        else:
-            embedding_vector = None
-
-        if embedding_vector is None and not prompt.document.strip():
-            self.statusBar().showMessage(
-                "Selected prompt does not include enough text for similarity search.",
-                4000,
-            )
-            return
-
-        try:
-            similar_prompts = self._manager.search_prompts(
-                "" if embedding_vector is not None else prompt.document,
-                limit=10,
-                embedding=embedding_vector,
-            )
-        except PromptManagerError as exc:
-            self._show_error("Unable to load similar prompts", str(exc))
-            return
-
-        recommendations = [candidate for candidate in similar_prompts if candidate.id != prompt.id]
-        if not recommendations:
-            self.statusBar().showMessage("No similar prompts found.", 4000)
-            return
-
-        self._suggestions = None
-        self._current_prompts = list(recommendations)
-        self._preserve_search_order = True
-        filtered = self._prompt_coordinator.apply_filters(self._filter_panel, self._current_prompts)
-        self._model.set_prompts(filtered)
-        self._list_view.clearSelection()
-        if filtered:
-            self._select_prompt(filtered[0].id)
-        else:
-            self._detail_widget.clear()
-        self._update_intent_hint(filtered)
-        self.statusBar().showMessage(
-            f"Showing prompts similar to '{prompt.name}'.",
-            4000,
-        )
-
     def _on_render_markdown_toggled(self, _state: int) -> None:
         """Refresh result and chat panes when the markdown toggle changes."""
         if self._execution_controller is not None:
@@ -1586,26 +1297,11 @@ class MainWindow(QMainWindow):
             return
         controller.copy_result_to_workspace()
 
-    def _apply_suggestions(self, suggestions: PromptManager.IntentSuggestions) -> None:
-        """Apply intent suggestions to the list view and update filters."""
-        self._suggestions = suggestions
-        self._current_prompts = list(suggestions.prompts)
-        filtered = self._prompt_coordinator.apply_filters(self._filter_panel, self._current_prompts)
-        sorted_prompts = self._prompt_coordinator.sort_prompts(filtered, self._sort_order)
-        self._model.set_prompts(sorted_prompts)
-        self._list_view.clearSelection()
-        if sorted_prompts:
-            self._select_prompt(sorted_prompts[0].id)
-        else:
-            self._detail_widget.clear()
-        self._update_intent_hint(sorted_prompts)
-
     def _current_prompt(self) -> Prompt | None:
         """Return the prompt currently selected in the list."""
-        index = self._list_view.currentIndex()
-        if not index.isValid():
+        if self._prompt_presenter is None:
             return None
-        return self._model.prompt_at(index.row())
+        return self._prompt_presenter.current_prompt()
 
     def _on_search_changed(self, text: str) -> None:
         """Refresh list + sorting when the inline clear action removes the query."""
@@ -1640,10 +1336,7 @@ class MainWindow(QMainWindow):
 
         if text and len(stripped) < 2:
             return
-        if use_indicator:
-            self._load_prompts_with_indicator(text)
-        else:
-            self._load_prompts(text)
+        self._load_prompts(text, use_indicator=use_indicator)
 
     def _on_prompt_double_clicked(self, index: QModelIndex) -> None:
         """Open the edit dialog when a prompt is double-clicked."""
@@ -1703,7 +1396,8 @@ class MainWindow(QMainWindow):
         elif selected_action is fork_action and prompt is not None:
             self._fork_prompt(prompt)
         elif selected_action is similar_action and prompt is not None:
-            self._show_similar_prompts(prompt)
+            if self._prompt_presenter is not None:
+                self._prompt_presenter.show_similar_prompts(prompt)
         elif selected_action is execute_action and prompt is not None:
             self._execute_prompt_from_context_menu(prompt)
         elif selected_action is execute_context_action and prompt is not None:
@@ -1830,78 +1524,15 @@ class MainWindow(QMainWindow):
 
     def _duplicate_prompt(self, prompt: Prompt) -> None:
         """Open a creation dialog with the selected prompt pre-filled and persist the copy."""
-        dialog = PromptDialog(
-            self,
-            name_generator=self._generate_prompt_name,
-            description_generator=self._generate_prompt_description,
-            category_provider=self._manager.list_categories,
-            category_generator=self._generate_prompt_category,
-            tags_generator=self._generate_prompt_tags,
-            scenario_generator=self._generate_prompt_scenarios,
-            prompt_engineer=(
-                self._refine_prompt_body if self._manager.prompt_engineer is not None else None
-            ),
-            structure_refiner=(
-                self._refine_prompt_structure
-                if self._manager.prompt_structure_engineer is not None
-                else None
-            ),
-            version_history_handler=self._open_version_history_dialog,
-        )
-        self._connect_prompt_dialog_signals(dialog)
-        dialog.prefill_from_prompt(prompt)
-        if dialog.exec() != QDialog.Accepted:
+        if self._prompt_editor_flow is None:
             return
-        duplicate = dialog.result_prompt
-        if duplicate is None:
-            return
-        try:
-            created = self._manager.create_prompt(duplicate)
-        except PromptStorageError as exc:
-            self._show_error("Unable to duplicate prompt", str(exc))
-            return
-        self._load_prompts(self._current_search_text())
-        self._select_prompt(created.id)
-        self.statusBar().showMessage("Prompt duplicated.", 4000)
+        self._prompt_editor_flow.duplicate_prompt(prompt)
 
     def _fork_prompt(self, prompt: Prompt) -> None:
         """Fork the selected prompt and allow optional edits before saving."""
-        try:
-            forked = self._manager.fork_prompt(prompt.id)
-        except PromptManagerError as exc:
-            self._show_error("Unable to fork prompt", str(exc))
+        if self._prompt_editor_flow is None:
             return
-
-        dialog = PromptDialog(
-            self,
-            forked,
-            category_provider=self._manager.list_categories,
-            name_generator=self._generate_prompt_name,
-            description_generator=self._generate_prompt_description,
-            category_generator=self._generate_prompt_category,
-            tags_generator=self._generate_prompt_tags,
-            scenario_generator=self._generate_prompt_scenarios,
-            prompt_engineer=(
-                self._refine_prompt_body if self._manager.prompt_engineer is not None else None
-            ),
-            structure_refiner=(
-                self._refine_prompt_structure
-                if self._manager.prompt_structure_engineer is not None
-                else None
-            ),
-            version_history_handler=self._open_version_history_dialog,
-        )
-        self._connect_prompt_dialog_signals(dialog)
-        dialog.setWindowTitle("Edit Forked Prompt")
-        if dialog.exec() == QDialog.Accepted and dialog.result_prompt is not None:
-            try:
-                forked = self._manager.update_prompt(dialog.result_prompt)
-            except PromptManagerError as exc:
-                self._show_error("Unable to save forked prompt", str(exc))
-                return
-        self._load_prompts(self._current_search_text())
-        self._select_prompt(forked.id)
-        self.statusBar().showMessage("Prompt fork created.", 4000)
+        self._prompt_editor_flow.fork_prompt(prompt)
 
     def _on_refresh_clicked(self) -> None:
         """Reload catalogue data, respecting the current search text."""
@@ -1909,37 +1540,9 @@ class MainWindow(QMainWindow):
 
     def _on_add_clicked(self) -> None:
         """Open the creation dialog and persist a new prompt."""
-        dialog = PromptDialog(
-            self,
-            category_provider=self._manager.list_categories,
-            name_generator=self._generate_prompt_name,
-            description_generator=self._generate_prompt_description,
-            category_generator=self._generate_prompt_category,
-            tags_generator=self._generate_prompt_tags,
-            scenario_generator=self._generate_prompt_scenarios,
-            prompt_engineer=(
-                self._refine_prompt_body if self._manager.prompt_engineer is not None else None
-            ),
-            structure_refiner=(
-                self._refine_prompt_structure
-                if self._manager.prompt_structure_engineer is not None
-                else None
-            ),
-            version_history_handler=self._open_version_history_dialog,
-        )
-        self._connect_prompt_dialog_signals(dialog)
-        if dialog.exec() != QDialog.Accepted:
+        if self._prompt_editor_flow is None:
             return
-        prompt = dialog.result_prompt
-        if prompt is None:
-            return
-        try:
-            created = self._manager.create_prompt(prompt)
-        except PromptStorageError as exc:
-            self._show_error("Unable to create prompt", str(exc))
-            return
-        self._load_prompts()
-        self._select_prompt(created.id)
+        self._prompt_editor_flow.create_prompt()
 
     def _on_workbench_clicked(self) -> None:
         """Launch the Enhanced Prompt Workbench with the desired starting mode."""
@@ -1977,53 +1580,9 @@ class MainWindow(QMainWindow):
         prompt = self._current_prompt()
         if prompt is None:
             return
-        dialog = PromptDialog(
-            self,
-            prompt,
-            category_provider=self._manager.list_categories,
-            name_generator=self._generate_prompt_name,
-            description_generator=self._generate_prompt_description,
-            category_generator=self._generate_prompt_category,
-            tags_generator=self._generate_prompt_tags,
-            scenario_generator=self._generate_prompt_scenarios,
-            prompt_engineer=(
-                self._refine_prompt_body if self._manager.prompt_engineer is not None else None
-            ),
-            structure_refiner=(
-                self._refine_prompt_structure
-                if self._manager.prompt_structure_engineer is not None
-                else None
-            ),
-            version_history_handler=self._open_version_history_dialog,
-        )
-        self._connect_prompt_dialog_signals(dialog)
-        dialog.applied.connect(  # type: ignore[arg-type]
-            lambda updated_prompt: self._on_prompt_applied(updated_prompt, dialog)
-        )
-        if dialog.exec() != QDialog.Accepted:
+        if self._prompt_editor_flow is None:
             return
-        if dialog.delete_requested:
-            self._delete_prompt(prompt, skip_confirmation=True)
-            return
-        updated = dialog.result_prompt
-        if updated is None:
-            return
-        try:
-            stored = ProcessingIndicator(self, "Saving prompt changes…").run(
-                self._manager.update_prompt,
-                updated,
-            )
-        except PromptNotFoundError:
-            self._show_error(
-                "Prompt missing", "The prompt cannot be located. Refresh and try again."
-            )
-            self._load_prompts()
-            return
-        except PromptStorageError as exc:
-            self._show_error("Unable to update prompt", str(exc))
-            return
-        self._load_prompts(self._current_search_text())
-        self._select_prompt(stored.id)
+        self._prompt_editor_flow.edit_prompt(prompt)
 
     def _on_fork_clicked(self) -> None:
         """Handle toolbar fork button taps."""
@@ -2058,40 +1617,6 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Prompt restored to selected version.", 4000)
         else:
             self._update_prompt_lineage_summary(prompt)
-
-    def _on_prompt_applied(self, prompt: Prompt, dialog: PromptDialog) -> None:
-        """Persist prompt edits triggered via the Apply button."""
-        try:
-            stored = ProcessingIndicator(dialog, "Saving prompt changes…").run(
-                self._manager.update_prompt,
-                prompt,
-            )
-        except PromptNotFoundError:
-            self._show_error(
-                "Prompt missing",
-                "The prompt cannot be located. Refresh and try again.",
-            )
-            self._load_prompts()
-            dialog.reject()
-            return
-        except PromptStorageError as exc:
-            self._show_error("Unable to update prompt", str(exc))
-            return
-
-        dialog.update_source_prompt(stored)
-        self._load_prompts(self._current_search_text())
-        self._select_prompt(stored.id)
-        self.statusBar().showMessage("Prompt changes applied.", 4000)
-
-    def _connect_prompt_dialog_signals(self, dialog: PromptDialog) -> None:
-        """Wire shared signal handlers for prompt dialogs."""
-        dialog.execute_context_requested.connect(  # type: ignore[arg-type]
-            lambda prompt, context_text, dlg=dialog: self._execute_prompt_as_context(
-                prompt,
-                parent=dlg,
-                context_override=context_text,
-            )
-        )
 
     def _delete_prompt(self, prompt: Prompt, *, skip_confirmation: bool = False) -> None:
         """Delete the provided prompt and refresh listings."""
@@ -2443,9 +1968,11 @@ class MainWindow(QMainWindow):
             else:
                 self._settings.prompt_templates = PromptTemplateOverrides()
 
-        self._quick_actions = self._build_quick_actions(self._runtime_settings.get("quick_actions"))
-        self._register_quick_shortcuts()
-        self._sync_active_quick_action_button()
+        if self._quick_action_controller is not None:
+            self._quick_action_controller.refresh_actions(
+                self._runtime_settings.get("quick_actions")
+            )
+        self._initialize_prompt_editor_helpers()
         self._apply_theme(theme_choice)
         if self._execution_controller is not None:
             self._execution_controller.refresh_chat_history_view()
@@ -2621,7 +2148,7 @@ class MainWindow(QMainWindow):
         self._update_prompt_lineage_summary(prompt)
         self._update_template_preview(prompt)
 
-    def _select_prompt(self, prompt_id: uuid.UUID) -> None:
+    def _select_prompt(self, prompt_id: UUID) -> None:
         """Highlight the given prompt in the list view when present."""
         for row, prompt in enumerate(self._model.prompts()):
             if prompt.id == prompt_id:

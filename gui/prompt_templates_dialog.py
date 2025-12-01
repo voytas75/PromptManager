@@ -1,6 +1,8 @@
 """Dialog for editing LiteLLM prompt template overrides.
 
-Updates: v0.1.0 - 2025-11-29 - Introduce dedicated prompt template editor dialog.
+Updates:
+  v0.1.1 - 2025-12-01 - Preserve trailing whitespace when saving template overrides.
+  v0.1.0 - 2025-11-29 - Introduce dedicated prompt template editor dialog.
 """
 
 from __future__ import annotations
@@ -48,7 +50,7 @@ class PromptTemplateEditorDialog(QDialog):
 
         self._defaults: dict[str, str] = dict(DEFAULT_PROMPT_TEMPLATES)
         self._initial_overrides: dict[str, str] = {
-            key: value.strip()
+            key: value
             for key, value in (templates or {}).items()
             if isinstance(value, str) and value.strip()
         }
@@ -148,15 +150,16 @@ class PromptTemplateEditorDialog(QDialog):
         editor = self._editors.get(key)
         if not label or not editor:
             return
-        text = editor.toPlainText().strip()
-        default_text = self._defaults.get(key, "").strip()
-        char_count = len(text)
+        raw_text = editor.toPlainText()
+        text = raw_text.strip()
+        default_text = self._defaults.get(key, "")
+        char_count = len(raw_text)
         if not text:
             label.setStyleSheet("color:#b91c1c;")
             label.setText("Required – enter system instructions for this workflow.")
             return
         label.setStyleSheet("")
-        status = "overriding default" if text != default_text else "using default"
+        status = "overriding default" if raw_text != default_text else "using default"
         label.setText(f"{char_count} characters • {status}")
 
     def _validate_inputs(self) -> None:
@@ -173,9 +176,11 @@ class PromptTemplateEditorDialog(QDialog):
 
         payload: dict[str, str] = {}
         for key, editor in self._editors.items():
-            text = editor.toPlainText().strip()
+            text = editor.toPlainText()
+            if not text.strip():
+                continue
             default_text = self._defaults.get(key, "")
-            if text and text != default_text:
+            if text != default_text:
                 payload[key] = text
         return payload
 
