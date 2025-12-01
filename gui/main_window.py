@@ -36,7 +36,6 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import (
     QCheckBox,
-    QDialog,
     QFrame,
     QListView,
     QMainWindow,
@@ -47,21 +46,17 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from config import DEFAULT_THEME_MODE, PromptManagerSettings
 from core import (
     IntentLabel,
-    NameGenerationError,
     PromptManager,
     PromptManagerError,
     PromptNotFoundError,
     PromptStorageError,
-    PromptVersionError,
-    RepositoryError,
 )
 from models.category_model import PromptCategory, slugify_category
 
 from .controllers.execution_controller import ExecutionController
-from .dialogs import InfoDialog, PromptVersionHistoryDialog
+from .dialog_launcher import DialogLauncher
 from .language_tools import DetectedLanguage, detect_language
 from .main_view_binder import MainViewBinderConfig, bind_main_view
 from .main_view_builder import MainViewCallbacks, build_main_view
@@ -71,13 +66,11 @@ from .prompt_generation_service import PromptGenerationService
 from .prompt_list_coordinator import PromptSortOrder
 from .prompt_list_presenter import PromptListCallbacks, PromptListPresenter
 from .prompt_search_controller import PromptSearchController
-from .prompt_templates_dialog import PromptTemplateEditorDialog
 from .quick_action_controller import QuickActionController
-from .runtime_settings_service import RuntimeSettingsResult
-from .settings_dialog import SettingsDialog
+from .settings_workflow import SettingsWorkflow
 from .toast import show_toast
-from .workbench.workbench_window import WorkbenchModeDialog, WorkbenchWindow
 from .workspace_command_router import WorkspaceCommandRouter
+from .workspace_history_controller import WorkspaceHistoryController
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from collections.abc import Sequence
@@ -86,6 +79,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from PySide6.QtCore import QModelIndex, QPoint
     from PySide6.QtGui import QResizeEvent, QShowEvent
 
+    from config import PromptManagerSettings
     from models.prompt_model import Prompt
 
     from .catalog_workflow_controller import CatalogWorkflowController
@@ -97,6 +91,11 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from .widgets import PromptDetailWidget, PromptFilterPanel, PromptToolbar
     from .workspace_actions_controller import WorkspaceActionsController
     from .workspace_view_controller import WorkspaceViewController
+else:  # pragma: no cover - runtime placeholders for type-only imports
+    from typing import Any as _Any
+
+    PromptManagerSettings = _Any
+    CatalogWorkflowController = _Any
 
 logger = logging.getLogger(__name__)
 
@@ -160,6 +159,9 @@ class MainWindow(QMainWindow):
         self._workspace_view: WorkspaceViewController | None = None
         self._workspace_actions: WorkspaceActionsController | None = None
         self._workspace_router = WorkspaceCommandRouter(lambda: self._workspace_actions)
+        self._workspace_history_controller: WorkspaceHistoryController | None = None
+        self._settings_workflow: SettingsWorkflow | None = None
+        self._dialog_launcher: DialogLauncher | None = None
         self._prompt_actions_controller: PromptActionsController | None = None
         self._template_preview_controller: TemplatePreviewController | None = None
         self._execution_controller: ExecutionController | None = None
@@ -179,7 +181,6 @@ class MainWindow(QMainWindow):
         self._filter_panel: PromptFilterPanel | None = None
         self._main_container: QFrame | None = None
         self._notification_controller: NotificationController | None = None
-        self._workbench_windows: list[WorkbenchWindow] = []
 
         detail_callbacks = DetailWidgetCallbacks(
             delete_requested=self._on_delete_clicked,
@@ -402,6 +403,41 @@ class MainWindow(QMainWindow):
             execute_from_prompt_body=self._execute_prompt_from_context_menu,
         )
         bind_main_view(self, components=components, config=binder_config)
+        self._workspace_history_controller = WorkspaceHistoryController(
+            manager=self._manager,
+            model=self._model,
+            detail_widget=self._detail_widget,
+            list_view=self._list_view,
+            current_prompt_supplier=self._current_prompt,
+            template_detail_widget_supplier=lambda: self._template_detail_widget,
+            template_preview_controller_supplier=lambda: self._template_preview_controller,
+            execution_controller_supplier=lambda: self._execution_controller,
+        )
+        self._settings_workflow = SettingsWorkflow(
+            parent=self,
+            manager=self._manager,
+            runtime_settings_service=self._runtime_settings_service,
+            runtime_settings=self._runtime_settings,
+            quick_action_supplier=lambda: self._quick_action_controller,
+            prompt_generation_refresher=self._rebuild_prompt_generation_components,
+            appearance_controller=self._appearance_controller,
+            execution_controller_supplier=lambda: self._execution_controller,
+            load_prompts=self._load_prompts,
+            current_search_text=self._current_search_text,
+            run_button=self._run_button,
+            template_preview_supplier=lambda: self._template_preview,
+            toast_callback=self._show_toast,
+        )
+        self._dialog_launcher = DialogLauncher(
+            parent=self,
+            manager=self._manager,
+            current_prompt_supplier=self._current_prompt,
+            load_prompts=self._load_prompts,
+            current_search_text=self._current_search_text,
+            select_prompt=lambda prompt: self._workspace_history_controller.select_prompt(prompt.id)
+            if self._workspace_history_controller is not None
+            else None,
+        )
         self._workspace_router = WorkspaceCommandRouter(lambda: self._workspace_actions)
         self._appearance_controller.set_container(self._main_container)
         self._update_detected_language(self._query_input.toPlainText(), force=True)
@@ -750,34 +786,9 @@ class MainWindow(QMainWindow):
 
     def _on_workbench_clicked(self) -> None:
         """Launch the Enhanced Prompt Workbench with the desired starting mode."""
-        try:
-            templates = self._manager.repository.list(limit=200)
-        except RepositoryError as exc:
-            logger.warning("Unable to load templates for workbench: %s", exc)
-            templates = []
-        dialog = WorkbenchModeDialog(templates, self)
-        if dialog.exec() != QDialog.Accepted:
+        if self._dialog_launcher is None:
             return
-        selection = dialog.result_selection()
-        window = WorkbenchWindow(
-            self._manager,
-            mode=selection.mode,
-            template_prompt=selection.template_prompt,
-            parent=self,
-        )
-        self._workbench_windows.append(window)
-
-        window.destroyed.connect(  # type: ignore[arg-type]
-            lambda *_: self._remove_workbench_window(window)
-        )
-        window.show()
-
-    def _remove_workbench_window(self, window: WorkbenchWindow) -> None:
-        """Remove closed workbench windows from the tracking list."""
-        try:
-            self._workbench_windows.remove(window)
-        except ValueError:
-            return
+        self._dialog_launcher.open_workbench()
 
     def _on_edit_clicked(self) -> None:
         """Open the edit dialog for the selected prompt and persist changes."""
@@ -804,23 +815,9 @@ class MainWindow(QMainWindow):
 
     def _open_version_history_dialog(self, prompt: Prompt | None = None) -> None:
         """Open the version history dialog for the requested or selected prompt."""
-        if prompt is None:
-            prompt = self._current_prompt()
-        if prompt is None:
+        if self._dialog_launcher is None:
             return
-        dialog = PromptVersionHistoryDialog(
-            self._manager,
-            prompt,
-            self,
-            status_callback=self._show_status_message,
-        )
-        dialog.exec()
-        if dialog.last_restored_prompt is not None:
-            self._load_prompts(self._current_search_text())
-            self._select_prompt(dialog.last_restored_prompt.id)
-            self.statusBar().showMessage("Prompt restored to selected version.", 4000)
-        else:
-            self._update_prompt_lineage_summary(prompt)
+        self._dialog_launcher.open_version_history_dialog(prompt)
 
     def _delete_prompt(self, prompt: Prompt, *, skip_confirmation: bool = False) -> None:
         """Delete the provided prompt and refresh listings."""
@@ -846,63 +843,39 @@ class MainWindow(QMainWindow):
 
     def _on_import_clicked(self) -> None:
         """Delegate to the catalogue workflow controller."""
+        if self._catalog_controller is None:
+            return
         self._catalog_controller.open_import_dialog()
 
     def _on_export_clicked(self) -> None:
         """Export prompts via the catalogue controller."""
+        if self._catalog_controller is None:
+            return
         self._catalog_controller.export_catalog()
 
     def _on_maintenance_clicked(self) -> None:
         """Open maintenance workflows via the controller."""
+        if self._catalog_controller is None:
+            return
         self._catalog_controller.open_maintenance_dialog()
 
     def _on_info_clicked(self) -> None:
         """Display application metadata and system characteristics."""
-        dialog = InfoDialog(self)
-        dialog.exec()
+        if self._dialog_launcher is None:
+            return
+        self._dialog_launcher.show_info_dialog()
 
     def _on_settings_clicked(self) -> None:
         """Open configuration dialog and apply updates."""
-        dialog = SettingsDialog(
-            self,
-            litellm_model=self._runtime_settings.get("litellm_model"),
-            litellm_inference_model=self._runtime_settings.get("litellm_inference_model"),
-            litellm_api_key=self._runtime_settings.get("litellm_api_key"),
-            litellm_api_base=self._runtime_settings.get("litellm_api_base"),
-            litellm_api_version=self._runtime_settings.get("litellm_api_version"),
-            litellm_drop_params=self._runtime_settings.get("litellm_drop_params"),
-            litellm_reasoning_effort=self._runtime_settings.get("litellm_reasoning_effort"),
-            litellm_stream=self._runtime_settings.get("litellm_stream"),
-            litellm_workflow_models=self._runtime_settings.get("litellm_workflow_models"),
-            embedding_model=self._runtime_settings.get("embedding_model"),
-            quick_actions=self._runtime_settings.get("quick_actions"),
-            chat_user_bubble_color=self._runtime_settings.get("chat_user_bubble_color"),
-            theme_mode=self._runtime_settings.get("theme_mode"),
-            chat_colors=self._runtime_settings.get("chat_colors"),
-            prompt_templates=self._runtime_settings.get("prompt_templates"),
-        )
-        if dialog.exec() != QDialog.Accepted:
+        if self._settings_workflow is None:
             return
-        updates = dialog.result_settings()
-        self._apply_settings(updates)
+        self._settings_workflow.open_settings_dialog(self._settings)
 
     def _on_prompt_templates_clicked(self) -> None:
         """Open the lightweight prompt template editor dialog."""
-        dialog = PromptTemplateEditorDialog(
-            self,
-            templates=self._runtime_settings.get("prompt_templates"),
-        )
-        if dialog.exec() != QDialog.Accepted:
+        if self._settings_workflow is None:
             return
-        overrides = dialog.result_templates()
-        cleaned_overrides: dict[str, str] | None = overrides or None
-        current_templates = self._runtime_settings.get("prompt_templates")
-        normalised_current = current_templates or None
-        if normalised_current == cleaned_overrides:
-            self._show_toast("Prompt templates are already up to date.")
-            return
-        self._apply_settings({"prompt_templates": cleaned_overrides})
-        self._show_toast("Prompt templates updated.")
+        self._settings_workflow.open_prompt_templates_dialog()
 
     def _on_exit_clicked(self) -> None:
         """Close the application via the toolbar exit control."""
@@ -918,96 +891,19 @@ class MainWindow(QMainWindow):
         self._catalog_controller = components.catalog_controller
 
 
-    def _apply_settings(self, updates: dict[str, object | None]) -> None:
-        """Persist settings, refresh catalogue, and update dependent controllers."""
-        if not updates:
-            return
-
-        try:
-            result = self._runtime_settings_service.apply_updates(
-                self._runtime_settings,
-                updates,
-            )
-        except NameGenerationError as exc:
-            QMessageBox.warning(self, "LiteLLM configuration", str(exc))
-            result = RuntimeSettingsResult(
-                theme_mode=str(self._runtime_settings.get("theme_mode") or DEFAULT_THEME_MODE),
-                has_executor=self._manager.executor is not None,
-            )
-
-        if self._quick_action_controller is not None:
-            self._quick_action_controller.refresh_actions(
-                self._runtime_settings.get("quick_actions")
-            )
-        self._rebuild_prompt_generation_components()
-        self._appearance_controller.apply_theme(result.theme_mode)
-        if self._execution_controller is not None:
-            self._execution_controller.refresh_chat_history_view()
-
-        self._load_prompts(self._current_search_text())
-        self._run_button.setEnabled(result.has_executor)
-        if self._template_preview is not None:
-            self._template_preview.set_run_enabled(result.has_executor)
-
     def _on_selection_changed(self, *_: object) -> None:
         """Update the detail panel to reflect the new selection."""
-        prompt = self._current_prompt()
-        if prompt is None:
-            self._detail_widget.clear()
-            if self._execution_controller is not None:
-                self._execution_controller.handle_prompt_selection_change(None)
-            self._update_template_preview(None)
-            if self._template_detail_widget is not None:
-                self._template_detail_widget.clear()
+        controller = self._workspace_history_controller
+        if controller is None:
             return
-        if self._execution_controller is not None:
-            self._execution_controller.handle_prompt_selection_change(prompt.id)
-        self._detail_widget.display_prompt(prompt)
-        if self._template_detail_widget is not None:
-            self._template_detail_widget.display_prompt(prompt)
-        self._update_prompt_lineage_summary(prompt)
-        self._update_template_preview(prompt)
+        controller.handle_selection_changed()
 
     def _select_prompt(self, prompt_id: UUID) -> None:
         """Highlight the given prompt in the list view when present."""
-        for row, prompt in enumerate(self._model.prompts()):
-            if prompt.id == prompt_id:
-                index = self._model.index(row, 0)
-                self._list_view.setCurrentIndex(index)
-                break
-
-    def _update_prompt_lineage_summary(self, prompt: Prompt) -> None:
-        """Fetch version/fork metadata for the detail pane."""
-        summary_parts: list[str] = []
-        try:
-            parent_link = self._manager.get_prompt_parent_fork(prompt.id)
-        except PromptVersionError:
-            parent_link = None
-        if parent_link is not None:
-            summary_parts.append(f"Forked from {parent_link.source_prompt_id}")
-
-        try:
-            children = self._manager.list_prompt_forks(prompt.id)
-        except PromptVersionError:
-            children = []
-        if children:
-            child_label = "fork" if len(children) == 1 else "forks"
-            summary_parts.append(f"{len(children)} {child_label}")
-        summary_text = " | ".join(summary_parts)
-        if summary_text:
-            self._detail_widget.update_lineage_summary(summary_text)
-            if self._template_detail_widget is not None:
-                self._template_detail_widget.update_lineage_summary(summary_text)
-        else:
-            self._detail_widget.update_lineage_summary("No lineage data yet.")
-            if self._template_detail_widget is not None:
-                self._template_detail_widget.update_lineage_summary("No lineage data yet.")
-
-    def _update_template_preview(self, prompt: Prompt | None) -> None:
-        """Refresh the workspace template preview widget for the selected prompt."""
-        if self._template_preview_controller is None:
+        controller = self._workspace_history_controller
+        if controller is None:
             return
-        self._template_preview_controller.update_preview(prompt)
+        controller.select_prompt(prompt_id)
 
     def _on_template_run_state_changed(self, can_run: bool) -> None:
         """Synchronise the Template tab shortcut button with preview availability."""
