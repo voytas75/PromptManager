@@ -1,6 +1,7 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.15.77 - 2025-12-01 - Extract prompt list coordinator for loading/filtering/sorting logic.
   v0.15.76 - 2025-12-01 - Delegate layout persistence to WindowStateManager helper.
   v0.15.75 - 2025-11-30 - Extract toolbar and filter panels into reusable widgets.
   v0.15.74 - 2025-11-30 - Extract execution and chat controller plus delegate workspace actions.
@@ -27,9 +28,7 @@ import json
 import logging
 import uuid
 from collections import deque
-from dataclasses import dataclass
 from datetime import UTC, datetime
-from enum import Enum
 from functools import partial
 from pathlib import Path
 from typing import (
@@ -112,6 +111,7 @@ from .layout_state import WindowStateManager
 from .main_view_builder import MainViewCallbacks, MainViewComponents, build_main_view
 from .notifications import BackgroundTaskCenterDialog, QtNotificationBridge
 from .processing_indicator import ProcessingIndicator
+from .prompt_list_coordinator import PromptListCoordinator, PromptLoadResult, PromptSortOrder
 from .prompt_list_model import PromptListModel
 from .prompt_templates_dialog import PromptTemplateEditorDialog
 from .settings_dialog import SettingsDialog, persist_settings_to_config
@@ -133,16 +133,6 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
 logger = logging.getLogger(__name__)
 
 _CHAT_PALETTE_KEYS = {"user", "assistant"}
-
-
-@dataclass(slots=True)
-class _PromptLoadResult:
-    """Fetched prompt data assembled from repository and optional search."""
-
-    all_prompts: list[Prompt]
-    search_results: list[Prompt] | None
-    preserve_search_order: bool
-    search_error: str | None
 
 
 def _match_category_label(
@@ -214,19 +204,6 @@ def palette_differs_from_defaults(palette: Mapping[str, str] | None) -> bool:
     return False
 
 
-class PromptSortOrder(Enum):
-    """Supported sorting orders for the prompt list view."""
-
-    NAME_ASC = "name_asc"
-    NAME_DESC = "name_desc"
-    QUALITY_DESC = "quality_desc"
-    MODIFIED_DESC = "modified_desc"
-    CREATED_DESC = "created_desc"
-    BODY_SIZE_DESC = "body_size_desc"
-    RATING_DESC = "rating_desc"
-    USAGE_DESC = "usage_desc"
-
-
 class MainWindow(QMainWindow):
     """Primary window exposing prompt CRUD operations."""
 
@@ -251,6 +228,7 @@ class MainWindow(QMainWindow):
         super().__init__(parent)
         self._manager = prompt_manager
         self._settings = settings
+        self._prompt_coordinator = PromptListCoordinator(self._manager)
         self._model = PromptListModel(parent=self)
         self._detail_widget = PromptDetailWidget(self)
         self._detail_widget.delete_requested.connect(self._on_delete_clicked)  # type: ignore[arg-type]
@@ -620,7 +598,7 @@ class MainWindow(QMainWindow):
     def _load_prompts(self, search_text: str = "") -> None:
         """Populate the list model from the repository or semantic search."""
         try:
-            result = self._fetch_prompt_load_result(search_text)
+            result = self._prompt_coordinator.fetch_prompts(search_text)
         except RepositoryError as exc:
             self._show_error("Unable to load prompts", str(exc))
             return
@@ -632,7 +610,7 @@ class MainWindow(QMainWindow):
             self._toolbar.set_search_enabled(False)
         try:
             result = ProcessingIndicator(self, "Searching prompts…", title="Searching Prompts").run(
-                self._fetch_prompt_load_result,
+                self._prompt_coordinator.fetch_prompts,
                 search_text,
             )
         except RepositoryError as exc:
@@ -643,34 +621,19 @@ class MainWindow(QMainWindow):
                 self._toolbar.set_search_enabled(True)
         self._apply_prompt_load_result(result)
 
-    def _fetch_prompt_load_result(self, search_text: str) -> _PromptLoadResult:
-        """Return prompt data queried from the repository and optional search."""
-        stripped = search_text.strip()
-        all_prompts = list(self._manager.repository.list())
-        search_results: list[Prompt] | None = None
-        search_error: str | None = None
-        preserve_order = False
-
-        if stripped:
-            try:
-                search_results = list(self._manager.search_prompts(stripped, limit=50))
-            except PromptManagerError as exc:
-                search_error = str(exc)
-            else:
-                preserve_order = True
-
-        return _PromptLoadResult(
-            all_prompts=all_prompts,
-            search_results=search_results,
-            preserve_search_order=preserve_order,
-            search_error=search_error,
-        )
-
-    def _apply_prompt_load_result(self, result: _PromptLoadResult) -> None:
+    def _apply_prompt_load_result(self, result: PromptLoadResult) -> None:
         """Update UI models based on fetched prompt data."""
         self._all_prompts = list(result.all_prompts)
         self._preserve_search_order = result.preserve_search_order
-        self._populate_filters(self._all_prompts)
+        (
+            self._pending_category_slug,
+            self._pending_tag_value,
+        ) = self._prompt_coordinator.populate_filters(
+            self._filter_panel,
+            self._all_prompts,
+            pending_category_slug=self._pending_category_slug,
+            pending_tag_value=self._pending_tag_value,
+        )
 
         if result.search_error:
             self._show_error("Unable to search prompts", result.search_error)
@@ -681,7 +644,9 @@ class MainWindow(QMainWindow):
             self._suggestions = None
             self._current_prompts = list(result.search_results)
 
-            filtered = self._apply_filters(self._current_prompts)
+            filtered = self._prompt_coordinator.apply_filters(
+                self._filter_panel, self._current_prompts
+            )
             # Do **not** apply additional sorting – relevance order matters.
             self._model.set_prompts(filtered)
             self._list_view.clearSelection()
@@ -695,40 +660,13 @@ class MainWindow(QMainWindow):
         self._suggestions = None
         self._current_prompts = list(self._all_prompts)
 
-        filtered = self._apply_filters(self._current_prompts)
-        sorted_prompts = self._sort_prompts(filtered)
+        filtered = self._prompt_coordinator.apply_filters(self._filter_panel, self._current_prompts)
+        sorted_prompts = self._prompt_coordinator.sort_prompts(filtered, self._sort_order)
         self._model.set_prompts(sorted_prompts)
         self._list_view.clearSelection()
         if not sorted_prompts:
             self._detail_widget.clear()
         self._update_intent_hint(sorted_prompts)
-
-    def _populate_filters(self, prompts: Sequence[Prompt]) -> None:
-        """Refresh category and tag filters based on available prompts."""
-        self._populate_category_filter()
-        self._populate_tag_filter(prompts)
-
-    def _populate_category_filter(self) -> None:
-        """Populate the category filter from the registry."""
-        panel = self._filter_panel
-        if panel is None:
-            return
-        categories = self._manager.list_categories()
-        target_category = panel.category_slug() or self._pending_category_slug
-        panel.set_categories(categories, target_category)
-        if target_category and panel.category_slug() == target_category:
-            self._pending_category_slug = None
-
-    def _populate_tag_filter(self, prompts: Sequence[Prompt]) -> None:
-        """Populate the tag filter options."""
-        panel = self._filter_panel
-        if panel is None:
-            return
-        tags = sorted({tag for prompt in prompts for tag in prompt.tags})
-        target_tag = panel.tag_value() or self._pending_tag_value
-        panel.set_tags(tags, target_tag)
-        if target_tag and panel.tag_value() == target_tag:
-            self._pending_tag_value = None
 
     def _on_manage_categories_clicked(self) -> None:
         """Open the category management dialog."""
@@ -738,113 +676,6 @@ class MainWindow(QMainWindow):
             self._load_prompts(self._current_search_text())
         else:
             self._populate_category_filter()
-
-    @staticmethod
-    def _prompt_category_slug(prompt: Prompt) -> str | None:
-        """Return the prompt's category slug, deriving it when missing."""
-        if prompt.category_slug:
-            return prompt.category_slug
-        return slugify_category(prompt.category)
-
-    @staticmethod
-    def _prompt_body_length(prompt: Prompt) -> int:
-        """Return the length of the prompt body used for embedding/search."""
-        payload = prompt.context or prompt.description or ""
-        return len(payload)
-
-    @staticmethod
-    def _prompt_average_rating(prompt: Prompt) -> float:
-        """Return the average rating for a prompt, defaulting to zero."""
-        if prompt.rating_count and prompt.rating_sum is not None:
-            try:
-                return float(prompt.rating_sum) / float(prompt.rating_count)
-            except ZeroDivisionError:  # pragma: no cover - defensive
-                return 0.0
-        return 0.0
-
-    def _apply_filters(self, prompts: Sequence[Prompt]) -> list[Prompt]:
-        """Apply category, tag, and quality filters to a prompt sequence."""
-        panel = self._filter_panel
-        selected_category = panel.category_slug() if panel is not None else None
-        selected_tag = panel.tag_value() if panel is not None else None
-        min_quality = panel.min_quality() if panel is not None else 0.0
-
-        filtered: list[Prompt] = []
-        for prompt in prompts:
-            if selected_category:
-                prompt_slug = self._prompt_category_slug(prompt)
-                if prompt_slug != selected_category:
-                    continue
-            if selected_tag and selected_tag not in prompt.tags:
-                continue
-            if min_quality > 0.0:
-                quality = prompt.quality_score or 0.0
-                if quality < min_quality:
-                    continue
-            filtered.append(prompt)
-        return filtered
-
-    def _sort_prompts(self, prompts: Sequence[Prompt]) -> list[Prompt]:
-        """Return prompts sorted according to the active sort order."""
-        if not prompts:
-            return []
-
-        order = self._sort_order
-        if order is PromptSortOrder.NAME_ASC:
-            return sorted(prompts, key=lambda prompt: (prompt.name.casefold(), str(prompt.id)))
-        if order is PromptSortOrder.NAME_DESC:
-            return sorted(
-                prompts,
-                key=lambda prompt: (prompt.name.casefold(), str(prompt.id)),
-                reverse=True,
-            )
-        if order is PromptSortOrder.QUALITY_DESC:
-
-            def quality_key(prompt: Prompt) -> tuple[float, str, str]:
-                quality = (
-                    prompt.quality_score if prompt.quality_score is not None else float("-inf")
-                )
-                return (-quality, prompt.name.casefold(), str(prompt.id))
-
-            return sorted(prompts, key=quality_key)
-        if order is PromptSortOrder.MODIFIED_DESC:
-
-            def modified_key(prompt: Prompt) -> tuple[float, str, str]:
-                timestamp = prompt.last_modified.timestamp() if prompt.last_modified else 0.0
-                return (-timestamp, prompt.name.casefold(), str(prompt.id))
-
-            return sorted(prompts, key=modified_key)
-        if order is PromptSortOrder.CREATED_DESC:
-
-            def created_key(prompt: Prompt) -> tuple[float, str, str]:
-                timestamp = prompt.created_at.timestamp() if prompt.created_at else 0.0
-                return (-timestamp, prompt.name.casefold(), str(prompt.id))
-
-            return sorted(prompts, key=created_key)
-        if order is PromptSortOrder.BODY_SIZE_DESC:
-
-            def body_size_key(prompt: Prompt) -> tuple[int, str, str]:
-                length = self._prompt_body_length(prompt)
-                return (-length, prompt.name.casefold(), str(prompt.id))
-
-            return sorted(prompts, key=body_size_key)
-        if order is PromptSortOrder.RATING_DESC:
-
-            def rating_key(prompt: Prompt) -> tuple[float, int, str, str]:
-                average = self._prompt_average_rating(prompt)
-                count = prompt.rating_count
-                return (-average, -(count or 0), prompt.name.casefold(), str(prompt.id))
-
-            return sorted(prompts, key=rating_key)
-        if order is PromptSortOrder.USAGE_DESC:
-
-            def usage_key(prompt: Prompt) -> tuple[int, float, str, str]:
-                usage = prompt.usage_count
-                modified = prompt.last_modified.timestamp() if prompt.last_modified else 0.0
-                return (-(usage or 0), -modified, prompt.name.casefold(), str(prompt.id))
-
-            return sorted(prompts, key=usage_key)
-        return list(prompts)
 
     def _on_filters_changed(self, *_: object) -> None:
         """Refresh the prompt list when filter widgets change."""
@@ -862,8 +693,8 @@ class MainWindow(QMainWindow):
             return
         selected_prompt = self._current_prompt()
         self._sort_order = sort_order
-        filtered = self._apply_filters(self._current_prompts)
-        sorted_prompts = self._sort_prompts(filtered)
+        filtered = self._prompt_coordinator.apply_filters(self._filter_panel, self._current_prompts)
+        sorted_prompts = self._prompt_coordinator.sort_prompts(filtered, self._sort_order)
         self._model.set_prompts(sorted_prompts)
         if selected_prompt and any(prompt.id == selected_prompt.id for prompt in sorted_prompts):
             self._select_prompt(selected_prompt.id)
@@ -875,8 +706,12 @@ class MainWindow(QMainWindow):
         self._persist_sort_preference()
 
     def _refresh_filtered_view(self, *, preserve_order: bool = False) -> None:
-        filtered = self._apply_filters(self._current_prompts)
-        prompts_to_show = filtered if preserve_order else self._sort_prompts(filtered)
+        filtered = self._prompt_coordinator.apply_filters(self._filter_panel, self._current_prompts)
+        prompts_to_show = (
+            filtered
+            if preserve_order
+            else self._prompt_coordinator.sort_prompts(filtered, self._sort_order)
+        )
         self._model.set_prompts(prompts_to_show)
         self._list_view.clearSelection()
         if not prompts_to_show:
@@ -914,8 +749,8 @@ class MainWindow(QMainWindow):
             self._select_prompt(prompt_id)
             return
 
-        filtered = self._apply_filters(self._current_prompts)
-        sorted_prompts = self._sort_prompts(filtered)
+        filtered = self._prompt_coordinator.apply_filters(self._filter_panel, self._current_prompts)
+        sorted_prompts = self._prompt_coordinator.sort_prompts(filtered, self._sort_order)
         self._model.set_prompts(sorted_prompts)
         if sorted_prompts:
             self._update_intent_hint(sorted_prompts)
@@ -1097,10 +932,18 @@ class MainWindow(QMainWindow):
             return
 
         self._suggestions = None
-        self._populate_filters(prompts)
+        (
+            self._pending_category_slug,
+            self._pending_tag_value,
+        ) = self._prompt_coordinator.populate_filters(
+            self._filter_panel,
+            prompts,
+            pending_category_slug=self._pending_category_slug,
+            pending_tag_value=self._pending_tag_value,
+        )
         self._current_prompts = list(prompts)
-        filtered = self._apply_filters(self._current_prompts)
-        sorted_prompts = self._sort_prompts(filtered)
+        filtered = self._prompt_coordinator.apply_filters(self._filter_panel, self._current_prompts)
+        sorted_prompts = self._prompt_coordinator.sort_prompts(filtered, self._sort_order)
         self._model.set_prompts(sorted_prompts)
         self._select_prompt(selected_prompt.id)
         self._detail_widget.display_prompt(selected_prompt)
@@ -1709,7 +1552,7 @@ class MainWindow(QMainWindow):
         self._suggestions = None
         self._current_prompts = list(recommendations)
         self._preserve_search_order = True
-        filtered = self._apply_filters(self._current_prompts)
+        filtered = self._prompt_coordinator.apply_filters(self._filter_panel, self._current_prompts)
         self._model.set_prompts(filtered)
         self._list_view.clearSelection()
         if filtered:
@@ -1747,8 +1590,8 @@ class MainWindow(QMainWindow):
         """Apply intent suggestions to the list view and update filters."""
         self._suggestions = suggestions
         self._current_prompts = list(suggestions.prompts)
-        filtered = self._apply_filters(self._current_prompts)
-        sorted_prompts = self._sort_prompts(filtered)
+        filtered = self._prompt_coordinator.apply_filters(self._filter_panel, self._current_prompts)
+        sorted_prompts = self._prompt_coordinator.sort_prompts(filtered, self._sort_order)
         self._model.set_prompts(sorted_prompts)
         self._list_view.clearSelection()
         if sorted_prompts:
