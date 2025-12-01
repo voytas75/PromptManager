@@ -1,6 +1,8 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.15.81 - 2025-12-01 - Extracted bootstrapper, binder, generation, search,
+    and workspace controllers to trim MainWindow.
   v0.15.80 - 2025-12-01 - Modularized layout, workspace, template preview,
     notifications, and prompt actions into dedicated controllers.
   v0.15.79 - 2025-12-01 - Delegated theme/palette, runtime settings, catalog,
@@ -30,15 +32,12 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from functools import partial
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QModelIndex, QPoint, QSettings
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
     QFrame,
-    QLabel,
     QListView,
     QMainWindow,
     QMessageBox,
@@ -59,53 +58,45 @@ from core import (
     PromptVersionError,
     RepositoryError,
 )
-from core.sharing import ShareTextProvider
 from models.category_model import PromptCategory, slugify_category
 
-from .appearance_controller import AppearanceController
-from .catalog_workflow_controller import CatalogWorkflowController
-from .code_highlighter import CodeHighlighter
 from .controllers.execution_controller import ExecutionController
-from .dialogs import (
-    CategoryManagerDialog,
-    InfoDialog,
-    PromptVersionHistoryDialog,
-)
+from .dialogs import InfoDialog, PromptVersionHistoryDialog
 from .language_tools import DetectedLanguage, detect_language
-from .layout_controller import LayoutController
-from .layout_state import WindowStateManager
-from .main_view_builder import MainViewCallbacks, MainViewComponents, build_main_view
+from .main_view_binder import MainViewBinderConfig, bind_main_view
+from .main_view_builder import MainViewCallbacks, build_main_view
+from .main_window_bootstrapper import DetailWidgetCallbacks, MainWindowBootstrapper
 from .notification_controller import NotificationController
-from .prompt_actions_controller import PromptActionsController
-from .prompt_editor_flow import PromptDialogFactory, PromptEditorFlow
-from .prompt_list_coordinator import PromptListCoordinator, PromptSortOrder
-from .prompt_list_model import PromptListModel
+from .prompt_generation_service import PromptGenerationService
+from .prompt_list_coordinator import PromptSortOrder
 from .prompt_list_presenter import PromptListCallbacks, PromptListPresenter
+from .prompt_search_controller import PromptSearchController
 from .prompt_templates_dialog import PromptTemplateEditorDialog
 from .quick_action_controller import QuickActionController
-from .runtime_settings_service import RuntimeSettingsResult, RuntimeSettingsService
+from .runtime_settings_service import RuntimeSettingsResult
 from .settings_dialog import SettingsDialog
-from .share_controller import ShareController
-from .share_workflow import ShareWorkflowCoordinator
-from .template_preview_controller import TemplatePreviewController
 from .toast import show_toast
-from .usage_logger import IntentUsageLogger
-from .widgets import PromptDetailWidget, PromptFilterPanel, PromptToolbar
 from .workbench.workbench_window import WorkbenchModeDialog, WorkbenchWindow
-from .workspace_actions_controller import WorkspaceActionsController
-from .workspace_view_controller import WorkspaceViewController
+from .workspace_command_router import WorkspaceCommandRouter
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from collections.abc import Sequence
     from uuid import UUID
 
+    from PySide6.QtCore import QModelIndex, QPoint
     from PySide6.QtGui import QResizeEvent, QShowEvent
 
-    from core.prompt_engineering import PromptRefinement
     from models.prompt_model import Prompt
 
+    from .catalog_workflow_controller import CatalogWorkflowController
+    from .prompt_actions_controller import PromptActionsController
+    from .prompt_editor_flow import PromptDialogFactory, PromptEditorFlow
     from .result_overlay import ResultActionsOverlay
     from .template_preview import TemplatePreviewWidget
+    from .template_preview_controller import TemplatePreviewController
+    from .widgets import PromptDetailWidget, PromptFilterPanel, PromptToolbar
+    from .workspace_actions_controller import WorkspaceActionsController
+    from .workspace_view_controller import WorkspaceViewController
 
 logger = logging.getLogger(__name__)
 
@@ -161,78 +152,101 @@ class MainWindow(QMainWindow):
         super().__init__(parent)
         self._manager = prompt_manager
         self._settings = settings
-        self._prompt_coordinator = PromptListCoordinator(self._manager)
         self._prompt_presenter: PromptListPresenter | None = None
         self._prompt_editor_factory: PromptDialogFactory | None = None
         self._prompt_editor_flow: PromptEditorFlow | None = None
+        self._catalog_controller: CatalogWorkflowController | None = None
         self._quick_action_controller: QuickActionController | None = None
-        self._model = PromptListModel(parent=self)
-        self._detail_widget = PromptDetailWidget(self)
-        self._detail_widget.delete_requested.connect(self._on_delete_clicked)  # type: ignore[arg-type]
-        self._detail_widget.edit_requested.connect(self._on_edit_clicked)  # type: ignore[arg-type]
-        self._detail_widget.version_history_requested.connect(self._open_version_history_dialog)  # type: ignore[arg-type]
-        self._detail_widget.fork_requested.connect(self._on_fork_clicked)  # type: ignore[arg-type]
-        self._detail_widget.refresh_scenarios_requested.connect(  # type: ignore[arg-type]
-            partial(self._handle_refresh_scenarios_request, self._detail_widget)
-        )
-        self._detail_widget.share_requested.connect(self._on_share_prompt_requested)  # type: ignore[arg-type]
-        self._search_active: bool = False
-        self._toolbar: PromptToolbar | None = None
-        self._filter_panel: PromptFilterPanel | None = None
-        self._sort_order = PromptSortOrder.NAME_ASC
-        self._history_limit = 50
-        self._runtime_settings_service = RuntimeSettingsService(self._manager, settings)
-        self._runtime_settings = self._runtime_settings_service.build_initial_runtime_settings()
-        self._appearance_controller = AppearanceController(self, self._runtime_settings)
-        self._usage_logger = IntentUsageLogger()
-        self._detected_language: DetectedLanguage = detect_language("")
+        self._workspace_view: WorkspaceViewController | None = None
+        self._workspace_actions: WorkspaceActionsController | None = None
+        self._workspace_router = WorkspaceCommandRouter(lambda: self._workspace_actions)
+        self._prompt_actions_controller: PromptActionsController | None = None
+        self._template_preview_controller: TemplatePreviewController | None = None
         self._execution_controller: ExecutionController | None = None
-        self._render_markdown_checkbox: QCheckBox | None = None
+        self._history_limit = 50
+        self._sort_order = PromptSortOrder.NAME_ASC
+        self._detected_language: DetectedLanguage = detect_language("")
+        self._share_result_button: QPushButton | None = None
         self._query_input: QPlainTextEdit | None = None
+        self._render_markdown_checkbox: QCheckBox | None = None
         self._template_preview: TemplatePreviewWidget | None = None
         self._template_list_view: QListView | None = None
         self._template_detail_widget: PromptDetailWidget | None = None
         self._template_run_shortcut_button: QPushButton | None = None
         self._result_overlay: ResultActionsOverlay | None = None
         self._tab_widget: QTabWidget | None = None
-        self._workspace_view: WorkspaceViewController | None = None
-        self._template_preview_controller: TemplatePreviewController | None = None
-        self._workspace_actions: WorkspaceActionsController | None = None
-        self._prompt_actions_controller: PromptActionsController | None = None
-        self._share_controller = ShareController(
-            self,
+        self._toolbar: PromptToolbar | None = None
+        self._filter_panel: PromptFilterPanel | None = None
+        self._main_container: QFrame | None = None
+        self._notification_controller: NotificationController | None = None
+        self._workbench_windows: list[WorkbenchWindow] = []
+
+        detail_callbacks = DetailWidgetCallbacks(
+            delete_requested=self._on_delete_clicked,
+            edit_requested=self._on_edit_clicked,
+            version_history_requested=self._open_version_history_dialog,
+            fork_requested=self._on_fork_clicked,
+            refresh_scenarios_requested=self._handle_refresh_scenarios_request,
+            share_requested=self._on_share_prompt_requested,
+        )
+        bootstrapper = MainWindowBootstrapper(
+            parent=self,
+            manager=self._manager,
+            settings=settings,
+            detail_callbacks=detail_callbacks,
             toast_callback=self._show_toast,
             status_callback=self._show_status_message,
             error_callback=self._show_error,
-            usage_logger=self._usage_logger,
-        )
-        self._share_result_button: QPushButton | None = None
-        self._share_workflow = ShareWorkflowCoordinator(
-            self._share_controller,
-            detail_widget=self._detail_widget,
-            prompt_supplier=self._detail_widget.current_prompt,
-            share_button_supplier=self._detail_widget.share_button,
             share_result_button_supplier=lambda: self._share_result_button,
             execution_controller_supplier=lambda: self._execution_controller,
+        )
+        bootstrap = bootstrapper.bootstrap()
+        self._model = bootstrap.model
+        self._detail_widget = bootstrap.detail_widget
+        self._prompt_coordinator = bootstrap.prompt_coordinator
+        self._usage_logger = bootstrap.usage_logger
+        self._share_controller = bootstrap.share_controller
+        self._share_workflow = bootstrap.share_workflow
+        self._layout_state = bootstrap.layout_state
+        self._layout_controller = bootstrap.layout_controller
+        self._runtime_settings_service = bootstrap.runtime_settings_service
+        self._runtime_settings = bootstrap.runtime_settings
+        self._appearance_controller = bootstrap.appearance_controller
+        self._notification_indicator = bootstrap.notification_indicator
+
+        self._prompt_generation_service = PromptGenerationService(
+            manager=self._manager,
+            execute_context_handler=lambda prompt, dlg, context: self._execute_prompt_as_context(
+                prompt,
+                parent=dlg,
+                context_override=context,
+            ),
+            load_prompts=self._load_prompts,
+            current_search_text=self._current_search_text,
+            select_prompt=self._select_prompt,
+            delete_prompt=self._delete_prompt,
             status_callback=self._show_status_message,
             error_callback=self._show_error,
+            current_prompt_supplier=self._current_prompt,
+            open_version_history_dialog=self._open_version_history_dialog,
         )
-        self._workbench_windows: list[WorkbenchWindow] = []
-        self._share_workflow.register_provider(ShareTextProvider())
-        settings = QSettings("PromptManager", "MainWindow")
-        self._layout_state = WindowStateManager(settings)
-        self._layout_controller = LayoutController(self._layout_state)
+        self._prompt_search_controller = PromptSearchController(
+            parent=self,
+            manager=self._manager,
+            presenter_supplier=lambda: self._prompt_presenter,
+            filter_panel_supplier=lambda: self._filter_panel,
+            layout_controller=self._layout_controller,
+            load_prompts=self._load_prompts,
+            current_search_text=self._current_search_text,
+            select_prompt=self._select_prompt,
+        )
+
         filter_prefs = self._layout_state.load_filter_preferences()
         pending_category_slug = filter_prefs.category_slug
         pending_tag_value = filter_prefs.tag
         pending_quality_value = filter_prefs.min_quality
         stored_sort_value = filter_prefs.sort_value
-        self._main_container: QFrame | None = None
-        self._notification_indicator = QLabel("", self)
-        self._notification_indicator.setObjectName("notificationIndicator")
-        self._notification_indicator.setStyleSheet("color: #2f80ed; font-weight: 500;")
-        self._notification_indicator.setVisible(False)
-        self._notification_controller: NotificationController | None = None
+
         self.setWindowTitle("Prompt Manager")
         self._layout_state.restore_window_geometry(self)
         self._build_ui()
@@ -280,7 +294,7 @@ class MainWindow(QMainWindow):
             quick_actions_config=self._runtime_settings.get("quick_actions"),
         )
         self._quick_action_controller.sync_button()
-        self._initialize_prompt_editor_helpers()
+        self._rebuild_prompt_generation_components()
         self._execution_controller = ExecutionController(
             manager=self._manager,
             runtime_settings=self._runtime_settings,
@@ -315,8 +329,10 @@ class MainWindow(QMainWindow):
     def _build_ui(self) -> None:
         """Create the main layout with list/search/detail panes."""
         callbacks = MainViewCallbacks(
-            search_requested=self._on_search_button_clicked,
-            search_text_changed=self._on_search_changed,
+            search_requested=lambda text=None: self._prompt_search_controller.search_requested(
+                text, use_indicator=True
+            ),
+            search_text_changed=self._prompt_search_controller.search_changed,
             refresh_requested=self._on_refresh_clicked,
             add_requested=self._on_add_clicked,
             workbench_requested=self._on_workbench_clicked,
@@ -340,8 +356,8 @@ class MainWindow(QMainWindow):
             copy_result_to_text_window_clicked=self._on_copy_result_to_text_window_clicked,
             save_result_clicked=self._on_save_result_clicked,
             share_result_clicked=self._on_share_result_clicked,
-            filters_changed=self._on_filters_changed,
-            sort_changed=self._on_sort_changed,
+            filters_changed=self._prompt_search_controller.filters_changed,
+            sort_changed=self._prompt_search_controller.sort_changed,
             manage_categories_clicked=self._on_manage_categories_clicked,
             query_text_changed=self._on_query_text_changed,
             tab_changed=self._on_tab_changed,
@@ -369,23 +385,24 @@ class MainWindow(QMainWindow):
             history_note_callback=self._handle_note_update,
             history_export_callback=self._handle_history_export,
         )
-        self._assign_main_view_components(components)
-        self._workspace_actions = WorkspaceActionsController(
-            parent=self,
+        binder_config = MainViewBinderConfig(
+            layout_controller=self._layout_controller,
+            layout_state=self._layout_state,
             manager=self._manager,
-            query_input=self._query_input,
-            execution_controller_supplier=lambda: self._execution_controller,
-            current_prompt_supplier=self._current_prompt,
-            prompt_list_supplier=lambda: self._model.prompts(),
-            workspace_view=self._workspace_view,
-            history_panel=self._history_panel,
+            model=self._model,
+            detail_widget=self._detail_widget,
             usage_logger=self._usage_logger,
             status_callback=self._show_status_message,
             error_callback=self._show_error,
-            disable_save_button=lambda enabled: self._save_button.setEnabled(enabled),
-            refresh_prompt_after_rating=self._refresh_prompt_after_rating,
+            toast_callback=self._show_toast,
+            current_prompt_supplier=self._current_prompt,
+            execution_controller_supplier=lambda: self._execution_controller,
+            quick_action_controller_supplier=lambda: self._quick_action_controller,
+            refresh_prompt_after_rating=self._prompt_search_controller.refresh_prompt_after_rating,
             execute_from_prompt_body=self._execute_prompt_from_context_menu,
         )
+        bind_main_view(self, components=components, config=binder_config)
+        self._workspace_router = WorkspaceCommandRouter(lambda: self._workspace_actions)
         self._appearance_controller.set_container(self._main_container)
         self._update_detected_language(self._query_input.toPlainText(), force=True)
         self.setCentralWidget(self._main_container)
@@ -400,114 +417,6 @@ class MainWindow(QMainWindow):
         self._share_result_button.setEnabled(False)
         self._continue_chat_button.setEnabled(False)
         self._end_chat_button.setEnabled(False)
-
-    def _assign_main_view_components(self, components: MainViewComponents) -> None:
-        """Store widget references built by ``build_main_view``."""
-        self._main_container = components.container
-        self._toolbar = components.toolbar
-        self._language_label = components.language_label
-        self._quick_actions_button = components.quick_actions_button
-        self._quick_actions_button_default_text = (
-            components.quick_actions_button_default_text
-        )
-        self._quick_actions_button_default_tooltip = (
-            components.quick_actions_button_default_tooltip
-        )
-        self._quick_actions_button.setToolTip(self._quick_actions_button_default_tooltip)
-        self._detect_button = components.detect_button
-        self._suggest_button = components.suggest_button
-        self._run_button = components.run_button
-        self._clear_button = components.clear_button
-        self._continue_chat_button = components.continue_chat_button
-        self._end_chat_button = components.end_chat_button
-        self._copy_button = components.copy_button
-        self._copy_result_button = components.copy_result_button
-        self._copy_result_to_text_window_button = (
-            components.copy_result_to_text_window_button
-        )
-        self._save_button = components.save_button
-        self._share_result_button = components.share_result_button
-        self._intent_hint = components.intent_hint
-        self._filter_panel = components.filter_panel
-        self._query_input = components.query_input
-        self._highlighter = CodeHighlighter(self._query_input.document())
-        self._tab_widget = components.tab_widget
-        main_splitter = components.main_splitter
-        if main_splitter is not None:
-            main_splitter.splitterMoved.connect(  # type: ignore[arg-type]
-                lambda *_: self._layout_controller.handle_main_splitter_moved()
-            )
-        self._layout_controller.configure(
-            main_splitter=main_splitter,
-            list_splitter=components.list_splitter,
-            workspace_splitter=components.workspace_splitter,
-            template_preview_splitter=components.template_preview_splitter,
-            template_preview_list_splitter=components.template_preview_list_splitter,
-            template_preview=components.template_preview,
-            filter_panel=components.filter_panel,
-            toolbar=components.toolbar,
-        )
-        self._list_view = components.list_view
-        self._result_label = components.result_label
-        self._result_meta = components.result_meta
-        self._result_tabs = components.result_tabs
-        self._workspace_view = WorkspaceViewController(
-            self._query_input,
-            self._result_tabs,
-            self._intent_hint,
-            status_callback=self._show_status_message,
-            execution_controller_supplier=lambda: self._execution_controller,
-            quick_action_controller_supplier=lambda: self._quick_action_controller,
-        )
-        self._prompt_actions_controller = PromptActionsController(
-            parent=self,
-            model=self._model,
-            list_view=self._list_view,
-            query_input=self._query_input,
-            layout_state=self._layout_state,
-            workspace_view=self._workspace_view,
-            execution_controller_supplier=lambda: self._execution_controller,
-            current_prompt_supplier=self._current_prompt,
-            edit_callback=self._on_edit_clicked,
-            duplicate_callback=self._duplicate_prompt,
-            fork_callback=self._fork_prompt,
-            similar_callback=self._show_similar_prompts,
-            status_callback=self._show_status_message,
-            error_callback=self._show_error,
-            toast_callback=self._show_toast,
-            usage_logger=self._usage_logger,
-        )
-        self._result_text = components.result_text
-        self._result_overlay = components.result_overlay
-        self._chat_history_view = components.chat_history_view
-        self._render_markdown_checkbox = components.render_markdown_checkbox
-        self._history_panel = components.history_panel
-        self._notes_panel = components.notes_panel
-        self._response_styles_panel = components.response_styles_panel
-        self._analytics_panel = components.analytics_panel
-        self._template_list_view = components.template_list_view
-        self._template_detail_widget = components.template_detail_widget
-        self._template_preview = components.template_preview
-        self._template_run_shortcut_button = components.template_run_shortcut_button
-        self._template_detail_widget.delete_requested.connect(self._on_delete_clicked)  # type: ignore[arg-type]
-        self._template_detail_widget.edit_requested.connect(self._on_edit_clicked)  # type: ignore[arg-type]
-        self._template_detail_widget.version_history_requested.connect(
-            self._open_version_history_dialog
-        )  # type: ignore[arg-type]
-        self._template_detail_widget.fork_requested.connect(self._on_fork_clicked)  # type: ignore[arg-type]
-        self._template_detail_widget.refresh_scenarios_requested.connect(  # type: ignore[arg-type]
-            partial(self._handle_refresh_scenarios_request, self._template_detail_widget)
-        )
-        self._template_preview_controller = TemplatePreviewController(
-            parent=self,
-            tab_widget=self._tab_widget,
-            template_preview=self._template_preview,
-            template_run_button=self._template_run_shortcut_button,
-            execution_controller_supplier=lambda: self._execution_controller,
-            current_prompt_supplier=self._current_prompt,
-            error_callback=self._show_error,
-            status_callback=self._show_status_message,
-        )
 
     def _initialize_notification_controller(self) -> None:
         """Wire the notification bridge and seed the indicator state."""
@@ -527,14 +436,6 @@ class MainWindow(QMainWindow):
     def _save_splitter_state(self) -> None:
         """Persist splitter sizes for future sessions."""
         self._layout_controller.save_splitter_state()
-
-    def _persist_filter_preferences(self) -> None:
-        """Persist the current category, tag, and quality filters."""
-        self._layout_controller.persist_filter_preferences()
-
-    def _persist_sort_preference(self) -> None:
-        """Persist the currently selected sort order."""
-        self._layout_controller.persist_sort_preference(self._sort_order)
 
     def _current_search_text(self) -> str:
         """Return the current text in the toolbar search field."""
@@ -559,49 +460,11 @@ class MainWindow(QMainWindow):
 
     def _on_manage_categories_clicked(self) -> None:
         """Open the category management dialog."""
-        dialog = CategoryManagerDialog(self._manager, self)
-        dialog.exec()
-        if dialog.has_changes:
-            self._load_prompts(self._current_search_text())
-        else:
-            self._populate_category_filter()
-
-    def _on_filters_changed(self, *_: object) -> None:
-        """Refresh the prompt list when filter widgets change."""
-        if self._prompt_presenter is not None:
-            self._prompt_presenter.refresh_filtered_view()
-        self._persist_filter_preferences()
-
-    def _on_sort_changed(self, raw_order: str) -> None:
-        """Re-sort the prompt list when the sort selection changes."""
-        try:
-            sort_order = PromptSortOrder(str(raw_order))
-        except ValueError:
-            logger.warning("Unknown sort order selection: %s", raw_order)
-            return
-        if sort_order is self._sort_order or self._prompt_presenter is None:
-            return
-        self._sort_order = sort_order
-        self._prompt_presenter.update_sort_order(sort_order)
-        self._persist_sort_preference()
-
-    def _refresh_prompt_after_rating(self, prompt_id: UUID) -> None:
-        """Refresh prompt collections and UI after capturing a rating."""
-        presenter = self._prompt_presenter
-        if presenter is None:
-            return
-        search_text = self._current_search_text().strip()
-        if search_text:
-            self._load_prompts(search_text)
-            self._select_prompt(prompt_id)
-            return
-        presenter.refresh_prompt_after_rating(prompt_id)
+        self._prompt_search_controller.manage_categories()
 
     def _handle_refresh_scenarios_request(self, detail_widget: PromptDetailWidget) -> None:
         """Regenerate persisted scenarios for the currently displayed prompt."""
-        if self._prompt_presenter is None:
-            return
-        self._prompt_presenter.handle_refresh_scenarios(detail_widget)
+        self._prompt_search_controller.handle_refresh_scenarios_request(detail_widget)
 
     def _update_intent_hint(self, prompts: Sequence[Prompt]) -> None:
         """Update the hint label with detected intent context and matches."""
@@ -671,183 +534,6 @@ class MainWindow(QMainWindow):
         if self._quick_action_controller is None:
             return
         self._quick_action_controller.show_command_palette()
-
-    def _initialize_prompt_editor_helpers(self) -> None:
-        if self._manager.prompt_engineer is not None:
-            prompt_engineer = self._refine_prompt_body
-        else:
-            prompt_engineer = None
-        if self._manager.prompt_structure_engineer is not None:
-            structure_refiner = self._refine_prompt_structure
-        else:
-            structure_refiner = None
-
-        def _execute_context_from_dialog(
-            prompt_obj: Prompt,
-            context_text: str,
-            dlg: QWidget | None,
-        ) -> None:
-            self._execute_prompt_as_context(
-                prompt_obj,
-                parent=dlg,
-                context_override=context_text,
-            )
-
-        def _reload_prompts(search_text: str) -> None:
-            self._load_prompts(search_text)
-
-        self._prompt_editor_factory = PromptDialogFactory(
-            manager=self._manager,
-            name_generator=self._generate_prompt_name,
-            description_generator=self._generate_prompt_description,
-            category_generator=self._generate_prompt_category,
-            tags_generator=self._generate_prompt_tags,
-            scenario_generator=self._generate_prompt_scenarios,
-            prompt_engineer=prompt_engineer,
-            structure_refiner=structure_refiner,
-            version_history_handler=self._open_version_history_dialog,
-            execute_context_handler=_execute_context_from_dialog,
-        )
-        self._prompt_editor_flow = PromptEditorFlow(
-            parent=self,
-            manager=self._manager,
-            dialog_factory=self._prompt_editor_factory,
-            load_prompts=_reload_prompts,
-            current_search_text=self._current_search_text,
-            select_prompt=self._select_prompt,
-            delete_prompt=self._delete_prompt,
-            status_callback=self._show_status_message,
-            error_callback=self._show_error,
-        )
-        self._catalog_controller = CatalogWorkflowController(
-            self,
-            self._manager,
-            load_prompts=self._load_prompts,
-            current_search_text=self._current_search_text,
-            select_prompt=self._select_prompt,
-            current_prompt=self._current_prompt,
-            show_status=self._show_status_message,
-            generate_category=self._generate_prompt_category,
-            generate_tags=self._generate_prompt_tags,
-        )
-
-    def _generate_prompt_name(self, context: str) -> str:
-        """Delegate name generation to PromptManager, surfacing errors."""
-        if not context.strip():
-            return ""
-        return self._manager.generate_prompt_name(context)
-
-    def _generate_prompt_description(self, context: str) -> str:
-        """Delegate description generation to PromptManager."""
-        if not context.strip():
-            return ""
-        return self._manager.generate_prompt_description(context)
-
-    def _generate_prompt_scenarios(self, context: str) -> list[str]:
-        """Delegate scenario generation to PromptManager."""
-        text = (context or "").strip()
-        if not text:
-            return []
-        return list(self._manager.generate_prompt_scenarios(text))
-
-    def _generate_prompt_category(self, context: str) -> str:
-        """Suggest a category using LiteLLM when configured, else fallback heuristics."""
-        text = (context or "").strip()
-        if not text:
-            return ""
-        try:
-            return self._manager.generate_prompt_category(text)
-        except PromptManagerError:
-            logger.debug("PromptManager category suggestion failed", exc_info=True)
-            return ""
-
-    def _generate_prompt_tags(self, context: str) -> list[str]:
-        """Suggest tags using the intent classifier and language heuristics."""
-        text = (context or "").strip()
-        if not text:
-            return []
-        tags: list[str] = []
-        classifier = self._manager.intent_classifier
-        if classifier is not None:
-            prediction = classifier.classify(text)
-            tags.extend(prediction.tag_hints)
-            tags.extend(prediction.language_hints)
-            default_tag_map = {
-                IntentLabel.ANALYSIS: "analysis",
-                IntentLabel.DEBUG: "debugging",
-                IntentLabel.REFACTOR: "refactor",
-                IntentLabel.ENHANCEMENT: "enhancement",
-                IntentLabel.DOCUMENTATION: "documentation",
-                IntentLabel.REPORTING: "reporting",
-                IntentLabel.GENERAL: "general",
-            }
-            default_tag = default_tag_map.get(prediction.label)
-            if default_tag:
-                tags.append(default_tag)
-        detected = detect_language(text)
-        if detected.code and detected.code not in {"", "plain"}:
-            tags.append(detected.code)
-        lowered = text.lower()
-        keyword_tags = {
-            "security": "security",
-            "performance": "performance",
-            "optimize": "optimization",
-            "refactor": "refactor",
-            "document": "documentation",
-            "explain": "explanation",
-            "bug": "bugfix",
-        }
-        for keyword, tag in keyword_tags.items():
-            if keyword in lowered:
-                tags.append(tag)
-        unique: list[str] = []
-        seen: set[str] = set()
-        for tag in tags:
-            normalized = tag.strip()
-            if not normalized:
-                continue
-            key = normalized.lower()
-            if key in seen:
-                continue
-            seen.add(key)
-            unique.append(normalized)
-        return unique[:8]
-
-    def _refine_prompt_body(
-        self,
-        prompt_text: str,
-        *,
-        name: str | None = None,
-        description: str | None = None,
-        category: str | None = None,
-        tags: Sequence[str] | None = None,
-    ) -> PromptRefinement:
-        """Delegate prompt refinement to PromptManager."""
-        return self._manager.refine_prompt_text(
-            prompt_text,
-            name=name,
-            description=description,
-            category=category,
-            tags=tags,
-        )
-
-    def _refine_prompt_structure(
-        self,
-        prompt_text: str,
-        *,
-        name: str | None = None,
-        description: str | None = None,
-        category: str | None = None,
-        tags: Sequence[str] | None = None,
-    ) -> PromptRefinement:
-        """Delegate structure-only prompt refinement to PromptManager."""
-        return self._manager.refine_prompt_structure(
-            prompt_text,
-            name=name,
-            description=description,
-            category=category,
-            tags=tags,
-        )
 
     def _on_detect_intent_clicked(self) -> None:
         """Run intent detection on the free-form query input."""
@@ -919,45 +605,31 @@ class MainWindow(QMainWindow):
 
     def _on_save_result_clicked(self) -> None:
         """Persist the latest execution result with optional user notes."""
-        if self._workspace_actions is None:
-            return
-        self._workspace_actions.save_result()
+        self._workspace_router.save_result()
 
     def _on_continue_chat_clicked(self) -> None:
         """Send a follow-up message within the active chat session."""
-        if self._workspace_actions is None:
-            return
-        self._workspace_actions.continue_chat()
+        self._workspace_router.continue_chat()
 
     def _on_end_chat_clicked(self) -> None:
         """Terminate the active chat session without clearing the transcript."""
-        if self._workspace_actions is None:
-            return
-        self._workspace_actions.end_chat()
+        self._workspace_router.end_chat()
 
     def _on_run_prompt_clicked(self) -> None:
         """Execute the selected prompt, seeding from the workspace or the prompt body."""
-        if self._workspace_actions is None:
-            return
-        self._workspace_actions.run_prompt()
+        self._workspace_router.run_prompt()
 
     def _on_clear_workspace_clicked(self) -> None:
         """Clear the workspace editor, output tab, and chat transcript."""
-        if self._workspace_actions is None:
-            return
-        self._workspace_actions.clear_workspace()
+        self._workspace_router.clear_workspace()
 
     def _handle_note_update(self, execution_id: UUID, note: str) -> None:
         """Record analytics when execution notes are edited."""
-        if self._workspace_actions is None:
-            return
-        self._workspace_actions.handle_note_update(execution_id, note)
+        self._workspace_router.handle_note_update(execution_id, note)
 
     def _handle_history_export(self, entries: int, path: str) -> None:
         """Record analytics when history is exported."""
-        if self._workspace_actions is None:
-            return
-        self._workspace_actions.handle_history_export(entries, path)
+        self._workspace_router.handle_history_export(entries, path)
 
     def _on_copy_prompt_clicked(self) -> None:
         """Copy the currently selected prompt body to the clipboard."""
@@ -997,56 +669,17 @@ class MainWindow(QMainWindow):
 
     def _on_copy_result_clicked(self) -> None:
         """Copy the latest execution result to the clipboard."""
-        if self._workspace_actions is None:
-            return
-        self._workspace_actions.copy_result_to_clipboard()
+        self._workspace_router.copy_result_to_clipboard()
 
     def _on_copy_result_to_text_window_clicked(self) -> None:
         """Populate the workspace text window with the latest execution result."""
-        if self._workspace_actions is None:
-            return
-        self._workspace_actions.copy_result_to_workspace()
+        self._workspace_router.copy_result_to_workspace()
 
     def _current_prompt(self) -> Prompt | None:
         """Return the prompt currently selected in the list."""
         if self._prompt_presenter is None:
             return None
         return self._prompt_presenter.current_prompt()
-
-    def _on_search_changed(self, text: str) -> None:
-        """Refresh list + sorting when the inline clear action removes the query."""
-        if text.strip():
-            return
-
-        if not self._search_active and (
-            self._filter_panel is None or self._filter_panel.is_sort_enabled()
-        ):
-            return
-
-        self._search_active = False
-        if self._filter_panel is not None:
-            self._filter_panel.set_sort_enabled(True)
-        self._load_prompts("")
-
-    def _on_search_button_clicked(self, text: str | None = None) -> None:
-        """Run the prompt search explicitly via the toolbar search trigger."""
-        query = text if text is not None else self._current_search_text()
-        self._handle_search_request(query, use_indicator=True)
-
-    def _handle_search_request(self, text: str, *, use_indicator: bool) -> None:
-        """Normalize search input handling and trigger prompt loads."""
-        stripped = text.strip()
-        self._search_active = bool(stripped)
-
-        # When a search query is active disable manual sorting so the user sees
-        # results strictly ordered by relevance. Re-enable it once the query
-        # field is cleared so manual sorting becomes available again.
-        if self._filter_panel is not None:
-            self._filter_panel.set_sort_enabled(not self._search_active)
-
-        if text and len(stripped) < 2:
-            return
-        self._load_prompts(text, use_indicator=use_indicator)
 
     def _on_prompt_double_clicked(self, index: QModelIndex) -> None:
         """Open the edit dialog when a prompt is double-clicked."""
@@ -1277,6 +910,13 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Closing Prompt Manager…", 2000)
         self.close()
 
+    def _rebuild_prompt_generation_components(self) -> None:
+        """Refresh prompt dialog flows after configuration or bootstrap changes."""
+        components = self._prompt_generation_service.rebuild_components(self)
+        self._prompt_editor_factory = components.dialog_factory
+        self._prompt_editor_flow = components.editor_flow
+        self._catalog_controller = components.catalog_controller
+
 
     def _apply_settings(self, updates: dict[str, object | None]) -> None:
         """Persist settings, refresh catalogue, and update dependent controllers."""
@@ -1299,7 +939,7 @@ class MainWindow(QMainWindow):
             self._quick_action_controller.refresh_actions(
                 self._runtime_settings.get("quick_actions")
             )
-        self._initialize_prompt_editor_helpers()
+        self._rebuild_prompt_generation_components()
         self._appearance_controller.apply_theme(result.theme_mode)
         if self._execution_controller is not None:
             self._execution_controller.refresh_chat_history_view()
