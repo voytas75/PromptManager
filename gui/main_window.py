@@ -215,7 +215,7 @@ class MainWindow(QMainWindow):
         self._share_controller = ShareController(
             self,
             toast_callback=lambda message, duration_ms=2500: show_toast(self, message, duration_ms),
-            status_callback=self.statusBar().showMessage,
+            status_callback=lambda message, duration=3000: self.statusBar().showMessage(message, duration),
             error_callback=lambda title, message: self._show_error(title, message),
             usage_logger=self._usage_logger,
         )
