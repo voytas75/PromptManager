@@ -1,6 +1,7 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.15.76 - 2025-12-01 - Delegate layout persistence to WindowStateManager helper.
   v0.15.75 - 2025-11-30 - Extract toolbar and filter panels into reusable widgets.
   v0.15.74 - 2025-11-30 - Extract execution and chat controller plus delegate workspace actions.
   v0.15.73 - 2025-11-30 - Extract widgets, list model, and layout persistence modules.
@@ -36,13 +37,7 @@ from typing import (
     Any,
 )
 
-from PySide6.QtCore import (
-    QByteArray,
-    QModelIndex,
-    QPoint,
-    QSettings,
-    Qt,
-)
+from PySide6.QtCore import QModelIndex, QPoint, QSettings, Qt
 from PySide6.QtGui import (
     QColor,
     QGuiApplication,
@@ -113,16 +108,7 @@ from .dialogs import (
 )
 from .execute_context_dialog import ExecuteContextDialog
 from .language_tools import DetectedLanguage, detect_language
-from .layout_state import (
-    _EXECUTE_CONTEXT_HISTORY_LIMIT,
-    _load_execute_context_history,
-    _load_filter_preferences,
-    _load_last_execute_context_task,
-    _store_execute_context_history,
-    _store_filter_preferences,
-    _store_last_execute_context_task,
-    _store_sort_preference,
-)
+from .layout_state import WindowStateManager
 from .main_view_builder import MainViewCallbacks, MainViewComponents, build_main_view
 from .notifications import BackgroundTaskCenterDialog, QtNotificationBridge
 from .processing_indicator import ProcessingIndicator
@@ -316,34 +302,22 @@ class MainWindow(QMainWindow):
         self._share_result_button: QPushButton | None = None
         self._workbench_windows: list[WorkbenchWindow] = []
         self._register_share_provider(ShareTextProvider())
-        self._layout_settings = QSettings("PromptManager", "MainWindow")
-        (
-            self._pending_category_slug,
-            self._pending_tag_value,
-            self._pending_quality_value,
-            stored_sort_value,
-        ) = _load_filter_preferences(self._layout_settings)
+        settings = QSettings("PromptManager", "MainWindow")
+        self._layout_state = WindowStateManager(settings)
+        filter_prefs = self._layout_state.load_filter_preferences()
+        self._pending_category_slug = filter_prefs.category_slug
+        self._pending_tag_value = filter_prefs.tag
+        self._pending_quality_value = filter_prefs.min_quality
+        stored_sort_value = filter_prefs.sort_value
         if stored_sort_value:
             try:
                 self._sort_order = PromptSortOrder(stored_sort_value)
             except ValueError:
                 logger.warning("Unknown stored sort order: %s", stored_sort_value)
-        self._last_execute_context_task: str = _load_last_execute_context_task(
-            self._layout_settings
-        )
-        self._execute_context_history_limit = _EXECUTE_CONTEXT_HISTORY_LIMIT
-        history_entries = _load_execute_context_history(
-            self._layout_settings,
-            limit=self._execute_context_history_limit,
-        )
-        self._execute_context_history: deque[str] = deque(
-            history_entries,
-            maxlen=self._execute_context_history_limit,
-        )
-        last_history_entry = self._last_execute_context_task
-        if last_history_entry.strip() and last_history_entry not in self._execute_context_history:
-            self._execute_context_history.appendleft(last_history_entry)
-            self._persist_execute_context_history()
+        execute_state = self._layout_state.load_execute_context_state()
+        self._last_execute_context_task = execute_state.last_task
+        self._execute_context_history_limit = self._layout_state.history_limit
+        self._execute_context_history = execute_state.history
         self._main_container: QFrame | None = None
         self._main_splitter: QSplitter | None = None
         self._list_splitter: QSplitter | None = None
@@ -365,7 +339,7 @@ class MainWindow(QMainWindow):
         self._notification_bridge = QtNotificationBridge(self._manager.notification_center, self)
         self._notification_bridge.notification_received.connect(self._handle_notification)
         self.setWindowTitle("Prompt Manager")
-        self._restore_window_geometry()
+        self._layout_state.restore_window_geometry(self)
         self._build_ui()
         self._execution_controller = ExecutionController(
             manager=self._manager,
@@ -540,62 +514,9 @@ class MainWindow(QMainWindow):
             partial(self._handle_refresh_scenarios_request, self._template_detail_widget)
         )
 
-    def _restore_window_geometry(self) -> None:
-        """Restore window size/position from persistent settings."""
-        stored = self._layout_settings.value("windowGeometry")
-        if isinstance(stored, QByteArray):
-            if not self.restoreGeometry(stored):
-                self.resize(1024, 640)
-            return
-        if isinstance(stored, (bytes, bytearray)):
-            if not self.restoreGeometry(QByteArray(stored)):
-                self.resize(1024, 640)
-            return
-        if isinstance(stored, str):
-            try:
-                width_str, height_str, *_ = stored.split(",")
-                width = int(width_str)
-                height = int(height_str)
-            except (ValueError, TypeError):
-                self.resize(1024, 640)
-            else:
-                if width > 0 and height > 0:
-                    self.resize(width, height)
-                else:
-                    self.resize(1024, 640)
-            return
-        self.resize(1024, 640)
-
     def _restore_splitter_state(self) -> None:
         """Restore splitter sizes from persisted settings."""
-        entries: list[tuple[str, QSplitter | None]] = [
-            ("mainSplitter", self._main_splitter),
-            ("listSplitter", self._list_splitter),
-            ("workspaceSplitter", self._workspace_splitter),
-            ("templatePreviewSplitter", self._template_preview_splitter),
-            ("templatePreviewListSplitter", self._template_preview_list_splitter),
-        ]
-        if self._template_preview is not None:
-            entries.append(
-                ("templatePreviewContentSplitter", self._template_preview.content_splitter)
-            )
-        for key, splitter in entries:
-            if splitter is None:
-                continue
-            stored = self._layout_settings.value(key)
-            if stored is None:
-                continue
-            if isinstance(stored, str):
-                parts = [segment for segment in stored.split(",") if segment]
-            else:
-                parts = list(stored) if isinstance(stored, (list, tuple)) else []
-            try:
-                sizes = [int(part) for part in parts]
-            except (TypeError, ValueError):
-                continue
-            if len(sizes) != splitter.count() or not sizes or sum(sizes) <= 0:
-                continue
-            splitter.setSizes(sizes)
+        self._layout_state.restore_splitter_sizes(self._splitter_state_entries())
 
     def _capture_main_splitter_left_width(self) -> None:
         """Record the current width of the left pane for resize management."""
@@ -647,6 +568,10 @@ class MainWindow(QMainWindow):
 
     def _save_splitter_state(self) -> None:
         """Persist splitter sizes for future sessions."""
+        self._layout_state.save_splitter_sizes(self._splitter_state_entries())
+
+    def _splitter_state_entries(self) -> list[tuple[str, QSplitter | None]]:
+        """Return splitter/key mappings used for persistence."""
         entries: list[tuple[str, QSplitter | None]] = [
             ("mainSplitter", self._main_splitter),
             ("listSplitter", self._list_splitter),
@@ -658,49 +583,14 @@ class MainWindow(QMainWindow):
             entries.append(
                 ("templatePreviewContentSplitter", self._template_preview.content_splitter)
             )
-        for key, splitter in entries:
-            if splitter is None:
-                continue
-            self._layout_settings.setValue(key, splitter.sizes())
-        self._layout_settings.sync()
-
-    def _save_window_geometry(self) -> None:
-        """Persist window size/position to settings."""
-        geometry = self.saveGeometry()
-        self._layout_settings.setValue("windowGeometry", geometry)
-
-    def _persist_last_execute_context_task(self, task_text: str) -> None:
-        """Persist the most recent execute-context task text."""
-        if not task_text:
-            _store_last_execute_context_task(self._layout_settings, "")
-            return
-        _store_last_execute_context_task(self._layout_settings, task_text)
-
-    def _persist_execute_context_history(self) -> None:
-        """Persist execute-context task history entries."""
-        _store_execute_context_history(self._layout_settings, tuple(self._execute_context_history))
-
-    def _record_execute_context_task(self, task_text: str) -> None:
-        """Insert *task_text* into the recent execute-context history."""
-        if not task_text.strip():
-            return
-        entries: list[str] = [task_text]
-        for existing in self._execute_context_history:
-            if existing == task_text:
-                continue
-            entries.append(existing)
-            if len(entries) >= self._execute_context_history_limit:
-                break
-        self._execute_context_history = deque(entries, maxlen=self._execute_context_history_limit)
-        self._persist_execute_context_history()
+        return entries
 
     def _persist_filter_preferences(self) -> None:
         """Persist the current category, tag, and quality filters."""
         panel = self._filter_panel
         if panel is None:
             return
-        _store_filter_preferences(
-            self._layout_settings,
+        self._layout_state.persist_filter_preferences(
             category_slug=panel.category_slug(),
             tag=panel.tag_value(),
             min_quality=panel.min_quality(),
@@ -708,7 +598,7 @@ class MainWindow(QMainWindow):
 
     def _persist_sort_preference(self) -> None:
         """Persist the currently selected sort order."""
-        _store_sort_preference(self._layout_settings, self._sort_order)
+        self._layout_state.persist_sort_order(self._sort_order)
 
     def _current_search_text(self) -> str:
         """Return the current text in the toolbar search field."""
@@ -2038,8 +1928,8 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(parent_widget, "Task required", "Enter a task before executing.")
             return
         self._last_execute_context_task = task_text
-        self._persist_last_execute_context_task(task_text)
-        self._record_execute_context_task(task_text)
+        self._layout_state.persist_last_execute_task(task_text)
+        self._layout_state.record_execute_task(task_text, self._execute_context_history)
         request_payload = (
             "You will receive a task and a context block. "
             "Use the context exclusively when fulfilling the task.\n\n"
@@ -3020,7 +2910,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:  # type: ignore[override]
         """Persist layout before closing and dispose transient dialogs."""
-        self._save_window_geometry()
+        self._layout_state.save_window_geometry(self)
         self._save_splitter_state()
         if hasattr(self, "_notification_bridge"):
             self._notification_bridge.close()
