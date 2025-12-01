@@ -214,7 +214,7 @@ class MainWindow(QMainWindow):
         self._workspace_view: WorkspaceViewController | None = None
         self._share_controller = ShareController(
             self,
-            toast_callback=self._show_toast,
+            toast_callback=lambda message, duration_ms=2500: show_toast(self, message, duration_ms),
             status_callback=self.statusBar().showMessage,
             error_callback=self._show_error,
             usage_logger=self._usage_logger,
