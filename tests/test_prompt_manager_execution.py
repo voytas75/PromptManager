@@ -155,6 +155,7 @@ def _manager_with_dependencies(
 
 
 def test_execute_prompt_returns_outcome_and_logs_history(tmp_path: Path) -> None:
+    """Execute prompts successfully and capture associated history metadata."""
     executor = _StubExecutor()
     manager, prompt, tracker = _manager_with_dependencies(tmp_path, executor)
 
@@ -184,6 +185,7 @@ def test_execute_prompt_returns_outcome_and_logs_history(tmp_path: Path) -> None
 
 
 def test_execute_prompt_logs_failure(tmp_path: Path) -> None:
+    """Record failure events in tracker when execution raises errors."""
     manager, prompt, tracker = _manager_with_dependencies(tmp_path, _FailingExecutor())
 
     with pytest.raises(PromptExecutionError):
@@ -199,6 +201,7 @@ def test_execute_prompt_logs_failure(tmp_path: Path) -> None:
 
 
 def test_execute_prompt_supports_conversation(tmp_path: Path) -> None:
+    """Preserve and reuse conversation context between runs."""
     executor = _StubExecutor()
     manager, prompt, tracker = _manager_with_dependencies(tmp_path, executor)
 
@@ -226,6 +229,7 @@ def test_execute_prompt_supports_conversation(tmp_path: Path) -> None:
 
 
 def test_execute_prompt_streams_to_callback(tmp_path: Path) -> None:
+    """Stream partial responses to callbacks during execution."""
     class _StreamingExecutor:
         def __init__(self) -> None:
             self.stream_flag: bool | None = None
@@ -271,6 +275,7 @@ def test_execute_prompt_streams_to_callback(tmp_path: Path) -> None:
 
 
 def test_save_execution_result_records_manual_entry(tmp_path: Path) -> None:
+    """Persist manually saved results with optional ratings and notes."""
     executor = _StubExecutor()
     manager, prompt, tracker = _manager_with_dependencies(tmp_path, executor)
 
@@ -297,6 +302,7 @@ def test_save_execution_result_records_manual_entry(tmp_path: Path) -> None:
 
 
 def test_update_execution_note(tmp_path: Path) -> None:
+    """Allow history entries to update their free-form notes."""
     executor = _StubExecutor()
     manager, prompt, tracker = _manager_with_dependencies(tmp_path, executor)
 
@@ -312,6 +318,7 @@ def test_update_execution_note(tmp_path: Path) -> None:
 
 
 def test_history_methods_without_tracker(tmp_path: Path) -> None:
+    """Gracefully no-op when history tracker dependencies are missing."""
     manager, prompt, tracker = _manager_with_dependencies(tmp_path, _StubExecutor(), history=False)
     assert tracker is None
     assert manager.list_recent_executions() == []
@@ -320,6 +327,7 @@ def test_history_methods_without_tracker(tmp_path: Path) -> None:
 
 
 def test_benchmark_prompts_returns_runs_with_history(tmp_path: Path) -> None:
+    """Benchmark prompts against configured models and log outcomes."""
     executor = _StubExecutor()
     manager, prompt, tracker = _manager_with_dependencies(tmp_path, executor)
 
@@ -336,6 +344,7 @@ def test_benchmark_prompts_returns_runs_with_history(tmp_path: Path) -> None:
 
 
 def test_benchmark_prompts_persists_history_when_requested(tmp_path: Path) -> None:
+    """Persist benchmark executions when the persist flag is enabled."""
     executor = _StubExecutor()
     manager, prompt, tracker = _manager_with_dependencies(tmp_path, executor)
 
@@ -348,6 +357,7 @@ def test_benchmark_prompts_persists_history_when_requested(tmp_path: Path) -> No
 
 
 def test_benchmark_prompts_rejects_unknown_models_for_stub_executor(tmp_path: Path) -> None:
+    """Validate that unknown models raise errors during benchmarking."""
     executor = _StubExecutor()
     manager, prompt, _ = _manager_with_dependencies(tmp_path, executor)
 

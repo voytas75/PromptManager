@@ -75,7 +75,11 @@ def test_json_precedes_env_when_both_provided(monkeypatch: MonkeyPatch, tmp_path
     ]
 
 
-def test_json_with_litellm_api_key_is_ignored(monkeypatch: MonkeyPatch, tmp_path: Path, caplog: LogCaptureFixture) -> None:
+def test_json_with_litellm_api_key_is_ignored(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+    caplog: LogCaptureFixture,
+) -> None:
     """Ensure LiteLLM API keys present in JSON configs are ignored."""
     config_payload = {
         "litellm_model": "azure/gpt-4o",
@@ -146,7 +150,10 @@ def test_litellm_inference_model_from_json(monkeypatch: MonkeyPatch, tmp_path: P
     assert settings.litellm_workflow_models == {"prompt_engineering": "inference"}
 
 
-def test_litellm_workflow_models_strip_fast_entries(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+def test_litellm_workflow_models_strip_fast_entries(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     """Remove redundant fast-tier entries when persisting workflow models."""
     config_path = tmp_path / "config.json"
     config_path.write_text(
@@ -173,7 +180,10 @@ def test_litellm_workflow_models_strip_fast_entries(monkeypatch: MonkeyPatch, tm
     }
 
 
-def test_litellm_workflow_models_include_category_generation(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+def test_litellm_workflow_models_include_category_generation(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     """Ensure category generation routing survives JSON round-trips."""
     config_path = tmp_path / "config.json"
     config_path.write_text(
@@ -238,7 +248,10 @@ def test_litellm_settings_accept_azure_aliases(monkeypatch: MonkeyPatch, tmp_pat
     assert settings.litellm_drop_params is None
 
 
-def test_litellm_drop_params_from_json_not_overridden_by_empty_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+def test_litellm_drop_params_from_json_not_overridden_by_empty_env(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     """Keep JSON drop params even if env variables are empty."""
     config_path = tmp_path / "config.json"
     config_path.write_text(json.dumps({"litellm_drop_params": ["max_tokens"]}), encoding="utf-8")
@@ -296,7 +309,10 @@ def test_embedding_backend_defaults_to_configured_constant_when_missing(
     assert settings.embedding_model == DEFAULT_EMBEDDING_MODEL
 
 
-def test_embedding_backend_respects_explicit_embedding_model(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+def test_embedding_backend_respects_explicit_embedding_model(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     """Honor explicit embedding model overrides regardless of defaults."""
     tmp_config = tmp_path / "config.json"
     tmp_config.write_text("{}", encoding="utf-8")

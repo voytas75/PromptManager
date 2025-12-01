@@ -34,17 +34,19 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from PySide6.QtWidgets import (
     QCheckBox,
     QFrame,
+    QLabel,
     QListView,
     QMainWindow,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
     QTabWidget,
+    QTextEdit,
     QWidget,
 )
 
@@ -80,15 +82,20 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from uuid import UUID
 
     from PySide6.QtCore import QModelIndex, QPoint
-    from PySide6.QtGui import QResizeEvent, QShowEvent
+    from PySide6.QtGui import QCloseEvent, QResizeEvent, QShowEvent
 
     from config import PromptManagerSettings
     from core import PromptManager
     from models.prompt_model import Prompt
 
+    from .analytics_panel import AnalyticsDashboardPanel
     from .catalog_workflow_controller import CatalogWorkflowController
+    from .code_highlighter import CodeHighlighter
+    from .history_panel import HistoryPanel
+    from .notes_panel import NotesPanel
     from .prompt_actions_controller import PromptActionsController
     from .prompt_editor_flow import PromptDialogFactory, PromptEditorFlow
+    from .response_styles_panel import ResponseStylesPanel
     from .result_overlay import ResultActionsOverlay
     from .template_preview import TemplatePreviewWidget
     from .template_preview_controller import TemplatePreviewController
@@ -100,10 +107,26 @@ else:  # pragma: no cover - runtime placeholders for type-only imports
 
     PromptManagerSettings = _Any
     CatalogWorkflowController = _Any
+    HistoryPanel = _Any
+    NotesPanel = _Any
+    ResponseStylesPanel = _Any
+    AnalyticsDashboardPanel = _Any
+    Prompt = _Any
+    PromptDetailWidget = _Any
+    PromptFilterPanel = _Any
+    PromptToolbar = _Any
+    ResultActionsOverlay = _Any
+    TemplatePreviewWidget = _Any
+    TemplatePreviewController = _Any
+    WorkspaceActionsController = _Any
+    WorkspaceViewController = _Any
+    PromptDialogFactory = _Any
+    PromptEditorFlow = _Any
+    PromptActionsController = _Any
 
 logger = logging.getLogger(__name__)
 
-def _match_category_label(
+def _match_category_label(  # pyright: ignore[reportUnusedFunction]
     value: str | None, categories: Sequence[PromptCategory]
 ) -> str | None:
     """Return the canonical category label matching *value* via exact, slug, or fuzzy match."""
@@ -149,7 +172,7 @@ class MainWindow(QMainWindow):
         self,
         prompt_manager: PromptManager,
         settings: PromptManagerSettings | None = None,
-        parent=None,
+        parent: QWidget | None = None,
     ) -> None:
         """Initialise widgets, state, and helper controllers for the GUI."""
         super().__init__(parent)
@@ -171,23 +194,50 @@ class MainWindow(QMainWindow):
         self._execution_controller: ExecutionController | None = None
         self._history_limit = 50
         self._sort_order = PromptSortOrder.NAME_ASC
-        self._share_result_button: QPushButton | None = None
-        self._query_input: QPlainTextEdit | None = None
-        self._render_markdown_checkbox: QCheckBox | None = None
-        self._template_preview: TemplatePreviewWidget | None = None
-        self._template_list_view: QListView | None = None
-        self._template_detail_widget: PromptDetailWidget | None = None
-        self._template_run_shortcut_button: QPushButton | None = None
-        self._result_overlay: ResultActionsOverlay | None = None
-        self._tab_widget: QTabWidget | None = None
-        self._toolbar: PromptToolbar | None = None
-        self._filter_panel: PromptFilterPanel | None = None
-        self._main_container: QFrame | None = None
         self._notification_controller: NotificationController | None = None
+        self._tab_widget: QTabWidget | None = None
+        self._template_preview: TemplatePreviewWidget | None = None
         self._prompt_actions_handler: PromptActionsHandler | None = None
         self._workspace_input_handler: WorkspaceInputHandler | None = None
         self._template_preview_handler: TemplatePreviewHandler | None = None
         self._workspace_insight_controller: WorkspaceInsightController | None = None
+
+        self._list_view: QListView = cast("QListView", None)
+        self._toolbar = cast("PromptToolbar", None)
+        self._language_label: QLabel = cast("QLabel", None)
+        self._quick_actions_button: QPushButton = cast("QPushButton", None)
+        self._quick_actions_button_default_text: str = ""
+        self._quick_actions_button_default_tooltip: str = ""
+        self._detect_button: QPushButton = cast("QPushButton", None)
+        self._suggest_button: QPushButton = cast("QPushButton", None)
+        self._run_button: QPushButton = cast("QPushButton", None)
+        self._clear_button: QPushButton = cast("QPushButton", None)
+        self._continue_chat_button: QPushButton = cast("QPushButton", None)
+        self._end_chat_button: QPushButton = cast("QPushButton", None)
+        self._copy_button: QPushButton = cast("QPushButton", None)
+        self._copy_result_button: QPushButton = cast("QPushButton", None)
+        self._copy_result_to_text_window_button: QPushButton = cast("QPushButton", None)
+        self._save_button: QPushButton = cast("QPushButton", None)
+        self._share_result_button: QPushButton = cast("QPushButton", None)
+        self._intent_hint: QLabel = cast("QLabel", None)
+        self._filter_panel = cast("PromptFilterPanel", None)
+        self._query_input: QPlainTextEdit = cast("QPlainTextEdit", None)
+        self._highlighter: CodeHighlighter = cast("CodeHighlighter", None)
+        self._main_container = cast("QFrame", None)
+        self._result_label: QLabel = cast("QLabel", None)
+        self._result_meta: QLabel = cast("QLabel", None)
+        self._result_tabs: QTabWidget = cast("QTabWidget", None)
+        self._result_text: QTextEdit = cast("QTextEdit", None)
+        self._result_overlay: ResultActionsOverlay = cast("ResultActionsOverlay", None)
+        self._chat_history_view: QTextEdit = cast("QTextEdit", None)
+        self._render_markdown_checkbox: QCheckBox = cast("QCheckBox", None)
+        self._history_panel: HistoryPanel = cast("HistoryPanel", None)
+        self._notes_panel: NotesPanel | None = None
+        self._response_styles_panel: ResponseStylesPanel | None = None
+        self._analytics_panel: AnalyticsDashboardPanel | None = None
+        self._template_list_view: QListView = cast("QListView", None)
+        self._template_detail_widget: PromptDetailWidget = cast("PromptDetailWidget", None)
+        self._template_run_shortcut_button: QPushButton = cast("QPushButton", None)
 
         detail_callbacks = DetailWidgetCallbacks(
             delete_requested=self._on_delete_clicked,
@@ -198,7 +248,11 @@ class MainWindow(QMainWindow):
             share_requested=self._on_share_prompt_requested,
         )
 
-        def _execute_prompt_from_dialog(prompt, dialog, context):
+        def _execute_prompt_from_dialog(
+            prompt: Prompt,
+            dialog: QWidget | None,
+            context: str | None,
+        ) -> None:
             self._execute_prompt_as_context(
                 prompt,
                 parent=dialog,
@@ -469,7 +523,7 @@ class MainWindow(QMainWindow):
             load_prompts=self._load_prompts,
             current_search_text=self._current_search_text,
             status_callback=self._show_status_message,
-            exit_callback=self.close,
+            exit_callback=self._close_window,
         )
         self._appearance_controller.set_container(self._main_container)
         self._workspace_insight_controller = WorkspaceInsightController(
@@ -882,6 +936,11 @@ class MainWindow(QMainWindow):
             self.close()
             return
         handler.close_application()
+        return
+
+    def _close_window(self) -> None:
+        """Close the window without additional handlers."""
+        self.close()
 
     def _rebuild_prompt_generation_components(self) -> None:
         """Refresh prompt dialog flows after configuration or bootstrap changes."""
@@ -924,7 +983,7 @@ class MainWindow(QMainWindow):
             return
         self._notification_controller.show_task_center()
 
-    def closeEvent(self, event) -> None:  # type: ignore[override]
+    def closeEvent(self, event: QCloseEvent) -> None:  # type: ignore[override]
         """Persist layout before closing and dispose transient dialogs."""
         self._layout_state.save_window_geometry(self)
         self._save_splitter_state()

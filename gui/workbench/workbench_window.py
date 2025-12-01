@@ -5,10 +5,14 @@ Updates:
   v0.1.20 - 2025-11-30 - Respect LiteLLM streaming flag when running prompts.
   v0.1.19 - 2025-11-29 - Fix toast calls to pass the parent widget first.
   v0.1.18 - 2025-11-29 - Persist Workbench window geometry between sessions.
-  v0.1.17 - 2025-11-29 - Stack the prompt editor above Run Output/History in the center column.
-  v0.1.16 - 2025-11-29 - Relocate output/history tabs into the center column and collapse the bottom panel.
-  v0.1.15 - 2025-11-29 - Move output/history tabs below the editor and persist output splitter widths.
-  v0.1.14 - 2025-11-29 - Replace QWizard with custom-styled dialog to control Guided mode appearance.
+  v0.1.17 - 2025-11-29 - Stack the prompt editor above Run Output/History in the
+    center column.
+  v0.1.16 - 2025-11-29 - Relocate output/history tabs into the center column and
+    collapse the bottom panel.
+  v0.1.15 - 2025-11-29 - Move output/history tabs below the editor and persist
+    output splitter widths.
+  v0.1.14 - 2025-11-29 - Replace QWizard with custom-styled dialog to control Guided
+    mode appearance.
   v0.1.13 - 2025-11-29 - Manually paint wizard background with palette colors to avoid OS tinting.
   v0.1.12 - 2025-11-29 - Force Fusion style for wizard to ensure palette-driven theming on Windows.
   v0.1.11 - 2025-11-29 - Log resolved wizard palette roles for troubleshooting theme differences.
@@ -29,19 +33,17 @@ from __future__ import annotations
 import logging
 import re
 import textwrap
-import uuid
 import threading
-from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Callable, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
-from PySide6.QtCore import QByteArray, QPoint, QSettings, Qt, Signal, QEvent, QObject, QEventLoop
+from PySide6.QtCore import QByteArray, QEvent, QEventLoop, QObject, QSettings, Qt, Signal
 from PySide6.QtGui import (
     QCloseEvent,
     QGuiApplication,
-    QPalette,
     QPainter,
     QPaintEvent,
+    QPalette,
     QTextCharFormat,
     QTextCursor,
 )
@@ -62,8 +64,8 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QSplitter,
-    QStatusBar,
     QStackedWidget,
+    QStatusBar,
     QTabWidget,
     QTextEdit,
     QToolBar,
@@ -75,11 +77,11 @@ from PySide6.QtWidgets import (
 from core import PromptManager, PromptManagerError
 from core.execution import CodexExecutionResult, CodexExecutor, ExecutionError
 from core.history_tracker import HistoryTracker, HistoryTrackerError
-from models.prompt_model import Prompt
 
 from ..processing_indicator import ProcessingIndicator
 from ..template_preview import TemplatePreviewWidget
 from ..toast import show_toast
+from .session import WorkbenchExecutionRecord, WorkbenchSession, WorkbenchVariable
 
 
 class _StreamRelay(QObject):
@@ -87,7 +89,18 @@ class _StreamRelay(QObject):
 
 
 _T = TypeVar("_T")
-from .session import WorkbenchExecutionRecord, WorkbenchSession, WorkbenchVariable
+
+if TYPE_CHECKING:  # pragma: no cover - typing helpers
+    from collections.abc import Callable, Mapping, Sequence
+
+    from models.prompt_model import Prompt
+else:  # pragma: no cover - runtime placeholders for type-only imports
+    from typing import Any as _Any
+
+    Callable = _Any
+    Mapping = _Any
+    Sequence = _Any
+    Prompt = _Any
 
 logger = logging.getLogger("prompt_manager.gui.workbench")
 
@@ -118,7 +131,10 @@ _BLOCK_SNIPPETS: Mapping[str, str] = {
         """### Examples\n**Input**\n<example input>\n\n**Expected Output**\n<example output>"""
     ),
     "JSON Response": textwrap.dedent(
-        """### Output Format\nReturn a JSON object with these keys:\n- `summary`: One sentence overview.\n- `steps`: Array of ordered actions."""
+        """### Output Format
+Return a JSON object with these keys:
+- `summary`: One sentence overview.
+- `steps`: Array of ordered actions."""
     ),
 }
 
@@ -153,6 +169,7 @@ class WorkbenchPromptEditor(QPlainTextEdit):
     variableActivated = Signal(str)
 
     def mouseDoubleClickEvent(self, event) -> None:  # type: ignore[override]
+        """Emit the variable token under the cursor when the user double-clicks."""
         super().mouseDoubleClickEvent(event)
         name = _variable_at_cursor(self.cursorForPosition(event.position().toPoint()))
         if name:
@@ -176,6 +193,7 @@ class ModeSelection:
 class WorkbenchModeDialog(QDialog):
     """Dialog that lets the user choose between guided, blank, or template modes."""
     def __init__(self, prompts: Sequence[Prompt], parent: QWidget | None = None) -> None:
+        """Initialise the dialog and populate the template list."""
         super().__init__(parent)
         _inherit_palette(self)
         self._prompts = list(prompts)
@@ -282,6 +300,7 @@ class VariableCaptureDialog(QDialog):
         name: str | None = None,
         parent: QWidget | None = None,
     ) -> None:
+        """Configure form fields for editing a single variable."""
         super().__init__(parent)
         _inherit_palette(self)
         self.setWindowTitle("Configure Variable")
@@ -388,6 +407,7 @@ class GuidedPromptWizard(QDialog):
     updated = Signal(dict)
 
     def __init__(self, session: WorkbenchSession, parent: QWidget | None = None) -> None:
+        """Build the wizard pages and sync palette styling."""
         super().__init__(parent)
         self._palette_updating = False
         self.setAttribute(Qt.WA_StyledBackground, True)
@@ -463,7 +483,12 @@ class GuidedPromptWizard(QDialog):
         self._next_button = QPushButton("Next", self)
         self._finish_button = QPushButton("Finish", self)
         self._cancel_button = QPushButton("Cancel", self)
-        for button in (self._back_button, self._next_button, self._finish_button, self._cancel_button):
+        for button in (
+            self._back_button,
+            self._next_button,
+            self._finish_button,
+            self._cancel_button,
+        ):
             button.setMinimumWidth(110)
         self._back_button.clicked.connect(self._go_back)
         self._next_button.clicked.connect(self._go_next)
@@ -476,6 +501,7 @@ class GuidedPromptWizard(QDialog):
         layout.addWidget(self._footer_widget)
 
     def changeEvent(self, event: QEvent) -> None:  # type: ignore[override]
+        """Reapply palette styling when the application theme changes."""
         super().changeEvent(event)
         if self._palette_updating:
             return
@@ -485,6 +511,7 @@ class GuidedPromptWizard(QDialog):
                 self._apply_palette(palette)
 
     def paintEvent(self, event: QPaintEvent) -> None:  # type: ignore[override]
+        """Fill the wizard background using the active palette."""
         painter = QPainter(self)
         painter.fillRect(self.rect(), self.palette().color(QPalette.Window))
         super().paintEvent(event)
@@ -607,7 +634,11 @@ class GuidedPromptWizard(QDialog):
                 continue
             description = parts[1] if len(parts) > 1 else None
             sample = parts[2] if len(parts) > 2 else None
-            variables[name] = WorkbenchVariable(name=name, description=description, sample_value=sample)
+            variables[name] = WorkbenchVariable(
+                name=name,
+                description=description,
+                sample_value=sample,
+            )
         payload = {
             "prompt_name": self._goal_page.name_input.text(),
             "goal": self._goal_page.goal_input.toPlainText(),
@@ -623,12 +654,14 @@ class GuidedPromptWizard(QDialog):
 class WorkbenchExportDialog(QDialog):
     """Collect final metadata before persisting a prompt draft."""
     def __init__(self, session: WorkbenchSession, parent: QWidget | None = None) -> None:
+        """Populate export fields using the provided session defaults."""
         super().__init__(parent)
         _inherit_palette(self)
         self.setWindowTitle("Export Prompt")
         self._build_ui(session)
 
     def prompt_kwargs(self) -> dict[str, Any] | None:
+        """Return keyword arguments for prompt creation when accepted."""
         if self.result() != QDialog.Accepted:
             return None
         tags = [tag.strip() for tag in self._tags_input.text().split(",") if tag.strip()]
@@ -673,6 +706,7 @@ class WorkbenchWindow(QMainWindow):
         template_prompt: Prompt | None = None,
         parent: QWidget | None = None,
     ) -> None:
+        """Initialise the window, settings, and supporting controllers."""
         super().__init__(parent)
         self._manager = prompt_manager
         self._session = WorkbenchSession()
@@ -710,7 +744,9 @@ class WorkbenchWindow(QMainWindow):
         validate_action = toolbar.addAction("✅ Validate", self._validate_template)
         validate_action.setToolTip("Re-run template preview validation and report status.")
         run_action = toolbar.addAction("▶️ Run Once", self._trigger_run)
-        run_action.setToolTip("Render the prompt with sample data and execute it via CodexExecutor.")
+        run_action.setToolTip(
+            "Render the prompt with sample data and execute it via CodexExecutor."
+        )
         export_action = toolbar.addAction("💾 Export", self._export_prompt)
         export_action.setToolTip("Persist this prompt into the repository.")
         executor_ready = self._executor is not None
@@ -817,6 +853,7 @@ class WorkbenchWindow(QMainWindow):
         self._restore_layout_state()
 
     def closeEvent(self, event: QCloseEvent) -> None:  # type: ignore[override]
+        """Persist splitters and clean up when closing the window."""
         self._persist_layout_state()
         super().closeEvent(event)
 
@@ -916,7 +953,11 @@ class WorkbenchWindow(QMainWindow):
         variable = dialog.result_variable()
         if variable is None:
             return
-        self._session.link_variable(variable.name, sample_value=variable.sample_value, description=variable.description)
+        self._session.link_variable(
+            variable.name,
+            sample_value=variable.sample_value,
+            description=variable.description,
+        )
         self._preview.apply_variable_values({variable.name: variable.sample_value or ""})
         show_toast(self, f"Variable '{variable.name}' updated.")
 
@@ -1087,9 +1128,6 @@ class WorkbenchWindow(QMainWindow):
         variables: Mapping[str, str],
     ) -> None:
         self._output_tabs.setCurrentWidget(self._output_view)
-        meta = textwrap.dedent(
-            f"""Model: {self._executor.model if self._executor else 'n/a'}\nDuration: {result.duration_ms} ms\nTokens: {result.usage.get('total_tokens', 'n/a')}"""
-        )
         self._output_view.setPlainText(result.response_text)
         record = WorkbenchExecutionRecord(
             request_text=request_text,

@@ -30,12 +30,14 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
 
     from config import PromptManagerSettings
     from core import PromptManager
+    from models.prompt_model import Prompt
 else:  # pragma: no cover - runtime placeholders for type-only imports
     from typing import Any as _Any
 
     Callable = _Any
     PromptManagerSettings = _Any
     PromptManager = _Any
+    Prompt = _Any
 
 class _PromptSupplier(Protocol):
     def __call__(self) -> object | None:
@@ -47,7 +49,7 @@ class DetailWidgetCallbacks:
     """Signal handlers used while wiring the prompt detail widget."""
     delete_requested: Callable[[], None]
     edit_requested: Callable[[], None]
-    version_history_requested: Callable[[object | None], None]
+    version_history_requested: Callable[[Prompt | None], None]
     fork_requested: Callable[[], None]
     refresh_scenarios_requested: Callable[[PromptDetailWidget], None]
     share_requested: Callable[[], None]

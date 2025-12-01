@@ -35,9 +35,7 @@ from collections import Counter
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-if TYPE_CHECKING:  # pragma: no cover - typing only
-    from collections.abc import Callable, Mapping, Sequence
-
+import core as core_services
 from config import (
     DEFAULT_EMBEDDING_BACKEND,
     DEFAULT_EMBEDDING_MODEL,
@@ -45,7 +43,9 @@ from config import (
     PromptManagerSettings,
     load_settings,
 )
-import core as core_services
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from collections.abc import Callable, Mapping, Sequence
 
 PromptManagerError = core_services.PromptManagerError
 build_prompt_manager = core_services.build_prompt_manager
@@ -692,12 +692,10 @@ def _run_history_analytics(manager, args: argparse.Namespace, logger: logging.Lo
                 else "n/a"
             )
             lines.append(
-                (
-                    f"{index}. {stats.name} — runs:{stats.total_runs} "
-                    f"success:{stats.success_rate * 100:.1f}% "
-                    f"avg_rating:{avg_rating} trend:{trend} latency:{latency} "
-                    f"last:{last_run}"
-                )
+                f"{index}. {stats.name} — runs:{stats.total_runs} "
+                f"success:{stats.success_rate * 100:.1f}% "
+                f"avg_rating:{avg_rating} trend:{trend} latency:{latency} "
+                f"last:{last_run}"
             )
 
     print("\n".join(lines))
@@ -763,6 +761,7 @@ def _run_suggest(manager, args: argparse.Namespace, logger: logging.Logger) -> i
 
 
 def parse_args() -> argparse.Namespace:
+    """Return parsed CLI arguments for the Prompt Manager launcher."""
     parser = argparse.ArgumentParser(description="Prompt Manager launcher")
     parser.add_argument(
         "--logging-config",
@@ -982,6 +981,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    """Entrypoint that wires settings, services, and CLI commands."""
     args = parse_args()
     _setup_logging(args.logging_config)
 

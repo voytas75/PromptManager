@@ -7,8 +7,8 @@ import pytest
 
 import core.name_generation as name_gen_module
 from core.name_generation import (
-    LiteLLMCategoryGenerator,
     DescriptionGenerationError,
+    LiteLLMCategoryGenerator,
     LiteLLMDescriptionGenerator,
     LiteLLMNameGenerator,
     NameGenerationError,

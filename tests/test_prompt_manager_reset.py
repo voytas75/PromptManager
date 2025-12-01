@@ -81,6 +81,7 @@ class _StubChromaClientNoDelete:
 
 
 def test_repository_reset_all_data(tmp_path: Path) -> None:
+    """Wipe repository data and ensure prompts plus history are removed."""
     db_path = tmp_path / "prompt_manager.db"
     repo = PromptRepository(str(db_path))
 
@@ -105,6 +106,7 @@ def test_repository_reset_all_data(tmp_path: Path) -> None:
 
 
 def test_prompt_manager_reset_application_data(tmp_path: Path) -> None:
+    """Bridge PromptManager reset helper to repository-level cleanup."""
     db_path = tmp_path / "prompt_manager.db"
     repo = PromptRepository(str(db_path))
     prompt = _make_prompt()
@@ -138,6 +140,7 @@ def test_prompt_manager_reset_application_data(tmp_path: Path) -> None:
 
 
 def test_reset_vector_store_without_client_delete(tmp_path: Path) -> None:
+    """Avoid deleting external vector stores when no delete client is provided."""
     db_path = tmp_path / "prompt_manager.db"
     repo = PromptRepository(str(db_path))
     repo.add(_make_prompt())
@@ -159,6 +162,7 @@ def test_reset_vector_store_without_client_delete(tmp_path: Path) -> None:
 
 
 def test_clear_usage_logs_handles_missing_directory(tmp_path: Path) -> None:
+    """Ignore missing usage-log directories when clearing state."""
     db_path = tmp_path / "prompt_manager.db"
     repo = PromptRepository(str(db_path))
     manager = PromptManager(
@@ -174,6 +178,7 @@ def test_clear_usage_logs_handles_missing_directory(tmp_path: Path) -> None:
 
 
 def test_rebuild_embeddings_resets_store_and_regenerates_vectors(tmp_path: Path) -> None:
+    """Recreate embedding vectors after dropping the backing store."""
     db_path = tmp_path / "prompt_manager.db"
     repo = PromptRepository(str(db_path))
     prompt_one = _make_prompt("Alpha")
@@ -203,6 +208,7 @@ def test_rebuild_embeddings_resets_store_and_regenerates_vectors(tmp_path: Path)
 
 
 def test_rebuild_embeddings_counts_generation_failures(tmp_path: Path) -> None:
+    """Surface failures encountered while regenerating embeddings."""
     db_path = tmp_path / "prompt_manager.db"
     repo = PromptRepository(str(db_path))
     repo.add(_make_prompt())

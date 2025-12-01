@@ -19,6 +19,7 @@ from models.prompt_model import (
 
 
 def test_helper_functions_cover_edge_cases() -> None:
+    """Exercise helper conversion utilities against edge-case payloads."""
     sample_uuid = uuid.uuid4()
     assert _ensure_uuid(sample_uuid) is sample_uuid
     assert _ensure_uuid(str(sample_uuid)) == sample_uuid
@@ -50,6 +51,7 @@ def test_helper_functions_cover_edge_cases() -> None:
 
 
 def test_prompt_roundtrip_metadata_and_record() -> None:
+    """Ensure prompts serialize and deserialize their metadata faithfully."""
     prompt = Prompt(
         id=uuid.uuid4(),
         name="Serializer",
@@ -102,6 +104,7 @@ def test_prompt_roundtrip_metadata_and_record() -> None:
 
 
 def test_prompt_from_chroma_handles_stringified_lists() -> None:
+    """Handle Chroma records that encode list fields as JSON strings."""
     prompt_id = str(uuid.uuid4())
     chroma_record = {
         "id": prompt_id,

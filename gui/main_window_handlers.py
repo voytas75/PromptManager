@@ -18,6 +18,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from PySide6.QtCore import QPoint
     from PySide6.QtWidgets import QWidget
 
+    from config import PromptManagerSettings
     from models.prompt_model import Prompt
 
     from .catalog_workflow_controller import CatalogWorkflowController
@@ -221,7 +222,7 @@ class PromptActionsHandler:
             return
         launcher.show_info_dialog()
 
-    def open_settings_dialog(self, settings) -> None:
+    def open_settings_dialog(self, settings: PromptManagerSettings | None) -> None:
         """Launch the settings workflow with the provided settings object."""
         workflow = self._settings_workflow_supplier()
         if workflow is None:

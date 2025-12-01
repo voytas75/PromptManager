@@ -19,6 +19,7 @@ from gui.dialogs import PromptVersionHistoryDialog
 
 @pytest.fixture(scope="module")
 def qt_app() -> QApplication:
+    """Provide a shared Qt application instance for UI tests."""
     app = QApplication.instance()
     if app is None:
         app = QApplication([])
@@ -35,6 +36,7 @@ def _prompt_stub() -> SimpleNamespace:
 
 
 def test_version_history_dialog_defaults_to_body_tab(qt_app: QApplication) -> None:
+    """Ensure the prompt body tab is selected by default when opened."""
     dialog = PromptVersionHistoryDialog(_ManagerStub(), _prompt_stub())
     try:
         tab_titles = [

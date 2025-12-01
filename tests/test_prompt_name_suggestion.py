@@ -130,6 +130,7 @@ fallback_suggest_prompt_name = dialogs.fallback_suggest_prompt_name
 
 
 def test_suggest_prompt_name_uses_first_words() -> None:
+    """Base fallback names on the leading words of the prompt text."""
     text = "Review backend service module for race conditions and logging gaps."
     name = fallback_suggest_prompt_name(text)
     assert name.startswith("Review Backend Service Module")
@@ -137,9 +138,11 @@ def test_suggest_prompt_name_uses_first_words() -> None:
 
 
 def test_suggest_prompt_name_handles_empty_input() -> None:
+    """Return empty strings when the source text lacks content."""
     assert fallback_suggest_prompt_name("") == ""
     assert fallback_suggest_prompt_name("   ") == ""
 
 
 def test_suggest_prompt_name_allows_short_text() -> None:
+    """Keep short snippets intact when generating names."""
     assert fallback_suggest_prompt_name("Cleanup") == "Cleanup"

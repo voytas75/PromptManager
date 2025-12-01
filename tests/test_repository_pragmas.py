@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
 
 def test_connect_configures_sqlite_pragmas(tmp_path: Path) -> None:
+    """Verify SQLite pragmas are set when establishing repository connections."""
     db_path = tmp_path / "pragmas.db"
     with _connect(db_path) as conn:
         foreign_keys = conn.execute("PRAGMA foreign_keys;").fetchone()[0]

@@ -5,25 +5,31 @@ Updates:
 """
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
-from PySide6.QtWidgets import QDialog, QMessageBox, QPlainTextEdit, QMainWindow
+from PySide6.QtWidgets import QDialog, QMainWindow, QPlainTextEdit
 
 from core import PromptExecutionUnavailable, PromptHistoryError
 
 from .dialogs import SaveResultDialog
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Sequence
     from uuid import UUID
 
     from core import PromptManager
     from models.prompt_model import Prompt
 
     from .controllers.execution_controller import ExecutionController
-    from .workspace_view_controller import WorkspaceViewController
     from .history_panel import HistoryPanel
     from .usage_logger import IntentUsageLogger
+    from .workspace_view_controller import WorkspaceViewController
+else:  # pragma: no cover - runtime placeholders for type-only imports
+    from typing import Any as _Any
+
+    Callable = _Any
+    Sequence = _Any
+    UUID = _Any
 
 
 class WorkspaceActionsController:
@@ -46,6 +52,7 @@ class WorkspaceActionsController:
         refresh_prompt_after_rating: Callable[[UUID], None],
         execute_from_prompt_body: Callable[[Prompt], None],
     ) -> None:
+        """Persist references to workspace widgets, managers, and callbacks."""
         self._parent = parent
         self._manager = manager
         self._query_input = query_input

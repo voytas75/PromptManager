@@ -5,15 +5,23 @@ Updates:
 """
 from __future__ import annotations
 
+import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-import re
-from typing import Mapping, Sequence
+from typing import TYPE_CHECKING
 
 from core.templating import SchemaValidationMode
 from models.category_model import slugify_category
 from models.prompt_model import Prompt
+
+if TYPE_CHECKING:  # pragma: no cover - typing helpers
+    from collections.abc import Mapping, Sequence
+else:  # pragma: no cover - runtime placeholders for type-only imports
+    from typing import Any as _Any
+
+    Mapping = _Any
+    Sequence = _Any
 
 
 def _now() -> datetime:

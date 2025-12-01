@@ -19,6 +19,7 @@ def _make_note(text: str = "Remember to test edge cases") -> PromptNote:
 
 
 def test_prompt_note_roundtrip() -> None:
+    """Serialize and deserialize prompt notes without losing fields."""
     note = _make_note()
     record = note.to_record()
     loaded = PromptNote.from_record(record)
@@ -27,6 +28,7 @@ def test_prompt_note_roundtrip() -> None:
 
 
 def test_repository_crud(tmp_path) -> None:
+    """Exercise CRUD operations for prompt notes in the repository."""
     repo = PromptRepository(str(tmp_path / "notes.db"))
     note = _make_note("Ship release notes")
 

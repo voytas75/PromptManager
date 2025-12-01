@@ -5,14 +5,27 @@ Updates:
 """
 from __future__ import annotations
 
-from typing import Callable
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QTextCursor
-from PySide6.QtWidgets import QLabel, QPlainTextEdit, QTabWidget
 
-from .controllers.execution_controller import ExecutionController
-from .quick_action_controller import QuickActionController
+if TYPE_CHECKING:  # pragma: no cover - typing helpers
+    from collections.abc import Callable
+
+    from PySide6.QtWidgets import QLabel, QPlainTextEdit, QTabWidget
+
+    from .controllers.execution_controller import ExecutionController
+    from .quick_action_controller import QuickActionController
+else:  # pragma: no cover - runtime placeholders for type-only imports
+    from typing import Any as _Any
+
+    Callable = _Any
+    QLabel = _Any
+    QPlainTextEdit = _Any
+    QTabWidget = _Any
+    ExecutionController = _Any
+    QuickActionController = _Any
 
 
 class WorkspaceViewController:
@@ -27,6 +40,7 @@ class WorkspaceViewController:
         execution_controller_supplier: Callable[[], ExecutionController | None],
         quick_action_controller_supplier: Callable[[], QuickActionController | None],
     ) -> None:
+        """Capture workspace widgets and helper callbacks."""
         self._query_input = query_input
         self._result_tabs = result_tabs
         self._intent_hint = intent_hint_label

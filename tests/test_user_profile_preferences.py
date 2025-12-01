@@ -67,6 +67,7 @@ def _make_prompt(name: str, category: str, tags: list[str]) -> Prompt:
 
 
 def test_user_profile_records_usage() -> None:
+    """Track prompt usage statistics per category and tag."""
     profile = UserProfile.create_default()
     prompt = _make_prompt("Debugger", "Debug", ["debugging", "ci"])
 
@@ -78,6 +79,7 @@ def test_user_profile_records_usage() -> None:
 
 
 def test_repository_persists_profile(tmp_path) -> None:
+    """Persist and reload user profile data via the repository."""
     repo = PromptRepository(str(tmp_path / "profile.db"))
     prompt = _make_prompt("Doc Helper", "Documentation", ["docs"])
 
@@ -90,6 +92,7 @@ def test_repository_persists_profile(tmp_path) -> None:
 
 
 def test_personalisation_biases_prompt_order(tmp_path) -> None:
+    """Bias ranking results using stored user preferences."""
     repo = PromptRepository(str(tmp_path / "prefs.db"))
     manager = PromptManager(
         chroma_path=str(tmp_path / "chroma"),

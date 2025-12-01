@@ -392,6 +392,7 @@ class PromptExecution:
     metadata: MutableMapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
+        """Ensure executions always have a stable input hash."""
         if not self.input_hash:
             self.input_hash = _hash_text(self.request_text)
 

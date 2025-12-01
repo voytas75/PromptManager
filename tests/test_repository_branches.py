@@ -66,6 +66,7 @@ def _make_prompt_note(text: str = "Remember to review logs") -> PromptNote:
 
 
 def test_json_helpers_cover_edge_cases() -> None:
+    """Validate JSON helper fallbacks for malformed or null data."""
     assert _json_dumps(None) is None
     assert _json_dumps(["a"]).startswith("[")
 
@@ -84,6 +85,7 @@ def test_json_helpers_cover_edge_cases() -> None:
 
 
 def test_repository_add_duplicate_raises_error(tmp_path: Path) -> None:
+    """Reject duplicate prompts when inserting into the repository."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     prompt = _make_prompt()
     repo.add(prompt)
@@ -92,6 +94,7 @@ def test_repository_add_duplicate_raises_error(tmp_path: Path) -> None:
 
 
 def test_repository_update_missing_prompt(tmp_path: Path) -> None:
+    """Raise when attempting to update prompts that do not exist."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     missing = _make_prompt()
     with pytest.raises(RepositoryNotFoundError):
@@ -99,12 +102,14 @@ def test_repository_update_missing_prompt(tmp_path: Path) -> None:
 
 
 def test_repository_delete_missing_prompt(tmp_path: Path) -> None:
+    """Raise when trying to delete prompts that are not stored."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     with pytest.raises(RepositoryNotFoundError):
         repo.delete(uuid.uuid4())
 
 
 def test_repository_list_with_limit(tmp_path: Path) -> None:
+    """Respect the limit parameter when listing prompts."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     prompts = [_make_prompt(f"p-{idx}") for idx in range(3)]
     for prompt in prompts:
@@ -116,6 +121,7 @@ def test_repository_list_with_limit(tmp_path: Path) -> None:
 
 
 def test_repository_execution_roundtrip(tmp_path: Path) -> None:
+    """Persist execution records and retrieve them with matching data."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     prompt = _make_prompt()
     repo.add(prompt)
@@ -147,6 +153,7 @@ def test_repository_execution_roundtrip(tmp_path: Path) -> None:
 
 
 def test_repository_add_execution_duplicate_error(tmp_path: Path) -> None:
+    """Prevent duplicate execution IDs from being inserted."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     prompt = _make_prompt()
     repo.add(prompt)
@@ -165,6 +172,7 @@ def test_repository_add_execution_duplicate_error(tmp_path: Path) -> None:
 
 
 def test_repository_filtered_execution_query(tmp_path: Path) -> None:
+    """Filter executions by prompt and status as expected."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     prompt_a = _make_prompt("Prompt A")
     prompt_b = _make_prompt("Prompt B")
@@ -207,6 +215,7 @@ def test_repository_filtered_execution_query(tmp_path: Path) -> None:
 
 
 def test_prompt_version_roundtrip(tmp_path: Path) -> None:
+    """Store and retrieve prompt versions including metadata fields."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     prompt = _make_prompt("Versioned Prompt")
     repo.add(prompt)
@@ -232,6 +241,7 @@ def test_prompt_version_roundtrip(tmp_path: Path) -> None:
 
 
 def test_prompt_version_listing_helpers(tmp_path: Path) -> None:
+    """List prompt versions in descending order with helper methods."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     prompt = _make_prompt("Version Sequence")
     repo.add(prompt)
@@ -246,6 +256,7 @@ def test_prompt_version_listing_helpers(tmp_path: Path) -> None:
 
 
 def test_prompt_fork_links(tmp_path: Path) -> None:
+    """Link forked prompts back to their source entries."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     source = _make_prompt("Source")
     child = _make_prompt("Child")
@@ -264,6 +275,7 @@ def test_prompt_fork_links(tmp_path: Path) -> None:
 
 
 def test_category_update_propagates_prompt_label(tmp_path: Path) -> None:
+    """Apply updated category labels to existing prompts."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     category = PromptCategory(slug="tests", label="Tests", description="Testing prompts")
     repo.create_category(category)
@@ -285,6 +297,7 @@ def test_category_update_propagates_prompt_label(tmp_path: Path) -> None:
 
 
 def test_category_registry_ensure_creates_custom_entry(tmp_path: Path) -> None:
+    """Create custom categories when ensuring registry entries."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     registry = CategoryRegistry(repo)
     custom = registry.ensure(slug="custom-support", label="Custom Support")
@@ -294,6 +307,7 @@ def test_category_registry_ensure_creates_custom_entry(tmp_path: Path) -> None:
 
 
 def test_prompt_catalogue_stats_cover_edge_cases(tmp_path: Path) -> None:
+    """Compute catalogue stats even when datasets are sparse."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     recent = _make_prompt("Recent")
     recent.category = "Docs"
@@ -321,6 +335,7 @@ def test_prompt_catalogue_stats_cover_edge_cases(tmp_path: Path) -> None:
 
 
 def test_get_prompts_for_ids_preserves_order(tmp_path: Path) -> None:
+    """Return prompts in the requested order of IDs."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     first = _make_prompt("First")
     second = _make_prompt("Second")
@@ -332,6 +347,7 @@ def test_get_prompts_for_ids_preserves_order(tmp_path: Path) -> None:
 
 
 def test_repository_backfills_category_slugs(tmp_path: Path) -> None:
+    """Backfill missing category slugs for legacy records."""
     db_path = tmp_path / "legacy.db"
     with sqlite3.connect(db_path) as conn:
         conn.execute(
@@ -417,6 +433,7 @@ def test_repository_backfills_category_slugs(tmp_path: Path) -> None:
 
 
 def test_list_categories_include_archived(tmp_path: Path) -> None:
+    """Include archived categories when requesting the full list."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     category = PromptCategory(slug="docs", label="Docs", description="Docs")
     repo.create_category(category)
@@ -428,6 +445,7 @@ def test_list_categories_include_archived(tmp_path: Path) -> None:
 
 
 def test_get_category_normalizes_slug(tmp_path: Path) -> None:
+    """Normalize lookup slugs when fetching categories."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     category = PromptCategory(slug="helpers", label="Helpers", description="Helpers")
     repo.create_category(category)
@@ -436,6 +454,7 @@ def test_get_category_normalizes_slug(tmp_path: Path) -> None:
 
 
 def test_set_category_active_toggles_state(tmp_path: Path) -> None:
+    """Toggle category active state and persist the change."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     category = PromptCategory(slug="docs", label="Docs", description="Docs prompts")
     repo.create_category(category)
@@ -448,6 +467,7 @@ def test_set_category_active_toggles_state(tmp_path: Path) -> None:
 
 
 def test_user_profile_roundtrip(tmp_path: Path) -> None:
+    """Persist and reload user profile preferences."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     profile = repo.get_user_profile()
     profile.username = "tester"
@@ -460,6 +480,7 @@ def test_repository_update_category_sql_error(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Surface SQL exceptions encountered during category updates."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     category = PromptCategory(slug="docs", label="Docs", description="Docs")
     repo.create_category(category)
@@ -473,6 +494,7 @@ def test_repository_update_category_sql_error(
 
 
 def test_response_style_crud(tmp_path: Path) -> None:
+    """Validate CRUD operations for response style records."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     style = _make_response_style()
     repo.add_response_style(style)
@@ -493,6 +515,7 @@ def test_response_style_crud(tmp_path: Path) -> None:
 def test_response_style_sql_errors(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Surface repository errors when response style queries fail."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     style = _make_response_style()
 
@@ -505,6 +528,7 @@ def test_response_style_sql_errors(
 
 
 def test_prompt_note_crud(tmp_path: Path) -> None:
+    """CRUD workflow for prompt notes behaves as expected."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     note = _make_prompt_note()
     repo.add_prompt_note(note)
@@ -518,6 +542,7 @@ def test_prompt_note_crud(tmp_path: Path) -> None:
 
 
 def test_prompt_note_errors(tmp_path: Path) -> None:
+    """Raise repository errors encountered while managing prompt notes."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     note = _make_prompt_note()
     with pytest.raises(RepositoryNotFoundError):
@@ -527,6 +552,7 @@ def test_prompt_note_errors(tmp_path: Path) -> None:
 
 
 def test_parse_optional_datetime_variants() -> None:
+    """Support multiple datetime input shapes in helper parser."""
     naive = datetime(2024, 1, 1, 12, 0, 0)
     parsed_naive = _parse_optional_datetime(naive)
     assert parsed_naive.tzinfo is not None
@@ -538,6 +564,7 @@ def test_parse_optional_datetime_variants() -> None:
 
 
 def test_sync_category_definitions_and_get_category(tmp_path: Path) -> None:
+    """Synchronize and retrieve category definitions from the repository."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     categories = [
         PromptCategory(slug="analysis", label="Analysis", description="Analysis prompts"),
@@ -549,6 +576,7 @@ def test_sync_category_definitions_and_get_category(tmp_path: Path) -> None:
 
 
 def test_update_prompt_category_labels_applies_to_prompts(tmp_path: Path) -> None:
+    """Apply refreshed category labels to prompts sharing the category."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     category = PromptCategory(slug="legacy", label="Legacy", description="Legacy")
     repo.create_category(category)
@@ -562,6 +590,7 @@ def test_update_prompt_category_labels_applies_to_prompts(tmp_path: Path) -> Non
 
 
 def test_update_execution_roundtrip(tmp_path: Path) -> None:
+    """Update execution metadata and ensure it persists."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     prompt = _make_prompt("Execution prompt")
     repo.add(prompt)
@@ -589,6 +618,7 @@ def test_update_execution_roundtrip(tmp_path: Path) -> None:
 
 
 def test_create_category_duplicate_raises(tmp_path: Path) -> None:
+    """Fail when trying to create a category whose slug already exists."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     category = PromptCategory(slug="dup", label="Duplicate", description="dup")
     repo.create_category(category)

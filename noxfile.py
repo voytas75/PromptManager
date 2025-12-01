@@ -1,5 +1,4 @@
-"""
-noxfile.py - Nox sessions for Prompt Manager
+"""noxfile.py - Nox sessions for Prompt Manager.
 
 Updates:
   v0.2.3 - 2025-11-29 - Convert missing-tool warning to f-string for Ruff UP031.

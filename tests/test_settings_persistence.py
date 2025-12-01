@@ -8,6 +8,7 @@ from config.settings import DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR, DEFAULT_CHAT_US
 
 
 def test_persist_settings_to_config(tmp_path, monkeypatch):
+    """Persist configured settings overrides to config.json."""
     monkeypatch.chdir(tmp_path)
 
     from config.persistence import persist_settings_to_config
@@ -26,6 +27,7 @@ def test_persist_settings_to_config(tmp_path, monkeypatch):
 
 
 def test_persist_settings_to_config_persists_chat_palette_override(tmp_path, monkeypatch):
+    """Write non-default chat palette overrides to the config file."""
     monkeypatch.chdir(tmp_path)
 
     from config.persistence import persist_settings_to_config
@@ -43,6 +45,7 @@ def test_persist_settings_to_config_persists_chat_palette_override(tmp_path, mon
 
 
 def test_persist_settings_to_config_ignores_default_palette(tmp_path, monkeypatch):
+    """Avoid writing chat colors when they match the defaults."""
     monkeypatch.chdir(tmp_path)
 
     from config.persistence import persist_settings_to_config
