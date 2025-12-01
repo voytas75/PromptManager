@@ -1,6 +1,7 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.15.80 - 2025-12-01 - Modularized layout, workspace, template preview, notifications, and prompt actions into dedicated controllers.
   v0.15.79 - 2025-12-01 - Delegated theme/palette, runtime settings, catalog, and share workflows to helpers.
   v0.15.78 - 2025-12-01 - Guard tab change handler until widgets are initialised.
   v0.15.77 - 2025-12-01 - Extract prompt list coordinator for loading/filtering/sorting logic.
@@ -27,16 +28,12 @@ Updates:
 from __future__ import annotations
 
 import logging
-from collections import deque
 from datetime import UTC, datetime
 from functools import partial
-from typing import (
-    TYPE_CHECKING,
-    Any,
-)
+from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QModelIndex, QPoint, QSettings, Qt
-from PySide6.QtGui import QGuiApplication, QResizeEvent, QShowEvent, QTextCursor
+from PySide6.QtCore import QModelIndex, QPoint, QSettings
+from PySide6.QtGui import QResizeEvent, QShowEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -44,11 +41,9 @@ from PySide6.QtWidgets import (
     QLabel,
     QListView,
     QMainWindow,
-    QMenu,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
-    QSplitter,
     QTabWidget,
     QWidget,
 )
@@ -66,8 +61,6 @@ from config import (
 from core import (
     IntentLabel,
     NameGenerationError,
-    PromptExecutionUnavailable,
-    PromptHistoryError,
     PromptManager,
     PromptManagerError,
     PromptNotFoundError,
@@ -75,7 +68,6 @@ from core import (
     PromptVersionError,
     RepositoryError,
 )
-from core.notifications import Notification, NotificationStatus
 from core.sharing import ShareTextProvider
 from models.category_model import PromptCategory, slugify_category
 
@@ -87,15 +79,14 @@ from .dialogs import (
     CategoryManagerDialog,
     InfoDialog,
     PromptVersionHistoryDialog,
-    SaveResultDialog,
 )
-from .execute_context_dialog import ExecuteContextDialog
 from .language_tools import DetectedLanguage, detect_language
+from .layout_controller import LayoutController
 from .layout_state import WindowStateManager
 from .main_view_builder import MainViewCallbacks, MainViewComponents, build_main_view
-from .notifications import BackgroundTaskCenterDialog, QtNotificationBridge
-from .processing_indicator import ProcessingIndicator
+from .notification_controller import NotificationController
 from .prompt_editor_flow import PromptDialogFactory, PromptEditorFlow
+from .prompt_actions_controller import PromptActionsController
 from .prompt_list_coordinator import PromptListCoordinator, PromptSortOrder
 from .prompt_list_model import PromptListModel
 from .prompt_list_presenter import PromptListCallbacks, PromptListPresenter
@@ -105,9 +96,11 @@ from .runtime_settings_service import RuntimeSettingsResult, RuntimeSettingsServ
 from .settings_dialog import SettingsDialog
 from .share_controller import ShareController
 from .share_workflow import ShareWorkflowCoordinator
+from .template_preview_controller import TemplatePreviewController
 from .toast import show_toast
 from .usage_logger import IntentUsageLogger
 from .widgets import PromptDetailWidget, PromptFilterPanel, PromptToolbar
+from .workspace_actions_controller import WorkspaceActionsController
 from .workbench.workbench_window import WorkbenchModeDialog, WorkbenchWindow
 from .workspace_view_controller import WorkspaceViewController
 
@@ -208,10 +201,12 @@ class MainWindow(QMainWindow):
         self._template_list_view: QListView | None = None
         self._template_detail_widget: PromptDetailWidget | None = None
         self._template_run_shortcut_button: QPushButton | None = None
-        self._template_transition_indicator: ProcessingIndicator | None = None
         self._result_overlay: ResultActionsOverlay | None = None
         self._tab_widget: QTabWidget | None = None
         self._workspace_view: WorkspaceViewController | None = None
+        self._template_preview_controller: TemplatePreviewController | None = None
+        self._workspace_actions: WorkspaceActionsController | None = None
+        self._prompt_actions_controller: PromptActionsController | None = None
         self._share_controller = ShareController(
             self,
             toast_callback=lambda message, duration_ms=2500: show_toast(self, message, duration_ms),
@@ -234,35 +229,18 @@ class MainWindow(QMainWindow):
         self._share_workflow.register_provider(ShareTextProvider())
         settings = QSettings("PromptManager", "MainWindow")
         self._layout_state = WindowStateManager(settings)
+        self._layout_controller = LayoutController(self._layout_state)
         filter_prefs = self._layout_state.load_filter_preferences()
         pending_category_slug = filter_prefs.category_slug
         pending_tag_value = filter_prefs.tag
         pending_quality_value = filter_prefs.min_quality
         stored_sort_value = filter_prefs.sort_value
-        execute_state = self._layout_state.load_execute_context_state()
-        self._last_execute_context_task = execute_state.last_task
-        self._execute_context_history_limit = self._layout_state.history_limit
-        self._execute_context_history = execute_state.history
         self._main_container: QFrame | None = None
-        self._main_splitter: QSplitter | None = None
-        self._list_splitter: QSplitter | None = None
-        self._workspace_splitter: QSplitter | None = None
-        self._template_preview_splitter: QSplitter | None = None
-        self._template_preview_list_splitter: QSplitter | None = None
-        self._main_splitter_left_width: int | None = None
-        self._suppress_main_splitter_sync = False
-        self._notification_history: deque[Notification] = deque(maxlen=200)
-        self._active_notifications: dict[str, Notification] = {}
-        for note in self._manager.notification_center.history():
-            self._notification_history.append(note)
-            self._update_active_notification(note)
         self._notification_indicator = QLabel("", self)
         self._notification_indicator.setObjectName("notificationIndicator")
         self._notification_indicator.setStyleSheet("color: #2f80ed; font-weight: 500;")
-        self._notification_indicator.setVisible(bool(self._active_notifications))
-        self._task_center_dialog: BackgroundTaskCenterDialog | None = None
-        self._notification_bridge = QtNotificationBridge(self._manager.notification_center, self)
-        self._notification_bridge.notification_received.connect(self._handle_notification)
+        self._notification_indicator.setVisible(False)
+        self._notification_controller: NotificationController | None = None
         self.setWindowTitle("Prompt Manager")
         self._layout_state.restore_window_geometry(self)
         self._build_ui()
@@ -338,9 +316,8 @@ class MainWindow(QMainWindow):
         self._execution_controller.notify_share_providers_changed()
         self._appearance_controller.apply_theme()
         self._restore_splitter_state()
-        self._capture_main_splitter_left_width()
         self.statusBar().addPermanentWidget(self._notification_indicator)
-        self._update_notification_indicator()
+        self._initialize_notification_controller()
         self._load_prompts()
 
     def _build_ui(self) -> None:
@@ -401,6 +378,22 @@ class MainWindow(QMainWindow):
             history_export_callback=self._handle_history_export,
         )
         self._assign_main_view_components(components)
+        self._workspace_actions = WorkspaceActionsController(
+            parent=self,
+            manager=self._manager,
+            query_input=self._query_input,
+            execution_controller_supplier=lambda: self._execution_controller,
+            current_prompt_supplier=self._current_prompt,
+            prompt_list_supplier=lambda: self._model.prompts(),
+            workspace_view=self._workspace_view,
+            history_panel=self._history_panel,
+            usage_logger=self._usage_logger,
+            status_callback=self._show_status_message,
+            error_callback=self._show_error,
+            disable_save_button=lambda enabled: self._save_button.setEnabled(enabled),
+            refresh_prompt_after_rating=self._refresh_prompt_after_rating,
+            execute_from_prompt_body=self._execute_prompt_from_context_menu,
+        )
         self._appearance_controller.set_container(self._main_container)
         self._update_detected_language(self._query_input.toPlainText(), force=True)
         self.setCentralWidget(self._main_container)
@@ -447,11 +440,22 @@ class MainWindow(QMainWindow):
         self._query_input = components.query_input
         self._highlighter = CodeHighlighter(self._query_input.document())
         self._tab_widget = components.tab_widget
-        self._main_splitter = components.main_splitter
-        self._main_splitter.splitterMoved.connect(self._on_main_splitter_moved)  # type: ignore[arg-type]
-        self._list_splitter = components.list_splitter
+        main_splitter = components.main_splitter
+        if main_splitter is not None:
+            main_splitter.splitterMoved.connect(  # type: ignore[arg-type]
+                lambda *_: self._layout_controller.handle_main_splitter_moved()
+            )
+        self._layout_controller.configure(
+            main_splitter=main_splitter,
+            list_splitter=components.list_splitter,
+            workspace_splitter=components.workspace_splitter,
+            template_preview_splitter=components.template_preview_splitter,
+            template_preview_list_splitter=components.template_preview_list_splitter,
+            template_preview=components.template_preview,
+            filter_panel=components.filter_panel,
+            toolbar=components.toolbar,
+        )
         self._list_view = components.list_view
-        self._workspace_splitter = components.workspace_splitter
         self._result_label = components.result_label
         self._result_meta = components.result_meta
         self._result_tabs = components.result_tabs
@@ -463,6 +467,24 @@ class MainWindow(QMainWindow):
             execution_controller_supplier=lambda: self._execution_controller,
             quick_action_controller_supplier=lambda: self._quick_action_controller,
         )
+        self._prompt_actions_controller = PromptActionsController(
+            parent=self,
+            model=self._model,
+            list_view=self._list_view,
+            query_input=self._query_input,
+            layout_state=self._layout_state,
+            workspace_view=self._workspace_view,
+            execution_controller_supplier=lambda: self._execution_controller,
+            current_prompt_supplier=self._current_prompt,
+            edit_callback=self._on_edit_clicked,
+            duplicate_callback=self._duplicate_prompt,
+            fork_callback=self._fork_prompt,
+            similar_callback=self._show_similar_prompts,
+            status_callback=self._show_status_message,
+            error_callback=self._show_error,
+            toast_callback=self._show_toast,
+            usage_logger=self._usage_logger,
+        )
         self._result_text = components.result_text
         self._result_overlay = components.result_overlay
         self._chat_history_view = components.chat_history_view
@@ -471,8 +493,6 @@ class MainWindow(QMainWindow):
         self._notes_panel = components.notes_panel
         self._response_styles_panel = components.response_styles_panel
         self._analytics_panel = components.analytics_panel
-        self._template_preview_splitter = components.template_preview_splitter
-        self._template_preview_list_splitter = components.template_preview_list_splitter
         self._template_list_view = components.template_list_view
         self._template_detail_widget = components.template_detail_widget
         self._template_preview = components.template_preview
@@ -486,109 +506,57 @@ class MainWindow(QMainWindow):
         self._template_detail_widget.refresh_scenarios_requested.connect(  # type: ignore[arg-type]
             partial(self._handle_refresh_scenarios_request, self._template_detail_widget)
         )
+        self._template_preview_controller = TemplatePreviewController(
+            parent=self,
+            tab_widget=self._tab_widget,
+            template_preview=self._template_preview,
+            template_run_button=self._template_run_shortcut_button,
+            execution_controller_supplier=lambda: self._execution_controller,
+            current_prompt_supplier=self._current_prompt,
+            error_callback=self._show_error,
+            status_callback=self._show_status_message,
+        )
+
+    def _initialize_notification_controller(self) -> None:
+        """Wire the notification bridge and seed the indicator state."""
+        self._notification_controller = NotificationController(
+            parent=self,
+            indicator=self._notification_indicator,
+            notification_center=self._manager.notification_center,
+            status_callback=self._show_status_message,
+            toast_callback=self._show_toast,
+        )
+        self._notification_controller.bootstrap_history(self._manager.notification_center.history())
 
     def _restore_splitter_state(self) -> None:
         """Restore splitter sizes from persisted settings."""
-        self._layout_state.restore_splitter_sizes(self._splitter_state_entries())
-
-    def _capture_main_splitter_left_width(self) -> None:
-        """Record the current width of the left pane for resize management."""
-        if self._main_splitter is None:
-            return
-        sizes = self._main_splitter.sizes()
-        if len(sizes) < 2:
-            return
-        self._main_splitter_left_width = max(sizes[0], 0)
-
-    def _enforce_main_splitter_left_width(self) -> None:
-        """Ensure left pane width stays constant when the window is resized."""
-        if self._main_splitter is None:
-            return
-        if self._main_splitter_left_width is None:
-            self._capture_main_splitter_left_width()
-            return
-        sizes = self._main_splitter.sizes()
-        if len(sizes) < 2:
-            return
-        total = sum(sizes)
-        if total <= 0:
-            return
-        minimum_right = 1 if total > 1 else 0
-        locked_width = min(self._main_splitter_left_width, total - minimum_right)
-        locked_width = max(locked_width, 0)
-        right_width = total - locked_width
-        if right_width < minimum_right:
-            right_width = minimum_right
-            locked_width = total - right_width
-        if locked_width == sizes[0]:
-            self._main_splitter_left_width = locked_width
-            return
-        self._suppress_main_splitter_sync = True
-        try:
-            self._main_splitter.setSizes([locked_width, right_width])
-        finally:
-            self._suppress_main_splitter_sync = False
-        self._main_splitter_left_width = locked_width
-
-    def _on_main_splitter_moved(self, _position: int, _index: int) -> None:
-        """Update stored left pane width when the splitter is dragged."""
-        if self._suppress_main_splitter_sync or self._main_splitter is None:
-            return
-        sizes = self._main_splitter.sizes()
-        if len(sizes) < 2:
-            return
-        self._main_splitter_left_width = max(sizes[0], 0)
+        self._layout_controller.restore_splitter_state()
 
     def _save_splitter_state(self) -> None:
         """Persist splitter sizes for future sessions."""
-        self._layout_state.save_splitter_sizes(self._splitter_state_entries())
-
-    def _splitter_state_entries(self) -> list[tuple[str, QSplitter | None]]:
-        """Return splitter/key mappings used for persistence."""
-        entries: list[tuple[str, QSplitter | None]] = [
-            ("mainSplitter", self._main_splitter),
-            ("listSplitter", self._list_splitter),
-            ("workspaceSplitter", self._workspace_splitter),
-            ("templatePreviewSplitter", self._template_preview_splitter),
-            ("templatePreviewListSplitter", self._template_preview_list_splitter),
-        ]
-        if self._template_preview is not None:
-            entries.append(
-                ("templatePreviewContentSplitter", self._template_preview.content_splitter)
-            )
-        return entries
+        self._layout_controller.save_splitter_state()
 
     def _persist_filter_preferences(self) -> None:
         """Persist the current category, tag, and quality filters."""
-        panel = self._filter_panel
-        if panel is None:
-            return
-        self._layout_state.persist_filter_preferences(
-            category_slug=panel.category_slug(),
-            tag=panel.tag_value(),
-            min_quality=panel.min_quality(),
-        )
+        self._layout_controller.persist_filter_preferences()
 
     def _persist_sort_preference(self) -> None:
         """Persist the currently selected sort order."""
-        self._layout_state.persist_sort_order(self._sort_order)
+        self._layout_controller.persist_sort_preference(self._sort_order)
 
     def _current_search_text(self) -> str:
         """Return the current text in the toolbar search field."""
-        if self._toolbar is None:
-            return ""
-        return self._toolbar.search_text()
+        return self._layout_controller.current_search_text()
 
     def showEvent(self, event: QShowEvent) -> None:  # type: ignore[override]
         """Ensure splitter state is captured once the window is visible."""
         super().showEvent(event)
-        self._capture_main_splitter_left_width()
-        self._enforce_main_splitter_left_width()
+        self._layout_controller.handle_show_event()
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # type: ignore[override]
         """Keep splitter stable when the window resizes."""
         super().resizeEvent(event)
-        self._enforce_main_splitter_left_width()
+        self._layout_controller.handle_resize_event()
 
     def _load_prompts(self, search_text: str = "", *, use_indicator: bool = False) -> None:
         """Delegate prompt loading to the presenter."""
@@ -940,6 +908,13 @@ class MainWindow(QMainWindow):
         if top_name:
             self.statusBar().showMessage(f"Top suggestion: {top_name}", 5000)
 
+    def _show_similar_prompts(self, prompt: Prompt) -> None:
+        """Delegate to the presenter to display similar prompts."""
+        presenter = self._prompt_presenter
+        if presenter is None:
+            return
+        presenter.show_similar_prompts(prompt)
+
     def _on_tab_changed(self, index: int) -> None:
         if self._tab_widget is None:
             return
@@ -947,129 +922,50 @@ class MainWindow(QMainWindow):
         if widget is self._history_panel:
             self._history_panel.refresh()
             self._usage_logger.log_history_view(total=self._history_panel.row_count())
-        if index == 0:
-            self._hide_template_transition_indicator()
+        if index == 0 and self._template_preview_controller is not None:
+            self._template_preview_controller.hide_transition_indicator()
 
     def _on_save_result_clicked(self) -> None:
         """Persist the latest execution result with optional user notes."""
-        controller = self._execution_controller
-        if controller is None:
-            self._show_error("Workspace unavailable", "Execution controller is not ready.")
+        if self._workspace_actions is None:
             return
-        outcome = controller.last_execution
-        if outcome is None:
-            self.statusBar().showMessage("Run a prompt before saving the result.", 3000)
-            return
-        prompt = self._current_prompt()
-        presenter = self._prompt_presenter
-        if prompt is None and presenter is not None:
-            prompts = presenter.current_prompts
-            if prompts:
-                prompt = prompts[0]
-        if prompt is None:
-            self.statusBar().showMessage("Select a prompt to associate with the result.", 3000)
-            return
-        default_summary = outcome.result.response_text[:200] if outcome.result.response_text else ""
-        dialog = SaveResultDialog(
-            self,
-            prompt_name=prompt.name,
-            default_text=default_summary,
-            button_text="Save",
-            enable_rating=True,
-        )
-        if dialog.exec() != QDialog.Accepted:
-            return
-        note = dialog.note
-        rating_value = dialog.rating
-        metadata: dict[str, Any] = {"source": "manual-save"}
-        if note:
-            metadata["note"] = note
-        if outcome.history_entry is not None:
-            metadata["source_execution_id"] = str(outcome.history_entry.id)
-
-        usage_metadata = outcome.result.usage if outcome.result.usage else None
-        try:
-            saved_entry = self._manager.save_execution_result(
-                prompt.id,
-                outcome.result.request_text,
-                outcome.result.response_text,
-                duration_ms=outcome.result.duration_ms,
-                usage=usage_metadata,
-                metadata=metadata,
-                rating=rating_value,
-            )
-        except PromptExecutionUnavailable as exc:
-            self._save_button.setEnabled(False)
-            self._show_error("History unavailable", str(exc))
-            return
-        except PromptHistoryError as exc:
-            self._show_error("Unable to save result", str(exc))
-            return
-
-        self._usage_logger.log_save(
-            prompt_name=prompt.name,
-            note_length=len(note),
-            rating=rating_value,
-        )
-        executed_at = saved_entry.executed_at.astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
-        self.statusBar().showMessage(f"Result saved ({executed_at}).", 5000)
-        if rating_value is not None:
-            self._refresh_prompt_after_rating(prompt.id)
-        self._history_panel.refresh()
+        self._workspace_actions.save_result()
 
     def _on_continue_chat_clicked(self) -> None:
         """Send a follow-up message within the active chat session."""
-        controller = self._execution_controller
-        if controller is None:
-            self._show_error("Workspace unavailable", "Execution controller is not ready.")
+        if self._workspace_actions is None:
             return
-        controller.continue_chat()
+        self._workspace_actions.continue_chat()
 
     def _on_end_chat_clicked(self) -> None:
         """Terminate the active chat session without clearing the transcript."""
-        controller = self._execution_controller
-        if controller is None:
-            self._show_error("Workspace unavailable", "Execution controller is not ready.")
+        if self._workspace_actions is None:
             return
-        controller.end_chat()
+        self._workspace_actions.end_chat()
 
     def _on_run_prompt_clicked(self) -> None:
         """Execute the selected prompt, seeding from the workspace or the prompt body."""
-        prompt = self._current_prompt()
-        if prompt is None:
-            prompts = self._model.prompts()
-            prompt = prompts[0] if prompts else None
-        if prompt is None:
-            self.statusBar().showMessage("Select a prompt to execute first.", 4000)
+        if self._workspace_actions is None:
             return
-        request_text = self._query_input.toPlainText()
-        if not request_text.strip():
-            self._execute_prompt_from_context_menu(prompt)
-            return
-        controller = self._execution_controller
-        if controller is None:
-            self._show_error("Workspace unavailable", "Execution controller is not ready.")
-            return
-        controller.execute_prompt_with_text(
-            prompt,
-            request_text,
-            status_prefix="Executed",
-            empty_text_message="Paste some text or code before executing a prompt.",
-            keep_text_after=False,
-        )
+        self._workspace_actions.run_prompt()
 
     def _on_clear_workspace_clicked(self) -> None:
         """Clear the workspace editor, output tab, and chat transcript."""
-        if self._workspace_view is not None:
-            self._workspace_view.clear()
+        if self._workspace_actions is None:
+            return
+        self._workspace_actions.clear_workspace()
 
     def _handle_note_update(self, execution_id: UUID, note: str) -> None:
         """Record analytics when execution notes are edited."""
-        self._usage_logger.log_note_edit(note_length=len(note))
+        if self._workspace_actions is None:
+            return
+        self._workspace_actions.handle_note_update(execution_id, note)
 
     def _handle_history_export(self, entries: int, path: str) -> None:
         """Record analytics when history is exported."""
-        self._usage_logger.log_history_export(entries=entries, path=path)
+        if self._workspace_actions is None:
+            return
+        self._workspace_actions.handle_history_export(entries, path)
 
     def _on_copy_prompt_clicked(self) -> None:
         """Copy the currently selected prompt body to the clipboard."""
@@ -1084,14 +980,9 @@ class MainWindow(QMainWindow):
 
     def _copy_prompt_to_clipboard(self, prompt: Prompt) -> None:
         """Copy a prompt's primary text to the clipboard with status feedback."""
-        payload = prompt.context or prompt.description
-        if not payload:
-            self.statusBar().showMessage("Selected prompt does not include a body to copy.", 3000)
+        if self._prompt_actions_controller is None:
             return
-        clipboard = QGuiApplication.clipboard()
-        clipboard.setText(payload)
-        self._show_toast(f"Copied '{prompt.name}' to the clipboard.")
-        self._usage_logger.log_copy(prompt_name=prompt.name, prompt_has_body=bool(prompt.context))
+        self._prompt_actions_controller.copy_prompt_to_clipboard(prompt)
 
     def _on_share_prompt_requested(self) -> None:
         """Display provider choices and initiate the share workflow."""
@@ -1103,19 +994,9 @@ class MainWindow(QMainWindow):
 
     def _show_prompt_description(self, prompt: Prompt) -> None:
         """Display the prompt description in a dialog for quick reference."""
-        description = (prompt.description or "").strip()
-        if not description:
-            QMessageBox.information(
-                self,
-                "No description available",
-                "The selected prompt does not have a description yet.",
-            )
+        if self._prompt_actions_controller is None:
             return
-        QMessageBox.information(
-            self,
-            f"{prompt.name} — Description",
-            description,
-        )
+        self._prompt_actions_controller.show_prompt_description(prompt)
 
     def _on_render_markdown_toggled(self, _state: int) -> None:
         """Refresh result and chat panes when the markdown toggle changes."""
@@ -1124,19 +1005,15 @@ class MainWindow(QMainWindow):
 
     def _on_copy_result_clicked(self) -> None:
         """Copy the latest execution result to the clipboard."""
-        controller = self._execution_controller
-        if controller is None:
-            self._show_error("Workspace unavailable", "Execution controller is not ready.")
+        if self._workspace_actions is None:
             return
-        controller.copy_result_to_clipboard()
+        self._workspace_actions.copy_result_to_clipboard()
 
     def _on_copy_result_to_text_window_clicked(self) -> None:
         """Populate the workspace text window with the latest execution result."""
-        controller = self._execution_controller
-        if controller is None:
-            self._show_error("Workspace unavailable", "Execution controller is not ready.")
+        if self._workspace_actions is None:
             return
-        controller.copy_result_to_workspace()
+        self._workspace_actions.copy_result_to_workspace()
 
     def _current_prompt(self) -> Prompt | None:
         """Return the prompt currently selected in the list."""
@@ -1188,91 +1065,15 @@ class MainWindow(QMainWindow):
 
     def _on_prompt_context_menu(self, point: QPoint) -> None:
         """Show a context menu with prompt-specific actions."""
-        index = self._list_view.indexAt(point)
-        prompt: Prompt | None = None
-        if index.isValid():
-            self._list_view.setCurrentIndex(index)
-            prompt = self._model.prompt_at(index.row())
-        else:
-            prompt = self._current_prompt()
-
-        menu = QMenu(self)
-        edit_action = menu.addAction("Edit Prompt")
-        duplicate_action = menu.addAction("Duplicate Prompt")
-        fork_action = menu.addAction("Fork Prompt")
-        similar_action = menu.addAction("Similar Prompts")
-        execute_action = menu.addAction("Execute Prompt")
-        execute_context_action = menu.addAction("Execute as Context…")
-        copy_action = menu.addAction("Copy Prompt Text")
-        description_action = menu.addAction("Show Description")
-
-        if prompt is None:
-            edit_action.setEnabled(False)
-            duplicate_action.setEnabled(False)
-            fork_action.setEnabled(False)
-            similar_action.setEnabled(False)
-            execute_action.setEnabled(False)
-            execute_context_action.setEnabled(False)
-            copy_action.setEnabled(False)
-            description_action.setEnabled(False)
-        else:
-            can_execute = bool((prompt.context or prompt.description) and self._manager.executor)
-            execute_action.setEnabled(can_execute)
-            has_context_body = bool((prompt.context or "").strip())
-            execute_context_action.setEnabled(bool(self._manager.executor) and has_context_body)
-            fork_action.setEnabled(True)
-            similar_action.setEnabled(True)
-            if not (prompt.context or prompt.description):
-                copy_action.setEnabled(False)
-            if not (prompt.description and prompt.description.strip()):
-                description_action.setEnabled(False)
-
-        selected_action = menu.exec(self._list_view.viewport().mapToGlobal(point))
-        if selected_action is None:
+        if self._prompt_actions_controller is None:
             return
-        if selected_action is edit_action:
-            self._on_edit_clicked()
-        elif selected_action is duplicate_action and prompt is not None:
-            self._duplicate_prompt(prompt)
-        elif selected_action is fork_action and prompt is not None:
-            self._fork_prompt(prompt)
-        elif selected_action is similar_action and prompt is not None:
-            if self._prompt_presenter is not None:
-                self._prompt_presenter.show_similar_prompts(prompt)
-        elif selected_action is execute_action and prompt is not None:
-            self._execute_prompt_from_context_menu(prompt)
-        elif selected_action is execute_context_action and prompt is not None:
-            self._execute_prompt_as_context(prompt)
-        elif selected_action is copy_action and prompt is not None:
-            self._copy_prompt_to_clipboard(prompt)
-        elif selected_action is description_action and prompt is not None:
-            self._show_prompt_description(prompt)
+        self._prompt_actions_controller.show_context_menu(point)
 
     def _execute_prompt_from_context_menu(self, prompt: Prompt) -> None:
         """Populate the workspace with the prompt body and execute immediately."""
-        raw_payload = prompt.context or prompt.description or ""
-        if not raw_payload.strip():
-            self.statusBar().showMessage(
-                "Selected prompt does not include any text to execute.",
-                4000,
-            )
+        if self._prompt_actions_controller is None:
             return
-        self._query_input.setPlainText(raw_payload)
-        cursor = self._query_input.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        self._query_input.setTextCursor(cursor)
-        self._query_input.setFocus(Qt.ShortcutFocusReason)
-        controller = self._execution_controller
-        if controller is None:
-            self._show_error("Workspace unavailable", "Execution controller is not ready.")
-            return
-        controller.execute_prompt_with_text(
-            prompt,
-            raw_payload,
-            status_prefix="Executed",
-            empty_text_message="Selected prompt does not include any text to execute.",
-            keep_text_after=True,
-        )
+        self._prompt_actions_controller.execute_prompt_from_body(prompt)
 
     def _execute_prompt_as_context(
         self,
@@ -1282,54 +1083,13 @@ class MainWindow(QMainWindow):
         context_override: str | None = None,
     ) -> None:
         """Ask for a task and run the prompt using its body as contextual input."""
-        context_text = context_override if context_override is not None else prompt.context or ""
-        cleaned_context = context_text.strip()
-        if not cleaned_context:
-            message = "Selected prompt does not include a prompt body to use as context."
-            if parent is not None:
-                QMessageBox.information(parent, "Execute as context", message)
-            else:
-                self._show_status_message(message, 5000)
+        if self._prompt_actions_controller is None:
             return
-        parent_widget = parent or self
-        if self._workspace_view is not None:
-            self._workspace_view.set_text(context_text, focus=True)
-        dialog = ExecuteContextDialog(
-            parent=parent_widget,
-            last_task=self._last_execute_context_task,
-            history=tuple(self._execute_context_history),
+        self._prompt_actions_controller.execute_prompt_as_context(
+            prompt,
+            parent=parent,
+            context_override=context_override,
         )
-        if dialog.exec() != QDialog.Accepted:
-            return
-        task_text = dialog.task_text()
-        cleaned_task = task_text.strip()
-        if not cleaned_task:
-            QMessageBox.warning(parent_widget, "Task required", "Enter a task before executing.")
-            return
-        self._last_execute_context_task = task_text
-        self._layout_state.persist_last_execute_task(task_text)
-        self._layout_state.record_execute_task(task_text, self._execute_context_history)
-        request_payload = (
-            "You will receive a task and a context block. "
-            "Use the context exclusively when fulfilling the task.\n\n"
-            f"Task:\n{cleaned_task}\n\n"
-            f"Context:\n{cleaned_context}"
-        )
-        controller = self._execution_controller
-        if controller is None:
-            self._show_error("Workspace unavailable", "Execution controller is not ready.")
-            return
-        try:
-            controller.execute_prompt_with_text(
-                prompt,
-                request_payload,
-                status_prefix="Executed context",
-                empty_text_message="Provide context text before executing.",
-                keep_text_after=False,
-            )
-        finally:
-            if self._workspace_view is not None:
-                self._workspace_view.set_text(context_text, focus=False)
 
     def _on_template_preview_run_requested(
         self,
@@ -1337,33 +1097,9 @@ class MainWindow(QMainWindow):
         variables: dict[str, str],
     ) -> None:
         """Execute the selected prompt using the rendered template preview text."""
-        prompt = self._current_prompt()
-        if prompt is None:
-            self._show_status_message("Select a prompt before running from the preview.", 4000)
+        if self._template_preview_controller is None:
             return
-        payload = rendered_text.strip()
-        if not payload:
-            self._show_status_message("Render the template before running it.", 4000)
-            return
-        if variables:
-            self.statusBar().showMessage(
-                f"Running template with {len(variables)} variable(s)…",
-                2000,
-            )
-        if self._tab_widget.currentIndex() != 0:
-            self._show_template_transition_indicator()
-            self._tab_widget.setCurrentIndex(0)
-        controller = self._execution_controller
-        if controller is None:
-            self._show_error("Workspace unavailable", "Execution controller is not ready.")
-            return
-        controller.execute_prompt_with_text(
-            prompt,
-            payload,
-            status_prefix="Executed preview",
-            empty_text_message="Render the template before running it.",
-            keep_text_after=False,
-        )
+        self._template_preview_controller.handle_run_requested(rendered_text, variables)
 
     def _duplicate_prompt(self, prompt: Prompt) -> None:
         """Open a creation dialog with the selected prompt pre-filled and persist the copy."""
@@ -1637,108 +1373,35 @@ class MainWindow(QMainWindow):
 
     def _update_template_preview(self, prompt: Prompt | None) -> None:
         """Refresh the workspace template preview widget for the selected prompt."""
-        if self._template_preview is None:
+        if self._template_preview_controller is None:
             return
-        if prompt is None:
-            self._template_preview.clear_template()
-            return
-        template_text = prompt.context or prompt.description or ""
-        self._template_preview.set_template(template_text, str(prompt.id))
+        self._template_preview_controller.update_preview(prompt)
 
     def _on_template_run_state_changed(self, can_run: bool) -> None:
         """Synchronise the Template tab shortcut button with preview availability."""
-        if self._template_run_shortcut_button is not None:
-            self._template_run_shortcut_button.setEnabled(can_run)
+        if self._template_preview_controller is None:
+            return
+        self._template_preview_controller.handle_run_state_changed(can_run)
 
     def _on_template_tab_run_clicked(self) -> None:
         """Invoke the template preview execution shortcut."""
-        if self._template_preview is None:
+        if self._template_preview_controller is None:
             return
-        if not self._template_preview.request_run():
-            self._show_status_message("Render the template before running it.", 4000)
-
-    def _show_template_transition_indicator(self) -> None:
-        """Display a busy dialog while switching from Template to Prompts."""
-        if self._template_transition_indicator is not None:
-            return
-        indicator = ProcessingIndicator(self, "Opening Prompts tab…", title="Switching Tabs")
-        indicator.__enter__()
-        self._template_transition_indicator = indicator
-
-    def _hide_template_transition_indicator(self) -> None:
-        """Dismiss the template transition indicator if it is visible."""
-        indicator = self._template_transition_indicator
-        if indicator is None:
-            return
-        self._template_transition_indicator = None
-        indicator.__exit__(None, None, None)
-
-    def _handle_notification(self, notification: Notification) -> None:
-        """React to notification updates published by the core manager."""
-        self._register_notification(notification, show_status=True)
-
-    def _register_notification(self, notification: Notification, *, show_status: bool) -> None:
-        self._notification_history.append(notification)
-        self._update_active_notification(notification)
-        self._update_notification_indicator()
-        if self._task_center_dialog is not None:
-            self._task_center_dialog.handle_notification(notification)
-        if show_status:
-            message = self._format_notification_message(notification)
-            duration = 0 if notification.status is NotificationStatus.STARTED else 5000
-            self.statusBar().showMessage(message, duration)
-        if notification.task_id and notification.status in {
-            NotificationStatus.SUCCEEDED,
-            NotificationStatus.FAILED,
-        }:
-            toast_duration = 3500 if notification.status is NotificationStatus.SUCCEEDED else 4500
-            self._show_toast(self._format_notification_message(notification), toast_duration)
-
-    def _update_active_notification(self, notification: Notification) -> None:
-        task_id = notification.task_id
-        if not task_id:
-            return
-        if notification.status is NotificationStatus.STARTED:
-            self._active_notifications[task_id] = notification
-        elif notification.status in {NotificationStatus.SUCCEEDED, NotificationStatus.FAILED}:
-            self._active_notifications.pop(task_id, None)
-
-    def _update_notification_indicator(self) -> None:
-        active = len(self._active_notifications)
-        if active:
-            self._notification_indicator.setText(f"Tasks: {active}")
-            self._notification_indicator.setVisible(True)
-        else:
-            self._notification_indicator.clear()
-            self._notification_indicator.setVisible(False)
-
-    @staticmethod
-    def _format_notification_message(notification: Notification) -> str:
-        status = notification.status.value.replace("_", " ").title()
-        return f"{notification.title}: {status} — {notification.message}"
+        self._template_preview_controller.handle_template_tab_run_clicked()
 
     def _on_notifications_clicked(self) -> None:
-        dialog = self._ensure_task_center_dialog()
-        dialog.set_history(tuple(self._notification_history))
-        dialog.set_active_notifications(tuple(self._active_notifications.values()))
-        dialog.show()
-        dialog.raise_()
-        dialog.activateWindow()
-
-    def _ensure_task_center_dialog(self) -> BackgroundTaskCenterDialog:
-        if self._task_center_dialog is None:
-            self._task_center_dialog = BackgroundTaskCenterDialog(self)
-        return self._task_center_dialog
+        if self._notification_controller is None:
+            return
+        self._notification_controller.show_task_center()
 
     def closeEvent(self, event) -> None:  # type: ignore[override]
         """Persist layout before closing and dispose transient dialogs."""
         self._layout_state.save_window_geometry(self)
         self._save_splitter_state()
-        if hasattr(self, "_notification_bridge"):
-            self._notification_bridge.close()
-        if self._task_center_dialog is not None:
-            self._task_center_dialog.close()
-        self._hide_template_transition_indicator()
+        if self._notification_controller is not None:
+            self._notification_controller.close()
+        if self._template_preview_controller is not None:
+            self._template_preview_controller.hide_transition_indicator()
         super().closeEvent(event)
 
     @staticmethod
