@@ -166,7 +166,6 @@ def _detect_unsupported_parameters(
 
 def serialise_litellm_response(response: object) -> dict[str, Any] | None:
     """Return a plain dictionary view of LiteLLM responses when possible."""
-
     if isinstance(response, Mapping):
         mapping = cast("Mapping[str, Any]", response)
         return {str(key): value for key, value in mapping.items()}

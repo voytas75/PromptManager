@@ -44,6 +44,7 @@ class QuickAction:
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any]) -> QuickAction:
+        """Create a ``QuickAction`` from a mapping, enforcing required fields."""
         identifier = str(data.get("identifier") or data.get("id") or "").strip()
         title = str(data.get("title") or "").strip()
         description = str(data.get("description") or "").strip()
@@ -72,7 +73,6 @@ class QuickAction:
 
 def rank_prompts_for_action(prompts: Iterable[Prompt], action: QuickAction) -> list[Prompt]:
     """Return prompts ordered by how well they match the quick action hints."""
-
     candidates: list[tuple[int, Prompt]] = []
     tags = set(tag.lower() for tag in action.tag_hints)
     category = (action.category_hint or "").lower()
@@ -95,6 +95,7 @@ class CommandPaletteDialog(QDialog):
     """Simple command palette enabling keyboard navigation across quick actions."""
 
     def __init__(self, actions: Sequence[QuickAction], parent=None) -> None:
+        """Configure dialog widgets and preload the quick action list."""
         super().__init__(parent)
         self.setWindowTitle("Command Palette")
         self.setModal(True)
@@ -132,9 +133,11 @@ class CommandPaletteDialog(QDialog):
 
     @property
     def selected_action(self) -> QuickAction | None:
+        """Return the last action accepted from the palette, if any."""
         return self._selected
 
     def _populate_list(self, actions: Sequence[QuickAction]) -> None:
+        """Populate the list widget with the provided quick actions."""
         self._list_widget.clear()
         self._filtered_actions = list(actions)
         for action in actions:
@@ -148,6 +151,7 @@ class CommandPaletteDialog(QDialog):
             self._list_widget.setCurrentRow(0)
 
     def _on_search_changed(self, text: str) -> None:
+        """Filter quick actions whenever the search input changes."""
         stripped = text.strip().lower()
         if not stripped:
             self._populate_list(self._actions)
@@ -162,6 +166,7 @@ class CommandPaletteDialog(QDialog):
         self._populate_list(matches)
 
     def _on_item_activated(self, item: QListWidgetItem) -> None:
+        """Accept the dialog when an action item is activated."""
         identifier = item.data(Qt.UserRole)
         for action in self._filtered_actions:
             if action.identifier == identifier:
@@ -170,6 +175,7 @@ class CommandPaletteDialog(QDialog):
         self.accept()
 
     def _show_help(self) -> None:
+        """Display a modal dialog summarising all available quick actions."""
         help_lines: list[str] = []
         for action in self._actions:
             shortcut_hint = f" [{action.shortcut}]" if action.shortcut else ""

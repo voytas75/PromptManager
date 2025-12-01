@@ -6,8 +6,9 @@ Updates:
 
 from __future__ import annotations
 
+from collections import abc
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from PySide6.QtWidgets import QDialog, QFileDialog, QMessageBox, QWidget
@@ -18,9 +19,11 @@ from core import (
     export_prompt_catalog,
     import_prompt_catalog,
 )
-from models.prompt_model import Prompt
 
 from .dialogs import CatalogPreviewDialog, PromptMaintenanceDialog
+
+if TYPE_CHECKING:
+    from models.prompt_model import Prompt
 
 
 class CatalogWorkflowController:
@@ -31,27 +34,30 @@ class CatalogWorkflowController:
         parent: QWidget,
         manager: PromptManager,
         *,
-        load_prompts: Callable[[str], None],
-        current_search_text: Callable[[], str],
-        select_prompt: Callable[[UUID], None],
-        current_prompt: Callable[[], Prompt | None],
-        show_status: Callable[[str, int], None],
-        generate_category: Callable[[str], str],
-        generate_tags: Callable[[str], list[str]],
+        load_prompts: abc.Callable[[str], None],
+        current_search_text: abc.Callable[[], str],
+        select_prompt: abc.Callable[[UUID], None],
+        current_prompt: abc.Callable[[], Prompt | None],
+        show_status: abc.Callable[[str, int], None],
+        generate_category: abc.Callable[[str], str],
+        generate_tags: abc.Callable[[str], list[str]],
     ) -> None:
+        """Store shared callbacks and dependencies for catalogue workflows."""
         self._parent = parent
         self._manager = manager
-        self._load_prompts = load_prompts
-        self._current_search_text = current_search_text
-        self._select_prompt = select_prompt
-        self._current_prompt = current_prompt
-        self._show_status = show_status
-        self._generate_category = generate_category
-        self._generate_tags = generate_tags
+        self._load_prompts = self._ensure_callable(load_prompts, "load_prompts")
+        self._current_search_text = self._ensure_callable(
+            current_search_text,
+            "current_search_text",
+        )
+        self._select_prompt = self._ensure_callable(select_prompt, "select_prompt")
+        self._current_prompt = self._ensure_callable(current_prompt, "current_prompt")
+        self._show_status = self._ensure_callable(show_status, "show_status")
+        self._generate_category = self._ensure_callable(generate_category, "generate_category")
+        self._generate_tags = self._ensure_callable(generate_tags, "generate_tags")
 
     def open_import_dialog(self) -> None:
         """Preview catalogue diff and optionally apply updates."""
-
         file_path, _ = QFileDialog.getOpenFileName(
             self._parent,
             "Select catalogue file",
@@ -101,7 +107,6 @@ class CatalogWorkflowController:
 
     def export_catalog(self) -> None:
         """Export current prompts to JSON or YAML."""
-
         default_path = str(Path.home() / "prompt_catalog.json")
         file_path, selected_filter = QFileDialog.getSaveFileName(
             self._parent,
@@ -126,7 +131,6 @@ class CatalogWorkflowController:
 
     def open_maintenance_dialog(self) -> None:
         """Launch the maintenance dialog for batch metadata helpers."""
-
         dialog = PromptMaintenanceDialog(
             self._parent,
             self._manager,
@@ -144,6 +148,13 @@ class CatalogWorkflowController:
             self._select_prompt(selected_id)
         if message:
             self._show_status(message, 5000)
+
+    @staticmethod
+    def _ensure_callable(callback: Any, name: str) -> abc.Callable[..., Any]:
+        """Ensure the provided callback is callable before storing it."""
+        if not isinstance(callback, abc.Callable):
+            raise TypeError(f"{name} callback must be callable")
+        return callback
 
 
 __all__ = ["CatalogWorkflowController"]

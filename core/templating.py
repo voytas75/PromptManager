@@ -23,7 +23,6 @@ from models.category_model import slugify_category
 
 def _truncate_filter(value: Any, limit: int = 500, suffix: str = "…") -> str:
     """Return ``value`` trimmed to ``limit`` characters with ``suffix`` appended."""
-
     text = str(value or "")
     if limit <= 0 or len(text) <= limit:
         return text
@@ -34,14 +33,12 @@ def _truncate_filter(value: Any, limit: int = 500, suffix: str = "…") -> str:
 
 def _slugify_filter(value: Any) -> str:
     """Return a slugified version of ``value`` using the project helper."""
-
     text = str(value or "")
     return slugify_category(text) or text.replace(" ", "-").lower()
 
 
 def _json_filter(value: Any, *, indent: int | None = None) -> str:
     """Return ``value`` serialized as JSON with optional pretty printing."""
-
     return json.dumps(value, ensure_ascii=False, indent=indent)
 
 
@@ -56,7 +53,6 @@ class TemplateRenderResult:
 
 def format_template_syntax_error(template_text: str, exc: TemplateSyntaxError) -> str:
     """Return a descriptive syntax error message with line context and hints."""
-
     base = f"Template syntax error on line {exc.lineno}: {exc.message}"
     line_text = _line_at(template_text, exc.lineno)
     if line_text:
@@ -125,6 +121,7 @@ class TemplateRenderer:
     _SPECIAL_VARIABLES: set[str] = {"cycler", "loop", "namespace", "super", "caller"}
 
     def __init__(self) -> None:
+        """Configure the Jinja2 environment with safe defaults and custom filters."""
         self._env = Environment(
             undefined=StrictUndefined,
             autoescape=False,
@@ -141,7 +138,6 @@ class TemplateRenderer:
 
     def extract_variables(self, template_text: str) -> list[str]:
         """Return sorted placeholder names referenced within ``template_text``."""
-
         if not template_text.strip():
             return []
         parsed = self._env.parse(template_text)
@@ -154,7 +150,6 @@ class TemplateRenderer:
 
     def render(self, template_text: str, variables: Mapping[str, Any]) -> TemplateRenderResult:
         """Render ``template_text`` with ``variables`` capturing syntax or undefined errors."""
-
         if not template_text.strip():
             return TemplateRenderResult(rendered_text="", errors=[])
         try:
@@ -175,7 +170,6 @@ class TemplateRenderer:
     @staticmethod
     def _infer_missing_variable(message: str) -> set[str]:
         """Best-effort extraction of undefined variable names from Jinja errors."""
-
         pattern = re.compile(r"'(?P<name>[^']+)' is undefined")
         match = pattern.search(message)
         if match:
@@ -193,6 +187,7 @@ class SchemaValidationMode(Enum):
 
     @classmethod
     def from_string(cls, value: str | None) -> SchemaValidationMode:
+        """Return a mode enum member matching ``value`` (defaults to ``NONE``)."""
         if not value:
             return cls.NONE
         lowered = value.strip().lower()
@@ -223,7 +218,6 @@ class SchemaValidator:
         mode: SchemaValidationMode = SchemaValidationMode.NONE,
     ) -> SchemaValidationResult:
         """Validate ``variables`` against ``schema_text`` according to ``mode``."""
-
         if mode is SchemaValidationMode.NONE or not schema_text.strip():
             return SchemaValidationResult(is_valid=True)
 

@@ -6,17 +6,20 @@ Updates:
 
 from __future__ import annotations
 
-from typing import Mapping
+from collections import abc
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QGuiApplication, QPalette
-from PySide6.QtWidgets import QMainWindow, QWidget
 
 from config import (
     DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR,
     DEFAULT_CHAT_USER_BUBBLE_COLOR,
     DEFAULT_THEME_MODE,
 )
+
+if TYPE_CHECKING:
+    from PySide6.QtWidgets import QMainWindow, QWidget
 
 _CHAT_PALETTE_KEYS = {"user", "assistant"}
 
@@ -28,15 +31,14 @@ def _default_chat_palette() -> dict[str, str]:
     }
 
 
-def normalise_chat_palette(palette: Mapping[str, object] | None) -> dict[str, str]:
+def normalise_chat_palette(palette: abc.Mapping[str, object] | None) -> dict[str, str]:
     """Return a validated chat palette containing user/assistant colours.
 
     Invalid entries, unsupported roles, and malformed colour values are ignored.
     Hex codes are normalised to lowercase ``#rrggbb`` strings for consistency.
     """
-
     cleaned: dict[str, str] = {}
-    if not palette:
+    if not palette or not isinstance(palette, abc.Mapping):
         return cleaned
     for role, value in palette.items():
         if role not in _CHAT_PALETTE_KEYS:
@@ -50,8 +52,9 @@ def normalise_chat_palette(palette: Mapping[str, object] | None) -> dict[str, st
     return cleaned
 
 
-def palette_differs_from_defaults(palette: Mapping[str, str] | None) -> bool:
-    if not palette:
+def palette_differs_from_defaults(palette: abc.Mapping[str, str] | None) -> bool:
+    """Return True when the provided palette differs from default chat colours."""
+    if not palette or not isinstance(palette, abc.Mapping):
         return False
     defaults = _default_chat_palette()
     for role, default_hex in defaults.items():
@@ -65,19 +68,18 @@ class AppearanceController:
     """Manage theming and palette styling for the main window."""
 
     def __init__(self, window: QMainWindow, runtime_settings: dict[str, object | None]) -> None:
+        """Store the target window and runtime settings reference."""
         self._window = window
         self._runtime_settings = runtime_settings
         self._container: QWidget | None = None
 
     def set_container(self, container: QWidget | None) -> None:
         """Track the main container so palette refresh can update borders."""
-
         self._container = container
         self.refresh_theme_styles()
 
     def apply_theme(self, mode: str | None = None) -> str:
         """Apply the provided or configured theme and return the active mode."""
-
         app = QGuiApplication.instance()
         if app is None:
             return DEFAULT_THEME_MODE
@@ -123,7 +125,6 @@ class AppearanceController:
 
     def refresh_theme_styles(self) -> None:
         """Update widgets styled using palette-derived colours."""
-
         container = self._container
         if container is None:
             return

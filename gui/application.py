@@ -50,7 +50,6 @@ def _should_force_offscreen(env: MutableMapping[str, str]) -> bool:
 
 def create_qapplication(argv: Sequence[str] | None = None) -> QApplication:
     """Return an existing QApplication or create a new one with sensible defaults."""
-
     app = QApplication.instance()
     if app is not None:
         return app  # Reuse existing instance when running inside tests/tools
@@ -82,7 +81,6 @@ def launch_prompt_manager(
     prompt_manager: PromptManager, settings: PromptManagerSettings | None = None
 ) -> int:
     """Create the Qt event loop, show the main window, and enter the GUI."""
-
     app = create_qapplication()
     icon = load_application_icon()
     if icon is not None:
