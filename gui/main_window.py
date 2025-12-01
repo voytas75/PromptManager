@@ -1,6 +1,7 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.15.79 - 2025-12-01 - Delegated theme/palette, runtime settings, catalog, and share workflows to helpers.
   v0.15.78 - 2025-12-01 - Guard tab change handler until widgets are initialised.
   v0.15.77 - 2025-12-01 - Extract prompt list coordinator for loading/filtering/sorting logic.
   v0.15.76 - 2025-12-01 - Delegate layout persistence to WindowStateManager helper.
@@ -25,30 +26,20 @@ Updates:
 
 from __future__ import annotations
 
-import json
 import logging
 from collections import deque
 from datetime import UTC, datetime
 from functools import partial
-from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
 )
 
 from PySide6.QtCore import QModelIndex, QPoint, QSettings, Qt
-from PySide6.QtGui import (
-    QColor,
-    QGuiApplication,
-    QPalette,
-    QResizeEvent,
-    QShowEvent,
-    QTextCursor,
-)
+from PySide6.QtGui import QGuiApplication, QResizeEvent, QShowEvent, QTextCursor
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
-    QFileDialog,
     QFrame,
     QLabel,
     QListView,
@@ -83,21 +74,18 @@ from core import (
     PromptStorageError,
     PromptVersionError,
     RepositoryError,
-    diff_prompt_catalog,
-    export_prompt_catalog,
-    import_prompt_catalog,
 )
 from core.notifications import Notification, NotificationStatus
-from core.sharing import ShareProvider, ShareTextProvider, format_prompt_for_share
+from core.sharing import ShareTextProvider
 from models.category_model import PromptCategory, slugify_category
 
+from .appearance_controller import AppearanceController
 from .code_highlighter import CodeHighlighter
+from .catalog_workflow_controller import CatalogWorkflowController
 from .controllers.execution_controller import ExecutionController
 from .dialogs import (
-    CatalogPreviewDialog,
     CategoryManagerDialog,
     InfoDialog,
-    PromptMaintenanceDialog,
     PromptVersionHistoryDialog,
     SaveResultDialog,
 )
@@ -113,12 +101,15 @@ from .prompt_list_model import PromptListModel
 from .prompt_list_presenter import PromptListCallbacks, PromptListPresenter
 from .prompt_templates_dialog import PromptTemplateEditorDialog
 from .quick_action_controller import QuickActionController
-from .settings_dialog import SettingsDialog, persist_settings_to_config
+from .runtime_settings_service import RuntimeSettingsResult, RuntimeSettingsService
+from .settings_dialog import SettingsDialog
 from .share_controller import ShareController
+from .share_workflow import ShareWorkflowCoordinator
 from .toast import show_toast
 from .usage_logger import IntentUsageLogger
 from .widgets import PromptDetailWidget, PromptFilterPanel, PromptToolbar
 from .workbench.workbench_window import WorkbenchModeDialog, WorkbenchWindow
+from .workspace_view_controller import WorkspaceViewController
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from collections.abc import Mapping, Sequence
@@ -131,9 +122,6 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from .template_preview import TemplatePreviewWidget
 
 logger = logging.getLogger(__name__)
-
-_CHAT_PALETTE_KEYS = {"user", "assistant"}
-
 
 def _match_category_label(
     value: str | None, categories: Sequence[PromptCategory]
@@ -162,46 +150,6 @@ def _match_category_label(
             return category.label
 
     return None
-
-
-def _default_chat_palette() -> dict[str, str]:
-    return {
-        "user": QColor(DEFAULT_CHAT_USER_BUBBLE_COLOR).name().lower(),
-        "assistant": QColor(DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR).name().lower(),
-    }
-
-
-
-def normalise_chat_palette(palette: Mapping[str, object] | None) -> dict[str, str]:
-    """Return a validated chat palette containing user/assistant colours.
-
-    Invalid entries, unsupported roles, and malformed colour values are ignored.
-    Hex codes are normalised to lowercase ``#rrggbb`` strings for consistency.
-    """
-    cleaned: dict[str, str] = {}
-    if not palette:
-        return cleaned
-    for role, value in palette.items():
-        if role not in _CHAT_PALETTE_KEYS:
-            continue
-        text = str(value).strip()
-        if not text:
-            continue
-        candidate = QColor(text)
-        if candidate.isValid():
-            cleaned[role] = candidate.name().lower()
-    return cleaned
-
-
-def palette_differs_from_defaults(palette: Mapping[str, str] | None) -> bool:
-    if not palette:
-        return False
-    defaults = _default_chat_palette()
-    for role, default_hex in defaults.items():
-        value = palette.get(role)
-        if value is not None and value != default_hex:
-            return True
-    return False
 
 
 class MainWindow(QMainWindow):
@@ -248,7 +196,9 @@ class MainWindow(QMainWindow):
         self._filter_panel: PromptFilterPanel | None = None
         self._sort_order = PromptSortOrder.NAME_ASC
         self._history_limit = 50
-        self._runtime_settings = self._initial_runtime_settings(settings)
+        self._runtime_settings_service = RuntimeSettingsService(self._manager, settings)
+        self._runtime_settings = self._runtime_settings_service.build_initial_runtime_settings()
+        self._appearance_controller = AppearanceController(self, self._runtime_settings)
         self._usage_logger = IntentUsageLogger()
         self._detected_language: DetectedLanguage = detect_language("")
         self._execution_controller: ExecutionController | None = None
@@ -261,6 +211,7 @@ class MainWindow(QMainWindow):
         self._template_transition_indicator: ProcessingIndicator | None = None
         self._result_overlay: ResultActionsOverlay | None = None
         self._tab_widget: QTabWidget | None = None
+        self._workspace_view: WorkspaceViewController | None = None
         self._share_controller = ShareController(
             self,
             toast_callback=self._show_toast,
@@ -269,8 +220,18 @@ class MainWindow(QMainWindow):
             usage_logger=self._usage_logger,
         )
         self._share_result_button: QPushButton | None = None
+        self._share_workflow = ShareWorkflowCoordinator(
+            self._share_controller,
+            detail_widget=self._detail_widget,
+            prompt_supplier=self._detail_widget.current_prompt,
+            share_button_supplier=self._detail_widget.share_button,
+            share_result_button_supplier=lambda: self._share_result_button,
+            execution_controller_supplier=lambda: self._execution_controller,
+            status_callback=self._show_status_message,
+            error_callback=self._show_error,
+        )
         self._workbench_windows: list[WorkbenchWindow] = []
-        self._register_share_provider(ShareTextProvider())
+        self._share_workflow.register_provider(ShareTextProvider())
         settings = QSettings("PromptManager", "MainWindow")
         self._layout_state = WindowStateManager(settings)
         filter_prefs = self._layout_state.load_filter_preferences()
@@ -375,8 +336,7 @@ class MainWindow(QMainWindow):
             settings=self._settings,
         )
         self._execution_controller.notify_share_providers_changed()
-        self._refresh_theme_styles()
-        self._apply_theme()
+        self._appearance_controller.apply_theme()
         self._restore_splitter_state()
         self._capture_main_splitter_left_width()
         self.statusBar().addPermanentWidget(self._notification_indicator)
@@ -441,6 +401,7 @@ class MainWindow(QMainWindow):
             history_export_callback=self._handle_history_export,
         )
         self._assign_main_view_components(components)
+        self._appearance_controller.set_container(self._main_container)
         self._update_detected_language(self._query_input.toPlainText(), force=True)
         self.setCentralWidget(self._main_container)
 
@@ -494,6 +455,14 @@ class MainWindow(QMainWindow):
         self._result_label = components.result_label
         self._result_meta = components.result_meta
         self._result_tabs = components.result_tabs
+        self._workspace_view = WorkspaceViewController(
+            self._query_input,
+            self._result_tabs,
+            self._intent_hint,
+            status_callback=self._show_status_message,
+            execution_controller_supplier=lambda: self._execution_controller,
+            quick_action_controller_supplier=lambda: self._quick_action_controller,
+        )
         self._result_text = components.result_text
         self._result_overlay = components.result_overlay
         self._chat_history_view = components.chat_history_view
@@ -714,71 +683,6 @@ class MainWindow(QMainWindow):
         self._intent_hint.setText(message)
         self._intent_hint.setVisible(True)
 
-    def _apply_theme(self, mode: str | None = None) -> None:
-        """Apply the configured theme palette across the application."""
-        app = QGuiApplication.instance()
-        if app is None:
-            return
-
-        theme = (
-            (mode or self._runtime_settings.get("theme_mode") or DEFAULT_THEME_MODE).strip().lower()
-        )
-        if theme not in {"light", "dark"}:
-            theme = DEFAULT_THEME_MODE
-
-        if theme == "dark":
-            palette = QPalette()
-            palette.setColor(QPalette.Window, QColor(31, 41, 51))
-            palette.setColor(QPalette.WindowText, Qt.white)
-            palette.setColor(QPalette.Base, QColor(24, 31, 41))
-            palette.setColor(QPalette.AlternateBase, QColor(37, 46, 59))
-            palette.setColor(QPalette.ToolTipBase, QColor(45, 55, 68))
-            palette.setColor(QPalette.ToolTipText, Qt.white)
-            palette.setColor(QPalette.Text, QColor(232, 235, 244))
-            palette.setColor(QPalette.Button, QColor(45, 55, 68))
-            palette.setColor(QPalette.ButtonText, Qt.white)
-            palette.setColor(QPalette.BrightText, QColor(255, 107, 107))
-            palette.setColor(QPalette.Link, QColor(140, 180, 255))
-            palette.setColor(QPalette.Highlight, QColor(99, 102, 241))
-            palette.setColor(QPalette.HighlightedText, Qt.white)
-            palette.setColor(QPalette.PlaceholderText, QColor(156, 163, 175))
-            palette.setColor(QPalette.Disabled, QPalette.Text, QColor(110, 115, 125))
-            palette.setColor(QPalette.Disabled, QPalette.ButtonText, QColor(110, 115, 125))
-            app.setPalette(palette)
-            app.setStyleSheet(
-                "QToolTip { color: #f9fafc; background-color: #1f2933; border: 1px solid #3b4252; }"
-            )
-        else:
-            palette = app.style().standardPalette()
-            app.setPalette(palette)
-            app.setStyleSheet("")
-            theme = "light"
-
-        self.setPalette(app.palette())
-        self._runtime_settings["theme_mode"] = theme
-        self._refresh_theme_styles()
-
-    def _refresh_theme_styles(self) -> None:
-        """Update widgets styled using palette-derived colours."""
-        container = self._main_container
-        if container is None:
-            return
-
-        app = QGuiApplication.instance()
-        palette = app.palette() if app is not None else self.palette()
-        window_color = palette.color(QPalette.Window)
-        border_color = QColor(
-            255 - window_color.red(),
-            255 - window_color.green(),
-            255 - window_color.blue(),
-        )
-        border_color.setAlpha(255)
-        container.setStyleSheet(
-            "#mainContainer { "
-            f"border: 1px solid {border_color.name()}; "
-            "border-radius: 6px; background-color: palette(base); }"
-        )
-
     def _on_query_text_changed(self) -> None:
         """Update language detection and syntax highlighting as the user types."""
         text = self._query_input.toPlainText()
@@ -854,6 +758,17 @@ class MainWindow(QMainWindow):
             delete_prompt=self._delete_prompt,
             status_callback=self._show_status_message,
             error_callback=self._show_error,
+        )
+        self._catalog_controller = CatalogWorkflowController(
+            self,
+            self._manager,
+            load_prompts=self._load_prompts,
+            current_search_text=self._current_search_text,
+            select_prompt=self._select_prompt,
+            current_prompt=self._current_prompt,
+            show_status=self._show_status_message,
+            generate_category=self._generate_prompt_category,
+            generate_tags=self._generate_prompt_tags,
         )
 
     def _generate_prompt_name(self, context: str) -> str:
@@ -1118,17 +1033,6 @@ class MainWindow(QMainWindow):
             return
         controller.end_chat()
 
-    def _set_workspace_text(self, text: str, *, focus: bool = False) -> None:
-        """Populate the paste-text workspace with *text* and optionally focus the field."""
-        if self._query_input is None:
-            return
-        self._query_input.setPlainText(text)
-        cursor = self._query_input.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        self._query_input.setTextCursor(cursor)
-        if focus:
-            self._query_input.setFocus(Qt.ShortcutFocusReason)
-
     def _on_run_prompt_clicked(self) -> None:
         """Execute the selected prompt, seeding from the workspace or the prompt body."""
         prompt = self._current_prompt()
@@ -1156,18 +1060,8 @@ class MainWindow(QMainWindow):
 
     def _on_clear_workspace_clicked(self) -> None:
         """Clear the workspace editor, output tab, and chat transcript."""
-        controller = self._execution_controller
-        if controller is not None:
-            controller.abort_streaming()
-            controller.clear_execution_result()
-
-        self._query_input.clear()
-        self._result_tabs.setCurrentIndex(0)
-        self._intent_hint.clear()
-        self._intent_hint.setVisible(False)
-        if self._quick_action_controller is not None:
-            self._quick_action_controller.clear_workspace_seed()
-        self.statusBar().showMessage("Workspace cleared.", 3000)
+        if self._workspace_view is not None:
+            self._workspace_view.clear()
 
     def _handle_note_update(self, execution_id: UUID, note: str) -> None:
         """Record analytics when execution notes are edited."""
@@ -1199,66 +1093,13 @@ class MainWindow(QMainWindow):
         self._show_toast(f"Copied '{prompt.name}' to the clipboard.")
         self._usage_logger.log_copy(prompt_name=prompt.name, prompt_has_body=bool(prompt.context))
 
-    def _register_share_provider(self, provider: ShareProvider) -> None:
-        """Store a share provider so it can be shown in the share menu."""
-        self._share_controller.register_provider(provider)
-        if self._execution_controller is not None:
-            self._execution_controller.notify_share_providers_changed()
-
     def _on_share_prompt_requested(self) -> None:
         """Display provider choices and initiate the share workflow."""
-        prompt = self._detail_widget.current_prompt()
-        if prompt is None:
-            self.statusBar().showMessage("Select a prompt to share first.", 4000)
-            return
-        provider_name = self._share_controller.choose_provider(self._detail_widget.share_button())
-        if not provider_name:
-            return
-        self._share_prompt(provider_name, prompt)
+        self._share_workflow.share_prompt()
 
     def _on_share_result_clicked(self) -> None:
         """Display provider choices for sharing the latest output text."""
-        controller = self._execution_controller
-        if controller is None:
-            self._show_error("Workspace unavailable", "Execution controller is not ready.")
-            return
-        provider_name = self._share_controller.choose_provider(self._share_result_button)
-        if not provider_name:
-            return
-        controller.share_result_text(provider_name)
-
-    def _share_prompt(self, provider_name: str, prompt: Prompt) -> None:
-        """Share *prompt* using the requested provider and copy the share link."""
-        payload = self._build_share_payload(prompt)
-        if payload is None:
-            return
-        self._share_controller.share_payload(
-            provider_name,
-            payload,
-            prompt=prompt,
-            prompt_name=prompt.name,
-            indicator_title="Sharing Prompt",
-            error_title="Unable to share prompt",
-        )
-
-    def _build_share_payload(self, prompt: Prompt) -> str | None:
-        """Return the formatted share payload for the selected mode."""
-        mode = self._detail_widget.share_payload_mode()
-        include_description = mode in {"body_description", "body_description_scenarios"}
-        include_scenarios = mode == "body_description_scenarios"
-        if not (prompt.context or "").strip():
-            self._show_error("Unable to share prompt", "Prompt body is empty.")
-            return None
-        payload = format_prompt_for_share(
-            prompt,
-            include_description=include_description,
-            include_scenarios=include_scenarios,
-            include_metadata=self._detail_widget.share_include_metadata(),
-        )
-        if not payload.strip():
-            self._show_error("Unable to share prompt", "Share payload is empty.")
-            return None
-        return payload
+        self._share_workflow.share_result()
 
     def _show_prompt_description(self, prompt: Prompt) -> None:
         """Display the prompt description in a dialog for quick reference."""
@@ -1451,7 +1292,8 @@ class MainWindow(QMainWindow):
                 self._show_status_message(message, 5000)
             return
         parent_widget = parent or self
-        self._set_workspace_text(context_text, focus=True)
+        if self._workspace_view is not None:
+            self._workspace_view.set_text(context_text, focus=True)
         dialog = ExecuteContextDialog(
             parent=parent_widget,
             last_task=self._last_execute_context_task,
@@ -1486,7 +1328,8 @@ class MainWindow(QMainWindow):
                 keep_text_after=False,
             )
         finally:
-            self._set_workspace_text(context_text, focus=False)
+            if self._workspace_view is not None:
+                self._workspace_view.set_text(context_text, focus=False)
 
     def _on_template_preview_run_requested(
         self,
@@ -1641,94 +1484,16 @@ class MainWindow(QMainWindow):
         self._load_prompts(self._current_search_text())
 
     def _on_import_clicked(self) -> None:
-        """Preview catalogue diff and optionally apply updates."""
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Select catalogue file",
-            "",
-            "JSON Files (*.json);;All Files (*)",
-        )
-        catalog_path: Path | None
-        if file_path:
-            catalog_path = Path(file_path)
-        else:
-            directory = QFileDialog.getExistingDirectory(self, "Select catalogue directory", "")
-            if not directory:
-                return
-            catalog_path = Path(directory)
-
-        catalog_path = catalog_path.expanduser()
-
-        try:
-            preview = diff_prompt_catalog(self._manager, catalog_path)
-        except Exception as exc:
-            QMessageBox.warning(self, "Catalogue preview failed", str(exc))
-            return
-
-        dialog = CatalogPreviewDialog(preview, self)
-        if dialog.exec() != QDialog.Accepted or not dialog.apply_requested:
-            return
-
-        try:
-            result = import_prompt_catalog(self._manager, catalog_path)
-        except Exception as exc:
-            QMessageBox.critical(self, "Catalogue import failed", str(exc))
-            return
-
-        message = (
-            f"Catalogue applied (added {result.added}, updated {result.updated}, "
-            f"skipped {result.skipped}, errors {result.errors})"
-        )
-        if result.errors:
-            QMessageBox.warning(self, "Catalogue applied with errors", message)
-        else:
-            self.statusBar().showMessage(message, 5000)
-        self._load_prompts(self._current_search_text())
+        """Delegate to the catalogue workflow controller."""
+        self._catalog_controller.open_import_dialog()
 
     def _on_export_clicked(self) -> None:
-        """Export current prompts to JSON or YAML."""
-        default_path = str(Path.home() / "prompt_catalog.json")
-        file_path, selected_filter = QFileDialog.getSaveFileName(
-            self,
-            "Export prompt catalogue",
-            default_path,
-            "JSON Files (*.json);;YAML Files (*.yaml *.yml);;All Files (*)",
-        )
-        if not file_path:
-            return
-        export_path = Path(file_path)
-        lower_suffix = export_path.suffix.lower()
-        if selected_filter.startswith("YAML") or lower_suffix in {".yaml", ".yml"}:
-            fmt = "yaml"
-        else:
-            fmt = "json"
-        try:
-            resolved = export_prompt_catalog(self._manager, export_path, fmt=fmt)
-        except Exception as exc:
-            QMessageBox.critical(self, "Export failed", str(exc))
-            return
-        self.statusBar().showMessage(f"Catalogue exported to {resolved}", 5000)
+        """Export prompts via the catalogue controller."""
+        self._catalog_controller.export_catalog()
 
     def _on_maintenance_clicked(self) -> None:
-        """Open the maintenance dialog for batch metadata helpers."""
-        dialog = PromptMaintenanceDialog(
-            self,
-            self._manager,
-            category_generator=self._generate_prompt_category,
-            tags_generator=self._generate_prompt_tags,
-        )
-        dialog.maintenance_applied.connect(self._on_maintenance_applied)  # type: ignore[arg-type]
-        dialog.exec()
-
-    def _on_maintenance_applied(self, message: str) -> None:
-        """Refresh listings after maintenance tasks run."""
-        selected = self._current_prompt()
-        selected_id = selected.id if selected else None
-        self._load_prompts(self._current_search_text())
-        if selected_id is not None:
-            self._select_prompt(selected_id)
-        if message:
-            self.statusBar().showMessage(message, 5000)
+        """Open maintenance workflows via the controller."""
+        self._catalog_controller.open_maintenance_dialog()
 
     def _on_info_clicked(self) -> None:
         """Display application metadata and system characteristics."""
@@ -1784,350 +1549,37 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Closing Prompt Manager…", 2000)
         self.close()
 
-    def _apply_settings(self, updates: dict[str, object | None]) -> None:
-        """Persist settings, refresh catalogue, and update name generator."""
-        if not updates:
-            return
 
-        runtime = self._runtime_settings
+def _apply_settings(self, updates: dict[str, object | None]) -> None:
+    """Persist settings, refresh catalogue, and update dependent controllers."""
+    if not updates:
+        return
 
-        simple_keys = (
-            "litellm_model",
-            "litellm_inference_model",
-            "litellm_api_key",
-            "litellm_api_base",
-            "litellm_api_version",
-            "litellm_reasoning_effort",
+    try:
+        result = self._runtime_settings_service.apply_updates(
+            self._runtime_settings,
+            updates,
         )
-        for key in simple_keys:
-            if key in updates:
-                runtime[key] = updates.get(key)
-
-        if "embedding_backend" in updates or "embedding_model" in updates:
-            backend_value = (
-                updates.get("embedding_backend") or runtime.get("embedding_backend")
-            ) or DEFAULT_EMBEDDING_BACKEND
-            model_value = (
-                updates.get("embedding_model") or runtime.get("embedding_model")
-            ) or DEFAULT_EMBEDDING_MODEL
-            runtime["embedding_backend"] = backend_value
-            runtime["embedding_model"] = model_value
-        embedding_backend_value = runtime.get("embedding_backend", DEFAULT_EMBEDDING_BACKEND)
-
-        cleaned_drop_params: list[str] | None = runtime.get("litellm_drop_params")  # type: ignore[assignment]
-        if "litellm_drop_params" in updates:
-            drop_params_value = updates.get("litellm_drop_params")
-            if isinstance(drop_params_value, list):
-                cleaned_drop_params = [
-                    str(item).strip() for item in drop_params_value if str(item).strip()
-                ]
-            elif isinstance(drop_params_value, str):
-                cleaned_drop_params = [
-                    part.strip() for part in drop_params_value.split(",") if part.strip()
-                ]
-            else:
-                cleaned_drop_params = None
-            runtime["litellm_drop_params"] = cleaned_drop_params
-
-        stream_flag = bool(runtime.get("litellm_stream"))
-        if "litellm_stream" in updates:
-            stream_flag = bool(updates.get("litellm_stream"))
-            runtime["litellm_stream"] = stream_flag
-
-        def _normalise_workflows(value: object | None) -> dict[str, str] | None:
-            if not isinstance(value, dict):
-                return None
-            return {
-                str(key): "inference"
-                for key, route in value.items()
-                if isinstance(route, str) and route.strip().lower() == "inference"
-            }
-
-        cleaned_workflow_models = _normalise_workflows(runtime.get("litellm_workflow_models"))
-        if "litellm_workflow_models" in updates:
-            cleaned_workflow_models = _normalise_workflows(updates.get("litellm_workflow_models"))
-            runtime["litellm_workflow_models"] = cleaned_workflow_models
-
-        cleaned_quick_actions: list[dict[str, object]] | None = None
-        existing_quick_actions = runtime.get("quick_actions")
-        if isinstance(existing_quick_actions, list):
-            cleaned_quick_actions = [
-                dict(entry) for entry in existing_quick_actions if isinstance(entry, dict)
-            ]
-        if "quick_actions" in updates:
-            quick_actions_value = updates.get("quick_actions")
-            if isinstance(quick_actions_value, list):
-                cleaned_quick_actions = [
-                    dict(entry) for entry in quick_actions_value if isinstance(entry, dict)
-                ]
-            else:
-                cleaned_quick_actions = None
-            runtime["quick_actions"] = cleaned_quick_actions
-
-        chat_colour = runtime.get("chat_user_bubble_color", DEFAULT_CHAT_USER_BUBBLE_COLOR)
-        if "chat_user_bubble_color" in updates:
-            color_value = updates.get("chat_user_bubble_color")
-            if isinstance(color_value, str) and QColor(color_value).isValid():
-                chat_colour = QColor(color_value).name().lower()
-            else:
-                chat_colour = DEFAULT_CHAT_USER_BUBBLE_COLOR
-            runtime["chat_user_bubble_color"] = chat_colour
-
-        cleaned_palette = normalise_chat_palette(
-            runtime.get("chat_colors") if isinstance(runtime.get("chat_colors"), dict) else None
-        )
-        if "chat_colors" in updates:
-            palette_input = (
-                updates.get("chat_colors") if isinstance(updates.get("chat_colors"), dict) else None
-            )
-            cleaned_palette = normalise_chat_palette(palette_input)
-            runtime["chat_colors"] = cleaned_palette or None
-
-        theme_choice = runtime.get("theme_mode", DEFAULT_THEME_MODE)
-        if "theme_mode" in updates:
-            theme_value = updates.get("theme_mode")
-            if isinstance(theme_value, str) and theme_value.strip().lower() in {"light", "dark"}:
-                theme_choice = theme_value.strip().lower()
-            else:
-                theme_choice = DEFAULT_THEME_MODE
-            runtime["theme_mode"] = theme_choice
-        if theme_choice not in {"light", "dark"}:
-            theme_choice = DEFAULT_THEME_MODE
-
-        prompt_templates_payload: dict[str, str] | None = runtime.get("prompt_templates")  # type: ignore[assignment]
-        if "prompt_templates" in updates:
-            prompt_templates_value = updates.get("prompt_templates")
-            if isinstance(prompt_templates_value, dict):
-                cleaned_prompt_templates = {
-                    str(key): value.strip()
-                    for key, value in prompt_templates_value.items()
-                    if isinstance(value, str) and value.strip()
-                }
-                prompt_templates_payload = cleaned_prompt_templates or None
-            else:
-                prompt_templates_payload = None
-            runtime["prompt_templates"] = prompt_templates_payload
-        persist_settings_to_config(
-            {
-                "litellm_model": self._runtime_settings.get("litellm_model"),
-                "litellm_inference_model": self._runtime_settings.get("litellm_inference_model"),
-                "litellm_api_base": self._runtime_settings.get("litellm_api_base"),
-                "litellm_api_version": self._runtime_settings.get("litellm_api_version"),
-                "litellm_reasoning_effort": self._runtime_settings.get("litellm_reasoning_effort"),
-                "litellm_workflow_models": self._runtime_settings.get("litellm_workflow_models"),
-                "quick_actions": self._runtime_settings.get("quick_actions"),
-                "litellm_drop_params": self._runtime_settings.get("litellm_drop_params"),
-                "litellm_stream": self._runtime_settings.get("litellm_stream"),
-                "litellm_api_key": self._runtime_settings.get("litellm_api_key"),
-                "embedding_backend": self._runtime_settings.get("embedding_backend"),
-                "embedding_model": self._runtime_settings.get("embedding_model"),
-                "chat_user_bubble_color": self._runtime_settings.get("chat_user_bubble_color"),
-                "chat_colors": (
-                    self._runtime_settings.get("chat_colors")
-                    if palette_differs_from_defaults(self._runtime_settings.get("chat_colors"))
-                    else None
-                ),
-                "theme_mode": self._runtime_settings.get("theme_mode"),
-                "prompt_templates": self._runtime_settings.get("prompt_templates"),
-            }
+    except NameGenerationError as exc:
+        QMessageBox.warning(self, "LiteLLM configuration", str(exc))
+        result = RuntimeSettingsResult(
+            theme_mode=str(self._runtime_settings.get("theme_mode") or DEFAULT_THEME_MODE),
+            has_executor=self._manager.executor is not None,
         )
 
-        if self._settings is not None:
-            self._settings.litellm_model = updates.get("litellm_model")
-            self._settings.litellm_inference_model = updates.get("litellm_inference_model")
-            self._settings.litellm_api_key = updates.get("litellm_api_key")
-            self._settings.litellm_api_base = updates.get("litellm_api_base")
-            self._settings.litellm_api_version = updates.get("litellm_api_version")
-            self._settings.litellm_reasoning_effort = updates.get("litellm_reasoning_effort")
-            self._settings.litellm_workflow_models = cleaned_workflow_models
-            self._settings.quick_actions = cleaned_quick_actions
-            self._settings.litellm_drop_params = cleaned_drop_params
-            self._settings.litellm_stream = stream_flag
-            self._settings.embedding_backend = embedding_backend_value
-            self._settings.embedding_model = self._runtime_settings.get("embedding_model")
-            self._settings.chat_user_bubble_color = chat_colour
-            self._settings.theme_mode = theme_choice
-            if cleaned_palette:
-                palette_model = getattr(self._settings, "chat_colors", None)
-                if isinstance(palette_model, ChatColors):
-                    self._settings.chat_colors = palette_model.model_copy(update=cleaned_palette)
-                else:
-                    self._settings.chat_colors = ChatColors(**cleaned_palette)
-            else:
-                self._settings.chat_colors = ChatColors()
-            if prompt_templates_payload:
-                overrides_model = getattr(self._settings, "prompt_templates", None)
-                if isinstance(overrides_model, PromptTemplateOverrides):
-                    self._settings.prompt_templates = overrides_model.model_copy(
-                        update=prompt_templates_payload
-                    )
-                else:
-                    self._settings.prompt_templates = PromptTemplateOverrides(
-                        **prompt_templates_payload
-                    )
-            else:
-                self._settings.prompt_templates = PromptTemplateOverrides()
+    if self._quick_action_controller is not None:
+        self._quick_action_controller.refresh_actions(
+            self._runtime_settings.get("quick_actions")
+        )
+    self._initialize_prompt_editor_helpers()
+    self._appearance_controller.apply_theme(result.theme_mode)
+    if self._execution_controller is not None:
+        self._execution_controller.refresh_chat_history_view()
 
-        if self._quick_action_controller is not None:
-            self._quick_action_controller.refresh_actions(
-                self._runtime_settings.get("quick_actions")
-            )
-        self._initialize_prompt_editor_helpers()
-        self._apply_theme(theme_choice)
-        if self._execution_controller is not None:
-            self._execution_controller.refresh_chat_history_view()
-
-        try:
-            self._manager.set_name_generator(
-                self._runtime_settings.get("litellm_model"),
-                self._runtime_settings.get("litellm_api_key"),
-                self._runtime_settings.get("litellm_api_base"),
-                self._runtime_settings.get("litellm_api_version"),
-                inference_model=self._runtime_settings.get("litellm_inference_model"),
-                workflow_models=self._runtime_settings.get("litellm_workflow_models"),
-                drop_params=self._runtime_settings.get("litellm_drop_params"),
-                reasoning_effort=self._runtime_settings.get("litellm_reasoning_effort"),
-                stream=self._runtime_settings.get("litellm_stream"),
-                prompt_templates=self._runtime_settings.get("prompt_templates"),
-            )
-        except NameGenerationError as exc:
-            QMessageBox.warning(self, "LiteLLM configuration", str(exc))
-
-        self._load_prompts(self._current_search_text())
-        has_executor = self._manager.executor is not None
-        self._run_button.setEnabled(has_executor)
-        if self._template_preview is not None:
-            self._template_preview.set_run_enabled(has_executor)
-
-    def _initial_runtime_settings(
-        self, settings: PromptManagerSettings | None
-    ) -> dict[str, object | None]:
-        """Load current settings snapshot from configuration."""
-        derived_quick_actions: list[dict[str, object]] | None
-        if settings and settings.quick_actions:
-            derived_quick_actions = [dict(entry) for entry in settings.quick_actions]
-        else:
-            derived_quick_actions = None
-
-        runtime = {
-            "litellm_model": settings.litellm_model if settings else None,
-            "litellm_inference_model": settings.litellm_inference_model if settings else None,
-            "litellm_api_key": settings.litellm_api_key if settings else None,
-            "litellm_api_base": settings.litellm_api_base if settings else None,
-            "litellm_api_version": settings.litellm_api_version if settings else None,
-            "litellm_drop_params": list(settings.litellm_drop_params)
-            if settings and settings.litellm_drop_params
-            else None,
-            "litellm_reasoning_effort": settings.litellm_reasoning_effort if settings else None,
-            "litellm_stream": settings.litellm_stream if settings is not None else None,
-            "litellm_workflow_models": dict(settings.litellm_workflow_models)
-            if settings and settings.litellm_workflow_models
-            else None,
-            "embedding_backend": settings.embedding_backend
-            if settings
-            else DEFAULT_EMBEDDING_BACKEND,
-            "embedding_model": settings.embedding_model if settings else DEFAULT_EMBEDDING_MODEL,
-            "quick_actions": derived_quick_actions,
-            "chat_user_bubble_color": (
-                settings.chat_user_bubble_color if settings else DEFAULT_CHAT_USER_BUBBLE_COLOR
-            ),
-            "theme_mode": settings.theme_mode if settings else DEFAULT_THEME_MODE,
-            "chat_colors": (
-                {
-                    "user": settings.chat_colors.user,
-                    "assistant": settings.chat_colors.assistant,
-                }
-                if settings
-                else None
-            ),
-            "prompt_templates": (
-                settings.prompt_templates.model_dump(exclude_none=True)
-                if settings and settings.prompt_templates
-                else None
-            ),
-        }
-
-        config_path = Path("config/config.json")
-        if config_path.exists():
-            try:
-                data = json.loads(config_path.read_text(encoding="utf-8"))
-            except json.JSONDecodeError:
-                data = {}
-            else:
-                for key in (
-                    "litellm_model",
-                    "litellm_inference_model",
-                    "litellm_api_key",
-                    "litellm_api_base",
-                    "litellm_api_version",
-                    "litellm_reasoning_effort",
-                    "embedding_backend",
-                    "embedding_model",
-                ):
-                    if runtime.get(key) is None and isinstance(data.get(key), str):
-                        runtime[key] = data[key]
-                if runtime.get("litellm_drop_params") is None:
-                    drop_value = data.get("litellm_drop_params")
-                    if isinstance(drop_value, list):
-                        runtime["litellm_drop_params"] = [
-                            str(item).strip() for item in drop_value if str(item).strip()
-                        ]
-                    elif isinstance(drop_value, str):
-                        parsed = [part.strip() for part in drop_value.split(",") if part.strip()]
-                        runtime["litellm_drop_params"] = parsed or None
-                if runtime.get("litellm_stream") is None:
-                    stream_value = data.get("litellm_stream")
-                    if isinstance(stream_value, bool):
-                        runtime["litellm_stream"] = stream_value
-                    elif isinstance(stream_value, str):
-                        lowered = stream_value.strip().lower()
-                        if lowered in {"true", "1", "yes", "on"}:
-                            runtime["litellm_stream"] = True
-                        elif lowered in {"false", "0", "no", "off"}:
-                            runtime["litellm_stream"] = False
-                if runtime.get("litellm_workflow_models") is None:
-                    routing_value = data.get("litellm_workflow_models")
-                    if isinstance(routing_value, dict):
-                        runtime["litellm_workflow_models"] = {
-                            str(key): "inference"
-                            for key, value in routing_value.items()
-                            if isinstance(value, str) and value.strip().lower() == "inference"
-                        }
-                if runtime["quick_actions"] is None and isinstance(data.get("quick_actions"), list):
-                    runtime["quick_actions"] = [
-                        dict(entry) for entry in data["quick_actions"] if isinstance(entry, dict)
-                    ]
-                color_value = data.get("chat_user_bubble_color")
-                if isinstance(color_value, str) and color_value.strip():
-                    runtime["chat_user_bubble_color"] = color_value.strip()
-                palette_value = data.get("chat_colors")
-                palette = normalise_chat_palette(
-                    palette_value if isinstance(palette_value, dict) else None
-                )
-                if palette:
-                    runtime["chat_colors"] = palette
-                theme_value = data.get("theme_mode")
-                if isinstance(theme_value, str) and theme_value.strip():
-                    runtime["theme_mode"] = theme_value.strip()
-        raw_colour = runtime.get("chat_user_bubble_color")
-        if isinstance(raw_colour, str):
-            candidate_colour = QColor(raw_colour)
-            runtime["chat_user_bubble_color"] = (
-                candidate_colour.name().lower()
-                if candidate_colour.isValid()
-                else DEFAULT_CHAT_USER_BUBBLE_COLOR
-            )
-        else:
-            runtime["chat_user_bubble_color"] = DEFAULT_CHAT_USER_BUBBLE_COLOR
-        theme_value = runtime.get("theme_mode")
-        if isinstance(theme_value, str):
-            theme_choice = theme_value.strip().lower()
-            runtime["theme_mode"] = (
-                theme_choice if theme_choice in {"light", "dark"} else DEFAULT_THEME_MODE
-            )
-        else:
-            runtime["theme_mode"] = DEFAULT_THEME_MODE
-        return runtime
+    self._load_prompts(self._current_search_text())
+    self._run_button.setEnabled(result.has_executor)
+    if self._template_preview is not None:
+        self._template_preview.set_run_enabled(result.has_executor)
 
     def _on_selection_changed(self, *_: object) -> None:
         """Update the detail panel to reflect the new selection."""
