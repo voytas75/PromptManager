@@ -3,7 +3,6 @@
 Updates:
   v0.1.0 - 2025-12-01 - Introduced AppearanceController managing theme + palette utilities.
 """
-
 from __future__ import annotations
 
 from collections import abc
@@ -66,7 +65,6 @@ def palette_differs_from_defaults(palette: abc.Mapping[str, str] | None) -> bool
 
 class AppearanceController:
     """Manage theming and palette styling for the main window."""
-
     def __init__(self, window: QMainWindow, runtime_settings: dict[str, object | None]) -> None:
         """Store the target window and runtime settings reference."""
         self._window = window

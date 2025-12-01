@@ -2,7 +2,6 @@
 
 Updates: v0.1.0 - 2025-12-06 - Cover PromptNote dataclass and CRUD workflows.
 """
-
 from __future__ import annotations
 
 import uuid

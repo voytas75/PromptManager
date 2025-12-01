@@ -3,7 +3,6 @@
 Updates:
   v0.1.0 - 2025-11-29 - Introduce workbench session, variable, and execution models.
 """
-
 from __future__ import annotations
 
 import uuid
@@ -24,7 +23,6 @@ def _now() -> datetime:
 @dataclass(slots=True)
 class WorkbenchVariable:
     """Tracked placeholder metadata plus sample values for preview rendering."""
-
     name: str
     description: str | None = None
     sample_value: str | None = None
@@ -32,14 +30,12 @@ class WorkbenchVariable:
 
     def resolved_value(self) -> str | None:
         """Return the best-known value for previews or execution runs."""
-
         return self.sample_value or self.last_test_value
 
 
 @dataclass(slots=True)
 class WorkbenchExecutionRecord:
     """Execution metadata captured while iterating on a prompt draft."""
-
     request_text: str
     response_text: str
     duration_ms: int | None = None
@@ -54,7 +50,6 @@ class WorkbenchExecutionRecord:
 @dataclass(slots=True)
 class WorkbenchSession:
     """Mutable prompt state shared by the Workbench wizard, editor, and preview."""
-
     prompt_name: str = ""
     goal_statement: str = ""
     audience: str = ""
@@ -81,7 +76,6 @@ class WorkbenchSession:
         variables: Mapping[str, WorkbenchVariable] | None = None,
     ) -> str:
         """Merge wizard inputs and rebuild the composite template text."""
-
         if prompt_name is not None:
             self.prompt_name = prompt_name.strip()
         if goal is not None:
@@ -105,7 +99,6 @@ class WorkbenchSession:
 
     def compose_template(self) -> str:
         """Return a markdown/Jinja template built from the current sections."""
-
         sections: list[str] = []
         if self.system_role.strip():
             sections.append("### System Role\n" + self.system_role.strip())
@@ -129,13 +122,11 @@ class WorkbenchSession:
 
     def set_template_text(self, text: str, *, source: str = "editor") -> None:
         """Persist manual edits so the preview and exports stay in sync."""
-
         self.template_text = text
         self.manual_override = source == "editor"
 
     def add_constraint(self, text: str) -> None:
         """Append a new constraint if it is not already present."""
-
         cleaned = text.strip()
         if not cleaned:
             return
@@ -151,7 +142,6 @@ class WorkbenchSession:
         description: str | None = None,
     ) -> WorkbenchVariable:
         """Create or update a variable entry used by the preview pane."""
-
         key = name.strip()
         if not key:
             raise ValueError("Variable name cannot be empty.")
@@ -166,7 +156,6 @@ class WorkbenchSession:
 
     def variable_payload(self) -> dict[str, str]:
         """Return the subset of variables with concrete values."""
-
         payload: dict[str, str] = {}
         for name, variable in self.variables.items():
             value = variable.sample_value or variable.last_test_value
@@ -176,17 +165,14 @@ class WorkbenchSession:
 
     def record_execution(self, record: WorkbenchExecutionRecord) -> None:
         """Append ``record`` to the in-memory execution history."""
-
         self.execution_history.append(record)
 
     def clear_history(self) -> None:
         """Forget recorded executions after exporting a prompt."""
-
         self.execution_history.clear()
 
     def suggest_refinement_target(self, response_text: str) -> str:
         """Heuristically pick the editor section most likely needing updates."""
-
         lower_constraints = " ".join(self.constraints).lower()
         if "json" in lower_constraints and not response_text.strip().startswith("{"):
             return "output"
@@ -203,7 +189,6 @@ class WorkbenchSession:
 
     def update_schema(self, text: str, *, mode: SchemaValidationMode | str | None) -> None:
         """Persist schema settings so exports capture validation rules."""
-
         self.schema_text = text
         if isinstance(mode, SchemaValidationMode):
             self.schema_mode = mode
@@ -220,7 +205,6 @@ class WorkbenchSession:
         prompt_id: uuid.UUID | None = None,
     ) -> Prompt:
         """Hydrate a ``Prompt`` instance from the current draft."""
-
         category_value = (category or "Workbench").strip() or "Workbench"
         description = self.goal_statement or self.context or "Workbench draft"
         name = self.prompt_name or description or "Workbench Draft"

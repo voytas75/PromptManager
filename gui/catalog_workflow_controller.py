@@ -3,7 +3,6 @@
 Updates:
   v0.1.0 - 2025-12-01 - Extracted catalogue workflows from MainWindow.
 """
-
 from __future__ import annotations
 
 from collections import abc
@@ -28,7 +27,6 @@ if TYPE_CHECKING:
 
 class CatalogWorkflowController:
     """Coordinate catalogue import/export and maintenance operations."""
-
     def __init__(
         self,
         parent: QWidget,

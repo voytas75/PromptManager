@@ -18,7 +18,6 @@ from PySide6.QtWidgets import (
 
 class PromptToolbar(QWidget):
     """Expose search, CRUD, and utility actions via a compact toolbar."""
-
     search_requested = Signal(str)
     search_text_changed = Signal(str)
     refresh_requested = Signal()

@@ -4,7 +4,6 @@ Updates:
   v0.1.1 - 2025-11-29 - Import Any for fake connections and wrap long test helpers.
   v0.1.0 - 2025-10-30 - Add error-path coverage for repository helpers.
 """
-
 from __future__ import annotations
 
 import sqlite3

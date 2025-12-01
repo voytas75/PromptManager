@@ -3,7 +3,6 @@
 Updates:
   v0.1.0 - 2025-12-01 - Added WorkspaceViewController for text + clear actions.
 """
-
 from __future__ import annotations
 
 from typing import Callable
@@ -18,7 +17,6 @@ from .quick_action_controller import QuickActionController
 
 class WorkspaceViewController:
     """Manage workspace text edits and clearing logic."""
-
     def __init__(
         self,
         query_input: QPlainTextEdit,
@@ -38,7 +36,6 @@ class WorkspaceViewController:
 
     def set_text(self, text: str, *, focus: bool = False) -> None:
         """Populate the workspace editor with *text* and optionally focus the field."""
-
         self._query_input.setPlainText(text)
         cursor = self._query_input.textCursor()
         cursor.movePosition(QTextCursor.End)
@@ -48,7 +45,6 @@ class WorkspaceViewController:
 
     def clear(self) -> None:
         """Clear the workspace editor, output tab, and chat transcript."""
-
         controller = self._execution_controller_supplier()
         if controller is not None:
             controller.abort_streaming()

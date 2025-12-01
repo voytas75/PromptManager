@@ -1,5 +1,4 @@
 """Integration tests around SQLite connection pragmas."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

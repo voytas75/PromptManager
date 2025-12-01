@@ -4,7 +4,6 @@ Updates:
   v0.1.1 - 2025-11-29 - Wrap highlight rule definitions to satisfy Ruff line-length rules.
   v0.1.0 - 2025-11-10 - Provide keyword-based highlighting for common languages.
 """
-
 from __future__ import annotations
 
 import re
@@ -133,17 +132,19 @@ _RULE_BUILDERS = {
 
 class CodeHighlighter(QSyntaxHighlighter):
     """Keyword-based syntax highlighter for the free-form query input."""
-
     def __init__(self, document) -> None:  # type: ignore[override]
+        """Prepare the highlighter with a target QTextDocument."""
         super().__init__(document)
         self._language = "plain"
         self._rules: list[_HighlightRule] = []
 
     @property
     def language(self) -> str:
+        """Return the currently active language identifier."""
         return self._language
 
     def set_language(self, language: str) -> None:
+        """Update the language and rebuild syntax rules as needed."""
         normalized = (language or "plain").lower()
         if normalized == self._language:
             return
@@ -153,6 +154,7 @@ class CodeHighlighter(QSyntaxHighlighter):
         self.rehighlight()
 
     def highlightBlock(self, text: str) -> None:  # noqa: N802 - Qt API
+        """Apply syntax formats for the current block of text."""
         if not self._rules or not text:
             return
         for rule in self._rules:

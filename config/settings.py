@@ -9,7 +9,6 @@ Updates:
   v0.4.8 - 2025-12-03 - Persisted chat colour palette overrides.
   v0.4.7 - 2025-11-05 - Added theme mode and chat appearance options.
 """
-
 from __future__ import annotations
 
 import json
@@ -51,7 +50,6 @@ DEFAULT_EMBEDDING_MODEL = "text-embedding-3-large"
 
 class ChatColors(BaseSettings):
     """Sub-model storing UI colour customisation options."""
-
     user: str = Field(
         default=DEFAULT_CHAT_USER_BUBBLE_COLOR,
         description="User chat bubble colour (hex)",
@@ -79,7 +77,6 @@ _THEME_CHOICES = {"light", "dark"}
 
 class PromptTemplateOverrides(BaseModel):
     """User supplied overrides for the core LiteLLM system prompts."""
-
     name_generation: str | None = Field(
         default=None,
         description="System prompt text for the name generation workflow.",
@@ -104,11 +101,8 @@ class PromptTemplateOverrides(BaseModel):
 
 class SettingsError(Exception):
     """Raised when Prompt Manager configuration cannot be loaded or validated."""
-
-
 class PromptManagerSettings(BaseSettings):
     """Application configuration sourced from environment variables or JSON files."""
-
     db_path: Path = Field(default=Path("data") / "prompt_manager.db")
     chroma_path: Path = Field(default=Path("data") / "chromadb")
     redis_dsn: str | None = None
@@ -585,7 +579,6 @@ class PromptManagerSettings(BaseSettings):
         _: type[BaseSettings],
     ) -> PydanticBaseSettingsSource:
         """Return settings extracted from an optional JSON config file."""
-
         def _loader(_: BaseSettings | None = None) -> dict[str, Any]:
             explicit_path = os.getenv("PROMPT_MANAGER_CONFIG_JSON")
             candidates: list[Path] = []

@@ -3,7 +3,6 @@
 Updates:
   v0.1.0 - 2025-11-30 - Introduce ShareController to manage provider menus and execution.
 """
-
 from __future__ import annotations
 
 from typing import Callable
@@ -21,7 +20,6 @@ from .usage_logger import IntentUsageLogger
 
 class ShareController(QObject):
     """Manage share providers, provider selection menus, and share execution."""
-
     def __init__(
         self,
         parent: QWidget,
@@ -41,17 +39,14 @@ class ShareController(QObject):
 
     def register_provider(self, provider: ShareProvider) -> None:
         """Store a share provider so it can be offered to users."""
-
         self._providers[provider.info.name] = provider
 
     def has_providers(self) -> bool:
         """Return True when at least one share provider is configured."""
-
         return bool(self._providers)
 
     def choose_provider(self, anchor: QWidget | None) -> str | None:
         """Display a provider picker next to *anchor* and return the selection."""
-
         if not self._providers:
             self._error_callback("Sharing unavailable", "No share providers are configured.")
             return None
@@ -81,7 +76,6 @@ class ShareController(QObject):
         prompt: object | None = None,
     ) -> bool:
         """Share *payload* using *provider_name* and log the outbound metadata."""
-
         provider = self._providers.get(provider_name)
         if provider is None:
             self._error_callback("Sharing unavailable", "Selected share provider is not registered.")

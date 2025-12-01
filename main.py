@@ -21,7 +21,6 @@ Updates:
   v0.2.0 - 2025-11-04 - Add optional PySide6 GUI launcher toggle.
   v0.1.0 - 2025-10-30 - Initial CLI bootstrap loading settings and building services.
 """
-
 from __future__ import annotations
 
 import argparse
@@ -58,14 +57,12 @@ PromptHistoryError = getattr(core_services, "PromptHistoryError", PromptManagerE
 
 def _print_and_log(logger: logging.Logger, level: int, message: str) -> None:
     """Log a message and mirror it to stdout for CLI expectations."""
-
     logger.log(level, message)
     print(message)
 
 
 def _mask_secret(value: str | None) -> str:
     """Return masked representation of secret values."""
-
     if not value:
         return "not set"
     secret = value.strip()
@@ -83,7 +80,6 @@ def _describe_path(
     allow_missing_file: bool = False,
 ) -> str:
     """Return a human-readable description of a configured filesystem path."""
-
     try:
         path = Path(path_value) if path_value is not None else None
     except TypeError:
@@ -110,7 +106,6 @@ def _describe_path(
 
 def _write_csv_rows(path: Path, rows: Sequence[Mapping[str, object]]) -> Path:
     """Persist dictionaries to CSV and return the resolved path."""
-
     if not rows:
         raise ValueError("No rows available for export")
     headers: list[str] = []
@@ -134,7 +129,6 @@ def _write_csv_rows(path: Path, rows: Sequence[Mapping[str, object]]) -> Path:
 
 def _print_settings_summary(settings: PromptManagerSettings) -> None:
     """Emit a readable summary of core configuration and health checks."""
-
     redis_dsn = getattr(settings, "redis_dsn", None)
     litellm_model = getattr(settings, "litellm_model", None)
     litellm_inference_model = getattr(settings, "litellm_inference_model", None)
@@ -244,7 +238,6 @@ def _run_catalog_export(manager, args: argparse.Namespace, logger: logging.Logge
 
 def _run_usage_report(args: argparse.Namespace, logger: logging.Logger) -> int:
     """Summarise intent workspace usage analytics."""
-
     path_value = getattr(args, "path", None)
     log_path = Path(path_value or Path("data") / "logs" / "intent_usage.jsonl").expanduser()
     if not log_path.exists():
@@ -645,7 +638,6 @@ def _format_metric(value: float | None, *, suffix: str = "") -> str:
 
 def _run_history_analytics(manager, args: argparse.Namespace, logger: logging.Logger) -> int:
     """Render aggregate execution analytics for CLI consumers."""
-
     window_days = getattr(args, "window_days", None)
     if window_days is not None and window_days <= 0:
         window_days = None
@@ -714,7 +706,6 @@ def _run_history_analytics(manager, args: argparse.Namespace, logger: logging.Lo
 
 def _run_reembed(manager, logger: logging.Logger) -> int:
     """Reset the Chroma vector store and regenerate embeddings for all prompts."""
-
     try:
         successes, failures = manager.rebuild_embeddings(reset_store=True)
     except PromptManagerError as exc:
@@ -735,7 +726,6 @@ def _run_reembed(manager, logger: logging.Logger) -> int:
 
 def _run_suggest(manager, args: argparse.Namespace, logger: logging.Logger) -> int:
     """Render semantic suggestions for manual verification."""
-
     query = getattr(args, "query", "") or ""
     if not query.strip():
         logger.error("Suggestion query must be provided.")

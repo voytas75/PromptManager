@@ -2,7 +2,6 @@
 
 Updates: v0.1.0 - 2025-11-05 - Ensure offscreen fallback only triggers when headless.
 """
-
 from __future__ import annotations
 
 import importlib
@@ -20,7 +19,6 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 @pytest.fixture()
 def stub_qt(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Provide minimal PySide6 stubs so gui.application can be imported."""
-
     qt_core = types.ModuleType("PySide6.QtCore")
     qt_widgets = types.ModuleType("PySide6.QtWidgets")
     qt_gui = types.ModuleType("PySide6.QtGui")

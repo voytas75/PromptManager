@@ -4,7 +4,6 @@ Updates: v0.1.2 - 2025-12-05 - Add response style repository and manager coverag
 Updates: v0.1.1 - 2025-11-02 - Added regression tests for cache usage and search fallback paths.
 Updates: v0.1.0 - 2025-10-31 - Introduce repository and manager storage integration tests.
 """
-
 from __future__ import annotations
 
 import uuid
@@ -49,7 +48,6 @@ def _make_prompt(name: str = "Sample Prompt") -> Prompt:
 
 def _make_response_style(name: str = "Concise Summary") -> ResponseStyle:
     """Return a populated ResponseStyle instance for manager tests."""
-
     now = datetime.now(UTC)
     return ResponseStyle(
         id=uuid.uuid4(),
@@ -83,7 +81,6 @@ def _clone_category(category: PromptCategory) -> PromptCategory:
 
 class _FakeRedis:
     """Minimal Redis facade storing values in-memory for assertions."""
-
     def __init__(self) -> None:
         self._store: dict[str, bytes] = {}
         self.get_calls = 0
@@ -101,7 +98,6 @@ class _FakeRedis:
 
 class _FakeCollection:
     """In-memory stand-in for ChromaDB collection operations."""
-
     def __init__(self) -> None:
         self._records: dict[str, dict[str, Any]] = {}
 
@@ -147,7 +143,6 @@ class _FakeCollection:
 
 class _FakeChromaClient:
     """Return a pre-seeded fake collection in place of PersistentClient."""
-
     def __init__(self, collection: _FakeCollection) -> None:
         self._collection = collection
         self.closed = False
@@ -166,7 +161,6 @@ class _FakeChromaClient:
 
 class _FakeRepository:
     """Minimal repository stub tracking invocation counts."""
-
     def __init__(self) -> None:
         self._store: dict[uuid.UUID, Prompt] = {}
         self.get_call_count = 0
@@ -416,7 +410,6 @@ def test_prompt_manager_coordinates_sqlite_and_chromadb(tmp_path) -> None:
 
 def test_prompt_manager_response_style_workflow(tmp_path) -> None:
     """Ensure response style CRUD is wired through the manager."""
-
     chroma_dir = tmp_path / "chroma"
     db_path = tmp_path / "prompt_manager.db"
     manager = PromptManager(
@@ -446,7 +439,6 @@ def test_prompt_manager_response_style_workflow(tmp_path) -> None:
 
 def test_prompt_manager_prompt_note_workflow(tmp_path) -> None:
     """Ensure prompt note CRUD is exposed via the manager."""
-
     chroma_dir = tmp_path / "chroma"
     db_path = tmp_path / "prompt_manager.db"
     manager = PromptManager(
@@ -536,6 +528,7 @@ def test_search_prompts_returns_chroma_records_when_sqlite_missing() -> None:
 
 
 def test_prompt_manager_close_shuts_down_workers_and_clients(tmp_path) -> None:
+    """Ensure PromptManager.close() safely disposes resources."""
     collection = _FakeCollection()
     chroma_client = _FakeChromaClient(collection)
     repository = _FakeRepository()

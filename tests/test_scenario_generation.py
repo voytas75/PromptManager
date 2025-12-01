@@ -4,7 +4,6 @@ Updates:
   v0.1.2 - 2025-12-01 - Cover ModelResponse serialisation path for LiteLLM scenarios.
   v0.1.1 - 2025-11-29 - Wrap scenario fixture strings for Ruff line length compliance.
 """
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -183,7 +182,6 @@ def test_generate_raises_when_no_scenarios(monkeypatch: pytest.MonkeyPatch) -> N
 
 def test_generate_accepts_model_response(monkeypatch: pytest.MonkeyPatch) -> None:
     """LiteLLMScenarioGenerator should normalise ModelResponse payloads."""
-
     class _ModelResponse:
         def __init__(self, payload: dict[str, Any]) -> None:
             self._payload = payload

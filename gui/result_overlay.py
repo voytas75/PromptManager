@@ -15,7 +15,6 @@ from shiboken6 import Shiboken
 
 class ResultActionsOverlay(QObject):
     """Manage the floating overlay that contains result action buttons."""
-
     def __init__(self, text_edit: QTextEdit | None) -> None:
         """Initialize the overlay manager for *text_edit*.
 

@@ -18,7 +18,6 @@ running these sessions. This file defines automation sessions:
 Adjust tool versions/args as needed. Sessions run directly in the host Python
 environment (no isolated venv) so ensure required tools are installed locally.
 """
-
 from __future__ import annotations
 
 import nox
@@ -26,7 +25,6 @@ import nox
 
 def _ensure_tool(session: nox.Session, command: str, *version_args: str) -> None:
     """Verify that an external tool is available before executing commands."""
-
     args = (command, *(version_args or ("--version",)))
     try:
         session.run(*args, external=True)

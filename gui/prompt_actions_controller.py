@@ -3,11 +3,9 @@
 Updates:
   v0.1.0 - 2025-12-01 - Extracted context menu, clipboard, and execute-as-context workflows.
 """
-
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QPoint, Qt
@@ -17,18 +15,19 @@ from PySide6.QtWidgets import QListView, QMenu, QMessageBox, QPlainTextEdit, QWi
 from .execute_context_dialog import ExecuteContextDialog
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from models.prompt_model import Prompt
 
     from .controllers.execution_controller import ExecutionController
     from .layout_state import WindowStateManager
     from .prompt_list_model import PromptListModel
-    from .workspace_view_controller import WorkspaceViewController
     from .usage_logger import IntentUsageLogger
+    from .workspace_view_controller import WorkspaceViewController
 
 
 class PromptActionsController:
     """Bundle prompt actions such as duplication, copying, and execute-as-context."""
-
     def __init__(
         self,
         *,
@@ -49,6 +48,7 @@ class PromptActionsController:
         toast_callback: Callable[[str, int], None],
         usage_logger: IntentUsageLogger,
     ) -> None:
+        """Wire UI widgets, callbacks, and helpers used for prompt actions."""
         self._parent = parent
         self._model = model
         self._list_view = list_view
@@ -67,7 +67,7 @@ class PromptActionsController:
         self._usage_logger = usage_logger
         execute_state = self._layout_state.load_execute_context_state()
         self._last_execute_context_task = execute_state.last_task
-        self._execute_context_history: deque[str] = execute_state.history
+        self._execute_context_history: deque[str] = deque(execute_state.history)
 
     def show_context_menu(self, point: QPoint) -> None:
         """Display the prompt context menu anchored to the list view."""
@@ -123,7 +123,11 @@ class PromptActionsController:
             self._duplicate_callback(prompt)
         elif selected_action is fork_action and prompt is not None:
             self._fork_callback(prompt)
-        elif selected_action is similar_action and prompt is not None and self._similar_callback is not None:
+        elif (
+            selected_action is similar_action
+            and prompt is not None
+            and self._similar_callback is not None
+        ):
             self._similar_callback(prompt)
         elif selected_action is execute_action and prompt is not None:
             self.execute_prompt_from_body(prompt)

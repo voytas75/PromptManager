@@ -3,7 +3,6 @@
 Updates: v0.1.1 - 2025-11-27 - Add toast callback for clipboard operations.
 Updates: v0.1.0 - 2025-12-06 - Initial implementation with CRUD actions.
 """
-
 from __future__ import annotations
 
 import uuid
@@ -40,7 +39,6 @@ if TYPE_CHECKING:
 
 class NotesPanel(QWidget):
     """Display and manage prompt notes."""
-
     def __init__(
         self,
         manager: PromptManager,
@@ -49,6 +47,7 @@ class NotesPanel(QWidget):
         status_callback: Callable[[str, int], None] | None = None,
         toast_callback: Callable[[str, int], None] | None = None,
     ) -> None:
+        """Initialise the notes panel and load existing entries."""
         super().__init__(parent)
         self._manager = manager
         self._status_callback = status_callback

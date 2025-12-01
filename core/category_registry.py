@@ -5,8 +5,6 @@ Updates:
   v0.1.1 - 2025-11-29 - Wrap long defaults and type-only Path import.
   v0.1.0 - 2025-11-22 - Introduce PromptCategory registry and defaults.
 """
-
-
 from __future__ import annotations
 
 import json
@@ -130,7 +128,6 @@ def load_category_definitions(
 
 class CategoryRegistry:
     """Cached view of stored categories with helper utilities."""
-
     def __init__(
         self,
         repository: PromptRepository,

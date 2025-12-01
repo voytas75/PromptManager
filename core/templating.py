@@ -4,7 +4,6 @@ Updates: v0.1.1 - 2025-11-27 - Add contextual hints to Jinja2 syntax errors.
 Updates: v0.1.0 - 2025-11-25 - Add strict Jinja2 renderer, custom filters,
 and schema validation helpers.
 """
-
 from __future__ import annotations
 
 import json
@@ -45,7 +44,6 @@ def _json_filter(value: Any, *, indent: int | None = None) -> str:
 @dataclass(slots=True)
 class TemplateRenderResult:
     """Outcome of rendering a template preview."""
-
     rendered_text: str
     errors: list[str] = field(default_factory=list)
     missing_variables: set[str] = field(default_factory=set)
@@ -117,7 +115,6 @@ def _extract_fragment(line_text: str, start_token: str, end_token: str) -> str:
 
 class TemplateRenderer:
     """Render Jinja2 templates with strict variable enforcement and custom filters."""
-
     _SPECIAL_VARIABLES: set[str] = {"cycler", "loop", "namespace", "super", "caller"}
 
     def __init__(self) -> None:
@@ -180,7 +177,6 @@ class TemplateRenderer:
 
 class SchemaValidationMode(Enum):
     """Schema validation strategies supported by the preview widget."""
-
     NONE = "none"
     JSON_SCHEMA = "json"
     PYDANTIC = "pydantic"
@@ -200,7 +196,6 @@ class SchemaValidationMode(Enum):
 @dataclass(slots=True)
 class SchemaValidationResult:
     """Outcome of validating user variables against an optional schema."""
-
     is_valid: bool
     errors: list[str] = field(default_factory=list)
     field_errors: set[str] = field(default_factory=set)
@@ -209,7 +204,6 @@ class SchemaValidationResult:
 
 class SchemaValidator:
     """Validate variable dictionaries using JSON Schema or derived Pydantic models."""
-
     def validate(
         self,
         variables: Mapping[str, Any],

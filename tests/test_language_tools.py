@@ -1,5 +1,4 @@
 """Tests for heuristic language detection utilities."""
-
 from __future__ import annotations
 
 from gui.language_tools import detect_language

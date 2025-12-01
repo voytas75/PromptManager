@@ -12,7 +12,6 @@ Updates:
   v0.14.1 - 2025-11-27 - Align façade with CodexExecutor prompt-centric API.
   v0.14.0 - 2025-11-18 - Initial scaffold with proxy implementation.
 """
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -37,7 +36,6 @@ ExecutionResult = CodexExecutionResult
 
 class PromptExecutor:
     """Facade over :class:`core.execution.CodexExecutor`."""
-
     def __init__(
         self,
         model: str,

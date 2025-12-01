@@ -10,7 +10,6 @@ Updates: v0.3.0 - 2025-11-03 - Export build_prompt_manager factory for shared bo
 Updates: v0.2.0 - 2025-10-31 - Surface PromptRepository alongside PromptManager.
 Updates: v0.1.0 - 2025-10-30 - Expose PromptManager API.
 """
-
 from models.category_model import PromptCategory
 from models.prompt_note import PromptNote
 from models.response_style import ResponseStyle

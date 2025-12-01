@@ -3,7 +3,6 @@
 Updates:
   v0.1.0 - 2025-12-01 - Introduced controller to manage execution, history, and chat actions.
 """
-
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
@@ -29,7 +28,6 @@ if TYPE_CHECKING:
 
 class WorkspaceActionsController:
     """Coordinate workspace actions such as run, save, chat, and analytics logging."""
-
     def __init__(
         self,
         *,

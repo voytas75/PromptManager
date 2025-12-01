@@ -3,7 +3,6 @@
 Updates: v0.1.1 - 2025-11-22 - Cover structure-only refinement calls.
 Updates: v0.1.0 - 2025-11-18 - Initial tests for prompt refinement workflow.
 """
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any

@@ -6,7 +6,6 @@ Updates:
   v0.1.1 - 2025-11-27 - Add toast confirmation for copying notification details.
   v0.1.0 - 2025-11-11 - Introduce notification bridge and history dialog.
 """
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -37,10 +36,10 @@ if TYPE_CHECKING:
 
 class QtNotificationBridge(QObject):
     """Subscribe to core notifications and forward them via Qt signals."""
-
     notification_received: Signal = Signal(object)
 
     def __init__(self, center: NotificationCenter, parent: QObject | None = None) -> None:
+        """Register a callback with ``center`` and bridge events to Qt."""
         super().__init__(parent)
         self._center = center
         self._subscription = center.subscribe(self._forward)
@@ -49,17 +48,18 @@ class QtNotificationBridge(QObject):
         self.notification_received.emit(notification)
 
     def close(self) -> None:
+        """Unsubscribe from the core notification center."""
         self._subscription.close()
 
 
 class NotificationHistoryDialog(QDialog):
     """Modal dialog presenting recent notification events."""
-
     def __init__(
         self,
         notifications: Sequence[Notification],
         parent: QObject | None = None,
     ) -> None:
+        """Populate the dialog with historic notifications."""
         super().__init__(parent)
         self.setWindowTitle("Notifications")
         self.resize(520, 360)
@@ -92,8 +92,8 @@ class NotificationHistoryDialog(QDialog):
 
 class BackgroundTaskItemWidget(QWidget):
     """Compact widget showing task title, message, and progress."""
-
     def __init__(self, notification: Notification, parent: QWidget | None = None) -> None:
+        """Render the provided notification inside a card-like widget."""
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 6, 8, 6)
@@ -121,7 +121,6 @@ class BackgroundTaskItemWidget(QWidget):
 
     def update_notification(self, notification: Notification) -> None:
         """Refresh labels and progress bar for the supplied notification."""
-
         self._title.setText(notification.title)
         self._message.setText(notification.message)
         status_text = notification.status.value.replace("_", " ").title()
@@ -151,10 +150,10 @@ class _ActiveTaskEntry:
 
 class BackgroundTaskCenterDialog(QDialog):
     """Live feed of background tasks with progress indicators."""
-
     _HISTORY_LIMIT = 200
 
     def __init__(self, parent: QWidget | None = None) -> None:
+        """Create the task center dialog and prepare its child widgets."""
         super().__init__(parent)
         self.setWindowTitle("Background Tasks")
         self.resize(560, 420)
@@ -193,7 +192,6 @@ class BackgroundTaskCenterDialog(QDialog):
 
     def set_history(self, notifications: Sequence[Notification]) -> None:
         """Populate the activity feed from persisted notifications."""
-
         self._history_list.clear()
         ordered = list(notifications)[-self._HISTORY_LIMIT :]
         for notification in reversed(ordered):
@@ -201,7 +199,6 @@ class BackgroundTaskCenterDialog(QDialog):
 
     def set_active_notifications(self, notifications: Sequence[Notification]) -> None:
         """Rebuild the active task list from current manager state."""
-
         self._active_list.clear()
         self._active_items.clear()
         for notification in notifications:
@@ -211,7 +208,6 @@ class BackgroundTaskCenterDialog(QDialog):
 
     def handle_notification(self, notification: Notification) -> None:
         """Update feed and task widgets for a new notification event."""
-
         self._prepend_history(notification)
         if notification.task_id:
             self._create_or_update_task(notification)

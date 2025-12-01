@@ -6,7 +6,6 @@ Updates:
   v0.2.0 - 2025-11-09 - Surface execution ratings in tables, details, and exports.
   v0.1.0 - 2025-11-08 - Provide filterable, editable execution history workspace.
 """
-
 from __future__ import annotations
 
 import csv
@@ -55,7 +54,6 @@ class _ExecutionRow:
 
 class HistoryPanel(QWidget):
     """Filterable, editable prompt execution history pane."""
-
     def __init__(
         self,
         manager: PromptManager,
@@ -65,6 +63,7 @@ class HistoryPanel(QWidget):
         on_note_updated: Callable[[uuid.UUID, str], None] | None = None,
         on_export: Callable[[int, str], None] | None = None,
     ) -> None:
+        """Initialise the panel and immediately load the latest executions."""
         super().__init__(parent)
         self._manager = manager
         self._limit = max(1, limit)
@@ -171,7 +170,6 @@ class HistoryPanel(QWidget):
 
     def refresh(self) -> None:
         """Reload executions with current filters."""
-
         self._populate_prompt_filter()
         status_value = self._status_filter.currentData()
         prompt_id = self._prompt_filter.currentData()
@@ -388,13 +386,11 @@ class HistoryPanel(QWidget):
 
     def row_count(self) -> int:
         """Return the number of rows currently displayed."""
-
         return len(self._rows)
 
     @staticmethod
     def _format_conversation(messages: list[Any]) -> list[str]:
         """Convert stored chat messages into plain text lines."""
-
         lines: list[str] = []
         for message in messages:
             if not isinstance(message, dict):

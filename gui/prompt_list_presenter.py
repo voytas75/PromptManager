@@ -3,7 +3,6 @@
 Updates:
   v0.1.0 - 2025-12-01 - Extract presenter to centralize prompt list filtering logic.
 """
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -34,7 +33,6 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
 @dataclass(slots=True)
 class PromptListCallbacks:
     """Callback collection used by :class:`PromptListPresenter`."""
-
     update_intent_hint: Callable[[Sequence[Prompt]], None]
     select_prompt: Callable[[UUID], None]
     show_error: Callable[[str, str], None]
@@ -44,7 +42,6 @@ class PromptListCallbacks:
 
 class PromptListPresenter:
     """Coordinate prompt loading, filtering, and sorting for the list view."""
-
     def __init__(
         self,
         *,

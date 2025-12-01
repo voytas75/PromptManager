@@ -18,7 +18,6 @@ Updates:
   v0.2.0 - 2025-11-08 - Add prompt execution history persistence APIs.
   v0.1.0 - 2025-10-31 - Introduce PromptRepository for SQLite storage.
 """
-
 from __future__ import annotations
 
 import json
@@ -28,11 +27,10 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
 from models.category_model import PromptCategory, slugify_category
 from models.prompt_model import (
@@ -52,7 +50,6 @@ logger = logging.getLogger("prompt_manager.repository")
 @dataclass(slots=True, frozen=True)
 class PromptCatalogueStats:
     """Aggregate prompt metadata metrics for maintenance views."""
-
     total_prompts: int
     active_prompts: int
     inactive_prompts: int
@@ -67,12 +64,8 @@ class PromptCatalogueStats:
 
 class RepositoryError(Exception):
     """Base exception for repository failures."""
-
-
 class RepositoryNotFoundError(RepositoryError):
     """Raised when a requested record cannot be located."""
-
-
 def _ensure_directory(path: Path) -> None:
     """Ensure the directory for the SQLite database exists."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -170,7 +163,6 @@ def _parse_optional_datetime(value: Any) -> datetime | None:
 
 class PromptRepository:
     """Persist prompts to SQLite and hydrate `Prompt` objects."""
-
     _COLUMNS: Sequence[str] = (
         "id",
         "name",

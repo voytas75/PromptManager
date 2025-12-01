@@ -6,7 +6,6 @@ Updates: v0.2.3 - 2025-11-05 - Persist theme mode and chat appearance overrides.
 Updates: v0.2.2 - 2025-11-05 - Persist chat appearance overrides.
 Updates: v0.2.1 - 2025-11-05 - Persist LiteLLM workflow routing selections.
 """
-
 from __future__ import annotations
 
 import json

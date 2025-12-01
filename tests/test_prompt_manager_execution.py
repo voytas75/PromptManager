@@ -1,5 +1,4 @@
 """Tests for PromptManager prompt execution workflow."""
-
 from __future__ import annotations
 
 import uuid

@@ -54,7 +54,6 @@ Updates:
   v0.2.0 - 2025-11-05 - Add prompt name suggestion based on context.
   v0.1.0 - 2025-11-04 - Implement create/edit prompt dialog backed by Prompt dataclass.
 """
-
 from __future__ import annotations
 
 import difflib
@@ -156,7 +155,6 @@ _TaskResult = TypeVar("_TaskResult")
 
 class SystemInfo(NamedTuple):
     """Container describing runtime platform characteristics for display."""
-
     cpu: str
     architecture: str
     platform_family: str
@@ -165,7 +163,6 @@ class SystemInfo(NamedTuple):
 
 def _classify_platform_family(system_name: str) -> str:
     """Return a high-level platform family string based on the system identifier."""
-
     name = system_name.lower()
     if name.startswith("win"):
         return "Windows"
@@ -180,7 +177,6 @@ def _classify_platform_family(system_name: str) -> str:
 
 def _collect_system_info() -> SystemInfo:
     """Gather CPU and platform metadata for the info dialog."""
-
     uname = platform.uname()
 
     raw_cpu = platform.processor() or uname.processor
@@ -206,7 +202,6 @@ def _strip_scenarios_metadata(
     metadata: MutableMapping[str, Any] | None,
 ) -> MutableMapping[str, Any] | None:
     """Return a deep copy of metadata without stored usage scenarios."""
-
     if metadata is None:
         return None
     cleaned = deepcopy(metadata)
@@ -216,7 +211,6 @@ def _strip_scenarios_metadata(
 
 class CollapsibleTextSection(QWidget):
     """Wrapper providing an expandable/collapsible plain text editor."""
-
     textChanged = Signal()
 
     def __init__(self, title: str, parent: QWidget | None = None) -> None:
@@ -283,7 +277,6 @@ class CollapsibleTextSection(QWidget):
 
     def _apply_toggle_style(self) -> None:
         """Align the toggle button background with the active theme palette."""
-
         palette = self._toggle.palette()
         button_color = palette.color(QPalette.Button).name()
         text_color = palette.color(QPalette.ButtonText).name()
@@ -332,7 +325,6 @@ class CollapsibleTextSection(QWidget):
 
 class PromptRefinedDialog(QDialog):
     """Modal dialog presenting prompt refinement output in a resizable view."""
-
     def __init__(
         self,
         content: str,
@@ -347,7 +339,6 @@ class PromptRefinedDialog(QDialog):
             parent: Optional parent widget that owns the dialog.
             title: Window title describing the refinement action.
         """
-
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setModal(True)
@@ -372,7 +363,6 @@ class PromptRefinedDialog(QDialog):
 
     def _apply_initial_size(self) -> None:
         """Resize the dialog to fit comfortably under the active screen size."""
-
         screen = QGuiApplication.primaryScreen()
         if screen is None:
             self.resize(720, 480)
@@ -413,7 +403,6 @@ def fallback_suggest_prompt_name(context: str, *, max_words: int = 5) -> str:
 
 def fallback_generate_description(context: str, *, max_length: int = 240) -> str:
     """Create a lightweight summary from the prompt body when LLMs are unavailable."""
-
     stripped = " ".join(context.split())
     if not stripped:
         return ""
@@ -428,7 +417,6 @@ def fallback_generate_description(context: str, *, max_length: int = 240) -> str
 
 def fallback_generate_scenarios(context: str, *, max_items: int = 3) -> list[str]:
     """Provide heuristic usage scenarios when LLM support is unavailable."""
-
     cleaned = context.strip()
     if not cleaned:
         return []
@@ -462,7 +450,6 @@ def fallback_generate_scenarios(context: str, *, max_items: int = 3) -> list[str
 
 class PromptDialog(QDialog):
     """Modal dialog used for creating or editing prompt records."""
-
     applied = Signal(Prompt)
     execute_context_requested = Signal(Prompt, str)
 
@@ -480,6 +467,7 @@ class PromptDialog(QDialog):
         structure_refiner: Callable[..., PromptRefinement] | None = None,
         version_history_handler: Callable[[Prompt], None] | None = None,
     ) -> None:
+        """Configure the prompt editor dialog, injecting optional helpers."""
         super().__init__(parent)
         self._source_prompt = prompt
         self._result_prompt: Prompt | None = None
@@ -512,24 +500,20 @@ class PromptDialog(QDialog):
     @property
     def result_prompt(self) -> Prompt | None:
         """Return the prompt produced by the dialog after acceptance."""
-
         return self._result_prompt
 
     @property
     def delete_requested(self) -> bool:
         """Return True when the user chose to delete the prompt instead of saving."""
-
         return self._delete_requested
 
     @property
     def source_prompt(self) -> Prompt | None:
         """Expose the prompt supplied to the dialog for convenience."""
-
         return self._source_prompt
 
     def _build_ui(self) -> None:
         """Construct the dialog layout and wire interactions."""
-
         main_layout = QVBoxLayout(self)
         form_layout = QFormLayout()
         form_layout.setLabelAlignment(Qt.AlignLeft | Qt.AlignTop)
@@ -740,14 +724,12 @@ class PromptDialog(QDialog):
 
     def prefill_from_prompt(self, prompt: Prompt) -> None:
         """Populate inputs from an existing prompt while staying in creation mode."""
-
         self._populate(prompt)
         self._result_prompt = None
         self._delete_requested = False
 
     def _populate(self, prompt: Prompt) -> None:
         """Fill inputs with the existing prompt values for editing."""
-
         self._name_input.setText(prompt.name)
         self._set_category_value(prompt.category)
         self._language_input.setText(prompt.language)
@@ -762,7 +744,6 @@ class PromptDialog(QDialog):
 
     def _on_accept(self) -> None:
         """Validate inputs, build the prompt, and close the dialog."""
-
         prompt = self._build_prompt()
         if prompt is None:
             return
@@ -771,7 +752,6 @@ class PromptDialog(QDialog):
 
     def _on_apply_clicked(self) -> None:
         """Persist prompt edits while keeping the dialog open."""
-
         prompt = self._build_prompt()
         if prompt is None:
             return
@@ -780,7 +760,6 @@ class PromptDialog(QDialog):
 
     def _on_delete_clicked(self) -> None:
         """Handle delete requests issued from the dialog."""
-
         if self._source_prompt is None:
             return
         current_name = self._name_input.text().strip()
@@ -806,13 +785,11 @@ class PromptDialog(QDialog):
         **kwargs,
     ) -> _TaskResult:
         """Execute *func* on a worker thread while showing a busy indicator."""
-
         indicator = ProcessingIndicator(self, message)
         return indicator.run(func, *args, **kwargs)
 
     def _on_generate_name_clicked(self) -> None:
         """Generate a prompt name from the context field."""
-
         try:
             suggestion = self._run_with_indicator(
                 "Generating prompt name…",
@@ -827,7 +804,6 @@ class PromptDialog(QDialog):
 
     def _on_generate_category_clicked(self) -> None:
         """Generate a category suggestion based on the prompt body."""
-
         if self._category_generator is None:
             return
         context = self._context_input.toPlainText()
@@ -854,7 +830,6 @@ class PromptDialog(QDialog):
 
     def _on_generate_tags_clicked(self) -> None:
         """Generate tag suggestions based on the prompt body."""
-
         if self._tags_generator is None:
             return
         context = self._context_input.toPlainText()
@@ -879,7 +854,6 @@ class PromptDialog(QDialog):
 
     def _collect_scenarios(self) -> list[str]:
         """Return the current scenarios listed in the dialog."""
-
         scenarios: list[str] = []
         seen: set[str] = set()
         for line in self._scenarios_input.toPlainText().splitlines():
@@ -895,7 +869,6 @@ class PromptDialog(QDialog):
 
     def _set_scenarios(self, scenarios: Sequence[str]) -> None:
         """Populate the scenarios editor with the provided entries."""
-
         sanitized = [str(item).strip() for item in scenarios if str(item).strip()]
         unique: list[str] = []
         seen: set[str] = set()
@@ -909,7 +882,6 @@ class PromptDialog(QDialog):
 
     def _populate_category_options(self) -> None:
         """Populate the category selector from the registry provider."""
-
         if self._category_input is None:
             return
         categories = self._load_categories()
@@ -924,7 +896,6 @@ class PromptDialog(QDialog):
 
     def _load_categories(self) -> list[PromptCategory]:
         """Return available categories, refreshing from the provider when possible."""
-
         if self._category_provider is None:
             return self._categories
         try:
@@ -938,7 +909,6 @@ class PromptDialog(QDialog):
 
     def _set_category_value(self, value: str | None) -> None:
         """Set the category selector text while aligning with registry labels."""
-
         if self._category_input is None:
             return
         resolved = self._resolve_category_label(value)
@@ -954,7 +924,6 @@ class PromptDialog(QDialog):
 
     def _current_category_value(self) -> str:
         """Return the canonical category text from the selector."""
-
         if self._category_input is None:
             return ""
         text = self._category_input.currentText().strip()
@@ -967,7 +936,6 @@ class PromptDialog(QDialog):
 
     def _resolve_category_label(self, value: str | None) -> str:
         """Return the stored category label when the value matches an entry."""
-
         text = (value or "").strip()
         if not text:
             return ""
@@ -982,7 +950,6 @@ class PromptDialog(QDialog):
 
     def _generate_scenarios(self, context: str) -> list[str]:
         """Generate scenarios using configured helpers with heuristic fallback."""
-
         context_text = context.strip()
         if not context_text:
             return []
@@ -1007,7 +974,6 @@ class PromptDialog(QDialog):
 
     def _on_generate_scenarios_clicked(self) -> None:
         """Populate the scenarios field using analysis of the prompt body."""
-
         context = self._context_input.toPlainText()
         if not context.strip():
             QMessageBox.information(
@@ -1036,7 +1002,6 @@ class PromptDialog(QDialog):
 
     def _on_context_changed(self) -> None:
         """Auto-suggest a prompt name when none has been supplied."""
-
         if self._source_prompt is not None:
             return
         if self._name_generator is None:
@@ -1053,7 +1018,6 @@ class PromptDialog(QDialog):
 
     def _generate_name(self, context: str) -> str:
         """Generate name using LiteLLM when configured."""
-
         context = context.strip()
         if not context:
             return ""
@@ -1081,7 +1045,6 @@ class PromptDialog(QDialog):
 
     def _generate_description(self, context: str) -> str:
         """Generate description using LiteLLM when configured."""
-
         context = context.strip()
         if not context:
             return ""
@@ -1109,7 +1072,6 @@ class PromptDialog(QDialog):
 
     def _on_refine_clicked(self) -> None:
         """Invoke the general prompt refinement workflow."""
-
         self._run_refinement(
             self._prompt_engineer,
             unavailable_title="Prompt refinement unavailable",
@@ -1120,7 +1082,6 @@ class PromptDialog(QDialog):
 
     def _on_refine_structure_clicked(self) -> None:
         """Invoke the structure-only refinement workflow."""
-
         self._run_refinement(
             self._structure_refiner,
             unavailable_title="Prompt refinement unavailable",
@@ -1131,7 +1092,6 @@ class PromptDialog(QDialog):
 
     def _on_execute_context_clicked(self) -> None:
         """Trigger the execute-as-context workflow from the dialog."""
-
         if self._source_prompt is None:
             QMessageBox.information(
                 self,
@@ -1159,7 +1119,6 @@ class PromptDialog(QDialog):
         indicator_message: str,
     ) -> None:
         """Execute a refinement handler and surface the summary to the user."""
-
         if handler is None:
             QMessageBox.information(self, unavailable_title, unavailable_message)
             return
@@ -1210,7 +1169,6 @@ class PromptDialog(QDialog):
     @staticmethod
     def _format_refinement_summary(result: PromptRefinement) -> str:
         """Compose a human-readable summary of the refinement output."""
-
         summary_parts: list[str] = []
         if result.analysis:
             summary_parts.append(result.analysis)
@@ -1226,7 +1184,6 @@ class PromptDialog(QDialog):
 
     def _build_prompt(self) -> Prompt | None:
         """Construct a Prompt object from the dialog inputs."""
-
         context_text = self._context_input.toPlainText().strip()
         name = self._name_input.text().strip()
         description = self._description_input.toPlainText().strip()
@@ -1309,14 +1266,12 @@ class PromptDialog(QDialog):
 
     def update_source_prompt(self, prompt: Prompt) -> None:
         """Refresh the backing prompt after an in-place update."""
-
         self._source_prompt = prompt
         self._populate(prompt)
         self._refresh_execute_context_button()
 
     def _update_version_controls(self, version: str | None) -> None:
         """Refresh the version label and history button state."""
-
         if self._version_label is None or self._version_history_button is None:
             return
         label_text = (version or "").strip() or "Not yet saved"
@@ -1329,7 +1284,6 @@ class PromptDialog(QDialog):
 
     def _refresh_execute_context_button(self) -> None:
         """Toggle execute-context control availability based on dialog state."""
-
         if self._execute_context_button is None:
             return
         has_source_prompt = self._source_prompt is not None
@@ -1345,7 +1299,6 @@ class PromptDialog(QDialog):
 
     def _on_version_history_clicked(self) -> None:
         """Open the version history dialog via the provided handler."""
-
         if self._version_history_handler is None or self._source_prompt is None:
             return
         self._version_history_handler(self._source_prompt)
@@ -1353,7 +1306,6 @@ class PromptDialog(QDialog):
 
 class PromptMaintenanceDialog(QDialog):
     """Expose bulk metadata maintenance utilities."""
-
     maintenance_applied = Signal(str)
 
     def __init__(
@@ -1364,6 +1316,7 @@ class PromptMaintenanceDialog(QDialog):
         category_generator: Callable[[str], str] | None = None,
         tags_generator: Callable[[str], Sequence[str]] | None = None,
     ) -> None:
+        """Create the maintenance dialog with optional LiteLLM helpers."""
         super().__init__(parent)
         self._manager = manager
         self._category_generator = category_generator
@@ -1406,7 +1359,6 @@ class PromptMaintenanceDialog(QDialog):
 
     def _restore_window_size(self) -> None:
         """Resize the dialog using the last persisted geometry if available."""
-
         width = self._settings.value("width", type=int)
         height = self._settings.value("height", type=int)
         if isinstance(width, int) and isinstance(height, int) and width > 0 and height > 0:
@@ -1414,7 +1366,6 @@ class PromptMaintenanceDialog(QDialog):
 
     def closeEvent(self, event: QEvent) -> None:  # type: ignore[override]
         """Persist the current window size before closing."""
-
         self._settings.setValue("width", self.width())
         self._settings.setValue("height", self.height())
         super().closeEvent(event)
@@ -1957,7 +1908,6 @@ class PromptMaintenanceDialog(QDialog):
 
     def _on_snapshot_clicked(self) -> None:
         """Prompt for a destination and create a maintenance snapshot."""
-
         default_name = datetime.now(UTC).strftime("prompt-manager-snapshot-%Y%m%d-%H%M%S.zip")
         default_path = str(Path.home() / default_name)
         path, _ = QFileDialog.getSaveFileName(
@@ -1988,7 +1938,6 @@ class PromptMaintenanceDialog(QDialog):
 
     def _on_reset_prompts_clicked(self) -> None:
         """Clear the SQLite prompt repository."""
-
         if not self._confirm_destructive_action(
             "Clear the prompt database and execution history?"
         ):
@@ -2011,7 +1960,6 @@ class PromptMaintenanceDialog(QDialog):
 
     def _on_reset_chroma_clicked(self) -> None:
         """Clear the ChromaDB vector store."""
-
         if not self._confirm_destructive_action(
             "Remove all embeddings from the ChromaDB vector store?"
         ):
@@ -2033,7 +1981,6 @@ class PromptMaintenanceDialog(QDialog):
 
     def _set_chroma_actions_busy(self, busy: bool) -> None:
         """Disable Chroma maintenance buttons while a task is running."""
-
         if not busy:
             return
         for button in (
@@ -2046,7 +1993,6 @@ class PromptMaintenanceDialog(QDialog):
 
     def _on_chroma_compact_clicked(self) -> None:
         """Run VACUUM maintenance on the Chroma persistent store."""
-
         self._set_chroma_actions_busy(True)
         try:
             self._manager.compact_vector_store()
@@ -2064,7 +2010,6 @@ class PromptMaintenanceDialog(QDialog):
 
     def _on_chroma_optimize_clicked(self) -> None:
         """Refresh query statistics for the Chroma persistent store."""
-
         self._set_chroma_actions_busy(True)
         try:
             self._manager.optimize_vector_store()
@@ -2082,7 +2027,6 @@ class PromptMaintenanceDialog(QDialog):
 
     def _on_chroma_verify_clicked(self) -> None:
         """Verify integrity of the Chroma persistent store."""
-
         self._set_chroma_actions_busy(True)
         try:
             summary = self._manager.verify_vector_store()
@@ -2097,7 +2041,6 @@ class PromptMaintenanceDialog(QDialog):
 
     def _set_storage_actions_busy(self, busy: bool) -> None:
         """Disable SQLite maintenance buttons while a task is running."""
-
         if not busy:
             return
         for button in (
@@ -2110,7 +2053,6 @@ class PromptMaintenanceDialog(QDialog):
 
     def _on_sqlite_compact_clicked(self) -> None:
         """Run VACUUM on the prompt repository."""
-
         self._set_storage_actions_busy(True)
         try:
             self._manager.compact_repository()
@@ -2128,7 +2070,6 @@ class PromptMaintenanceDialog(QDialog):
 
     def _on_sqlite_optimize_clicked(self) -> None:
         """Refresh SQLite statistics for the prompt repository."""
-
         self._set_storage_actions_busy(True)
         try:
             self._manager.optimize_repository()
@@ -2146,7 +2087,6 @@ class PromptMaintenanceDialog(QDialog):
 
     def _on_sqlite_verify_clicked(self) -> None:
         """Verify integrity of the prompt repository."""
-
         self._set_storage_actions_busy(True)
         try:
             summary = self._manager.verify_repository()
@@ -2161,7 +2101,6 @@ class PromptMaintenanceDialog(QDialog):
 
     def _on_reset_application_clicked(self) -> None:
         """Clear prompts, embeddings, and usage logs."""
-
         if not self._confirm_destructive_action(
             "Reset all application data (prompts, history, embeddings, and logs)?"
         ):
@@ -2185,7 +2124,6 @@ class PromptMaintenanceDialog(QDialog):
 
     def _refresh_redis_info(self) -> None:
         """Update the Redis tab with the latest cache status."""
-
         details = self._manager.get_redis_details()
         enabled = details.get("enabled", False)
         if not enabled:
@@ -2242,7 +2180,6 @@ class PromptMaintenanceDialog(QDialog):
 
     def _refresh_chroma_info(self) -> None:
         """Update the ChromaDB tab with vector store information."""
-
         details = self._manager.get_chroma_details()
         enabled = details.get("enabled", False)
         path = details.get("path") or ""
@@ -2290,7 +2227,6 @@ class PromptMaintenanceDialog(QDialog):
 
     def _refresh_storage_info(self) -> None:
         """Update the SQLite tab with repository information."""
-
         repository = self._manager.repository
         db_path_obj = getattr(repository, "_db_path", None)
         if isinstance(db_path_obj, Path):
@@ -2351,7 +2287,6 @@ class PromptMaintenanceDialog(QDialog):
 
 class CategoryEditorDialog(QDialog):
     """Collect category details for creation or editing workflows."""
-
     def __init__(
         self,
         parent: QWidget | None = None,
@@ -2370,7 +2305,6 @@ class CategoryEditorDialog(QDialog):
     @property
     def payload(self) -> dict[str, object]:
         """Return the collected form data."""
-
         return dict(self._payload)
 
     def _build_ui(self) -> None:
@@ -2418,7 +2352,6 @@ class CategoryEditorDialog(QDialog):
 
     def _populate(self, category: PromptCategory) -> None:
         """Populate the form with an existing category."""
-
         self._label_input.setText(category.label)
         self._slug_input.setText(category.slug)
         self._slug_input.setReadOnly(True)
@@ -2432,7 +2365,6 @@ class CategoryEditorDialog(QDialog):
 
     def _on_accept(self) -> None:
         """Validate inputs and persist them in payload."""
-
         label = self._label_input.text().strip()
         if not label:
             QMessageBox.warning(self, "Invalid category", "Label is required.")
@@ -2471,7 +2403,6 @@ class CategoryEditorDialog(QDialog):
 
 class CategoryManagerDialog(QDialog):
     """Provide CRUD workflows for prompt categories."""
-
     def __init__(self, manager: PromptManager, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._manager = manager
@@ -2487,7 +2418,6 @@ class CategoryManagerDialog(QDialog):
     @property
     def has_changes(self) -> bool:
         """Return True when categories were created or updated."""
-
         return self._has_changes
 
     def _build_ui(self) -> None:
@@ -2551,7 +2481,6 @@ class CategoryManagerDialog(QDialog):
 
     def _load_categories(self) -> None:
         """Populate table with repository categories."""
-
         try:
             categories = self._manager.list_categories(include_archived=True)
         except CategoryStorageError as exc:
@@ -2573,7 +2502,6 @@ class CategoryManagerDialog(QDialog):
 
     def _selected_category(self) -> PromptCategory | None:
         """Return the currently selected category."""
-
         selected_rows = self._table.selectionModel().selectedRows()
         if not selected_rows:
             return None
@@ -2584,7 +2512,6 @@ class CategoryManagerDialog(QDialog):
 
     def _update_button_states(self) -> None:
         """Enable/disable actions based on selection."""
-
         category = self._selected_category()
         has_selection = category is not None
         self._edit_button.setEnabled(has_selection)
@@ -2596,7 +2523,6 @@ class CategoryManagerDialog(QDialog):
 
     def _on_refresh_clicked(self) -> None:
         """Reload categories from the registry."""
-
         try:
             self._manager.refresh_categories()
         except CategoryStorageError as exc:
@@ -2605,7 +2531,6 @@ class CategoryManagerDialog(QDialog):
 
     def _on_add_category(self) -> None:
         """Open the category editor and persist a new category."""
-
         dialog = CategoryEditorDialog(self)
         if not dialog.exec():
             return
@@ -2620,7 +2545,6 @@ class CategoryManagerDialog(QDialog):
 
     def _on_edit_category(self) -> None:
         """Edit the selected category."""
-
         category = self._selected_category()
         if category is None:
             return
@@ -2650,7 +2574,6 @@ class CategoryManagerDialog(QDialog):
 
     def _on_toggle_category(self) -> None:
         """Archive or activate the selected category."""
-
         category = self._selected_category()
         if category is None:
             return
@@ -2668,7 +2591,6 @@ class CategoryManagerDialog(QDialog):
 
 class SaveResultDialog(QDialog):
     """Collect optional notes before persisting or updating a prompt execution."""
-
     def __init__(
         self,
         parent: QWidget | None,
@@ -2680,6 +2602,7 @@ class SaveResultDialog(QDialog):
         enable_rating: bool = True,
         initial_rating: float | None = None,
     ) -> None:
+        """Configure the result dialog with labels, defaults, and rating controls."""
         super().__init__(parent)
         self._max_chars = max_chars
         self._summary = ""
@@ -2693,13 +2616,11 @@ class SaveResultDialog(QDialog):
     @property
     def note(self) -> str:
         """Return the trimmed note content."""
-
         return self._summary
 
     @property
     def rating(self) -> int | None:
         """Return the selected rating, if any."""
-
         return self._rating
 
     def _build_ui(self, default_text: str, button_text: str) -> None:
@@ -2761,7 +2682,6 @@ class SaveResultDialog(QDialog):
 
 class ResponseStyleDialog(QDialog):
     """Modal dialog for creating or editing prompt parts such as response styles."""
-
     _PROMPT_PART_PRESETS: Sequence[str] = (
         "Response Style",
         "System Instruction",
@@ -2777,6 +2697,7 @@ class ResponseStyleDialog(QDialog):
         *,
         style: ResponseStyle | None = None,
     ) -> None:
+        """Initialise the response style editor with optional existing data."""
         super().__init__(parent)
         self._source_style = style
         self._result_style: ResponseStyle | None = None
@@ -2789,7 +2710,6 @@ class ResponseStyleDialog(QDialog):
     @property
     def result_style(self) -> ResponseStyle | None:
         """Return the resulting prompt part entry."""
-
         return self._result_style
 
     def _build_ui(self) -> None:
@@ -2871,7 +2791,6 @@ class ResponseStyleDialog(QDialog):
 
     def _populate(self, style: ResponseStyle) -> None:
         """Populate dialog fields from an existing prompt part."""
-
         self._name_input.setText(style.name)
         self._description_input.setPlainText(style.description)
         self._phrase_input.setPlainText(style.format_instructions or style.description)
@@ -2887,7 +2806,6 @@ class ResponseStyleDialog(QDialog):
 
     def _on_accept(self) -> None:
         """Validate user input and produce a ResponseStyle instance."""
-
         phrase = self._phrase_input.toPlainText().strip()
         if not phrase:
             QMessageBox.warning(
@@ -2941,7 +2859,6 @@ class ResponseStyleDialog(QDialog):
     @staticmethod
     def _auto_generate_name(phrase: str, *, max_words: int = 3) -> str:
         """Derive a friendly style name from the pasted phrase."""
-
         tokens = [token.strip(".,!?") for token in phrase.split() if token.strip(".,!?")]
         if tokens:
             snippet = " ".join(tokens[:max_words]).title()
@@ -2953,8 +2870,8 @@ class ResponseStyleDialog(QDialog):
 
 class PromptNoteDialog(QDialog):
     """Modal dialog for creating or editing prompt notes."""
-
     def __init__(self, parent: QWidget | None = None, *, note: PromptNote | None = None) -> None:
+        """Initialise the note editor and optionally preload existing text."""
         super().__init__(parent)
         self._source_note = note
         self._result_note: PromptNote | None = None
@@ -2967,7 +2884,6 @@ class PromptNoteDialog(QDialog):
     @property
     def result_note(self) -> PromptNote | None:
         """Return the resulting note after dialog acceptance."""
-
         return self._result_note
 
     def _build_ui(self) -> None:
@@ -2998,7 +2914,6 @@ class PromptNoteDialog(QDialog):
 
 class MarkdownPreviewDialog(QDialog):
     """Display markdown content rendered in a read-only viewer."""
-
     def __init__(
         self,
         markdown_text: str,
@@ -3006,6 +2921,7 @@ class MarkdownPreviewDialog(QDialog):
         *,
         title: str = "Rendered Output",
     ) -> None:
+        """Render ``markdown_text`` inside a read-only dialog."""
         super().__init__(parent)
         self._markdown_text = markdown_text
         self.setWindowTitle(title)
@@ -3014,7 +2930,6 @@ class MarkdownPreviewDialog(QDialog):
 
     def _build_ui(self) -> None:
         """Construct the markdown preview layout and wire controls."""
-
         layout = QVBoxLayout(self)
         viewer = QTextBrowser(self)
         viewer.setOpenExternalLinks(True)
@@ -3033,10 +2948,10 @@ class MarkdownPreviewDialog(QDialog):
 
 class InfoDialog(QDialog):
     """Dialog summarising application metadata and runtime system details."""
-
     _TAGLINE = "Catalog, execute, and track AI prompts from a single desktop workspace."
 
     def __init__(self, parent: QWidget | None = None) -> None:
+        """Initialise the informational dialog and load system metadata."""
         super().__init__(parent)
         self.setWindowTitle("About Prompt Manager")
         self.setModal(True)
@@ -3112,7 +3027,6 @@ class InfoDialog(QDialog):
     @staticmethod
     def _resolve_app_version() -> str:
         """Return the application version preferring the local pyproject when available."""
-
         project_version = InfoDialog._version_from_pyproject()
         if project_version:
             return project_version
@@ -3187,7 +3101,6 @@ def _diff_entry_to_text(entry: CatalogDiffEntry) -> str:
 
 class PromptVersionHistoryDialog(QDialog):
     """Display committed prompt versions with diff/restore controls."""
-
     _BODY_PLACEHOLDER = "Select a version to view the prompt body."
     _EMPTY_BODY_TEXT = "Prompt body is empty."
 
@@ -3200,6 +3113,7 @@ class PromptVersionHistoryDialog(QDialog):
         status_callback: Callable[[str, int], None] | None = None,
         limit: int = 200,
     ) -> None:
+        """Create the history dialog for *prompt* with optional status callbacks."""
         super().__init__(parent)
         self._manager = manager
         self._prompt = prompt
@@ -3352,7 +3266,6 @@ class PromptVersionHistoryDialog(QDialog):
 
     def _body_text_for_version(self, version: PromptVersion) -> str:
         """Return the prompt body stored in the snapshot or a placeholder."""
-
         raw_body = version.snapshot.get("context")
         if isinstance(raw_body, str) and raw_body.strip():
             return raw_body
@@ -3401,7 +3314,6 @@ class PromptVersionHistoryDialog(QDialog):
 
     def _copy_body_to_clipboard(self) -> None:
         """Copy the selected prompt version body to the clipboard."""
-
         version = self._selected_version()
         if version is None:
             return
@@ -3438,8 +3350,8 @@ class PromptVersionHistoryDialog(QDialog):
 
 class CatalogPreviewDialog(QDialog):
     """Show a diff preview before applying catalogue changes."""
-
     def __init__(self, diff: CatalogDiff, parent=None) -> None:
+        """Display the provided catalogue diff and capture user intent."""
         super().__init__(parent)
         self._diff = diff
         self._apply = False
@@ -3450,7 +3362,6 @@ class CatalogPreviewDialog(QDialog):
     @property
     def apply_requested(self) -> bool:
         """Return True when the user confirmed the import."""
-
         return self._apply
 
     def _build_ui(self) -> None:

@@ -2,7 +2,6 @@
 
 Updates: v0.1.0 - 2025-10-30 - Add Redis client resolution unit tests.
 """
-
 from __future__ import annotations
 
 from types import SimpleNamespace

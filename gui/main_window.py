@@ -1,8 +1,10 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
-  v0.15.80 - 2025-12-01 - Modularized layout, workspace, template preview, notifications, and prompt actions into dedicated controllers.
-  v0.15.79 - 2025-12-01 - Delegated theme/palette, runtime settings, catalog, and share workflows to helpers.
+  v0.15.80 - 2025-12-01 - Modularized layout, workspace, template preview,
+    notifications, and prompt actions into dedicated controllers.
+  v0.15.79 - 2025-12-01 - Delegated theme/palette, runtime settings, catalog,
+    and share workflows to helpers.
   v0.15.78 - 2025-12-01 - Guard tab change handler until widgets are initialised.
   v0.15.77 - 2025-12-01 - Extract prompt list coordinator for loading/filtering/sorting logic.
   v0.15.76 - 2025-12-01 - Delegate layout persistence to WindowStateManager helper.
@@ -24,7 +26,6 @@ Updates:
   v0.15.60 - 2025-11-28 - Introduced background task center with toasts.
   v0.15.59 - 2025-11-28 - Wired Refresh Scenarios action to LiteLLM.
 """
-
 from __future__ import annotations
 
 import logging
@@ -33,7 +34,6 @@ from functools import partial
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QModelIndex, QPoint, QSettings
-from PySide6.QtGui import QResizeEvent, QShowEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -48,16 +48,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from config import (
-    DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR,
-    DEFAULT_CHAT_USER_BUBBLE_COLOR,
-    DEFAULT_EMBEDDING_BACKEND,
-    DEFAULT_EMBEDDING_MODEL,
-    DEFAULT_THEME_MODE,
-    ChatColors,
-    PromptManagerSettings,
-    PromptTemplateOverrides,
-)
+from config import DEFAULT_THEME_MODE, PromptManagerSettings
 from core import (
     IntentLabel,
     NameGenerationError,
@@ -72,8 +63,8 @@ from core.sharing import ShareTextProvider
 from models.category_model import PromptCategory, slugify_category
 
 from .appearance_controller import AppearanceController
-from .code_highlighter import CodeHighlighter
 from .catalog_workflow_controller import CatalogWorkflowController
+from .code_highlighter import CodeHighlighter
 from .controllers.execution_controller import ExecutionController
 from .dialogs import (
     CategoryManagerDialog,
@@ -85,8 +76,8 @@ from .layout_controller import LayoutController
 from .layout_state import WindowStateManager
 from .main_view_builder import MainViewCallbacks, MainViewComponents, build_main_view
 from .notification_controller import NotificationController
-from .prompt_editor_flow import PromptDialogFactory, PromptEditorFlow
 from .prompt_actions_controller import PromptActionsController
+from .prompt_editor_flow import PromptDialogFactory, PromptEditorFlow
 from .prompt_list_coordinator import PromptListCoordinator, PromptSortOrder
 from .prompt_list_model import PromptListModel
 from .prompt_list_presenter import PromptListCallbacks, PromptListPresenter
@@ -100,13 +91,15 @@ from .template_preview_controller import TemplatePreviewController
 from .toast import show_toast
 from .usage_logger import IntentUsageLogger
 from .widgets import PromptDetailWidget, PromptFilterPanel, PromptToolbar
-from .workspace_actions_controller import WorkspaceActionsController
 from .workbench.workbench_window import WorkbenchModeDialog, WorkbenchWindow
+from .workspace_actions_controller import WorkspaceActionsController
 from .workspace_view_controller import WorkspaceViewController
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Sequence
     from uuid import UUID
+
+    from PySide6.QtGui import QResizeEvent, QShowEvent
 
     from core.prompt_engineering import PromptRefinement
     from models.prompt_model import Prompt
@@ -147,7 +140,6 @@ def _match_category_label(
 
 class MainWindow(QMainWindow):
     """Primary window exposing prompt CRUD operations."""
-
     _SORT_OPTIONS: Sequence[tuple[str, PromptSortOrder]] = (
         ("Name (A-Z)", PromptSortOrder.NAME_ASC),
         ("Name (Z-A)", PromptSortOrder.NAME_DESC),
@@ -209,9 +201,9 @@ class MainWindow(QMainWindow):
         self._prompt_actions_controller: PromptActionsController | None = None
         self._share_controller = ShareController(
             self,
-            toast_callback=lambda message, duration_ms=2500: show_toast(self, message, duration_ms),
-            status_callback=lambda message, duration=3000: self.statusBar().showMessage(message, duration),
-            error_callback=lambda title, message: self._show_error(title, message),
+            toast_callback=self._show_toast,
+            status_callback=self._show_status_message,
+            error_callback=self._show_error,
             usage_logger=self._usage_logger,
         )
         self._share_result_button: QPushButton | None = None

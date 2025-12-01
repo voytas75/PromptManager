@@ -15,7 +15,6 @@ Updates:
   v0.1.1 - 2025-11-15 - Avoid persisting LiteLLM API secrets to disk.
   v0.1.0 - 2025-11-04 - Initial settings dialog implementation.
 """
-
 from __future__ import annotations
 
 import json
@@ -66,7 +65,6 @@ if TYPE_CHECKING:
 
 class SettingsDialog(QDialog):
     """Modal dialog enabling users to configure catalogue and LiteLLM options."""
-
     def __init__(
         self,
         parent=None,
@@ -433,14 +431,12 @@ class SettingsDialog(QDialog):
 
     def _on_theme_mode_changed(self, index: int) -> None:
         """Synchronise the selected theme mode with internal state."""
-
         self._theme_mode = "dark" if index == 1 else "light"
         if self._chat_color_input is not None:
             self._update_chat_color_preview(self._chat_color_input.text())
 
     def _update_chat_color_preview(self, value: str) -> None:
         """Refresh the preview bubble based on the current colour entry."""
-
         if self._chat_color_preview is None:
             return
         text = (value or "").strip()
@@ -533,7 +529,6 @@ class SettingsDialog(QDialog):
 
     def result_settings(self) -> dict[str, object | None]:
         """Return cleaned settings data."""
-
         def _clean(value: str) -> str | None:
             stripped = value.strip()
             return stripped or None
@@ -573,7 +568,6 @@ class SettingsDialog(QDialog):
 
     def _reset_prompt_template(self, key: str) -> None:
         """Reset a single prompt template editor to its default value."""
-
         editor = self._prompt_template_inputs.get(key)
         if editor is None:
             return
@@ -581,7 +575,6 @@ class SettingsDialog(QDialog):
 
     def _reset_all_prompt_templates(self) -> None:
         """Reset every prompt template editor to the default text."""
-
         for key in PROMPT_TEMPLATE_KEYS:
             self._reset_prompt_template(key)
 

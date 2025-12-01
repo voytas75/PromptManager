@@ -1,5 +1,4 @@
 """Tests for command palette utilities."""
-
 from __future__ import annotations
 
 import uuid

@@ -3,7 +3,6 @@
 Updates: v0.1.1 - 2025-11-24 - Add category suggestion template for LiteLLM workflows.
 Updates: v0.1.0 - 2025-11-23 - Centralise prompt template defaults for runtime overrides.
 """
-
 from __future__ import annotations
 
 NAME_GENERATION_PROMPT = (
@@ -108,13 +107,11 @@ DEFAULT_PROMPT_TEMPLATES: dict[str, str] = {
 
 def get_default_prompt(key: str) -> str:
     """Return the default prompt text for a workflow key."""
-
     return DEFAULT_PROMPT_TEMPLATES.get(key, "")
 
 
 def normalise_prompt_templates(value: dict[str, str] | None) -> dict[str, str]:
     """Return a cleaned mapping of prompt overrides keyed by workflow."""
-
     if not value:
         return {}
     cleaned: dict[str, str] = {}

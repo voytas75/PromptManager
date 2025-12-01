@@ -1,5 +1,4 @@
 """Unit tests covering embedding provider and sync worker utilities."""
-
 from __future__ import annotations
 
 import threading

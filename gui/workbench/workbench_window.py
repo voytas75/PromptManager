@@ -24,7 +24,6 @@ Updates:
   v0.1.1 - 2025-11-29 - Align guided wizard palette with the active application theme.
   v0.1.0 - 2025-11-29 - Introduce guided Workbench window, mode selector, and export dialog.
 """
-
 from __future__ import annotations
 
 import logging
@@ -151,7 +150,6 @@ def _normalise_variable_token(text: str) -> str | None:
 
 class WorkbenchPromptEditor(QPlainTextEdit):
     """Custom prompt editor that surfaces variable tokens on double-click."""
-
     variableActivated = Signal(str)
 
     def mouseDoubleClickEvent(self, event) -> None:  # type: ignore[override]
@@ -163,7 +161,6 @@ class WorkbenchPromptEditor(QPlainTextEdit):
 
 class WorkbenchMode:
     """Enumeration representing the Workbench launch path."""
-
     GUIDED = "guided"
     BLANK = "blank"
     TEMPLATE = "template"
@@ -172,14 +169,12 @@ class WorkbenchMode:
 @dataclass(slots=True)
 class ModeSelection:
     """Result payload returned by WorkbenchModeDialog."""
-
     mode: str
     template_prompt: Prompt | None
 
 
 class WorkbenchModeDialog(QDialog):
     """Dialog that lets the user choose between guided, blank, or template modes."""
-
     def __init__(self, prompts: Sequence[Prompt], parent: QWidget | None = None) -> None:
         super().__init__(parent)
         _inherit_palette(self)
@@ -190,7 +185,6 @@ class WorkbenchModeDialog(QDialog):
 
     def result_selection(self) -> ModeSelection:
         """Return the chosen mode and, when relevant, the template prompt."""
-
         return self._selection
 
     def _build_ui(self) -> None:
@@ -283,7 +277,6 @@ class WorkbenchModeDialog(QDialog):
 
 class VariableCaptureDialog(QDialog):
     """Dialog for defining placeholder metadata and sample values."""
-
     def __init__(
         self,
         name: str | None = None,
@@ -296,7 +289,6 @@ class VariableCaptureDialog(QDialog):
 
     def result_variable(self) -> WorkbenchVariable | None:
         """Return a WorkbenchVariable when the dialog is accepted."""
-
         if self.result() != QDialog.Accepted:
             return None
         name = self._name_input.text().strip()
@@ -393,7 +385,6 @@ class _DetailWizardPage(QWidget):
 
 class GuidedPromptWizard(QDialog):
     """Custom-styled wizard dialog that emits updates whenever fields change."""
-
     updated = Signal(dict)
 
     def __init__(self, session: WorkbenchSession, parent: QWidget | None = None) -> None:
@@ -631,7 +622,6 @@ class GuidedPromptWizard(QDialog):
 
 class WorkbenchExportDialog(QDialog):
     """Collect final metadata before persisting a prompt draft."""
-
     def __init__(self, session: WorkbenchSession, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         _inherit_palette(self)
@@ -675,7 +665,6 @@ class WorkbenchExportDialog(QDialog):
 
 class WorkbenchWindow(QMainWindow):
     """Modal workspace that guides users through crafting prompts iteratively."""
-
     def __init__(
         self,
         prompt_manager: PromptManager,

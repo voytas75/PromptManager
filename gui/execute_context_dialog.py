@@ -2,7 +2,6 @@
 
 Updates: v0.1.0 - 2025-11-26 - Add execute-as-context history picker dialog.
 """
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -26,7 +25,6 @@ if TYPE_CHECKING:
 
 class ExecuteContextDialog(QDialog):
     """Collect a task description and expose quick history selection."""
-
     def __init__(
         self,
         *,
@@ -34,6 +32,7 @@ class ExecuteContextDialog(QDialog):
         history: Sequence[str] | None = None,
         parent=None,
     ) -> None:
+        """Initialise the dialog with optional history and last-task defaults."""
         super().__init__(parent)
         self.setWindowTitle("Execute as Context")
         self.setModal(True)
@@ -45,12 +44,10 @@ class ExecuteContextDialog(QDialog):
 
     def task_text(self) -> str:
         """Return the task description provided by the user."""
-
         return self._description_input.toPlainText()
 
     def _build_ui(self, last_task: str) -> None:
         """Create the dialog layout and populate controls."""
-
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(12)
@@ -101,18 +98,15 @@ class ExecuteContextDialog(QDialog):
 
     def _on_history_item_clicked(self, item: QListWidgetItem) -> None:
         """Populate the task input with the clicked history entry."""
-
         self._apply_history_text(item.text())
 
     def _on_history_item_double_clicked(self, item: QListWidgetItem) -> None:
         """Populate the task input and accept the dialog on double click."""
-
         self._apply_history_text(item.text())
         self.accept()
 
     def _apply_history_text(self, text: str) -> None:
         """Set the description field to *text* and focus the editor."""
-
         self._description_input.setPlainText(text)
         cursor = self._description_input.textCursor()
         cursor.movePosition(QTextCursor.End)

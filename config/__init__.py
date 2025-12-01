@@ -6,7 +6,6 @@ Updates: v0.2.1 - 2025-11-05 - Expose LiteLLM workflow routing constants.
 Updates: v0.2.0 - 2025-11-03 - Expose settings loader and configuration error types.
 Updates: v0.1.0 - 2025-10-30 - Package scaffold.
 """
-
 from .settings import (
     DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR,
     DEFAULT_CHAT_USER_BUBBLE_COLOR,

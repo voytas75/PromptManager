@@ -11,7 +11,6 @@ Updates: v0.2.0 - 2025-11-08 - Add prompt execution records for history logging.
 Updates: v0.1.1 - 2025-11-01 - Filtered null metadata fields for Chroma compatibility.
 Updates: v0.1.0 - 2025-10-30 - Initial Prompt schema with serialization helpers.
 """
-
 from __future__ import annotations
 
 import hashlib
@@ -61,7 +60,6 @@ def _serialize_list(items: Iterable[Any] | None) -> list[Any]:
 
 def _sanitize_scenarios(items: Iterable[Any] | None) -> list[str]:
     """Return a deduplicated, trimmed list of scenario strings."""
-
     scenarios: list[str] = []
     seen: set[str] = set()
     for raw in _serialize_list(items):
@@ -118,7 +116,6 @@ def _deserialize_list(value: Any) -> list[str]:
 
 def _normalize_version_label(value: Any) -> str:
     """Return an integer-only version label derived from mixed inputs."""
-
     if value is None:
         return "1"
     text = str(value).strip()
@@ -141,7 +138,6 @@ def _hash_text(value: str) -> str:
 
 class ExecutionStatus(str, Enum):
     """Enumerate prompt execution outcomes for history tracking."""
-
     SUCCESS = "success"
     FAILED = "failed"
     PARTIAL = "partial"
@@ -150,7 +146,6 @@ class ExecutionStatus(str, Enum):
 @dataclass(slots=True)
 class Prompt:
     """Dataclass representation of a prompt entry."""
-
     id: uuid.UUID
     name: str
     description: str
@@ -187,7 +182,6 @@ class Prompt:
 
     def __post_init__(self) -> None:
         """Normalise stored scenarios and mirror them into ext5 metadata."""
-
         ext5_mapping: MutableMapping[str, Any] | None
         if isinstance(self.ext5, MutableMapping):
             ext5_mapping = self.ext5
@@ -385,7 +379,6 @@ class Prompt:
 @dataclass(slots=True)
 class PromptExecution:
     """Dataclass representing a single prompt execution event."""
-
     id: uuid.UUID
     prompt_id: uuid.UUID
     request_text: str
@@ -452,7 +445,6 @@ class PromptExecution:
 @dataclass(slots=True)
 class PromptVersion:
     """Snapshot of a prompt captured for version history tracking."""
-
     id: int
     prompt_id: uuid.UUID
     version_number: int
@@ -463,13 +455,11 @@ class PromptVersion:
 
     def to_prompt(self) -> Prompt:
         """Hydrate the stored snapshot into a :class:`Prompt`."""
-
         return Prompt.from_record(self.snapshot)
 
     @classmethod
     def from_row(cls, row: Mapping[str, Any]) -> PromptVersion:
         """Instantiate a version from a SQLite row payload."""
-
         raw_snapshot = row["snapshot_json"]
         if raw_snapshot is None:
             raise ValueError("Prompt version snapshot is missing")
@@ -499,7 +489,6 @@ class PromptVersion:
 @dataclass(slots=True)
 class PromptForkLink:
     """Describe lineage between a source prompt and its fork."""
-
     id: int
     source_prompt_id: uuid.UUID
     child_prompt_id: uuid.UUID
@@ -508,7 +497,6 @@ class PromptForkLink:
     @classmethod
     def from_row(cls, row: Mapping[str, Any]) -> PromptForkLink:
         """Hydrate a fork link from a SQLite row payload."""
-
         return cls(
             id=int(row["fork_id"]),
             source_prompt_id=_ensure_uuid(row["source_prompt_id"]),
@@ -522,7 +510,6 @@ DEFAULT_PROFILE_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 @dataclass(slots=True)
 class UserProfile:
     """Lightweight preference profile for the single Prompt Manager user."""
-
     id: uuid.UUID
     username: str = "default"
     preferred_language: str | None = None
@@ -537,12 +524,10 @@ class UserProfile:
 
     def touch(self) -> None:
         """Refresh the profile timestamp."""
-
         self.updated_at = _utc_now()
 
     def record_prompt_usage(self, prompt: Prompt, *, max_recent: int = 20) -> None:
         """Update preference counters and recency list from a prompt usage."""
-
         category = (prompt.category or "").strip()
         if category:
             self.category_weights[category] = int(self.category_weights.get(category, 0)) + 1
@@ -564,7 +549,6 @@ class UserProfile:
 
     def favorite_categories(self, *, limit: int = 3) -> list[str]:
         """Return the most frequently used categories."""
-
         if not self.category_weights:
             return []
         ordered = sorted(
@@ -576,7 +560,6 @@ class UserProfile:
 
     def favorite_tags(self, *, limit: int = 5) -> list[str]:
         """Return the most frequently used tags."""
-
         if not self.tag_weights:
             return []
         ordered = sorted(
@@ -588,7 +571,6 @@ class UserProfile:
 
     def to_record(self) -> dict[str, Any]:
         """Serialise the profile into a plain mapping."""
-
         return {
             "id": str(self.id),
             "username": self.username,
@@ -606,7 +588,6 @@ class UserProfile:
     @classmethod
     def from_record(cls, data: Mapping[str, Any]) -> UserProfile:
         """Hydrate a profile from a mapping."""
-
         settings_value = data.get("settings")
         if isinstance(settings_value, Mapping):
             settings_dict = {str(key): settings_value[key] for key in settings_value}
@@ -640,7 +621,6 @@ class UserProfile:
     @classmethod
     def create_default(cls, username: str = "default") -> UserProfile:
         """Return a default profile for single-user deployments."""
-
         return cls(id=DEFAULT_PROFILE_ID, username=username)
 
 

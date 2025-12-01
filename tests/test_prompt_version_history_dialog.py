@@ -4,7 +4,6 @@ Updates:
   v0.1.1 - 2025-11-29 - Wrap tab title comprehension for Ruff line length.
   v0.1.0 - 2025-11-22 - Ensure prompt body tab is default selection.
 """
-
 from __future__ import annotations
 
 import uuid

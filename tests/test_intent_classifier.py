@@ -1,5 +1,4 @@
 """Tests for rule-based intent classifier utilities."""
-
 from __future__ import annotations
 
 from core.intent_classifier import IntentClassifier, IntentLabel, rank_by_hints

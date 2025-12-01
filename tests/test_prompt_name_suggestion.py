@@ -1,5 +1,4 @@
 """Tests for prompt name suggestion helper."""
-
 from __future__ import annotations
 
 import importlib.machinery

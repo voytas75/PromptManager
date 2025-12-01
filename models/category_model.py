@@ -2,7 +2,6 @@
 
 Updates: v0.1.0 - 2025-11-22 - Introduce PromptCategory dataclass and helpers.
 """
-
 from __future__ import annotations
 
 import re
@@ -23,7 +22,6 @@ def _utc_now() -> datetime:
 
 def slugify_category(value: str | None) -> str:
     """Return a URL-safe slug derived from the provided value."""
-
     text = (value or "").strip().lower()
     if not text:
         return ""
@@ -33,7 +31,6 @@ def slugify_category(value: str | None) -> str:
 
 def _parse_datetime(value: Any) -> datetime:
     """Return a timezone-aware datetime from unstructured inputs."""
-
     if isinstance(value, datetime):
         return value if value.tzinfo else value.replace(tzinfo=UTC)
     if value is None:
@@ -46,7 +43,6 @@ def _parse_datetime(value: Any) -> datetime:
 
 def _normalise_tags(value: Iterable[Any] | None) -> list[str]:
     """Coerce iterable tag inputs into a deduplicated list of strings."""
-
     tags: list[str] = []
     seen: set[str] = set()
     if value is None:
@@ -74,7 +70,6 @@ def _clean_optional_text(value: str | None) -> str | None:
 @dataclass(slots=True)
 class PromptCategory:
     """Structured representation of a prompt category."""
-
     slug: str
     label: str
     description: str
@@ -89,7 +84,6 @@ class PromptCategory:
 
     def __post_init__(self) -> None:
         """Normalise text fields and ensure slug validity."""
-
         if not self.slug:
             self.slug = slugify_category(self.label)
         else:
@@ -117,7 +111,6 @@ class PromptCategory:
 
     def to_record(self) -> dict[str, Any]:
         """Serialize the category into a plain dictionary."""
-
         return {
             "slug": self.slug,
             "label": self.label,
@@ -135,7 +128,6 @@ class PromptCategory:
     @classmethod
     def from_record(cls, data: Mapping[str, Any]) -> PromptCategory:
         """Hydrate a PromptCategory from a mapping."""
-
         return cls(
             slug=str(data["slug"]),
             label=str(data.get("label") or data["slug"]),
@@ -153,7 +145,6 @@ class PromptCategory:
     @classmethod
     def from_mapping(cls, payload: Mapping[str, Any]) -> PromptCategory:
         """Create a category from loosely structured configuration."""
-
         if "label" not in payload and "slug" not in payload:
             raise ValueError("categories require at least a label or slug")
         return cls(

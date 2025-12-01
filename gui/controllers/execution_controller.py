@@ -3,7 +3,6 @@
 Updates:
   v0.1.0 - 2025-11-30 - Extract execution and chat orchestration from main window.
 """
-
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
@@ -50,7 +49,6 @@ ToastCallback = Callable[[str, int], None]
 
 class ExecutionController:
     """Manage workspace execution, streaming output, and chat state."""
-
     def __init__(
         self,
         *,

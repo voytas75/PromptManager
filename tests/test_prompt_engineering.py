@@ -1,5 +1,4 @@
 """Tests for prompt engineering helpers."""
-
 from __future__ import annotations
 
 import json

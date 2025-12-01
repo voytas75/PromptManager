@@ -15,7 +15,6 @@ Updates:
   v0.1.1 - 2025-11-27 - Capture variables with multiline editors sized to four lines.
   v0.1.0 - 2025-11-25 - Add dynamic Jinja2 preview with custom filters and schema validation.
 """
-
 from __future__ import annotations
 
 import json
@@ -49,7 +48,6 @@ if TYPE_CHECKING:
 
 class TemplatePreviewWidget(QWidget):
     """Provide a JSON-driven variables editor with live Jinja2 previews."""
-
     run_requested = Signal(str, dict)
     run_state_changed = Signal(bool)
 
@@ -77,7 +75,6 @@ class TemplatePreviewWidget(QWidget):
 
     def set_template(self, template_text: str, prompt_id: str | None = None) -> None:
         """Load a new template and refresh the preview state."""
-
         self._template_text = template_text or ""
         self._current_prompt_id = prompt_id
         self._template_parse_error = None
@@ -100,12 +97,10 @@ class TemplatePreviewWidget(QWidget):
 
     def clear_template(self) -> None:
         """Reset the widget to an empty template state."""
-
         self.set_template("", None)
 
     def variables_payload(self) -> Mapping[str, object]:
         """Return the current variables dictionary assembled from form inputs."""
-
         return self._collect_variables()
 
     def _build_ui(self) -> None:
@@ -264,7 +259,6 @@ class TemplatePreviewWidget(QWidget):
 
     def apply_variable_values(self, values: Mapping[str, object]) -> None:
         """Populate variable editors from ``values`` without manual typing."""
-
         if not values:
             return
 
@@ -289,7 +283,6 @@ class TemplatePreviewWidget(QWidget):
 
     def refresh_preview(self) -> None:
         """Recompute preview and validation state after external changes."""
-
         self._update_preview()
 
     def _update_preview(self) -> None:
@@ -388,7 +381,6 @@ class TemplatePreviewWidget(QWidget):
 
     def set_run_enabled(self, enabled: bool) -> None:
         """Enable or disable the Run Prompt button based on executor availability."""
-
         self._run_enabled = bool(enabled)
         self._refresh_run_button_state()
 
@@ -410,7 +402,6 @@ class TemplatePreviewWidget(QWidget):
 
     def request_run(self) -> bool:
         """Emit the run signal when the preview is ready; return True on success."""
-
         if not (self._preview_ready and self._last_rendered_text.strip()):
             self._set_status("Preview must be ready before running.", is_error=True)
             return False
@@ -477,7 +468,6 @@ class TemplatePreviewWidget(QWidget):
     @property
     def content_splitter(self) -> QSplitter:
         """Return the splitter controlling status and preview panes."""
-
         return self._content_splitter
 
 

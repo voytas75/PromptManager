@@ -1,5 +1,4 @@
 """Tests for category hint matching helper."""
-
 from __future__ import annotations
 
 from gui.main_window import _match_category_label

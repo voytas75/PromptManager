@@ -3,7 +3,6 @@
 Updates: v0.1.1 - 2025-11-27 - Add prompt part classification so entries cover any prompt segment.
 Updates: v0.1.0 - 2025-12-05 - Introduce ResponseStyle dataclass for formatting presets.
 """
-
 from __future__ import annotations
 
 import uuid
@@ -26,7 +25,6 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 @dataclass(slots=True)
 class ResponseStyle:
     """Describe reusable response formatting and tone preferences."""
-
     id: uuid.UUID
     name: str
     description: str
@@ -48,12 +46,10 @@ class ResponseStyle:
 
     def touch(self) -> None:
         """Refresh the modification timestamp."""
-
         self.last_modified = _utc_now()
 
     def to_record(self) -> dict[str, Any]:
         """Return a serialisable mapping suitable for SQLite persistence."""
-
         metadata_payload: dict[str, Any] | None
         if isinstance(self.metadata, Mapping):
             metadata_payload = dict(self.metadata)
@@ -84,7 +80,6 @@ class ResponseStyle:
     @classmethod
     def from_record(cls, data: Mapping[str, Any]) -> ResponseStyle:
         """Hydrate a ResponseStyle from a mapping."""
-
         metadata_value = data.get("metadata")
         if isinstance(metadata_value, Mapping):
             metadata_dict = {str(key): metadata_value[key] for key in metadata_value}

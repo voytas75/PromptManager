@@ -4,7 +4,6 @@ Updates:
   v0.1.1 - 2025-11-29 - Wrap detection result creation for Ruff line-length compliance.
   v0.1.0 - 2025-11-10 - Introduce lightweight language detection for query input.
 """
-
 from __future__ import annotations
 
 import re
@@ -18,7 +17,6 @@ if TYPE_CHECKING:
 @dataclass(slots=True)
 class DetectedLanguage:
     """Structured result describing the detected language."""
-
     code: str
     name: str
     confidence: float
@@ -133,7 +131,6 @@ _LANGUAGE_ALIASES = {
 
 def detect_language(text: str) -> DetectedLanguage:
     """Return a best-effort guess at the language contained in `text`."""
-
     stripped = text.strip()
     if not stripped:
         return DetectedLanguage(code="plain", name=_LANGUAGE_ALIASES["plain"], confidence=0.0)

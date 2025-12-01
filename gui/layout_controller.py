@@ -3,25 +3,23 @@
 Updates:
   v0.1.0 - 2025-12-01 - Extracted from MainWindow to handle layout and filter state.
 """
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide6.QtWidgets import QSplitter
-
-from .widgets import PromptFilterPanel, PromptToolbar
-
 if TYPE_CHECKING:
+    from PySide6.QtWidgets import QSplitter
+
     from .layout_state import WindowStateManager
-    from .template_preview import TemplatePreviewWidget
     from .prompt_list_coordinator import PromptSortOrder
+    from .template_preview import TemplatePreviewWidget
+    from .widgets import PromptFilterPanel, PromptToolbar
 
 
 class LayoutController:
     """Encapsulate splitter sizing logic and persisted UI preferences."""
-
     def __init__(self, layout_state: WindowStateManager) -> None:
+        """Store the layout state helper and reset cached widgets."""
         self._layout_state = layout_state
         self._main_splitter_left_width: int | None = None
         self._suppress_main_splitter_sync = False

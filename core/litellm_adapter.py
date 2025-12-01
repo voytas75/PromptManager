@@ -10,7 +10,6 @@ Updates:
   v0.6.1 - 2025-11-07 - Tolerate LiteLLM builds without embedding support.
   v0.6.0 - 2025-11-07 - Provide shared completion/embedding import helpers.
 """
-
 from __future__ import annotations
 
 import importlib
@@ -24,7 +23,6 @@ if TYPE_CHECKING:
 
 class LiteLLMNotInstalledError(RuntimeError):
     """Raised when LiteLLM is not available in the current environment."""
-
 logger = logging.getLogger("prompt_manager.litellm")
 
 _completion: Callable[..., object] | None = None

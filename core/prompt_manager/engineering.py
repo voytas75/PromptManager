@@ -12,7 +12,6 @@ implementation in :pymod:`core.prompt_engineering`. Future iterations can
 replace the underlying engine or add pre/post-processing without touching
 import sites.
 """
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -31,7 +30,6 @@ __all__ = [
 
 class PromptEngineerFacade:
     """Facade over :class:`core.prompt_engineering.PromptEngineer`."""
-
     def __init__(
         self,
         *,

@@ -3,12 +3,13 @@
 Updates:
   v0.1.0 - 2025-12-01 - Extracted runtime settings snapshot + apply helpers.
 """
-
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
+
 from PySide6.QtGui import QColor
 
 from config import (
@@ -20,10 +21,12 @@ from config import (
     PromptManagerSettings,
     PromptTemplateOverrides,
 )
-from core import PromptManager
 
 from .appearance_controller import normalise_chat_palette, palette_differs_from_defaults
 from .settings_dialog import persist_settings_to_config
+
+if TYPE_CHECKING:
+    from core import PromptManager
 
 RuntimeSettings = dict[str, object | None]
 
@@ -31,21 +34,19 @@ RuntimeSettings = dict[str, object | None]
 @dataclass(slots=True)
 class RuntimeSettingsResult:
     """Return data after applying runtime settings updates."""
-
     theme_mode: str
     has_executor: bool
 
 
 class RuntimeSettingsService:
     """Coordinate runtime settings hydration and persistence."""
-
     def __init__(self, manager: PromptManager, settings: PromptManagerSettings | None) -> None:
+        """Store references to the PromptManager and persisted settings snapshot."""
         self._manager = manager
         self._settings = settings
 
     def build_initial_runtime_settings(self) -> RuntimeSettings:
         """Load current settings snapshot from configuration and config files."""
-
         settings = self._settings
         derived_quick_actions: list[dict[str, object]] | None
         if settings and settings.quick_actions:
@@ -67,8 +68,12 @@ class RuntimeSettingsService:
             "litellm_workflow_models": dict(settings.litellm_workflow_models)
             if settings and settings.litellm_workflow_models
             else None,
-            "embedding_backend": settings.embedding_backend if settings else DEFAULT_EMBEDDING_BACKEND,
-            "embedding_model": settings.embedding_model if settings else DEFAULT_EMBEDDING_MODEL,
+            "embedding_backend": (
+                settings.embedding_backend if settings else DEFAULT_EMBEDDING_BACKEND
+            ),
+            "embedding_model": (
+                settings.embedding_model if settings else DEFAULT_EMBEDDING_MODEL
+            ),
             "quick_actions": derived_quick_actions,
             "chat_user_bubble_color": (
                 settings.chat_user_bubble_color if settings else DEFAULT_CHAT_USER_BUBBLE_COLOR
@@ -171,9 +176,12 @@ class RuntimeSettingsService:
             runtime["theme_mode"] = DEFAULT_THEME_MODE
         return runtime
 
-    def apply_updates(self, runtime: RuntimeSettings, updates: dict[str, object | None]) -> RuntimeSettingsResult:
+    def apply_updates(
+        self,
+        runtime: RuntimeSettings,
+        updates: dict[str, object | None],
+    ) -> RuntimeSettingsResult:
         """Apply updates to the runtime snapshot and persist configuration."""
-
         if not updates:
             return RuntimeSettingsResult(
                 theme_mode=str(runtime.get("theme_mode") or DEFAULT_THEME_MODE),
@@ -193,8 +201,16 @@ class RuntimeSettingsService:
                 runtime[key] = updates.get(key)
 
         if "embedding_backend" in updates or "embedding_model" in updates:
-            backend_value = (updates.get("embedding_backend") or runtime.get("embedding_backend")) or DEFAULT_EMBEDDING_BACKEND
-            model_value = (updates.get("embedding_model") or runtime.get("embedding_model")) or DEFAULT_EMBEDDING_MODEL
+            backend_value = (
+                updates.get("embedding_backend")
+                or runtime.get("embedding_backend")
+                or DEFAULT_EMBEDDING_BACKEND
+            )
+            model_value = (
+                updates.get("embedding_model")
+                or runtime.get("embedding_model")
+                or DEFAULT_EMBEDDING_MODEL
+            )
             runtime["embedding_backend"] = backend_value
             runtime["embedding_model"] = model_value
         embedding_backend_value = runtime.get("embedding_backend", DEFAULT_EMBEDDING_BACKEND)
@@ -236,11 +252,15 @@ class RuntimeSettingsService:
         cleaned_quick_actions: list[dict[str, object]] | None = None
         existing_quick_actions = runtime.get("quick_actions")
         if isinstance(existing_quick_actions, list):
-            cleaned_quick_actions = [dict(entry) for entry in existing_quick_actions if isinstance(entry, dict)]
+            cleaned_quick_actions = [
+                dict(entry) for entry in existing_quick_actions if isinstance(entry, dict)
+            ]
         if "quick_actions" in updates:
             quick_actions_value = updates.get("quick_actions")
             if isinstance(quick_actions_value, list):
-                cleaned_quick_actions = [dict(entry) for entry in quick_actions_value if isinstance(entry, dict)]
+                cleaned_quick_actions = [
+                    dict(entry) for entry in quick_actions_value if isinstance(entry, dict)
+                ]
             else:
                 cleaned_quick_actions = None
             runtime["quick_actions"] = cleaned_quick_actions
@@ -345,7 +365,9 @@ class RuntimeSettingsService:
                         update=prompt_templates_payload
                     )
                 else:
-                    settings_model.prompt_templates = PromptTemplateOverrides(**prompt_templates_payload)
+                    settings_model.prompt_templates = PromptTemplateOverrides(
+                        **prompt_templates_payload
+                    )
             else:
                 settings_model.prompt_templates = PromptTemplateOverrides()
 

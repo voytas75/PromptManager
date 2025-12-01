@@ -5,7 +5,6 @@ Updates:
   v0.1.1 - 2025-11-30 - Fix function docstring spacing for lint compliance.
   v0.1.0 - 2025-11-28 - Introduce analytics snapshot builder for CLI and GUI surfaces.
 """
-
 from __future__ import annotations
 
 import json
@@ -29,7 +28,6 @@ logger = logging.getLogger("prompt_manager.analytics")
 @dataclass(slots=True)
 class UsageFrequencyEntry:
     """Summarise prompt usage volume for ranking charts."""
-
     prompt_id: UUID
     name: str
     usage_count: int
@@ -40,7 +38,6 @@ class UsageFrequencyEntry:
 @dataclass(slots=True)
 class ModelCostEntry:
     """Aggregated token usage per model."""
-
     model: str
     run_count: int
     prompt_tokens: int
@@ -51,7 +48,6 @@ class ModelCostEntry:
 @dataclass(slots=True)
 class BenchmarkStatsEntry:
     """Aggregated benchmark execution metrics."""
-
     model: str
     run_count: int
     success_rate: float
@@ -62,7 +58,6 @@ class BenchmarkStatsEntry:
 @dataclass(slots=True)
 class IntentSuccessPoint:
     """Success ratio for intent executions bucketed by day."""
-
     bucket: datetime
     success_rate: float
     success: int
@@ -72,7 +67,6 @@ class IntentSuccessPoint:
 @dataclass(slots=True)
 class AnalyticsSnapshot:
     """Container for dashboard datasets."""
-
     execution: ExecutionAnalytics | None
     usage_frequency: list[UsageFrequencyEntry]
     model_costs: list[ModelCostEntry]

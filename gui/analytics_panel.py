@@ -4,7 +4,6 @@ Updates:
   v0.1.1 - 2025-11-29 - Wrap analytics strings to satisfy Ruff line-length rules.
   v0.1.0 - 2025-11-28 - Introduce dashboard tab with charts and CSV export.
 """
-
 from __future__ import annotations
 
 import csv
@@ -48,7 +47,6 @@ if TYPE_CHECKING:
 
 class AnalyticsDashboardPanel(QWidget):
     """Interactive analytics dashboard with charts and CSV export."""
-
     _DATASETS: Sequence[tuple[str, str]] = (
         ("usage", "Usage Frequency"),
         ("model_costs", "Model Cost Breakdown"),
@@ -64,6 +62,7 @@ class AnalyticsDashboardPanel(QWidget):
         *,
         usage_log_path: Path | None = None,
     ) -> None:
+        """Initialise analytics widgets and load persisted preferences."""
         super().__init__(parent)
         self._manager = manager
         self._usage_log_path = usage_log_path
@@ -154,6 +153,7 @@ class AnalyticsDashboardPanel(QWidget):
         layout.addLayout(status_layout)
 
     def refresh(self, *, show_indicator: bool = False) -> None:
+        """Recompute analytics snapshot and update the chart/table views."""
         window_days = self._window_spin.value()
         prompt_limit = self._prompt_limit_spin.value()
         message = "Refreshing analytics…"

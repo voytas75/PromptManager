@@ -6,7 +6,6 @@ Updates:
   v0.2.0 - 2025-11-09 - Record manual save ratings alongside notes.
   v0.1.0 - 2025-11-07 - Introduce JSONL logger for detect/suggest/copy events.
 """
-
 from __future__ import annotations
 
 import hashlib
@@ -30,7 +29,6 @@ def _now_iso() -> str:
 
 class IntentUsageLogger:
     """Persist anonymised analytics for intent workspace interactions."""
-
     def __init__(self, path: Path | str | None = None, *, enabled: bool = True) -> None:
         self._enabled = enabled
         default_path = Path("data") / "logs" / "intent_usage.jsonl"
@@ -39,12 +37,10 @@ class IntentUsageLogger:
     @property
     def log_path(self) -> Path:
         """Return the resolved path for the usage log."""
-
         return self._path
 
     def log_detect(self, *, prediction: IntentPrediction, query_text: str) -> None:
         """Log details for an intent detection event."""
-
         record = self._base_record("detect", query_text)
         record.update(
             {
@@ -66,7 +62,6 @@ class IntentUsageLogger:
         fallback_used: bool,
     ) -> None:
         """Log details for a suggestion event."""
-
         record = self._base_record("suggest", query_text)
         record.update(
             {
@@ -81,7 +76,6 @@ class IntentUsageLogger:
 
     def log_copy(self, *, prompt_name: str, prompt_has_body: bool) -> None:
         """Log that a prompt has been copied to the clipboard."""
-
         record = {
             "timestamp": _now_iso(),
             "event": "copy",
@@ -92,7 +86,6 @@ class IntentUsageLogger:
 
     def log_share(self, *, provider: str, prompt_name: str, payload_chars: int) -> None:
         """Log that a prompt was shared via an external provider."""
-
         record = {
             "timestamp": _now_iso(),
             "event": "share",
@@ -111,7 +104,6 @@ class IntentUsageLogger:
         error: str | None = None,
     ) -> None:
         """Log prompt execution outcomes."""
-
         record = {
             "timestamp": _now_iso(),
             "event": "execute",
@@ -125,7 +117,6 @@ class IntentUsageLogger:
 
     def log_history_view(self, *, total: int) -> None:
         """Log when the execution history dialog is opened."""
-
         record = {
             "timestamp": _now_iso(),
             "event": "history",
@@ -135,7 +126,6 @@ class IntentUsageLogger:
 
     def log_save(self, *, prompt_name: str, note_length: int, rating: float | None = None) -> None:
         """Log that a prompt result was manually saved."""
-
         record = {
             "timestamp": _now_iso(),
             "event": "save",
@@ -148,7 +138,6 @@ class IntentUsageLogger:
 
     def log_note_edit(self, *, note_length: int) -> None:
         """Log note edits performed in the history dialog."""
-
         record = {
             "timestamp": _now_iso(),
             "event": "edit_note",
@@ -158,7 +147,6 @@ class IntentUsageLogger:
 
     def log_history_export(self, *, entries: int, path: str) -> None:
         """Log that history was exported."""
-
         record = {
             "timestamp": _now_iso(),
             "event": "history_export",

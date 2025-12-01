@@ -2,7 +2,6 @@
 
 Updates: v0.1.0 - 2025-11-03 - Ensure Chroma anonymized telemetry is disabled by default.
 """
-
 from __future__ import annotations
 
 from typing import Any
@@ -16,7 +15,6 @@ class _RecordingClient:
     Acts as a stand-in for `chromadb.Client`/`PersistentClient` and exposes
     the minimal surface that `PromptManager` uses in tests.
     """
-
     def __init__(self) -> None:
         self.get_or_create_called = False
         self.kwargs: dict[str, Any] = {}

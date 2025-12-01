@@ -1,5 +1,4 @@
 """Unit tests for HistoryTracker execution logging."""
-
 from __future__ import annotations
 
 import uuid

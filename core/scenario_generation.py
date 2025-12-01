@@ -8,7 +8,6 @@ Updates:
   v0.1.1 - 2025-11-05 - Remove explicit LiteLLM timeout to rely on provider defaults.
   v0.1.0 - 2025-11-19 - Introduce scenario generator for prompt usage guidance.
 """
-
 from __future__ import annotations
 
 import json
@@ -29,8 +28,6 @@ from .litellm_adapter import (
 
 class ScenarioGenerationError(Exception):
     """Raised when usage scenarios cannot be generated."""
-
-
 def _normalise_scenarios(candidates: Sequence[str], limit: int) -> list[str]:
     """Return up to *limit* distinct, trimmed scenario strings."""
     cleaned: list[str] = []
@@ -104,7 +101,6 @@ def _extract_candidates(response_text: str) -> list[str]:
 @dataclass(slots=True)
 class LiteLLMScenarioGenerator:
     """Generate prompt usage scenarios via LiteLLM chat completions."""
-
     model: str
     api_key: str | None = None
     api_base: str | None = None

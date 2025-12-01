@@ -1,5 +1,4 @@
 """Administrative and diagnostic tests for PromptManager."""
-
 from __future__ import annotations
 
 import json
@@ -52,7 +51,6 @@ def _clone_category(category: PromptCategory) -> PromptCategory:
 
 class _InMemoryRepository:
     """Minimal in-memory repository facade for PromptManager tests."""
-
     def __init__(self, prompts: Sequence[Prompt] | None = None) -> None:
         self.prompts: dict[uuid.UUID, Prompt] = {}
         for prompt in prompts or []:
@@ -139,7 +137,6 @@ class _InMemoryRepository:
 
 class _CategoryRegistryStub:
     """Stub category registry exposing only the surface used in tests."""
-
     def __init__(self, category: PromptCategory | None = None) -> None:
         self.category = category
         self.refresh_calls = 0
@@ -161,7 +158,6 @@ class _CategoryRegistryStub:
 
 class _DummyCollection:
     """Minimal Chroma collection double for admin tests."""
-
     def __init__(self) -> None:
         self.count_value = 0
         self.count_exception: BaseException | None = None
@@ -175,7 +171,6 @@ class _DummyCollection:
 
     def delete(self, **_: Any) -> None:  # noqa: D401 - interface compatibility
         """No-op delete for compatibility."""
-
     def upsert(self, **kwargs: Any) -> None:
         self.upsert_payloads.append(dict(kwargs))
 
@@ -189,7 +184,6 @@ class _DummyCollection:
 
 class _DummyChromaClient:
     """Provide deterministic Chroma client behaviour."""
-
     def __init__(self, collection: _DummyCollection) -> None:
         self.collection = collection
         self.persist_calls = 0
@@ -203,7 +197,6 @@ class _DummyChromaClient:
 
 class _HistoryTrackerStub:
     """Record execution queries issued by PromptManager."""
-
     def __init__(self) -> None:
         self.requests: list[dict[str, Any]] = []
         self.should_raise = False
@@ -230,14 +223,12 @@ class _HistoryTrackerStub:
 
 class _RedisPoolStub:
     """Expose connection kwargs for Redis diagnostics."""
-
     def __init__(self, **kwargs: Any) -> None:
         self.connection_kwargs = dict(kwargs)
 
 
 class _RedisClientStub:
     """Redis client double with controllable responses."""
-
     def __init__(
         self,
         *,
@@ -285,7 +276,6 @@ class _RedisClientStub:
 
 def _make_recorder() -> type:
     """Return a recorder class capturing LiteLLM factory kwargs."""
-
     class Recorder:
         instances: list[Recorder] = []
 
@@ -301,7 +291,6 @@ def _make_recorder() -> type:
 
 class _ExecutorRecorder:
     """Capture CodexExecutor constructor arguments."""
-
     instances: list[_ExecutorRecorder] = []
 
     def __init__(self, **kwargs: Any) -> None:
@@ -317,7 +306,6 @@ def prompt_manager(
     tmp_path: Path,
 ) -> tuple[PromptManager, _DummyCollection, _DummyChromaClient, Path]:
     """Fixture providing a PromptManager wired to stub backends."""
-
     chroma_dir = tmp_path / "chroma"
     chroma_dir.mkdir(parents=True, exist_ok=True)
     db_path = tmp_path / "prompt_manager.db"
@@ -334,7 +322,6 @@ def prompt_manager(
 
 def _ensure_chroma_database(chroma_dir: Path) -> Path:
     """Create or return the Chroma SQLite path used for maintenance operations."""
-
     db_path = chroma_dir / "chroma.sqlite3"
     db_path.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(db_path) as connection:
@@ -344,7 +331,6 @@ def _ensure_chroma_database(chroma_dir: Path) -> Path:
 
 def _make_prompt(name: str = "Diagnostics") -> Prompt:
     """Return a prompt instance with predictable metadata."""
-
     return Prompt(
         id=uuid.uuid4(),
         name=name,

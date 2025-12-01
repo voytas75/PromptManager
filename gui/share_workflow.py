@@ -3,7 +3,6 @@
 Updates:
   v0.1.0 - 2025-12-01 - Extracted prompt/result share helpers from MainWindow.
 """
-
 from __future__ import annotations
 
 from typing import Callable
@@ -20,7 +19,6 @@ from .widgets import PromptDetailWidget
 
 class ShareWorkflowCoordinator:
     """Handle prompt and result sharing interactions."""
-
     def __init__(
         self,
         share_controller: ShareController,
@@ -44,7 +42,6 @@ class ShareWorkflowCoordinator:
 
     def register_provider(self, provider: ShareProvider) -> None:
         """Store a share provider via the underlying controller."""
-
         self._share_controller.register_provider(provider)
         controller = self._execution_controller_supplier()
         if controller is not None:
@@ -52,7 +49,6 @@ class ShareWorkflowCoordinator:
 
     def share_prompt(self) -> None:
         """Display provider choices and initiate the share workflow."""
-
         prompt = self._detail_widget.current_prompt()
         if prompt is None:
             self._show_status("Select a prompt to share first.", 4000)
@@ -75,7 +71,6 @@ class ShareWorkflowCoordinator:
 
     def share_result(self) -> None:
         """Display provider choices for sharing the latest output text."""
-
         controller = self._execution_controller_supplier()
         if controller is None:
             self._show_error("Workspace unavailable", "Execution controller is not ready.")

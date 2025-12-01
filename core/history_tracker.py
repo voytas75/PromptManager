@@ -9,7 +9,6 @@ Updates:
   v0.2.0 - 2025-11-09 - Capture optional ratings alongside execution logs.
   v0.1.0 - 2025-11-08 - Introduce HistoryTracker for execution logs.
 """
-
 from __future__ import annotations
 
 import logging
@@ -33,12 +32,9 @@ logger = logging.getLogger("prompt_manager.history_tracker")
 
 class HistoryTrackerError(Exception):
     """Raised when execution history cannot be persisted."""
-
-
 @dataclass(slots=True)
 class PromptExecutionAnalytics:
     """Per-prompt aggregates for execution history."""
-
     prompt_id: uuid.UUID
     name: str
     total_runs: int
@@ -52,7 +48,6 @@ class PromptExecutionAnalytics:
 @dataclass(slots=True)
 class ExecutionAnalytics:
     """Aggregated execution statistics across the catalogue."""
-
     total_runs: int
     success_rate: float
     average_duration_ms: float | None
@@ -74,7 +69,6 @@ def _clip(text: str | None, max_length: int) -> str:
 @dataclass(slots=True)
 class HistoryTracker:
     """Manage prompt execution history using the SQLite repository."""
-
     repository: PromptRepository
     max_request_chars: int = _DEFAULT_MAX_REQUEST_LENGTH
     max_response_chars: int = _DEFAULT_MAX_RESPONSE_LENGTH

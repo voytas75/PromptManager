@@ -10,7 +10,6 @@ Updates:
   v0.2.0 - 2025-11-12 - Support multi-turn conversation payloads for LiteLLM execution.
   v0.1.0 - 2025-11-08 - Introduce CodexExecutor for running prompts via LiteLLM.
 """
-
 from __future__ import annotations
 
 import logging
@@ -35,8 +34,6 @@ logger = logging.getLogger("prompt_manager.execution")
 
 class ExecutionError(Exception):
     """Raised when LiteLLM prompt execution fails."""
-
-
 def _supports_reasoning(model: str) -> bool:
     """Return True when the target model supports OpenAI reasoning payloads."""
     lowered = model.lower()
@@ -47,7 +44,6 @@ def _supports_reasoning(model: str) -> bool:
 @dataclass(slots=True)
 class CodexExecutionResult:
     """Container for prompt execution responses."""
-
     prompt_id: UUID
     request_text: str
     response_text: str
@@ -59,7 +55,6 @@ class CodexExecutionResult:
 @dataclass(slots=True)
 class CodexExecutor:
     """Execute prompts against GPT-style models via LiteLLM."""
-
     model: str
     api_key: str | None = None
     api_base: str | None = None

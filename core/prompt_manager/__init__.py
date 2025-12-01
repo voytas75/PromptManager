@@ -42,7 +42,6 @@ Updates:
   v0.2.0 - 2025-10-31 - Add SQLite repository integration with ChromaDB/Redis sync.
   v0.1.0 - 2025-10-30 - Initial PromptManager with CRUD and search support.
 """
-
 from __future__ import annotations
 
 import difflib
@@ -240,16 +239,12 @@ RedisValue = str | bytes | memoryview
 
 class RedisConnectionPoolProtocol(Protocol):
     """Subset of redis-py connection pool used for diagnostics."""
-
     connection_kwargs: Mapping[str, Any]
 
     def disconnect(self) -> None:
         """Close all pooled connections."""
-
-
 class RedisClientProtocol(Protocol):
     """Subset of redis-py client behaviour used within the manager."""
-
     connection_pool: RedisConnectionPoolProtocol | None
 
     def ping(self) -> bool: ...
@@ -269,7 +264,6 @@ class RedisClientProtocol(Protocol):
 
 class CollectionProtocol(Protocol):
     """Minimal Chroma collection surface consumed by the manager."""
-
     def count(self) -> int: ...
 
     def delete(self, **kwargs: Any) -> Any: ...
@@ -377,7 +371,6 @@ def _match_category_label(
 
 class PromptManager:
     """Manage prompt persistence, caching, and semantic search."""
-
     def __init__(
         self,
         chroma_path: str,
@@ -418,16 +411,24 @@ class PromptManager:
             redis_client: Optional Redis client instance for caching.
             chroma_client: Optional preconfigured Chroma client.
             embedding_function: Optional embedding function for Chroma.
+            embedding_provider: Optional provider wrapper used for ad-hoc embeddings.
+            embedding_worker: Background worker handling embedding synchronisation.
+            enable_background_sync: Toggle to start the embedding worker automatically.
             repository: Optional preconfigured repository instance (for example, in tests).
             category_definitions: Optional PromptCategory defaults for seeding the repository.
+            name_generator: LiteLLM helper for generating prompt names.
+            description_generator: LiteLLM helper for generating prompt descriptions.
+            scenario_generator: LiteLLM helper for generating usage scenarios.
             fast_model: LiteLLM fast-tier model identifier configured for workflows.
             inference_model: LiteLLM inference-tier model identifier configured for workflows.
             workflow_models: Mapping of workflow identifiers to routing tiers.
+            intent_classifier: Optional classifier instance for detecting prompt intent.
             notification_center: Optional NotificationCenter override for task events.
             executor: Optional CodexExecutor responsible for running prompts.
             history_tracker: Optional execution history tracker for persistence.
             user_profile: Optional profile to seed single-user personalisation state.
             prompt_engineer: Optional prompt refinement helper using LiteLLM.
+            structure_prompt_engineer: Optional helper focusing on prompt structure tweaks.
             prompt_templates: Optional mapping of workflow identifiers to system prompt overrides.
             category_generator: Optional LiteLLM helper for suggesting prompt categories.
         """
@@ -647,7 +648,6 @@ class PromptManager:
     @dataclass(slots=True)
     class IntentSuggestions:
         """Intent-aware search recommendations returned to callers."""
-
         prediction: IntentPrediction
         prompts: list[Prompt]
         fallback_used: bool = False
@@ -655,7 +655,6 @@ class PromptManager:
     @dataclass(slots=True)
     class ExecutionOutcome:
         """Aggregate data returned after executing a prompt."""
-
         result: CodexExecutionResult
         history_entry: PromptExecution | None
         conversation: list[dict[str, str]]
@@ -663,7 +662,6 @@ class PromptManager:
     @dataclass(slots=True)
     class BenchmarkRun:
         """Single benchmark result for a prompt/model pair."""
-
         prompt_id: uuid.UUID
         prompt_name: str
         model: str
@@ -676,13 +674,11 @@ class PromptManager:
     @dataclass(slots=True)
     class BenchmarkReport:
         """Structured response returned by benchmark_prompts."""
-
         runs: list[PromptManager.BenchmarkRun]
 
     @dataclass(slots=True)
     class EmbeddingDimensionMismatch:
         """Stored prompt embedding vector that no longer matches the reference dimension."""
-
         prompt_id: uuid.UUID
         prompt_name: str
         stored_dimension: int
@@ -690,14 +686,12 @@ class PromptManager:
     @dataclass(slots=True)
     class MissingEmbedding:
         """Prompt record that is missing a persisted embedding vector."""
-
         prompt_id: uuid.UUID
         prompt_name: str
 
     @dataclass(slots=True)
     class EmbeddingDiagnostics:
         """Summary of embedding backend health and stored vector consistency."""
-
         backend_ok: bool
         backend_message: str
         backend_dimension: int | None
@@ -714,7 +708,6 @@ class PromptManager:
     @dataclass(slots=True)
     class CategoryHealth:
         """Aggregated prompt and execution metrics for a category."""
-
         slug: str
         label: str
         total_prompts: int
@@ -725,7 +718,6 @@ class PromptManager:
     @dataclass(slots=True)
     class PromptVersionDiff:
         """Diff payload surfaced when comparing two prompt versions."""
-
         prompt_id: uuid.UUID
         base_version: PromptVersion
         target_version: PromptVersion
@@ -2665,6 +2657,7 @@ class PromptManager:
                     )
 
     def __enter__(self) -> PromptManager:
+        """Support use of PromptManager as a context manager."""
         return self
 
     def __exit__(
@@ -2673,6 +2666,7 @@ class PromptManager:
         exc: BaseException | None,
         tb: TracebackType | None,
     ) -> None:
+        """Close resources when exiting a context manager block."""
         self.close()
 
     def create_prompt(
@@ -3660,7 +3654,6 @@ class PromptManager:
 
 class _NullEmbeddingWorker:
     """Embedding worker placeholder used when background sync is disabled."""
-
     def schedule(self, _: uuid.UUID) -> None:  # pragma: no cover - trivial noop
         return
 

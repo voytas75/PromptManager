@@ -11,7 +11,6 @@ from PySide6.QtWidgets import QLayout, QLayoutItem, QWidget, QWidgetItem
 
 class FlowLayout(QLayout):
     """Layout that arranges widgets left-to-right and wraps on overflow."""
-
     def __init__(
         self, parent: QWidget | None = None, *, margin: int = 0, spacing: int = -1
     ) -> None:

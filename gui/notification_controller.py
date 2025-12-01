@@ -3,22 +3,23 @@
 Updates:
   v0.1.0 - 2025-12-01 - Extracted notification indicator management from MainWindow.
 """
-
 from __future__ import annotations
 
 from collections import deque
-from typing import Iterable
-
-from PySide6.QtWidgets import QLabel, QWidget
+from typing import TYPE_CHECKING
 
 from core.notifications import Notification, NotificationStatus
 
 from .notifications import BackgroundTaskCenterDialog, QtNotificationBridge
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from PySide6.QtWidgets import QLabel, QWidget
+
 
 class NotificationController:
     """Bridge core notifications into the Qt UI with history tracking."""
-
     def __init__(
         self,
         *,
@@ -28,6 +29,7 @@ class NotificationController:
         status_callback,
         toast_callback,
     ) -> None:
+        """Bind Qt widgets to the shared notification center."""
         self._parent = parent
         self._indicator = indicator
         self._notification_center = notification_center
@@ -40,12 +42,14 @@ class NotificationController:
         self._bridge.notification_received.connect(self._handle_notification)  # type: ignore[attr-defined]
 
     def bootstrap_history(self, history: Iterable[Notification]) -> None:
+        """Seed the indicator with existing notification history."""
         for note in history:
             self._history.append(note)
             self._update_active_notification(note)
         self._update_indicator()
 
     def show_task_center(self) -> None:
+        """Present the background task center dialog."""
         dialog = self._ensure_task_center_dialog()
         dialog.set_history(tuple(self._history))
         dialog.set_active_notifications(tuple(self._active_notifications.values()))
@@ -54,6 +58,7 @@ class NotificationController:
         dialog.activateWindow()
 
     def close(self) -> None:
+        """Release signal subscriptions and close dialogs."""
         if self._task_center_dialog is not None:
             self._task_center_dialog.close()
         self._bridge.close()

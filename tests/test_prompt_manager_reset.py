@@ -1,5 +1,4 @@
 """Tests covering PromptManager datastore reset workflows."""
-
 from __future__ import annotations
 
 import uuid
