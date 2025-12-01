@@ -5,16 +5,20 @@ Updates:
 """
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
-from PySide6.QtWidgets import QPushButton
+from core.sharing import format_prompt_for_share
 
-from core.sharing import ShareProvider, format_prompt_for_share
-from models.prompt_model import Prompt
+if TYPE_CHECKING:
+    from PySide6.QtWidgets import QPushButton
 
-from .controllers.execution_controller import ExecutionController
-from .share_controller import ShareController
-from .widgets import PromptDetailWidget
+    from core.sharing import ShareProvider
+    from models.prompt_model import Prompt
+
+    from .controllers.execution_controller import ExecutionController
+    from .share_controller import ShareController
+    from .widgets import PromptDetailWidget
 
 
 class ShareWorkflowCoordinator:
@@ -31,14 +35,24 @@ class ShareWorkflowCoordinator:
         status_callback: Callable[[str, int], None],
         error_callback: Callable[[str, str], None],
     ) -> None:
+        """Wire widget suppliers, callbacks, and controller dependencies."""
         self._share_controller = share_controller
         self._detail_widget = detail_widget
-        self._prompt_supplier = prompt_supplier
-        self._share_button_supplier = share_button_supplier
-        self._share_result_button_supplier = share_result_button_supplier
-        self._execution_controller_supplier = execution_controller_supplier
-        self._show_status = status_callback
-        self._show_error = error_callback
+        self._prompt_supplier = self._ensure_callable(prompt_supplier, "prompt_supplier")
+        self._share_button_supplier = self._ensure_callable(
+            share_button_supplier,
+            "share_button_supplier",
+        )
+        self._share_result_button_supplier = self._ensure_callable(
+            share_result_button_supplier,
+            "share_result_button_supplier",
+        )
+        self._execution_controller_supplier = self._ensure_callable(
+            execution_controller_supplier,
+            "execution_controller_supplier",
+        )
+        self._show_status = self._ensure_callable(status_callback, "status_callback")
+        self._show_error = self._ensure_callable(error_callback, "error_callback")
 
     def register_provider(self, provider: ShareProvider) -> None:
         """Store a share provider via the underlying controller."""
@@ -99,6 +113,16 @@ class ShareWorkflowCoordinator:
             self._show_error("Unable to share prompt", "Share payload is empty.")
             return None
         return payload
+
+    @staticmethod
+    def _ensure_callable(
+        callback: Callable[..., Any],
+        name: str,
+    ) -> Callable[..., Any]:
+        """Validate callable dependencies supplied to the coordinator."""
+        if not isinstance(callback, Callable):
+            raise TypeError(f"{name} must be callable")
+        return callback
 
 
 __all__ = ["ShareWorkflowCoordinator"]

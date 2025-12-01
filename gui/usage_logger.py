@@ -30,6 +30,7 @@ def _now_iso() -> str:
 class IntentUsageLogger:
     """Persist anonymised analytics for intent workspace interactions."""
     def __init__(self, path: Path | str | None = None, *, enabled: bool = True) -> None:
+        """Optionally disable logging or override the JSONL output path."""
         self._enabled = enabled
         default_path = Path("data") / "logs" / "intent_usage.jsonl"
         self._path = Path(path) if path is not None else default_path

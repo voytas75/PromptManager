@@ -5,17 +5,23 @@ Updates:
 """
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import QObject
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QMenu, QWidget
 
 from core.exceptions import ShareProviderError
-from core.sharing import ShareProvider
 
 from .processing_indicator import ProcessingIndicator
-from .usage_logger import IntentUsageLogger
+
+if TYPE_CHECKING:
+    from core.sharing import ShareProvider
+
+    from .usage_logger import IntentUsageLogger
+else:  # pragma: no cover - fallback stub for runtime annotations
+    IntentUsageLogger = object  # type: ignore[assignment]
 
 
 class ShareController(QObject):
@@ -29,11 +35,12 @@ class ShareController(QObject):
         error_callback: Callable[[str, str], None],
         usage_logger: IntentUsageLogger,
     ) -> None:
+        """Initialise share helpers and callbacks required for feedback."""
         super().__init__(parent)
         self._parent = parent
-        self._toast_callback = toast_callback
-        self._status_callback = status_callback
-        self._error_callback = error_callback
+        self._toast_callback = self._ensure_callable(toast_callback, "toast_callback")
+        self._status_callback = self._ensure_callable(status_callback, "status_callback")
+        self._error_callback = self._ensure_callable(error_callback, "error_callback")
         self._usage_logger = usage_logger
         self._providers: dict[str, ShareProvider] = {}
 
@@ -78,7 +85,10 @@ class ShareController(QObject):
         """Share *payload* using *provider_name* and log the outbound metadata."""
         provider = self._providers.get(provider_name)
         if provider is None:
-            self._error_callback("Sharing unavailable", "Selected share provider is not registered.")
+            self._error_callback(
+                "Sharing unavailable",
+                "Selected share provider is not registered.",
+            )
             return False
         payload_text = payload or ""
         if not payload_text.strip():
@@ -111,6 +121,16 @@ class ShareController(QObject):
                 10000,
             )
         return True
+
+    @staticmethod
+    def _ensure_callable(
+        callback: Callable[..., Any],
+        name: str,
+    ) -> Callable[..., Any]:
+        """Validate that ``callback`` is callable, raising otherwise."""
+        if not isinstance(callback, Callable):
+            raise TypeError(f"{name} must be callable")
+        return callback
 
 
 __all__ = ["ShareController"]

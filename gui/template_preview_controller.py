@@ -6,24 +6,26 @@ Updates:
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING
-
-from PySide6.QtWidgets import QPushButton, QTabWidget, QWidget
+from typing import TYPE_CHECKING, Any
 
 from .processing_indicator import ProcessingIndicator
 
 if TYPE_CHECKING:
+    from PySide6.QtWidgets import QPushButton, QTabWidget, QWidget
+
     from models.prompt_model import Prompt
 
     from .controllers.execution_controller import ExecutionController
     from .template_preview import TemplatePreviewWidget
+else:  # pragma: no cover - fallback to satisfy runtime annotations
+    QWidget = QTabWidget = QPushButton = object  # type: ignore[assignment]
 
 
 class TemplatePreviewController:
     """Manage preview refreshing, execution requests, and tab transitions."""
     def __init__(
         self,
-        *, 
+        *,
         parent: QWidget,
         tab_widget: QTabWidget | None,
         template_preview: TemplatePreviewWidget | None,
@@ -33,14 +35,21 @@ class TemplatePreviewController:
         error_callback: Callable[[str, str], None],
         status_callback: Callable[[str, int], None],
     ) -> None:
+        """Coordinate template-preview state with workspace and execution widgets."""
         self._parent = parent
         self._tab_widget = tab_widget
         self._template_preview = template_preview
         self._template_run_button = template_run_button
-        self._execution_controller_supplier = execution_controller_supplier
-        self._current_prompt_supplier = current_prompt_supplier
-        self._error_callback = error_callback
-        self._status_callback = status_callback
+        self._execution_controller_supplier = self._ensure_callable(
+            execution_controller_supplier,
+            "execution_controller_supplier",
+        )
+        self._current_prompt_supplier = self._ensure_callable(
+            current_prompt_supplier,
+            "current_prompt_supplier",
+        )
+        self._error_callback = self._ensure_callable(error_callback, "error_callback")
+        self._status_callback = self._ensure_callable(status_callback, "status_callback")
         self._transition_indicator: ProcessingIndicator | None = None
 
     def update_preview(self, prompt: Prompt | None) -> None:
@@ -110,12 +119,26 @@ class TemplatePreviewController:
     def _show_transition_indicator(self) -> None:
         if self._transition_indicator is not None:
             return
-        indicator = ProcessingIndicator(self._parent, "Opening Prompts tab…", title="Switching Tabs")
+        indicator = ProcessingIndicator(
+            self._parent,
+            "Opening Prompts tab…",
+            title="Switching Tabs",
+        )
         indicator.__enter__()
         self._transition_indicator = indicator
 
     def _execution_controller(self) -> ExecutionController | None:
         return self._execution_controller_supplier()
+
+    @staticmethod
+    def _ensure_callable(
+        callback: Callable[..., Any],
+        name: str,
+    ) -> Callable[..., Any]:
+        """Ensure dependency callbacks are callable."""
+        if not isinstance(callback, Callable):
+            raise TypeError(f"{name} must be callable")
+        return callback
 
 
 __all__ = ["TemplatePreviewController"]

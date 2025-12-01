@@ -1,7 +1,8 @@
 """Workspace template preview widget with live variable validation.
 
 Updates:
-  v0.2.2 - 2025-11-29 - Allow programmatic variable population and refresh hooks for external editors.
+  v0.2.2 - 2025-11-29 - Allow programmatic variable population and refresh hooks
+    for external editors.
   v0.2.1 - 2025-11-29 - Wrap schema persistence logic to satisfy Ruff line length.
   v0.2.0 - 2025-11-27 - Persist template variables and schema settings per prompt using QSettings.
   v0.1.9 - 2025-11-27 - Expose run trigger for external shortcuts and publish run state changes.
@@ -55,6 +56,7 @@ class TemplatePreviewWidget(QWidget):
     _ERROR_COLOR = "#b91c1c"
 
     def __init__(self, parent: QWidget | None = None) -> None:
+        """Construct the preview UI and load persisted template state."""
         super().__init__(parent)
         self._renderer = TemplateRenderer()
         self._validator = SchemaValidator()

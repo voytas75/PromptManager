@@ -85,6 +85,7 @@ class SettingsDialog(QDialog):
         chat_colors: dict[str, str] | None = None,
         prompt_templates: dict[str, str] | None = None,
     ) -> None:
+        """Build the settings UI with existing runtime values pre-populated."""
         super().__init__(parent)
         self.setWindowTitle("Prompt Manager Settings")
         self._settings = QSettings("PromptManager", "SettingsDialog")
@@ -158,6 +159,7 @@ class SettingsDialog(QDialog):
             self.resize(width, height)
 
     def closeEvent(self, event: QEvent) -> None:  # type: ignore[override]
+        """Persist the dialog geometry before closing."""
         self._settings.setValue("width", self.width())
         self._settings.setValue("height", self.height())
         super().closeEvent(event)
@@ -460,6 +462,7 @@ class SettingsDialog(QDialog):
         self._chat_color_preview.setText("You: Example message")
 
     def accept(self) -> None:
+        """Validate inputs, capture state, and close with ``QDialog.Accepted``."""
         text = self._quick_actions_input.toPlainText().strip()
         if text:
             try:
