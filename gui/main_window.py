@@ -1550,36 +1550,36 @@ class MainWindow(QMainWindow):
         self.close()
 
 
-def _apply_settings(self, updates: dict[str, object | None]) -> None:
-    """Persist settings, refresh catalogue, and update dependent controllers."""
-    if not updates:
-        return
+    def _apply_settings(self, updates: dict[str, object | None]) -> None:
+        """Persist settings, refresh catalogue, and update dependent controllers."""
+        if not updates:
+            return
 
-    try:
-        result = self._runtime_settings_service.apply_updates(
-            self._runtime_settings,
-            updates,
-        )
-    except NameGenerationError as exc:
-        QMessageBox.warning(self, "LiteLLM configuration", str(exc))
-        result = RuntimeSettingsResult(
-            theme_mode=str(self._runtime_settings.get("theme_mode") or DEFAULT_THEME_MODE),
-            has_executor=self._manager.executor is not None,
-        )
+        try:
+            result = self._runtime_settings_service.apply_updates(
+                self._runtime_settings,
+                updates,
+            )
+        except NameGenerationError as exc:
+            QMessageBox.warning(self, "LiteLLM configuration", str(exc))
+            result = RuntimeSettingsResult(
+                theme_mode=str(self._runtime_settings.get("theme_mode") or DEFAULT_THEME_MODE),
+                has_executor=self._manager.executor is not None,
+            )
 
-    if self._quick_action_controller is not None:
-        self._quick_action_controller.refresh_actions(
-            self._runtime_settings.get("quick_actions")
-        )
-    self._initialize_prompt_editor_helpers()
-    self._appearance_controller.apply_theme(result.theme_mode)
-    if self._execution_controller is not None:
-        self._execution_controller.refresh_chat_history_view()
+        if self._quick_action_controller is not None:
+            self._quick_action_controller.refresh_actions(
+                self._runtime_settings.get("quick_actions")
+            )
+        self._initialize_prompt_editor_helpers()
+        self._appearance_controller.apply_theme(result.theme_mode)
+        if self._execution_controller is not None:
+            self._execution_controller.refresh_chat_history_view()
 
-    self._load_prompts(self._current_search_text())
-    self._run_button.setEnabled(result.has_executor)
-    if self._template_preview is not None:
-        self._template_preview.set_run_enabled(result.has_executor)
+        self._load_prompts(self._current_search_text())
+        self._run_button.setEnabled(result.has_executor)
+        if self._template_preview is not None:
+            self._template_preview.set_run_enabled(result.has_executor)
 
     def _on_selection_changed(self, *_: object) -> None:
         """Update the detail panel to reflect the new selection."""
