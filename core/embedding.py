@@ -134,14 +134,15 @@ class LiteLLMEmbeddingFunction:
     @staticmethod
     def _extract_data_array(payload: Any) -> Sequence[Any]:
         """Extract the embedding data array from LiteLLM responses."""
-        payload_obj = cast("object", payload)
+        data_obj: Any
         if isinstance(payload, Mapping) and "data" in payload:
             payload_map = cast("Mapping[str, Any]", payload)
-            data_obj: Any = payload_map["data"]
-        elif hasattr(payload_obj, "data"):
-            data_obj = payload_obj.data
+            data_obj = payload_map.get("data")
         else:
-            data_obj = payload_obj
+            attr_source = cast("Any", payload)
+            data_obj = attr_source
+            if hasattr(attr_source, "data"):
+                data_obj = getattr(attr_source, "data")
         if not isinstance(data_obj, Sequence) or isinstance(data_obj, (str, bytes)):
             raise EmbeddingGenerationError("LiteLLM embedding response missing data array.")
         return cast("Sequence[Any]", data_obj)

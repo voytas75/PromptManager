@@ -32,7 +32,7 @@ class IntentLabel(str, Enum):
     REPORTING = "reporting"
 
 
-_CATEGORY_HINTS = {
+_CATEGORY_HINTS: dict[IntentLabel, list[str]] = {
     IntentLabel.ANALYSIS: ["Code Analysis"],
     IntentLabel.DEBUG: ["Reasoning / Debugging"],
     IntentLabel.REFACTOR: ["Refactoring"],
@@ -42,7 +42,7 @@ _CATEGORY_HINTS = {
     IntentLabel.GENERAL: [],
 }
 
-_TAG_HINTS = {
+_TAG_HINTS: dict[IntentLabel, list[str]] = {
     IntentLabel.ANALYSIS: ["analysis", "tests", "review"],
     IntentLabel.DEBUG: ["debugging", "ci", "failure"],
     IntentLabel.REFACTOR: ["refactor", "cleanup", "modular"],
@@ -61,7 +61,7 @@ def _collect_keywords(keywords: Sequence[str], text: str) -> int:
     return len(matches)
 
 
-_HEURISTIC_KEYWORDS = {
+_HEURISTIC_KEYWORDS: dict[IntentLabel, tuple[str, ...]] = {
     IntentLabel.DEBUG: (
         "bug",
         "debug",
@@ -130,7 +130,7 @@ _HEURISTIC_KEYWORDS = {
 }
 
 
-_LANGUAGE_HINTS = {
+_LANGUAGE_HINTS: dict[str, tuple[str, ...]] = {
     "python": ("python", "py ", "py3", "pytest", "fastapi", "pydantic"),
     "powershell": ("powershell", "ps1", "pwsh", "get-", "set-", "invoke-"),
     "bash": ("bash", "shell", "sh", "#!/bin/bash"),
@@ -139,15 +139,20 @@ _LANGUAGE_HINTS = {
 }
 
 
+def _string_list_factory() -> list[str]:
+    """Return a typed list factory for dataclass defaults."""
+    return []
+
+
 @dataclass(slots=True)
 class IntentPrediction:
     """Result of the classifier containing hints for retrieval."""
     label: IntentLabel
     confidence: float
     rationale: str | None = None
-    category_hints: list[str] = field(default_factory=list)
-    tag_hints: list[str] = field(default_factory=list)
-    language_hints: list[str] = field(default_factory=list)
+    category_hints: list[str] = field(default_factory=_string_list_factory)
+    tag_hints: list[str] = field(default_factory=_string_list_factory)
+    language_hints: list[str] = field(default_factory=_string_list_factory)
 
     @classmethod
     def general(cls) -> IntentPrediction:
@@ -209,12 +214,15 @@ class PromptLikeProtocol(Protocol):
     @property
     def id(self) -> object:  # pragma: no cover - attribute hints only
         """Return the identifier for the prompt-like instance."""
+        ...
     @property
     def category(self) -> str:  # pragma: no cover - attribute hints only
         """Return the category slug associated with the prompt-like instance."""
+        ...
     @property
     def tags(self) -> Sequence[str]:  # pragma: no cover - attribute hints only
         """Return the tag sequence for the prompt-like instance."""
+        ...
 def rank_by_hints[PromptLikeT: PromptLikeProtocol](
     prompts: Iterable[PromptLikeT],
     *,

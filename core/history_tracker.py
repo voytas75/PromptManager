@@ -15,7 +15,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, SupportsFloat, cast
 
 from models.prompt_model import ExecutionStatus, PromptExecution
 
@@ -362,7 +362,11 @@ class HistoryTracker:
                 extra={"prompt_id": str(prompt_id)},
             )
             return None
-        ratings = [entry.rating for entry in recent if entry.rating is not None]
+        ratings: list[float] = []
+        for entry in recent:
+            rating_value = _coerce_float(getattr(entry, "rating", None))
+            if rating_value is not None:
+                ratings.append(rating_value)
         if not ratings:
             return None
         recent_average = sum(ratings) / len(ratings)
@@ -375,7 +379,8 @@ def _coerce_float(value: object | None) -> float | None:
     if value is None:
         return None
     try:
-        return float(value)
+        numeric_value = cast("SupportsFloat | str | int | float", value)
+        return float(numeric_value)
     except (TypeError, ValueError):
         return None
 

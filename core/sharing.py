@@ -45,6 +45,7 @@ class ShareProvider(Protocol):
         prompt: Prompt | None = None,
     ) -> ShareResult:  # pragma: no cover - Protocol
         """Share *payload* (optionally describing *prompt*) and return a :class:`ShareResult`."""
+        ...
 def format_prompt_for_share(
     prompt: Prompt,
     *,

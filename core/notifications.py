@@ -40,6 +40,11 @@ class NotificationStatus(str, Enum):
     FAILED = "failed"
 
 
+def _metadata_factory() -> dict[str, Any]:
+    """Return a mutable metadata dictionary for Notification dataclass defaults."""
+    return {}
+
+
 @dataclass(slots=True)
 class Notification:
     """Immutable payload describing a notification event."""
@@ -51,7 +56,7 @@ class Notification:
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     task_id: str | None = None
     duration_ms: int | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=_metadata_factory)
 
     def to_dict(self) -> dict[str, Any]:
         """Return a serialisable representation of the notification."""
