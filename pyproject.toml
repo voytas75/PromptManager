@@ -98,6 +98,7 @@ include = ["main.py", "core", "config", "gui", "models", "tests"]
 exclude = ["data"]
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
+stubPath = "typings"
 reportMissingImports = "warning"
 reportMissingTypeStubs = "warning"
 useLibraryCodeForTypes = true
