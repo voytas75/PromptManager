@@ -1,12 +1,13 @@
 """Prompt dialog factory and editor flow helpers.
 
 Updates:
+  v0.1.1 - 2025-12-02 - Ensure delete flow bypasses confirmation via keyword arg.
   v0.1.0 - 2025-12-01 - Introduce shared dialog factory and CRUD flow coordinator.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from PySide6.QtWidgets import QDialog, QWidget
 
@@ -20,6 +21,11 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from uuid import UUID
 
     from models.prompt_model import Prompt
+
+
+class _DeletePromptCallable(Protocol):
+    def __call__(self, prompt: Prompt, *, skip_confirmation: bool = False) -> None:
+        """Delete *prompt* with optional confirmation overrides."""
 
 
 class PromptDialogFactory:
@@ -90,7 +96,7 @@ class PromptEditorFlow:
         load_prompts: Callable[[str], None],
         current_search_text: Callable[[], str],
         select_prompt: Callable[[UUID], None],
-        delete_prompt: Callable[[Prompt, bool], None],
+        delete_prompt: _DeletePromptCallable,
         status_callback: Callable[[str, int], None],
         error_callback: Callable[[str, str], None],
     ) -> None:
@@ -130,7 +136,7 @@ class PromptEditorFlow:
         if dialog.exec() != QDialog.Accepted:
             return
         if dialog.delete_requested:
-            self._delete_prompt(prompt, True)
+            self._delete_prompt(prompt, skip_confirmation=True)
             return
         updated = dialog.result_prompt
         if updated is None:
