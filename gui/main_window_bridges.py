@@ -1,6 +1,7 @@
 """Bridges that safely delegate MainWindow events to handlers.
 
 Updates:
+  v0.16.1 - 2025-12-02 - Defer handler lookup so early-wired callbacks work reliably.
   v0.16.0 - 2025-12-02 - Introduce prompt, workspace, and template handler bridges.
 """
 from __future__ import annotations
@@ -30,10 +31,16 @@ class _BaseBridge:
         self._handler_supplier = handler_supplier
 
     def __getattr__(self, attribute: str):
-        """Return the requested handler attribute, falling back to a no-op."""
+        """Return the requested handler attribute, deferring lookup when needed."""
         handler = self._handler_supplier()
         if handler is None:
-            return lambda *args, **kwargs: None
+            def _deferred(*args, **kwargs):
+                live_handler = self._handler_supplier()
+                if live_handler is None:
+                    return None
+                return getattr(live_handler, attribute)(*args, **kwargs)
+
+            return _deferred
         return getattr(handler, attribute)
 
 
@@ -53,10 +60,14 @@ class PromptActionsBridge(_BaseBridge):
     def __getattr__(self, attribute: str):
         """Provide lazy attribute lookup with graceful close fallbacks."""
         if attribute == "close_application":
-            handler = self._handler_supplier()
-            if handler is None:
-                return lambda *args, **kwargs: self._close_fallback()
-            return getattr(handler, attribute)
+            def _close(*args, **kwargs):
+                handler = self._handler_supplier()
+                if handler is None:
+                    self._close_fallback()
+                    return None
+                return getattr(handler, attribute)(*args, **kwargs)
+
+            return _close
         return super().__getattr__(attribute)
 
 
