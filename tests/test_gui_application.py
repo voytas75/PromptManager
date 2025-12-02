@@ -2,6 +2,7 @@
 
 Updates: v0.1.0 - 2025-11-05 - Ensure offscreen fallback only triggers when headless.
 """
+
 from __future__ import annotations
 
 import importlib

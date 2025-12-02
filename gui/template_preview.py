@@ -16,6 +16,7 @@ Updates:
   v0.1.1 - 2025-11-27 - Capture variables with multiline editors sized to four lines.
   v0.1.0 - 2025-11-25 - Add dynamic Jinja2 preview with custom filters and schema validation.
 """
+
 from __future__ import annotations
 
 import json
@@ -49,6 +50,7 @@ if TYPE_CHECKING:
 
 class TemplatePreviewWidget(QWidget):
     """Provide a JSON-driven variables editor with live Jinja2 previews."""
+
     run_requested = Signal(str, dict)
     run_state_changed = Signal(bool)
 
@@ -390,9 +392,7 @@ class TemplatePreviewWidget(QWidget):
         if not hasattr(self, "_run_button"):
             return
         can_run = (
-            self._run_enabled
-            and self._preview_ready
-            and bool(self._last_rendered_text.strip())
+            self._run_enabled and self._preview_ready and bool(self._last_rendered_text.strip())
         )
         self._run_button.setEnabled(can_run)
         if can_run != self._last_run_ready:

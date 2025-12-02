@@ -17,11 +17,14 @@ Updates: v0.16.0 – 2025‑12‑06 – Add PromptNote exception hierarchy.
 Updates: v0.15.0 – 2025‑12‑05 – Add ResponseStyle exception hierarchy.
 Updates: v0.14.0 – 2025‑11‑18 – Created module; migrated existing classes.
 """
+
 from __future__ import annotations
 
 
 class PromptManagerError(Exception):
     """Base exception for Prompt Manager failures."""
+
+
 # ---------------------------------------------------------------------------
 # Prompt‑specific errors (extracted from the former core.prompt_manager module)
 # ---------------------------------------------------------------------------
@@ -29,41 +32,79 @@ class PromptManagerError(Exception):
 
 class PromptNotFoundError(PromptManagerError):
     """Raised when a prompt cannot be located in the backing store."""
+
+
 class PromptExecutionUnavailable(PromptManagerError):
     """Raised when prompt execution is not configured for the manager."""
+
+
 class PromptExecutionError(PromptManagerError):
     """Raised when executing a prompt via an LLM fails."""
+
+
 class PromptHistoryError(PromptManagerError):
     """Raised when manual history operations fail."""
+
+
 class PromptStorageError(PromptManagerError):
     """Raised when interactions with persistent backends fail."""
+
+
 class PromptCacheError(PromptManagerError):
     """Raised when Redis cache lookups or writes fail."""
+
+
 class PromptEngineeringUnavailable(PromptManagerError):
     """Raised when prompt refinement is requested without an engineer configured."""
+
+
 class CategoryError(PromptManagerError):
     """Base class for prompt category management failures."""
+
+
 class CategoryNotFoundError(CategoryError):
     """Raised when a requested category does not exist."""
+
+
 class CategoryStorageError(CategoryError):
     """Raised when persisting or loading categories fails."""
+
+
 class ResponseStyleError(PromptManagerError):
     """Base class for response style workflow failures."""
+
+
 class ResponseStyleNotFoundError(ResponseStyleError):
     """Raised when a response style cannot be located."""
+
+
 class ResponseStyleStorageError(ResponseStyleError):
     """Raised when response style persistence fails."""
+
+
 class PromptNoteError(PromptManagerError):
     """Base class for prompt note workflow failures."""
+
+
 class PromptNoteNotFoundError(PromptNoteError):
     """Raised when a prompt note cannot be found."""
+
+
 class PromptNoteStorageError(PromptNoteError):
     """Raised when persistence for prompt notes fails."""
+
+
 class PromptVersionError(PromptManagerError):
     """Base class for prompt versioning workflow failures."""
+
+
 class PromptVersionNotFoundError(PromptVersionError):
     """Raised when the requested prompt version or fork lineage entry is missing."""
+
+
 class PromptShareError(PromptManagerError):
     """Base class for prompt sharing workflow failures."""
+
+
 class ShareProviderError(PromptShareError):
     """Raised when a remote sharing provider rejects or fails a request."""

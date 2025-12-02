@@ -3,6 +3,7 @@
 Updates:
   v0.1.0 - 2025-12-01 - Introduce PromptListCoordinator and associated models.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -23,6 +24,7 @@ if TYPE_CHECKING:
 @dataclass(slots=True)
 class PromptLoadResult:
     """Fetched prompt data assembled from repository and optional search."""
+
     all_prompts: list[Prompt]
     search_results: list[Prompt] | None
     preserve_search_order: bool
@@ -31,6 +33,7 @@ class PromptLoadResult:
 
 class PromptSortOrder(Enum):
     """Supported sorting orders for the prompt list view."""
+
     NAME_ASC = "name_asc"
     NAME_DESC = "name_desc"
     QUALITY_DESC = "quality_desc"
@@ -43,6 +46,7 @@ class PromptSortOrder(Enum):
 
 class PromptListCoordinator:
     """Encapsulates prompt loading, filtering, and sorting logic."""
+
     def __init__(self, manager: PromptManager) -> None:
         """Store PromptManager dependency for data access."""
         self._manager = manager

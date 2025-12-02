@@ -32,6 +32,7 @@ Updates:
   v0.15.60 - 2025-11-28 - Introduced background task center with toasts.
   v0.15.59 - 2025-11-28 - Wired Refresh Scenarios action to LiteLLM.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -136,6 +137,7 @@ else:  # pragma: no cover - runtime placeholders for type-only imports
     PromptEditorFlow = _Any
     PromptActionsController = _Any
 
+
 def _match_category_label(  # pyright: ignore[reportUnusedFunction]
     value: str | None, categories: Sequence[PromptCategory]
 ) -> str | None:
@@ -167,6 +169,7 @@ def _match_category_label(  # pyright: ignore[reportUnusedFunction]
 
 class MainWindow(QMainWindow):
     """Primary window exposing prompt CRUD operations."""
+
     _SORT_OPTIONS: Sequence[tuple[str, PromptSortOrder]] = (
         ("Name (A-Z)", PromptSortOrder.NAME_ASC),
         ("Name (Z-A)", PromptSortOrder.NAME_DESC),
@@ -279,6 +282,7 @@ class MainWindow(QMainWindow):
                 parent=dialog,
                 context_override=context,
             )
+
         composition = build_main_window_composition(
             parent=self,
             manager=self._manager,
@@ -613,6 +617,7 @@ class MainWindow(QMainWindow):
         self._prompt_editor_factory = components.dialog_factory
         self._prompt_editor_flow = components.editor_flow
         self._catalog_controller = components.catalog_controller
+
     def _on_selection_changed(self, *_: object) -> None:
         """Update the detail panel to reflect the new selection."""
         controller = self._workspace_history_controller

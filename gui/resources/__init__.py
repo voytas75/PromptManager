@@ -5,6 +5,7 @@ Updates:
   v0.1.1 - 2025-11-05 - Ship stylised Prompt Manager icon and expose loader.
   v0.1.0 - 2025-11-05 - Provide accessor for packaged application icon.
 """
+
 from __future__ import annotations
 
 import importlib.resources as importlib_resources

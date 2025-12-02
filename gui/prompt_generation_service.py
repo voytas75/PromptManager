@@ -3,6 +3,7 @@
 Updates:
   v0.15.81 - 2025-12-01 - Provide reusable prompt generation + editor factory service.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -35,6 +36,7 @@ else:  # pragma: no cover - runtime placeholders for type-only names
 @dataclass(slots=True)
 class PromptGenerationComponents:
     """Artifacts produced when building prompt editor workflows."""
+
     dialog_factory: PromptDialogFactory
     editor_flow: PromptEditorFlow
     catalog_controller: CatalogWorkflowController

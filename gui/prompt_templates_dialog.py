@@ -4,6 +4,7 @@ Updates:
   v0.1.1 - 2025-12-01 - Preserve trailing whitespace when saving template overrides.
   v0.1.0 - 2025-11-29 - Introduce dedicated prompt template editor dialog.
 """
+
 from __future__ import annotations
 
 from functools import partial
@@ -36,6 +37,7 @@ if TYPE_CHECKING:
 
 class PromptTemplateEditorDialog(QDialog):
     """Modal dialog that exposes editable LiteLLM prompt templates."""
+
     def __init__(
         self,
         parent: QWidget | None = None,

@@ -4,6 +4,7 @@ Updates:
   v0.1.1 - 2025-11-29 - Wrap help dialog description builder for Ruff line length.
   v0.1.0 - 2025-11-10 - Introduce keyboard-driven quick action palette.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -31,6 +32,7 @@ if TYPE_CHECKING:
 @dataclass(slots=True)
 class QuickAction:
     """Representation of a quick command entry."""
+
     identifier: str
     title: str
     description: str
@@ -91,6 +93,7 @@ def rank_prompts_for_action(prompts: Iterable[Prompt], action: QuickAction) -> l
 
 class CommandPaletteDialog(QDialog):
     """Simple command palette enabling keyboard navigation across quick actions."""
+
     def __init__(self, actions: Sequence[QuickAction], parent=None) -> None:
         """Configure dialog widgets and preload the quick action list."""
         super().__init__(parent)

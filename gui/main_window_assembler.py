@@ -3,6 +3,7 @@
 Updates:
   v0.16.0 - 2025-12-02 - Extract presenter, quick action, and execution controller setup.
 """
+
 from __future__ import annotations
 
 import logging

@@ -5,6 +5,7 @@ Updates:
   v0.1.1 - 2025-11-27 - Run blocking tasks on a worker thread so the UI stays responsive.
   v0.1.0 - 2025-11-27 - Add reusable busy indicator for prompt workflows.
 """
+
 from __future__ import annotations
 
 import threading
@@ -24,6 +25,7 @@ _T = TypeVar("_T")
 
 class ProcessingIndicator(AbstractContextManager["ProcessingIndicator"]):
     """Display a modal busy dialog while scoped work executes."""
+
     def __init__(self, parent: QWidget, message: str, *, title: str = "Processing") -> None:
         """Create an indicator bound to *parent* with the provided message."""
         self._dialog = _ProcessingDialog(parent, title=title, message=message)
@@ -85,6 +87,7 @@ class ProcessingIndicator(AbstractContextManager["ProcessingIndicator"]):
 
 class _ProcessingDialog(QDialog):
     """Compact dialog that centers an indeterminate progress bar."""
+
     def __init__(self, parent: QWidget, *, title: str, message: str) -> None:
         super().__init__(parent, Qt.Dialog | Qt.CustomizeWindowHint | Qt.WindowTitleHint)
         self.setWindowTitle(title)
@@ -109,5 +112,6 @@ class _ProcessingDialog(QDialog):
     def setLabelText(self, text: str) -> None:
         """Update the message displayed above the progress bar."""
         self._label.setText(text)
+
 
 __all__ = ["ProcessingIndicator"]

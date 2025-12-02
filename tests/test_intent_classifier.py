@@ -1,4 +1,5 @@
 """Tests for rule-based intent classifier utilities."""
+
 from __future__ import annotations
 
 from core.intent_classifier import IntentClassifier, IntentLabel, rank_by_hints
@@ -40,4 +41,3 @@ def test_rank_by_hints_prioritises_matching_prompts() -> None:
 
     ranked = rank_by_hints(prompts, category_hints=["Reasoning / Debugging"], tag_hints=["docs"])
     assert [prompt.id for prompt in ranked] == ["debug", "docs", "general"]
-

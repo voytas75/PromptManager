@@ -3,6 +3,7 @@
 Updates:
   v0.1.0 - 2025-12-01 - Extracted runtime settings snapshot + apply helpers.
 """
+
 from __future__ import annotations
 
 import json
@@ -34,12 +35,14 @@ RuntimeSettings = dict[str, object | None]
 @dataclass(slots=True)
 class RuntimeSettingsResult:
     """Return data after applying runtime settings updates."""
+
     theme_mode: str
     has_executor: bool
 
 
 class RuntimeSettingsService:
     """Coordinate runtime settings hydration and persistence."""
+
     def __init__(self, manager: PromptManager, settings: PromptManagerSettings | None) -> None:
         """Store references to the PromptManager and persisted settings snapshot."""
         self._manager = manager
@@ -71,9 +74,7 @@ class RuntimeSettingsService:
             "embedding_backend": (
                 settings.embedding_backend if settings else DEFAULT_EMBEDDING_BACKEND
             ),
-            "embedding_model": (
-                settings.embedding_model if settings else DEFAULT_EMBEDDING_MODEL
-            ),
+            "embedding_model": (settings.embedding_model if settings else DEFAULT_EMBEDDING_MODEL),
             "quick_actions": derived_quick_actions,
             "chat_user_bubble_color": (
                 settings.chat_user_bubble_color if settings else DEFAULT_CHAT_USER_BUBBLE_COLOR

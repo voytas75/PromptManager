@@ -43,6 +43,7 @@ Updates:
   v0.2.0 - 2025-10-31 - Add SQLite repository integration with ChromaDB/Redis sync.
   v0.1.0 - 2025-10-30 - Initial PromptManager with CRUD and search support.
 """
+
 from __future__ import annotations
 
 import difflib
@@ -241,12 +242,16 @@ RedisValue = str | bytes | memoryview
 
 class RedisConnectionPoolProtocol(Protocol):
     """Subset of redis-py connection pool used for diagnostics."""
+
     connection_kwargs: Mapping[str, Any]
 
     def disconnect(self) -> None:
         """Close all pooled connections."""
+
+
 class RedisClientProtocol(Protocol):
     """Subset of redis-py client behaviour used within the manager."""
+
     connection_pool: RedisConnectionPoolProtocol | None
 
     def ping(self) -> bool: ...
@@ -266,6 +271,7 @@ class RedisClientProtocol(Protocol):
 
 class CollectionProtocol(Protocol):
     """Minimal Chroma collection surface consumed by the manager."""
+
     def count(self) -> int: ...
 
     def delete(self, **kwargs: Any) -> Any: ...
@@ -373,6 +379,7 @@ def _match_category_label(
 
 class PromptManager(CategorySupport, ResponseStyleSupport, PromptNoteSupport):
     """Manage prompt persistence, caching, and semantic search."""
+
     def __init__(
         self,
         chroma_path: str,
@@ -650,6 +657,7 @@ class PromptManager(CategorySupport, ResponseStyleSupport, PromptNoteSupport):
     @dataclass(slots=True)
     class IntentSuggestions:
         """Intent-aware search recommendations returned to callers."""
+
         prediction: IntentPrediction
         prompts: list[Prompt]
         fallback_used: bool = False
@@ -657,6 +665,7 @@ class PromptManager(CategorySupport, ResponseStyleSupport, PromptNoteSupport):
     @dataclass(slots=True)
     class ExecutionOutcome:
         """Aggregate data returned after executing a prompt."""
+
         result: CodexExecutionResult
         history_entry: PromptExecution | None
         conversation: list[dict[str, str]]
@@ -664,6 +673,7 @@ class PromptManager(CategorySupport, ResponseStyleSupport, PromptNoteSupport):
     @dataclass(slots=True)
     class BenchmarkRun:
         """Single benchmark result for a prompt/model pair."""
+
         prompt_id: uuid.UUID
         prompt_name: str
         model: str
@@ -676,11 +686,13 @@ class PromptManager(CategorySupport, ResponseStyleSupport, PromptNoteSupport):
     @dataclass(slots=True)
     class BenchmarkReport:
         """Structured response returned by benchmark_prompts."""
+
         runs: list[PromptManager.BenchmarkRun]
 
     @dataclass(slots=True)
     class EmbeddingDimensionMismatch:
         """Stored prompt embedding vector that no longer matches the reference dimension."""
+
         prompt_id: uuid.UUID
         prompt_name: str
         stored_dimension: int
@@ -688,12 +700,14 @@ class PromptManager(CategorySupport, ResponseStyleSupport, PromptNoteSupport):
     @dataclass(slots=True)
     class MissingEmbedding:
         """Prompt record that is missing a persisted embedding vector."""
+
         prompt_id: uuid.UUID
         prompt_name: str
 
     @dataclass(slots=True)
     class EmbeddingDiagnostics:
         """Summary of embedding backend health and stored vector consistency."""
+
         backend_ok: bool
         backend_message: str
         backend_dimension: int | None
@@ -710,6 +724,7 @@ class PromptManager(CategorySupport, ResponseStyleSupport, PromptNoteSupport):
     @dataclass(slots=True)
     class CategoryHealth:
         """Aggregated prompt and execution metrics for a category."""
+
         slug: str
         label: str
         total_prompts: int
@@ -720,6 +735,7 @@ class PromptManager(CategorySupport, ResponseStyleSupport, PromptNoteSupport):
     @dataclass(slots=True)
     class PromptVersionDiff:
         """Diff payload surfaced when comparing two prompt versions."""
+
         prompt_id: uuid.UUID
         base_version: PromptVersion
         target_version: PromptVersion
@@ -3462,6 +3478,7 @@ class PromptManager(CategorySupport, ResponseStyleSupport, PromptNoteSupport):
 
 class _NullEmbeddingWorker:
     """Embedding worker placeholder used when background sync is disabled."""
+
     def schedule(self, _: uuid.UUID) -> None:  # pragma: no cover - trivial noop
         return
 

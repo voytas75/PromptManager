@@ -7,6 +7,7 @@ Updates:
   v0.3.0 - 2025-11-15 - Cover enhanced --print-settings summary and masked API keys.
   v0.2.0 - 2025-11-05 - Add coverage for GUI dependency fallback.
 """
+
 from __future__ import annotations
 
 import json

@@ -14,6 +14,7 @@ Updates:
   v0.6.0 - 2025-11-07 - Share LiteLLM import helper with embedding adapters.
   v0.5.0 - 2025-11-05 - Introduce LiteLLM name generator with graceful fallbacks.
 """
+
 from __future__ import annotations
 
 import logging
@@ -43,13 +44,20 @@ logger = logging.getLogger(__name__)
 
 class NameGenerationError(Exception):
     """Raised when a prompt name cannot be generated."""
+
+
 class DescriptionGenerationError(Exception):
     """Raised when a prompt description cannot be generated."""
+
+
 class CategorySuggestionError(Exception):
     """Raised when a prompt category cannot be suggested."""
+
+
 @dataclass(slots=True)
 class LiteLLMNameGenerator:
     """Generate prompt names via LiteLLM chat completion API."""
+
     model: str
     api_key: str | None = None
     api_base: str | None = None
@@ -129,6 +137,7 @@ class LiteLLMNameGenerator:
 @dataclass(slots=True)
 class LiteLLMDescriptionGenerator:
     """Generate succinct prompt descriptions via LiteLLM."""
+
     model: str
     api_key: str | None = None
     api_base: str | None = None
@@ -230,6 +239,7 @@ class LiteLLMDescriptionGenerator:
 @dataclass(slots=True)
 class LiteLLMCategoryGenerator:
     """Suggest prompt categories from the configured catalogue via LiteLLM."""
+
     model: str
     api_key: str | None = None
     api_base: str | None = None

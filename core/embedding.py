@@ -9,6 +9,7 @@ Updates:
   v0.6.0 - 2025-11-07 - Add configurable LiteLLM and sentence-transformer backends.
   v0.1.0 - 2025-11-05 - Introduce embedding provider with retry logic and sync worker.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -39,8 +40,12 @@ EmbeddingFunction = Callable[[Sequence[str]], Sequence[Sequence[float]]]
 
 class EmbeddingProviderError(Exception):
     """Base exception for embedding provider failures."""
+
+
 class EmbeddingGenerationError(EmbeddingProviderError):
     """Raised when generating embeddings fails after retries."""
+
+
 class DefaultEmbeddingFunction:
     """Deterministic, lightweight embedding fallback.
 
@@ -48,6 +53,7 @@ class DefaultEmbeddingFunction:
     vector in the range [0.0, 1.0]. It serves as a placeholder until the
     application is wired to a real embedding backend.
     """
+
     _VECTOR_LENGTH = 32
 
     def __call__(self, input: Sequence[str]) -> list[list[float]]:
@@ -62,6 +68,7 @@ class DefaultEmbeddingFunction:
 
 class LiteLLMEmbeddingFunction:
     """Call LiteLLM embedding endpoint for semantic vectors."""
+
     def __init__(
         self,
         *,
@@ -170,9 +177,7 @@ class LiteLLMEmbeddingFunction:
             candidate = item
 
         if candidate is None:
-            raise EmbeddingGenerationError(
-                f"LiteLLM response missing embedding at index {index}"
-            )
+            raise EmbeddingGenerationError(f"LiteLLM response missing embedding at index {index}")
         if isinstance(candidate, Mapping):
             candidate = cast("Mapping[str, Any]", candidate).get("embedding")
         if not isinstance(candidate, Sequence) or isinstance(candidate, (str, bytes)):
@@ -182,6 +187,7 @@ class LiteLLMEmbeddingFunction:
 
 class SentenceTransformersEmbeddingFunction:
     """Use sentence-transformers models for local embeddings."""
+
     def __init__(self, model: str, *, device: str | None = None) -> None:
         """Load a sentence-transformers model for local embedding generation."""
         if not model:
@@ -244,6 +250,7 @@ def create_embedding_function(
 
 class EmbeddingProvider:
     """Generate embeddings with retry logic and pluggable backends."""
+
     def __init__(
         self,
         embedding_function: EmbeddingFunction | None = None,
@@ -277,6 +284,7 @@ class EmbeddingProvider:
 
 class EmbeddingSyncWorker:
     """Background worker that keeps prompt embeddings in sync."""
+
     def __init__(
         self,
         provider: EmbeddingProvider,

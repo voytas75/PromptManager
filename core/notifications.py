@@ -5,6 +5,7 @@ Updates:
   v0.1.1 - 2025-11-29 - Reformat docstring and wrap subscription constructor signature.
   v0.1.0 - 2025-11-11 - Introduce notification hub with task tracking helpers.
 """
+
 from __future__ import annotations
 
 import logging
@@ -26,6 +27,7 @@ logger = logging.getLogger("prompt_manager.notifications")
 
 class NotificationLevel(str, Enum):
     """Severity levels communicated to listeners."""
+
     INFO = "info"
     SUCCESS = "success"
     WARNING = "warning"
@@ -34,6 +36,7 @@ class NotificationLevel(str, Enum):
 
 class NotificationStatus(str, Enum):
     """High-level lifecycle stage for a task notification."""
+
     STARTED = "started"
     IN_PROGRESS = "in_progress"
     SUCCEEDED = "succeeded"
@@ -48,6 +51,7 @@ def _metadata_factory() -> dict[str, Any]:
 @dataclass(slots=True)
 class Notification:
     """Immutable payload describing a notification event."""
+
     id: uuid.UUID
     title: str
     message: str
@@ -75,6 +79,7 @@ class Notification:
 
 class NotificationSubscription:
     """Disposable handle that removes its callback when closed."""
+
     def __init__(
         self,
         center: NotificationCenter,
@@ -103,6 +108,7 @@ class NotificationSubscription:
 
 class NotificationCenter:
     """Thread-safe publish/subscribe hub for sending notifications to listeners."""
+
     def __init__(self, history_limit: int = 200) -> None:
         """Initialise the subscriber registry and bounded history queue."""
         self._subscribers: list[Callable[[Notification], None]] = []

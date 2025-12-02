@@ -6,6 +6,7 @@ Updates:
   v0.2.0 - 2025-11-26 - Cover history load/store helpers and trimming logic.
   v0.1.0 - 2025-11-22 - Cover helper functions that load/store the last task text.
 """
+
 from __future__ import annotations
 
 import json
@@ -86,8 +87,7 @@ def test_store_execute_context_history_preserves_whitespace_and_limits() -> None
     settings = _FakeSettings()
 
     _store_execute_context_history(
-        settings,
-        ["  Summarise logs  ", "Investigate outages", "Summarise logs", ""]
+        settings, ["  Summarise logs  ", "Investigate outages", "Summarise logs", ""]
     )
 
     stored = json.loads(settings.values[_EXECUTE_CONTEXT_HISTORY_KEY])

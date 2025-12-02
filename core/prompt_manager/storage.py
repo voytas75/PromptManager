@@ -18,6 +18,7 @@ Updates:
   v0.14.1 - 2025-11-29 - Move typing-only imports behind TYPE_CHECKING and wrap init.
   v0.14.0 - 2025-11-18 - Initial scaffold with proxy implementation.
 """
+
 from __future__ import annotations
 
 import threading
@@ -43,6 +44,7 @@ class PromptStorage:
     that may later gain smarter coordination logic (caching, batching, async
     I/O) without changing their public signature.
     """
+
     _lock: threading.RLock
 
     def __init__(

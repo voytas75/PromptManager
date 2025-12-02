@@ -3,6 +3,7 @@
 Updates:
   v0.15.81 - 2025-12-01 - Extracted widget/controller bootstrap helpers from gui.main_window.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -39,6 +40,7 @@ else:  # pragma: no cover - runtime placeholders for type-only imports
     PromptManager = _Any
     Prompt = _Any
 
+
 class _PromptSupplier(Protocol):
     def __call__(self) -> object | None:
         """Return the currently selected prompt or widget."""
@@ -47,6 +49,7 @@ class _PromptSupplier(Protocol):
 @dataclass(slots=True)
 class DetailWidgetCallbacks:
     """Signal handlers used while wiring the prompt detail widget."""
+
     delete_requested: Callable[[], None]
     edit_requested: Callable[[], None]
     version_history_requested: Callable[[Prompt | None], None]
@@ -58,6 +61,7 @@ class DetailWidgetCallbacks:
 @dataclass(slots=True)
 class BootstrapResult:
     """Container describing the collaborators created during bootstrap."""
+
     model: PromptListModel
     detail_widget: PromptDetailWidget
     prompt_coordinator: PromptListCoordinator
@@ -105,7 +109,9 @@ class MainWindowBootstrapper:
         detail_widget = PromptDetailWidget(self._parent)
         detail_widget.delete_requested.connect(self._detail_callbacks.delete_requested)  # type: ignore[arg-type]
         detail_widget.edit_requested.connect(self._detail_callbacks.edit_requested)  # type: ignore[arg-type]
-        detail_widget.version_history_requested.connect(self._detail_callbacks.version_history_requested)  # type: ignore[arg-type]
+        detail_widget.version_history_requested.connect(
+            self._detail_callbacks.version_history_requested
+        )  # type: ignore[arg-type]
         detail_widget.fork_requested.connect(self._detail_callbacks.fork_requested)  # type: ignore[arg-type]
         detail_widget.refresh_scenarios_requested.connect(  # type: ignore[arg-type]
             partial(self._detail_callbacks.refresh_scenarios_requested, detail_widget)

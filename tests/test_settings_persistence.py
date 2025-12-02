@@ -1,4 +1,5 @@
 """Verify settings persistence helpers without requiring PySide runtime."""
+
 from __future__ import annotations
 
 import json

@@ -1,4 +1,5 @@
 """Tests for PromptManager prompt execution workflow."""
+
 from __future__ import annotations
 
 import uuid
@@ -194,9 +195,7 @@ def test_execute_prompt_logs_failure(tmp_path: Path) -> None:
     history = tracker.list_for_prompt(prompt.id)
     assert history and history[0].status.value == "failed"
     assert history[0].metadata is not None
-    assert history[0].metadata["conversation"] == [
-        {"role": "user", "content": "raise Exception"}
-    ]
+    assert history[0].metadata["conversation"] == [{"role": "user", "content": "raise Exception"}]
     manager.close()
 
 
@@ -230,6 +229,7 @@ def test_execute_prompt_supports_conversation(tmp_path: Path) -> None:
 
 def test_execute_prompt_streams_to_callback(tmp_path: Path) -> None:
     """Stream partial responses to callbacks during execution."""
+
     class _StreamingExecutor:
         def __init__(self) -> None:
             self.stream_flag: bool | None = None

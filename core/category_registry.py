@@ -5,6 +5,7 @@ Updates:
   v0.1.1 - 2025-11-29 - Wrap long defaults and type-only Path import.
   v0.1.0 - 2025-11-22 - Introduce PromptCategory registry and defaults.
 """
+
 from __future__ import annotations
 
 import json
@@ -48,8 +49,7 @@ DEFAULT_CATEGORY_DEFINITIONS: Sequence[Mapping[str, str]] = (
         "slug": "refactoring",
         "label": "Refactoring",
         "description": (
-            "Improving structure, readability, and maintainability "
-            "without changing behaviour."
+            "Improving structure, readability, and maintainability without changing behaviour."
         ),
         "color": "#7c3aed",
         "icon": "mdi-code-json",
@@ -86,8 +86,7 @@ def load_category_definitions(
 ) -> list[PromptCategory]:
     """Return PromptCategory definitions from defaults plus overrides."""
     catalog: MutableMapping[str, PromptCategory] = {
-        entry["slug"]: PromptCategory.from_mapping(entry)
-        for entry in DEFAULT_CATEGORY_DEFINITIONS
+        entry["slug"]: PromptCategory.from_mapping(entry) for entry in DEFAULT_CATEGORY_DEFINITIONS
     }
 
     payloads: list[Mapping[str, object]] = []
@@ -128,6 +127,7 @@ def load_category_definitions(
 
 class CategoryRegistry:
     """Cached view of stored categories with helper utilities."""
+
     def __init__(
         self,
         repository: PromptRepository,
@@ -152,9 +152,7 @@ class CategoryRegistry:
         except RepositoryError as exc:
             raise CategoryStorageError("Unable to load categories") from exc
         self._all = {category.slug: category for category in categories}
-        self._active = {
-            category.slug: category for category in categories if category.is_active
-        }
+        self._active = {category.slug: category for category in categories if category.is_active}
         return categories
 
     def all(self, include_archived: bool = False) -> list[PromptCategory]:

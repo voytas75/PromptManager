@@ -4,6 +4,7 @@ Updates:
   v0.1.1 - 2025-11-29 - Import Any for fake connections and wrap long test helpers.
   v0.1.0 - 2025-10-30 - Add error-path coverage for repository helpers.
 """
+
 from __future__ import annotations
 
 import sqlite3
@@ -512,9 +513,7 @@ def test_response_style_crud(tmp_path: Path) -> None:
         repo.get_response_style(style.id)
 
 
-def test_response_style_sql_errors(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_response_style_sql_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Surface repository errors when response style queries fail."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     style = _make_response_style()

@@ -54,6 +54,7 @@ Updates:
   v0.2.0 - 2025-11-05 - Add prompt name suggestion based on context.
   v0.1.0 - 2025-11-04 - Implement create/edit prompt dialog backed by Prompt dataclass.
 """
+
 from __future__ import annotations
 
 import difflib
@@ -155,6 +156,7 @@ _TaskResult = TypeVar("_TaskResult")
 
 class SystemInfo(NamedTuple):
     """Container describing runtime platform characteristics for display."""
+
     cpu: str
     architecture: str
     platform_family: str
@@ -211,6 +213,7 @@ def _strip_scenarios_metadata(
 
 class CollapsibleTextSection(QWidget):
     """Wrapper providing an expandable/collapsible plain text editor."""
+
     textChanged = Signal()
 
     def __init__(self, title: str, parent: QWidget | None = None) -> None:
@@ -325,6 +328,7 @@ class CollapsibleTextSection(QWidget):
 
 class PromptRefinedDialog(QDialog):
     """Modal dialog presenting prompt refinement output in a resizable view."""
+
     def __init__(
         self,
         content: str,
@@ -435,7 +439,7 @@ def fallback_generate_scenarios(context: str, *, max_items: int = 3) -> list[str
             continue
         lowered = clause[0].lower() + clause[1:] if len(clause) > 1 else clause.lower()
         scenario = f"Use when you need to {lowered}"
-        if not scenario.endswith('.'):
+        if not scenario.endswith("."):
             scenario += "."
         normalised = textwrap.shorten(scenario, width=140, placeholder="…")
         key = normalised.lower()
@@ -450,6 +454,7 @@ def fallback_generate_scenarios(context: str, *, max_items: int = 3) -> list[str
 
 class PromptDialog(QDialog):
     """Modal dialog used for creating or editing prompt records."""
+
     applied = Signal(Prompt)
     execute_context_requested = Signal(Prompt, str)
 
@@ -620,9 +625,7 @@ class PromptDialog(QDialog):
         self._generate_tags_button.clicked.connect(self._on_generate_tags_clicked)  # type: ignore[arg-type]
         if self._tags_generator is None:
             self._generate_tags_button.setEnabled(False)
-            self._generate_tags_button.setToolTip(
-                "Tag suggestions require the main app context."
-            )
+            self._generate_tags_button.setToolTip("Tag suggestions require the main app context.")
         tags_container_layout.addWidget(self._generate_tags_button)
         metadata_layout.addWidget(tags_container, 1, 2)
         metadata_layout.setColumnStretch(0, 1)
@@ -834,11 +837,14 @@ class PromptDialog(QDialog):
             return
         context = self._context_input.toPlainText()
         try:
-            suggestions = self._run_with_indicator(
-                "Generating tags…",
-                self._tags_generator,
-                context,
-            ) or []
+            suggestions = (
+                self._run_with_indicator(
+                    "Generating tags…",
+                    self._tags_generator,
+                    context,
+                )
+                or []
+            )
         except Exception as exc:  # noqa: BLE001 - surface generator failures to the user
             QMessageBox.warning(self, "Tag suggestion failed", str(exc))
             return
@@ -1022,9 +1028,7 @@ class PromptDialog(QDialog):
         if not context:
             return ""
         if self._name_generator is None:
-            logger.info(
-                "LiteLLM disabled (model not configured); using fallback name suggestion"
-            )
+            logger.info("LiteLLM disabled (model not configured); using fallback name suggestion")
             return fallback_suggest_prompt_name(context)
         try:
             return self._name_generator(context)
@@ -1306,6 +1310,7 @@ class PromptDialog(QDialog):
 
 class PromptMaintenanceDialog(QDialog):
     """Expose bulk metadata maintenance utilities."""
+
     maintenance_applied = Signal(str)
 
     def __init__(
@@ -1506,9 +1511,7 @@ class PromptMaintenanceDialog(QDialog):
         redis_tab = QWidget(self)
         redis_layout = QVBoxLayout(redis_tab)
 
-        redis_description = QLabel(
-            "Inspect the Redis cache used for prompt caching.", redis_tab
-        )
+        redis_description = QLabel("Inspect the Redis cache used for prompt caching.", redis_tab)
         redis_description.setWordWrap(True)
         redis_layout.addWidget(redis_description)
 
@@ -1938,9 +1941,7 @@ class PromptMaintenanceDialog(QDialog):
 
     def _on_reset_prompts_clicked(self) -> None:
         """Clear the SQLite prompt repository."""
-        if not self._confirm_destructive_action(
-            "Clear the prompt database and execution history?"
-        ):
+        if not self._confirm_destructive_action("Clear the prompt database and execution history?"):
             return
         try:
             self._manager.reset_prompt_repository()
@@ -2287,6 +2288,7 @@ class PromptMaintenanceDialog(QDialog):
 
 class CategoryEditorDialog(QDialog):
     """Collect category details for creation or editing workflows."""
+
     def __init__(
         self,
         parent: QWidget | None = None,
@@ -2383,11 +2385,7 @@ class CategoryEditorDialog(QDialog):
             except ValueError:
                 QMessageBox.warning(self, "Invalid category", "Minimum quality must be a number.")
                 return
-        tags = [
-            tag.strip()
-            for tag in self._tags_input.text().split(",")
-            if tag.strip()
-        ]
+        tags = [tag.strip() for tag in self._tags_input.text().split(",") if tag.strip()]
         self._payload = {
             "label": label,
             "slug": slug,
@@ -2403,6 +2401,7 @@ class CategoryEditorDialog(QDialog):
 
 class CategoryManagerDialog(QDialog):
     """Provide CRUD workflows for prompt categories."""
+
     def __init__(self, manager: PromptManager, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._manager = manager
@@ -2591,6 +2590,7 @@ class CategoryManagerDialog(QDialog):
 
 class SaveResultDialog(QDialog):
     """Collect optional notes before persisting or updating a prompt execution."""
+
     def __init__(
         self,
         parent: QWidget | None,
@@ -2606,9 +2606,7 @@ class SaveResultDialog(QDialog):
         super().__init__(parent)
         self._max_chars = max_chars
         self._summary = ""
-        self._rating: int | None = (
-            int(initial_rating) if initial_rating is not None else None
-        )
+        self._rating: int | None = int(initial_rating) if initial_rating is not None else None
         self._enable_rating = enable_rating
         self.setWindowTitle(f"{button_text} Result — {prompt_name}")
         self._build_ui(default_text, button_text)
@@ -2682,6 +2680,7 @@ class SaveResultDialog(QDialog):
 
 class ResponseStyleDialog(QDialog):
     """Modal dialog for creating or editing prompt parts such as response styles."""
+
     _PROMPT_PART_PRESETS: Sequence[str] = (
         "Response Style",
         "System Instruction",
@@ -2824,9 +2823,7 @@ class ResponseStyleDialog(QDialog):
 
         tags = [tag.strip() for tag in self._tags_input.text().split(",") if tag.strip()]
         examples = [
-            line.strip()
-            for line in self._examples_input.toPlainText().splitlines()
-            if line.strip()
+            line.strip() for line in self._examples_input.toPlainText().splitlines() if line.strip()
         ]
         if not examples:
             examples = [phrase]
@@ -2870,6 +2867,7 @@ class ResponseStyleDialog(QDialog):
 
 class PromptNoteDialog(QDialog):
     """Modal dialog for creating or editing prompt notes."""
+
     def __init__(self, parent: QWidget | None = None, *, note: PromptNote | None = None) -> None:
         """Initialise the note editor and optionally preload existing text."""
         super().__init__(parent)
@@ -2914,6 +2912,7 @@ class PromptNoteDialog(QDialog):
 
 class MarkdownPreviewDialog(QDialog):
     """Display markdown content rendered in a read-only viewer."""
+
     def __init__(
         self,
         markdown_text: str,
@@ -2948,6 +2947,7 @@ class MarkdownPreviewDialog(QDialog):
 
 class InfoDialog(QDialog):
     """Dialog summarising application metadata and runtime system details."""
+
     _TAGLINE = "Catalog, execute, and track AI prompts from a single desktop workspace."
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -3101,6 +3101,7 @@ def _diff_entry_to_text(entry: CatalogDiffEntry) -> str:
 
 class PromptVersionHistoryDialog(QDialog):
     """Display committed prompt versions with diff/restore controls."""
+
     _BODY_PLACEHOLDER = "Select a version to view the prompt body."
     _EMPTY_BODY_TEXT = "Prompt body is empty."
 
@@ -3350,6 +3351,7 @@ class PromptVersionHistoryDialog(QDialog):
 
 class CatalogPreviewDialog(QDialog):
     """Show a diff preview before applying catalogue changes."""
+
     def __init__(self, diff: CatalogDiff, parent=None) -> None:
         """Display the provided catalogue diff and capture user intent."""
         super().__init__(parent)

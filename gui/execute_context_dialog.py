@@ -2,6 +2,7 @@
 
 Updates: v0.1.0 - 2025-11-26 - Add execute-as-context history picker dialog.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -25,6 +26,7 @@ if TYPE_CHECKING:
 
 class ExecuteContextDialog(QDialog):
     """Collect a task description and expose quick history selection."""
+
     def __init__(
         self,
         *,

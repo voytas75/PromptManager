@@ -3,6 +3,7 @@
 Updates:
   v0.1.0 - 2025-12-01 - Introduce shared dialog factory and CRUD flow coordinator.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -23,6 +24,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
 
 class PromptDialogFactory:
     """Build pre-configured :class:`PromptDialog` instances for editors."""
+
     def __init__(
         self,
         *,
@@ -64,6 +66,7 @@ class PromptDialogFactory:
             structure_refiner=self._structure_refiner,
             version_history_handler=self._version_history_handler,
         )
+
         def _handle_execute_context(
             prompt_obj: Prompt,
             context_text: str,
@@ -77,6 +80,7 @@ class PromptDialogFactory:
 
 class PromptEditorFlow:
     """Coordinate add/edit/fork flows using :class:`PromptDialogFactory`."""
+
     def __init__(
         self,
         *,

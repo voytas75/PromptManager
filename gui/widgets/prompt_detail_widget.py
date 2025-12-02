@@ -3,6 +3,7 @@
 Updates:
   v0.1.0 - 2025-11-30 - Extract prompt detail widget for reuse/testing.
 """
+
 from __future__ import annotations
 
 import json
@@ -31,6 +32,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing helper
 
 class PromptDetailWidget(QWidget):
     """Panel that summarises the currently selected prompt."""
+
     _CONTEXT_PREVIEW_LIMIT = 200
 
     delete_requested = Signal()

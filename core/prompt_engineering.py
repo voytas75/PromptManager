@@ -8,6 +8,7 @@ Updates:
   v0.1.1 - 2025-11-02 - Drop configured LiteLLM parameters locally before refinement calls.
   v0.1.0 - 2025-11-15 - Introduce prompt refinement helper using meta-prompt rules.
 """
+
 from __future__ import annotations
 
 import json
@@ -35,9 +36,12 @@ logger = logging.getLogger(__name__)
 
 class PromptEngineeringError(Exception):
     """Raised when prompt refinement fails."""
+
+
 @dataclass(slots=True)
 class PromptRefinement:
     """Structured result returned by the prompt engineering workflow."""
+
     improved_prompt: str
     analysis: str
     checklist: Sequence[str]
@@ -71,6 +75,7 @@ def _strip_code_fence(text: str) -> str:
 @dataclass(slots=True)
 class PromptEngineer:
     """Refine prompts using the meta-prompt ruleset via LiteLLM."""
+
     model: str
     api_key: str | None = None
     api_base: str | None = None
@@ -298,6 +303,7 @@ class PromptEngineer:
     @staticmethod
     def _extract_message(response: Any) -> str:
         """Extract the primary message content from the LiteLLM response payload."""
+
         def _normalise_content(value: Any) -> str | None:
             if value is None:
                 return None

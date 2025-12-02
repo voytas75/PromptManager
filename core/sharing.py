@@ -4,6 +4,7 @@ Updates:
   v0.1.1 - 2025-11-30 - Document ShareText provider methods for lint compliance.
   v0.1.0 - 2025-11-28 - Add ShareText provider and prompt formatting helper.
 """
+
 from __future__ import annotations
 
 import json
@@ -21,6 +22,7 @@ if TYPE_CHECKING:
 @dataclass(frozen=True, slots=True)
 class ShareProviderInfo:
     """Metadata describing a share provider entry."""
+
     name: str
     label: str
     description: str
@@ -29,6 +31,7 @@ class ShareProviderInfo:
 @dataclass(frozen=True, slots=True)
 class ShareResult:
     """Details returned after a share succeeds."""
+
     provider: ShareProviderInfo
     url: str
     payload_chars: int
@@ -37,6 +40,7 @@ class ShareResult:
 
 class ShareProvider(Protocol):
     """Protocol implemented by share providers."""
+
     info: ShareProviderInfo
 
     def share(
@@ -46,6 +50,8 @@ class ShareProvider(Protocol):
     ) -> ShareResult:  # pragma: no cover - Protocol
         """Share *payload* (optionally describing *prompt*) and return a :class:`ShareResult`."""
         ...
+
+
 def format_prompt_for_share(
     prompt: Prompt,
     *,
@@ -104,6 +110,7 @@ def format_prompt_for_share(
 
 class ShareTextProvider:
     """Share prompts via https://sharetext.io."""
+
     _API_URL = "https://sharetext.io/api/text"
     _SITE_URL = "https://sharetext.io"
     _USER_AGENT = "PromptManager/PromptShare"

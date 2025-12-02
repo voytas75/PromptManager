@@ -3,6 +3,7 @@
 Updates:
   v0.1.0 - 2025-11-29 - Cover wizard updates, variable handling, and prompt exports.
 """
+
 from __future__ import annotations
 
 from gui.workbench.session import WorkbenchSession

@@ -3,6 +3,7 @@
 Updates:
   v0.1.0 - 2025-12-01 - Extracted context menu, clipboard, and execute-as-context workflows.
 """
+
 from __future__ import annotations
 
 from collections import deque
@@ -28,6 +29,7 @@ if TYPE_CHECKING:
 
 class PromptActionsController:
     """Bundle prompt actions such as duplication, copying, and execute-as-context."""
+
     def __init__(
         self,
         *,

@@ -3,6 +3,7 @@
 Updates:
   v0.1.0 - 2025-11-30 - Extract reusable prompt filter panel widget.
 """
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -27,6 +28,7 @@ else:  # pragma: no cover - runtime fallback for type checking aids
 
 class PromptFilterPanel(QWidget):
     """Expose filter inputs and emit signals when the user changes them."""
+
     filters_changed = Signal()
     sort_changed = Signal(str)
     manage_categories_requested = Signal()

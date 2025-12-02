@@ -3,6 +3,7 @@
 Updates:
   v0.1.0 - 2025-12-01 - Extracted preview execution and transition logic from MainWindow.
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -23,6 +24,7 @@ else:  # pragma: no cover - fallback to satisfy runtime annotations
 
 class TemplatePreviewController:
     """Manage preview refreshing, execution requests, and tab transitions."""
+
     def __init__(
         self,
         *,

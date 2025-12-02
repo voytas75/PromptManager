@@ -3,6 +3,7 @@
 Updates:
   v0.15.81 - 2025-12-01 - Moved widget wiring and controller construction out of gui.main_window.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -49,6 +50,7 @@ else:  # pragma: no cover - runtime placeholders for type-only imports
 @dataclass(slots=True)
 class MainViewBinderConfig:
     """Dependencies required to bind main view components."""
+
     layout_controller: LayoutController
     layout_state: WindowStateManager
     manager: PromptManager

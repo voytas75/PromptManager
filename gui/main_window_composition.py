@@ -3,6 +3,7 @@
 Updates:
   v0.15.82 - 2025-12-01 - Introduced composition helpers for gui.main_window.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

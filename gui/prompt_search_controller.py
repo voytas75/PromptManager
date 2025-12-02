@@ -3,6 +3,7 @@
 Updates:
   v0.15.81 - 2025-12-01 - Extracted search/filter orchestration from gui.main_window.
 """
+
 from __future__ import annotations
 
 import logging

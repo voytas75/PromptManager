@@ -6,6 +6,7 @@ Updates:
   v0.1.1 - 2025-11-27 - Add toast confirmation for copying notification details.
   v0.1.0 - 2025-11-11 - Introduce notification bridge and history dialog.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -36,6 +37,7 @@ if TYPE_CHECKING:
 
 class QtNotificationBridge(QObject):
     """Subscribe to core notifications and forward them via Qt signals."""
+
     notification_received: Signal = Signal(object)
 
     def __init__(self, center: NotificationCenter, parent: QObject | None = None) -> None:
@@ -54,6 +56,7 @@ class QtNotificationBridge(QObject):
 
 class NotificationHistoryDialog(QDialog):
     """Modal dialog presenting recent notification events."""
+
     def __init__(
         self,
         notifications: Sequence[Notification],
@@ -92,6 +95,7 @@ class NotificationHistoryDialog(QDialog):
 
 class BackgroundTaskItemWidget(QWidget):
     """Compact widget showing task title, message, and progress."""
+
     def __init__(self, notification: Notification, parent: QWidget | None = None) -> None:
         """Render the provided notification inside a card-like widget."""
         super().__init__(parent)
@@ -150,6 +154,7 @@ class _ActiveTaskEntry:
 
 class BackgroundTaskCenterDialog(QDialog):
     """Live feed of background tasks with progress indicators."""
+
     _HISTORY_LIMIT = 200
 
     def __init__(self, parent: QWidget | None = None) -> None:

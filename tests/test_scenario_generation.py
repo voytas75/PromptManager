@@ -4,6 +4,7 @@ Updates:
   v0.1.2 - 2025-12-01 - Cover ModelResponse serialisation path for LiteLLM scenarios.
   v0.1.1 - 2025-11-29 - Wrap scenario fixture strings for Ruff line length compliance.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -152,6 +153,7 @@ def test_generate_requires_context(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_generate_raises_when_no_scenarios(monkeypatch: pytest.MonkeyPatch) -> None:
     """Missing LiteLLM content should raise ScenarioGenerationError."""
+
     def fake_get_completion() -> tuple[Callable[..., Any], type[Exception]]:
         def _completion(**_: Any) -> dict[str, Any]:
             return {"choices": [{"message": {"content": "[]"}}]}
@@ -182,6 +184,7 @@ def test_generate_raises_when_no_scenarios(monkeypatch: pytest.MonkeyPatch) -> N
 
 def test_generate_accepts_model_response(monkeypatch: pytest.MonkeyPatch) -> None:
     """LiteLLMScenarioGenerator should normalise ModelResponse payloads."""
+
     class _ModelResponse:
         def __init__(self, payload: dict[str, Any]) -> None:
             self._payload = payload
@@ -191,9 +194,7 @@ def test_generate_accepts_model_response(monkeypatch: pytest.MonkeyPatch) -> Non
 
     def fake_get_completion() -> tuple[Callable[..., Any], type[Exception]]:
         def _completion(**_: Any) -> _ModelResponse:
-            return _ModelResponse(
-                {"choices": [{"message": {"content": '["Alpha", "Beta"]'}}]}
-            )
+            return _ModelResponse({"choices": [{"message": {"content": '["Alpha", "Beta"]'}}]})
 
         return _completion, RuntimeError
 

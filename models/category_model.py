@@ -2,6 +2,7 @@
 
 Updates: v0.1.0 - 2025-11-22 - Introduce PromptCategory dataclass and helpers.
 """
+
 from __future__ import annotations
 
 import re
@@ -70,6 +71,7 @@ def _clean_optional_text(value: str | None) -> str | None:
 @dataclass(slots=True)
 class PromptCategory:
     """Structured representation of a prompt category."""
+
     slug: str
     label: str
     description: str

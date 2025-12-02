@@ -1,4 +1,5 @@
 """Administrative and diagnostic tests for PromptManager."""
+
 from __future__ import annotations
 
 import json
@@ -51,6 +52,7 @@ def _clone_category(category: PromptCategory) -> PromptCategory:
 
 class _InMemoryRepository:
     """Minimal in-memory repository facade for PromptManager tests."""
+
     def __init__(self, prompts: Sequence[Prompt] | None = None) -> None:
         self.prompts: dict[uuid.UUID, Prompt] = {}
         for prompt in prompts or []:
@@ -137,6 +139,7 @@ class _InMemoryRepository:
 
 class _CategoryRegistryStub:
     """Stub category registry exposing only the surface used in tests."""
+
     def __init__(self, category: PromptCategory | None = None) -> None:
         self.category = category
         self.refresh_calls = 0
@@ -158,6 +161,7 @@ class _CategoryRegistryStub:
 
 class _DummyCollection:
     """Minimal Chroma collection double for admin tests."""
+
     def __init__(self) -> None:
         self.count_value = 0
         self.count_exception: BaseException | None = None
@@ -171,6 +175,7 @@ class _DummyCollection:
 
     def delete(self, **_: Any) -> None:  # noqa: D401 - interface compatibility
         """No-op delete for compatibility."""
+
     def upsert(self, **kwargs: Any) -> None:
         self.upsert_payloads.append(dict(kwargs))
 
@@ -184,6 +189,7 @@ class _DummyCollection:
 
 class _DummyChromaClient:
     """Provide deterministic Chroma client behaviour."""
+
     def __init__(self, collection: _DummyCollection) -> None:
         self.collection = collection
         self.persist_calls = 0
@@ -197,6 +203,7 @@ class _DummyChromaClient:
 
 class _HistoryTrackerStub:
     """Record execution queries issued by PromptManager."""
+
     def __init__(self) -> None:
         self.requests: list[dict[str, Any]] = []
         self.should_raise = False
@@ -223,12 +230,14 @@ class _HistoryTrackerStub:
 
 class _RedisPoolStub:
     """Expose connection kwargs for Redis diagnostics."""
+
     def __init__(self, **kwargs: Any) -> None:
         self.connection_kwargs = dict(kwargs)
 
 
 class _RedisClientStub:
     """Redis client double with controllable responses."""
+
     def __init__(
         self,
         *,
@@ -276,6 +285,7 @@ class _RedisClientStub:
 
 def _make_recorder() -> type:
     """Return a recorder class capturing LiteLLM factory kwargs."""
+
     class Recorder:
         instances: list[Recorder] = []
 
@@ -291,6 +301,7 @@ def _make_recorder() -> type:
 
 class _ExecutorRecorder:
     """Capture CodexExecutor constructor arguments."""
+
     instances: list[_ExecutorRecorder] = []
 
     def __init__(self, **kwargs: Any) -> None:
@@ -782,16 +793,22 @@ def test_fallback_category_uses_classifier_hints(
             return prediction
 
     manager.set_intent_classifier(_Classifier())
-    assert manager._fallback_category_from_context(
-        "Investigate bug",
-        categories,
-    ) == "Reasoning / Debugging"
+    assert (
+        manager._fallback_category_from_context(
+            "Investigate bug",
+            categories,
+        )
+        == "Reasoning / Debugging"
+    )
 
     manager.set_intent_classifier(None)
-    assert manager._fallback_category_from_context(
-        "Document the feature",
-        categories,
-    ) == "Documentation"
+    assert (
+        manager._fallback_category_from_context(
+            "Document the feature",
+            categories,
+        )
+        == "Documentation"
+    )
 
 
 def test_build_description_fallback_composes_segments(
@@ -1111,9 +1128,9 @@ def test_log_execution_success_and_failure_paths(
     assert tracker_calls["success"][0]["metadata"]["usage"]["prompt_tokens"] == 5
 
     tracker.raise_on_success = True
-    assert (
-        manager._log_execution_success(prompt.id, "hello", result) is None
-    ), "should swallow tracker errors"
+    assert manager._log_execution_success(prompt.id, "hello", result) is None, (
+        "should swallow tracker errors"
+    )
 
     logged_failure = manager._log_execution_failure(
         prompt.id,
@@ -1281,6 +1298,8 @@ def test_set_category_active_handles_missing_entries(
 
     with pytest.raises(CategoryNotFoundError):
         manager.set_category_active("missing", True)
+
+
 def test_refine_prompt_structure_validation(
     prompt_manager: tuple[PromptManager, _DummyCollection, _DummyChromaClient, Path],
 ) -> None:

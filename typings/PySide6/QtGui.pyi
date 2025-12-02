@@ -4,6 +4,7 @@ Updates:
   v0.1.1 - 2025-12-02 - Expand PySide6.QtGui stub classes and expose referenced attributes.
   v0.1.0 - 2025-12-02 - Initial shim exposing Qt types used by the GUI.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -12,27 +13,15 @@ class _QtBase:
     """Catch-all base providing permissive attribute access on Qt objects."""
 
     def __init__(self, *args: object, **kwargs: object) -> None: ...
-
     def __call__(self, *args: object, **kwargs: object) -> Any: ...
-
     def __getattr__(self, name: str, /) -> Any: ...
 
-
-class QClipboard(_QtBase):
-    ...
-
-
-class QCloseEvent(_QtBase):
-    ...
-
-
-class QColor(_QtBase):
-    ...
-
+class QClipboard(_QtBase): ...
+class QCloseEvent(_QtBase): ...
+class QColor(_QtBase): ...
 
 class QFont(_QtBase):
     Weight: Any
-
 
 class QGuiApplication(_QtBase):
     clipboard: Any
@@ -40,22 +29,12 @@ class QGuiApplication(_QtBase):
     primaryScreen: Any
     processEvents: Any
 
-
-class QIcon(_QtBase):
-    ...
-
-
-class QKeySequence(_QtBase):
-    ...
-
-
-class QPaintEvent(_QtBase):
-    ...
-
+class QIcon(_QtBase): ...
+class QKeySequence(_QtBase): ...
+class QPaintEvent(_QtBase): ...
 
 class QPainter(_QtBase):
     Antialiasing: Any
-
 
 class QPalette(_QtBase):
     AlternateBase: Any
@@ -76,32 +55,16 @@ class QPalette(_QtBase):
     Window: Any
     WindowText: Any
 
-
-class QResizeEvent(_QtBase):
-    ...
-
-
-class QShortcut(_QtBase):
-    ...
-
-
-class QShowEvent(_QtBase):
-    ...
-
-
-class QSyntaxHighlighter(_QtBase):
-    ...
-
-
-class QTextCharFormat(_QtBase):
-    ...
-
+class QResizeEvent(_QtBase): ...
+class QShortcut(_QtBase): ...
+class QShowEvent(_QtBase): ...
+class QSyntaxHighlighter(_QtBase): ...
+class QTextCharFormat(_QtBase): ...
 
 class QTextCursor(_QtBase):
     End: Any
     EndOfBlock: Any
     KeepAnchor: Any
-
 
 __all__ = [
     "QClipboard",

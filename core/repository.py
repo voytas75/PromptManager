@@ -18,6 +18,7 @@ Updates:
   v0.2.0 - 2025-11-08 - Add prompt execution history persistence APIs.
   v0.1.0 - 2025-10-31 - Introduce PromptRepository for SQLite storage.
 """
+
 from __future__ import annotations
 
 import json
@@ -50,6 +51,7 @@ logger = logging.getLogger("prompt_manager.repository")
 @dataclass(slots=True, frozen=True)
 class PromptCatalogueStats:
     """Aggregate prompt metadata metrics for maintenance views."""
+
     total_prompts: int
     active_prompts: int
     inactive_prompts: int
@@ -64,8 +66,12 @@ class PromptCatalogueStats:
 
 class RepositoryError(Exception):
     """Base exception for repository failures."""
+
+
 class RepositoryNotFoundError(RepositoryError):
     """Raised when a requested record cannot be located."""
+
+
 def _ensure_directory(path: Path) -> None:
     """Ensure the directory for the SQLite database exists."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -163,6 +169,7 @@ def _parse_optional_datetime(value: Any) -> datetime | None:
 
 class PromptRepository:
     """Persist prompts to SQLite and hydrate `Prompt` objects."""
+
     _COLUMNS: Sequence[str] = (
         "id",
         "name",
@@ -357,9 +364,7 @@ class PromptRepository:
         """Persist an existing prompt."""
         payload = self._prompt_to_row(prompt)
         assignments = ", ".join(
-            f"{column} = :{column}"
-            for column in self._COLUMNS
-            if column != "id"
+            f"{column} = :{column}" for column in self._COLUMNS if column != "id"
         )
         query = f"UPDATE prompts SET {assignments} WHERE id = :id;"
         try:
@@ -1111,9 +1116,7 @@ class PromptRepository:
         """Persist changes to an existing execution entry."""
         payload = self._execution_to_row(execution)
         assignments = ", ".join(
-            f"{column} = :{column}"
-            for column in self._EXECUTION_COLUMNS
-            if column != "id"
+            f"{column} = :{column}" for column in self._EXECUTION_COLUMNS if column != "id"
         )
         query = f"UPDATE prompt_executions SET {assignments} WHERE id = :id;"
         try:
@@ -1363,12 +1366,8 @@ class PromptRepository:
             );
             """
         )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_prompts_category ON prompts(category);"
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_prompts_name ON prompts(name);"
-        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_prompts_category ON prompts(category);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_prompts_name ON prompts(name);")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS prompt_categories (
@@ -1432,8 +1431,7 @@ class PromptRepository:
             """
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_prompt_forks_source "
-            "ON prompt_forks(source_prompt_id);"
+            "CREATE INDEX IF NOT EXISTS idx_prompt_forks_source ON prompt_forks(source_prompt_id);"
         )
         conn.execute(
             """
@@ -1486,8 +1484,7 @@ class PromptRepository:
             """
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_response_styles_name "
-            "ON response_styles(name);"
+            "CREATE INDEX IF NOT EXISTS idx_response_styles_name ON response_styles(name);"
         )
         response_style_columns = {
             row["name"] for row in conn.execute("PRAGMA table_info(response_styles);")
@@ -1510,9 +1507,7 @@ class PromptRepository:
             );
             """
         )
-        prompt_columns = {
-            row["name"] for row in conn.execute("PRAGMA table_info(prompts);")
-        }
+        prompt_columns = {row["name"] for row in conn.execute("PRAGMA table_info(prompts);")}
         if "category_slug" not in prompt_columns:
             conn.execute("ALTER TABLE prompts ADD COLUMN category_slug TEXT;")
         if "scenarios" not in prompt_columns:
@@ -1544,9 +1539,7 @@ class PromptRepository:
             );
             """
         )
-        profile_columns = {
-            row["name"] for row in conn.execute("PRAGMA table_info(user_profile);")
-        }
+        profile_columns = {row["name"] for row in conn.execute("PRAGMA table_info(user_profile);")}
         for column, ddl in (
             ("category_weights", "ALTER TABLE user_profile ADD COLUMN category_weights TEXT;"),
             ("tag_weights", "ALTER TABLE user_profile ADD COLUMN tag_weights TEXT;"),
@@ -1672,10 +1665,7 @@ class PromptRepository:
 
     def _row_to_response_style(self, row: sqlite3.Row) -> ResponseStyle:
         """Hydrate ResponseStyle from SQLite row."""
-        payload: dict[str, Any] = {
-            column: row[column]
-            for column in row.keys()
-        }
+        payload: dict[str, Any] = {column: row[column] for column in row.keys()}
         payload["tags"] = _json_loads_list(row["tags"])
         payload["examples"] = _json_loads_list(row["examples"])
         payload["metadata"] = _json_loads_optional(row["metadata"])
@@ -1723,9 +1713,7 @@ class PromptRepository:
         """Update an existing response style record."""
         payload = self._response_style_to_row(style)
         assignments = ", ".join(
-            f"{column} = :{column}"
-            for column in self._RESPONSE_STYLE_COLUMNS
-            if column != "id"
+            f"{column} = :{column}" for column in self._RESPONSE_STYLE_COLUMNS if column != "id"
         )
         query = f"UPDATE response_styles SET {assignments} WHERE id = :id;"
         try:

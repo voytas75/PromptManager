@@ -2,6 +2,7 @@
 
 Updates: v0.1.0 - 2025-12-06 - Add PromptNote dataclass for simple note storage.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -18,6 +19,7 @@ def _utc_now() -> datetime:
 @dataclass(slots=True)
 class PromptNote:
     """Single-field note persisted for quick reference."""
+
     id: uuid.UUID
     note: str
     created_at: datetime = field(default_factory=_utc_now)

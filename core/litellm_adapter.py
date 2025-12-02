@@ -10,6 +10,7 @@ Updates:
   v0.6.1 - 2025-11-07 - Tolerate LiteLLM builds without embedding support.
   v0.6.0 - 2025-11-07 - Provide shared completion/embedding import helpers.
 """
+
 from __future__ import annotations
 
 import importlib
@@ -23,6 +24,8 @@ if TYPE_CHECKING:
 
 class LiteLLMNotInstalledError(RuntimeError):
     """Raised when LiteLLM is not available in the current environment."""
+
+
 logger = logging.getLogger("prompt_manager.litellm")
 
 _completion: Callable[..., object] | None = None
@@ -91,17 +94,11 @@ def call_completion_with_fallback(
     except lite_llm_exception as exc:  # type: ignore[arg-type]
         existing_drop: set[str] = set()
         if pre_dropped:
-            existing_drop.update(
-                str(item).strip() for item in pre_dropped if str(item).strip()
-            )
-        unsupported = _detect_unsupported_parameters(
-            str(exc), request.keys(), drop_candidates
-        )
+            existing_drop.update(str(item).strip() for item in pre_dropped if str(item).strip())
+        unsupported = _detect_unsupported_parameters(str(exc), request.keys(), drop_candidates)
         if not unsupported:
             raise
-        trimmed_request = {
-            key: value for key, value in request.items() if key not in unsupported
-        }
+        trimmed_request = {key: value for key, value in request.items() if key not in unsupported}
         merged_drop = sorted(existing_drop.union(unsupported))
         logger.info(
             "LiteLLM model rejected parameters %s; retrying request without them.",

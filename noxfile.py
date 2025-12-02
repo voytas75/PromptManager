@@ -17,6 +17,7 @@ running these sessions. This file defines automation sessions:
 Adjust tool versions/args as needed. Sessions run directly in the host Python
 environment (no isolated venv) so ensure required tools are installed locally.
 """
+
 from __future__ import annotations
 
 import nox
@@ -33,6 +34,7 @@ def _ensure_tool(session: nox.Session, command: str, *version_args: str) -> None
             f"environment before running this session. Original error: {exc}"
         )
 
+
 # Directories to operate on
 CODE_LOCATIONS: tuple[str, ...] = (
     "main.py",
@@ -42,6 +44,7 @@ CODE_LOCATIONS: tuple[str, ...] = (
     "models",
     "tests",
 )
+
 
 @nox.session(venv_backend="none")
 def fmt(session: nox.Session) -> None:

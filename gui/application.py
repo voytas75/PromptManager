@@ -7,6 +7,7 @@ Updates:
   v0.1.1 - 2025-11-05 - Detect display server before forcing offscreen backend.
   v0.1.0 - 2025-11-04 - Provide QApplication factory and launch routine.
 """
+
 from __future__ import annotations
 
 import logging

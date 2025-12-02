@@ -6,6 +6,7 @@ Updates:
   v0.15.2 - 2025-11-27 - Add prompt part classification column and rename UI strings accordingly.
   v0.15.1 - 2025-11-25 - Document module metadata for AGENTS compliance.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -42,6 +43,7 @@ if TYPE_CHECKING:
 
 class ResponseStylesPanel(QWidget):
     """Display and manage prompt parts (including response styles) inside their own tab."""
+
     def __init__(
         self,
         manager: PromptManager,

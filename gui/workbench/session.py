@@ -3,6 +3,7 @@
 Updates:
   v0.1.0 - 2025-11-29 - Introduce workbench session, variable, and execution models.
 """
+
 from __future__ import annotations
 
 import re
@@ -31,6 +32,7 @@ def _now() -> datetime:
 @dataclass(slots=True)
 class WorkbenchVariable:
     """Tracked placeholder metadata plus sample values for preview rendering."""
+
     name: str
     description: str | None = None
     sample_value: str | None = None
@@ -44,6 +46,7 @@ class WorkbenchVariable:
 @dataclass(slots=True)
 class WorkbenchExecutionRecord:
     """Execution metadata captured while iterating on a prompt draft."""
+
     request_text: str
     response_text: str
     duration_ms: int | None = None
@@ -58,6 +61,7 @@ class WorkbenchExecutionRecord:
 @dataclass(slots=True)
 class WorkbenchSession:
     """Mutable prompt state shared by the Workbench wizard, editor, and preview."""
+
     prompt_name: str = ""
     goal_statement: str = ""
     audience: str = ""

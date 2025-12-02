@@ -28,6 +28,7 @@ Updates:
   v0.1.1 - 2025-11-29 - Align guided wizard palette with the active application theme.
   v0.1.0 - 2025-11-29 - Introduce guided Workbench window, mode selector, and export dialog.
 """
+
 from __future__ import annotations
 
 import logging
@@ -166,6 +167,7 @@ def _normalise_variable_token(text: str) -> str | None:
 
 class WorkbenchPromptEditor(QPlainTextEdit):
     """Custom prompt editor that surfaces variable tokens on double-click."""
+
     variableActivated = Signal(str)
 
     def mouseDoubleClickEvent(self, event) -> None:  # type: ignore[override]
@@ -178,6 +180,7 @@ class WorkbenchPromptEditor(QPlainTextEdit):
 
 class WorkbenchMode:
     """Enumeration representing the Workbench launch path."""
+
     GUIDED = "guided"
     BLANK = "blank"
     TEMPLATE = "template"
@@ -186,12 +189,14 @@ class WorkbenchMode:
 @dataclass(slots=True)
 class ModeSelection:
     """Result payload returned by WorkbenchModeDialog."""
+
     mode: str
     template_prompt: Prompt | None
 
 
 class WorkbenchModeDialog(QDialog):
     """Dialog that lets the user choose between guided, blank, or template modes."""
+
     def __init__(self, prompts: Sequence[Prompt], parent: QWidget | None = None) -> None:
         """Initialise the dialog and populate the template list."""
         super().__init__(parent)
@@ -295,6 +300,7 @@ class WorkbenchModeDialog(QDialog):
 
 class VariableCaptureDialog(QDialog):
     """Dialog for defining placeholder metadata and sample values."""
+
     def __init__(
         self,
         name: str | None = None,
@@ -404,6 +410,7 @@ class _DetailWizardPage(QWidget):
 
 class GuidedPromptWizard(QDialog):
     """Custom-styled wizard dialog that emits updates whenever fields change."""
+
     updated = Signal(dict)
 
     def __init__(self, session: WorkbenchSession, parent: QWidget | None = None) -> None:
@@ -653,6 +660,7 @@ class GuidedPromptWizard(QDialog):
 
 class WorkbenchExportDialog(QDialog):
     """Collect final metadata before persisting a prompt draft."""
+
     def __init__(self, session: WorkbenchSession, parent: QWidget | None = None) -> None:
         """Populate export fields using the provided session defaults."""
         super().__init__(parent)
@@ -698,6 +706,7 @@ class WorkbenchExportDialog(QDialog):
 
 class WorkbenchWindow(QMainWindow):
     """Modal workspace that guides users through crafting prompts iteratively."""
+
     def __init__(
         self,
         prompt_manager: PromptManager,
@@ -1168,14 +1177,12 @@ class WorkbenchWindow(QMainWindow):
 
     def _run_brainstorm(self) -> None:
         self._invoke_helper(
-            "brainstorm",
-            "Provide three alternative phrasings that could strengthen this prompt."
+            "brainstorm", "Provide three alternative phrasings that could strengthen this prompt."
         )
 
     def _run_peek(self) -> None:
         self._invoke_helper(
-            "peek",
-            "Summarise this prompt in two sentences and point out obvious gaps."
+            "peek", "Summarise this prompt in two sentences and point out obvious gaps."
         )
 
     def _invoke_helper(self, label: str, instruction: str) -> None:

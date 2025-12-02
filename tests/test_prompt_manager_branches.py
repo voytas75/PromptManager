@@ -3,6 +3,7 @@
 Updates: v0.1.1 - 2025-11-22 - Seed version history for legacy prompts without snapshots.
 Updates: v0.1.0 - 2025-10-30 - Add unit tests for error handling and caching paths.
 """
+
 from __future__ import annotations
 
 import json
@@ -46,6 +47,7 @@ def _clone_category(category: PromptCategory) -> PromptCategory:
 @dataclass
 class _StubCollection:
     """Chroma collection stub with injectable behaviours."""
+
     add_exception: BaseException | None = None
     upsert_exception: BaseException | None = None
     delete_exception: BaseException | None = None
@@ -82,6 +84,7 @@ class _StubCollection:
 
 class _StubChromaClient:
     """Return a shared collection stub for PromptManager."""
+
     def __init__(self, collection: _StubCollection) -> None:
         self.collection = collection
         self.get_or_create_calls = 0
@@ -93,6 +96,7 @@ class _StubChromaClient:
 
 class _RecordingRepository:
     """Repository stand-in storing prompts in memory for tests."""
+
     def __init__(self) -> None:
         self.storage: dict[uuid.UUID, Prompt] = {}
         self.deleted: list[uuid.UUID] = []
@@ -131,10 +135,7 @@ class _RecordingRepository:
         return _clone_prompt(self.storage[prompt_id])
 
     def list(self, limit: int | None = None) -> builtins.list[Prompt]:
-        values = [
-            _clone_prompt(prompt)
-            for prompt in self.storage.values()
-        ]
+        values = [_clone_prompt(prompt) for prompt in self.storage.values()]
         return values[:limit] if limit is not None else values
 
     def list_categories(self, include_archived: bool = False) -> builtins.list[PromptCategory]:
@@ -280,6 +281,7 @@ class _RecordingRepository:
 
 class _RedisStub:
     """Redis client double that can be configured per test."""
+
     def __init__(
         self,
         *,
@@ -400,9 +402,7 @@ def test_suggest_prompts_prioritises_classifier_matches() -> None:
     collection = _StubCollection(
         query_result={
             "ids": [[str(debug_prompt.id), str(doc_prompt.id), str(general_prompt.id)]],
-            "documents": [
-                [debug_prompt.document, doc_prompt.document, general_prompt.document]
-            ],
+            "documents": [[debug_prompt.document, doc_prompt.document, general_prompt.document]],
             "metadatas": [
                 [
                     debug_prompt.to_metadata(),

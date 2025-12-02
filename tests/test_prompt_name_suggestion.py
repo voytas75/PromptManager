@@ -1,4 +1,5 @@
 """Tests for prompt name suggestion helper."""
+
 from __future__ import annotations
 
 import importlib.machinery
@@ -11,6 +12,7 @@ from pathlib import Path
 def _install_qt_stubs() -> None:
     try:
         import PySide6  # noqa: F401
+
         return
     except ImportError:
         pass
@@ -76,6 +78,7 @@ def _install_qt_stubs() -> None:
     qt_widgets.QWidget = _Widget  # type: ignore[attr-defined]
     qt_widgets.QApplication = _Widget  # type: ignore[attr-defined]
     qt_widgets.QLabel = _Widget  # type: ignore[attr-defined]
+
     class _ComboBox(_Widget):
         def __init__(self, *_: object, **__: object) -> None:
             self._items: list[tuple[str, object]] = []
@@ -104,6 +107,7 @@ def _install_qt_stubs() -> None:
     qt_widgets.QComboBox = _ComboBox  # type: ignore[attr-defined]
 
     qt_core = types.ModuleType("PySide6.QtCore")
+
     class _Qt:
         AA_EnableHighDpiScaling = 1
         AA_UseHighDpiPixmaps = 2

@@ -6,6 +6,7 @@ Updates:
   v0.2.0 - 2025-11-09 - Surface execution ratings in tables, details, and exports.
   v0.1.0 - 2025-11-08 - Provide filterable, editable execution history workspace.
 """
+
 from __future__ import annotations
 
 import csv
@@ -54,6 +55,7 @@ class _ExecutionRow:
 
 class HistoryPanel(QWidget):
     """Filterable, editable prompt execution history pane."""
+
     def __init__(
         self,
         manager: PromptManager,
@@ -214,9 +216,7 @@ class HistoryPanel(QWidget):
                 note_preview = str(execution.metadata.get("note") or "")
                 if len(note_preview) > 80:
                     note_preview = note_preview[:77] + "..."
-            rating_text = (
-                f"{execution.rating:.1f}" if execution.rating is not None else "-"
-            )
+            rating_text = f"{execution.rating:.1f}" if execution.rating is not None else "-"
             values = [
                 row.prompt_name,
                 execution.status.value.title(),
@@ -366,15 +366,15 @@ class HistoryPanel(QWidget):
                     if execution.metadata:
                         note = str(execution.metadata.get("note") or "")
                     writer.writerow(
-                            [
-                                row.prompt_name,
-                                execution.status.value,
-                                execution.rating if execution.rating is not None else "",
-                                execution.duration_ms if execution.duration_ms is not None else "",
-                                execution.executed_at.isoformat(),
-                                execution.error_message or "",
-                                note,
-                                execution.request_text,
+                        [
+                            row.prompt_name,
+                            execution.status.value,
+                            execution.rating if execution.rating is not None else "",
+                            execution.duration_ms if execution.duration_ms is not None else "",
+                            execution.executed_at.isoformat(),
+                            execution.error_message or "",
+                            note,
+                            execution.request_text,
                             execution.response_text,
                         ]
                     )

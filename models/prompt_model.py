@@ -11,6 +11,7 @@ Updates: v0.2.0 - 2025-11-08 - Add prompt execution records for history logging.
 Updates: v0.1.1 - 2025-11-01 - Filtered null metadata fields for Chroma compatibility.
 Updates: v0.1.0 - 2025-10-30 - Initial Prompt schema with serialization helpers.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -138,6 +139,7 @@ def _hash_text(value: str) -> str:
 
 class ExecutionStatus(str, Enum):
     """Enumerate prompt execution outcomes for history tracking."""
+
     SUCCESS = "success"
     FAILED = "failed"
     PARTIAL = "partial"
@@ -146,6 +148,7 @@ class ExecutionStatus(str, Enum):
 @dataclass(slots=True)
 class Prompt:
     """Dataclass representation of a prompt entry."""
+
     id: uuid.UUID
     name: str
     description: str
@@ -224,9 +227,7 @@ class Prompt:
             f"Context: {self.context}" if self.context else "",
             f"Example Input: {self.example_input}" if self.example_input else "",
             f"Example Output: {self.example_output}" if self.example_output else "",
-            (
-                "Scenarios:\n" + "\n".join(f"- {scenario}" for scenario in self.scenarios)
-            )
+            ("Scenarios:\n" + "\n".join(f"- {scenario}" for scenario in self.scenarios))
             if self.scenarios
             else "",
         ]
@@ -379,6 +380,7 @@ class Prompt:
 @dataclass(slots=True)
 class PromptExecution:
     """Dataclass representing a single prompt execution event."""
+
     id: uuid.UUID
     prompt_id: uuid.UUID
     request_text: str
@@ -428,17 +430,11 @@ class PromptExecution:
             status=parsed_status,
             error_message=data.get("error_message"),
             duration_ms=(
-                int(data["duration_ms"])
-                if data.get("duration_ms") not in (None, "")
-                else None
+                int(data["duration_ms"]) if data.get("duration_ms") not in (None, "") else None
             ),
             executed_at=_ensure_datetime(data.get("executed_at")),
             input_hash=str(data.get("input_hash") or ""),
-            rating=(
-                float(data["rating"])
-                if data.get("rating") not in (None, "")
-                else None
-            ),
+            rating=(float(data["rating"]) if data.get("rating") not in (None, "") else None),
             metadata=_deserialize_metadata(data.get("metadata")),
         )
 
@@ -446,6 +442,7 @@ class PromptExecution:
 @dataclass(slots=True)
 class PromptVersion:
     """Snapshot of a prompt captured for version history tracking."""
+
     id: int
     prompt_id: uuid.UUID
     version_number: int
@@ -490,6 +487,7 @@ class PromptVersion:
 @dataclass(slots=True)
 class PromptForkLink:
     """Describe lineage between a source prompt and its fork."""
+
     id: int
     source_prompt_id: uuid.UUID
     child_prompt_id: uuid.UUID
@@ -505,12 +503,14 @@ class PromptForkLink:
             created_at=_ensure_datetime(row["created_at"]),
         )
 
+
 DEFAULT_PROFILE_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
 
 @dataclass(slots=True)
 class UserProfile:
     """Lightweight preference profile for the single Prompt Manager user."""
+
     id: uuid.UUID
     username: str = "default"
     preferred_language: str | None = None
@@ -608,8 +608,7 @@ class UserProfile:
                 for key, value in dict(data.get("category_weights") or {}).items()
             },
             tag_weights={
-                str(key): int(value)
-                for key, value in dict(data.get("tag_weights") or {}).items()
+                str(key): int(value) for key, value in dict(data.get("tag_weights") or {}).items()
             },
             recent_prompts=_serialize_list(data.get("recent_prompts")),
             settings=settings_dict,

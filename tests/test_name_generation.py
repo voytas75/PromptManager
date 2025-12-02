@@ -3,6 +3,7 @@
 Updates:
   v0.1.1 - 2025-12-01 - Cover ModelResponse payloads across metadata generators.
 """
+
 import pytest
 
 import core.name_generation as name_gen_module
@@ -123,6 +124,7 @@ def test_description_content_filter_error_is_summarised(monkeypatch: pytest.Monk
 
 def test_name_generator_handles_model_response(monkeypatch: pytest.MonkeyPatch) -> None:
     """LiteLLMNameGenerator should normalise ModelResponse style payloads."""
+
     class _ModelResponse:
         def __init__(self, payload: dict[str, object]) -> None:
             self._payload = payload
@@ -145,6 +147,7 @@ def test_name_generator_handles_model_response(monkeypatch: pytest.MonkeyPatch) 
 
 def test_description_generator_handles_model_response(monkeypatch: pytest.MonkeyPatch) -> None:
     """LiteLLMDescriptionGenerator should accept dict-producing responses."""
+
     class _ModelResponse:
         def __init__(self, payload: dict[str, object]) -> None:
             self._payload = payload
@@ -153,9 +156,7 @@ def test_description_generator_handles_model_response(monkeypatch: pytest.Monkey
             return dict(self._payload)
 
     def _fake_completion(**kwargs):  # noqa: ARG001
-        return _ModelResponse(
-            {"choices": [{"message": {"content": "Summarise request context."}}]}
-        )
+        return _ModelResponse({"choices": [{"message": {"content": "Summarise request context."}}]})
 
     monkeypatch.setattr(
         name_gen_module,
@@ -170,6 +171,7 @@ def test_description_generator_handles_model_response(monkeypatch: pytest.Monkey
 
 def test_category_generator_handles_model_response(monkeypatch: pytest.MonkeyPatch) -> None:
     """LiteLLMCategoryGenerator should normalise response payloads."""
+
     class _ModelResponse:
         def __init__(self, payload: dict[str, object]) -> None:
             self._payload = payload

@@ -4,6 +4,7 @@ Updates:
   v0.1.1 - 2025-12-01 - Add WindowStateManager for geometry/splitter/history helpers.
   v0.1.0 - 2025-11-30 - Extract layout persistence helpers from main window.
 """
+
 from __future__ import annotations
 
 import json
@@ -100,6 +101,7 @@ def _load_filter_preferences(
     settings: QSettings,
 ) -> tuple[str | None, str | None, float | None, str | None]:
     """Return persisted filter selections (category, tag, quality, sort)."""
+
     def _clean_text(value: object) -> str | None:
         if value is None:
             return None
@@ -153,6 +155,7 @@ def _store_sort_preference(settings: QSettings, sort_value: Enum | str) -> None:
 @dataclass(slots=True)
 class FilterPreferences:
     """Persisted filters restored from user settings."""
+
     category_slug: str | None
     tag: str | None
     min_quality: float | None
@@ -162,12 +165,14 @@ class FilterPreferences:
 @dataclass(slots=True)
 class ExecuteContextState:
     """Execute-context history pulled from persistent storage."""
+
     last_task: str
     history: deque[str]
 
 
 class WindowStateManager:
     """High-level helper that encapsulates window/state persistence logic."""
+
     def __init__(
         self,
         settings: QSettings,

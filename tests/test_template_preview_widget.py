@@ -4,6 +4,7 @@ Updates:
   v0.1.1 - 2025-11-29 - Extend preview helper with persistence/run state fields.
   v0.1.0 - 2025-11-27 - Ensure parse/render errors keep raw template text visible.
 """
+
 from __future__ import annotations
 
 import importlib

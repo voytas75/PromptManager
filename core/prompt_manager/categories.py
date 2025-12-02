@@ -3,6 +3,7 @@
 Updates:
   v0.1.0 - 2025-12-02 - Extract category APIs into mixin for modularisation.
 """
+
 from __future__ import annotations
 
 from dataclasses import replace

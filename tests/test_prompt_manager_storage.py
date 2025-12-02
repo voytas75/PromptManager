@@ -4,6 +4,7 @@ Updates: v0.1.2 - 2025-12-05 - Add response style repository and manager coverag
 Updates: v0.1.1 - 2025-11-02 - Added regression tests for cache usage and search fallback paths.
 Updates: v0.1.0 - 2025-10-31 - Introduce repository and manager storage integration tests.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -81,6 +82,7 @@ def _clone_category(category: PromptCategory) -> PromptCategory:
 
 class _FakeRedis:
     """Minimal Redis facade storing values in-memory for assertions."""
+
     def __init__(self) -> None:
         self._store: dict[str, bytes] = {}
         self.get_calls = 0
@@ -98,6 +100,7 @@ class _FakeRedis:
 
 class _FakeCollection:
     """In-memory stand-in for ChromaDB collection operations."""
+
     def __init__(self) -> None:
         self._records: dict[str, dict[str, Any]] = {}
 
@@ -143,6 +146,7 @@ class _FakeCollection:
 
 class _FakeChromaClient:
     """Return a pre-seeded fake collection in place of PersistentClient."""
+
     def __init__(self, collection: _FakeCollection) -> None:
         self._collection = collection
         self.closed = False
@@ -161,6 +165,7 @@ class _FakeChromaClient:
 
 class _FakeRepository:
     """Minimal repository stub tracking invocation counts."""
+
     def __init__(self) -> None:
         self._store: dict[uuid.UUID, Prompt] = {}
         self.get_call_count = 0
@@ -405,7 +410,6 @@ def test_prompt_manager_coordinates_sqlite_and_chromadb(tmp_path) -> None:
     chroma_result = manager.collection.get(ids=[str(prompt.id)])
     assert not chroma_result.get("ids"), "ChromaDB entry should be removed"
     manager.close()
-
 
 
 def test_prompt_manager_response_style_workflow(tmp_path) -> None:

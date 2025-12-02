@@ -1,4 +1,5 @@
 """Tests for the application notification centre."""
+
 from __future__ import annotations
 
 import pytest

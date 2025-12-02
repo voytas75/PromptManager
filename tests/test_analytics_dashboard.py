@@ -1,4 +1,5 @@
 """Unit tests for analytics snapshot helpers."""
+
 from __future__ import annotations
 
 import uuid

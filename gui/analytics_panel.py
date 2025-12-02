@@ -4,6 +4,7 @@ Updates:
   v0.1.1 - 2025-11-29 - Wrap analytics strings to satisfy Ruff line-length rules.
   v0.1.0 - 2025-11-28 - Introduce dashboard tab with charts and CSV export.
 """
+
 from __future__ import annotations
 
 import csv
@@ -47,6 +48,7 @@ if TYPE_CHECKING:
 
 class AnalyticsDashboardPanel(QWidget):
     """Interactive analytics dashboard with charts and CSV export."""
+
     _DATASETS: Sequence[tuple[str, str]] = (
         ("usage", "Usage Frequency"),
         ("model_costs", "Model Cost Breakdown"),
@@ -396,7 +398,9 @@ class AnalyticsDashboardPanel(QWidget):
             return
         report = snapshot.embedding
         consistent = (
-            "consistent" if report.consistent_counts else "mismatch"
+            "consistent"
+            if report.consistent_counts
+            else "mismatch"
             if report.consistent_counts is False
             else "unknown"
         )

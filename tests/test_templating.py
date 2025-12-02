@@ -2,6 +2,7 @@
 
 Updates: v0.2.0 - 2025-11-27 - Assert syntax error hints for unmatched delimiters.
 """
+
 from __future__ import annotations
 
 import json
@@ -28,7 +29,7 @@ def test_template_renderer_supports_custom_filters() -> None:
     )
     assert isinstance(result, TemplateRenderResult)
     assert result.errors == []
-    assert result.rendered_text == "Hello prompt-wizard -- abcd… -- {\"a\": 1}"
+    assert result.rendered_text == 'Hello prompt-wizard -- abcd… -- {"a": 1}'
 
 
 def test_template_renderer_reports_missing_variables() -> None:

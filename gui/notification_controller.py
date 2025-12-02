@@ -3,6 +3,7 @@
 Updates:
   v0.1.0 - 2025-12-01 - Extracted notification indicator management from MainWindow.
 """
+
 from __future__ import annotations
 
 from collections import deque
@@ -20,6 +21,7 @@ if TYPE_CHECKING:
 
 class NotificationController:
     """Bridge core notifications into the Qt UI with history tracking."""
+
     def __init__(
         self,
         *,

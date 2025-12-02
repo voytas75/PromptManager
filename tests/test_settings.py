@@ -10,6 +10,7 @@ Updates:
   v0.1.1 - 2025-11-03 - Add precedence test using example template.
   v0.1.0 - 2025-11-03 - Cover JSON/env precedence and validation errors.
 """
+
 from __future__ import annotations
 
 import json

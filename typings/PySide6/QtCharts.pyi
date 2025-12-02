@@ -3,6 +3,7 @@
 Updates:
   v0.1.0 - 2025-12-02 - Cover QtCharts symbols referenced by Prompt Manager widgets.
 """
+
 from __future__ import annotations
 
 from typing import Any

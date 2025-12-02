@@ -1,4 +1,5 @@
 """Tests for intent workspace usage logging utilities."""
+
 from __future__ import annotations
 
 import importlib.util

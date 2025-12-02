@@ -3,6 +3,7 @@
 Updates:
   v0.1.0 - 2025-11-30 - Extract PromptListModel into its own module.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -17,6 +18,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing helper
 
 class PromptListModel(QAbstractListModel):
     """List model providing prompt summaries for the QListView."""
+
     def __init__(self, prompts: Sequence[Prompt] | None = None, parent=None) -> None:
         """Initialise the model with optional starting *prompts*."""
         super().__init__(parent)

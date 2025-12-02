@@ -3,6 +3,7 @@
 Updates:
   v0.1.0 - 2025-11-30 - Extract main window UI assembly into reusable builder helpers.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -47,6 +48,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
 @dataclass(slots=True)
 class MainViewCallbacks:
     """Signal targets required to wire the main view widgets."""
+
     search_requested: Callable[[str | None], None]
     search_text_changed: Callable[[str], None]
     refresh_requested: Callable[[], None]
@@ -89,6 +91,7 @@ class MainViewCallbacks:
 @dataclass(slots=True)
 class MainViewComponents:
     """Public widgets built for the main window."""
+
     container: QFrame
     toolbar: PromptToolbar
     language_label: QLabel
@@ -220,9 +223,7 @@ def build_main_view(
     copy_result_button.clicked.connect(callbacks.copy_result_clicked)  # type: ignore[arg-type]
 
     copy_result_to_text_window_button = QPushButton("Copy to Text Window", parent)
-    copy_result_to_text_window_button.clicked.connect(
-        callbacks.copy_result_to_text_window_clicked
-    )  # type: ignore[arg-type]
+    copy_result_to_text_window_button.clicked.connect(callbacks.copy_result_to_text_window_clicked)  # type: ignore[arg-type]
 
     save_button = QPushButton("Save Result", parent)
     save_button.clicked.connect(callbacks.save_result_clicked)  # type: ignore[arg-type]

@@ -6,6 +6,7 @@ Updates:
   v0.2.0 - 2025-11-09 - Record manual save ratings alongside notes.
   v0.1.0 - 2025-11-07 - Introduce JSONL logger for detect/suggest/copy events.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -29,6 +30,7 @@ def _now_iso() -> str:
 
 class IntentUsageLogger:
     """Persist anonymised analytics for intent workspace interactions."""
+
     def __init__(self, path: Path | str | None = None, *, enabled: bool = True) -> None:
         """Optionally disable logging or override the JSONL output path."""
         self._enabled = enabled

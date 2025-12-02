@@ -3,6 +3,7 @@
 Updates: v0.1.1 - 2025-11-27 - Cover scenario metadata stripping helper.
 Updates: v0.1.0 - 2025-11-22 - Verify structure-only refinement button wiring.
 """
+
 from __future__ import annotations
 
 import pytest

@@ -4,6 +4,7 @@ Updates:
   v0.1.1 - 2025-11-29 - Wrap highlight rule definitions to satisfy Ruff line-length rules.
   v0.1.0 - 2025-11-10 - Provide keyword-based highlighting for common languages.
 """
+
 from __future__ import annotations
 
 import re
@@ -41,27 +42,30 @@ def _compile_pattern(pattern: str) -> re.Pattern[str]:
 
 def _python_rules() -> list[_HighlightRule]:
     return [
-        _HighlightRule(_compile_keywords(
-            (
-                "def",
-                "class",
-                "import",
-                "from",
-                "async",
-                "await",
-                "return",
-                "yield",
-                "try",
-                "except",
-                "with",
-                "for",
-                "while",
-                "if",
-                "else",
-                "elif",
-                "raise",
-            )
-        ), _format("#007acc", bold=True)),
+        _HighlightRule(
+            _compile_keywords(
+                (
+                    "def",
+                    "class",
+                    "import",
+                    "from",
+                    "async",
+                    "await",
+                    "return",
+                    "yield",
+                    "try",
+                    "except",
+                    "with",
+                    "for",
+                    "while",
+                    "if",
+                    "else",
+                    "elif",
+                    "raise",
+                )
+            ),
+            _format("#007acc", bold=True),
+        ),
         _HighlightRule(_compile_pattern(r"#[^\n]*"), _format("#6a9955")),
         _HighlightRule(_compile_pattern(r"\b(True|False|None)\b"), _format("#569cd6")),
         _HighlightRule(_compile_pattern(r"\b(self)\b"), _format("#dcdcaa")),
@@ -132,6 +136,7 @@ _RULE_BUILDERS = {
 
 class CodeHighlighter(QSyntaxHighlighter):
     """Keyword-based syntax highlighter for the free-form query input."""
+
     def __init__(self, document) -> None:  # type: ignore[override]
         """Prepare the highlighter with a target QTextDocument."""
         super().__init__(document)

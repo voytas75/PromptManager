@@ -3,6 +3,7 @@
 Updates:
   v0.1.0 - 2025-11-29 - Introduce Enhanced Prompt Workbench namespace exports.
 """
+
 from __future__ import annotations
 
 from .session import WorkbenchExecutionRecord, WorkbenchSession, WorkbenchVariable

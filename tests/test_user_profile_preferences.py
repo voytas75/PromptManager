@@ -4,6 +4,7 @@ Updates:
   v0.1.1 - 2025-11-29 - Add strict flag to zip usage for Ruff B905 compliance.
   v0.1.0 - 2025-11-11 - Introduce coverage for profile tracking and suggestion biasing.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -16,6 +17,7 @@ from models.prompt_model import Prompt, UserProfile
 
 class _NoopCollection:
     """Minimal Chroma collection stub used for PromptManager wiring."""
+
     def add(
         self,
         ids: list[str],

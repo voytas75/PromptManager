@@ -1,4 +1,5 @@
 """Tests for prompt engineering helpers."""
+
 from __future__ import annotations
 
 import json
@@ -170,8 +171,7 @@ def test_prompt_engineer_parses_json_with_preamble(monkeypatch: pytest.MonkeyPat
     }
 
     response_text = (
-        "Notes:\n- Ensure coverage\n\nRefined payload follows:\n"
-        f"{json.dumps(payload)}\nThanks!"
+        f"Notes:\n- Ensure coverage\n\nRefined payload follows:\n{json.dumps(payload)}\nThanks!"
     )
 
     def _fake_completion(**kwargs):  # noqa: ARG001

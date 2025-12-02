@@ -3,6 +3,7 @@
 Updates:
   v0.1.0 - 2025-12-01 - Added WorkspaceViewController for text + clear actions.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -30,6 +31,7 @@ else:  # pragma: no cover - runtime placeholders for type-only imports
 
 class WorkspaceViewController:
     """Manage workspace text edits and clearing logic."""
+
     def __init__(
         self,
         query_input: QPlainTextEdit,

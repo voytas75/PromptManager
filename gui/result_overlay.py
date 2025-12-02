@@ -6,6 +6,7 @@ Updates:
   v0.1.1 - 2025-11-30 - Ensure module is packaged and docstring formatting matches guidelines.
   v0.1.0 - 2025-11-30 - Introduce ResultActionsOverlay helper for workspace output buttons.
 """
+
 from __future__ import annotations
 
 from PySide6.QtCore import QEvent, QObject, Qt
@@ -15,6 +16,7 @@ from shiboken6 import Shiboken
 
 class ResultActionsOverlay(QObject):
     """Manage the floating overlay that contains result action buttons."""
+
     def __init__(self, text_edit: QTextEdit | None) -> None:
         """Initialize the overlay manager for *text_edit*.
 

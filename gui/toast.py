@@ -2,6 +2,7 @@
 
 Updates: v0.1.0 - 2025-11-27 - Provide reusable toast notifications for transient feedback.
 """
+
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, QTimer

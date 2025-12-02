@@ -3,6 +3,7 @@
 Updates:
   v0.1.0 - 2025-12-01 - Extracted prompt/result share helpers from MainWindow.
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -23,6 +24,7 @@ if TYPE_CHECKING:
 
 class ShareWorkflowCoordinator:
     """Handle prompt and result sharing interactions."""
+
     def __init__(
         self,
         share_controller: ShareController,
@@ -89,9 +91,7 @@ class ShareWorkflowCoordinator:
         if controller is None:
             self._show_error("Workspace unavailable", "Execution controller is not ready.")
             return
-        provider_name = self._share_controller.choose_provider(
-            self._share_result_button_supplier()
-        )
+        provider_name = self._share_controller.choose_provider(self._share_result_button_supplier())
         if not provider_name:
             return
         controller.share_result_text(provider_name)

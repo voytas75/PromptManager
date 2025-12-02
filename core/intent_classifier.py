@@ -5,6 +5,7 @@ Updates:
   v0.6.1 - 2025-11-29 - Adopt PEP 695 generics and gate typing-only imports for Ruff.
   v0.6.0 - 2025-11-06 - Provide rule-based classifier aligned with hybrid retrieval plan.
 """
+
 from __future__ import annotations
 
 import logging
@@ -21,8 +22,11 @@ logger = logging.getLogger(__name__)
 
 class IntentClassifierError(Exception):
     """Raised when intent classification cannot be completed."""
+
+
 class IntentLabel(str, Enum):
     """Canonical labels representing prompt intent groupings."""
+
     GENERAL = "general"
     ANALYSIS = "analysis"
     DEBUG = "debug"
@@ -147,6 +151,7 @@ def _string_list_factory() -> list[str]:
 @dataclass(slots=True)
 class IntentPrediction:
     """Result of the classifier containing hints for retrieval."""
+
     label: IntentLabel
     confidence: float
     rationale: str | None = None
@@ -162,6 +167,7 @@ class IntentPrediction:
 
 class IntentClassifier:
     """Classify free-form queries into prompt intent categories."""
+
     def classify(self, query: str) -> IntentPrediction:
         """Return intent prediction for the supplied query text."""
         stripped = query.strip()
@@ -211,18 +217,23 @@ class IntentClassifier:
 
 class PromptLikeProtocol(Protocol):
     """Structural type describing objects accepted by `rank_by_hints`."""
+
     @property
     def id(self) -> object:  # pragma: no cover - attribute hints only
         """Return the identifier for the prompt-like instance."""
         ...
+
     @property
     def category(self) -> str:  # pragma: no cover - attribute hints only
         """Return the category slug associated with the prompt-like instance."""
         ...
+
     @property
     def tags(self) -> Sequence[str]:  # pragma: no cover - attribute hints only
         """Return the tag sequence for the prompt-like instance."""
         ...
+
+
 def rank_by_hints[PromptLikeT: PromptLikeProtocol](
     prompts: Iterable[PromptLikeT],
     *,

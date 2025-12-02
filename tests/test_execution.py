@@ -1,4 +1,5 @@
 """Tests for CodexExecutor execution helpers."""
+
 from __future__ import annotations
 
 import uuid

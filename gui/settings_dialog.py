@@ -15,6 +15,7 @@ Updates:
   v0.1.1 - 2025-11-15 - Avoid persisting LiteLLM API secrets to disk.
   v0.1.0 - 2025-11-04 - Initial settings dialog implementation.
 """
+
 from __future__ import annotations
 
 import json
@@ -65,6 +66,7 @@ if TYPE_CHECKING:
 
 class SettingsDialog(QDialog):
     """Modal dialog enabling users to configure catalogue and LiteLLM options."""
+
     def __init__(
         self,
         parent=None,
@@ -532,6 +534,7 @@ class SettingsDialog(QDialog):
 
     def result_settings(self) -> dict[str, object | None]:
         """Return cleaned settings data."""
+
         def _clean(value: str) -> str | None:
             stripped = value.strip()
             return stripped or None

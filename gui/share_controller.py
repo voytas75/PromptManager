@@ -3,6 +3,7 @@
 Updates:
   v0.1.0 - 2025-11-30 - Introduce ShareController to manage provider menus and execution.
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -26,6 +27,7 @@ else:  # pragma: no cover - fallback stub for runtime annotations
 
 class ShareController(QObject):
     """Manage share providers, provider selection menus, and share execution."""
+
     def __init__(
         self,
         parent: QWidget,

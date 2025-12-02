@@ -3,6 +3,7 @@
 Updates:
   v0.15.82 - 2025-12-01 - Extract info/workbench/version dialogs from gui.main_window.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

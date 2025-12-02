@@ -3,6 +3,7 @@
 Updates:
   v0.1.0 - 2025-12-01 - Extracted from MainWindow to handle layout and filter state.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -18,6 +19,7 @@ if TYPE_CHECKING:
 
 class LayoutController:
     """Encapsulate splitter sizing logic and persisted UI preferences."""
+
     def __init__(self, layout_state: WindowStateManager) -> None:
         """Store the layout state helper and reset cached widgets."""
         self._layout_state = layout_state

@@ -5,6 +5,7 @@ Updates:
   v0.1.1 - 2025-11-30 - Fix function docstring spacing for lint compliance.
   v0.1.0 - 2025-11-28 - Introduce analytics snapshot builder for CLI and GUI surfaces.
 """
+
 from __future__ import annotations
 
 import json
@@ -28,6 +29,7 @@ logger = logging.getLogger("prompt_manager.analytics")
 @dataclass(slots=True)
 class UsageFrequencyEntry:
     """Summarise prompt usage volume for ranking charts."""
+
     prompt_id: UUID
     name: str
     usage_count: int
@@ -38,6 +40,7 @@ class UsageFrequencyEntry:
 @dataclass(slots=True)
 class ModelCostEntry:
     """Aggregated token usage per model."""
+
     model: str
     run_count: int
     prompt_tokens: int
@@ -48,6 +51,7 @@ class ModelCostEntry:
 @dataclass(slots=True)
 class BenchmarkStatsEntry:
     """Aggregated benchmark execution metrics."""
+
     model: str
     run_count: int
     success_rate: float
@@ -58,6 +62,7 @@ class BenchmarkStatsEntry:
 @dataclass(slots=True)
 class IntentSuccessPoint:
     """Success ratio for intent executions bucketed by day."""
+
     bucket: datetime
     success_rate: float
     success: int
@@ -67,6 +72,7 @@ class IntentSuccessPoint:
 @dataclass(slots=True)
 class AnalyticsSnapshot:
     """Container for dashboard datasets."""
+
     execution: ExecutionAnalytics | None
     usage_frequency: list[UsageFrequencyEntry]
     model_costs: list[ModelCostEntry]
@@ -136,14 +142,10 @@ def snapshot_dataset_rows(snapshot: AnalyticsSnapshot, dataset: str) -> list[dic
                 "prompt_name": entry.name,
                 "usage_count": entry.usage_count,
                 "success_rate": (
-                    round(entry.success_rate * 100, 2)
-                    if entry.success_rate is not None
-                    else None
+                    round(entry.success_rate * 100, 2) if entry.success_rate is not None else None
                 ),
                 "last_executed_at": (
-                    entry.last_executed_at.isoformat()
-                    if entry.last_executed_at
-                    else None
+                    entry.last_executed_at.isoformat() if entry.last_executed_at else None
                 ),
             }
             for entry in snapshot.usage_frequency
@@ -259,14 +261,14 @@ def _collect_model_costs(
     for row in rows:
         model = str(row.get("model") or "unknown").strip() or "unknown"
         entries.append(
-                ModelCostEntry(
-                    model=model,
-                    run_count=_coerce_int(row.get("run_count"), default=0),
-                    prompt_tokens=_coerce_int(row.get("prompt_tokens"), default=0),
-                    completion_tokens=_coerce_int(row.get("completion_tokens"), default=0),
-                    total_tokens=_coerce_int(row.get("total_tokens"), default=0),
-                )
+            ModelCostEntry(
+                model=model,
+                run_count=_coerce_int(row.get("run_count"), default=0),
+                prompt_tokens=_coerce_int(row.get("prompt_tokens"), default=0),
+                completion_tokens=_coerce_int(row.get("completion_tokens"), default=0),
+                total_tokens=_coerce_int(row.get("total_tokens"), default=0),
             )
+        )
     return entries
 
 
@@ -294,14 +296,14 @@ def _collect_benchmark_stats(
         except (TypeError, ValueError):  # pragma: no cover - defensive
             avg_duration_value = None
         entries.append(
-                BenchmarkStatsEntry(
-                    model=model,
-                    run_count=total_runs,
-                    success_rate=success_rate,
-                    average_duration_ms=avg_duration_value,
-                    total_tokens=_coerce_int(row.get("total_tokens"), default=0),
+            BenchmarkStatsEntry(
+                model=model,
+                run_count=total_runs,
+                success_rate=success_rate,
+                average_duration_ms=avg_duration_value,
+                total_tokens=_coerce_int(row.get("total_tokens"), default=0),
             )
-            )
+        )
     return entries
 
 

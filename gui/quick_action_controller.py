@@ -3,6 +3,7 @@
 Updates:
   v0.1.0 - 2025-12-01 - Extract controller to manage palette, shortcuts, and execution.
 """
+
 from __future__ import annotations
 
 import logging
@@ -30,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 class QuickActionController:
     """Encapsulate quick action palette, shortcuts, and execution wiring."""
+
     def __init__(
         self,
         *,
@@ -228,8 +230,7 @@ class QuickActionController:
                 identifier="add-comments",
                 title="Add Comments",
                 description=(
-                    "Jump to documentation prompts that generate docstrings "
-                    "and commentary."
+                    "Jump to documentation prompts that generate docstrings and commentary."
                 ),
                 category_hint="Documentation",
                 tag_hints=("documentation", "docstrings"),

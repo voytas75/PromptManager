@@ -21,6 +21,7 @@ Updates:
   v0.2.0 - 2025-11-04 - Add optional PySide6 GUI launcher toggle.
   v0.1.0 - 2025-10-30 - Initial CLI bootstrap loading settings and building services.
 """
+
 from __future__ import annotations
 
 import argparse

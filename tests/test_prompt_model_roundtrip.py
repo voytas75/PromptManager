@@ -1,4 +1,5 @@
 """Prompt dataclass serialization and helper coverage tests."""
+
 from __future__ import annotations
 
 import json

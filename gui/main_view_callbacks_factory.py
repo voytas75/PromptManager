@@ -3,6 +3,7 @@
 Updates:
   v0.16.0 - 2025-12-02 - Move MainViewCallbacks assembly out of MainWindow.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

@@ -3,6 +3,7 @@
 Updates:
   v0.15.81 - 2025-12-01 - Extracted workspace signal handlers from gui.main_window.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

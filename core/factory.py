@@ -13,6 +13,7 @@ Updates:
   v0.5.0 - 2025-11-05 - Add LiteLLM name generator wiring.
   v0.1.0 - 2025-11-03 - Added build_prompt_manager helper for GUI/bootstrap reuse.
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping

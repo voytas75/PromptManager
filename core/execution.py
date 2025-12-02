@@ -10,6 +10,7 @@ Updates:
   v0.2.0 - 2025-11-12 - Support multi-turn conversation payloads for LiteLLM execution.
   v0.1.0 - 2025-11-08 - Introduce CodexExecutor for running prompts via LiteLLM.
 """
+
 from __future__ import annotations
 
 import logging
@@ -34,6 +35,8 @@ logger = logging.getLogger("prompt_manager.execution")
 
 class ExecutionError(Exception):
     """Raised when LiteLLM prompt execution fails."""
+
+
 def _supports_reasoning(model: str) -> bool:
     """Return True when the target model supports OpenAI reasoning payloads."""
     lowered = model.lower()
@@ -44,6 +47,7 @@ def _supports_reasoning(model: str) -> bool:
 @dataclass(slots=True)
 class CodexExecutionResult:
     """Container for prompt execution responses."""
+
     prompt_id: UUID
     request_text: str
     response_text: str
@@ -55,6 +59,7 @@ class CodexExecutionResult:
 @dataclass(slots=True)
 class CodexExecutor:
     """Execute prompts against GPT-style models via LiteLLM."""
+
     model: str
     api_key: str | None = None
     api_base: str | None = None
@@ -97,9 +102,7 @@ class CodexExecutor:
                     )
                 content = message.get("content")
                 if content is None:
-                    raise ExecutionError(
-                        f"Conversation message '{role}' is missing content."
-                    )
+                    raise ExecutionError(f"Conversation message '{role}' is missing content.")
                 normalised_conversation.append({"role": role, "content": str(content)})
         payload_messages.extend(normalised_conversation)
         payload_messages.append({"role": "user", "content": request_text.strip()})
@@ -285,9 +288,7 @@ def _consume_streaming_response(
         "chunks": serialised_chunks,
     }
     if final_text:
-        raw_payload["choices"] = [
-            {"message": {"role": "assistant", "content": final_text}}
-        ]
+        raw_payload["choices"] = [{"message": {"role": "assistant", "content": final_text}}]
     if usage:
         raw_payload["usage"] = usage
     return final_text, usage, raw_payload

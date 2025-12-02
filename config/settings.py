@@ -9,6 +9,7 @@ Updates:
   v0.4.8 - 2025-12-03 - Persisted chat colour palette overrides.
   v0.4.7 - 2025-11-05 - Added theme mode and chat appearance options.
 """
+
 from __future__ import annotations
 
 import json
@@ -50,6 +51,7 @@ DEFAULT_EMBEDDING_MODEL = "text-embedding-3-large"
 
 class ChatColors(BaseSettings):
     """Sub-model storing UI colour customisation options."""
+
     user: str = Field(
         default=DEFAULT_CHAT_USER_BUBBLE_COLOR,
         description="User chat bubble colour (hex)",
@@ -71,12 +73,14 @@ class ChatColors(BaseSettings):
         },
     )
 
+
 _CHAT_COLOR_PATTERN = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
 _THEME_CHOICES = {"light", "dark"}
 
 
 class PromptTemplateOverrides(BaseModel):
     """User supplied overrides for the core LiteLLM system prompts."""
+
     name_generation: str | None = Field(
         default=None,
         description="System prompt text for the name generation workflow.",
@@ -101,8 +105,11 @@ class PromptTemplateOverrides(BaseModel):
 
 class SettingsError(Exception):
     """Raised when Prompt Manager configuration cannot be loaded or validated."""
+
+
 class PromptManagerSettings(BaseSettings):
     """Application configuration sourced from environment variables or JSON files."""
+
     db_path: Path = Field(default=Path("data") / "prompt_manager.db")
     chroma_path: Path = Field(default=Path("data") / "chromadb")
     redis_dsn: str | None = None
@@ -144,8 +151,7 @@ class PromptManagerSettings(BaseSettings):
     litellm_reasoning_effort: str | None = Field(
         default=None,
         description=(
-            "Optional reasoning effort level for OpenAI reasoning models (minimal, "
-            "medium, high)."
+            "Optional reasoning effort level for OpenAI reasoning models (minimal, medium, high)."
         ),
     )
     litellm_stream: bool = Field(
@@ -196,8 +202,7 @@ class PromptManagerSettings(BaseSettings):
     embedding_model: str | None = Field(
         default=None,
         description=(
-            "Model name for the embedding backend (required for LiteLLM and "
-            "sentence-transformers)."
+            "Model name for the embedding backend (required for LiteLLM and sentence-transformers)."
         ),
     )
     embedding_device: str | None = Field(
@@ -312,7 +317,6 @@ class PromptManagerSettings(BaseSettings):
             return cleaned or None
         raise ValueError("categories must be provided as a list of objects")
 
-
     @field_validator(
         "litellm_model",
         "litellm_inference_model",
@@ -381,8 +385,7 @@ class PromptManagerSettings(BaseSettings):
 
         if backend != "deterministic" and not model:
             raise ValueError(
-                "embedding_model must be provided when embedding_backend is set to "
-                f"'{backend}'"
+                f"embedding_model must be provided when embedding_backend is set to '{backend}'"
             )
         return self
 
@@ -503,6 +506,7 @@ class PromptManagerSettings(BaseSettings):
             3. Environment variables / aliases.
             4. File secrets.
         """
+
         # Compose an environment source that also considers aliases explicitly
         def env_with_aliases(_: BaseSettings | None = None) -> dict[str, Any]:
             data: dict[str, Any] = {}
@@ -579,6 +583,7 @@ class PromptManagerSettings(BaseSettings):
         _: type[BaseSettings],
     ) -> PydanticBaseSettingsSource:
         """Return settings extracted from an optional JSON config file."""
+
         def _loader(_: BaseSettings | None = None) -> dict[str, Any]:
             explicit_path = os.getenv("PROMPT_MANAGER_CONFIG_JSON")
             candidates: list[Path] = []
@@ -600,9 +605,7 @@ class PromptManagerSettings(BaseSettings):
                 try:
                     data = json.loads(raw_contents)
                 except json.JSONDecodeError as exc:
-                    raise SettingsError(
-                        f"Invalid JSON in configuration file: {path}"
-                    ) from exc
+                    raise SettingsError(f"Invalid JSON in configuration file: {path}") from exc
                 if not isinstance(data, dict):
                     message = f"Configuration file {path} must contain a JSON object"
                     raise SettingsError(message)
@@ -657,6 +660,7 @@ class PromptManagerSettings(BaseSettings):
                     mapped["litellm_api_version"] = data_dict["AZURE_OPENAI_API_VERSION"]
                 return mapped
             return {}
+
         return cast("PydanticBaseSettingsSource", _loader)
 
 
@@ -668,4 +672,6 @@ def load_settings(**overrides: Any) -> PromptManagerSettings:
         raise
     except ValidationError as exc:
         raise SettingsError("Invalid Prompt Manager configuration") from exc
+
+
 logger = logging.getLogger("prompt_manager.settings")

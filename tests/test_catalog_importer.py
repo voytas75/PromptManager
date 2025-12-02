@@ -2,6 +2,7 @@
 
 Updates: v0.2.0 - 2025-11-30 - Ensure GUI import helpers remain functional post-CLI removal.
 """
+
 from __future__ import annotations
 
 import json

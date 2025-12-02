@@ -7,6 +7,7 @@ Updates:
   v0.6.0 - 2025-11-06 - Added diff previews, export helpers, and bulk directory support.
   v0.5.0 - 2025-11-05 - Seeded SQLite/Chroma from packaged or user catalogues.
 """
+
 from __future__ import annotations
 
 import difflib
@@ -185,6 +186,7 @@ def _merge_prompt(existing: Prompt, incoming: Prompt) -> Prompt:
 
 class CatalogChangeType(str, Enum):
     """Categorise catalogue changes detected during preview."""
+
     ADD = "add"
     UPDATE = "update"
     SKIP = "skip"
@@ -194,6 +196,7 @@ class CatalogChangeType(str, Enum):
 @dataclass(slots=True)
 class CatalogDiffEntry:
     """Single change entry rendered in a preview or diff dialog."""
+
     prompt_id: uuid.UUID
     name: str
     change_type: CatalogChangeType
@@ -203,6 +206,7 @@ class CatalogDiffEntry:
 @dataclass(slots=True)
 class CatalogDiff:
     """Aggregate diff describing catalogue changes."""
+
     entries: list[CatalogDiffEntry] = field(default_factory=_entry_list_factory)
     added: int = 0
     updated: int = 0
@@ -227,6 +231,7 @@ class CatalogDiff:
 @dataclass(slots=True)
 class CatalogChangePlan:
     """Plan describing how a catalogue import should be applied."""
+
     create: list[Prompt] = field(default_factory=_prompt_list_factory)
     update: list[tuple[Prompt, Prompt]] = field(default_factory=_prompt_pair_list_factory)
     skip: list[Prompt] = field(default_factory=_prompt_list_factory)
@@ -377,6 +382,7 @@ def _build_change_plan(
 @dataclass(slots=True)
 class CatalogImportResult:
     """Aggregate statistics from a catalogue import operation."""
+
     added: int = 0
     updated: int = 0
     skipped: int = 0
