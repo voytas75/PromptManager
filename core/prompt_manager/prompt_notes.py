@@ -5,15 +5,20 @@ Updates:
 """
 from __future__ import annotations
 
-import uuid
-
-from models.prompt_note import PromptNote
+from typing import TYPE_CHECKING
 
 from ..exceptions import (
     PromptNoteNotFoundError,
     PromptNoteStorageError,
 )
-from ..repository import PromptRepository, RepositoryError, RepositoryNotFoundError
+from ..repository import RepositoryError, RepositoryNotFoundError
+
+if TYPE_CHECKING:
+    from uuid import UUID
+
+    from models.prompt_note import PromptNote
+
+    from ..repository import PromptRepository
 
 __all__ = ["PromptNoteSupport"]
 
@@ -30,7 +35,7 @@ class PromptNoteSupport:
         except RepositoryError as exc:
             raise PromptNoteStorageError("Unable to list prompt notes") from exc
 
-    def get_prompt_note(self, note_id: uuid.UUID) -> PromptNote:
+    def get_prompt_note(self, note_id: UUID) -> PromptNote:
         """Return a single prompt note by identifier."""
         try:
             return self._repository.get_prompt_note(note_id)
@@ -57,7 +62,7 @@ class PromptNoteSupport:
         except RepositoryError as exc:
             raise PromptNoteStorageError(f"Failed to update prompt note {note.id}") from exc
 
-    def delete_prompt_note(self, note_id: uuid.UUID) -> None:
+    def delete_prompt_note(self, note_id: UUID) -> None:
         """Delete a stored prompt note."""
         try:
             self._repository.delete_prompt_note(note_id)

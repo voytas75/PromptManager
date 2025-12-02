@@ -83,8 +83,6 @@ from models.prompt_model import (
     PromptVersion,
     UserProfile,
 )
-from models.prompt_note import PromptNote  # noqa: TCH001
-from models.response_style import ResponseStyle  # noqa: TCH001
 from prompt_templates import DEFAULT_PROMPT_TEMPLATES, PROMPT_TEMPLATE_KEYS
 
 from ..category_registry import CategoryRegistry

@@ -142,7 +142,7 @@ class LiteLLMEmbeddingFunction:
             attr_source = cast("Any", payload)
             data_obj = attr_source
             if hasattr(attr_source, "data"):
-                data_obj = getattr(attr_source, "data")
+                data_obj = attr_source.data
         if not isinstance(data_obj, Sequence) or isinstance(data_obj, (str, bytes)):
             raise EmbeddingGenerationError("LiteLLM embedding response missing data array.")
         return cast("Sequence[Any]", data_obj)

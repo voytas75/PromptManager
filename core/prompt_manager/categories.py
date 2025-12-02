@@ -11,12 +11,14 @@ from typing import TYPE_CHECKING
 
 from models.category_model import PromptCategory
 
-from ..category_registry import CategoryRegistry
 from ..exceptions import CategoryNotFoundError, CategoryStorageError
-from ..repository import PromptRepository, RepositoryError, RepositoryNotFoundError
+from ..repository import RepositoryError, RepositoryNotFoundError
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    from ..category_registry import CategoryRegistry
+    from ..repository import PromptRepository
 
 __all__ = ["CategorySupport"]
 

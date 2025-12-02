@@ -62,7 +62,7 @@ def _resolve_redis_client(
     redis_module = cast("Any", redis)
     if redis_module is None:
         raise PromptCacheError("Redis DSN provided but redis package is not installed")
-    from_url = cast("Callable[[str], Redis]", getattr(redis_module, "from_url"))
+    from_url = cast("Callable[[str], Redis]", redis_module.from_url)
     return from_url(redis_dsn)
 
 

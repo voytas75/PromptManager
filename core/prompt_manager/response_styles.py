@@ -5,15 +5,20 @@ Updates:
 """
 from __future__ import annotations
 
-import uuid
-
-from models.response_style import ResponseStyle
+from typing import TYPE_CHECKING
 
 from ..exceptions import (
     ResponseStyleNotFoundError,
     ResponseStyleStorageError,
 )
-from ..repository import PromptRepository, RepositoryError, RepositoryNotFoundError
+from ..repository import RepositoryError, RepositoryNotFoundError
+
+if TYPE_CHECKING:
+    from uuid import UUID
+
+    from models.response_style import ResponseStyle
+
+    from ..repository import PromptRepository
 
 __all__ = ["ResponseStyleSupport"]
 
@@ -38,7 +43,7 @@ class ResponseStyleSupport:
         except RepositoryError as exc:
             raise ResponseStyleStorageError("Unable to list response styles") from exc
 
-    def get_response_style(self, style_id: uuid.UUID) -> ResponseStyle:
+    def get_response_style(self, style_id: UUID) -> ResponseStyle:
         """Return a single response style by identifier."""
         try:
             return self._repository.get_response_style(style_id)
@@ -65,7 +70,7 @@ class ResponseStyleSupport:
         except RepositoryError as exc:
             raise ResponseStyleStorageError(f"Failed to update response style {style.id}") from exc
 
-    def delete_response_style(self, style_id: uuid.UUID) -> None:
+    def delete_response_style(self, style_id: UUID) -> None:
         """Delete a stored response style."""
         try:
             self._repository.delete_response_style(style_id)

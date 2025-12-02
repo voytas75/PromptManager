@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 class _QtBase:
     """Catch-all base providing permissive attribute access on Qt objects."""
 
@@ -104,4 +103,21 @@ class QTextCursor(_QtBase):
     KeepAnchor: Any
 
 
-__all__ = ["QClipboard", "QCloseEvent", "QColor", "QFont", "QGuiApplication", "QIcon", "QKeySequence", "QPaintEvent", "QPainter", "QPalette", "QResizeEvent", "QShortcut", "QShowEvent", "QSyntaxHighlighter", "QTextCharFormat", "QTextCursor"]
+__all__ = [
+    "QClipboard",
+    "QCloseEvent",
+    "QColor",
+    "QFont",
+    "QGuiApplication",
+    "QIcon",
+    "QKeySequence",
+    "QPaintEvent",
+    "QPainter",
+    "QPalette",
+    "QResizeEvent",
+    "QShortcut",
+    "QShowEvent",
+    "QSyntaxHighlighter",
+    "QTextCharFormat",
+    "QTextCursor",
+]

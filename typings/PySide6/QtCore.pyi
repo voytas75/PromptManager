@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 class _QtBase:
     """Catch-all base providing permissive attribute access on Qt objects."""
 
@@ -103,4 +102,18 @@ class Signal(_QtBase):
     def __init__(self, *args: object, **kwargs: object) -> None: ...
     def emit(self, *args: object, **kwargs: object) -> None: ...
 
-__all__ = ["QAbstractListModel", "QByteArray", "QEvent", "QEventLoop", "QModelIndex", "QObject", "QPoint", "QRect", "QSettings", "QSize", "QTimer", "Qt", "Signal"]
+__all__ = [
+    "QAbstractListModel",
+    "QByteArray",
+    "QEvent",
+    "QEventLoop",
+    "QModelIndex",
+    "QObject",
+    "QPoint",
+    "QRect",
+    "QSettings",
+    "QSize",
+    "QTimer",
+    "Qt",
+    "Signal",
+]

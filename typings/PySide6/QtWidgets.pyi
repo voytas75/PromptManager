@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 class _QtBase:
     """Catch-all base providing permissive attribute access on Qt objects."""
 
@@ -243,4 +242,54 @@ class QWidgetItem(_QtBase):
     ...
 
 
-__all__ = ["QAbstractItemView", "QAbstractSpinBox", "QApplication", "QButtonGroup", "QCheckBox", "QColorDialog", "QComboBox", "QDialog", "QDialogButtonBox", "QDoubleSpinBox", "QFileDialog", "QFormLayout", "QFrame", "QGridLayout", "QGroupBox", "QHBoxLayout", "QHeaderView", "QLabel", "QLayout", "QLayoutItem", "QLineEdit", "QListView", "QListWidget", "QListWidgetItem", "QMainWindow", "QMenu", "QMessageBox", "QPlainTextEdit", "QProgressBar", "QPushButton", "QRadioButton", "QScrollArea", "QSizePolicy", "QSpinBox", "QSplitter", "QStackedWidget", "QStatusBar", "QStyle", "QStyleFactory", "QTabWidget", "QTableWidget", "QTableWidgetItem", "QTextBrowser", "QTextEdit", "QToolBar", "QToolButton", "QVBoxLayout", "QWidget", "QWidgetItem"]
+__all__ = [
+    "QAbstractItemView",
+    "QAbstractSpinBox",
+    "QApplication",
+    "QButtonGroup",
+    "QCheckBox",
+    "QColorDialog",
+    "QComboBox",
+    "QDialog",
+    "QDialogButtonBox",
+    "QDoubleSpinBox",
+    "QFileDialog",
+    "QFormLayout",
+    "QFrame",
+    "QGridLayout",
+    "QGroupBox",
+    "QHBoxLayout",
+    "QHeaderView",
+    "QLabel",
+    "QLayout",
+    "QLayoutItem",
+    "QLineEdit",
+    "QListView",
+    "QListWidget",
+    "QListWidgetItem",
+    "QMainWindow",
+    "QMenu",
+    "QMessageBox",
+    "QPlainTextEdit",
+    "QProgressBar",
+    "QPushButton",
+    "QRadioButton",
+    "QScrollArea",
+    "QSizePolicy",
+    "QSpinBox",
+    "QSplitter",
+    "QStackedWidget",
+    "QStatusBar",
+    "QStyle",
+    "QStyleFactory",
+    "QTabWidget",
+    "QTableWidget",
+    "QTableWidgetItem",
+    "QTextBrowser",
+    "QTextEdit",
+    "QToolBar",
+    "QToolButton",
+    "QVBoxLayout",
+    "QWidget",
+    "QWidgetItem",
+]
