@@ -1,6 +1,7 @@
 """LiteLLM-backed prompt metadata generation utilities.
 
 Updates:
+  v0.8.0 - 2025-12-02 - Reuse central exception definitions for LiteLLM helpers.
   v0.7.9 - 2025-12-01 - Normalise LiteLLM ModelResponse payloads before parsing text.
   v0.7.8 - 2025-11-29 - Move Sequence import behind TYPE_CHECKING per Ruff TC003.
   v0.7.7 - 2025-11-29 - Guard PromptCategory import for typing and wrap long literals.
@@ -10,9 +11,7 @@ Updates:
   v0.7.3 - 2025-11-02 - Strip configured drop parameters before calling LiteLLM.
   v0.7.2 - 2025-11-17 - Retry without unsupported LiteLLM parameters when models reject them.
   v0.7.1 - 2025-11-11 - Summarise LiteLLM errors for friendlier GUI fallbacks.
-  v0.7.0 - 2025-11-07 - Add description generator alongside name helper.
-  v0.6.0 - 2025-11-07 - Share LiteLLM import helper with embedding adapters.
-  v0.5.0 - 2025-11-05 - Introduce LiteLLM name generator with graceful fallbacks.
+  v0.5.0-v0.7.0 - 2025-11-07 - Introduce LiteLLM name/description generators and shared adapter.
 """
 
 from __future__ import annotations
@@ -27,6 +26,11 @@ from prompt_templates import (
     NAME_GENERATION_PROMPT,
 )
 
+from .exceptions import (
+    CategorySuggestionError,
+    DescriptionGenerationError,
+    NameGenerationError,
+)
 from .litellm_adapter import (
     apply_configured_drop_params,
     call_completion_with_fallback,
@@ -40,18 +44,6 @@ if TYPE_CHECKING:  # pragma: no cover - imported for annotations only
     from models.category_model import PromptCategory
 
 logger = logging.getLogger(__name__)
-
-
-class NameGenerationError(Exception):
-    """Raised when a prompt name cannot be generated."""
-
-
-class DescriptionGenerationError(Exception):
-    """Raised when a prompt description cannot be generated."""
-
-
-class CategorySuggestionError(Exception):
-    """Raised when a prompt category cannot be suggested."""
 
 
 @dataclass(slots=True)

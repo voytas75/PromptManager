@@ -1,6 +1,7 @@
 """LiteLLM-backed prompt scenario generation utilities.
 
 Updates:
+  v0.2.0 - 2025-12-02 - Reuse shared ScenarioGenerationError from core.exceptions.
   v0.1.5 - 2025-12-01 - Accept LiteLLM ModelResponse payloads during scenario refresh.
   v0.1.4 - 2025-11-30 - Align LiteLLM request prompt text with CLI contract.
   v0.1.3 - 2025-11-27 - Strip Markdown code fences before parsing scenarios.
@@ -19,16 +20,13 @@ from typing import Any, cast
 
 from prompt_templates import SCENARIO_GENERATION_PROMPT
 
+from .exceptions import ScenarioGenerationError
 from .litellm_adapter import (
     apply_configured_drop_params,
     call_completion_with_fallback,
     get_completion,
     serialise_litellm_response,
 )
-
-
-class ScenarioGenerationError(Exception):
-    """Raised when usage scenarios cannot be generated."""
 
 
 def _normalise_scenarios(candidates: Sequence[str], limit: int) -> list[str]:

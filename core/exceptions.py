@@ -4,18 +4,20 @@ This module centralises shared exception definitions to reduce duplication
 across the **core** package and to unblock incremental modularisation work.
 
 The initial set has been extracted from the former monolithic
-`core/prompt_manager.py`.  Additional core‑level exceptions should be added
+`core/prompt_manager.py`. Additional core-level exceptions should be added
 here rather than redefining them in individual modules.
 
 All exceptions ultimately inherit from :class:`PromptManagerError`, allowing
-callers to catch a single base class for any manager‑related failure while
+callers to catch a single base class for any manager-related failure while
 still distinguishing individual error categories when needed.
 
-Updates: v0.18.0 – 2025‑11‑22 – Add category exception hierarchy.
-Updates: v0.17.0 – 2025‑11‑22 – Add prompt versioning exception hierarchy.
-Updates: v0.16.0 – 2025‑12‑06 – Add PromptNote exception hierarchy.
-Updates: v0.15.0 – 2025‑12‑05 – Add ResponseStyle exception hierarchy.
-Updates: v0.14.0 – 2025‑11‑18 – Created module; migrated existing classes.
+Updates:
+  v0.19.0 - 2025-12-02 - Centralise LiteLLM generation errors and category suggestion failures.
+  v0.18.0 - 2025-11-22 - Add category exception hierarchy.
+  v0.17.0 - 2025-11-22 - Add prompt versioning exception hierarchy.
+  v0.16.0 - 2025-12-06 - Add PromptNote exception hierarchy.
+  v0.15.0 - 2025-12-05 - Add ResponseStyle exception hierarchy.
+  v0.14.0 - 2025-11-18 - Created module; migrated existing classes.
 """
 
 from __future__ import annotations
@@ -68,6 +70,26 @@ class CategoryNotFoundError(CategoryError):
 
 class CategoryStorageError(CategoryError):
     """Raised when persisting or loading categories fails."""
+
+
+class CategorySuggestionError(CategoryError):
+    """Raised when LiteLLM category suggestions fail or return invalid data."""
+
+
+class PromptGenerationError(PromptManagerError):
+    """Base class for LiteLLM prompt metadata generation failures."""
+
+
+class NameGenerationError(PromptGenerationError):
+    """Raised when a prompt name cannot be generated."""
+
+
+class DescriptionGenerationError(PromptGenerationError):
+    """Raised when a prompt description cannot be generated."""
+
+
+class ScenarioGenerationError(PromptGenerationError):
+    """Raised when LiteLLM usage scenarios cannot be generated."""
 
 
 class ResponseStyleError(PromptManagerError):

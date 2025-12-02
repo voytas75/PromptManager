@@ -1,14 +1,16 @@
 """Core service layer for Prompt Manager.
 
-Updates: v0.10.0 - 2025-11-28 - Export analytics dashboard helpers for diagnostics dashboards.
-Updates: v0.9.0 - 2025-12-06 - Export PromptNote models and exception helpers.
-Updates: v0.7.1 - 2025-11-30 - Restore catalogue import helpers for GUI workflows.
-Updates: v0.6.0 - 2025-11-15 - Export prompt engineering helpers alongside manager API.
-Updates: v0.5.0 - 2025-11-07 - Export embedding factory helper for external use.
-Updates: v0.4.0 - 2025-11-06 - Export intent classifier utilities for GUI integration.
-Updates: v0.3.0 - 2025-11-03 - Export build_prompt_manager factory for shared bootstrap.
-Updates: v0.2.0 - 2025-10-31 - Surface PromptRepository alongside PromptManager.
-Updates: v0.1.0 - 2025-10-30 - Expose PromptManager API.
+Updates:
+  v0.11.0 - 2025-12-02 - Import LiteLLM generation errors from the central exceptions module.
+  v0.10.0 - 2025-11-28 - Export analytics dashboard helpers for diagnostics dashboards.
+  v0.9.0 - 2025-12-06 - Export PromptNote models and exception helpers.
+  v0.7.1 - 2025-11-30 - Restore catalogue import helpers for GUI workflows.
+  v0.6.0 - 2025-11-15 - Export prompt engineering helpers alongside manager API.
+  v0.5.0 - 2025-11-07 - Export embedding factory helper for external use.
+  v0.4.0 - 2025-11-06 - Export intent classifier utilities for GUI integration.
+  v0.3.0 - 2025-11-03 - Export build_prompt_manager factory for shared bootstrap.
+  v0.2.0 - 2025-10-31 - Surface PromptRepository alongside PromptManager.
+  v0.1.0 - 2025-10-30 - Expose PromptManager API.
 """
 
 from models.category_model import PromptCategory
@@ -37,7 +39,14 @@ from .catalog_importer import (
 )
 from .category_registry import CategoryRegistry
 from .embedding import create_embedding_function
-from .exceptions import PromptShareError, ShareProviderError
+from .exceptions import (
+    CategorySuggestionError,
+    DescriptionGenerationError,
+    NameGenerationError,
+    PromptShareError,
+    ScenarioGenerationError,
+    ShareProviderError,
+)
 from .execution import CodexExecutionResult, CodexExecutor, ExecutionError
 from .factory import build_prompt_manager
 from .history_tracker import (
@@ -53,11 +62,8 @@ from .intent_classifier import (
     IntentPrediction,
 )
 from .name_generation import (
-    CategorySuggestionError,
-    DescriptionGenerationError,
     LiteLLMCategoryGenerator,
     LiteLLMDescriptionGenerator,
-    NameGenerationError,
 )
 from .notifications import (
     Notification,
@@ -91,7 +97,7 @@ from .prompt_manager import (
     ResponseStyleStorageError,
 )
 from .repository import PromptRepository, RepositoryError, RepositoryNotFoundError
-from .scenario_generation import LiteLLMScenarioGenerator, ScenarioGenerationError
+from .scenario_generation import LiteLLMScenarioGenerator
 
 __all__ = [
     "PromptManager",
