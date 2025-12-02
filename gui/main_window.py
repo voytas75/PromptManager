@@ -343,6 +343,34 @@ class MainWindow(QMainWindow):
         self._initialize_notification_controller()
         self._load_prompts()
 
+    def _on_delete_clicked(self) -> None:
+        """Handle delete actions originating from the detail panel."""
+        self._prompt_actions_bridge.delete_current_prompt()
+
+    def _on_edit_clicked(self) -> None:
+        """Open the editor for the currently selected prompt."""
+        self._prompt_actions_bridge.edit_prompt()
+
+    def _on_fork_clicked(self) -> None:
+        """Fork the currently selected prompt via the detail panel."""
+        self._prompt_actions_bridge.fork_prompt()
+
+    def _duplicate_prompt(self, prompt: Prompt) -> None:
+        """Duplicate *prompt* when invoked from the list context menu."""
+        self._prompt_actions_bridge.duplicate_prompt(prompt)
+
+    def _fork_prompt(self, prompt: Prompt) -> None:
+        """Fork *prompt* when invoked from the list context menu."""
+        self._prompt_actions_bridge.fork_prompt_direct(prompt)
+
+    def _open_version_history_dialog(self) -> None:
+        """Open the version history dialog for the active prompt."""
+        self._prompt_actions_bridge.open_version_history_dialog()
+
+    def _handle_refresh_scenarios_request(self, detail_widget: PromptDetailWidget) -> None:
+        """Regenerate scenarios requested by the detail widget."""
+        self._prompt_actions_bridge.handle_refresh_scenarios_request(detail_widget)
+
     def _build_ui(self) -> None:
         """Create the main layout with list/search/detail panes."""
         callbacks = build_main_view_callbacks(self)
