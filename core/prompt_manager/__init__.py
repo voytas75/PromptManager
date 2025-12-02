@@ -1,6 +1,7 @@
 """Prompt Manager package façade and orchestration layer.
 
 Updates:
+  v0.14.7 - 2025-12-02 - Extract category, response style, and note APIs into mixins.
   v0.14.6 - 2025-11-30 - Ensure Chroma directories exist and stabilise Chroma client bootstrap.
   v0.14.5 - 2025-11-29 - Reformat header/imports and wrap CLI analytics summaries.
   v0.14.4 - 2025-02-14 - Add embedding diagnostics helper for CLI integration.
@@ -142,8 +143,11 @@ from ..repository import (
     RepositoryNotFoundError,
 )
 from ..scenario_generation import LiteLLMScenarioGenerator, ScenarioGenerationError
+from .categories import CategorySupport
 from .engineering import PromptEngineerFacade
 from .execution import ExecutionResult, PromptExecutor
+from .prompt_notes import PromptNoteSupport
+from .response_styles import ResponseStyleSupport
 from .storage import PromptStorage
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -369,7 +373,7 @@ def _match_category_label(
     return None
 
 
-class PromptManager:
+class PromptManager(CategorySupport, ResponseStyleSupport, PromptNoteSupport):
     """Manage prompt persistence, caching, and semantic search."""
     def __init__(
         self,
@@ -2748,102 +2752,6 @@ class PromptManager:
             )
         return prompt_obj
 
-    # Category APIs ----------------------------------------------------- #
-
-    def list_categories(self, include_archived: bool = False) -> list[PromptCategory]:
-        """Return cached categories."""
-        return self._category_registry.all(include_archived)
-
-    def refresh_categories(self) -> list[PromptCategory]:
-        """Reload categories from the repository."""
-        return self._category_registry.refresh()
-
-    def create_category(
-        self,
-        *,
-        label: str,
-        slug: str | None = None,
-        description: str | None = None,
-        parent_slug: str | None = None,
-        color: str | None = None,
-        icon: str | None = None,
-        min_quality: float | None = None,
-        default_tags: Sequence[str] | None = None,
-        is_active: bool = True,
-    ) -> PromptCategory:
-        """Create a new category entry."""
-        category = PromptCategory(
-            slug=slug or label,
-            label=label,
-            description=description or label,
-            parent_slug=parent_slug,
-            color=color,
-            icon=icon,
-            min_quality=min_quality,
-            default_tags=list(default_tags or []),
-            is_active=is_active,
-        )
-        try:
-            created = self._repository.create_category(category)
-        except RepositoryError as exc:
-            raise CategoryStorageError("Unable to create category") from exc
-        self._category_registry.refresh()
-        return created
-
-    def update_category(
-        self,
-        slug: str,
-        *,
-        label: str | None = None,
-        description: str | None = None,
-        parent_slug: str | None = None,
-        color: str | None = None,
-        icon: str | None = None,
-        min_quality: float | None = None,
-        default_tags: Sequence[str] | None = None,
-        is_active: bool | None = None,
-    ) -> PromptCategory:
-        """Update the specified category."""
-        current = self._category_registry.require(slug)
-        updated = replace(
-            current,
-            label=label or current.label,
-            description=description or current.description,
-            parent_slug=parent_slug if parent_slug is not None else current.parent_slug,
-            color=color if color is not None else current.color,
-            icon=icon if icon is not None else current.icon,
-            min_quality=min_quality if min_quality is not None else current.min_quality,
-            default_tags=list(default_tags) if default_tags is not None else current.default_tags,
-            is_active=is_active if is_active is not None else current.is_active,
-            updated_at=datetime.now(UTC),
-        )
-        try:
-            persisted = self._repository.update_category(updated)
-        except RepositoryNotFoundError as exc:
-            raise CategoryNotFoundError(str(exc)) from exc
-        except RepositoryError as exc:
-            raise CategoryStorageError("Unable to update category") from exc
-        self._category_registry.refresh()
-        return persisted
-
-    def set_category_active(self, slug: str, is_active: bool) -> PromptCategory:
-        """Toggle category visibility."""
-        try:
-            category = self._repository.set_category_active(slug, is_active)
-        except RepositoryNotFoundError as exc:
-            raise CategoryNotFoundError(str(exc)) from exc
-        except RepositoryError as exc:
-            raise CategoryStorageError("Unable to update category state") from exc
-        self._category_registry.refresh()
-        return category
-
-    def resolve_category_label(self, slug: str | None, fallback: str | None = None) -> str:
-        """Return the human-readable label for a slug."""
-        category = self._category_registry.get(slug)
-        if category:
-            return category.label
-        return fallback or ""
-
     def update_prompt(
         self,
         prompt: Prompt,
@@ -3157,104 +3065,6 @@ class PromptManager:
             return self._repository.get_prompt_parent_fork(prompt_id)
         except RepositoryError as exc:
             raise PromptVersionError("Unable to load fork lineage") from exc
-
-    # Response style management ----------------------------------------- #
-
-    def list_response_styles(
-        self,
-        *,
-        include_inactive: bool = False,
-        search: str | None = None,
-    ) -> list[ResponseStyle]:
-        """Return stored response styles ordered by name."""
-        try:
-            return self._repository.list_response_styles(
-                include_inactive=include_inactive,
-                search=search,
-            )
-        except RepositoryError as exc:
-            raise ResponseStyleStorageError("Unable to list response styles") from exc
-
-    def get_response_style(self, style_id: uuid.UUID) -> ResponseStyle:
-        """Return a single response style by identifier."""
-        try:
-            return self._repository.get_response_style(style_id)
-        except RepositoryNotFoundError as exc:
-            raise ResponseStyleNotFoundError(str(exc)) from exc
-        except RepositoryError as exc:
-            raise ResponseStyleStorageError(f"Unable to load response style {style_id}") from exc
-
-    def create_response_style(self, style: ResponseStyle) -> ResponseStyle:
-        """Persist a new response style record."""
-        style.touch()
-        try:
-            return self._repository.add_response_style(style)
-        except RepositoryError as exc:
-            raise ResponseStyleStorageError(f"Failed to persist response style {style.id}") from exc
-
-    def update_response_style(self, style: ResponseStyle) -> ResponseStyle:
-        """Update an existing response style record."""
-        style.touch()
-        try:
-            return self._repository.update_response_style(style)
-        except RepositoryNotFoundError as exc:
-            raise ResponseStyleNotFoundError(str(exc)) from exc
-        except RepositoryError as exc:
-            raise ResponseStyleStorageError(f"Failed to update response style {style.id}") from exc
-
-    def delete_response_style(self, style_id: uuid.UUID) -> None:
-        """Delete a stored response style."""
-        try:
-            self._repository.delete_response_style(style_id)
-        except RepositoryNotFoundError as exc:
-            raise ResponseStyleNotFoundError(str(exc)) from exc
-        except RepositoryError as exc:
-            raise ResponseStyleStorageError(f"Failed to delete response style {style_id}") from exc
-
-    # Prompt note management ------------------------------------------- #
-
-    def list_prompt_notes(self) -> list[PromptNote]:
-        """Return stored prompt notes ordered by recency."""
-        try:
-            return self._repository.list_prompt_notes()
-        except RepositoryError as exc:
-            raise PromptNoteStorageError("Unable to list prompt notes") from exc
-
-    def get_prompt_note(self, note_id: uuid.UUID) -> PromptNote:
-        """Return a single prompt note by identifier."""
-        try:
-            return self._repository.get_prompt_note(note_id)
-        except RepositoryNotFoundError as exc:
-            raise PromptNoteNotFoundError(str(exc)) from exc
-        except RepositoryError as exc:
-            raise PromptNoteStorageError(f"Unable to load prompt note {note_id}") from exc
-
-    def create_prompt_note(self, note: PromptNote) -> PromptNote:
-        """Persist a new prompt note."""
-        note.touch()
-        try:
-            return self._repository.add_prompt_note(note)
-        except RepositoryError as exc:
-            raise PromptNoteStorageError(f"Failed to persist prompt note {note.id}") from exc
-
-    def update_prompt_note(self, note: PromptNote) -> PromptNote:
-        """Update an existing prompt note."""
-        note.touch()
-        try:
-            return self._repository.update_prompt_note(note)
-        except RepositoryNotFoundError as exc:
-            raise PromptNoteNotFoundError(str(exc)) from exc
-        except RepositoryError as exc:
-            raise PromptNoteStorageError(f"Failed to update prompt note {note.id}") from exc
-
-    def delete_prompt_note(self, note_id: uuid.UUID) -> None:
-        """Delete a prompt note."""
-        try:
-            self._repository.delete_prompt_note(note_id)
-        except RepositoryNotFoundError as exc:
-            raise PromptNoteNotFoundError(str(exc)) from exc
-        except RepositoryError as exc:
-            raise PromptNoteStorageError(f"Failed to delete prompt note {note_id}") from exc
 
     def search_prompts(
         self,
