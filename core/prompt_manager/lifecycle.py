@@ -10,7 +10,7 @@ import json
 import logging
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol, cast
 from uuid import UUID
 
 from chromadb.errors import ChromaError
@@ -27,9 +27,23 @@ from ..exceptions import (
 from ..repository import RepositoryError, RepositoryNotFoundError
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers only
-    from models.prompt_model import PromptVersion
+    from collections.abc import Mapping
+
+    from models.prompt_model import PromptCategory, PromptVersion
 
     from ..repository import PromptRepository
+
+    class _CategoryInsightAccessor(Protocol):
+        def list_categories(self) -> list[PromptCategory]: ...
+
+        def _update_category_insight(
+            self,
+            prompt: Prompt,
+            *,
+            previous_prompt: Prompt | None,
+        ) -> None: ...
+else:  # pragma: no cover - typing fallback
+    _CategoryInsightAccessor = Any
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +70,8 @@ class PromptLifecycleMixin:
     ) -> Prompt:
         """Persist a new prompt in SQLite/ChromaDB and prime the cache."""
         prompt = self._apply_category_metadata(prompt)
-        self._update_category_insight(prompt, previous_prompt=None)
+        insight_accessor = cast("_CategoryInsightAccessor", self)
+        insight_accessor._update_category_insight(prompt, previous_prompt=None)
         generated_embedding: list[float] | None = None
         if embedding is not None:
             generated_embedding = list(embedding)
@@ -157,7 +172,9 @@ class PromptLifecycleMixin:
                 exc_info=True,
             )
 
-        self._update_category_insight(prompt, previous_prompt=previous_prompt)
+        cast("_CategoryInsightAccessor", self)._update_category_insight(
+            prompt, previous_prompt=previous_prompt
+        )
 
         body_changed = self._normalise_body(previous_prompt.context) != self._normalise_body(
             prompt.context
@@ -259,12 +276,6 @@ class PromptLifecycleMixin:
     def _normalise_body(body: str | None) -> str:
         return body.replace("\r\n", "\n") if body else ""
 
-    @staticmethod
-    def _ensure_uuid(value: UUID) -> UUID:
-        if not isinstance(value, UUID):
-            raise TypeError("prompt_id must be a uuid.UUID instance.")
-        return value
-
     def _record_prompt_usage(self, prompt: Prompt) -> None:
         """Persist prompt usage into the single-user profile when possible."""
         try:
@@ -280,7 +291,8 @@ class PromptLifecycleMixin:
 
     def _apply_rating(self, prompt_id: UUID, rating: float) -> None:
         """Update prompt aggregates from a new rating."""
-        prompt_id = self._ensure_uuid(prompt_id)
+        if not isinstance(prompt_id, UUID):
+            raise TypeError("prompt_id must be a uuid.UUID instance.")
         try:
             prompt = self.get_prompt(prompt_id)
         except PromptManagerError:
