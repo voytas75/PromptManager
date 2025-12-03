@@ -9,9 +9,9 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
-from models.prompt_model import ExecutionStatus
+from models.prompt_model import ExecutionStatus, Prompt, PromptExecution
 
 from ..exceptions import (
     PromptExecutionError,
@@ -29,13 +29,19 @@ from ..notifications import NotificationCenter, NotificationLevel
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
-
-    from models.prompt_model import Prompt, PromptExecution
+    from typing import Protocol
 
     from ..history_tracker import HistoryTracker
-    from . import PromptManager as _PromptManager
-else:
-    _PromptManager = Any
+
+    class _PromptAccessor(Protocol):
+        def get_prompt(self, prompt_id: uuid.UUID) -> Prompt: ...
+
+        def increment_usage(self, prompt_id: uuid.UUID) -> None: ...
+
+        def _apply_rating(self, prompt_id: uuid.UUID, rating: float) -> None: ...
+
+else:  # pragma: no cover - typing fallback
+    HistoryTracker = Any
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +145,7 @@ class ExecutionHistoryMixin:
         return context
 
     def execute_prompt(
-        self: _PromptManager,
+        self,
         prompt_id: uuid.UUID,
         request_text: str,
         *,
@@ -156,7 +162,8 @@ class ExecutionHistoryMixin:
             )
 
         conversation_history = _normalise_conversation(conversation)
-        prompt = self.get_prompt(prompt_id)
+        deps = cast("_PromptAccessor", self)
+        prompt = deps.get_prompt(prompt_id)
         stream_enabled = self._executor.stream if stream is None else bool(stream)
         task_id = f"prompt-exec:{prompt.id}:{uuid.uuid4()}"
         metadata = {
@@ -223,7 +230,7 @@ class ExecutionHistoryMixin:
                 context_metadata=context_metadata,
             )
             try:
-                self.increment_usage(prompt.id)
+                deps.increment_usage(prompt.id)
             except PromptManagerError:
                 logger.debug(
                     "Prompt executed but usage counter update failed",
@@ -238,7 +245,7 @@ class ExecutionHistoryMixin:
         )
 
     def benchmark_prompts(
-        self: _PromptManager,
+        self,
         prompt_ids: Sequence[uuid.UUID],
         request_text: str,
         *,
@@ -266,7 +273,8 @@ class ExecutionHistoryMixin:
             seen_prompts.add(prompt_id)
             unique_prompt_ids.append(prompt_id)
 
-        prompts: list[Prompt] = [self.get_prompt(prompt_id) for prompt_id in unique_prompt_ids]
+        deps = cast("_PromptAccessor", self)
+        prompts: list[Prompt] = [deps.get_prompt(prompt_id) for prompt_id in unique_prompt_ids]
 
         model_candidates: list[str] = []
         if models:
@@ -288,30 +296,22 @@ class ExecutionHistoryMixin:
         base_executor = self._executor
 
         def _executor_for_model(model_name: str) -> CodexExecutor:
-            if isinstance(base_executor, CodexExecutor):
-                if base_executor.model == model_name:
-                    return base_executor
-                drop_params = (
-                    list(base_executor.drop_params) if base_executor.drop_params else None
-                )
-                return CodexExecutor(
-                    model=model_name,
-                    api_key=base_executor.api_key,
-                    api_base=base_executor.api_base,
-                    api_version=base_executor.api_version,
-                    timeout_seconds=base_executor.timeout_seconds,
-                    max_output_tokens=base_executor.max_output_tokens,
-                    temperature=base_executor.temperature,
-                    drop_params=drop_params,
-                    reasoning_effort=base_executor.reasoning_effort,
-                    stream=base_executor.stream,
-                )
-            base_model = getattr(base_executor, "model", None)
-            if base_model and base_model == model_name:
+            if base_executor.model == model_name:
                 return base_executor
-            raise PromptExecutionUnavailable(
-                "Configured executor does not support switching models; specify the configured "
-                "model only."
+            drop_params = (
+                list(base_executor.drop_params) if base_executor.drop_params else None
+            )
+            return CodexExecutor(
+                model=model_name,
+                api_key=base_executor.api_key,
+                api_base=base_executor.api_base,
+                api_version=base_executor.api_version,
+                timeout_seconds=base_executor.timeout_seconds,
+                max_output_tokens=base_executor.max_output_tokens,
+                temperature=base_executor.temperature,
+                drop_params=drop_params,
+                reasoning_effort=base_executor.reasoning_effort,
+                stream=base_executor.stream,
             )
 
         tracker = self._history_tracker
@@ -413,7 +413,7 @@ class ExecutionHistoryMixin:
         return BenchmarkReport(runs=runs)
 
     def save_execution_result(
-        self: _PromptManager,
+        self,
         prompt_id: uuid.UUID,
         request_text: str,
         response_text: str,
@@ -450,11 +450,11 @@ class ExecutionHistoryMixin:
         except HistoryTrackerError as exc:
             raise PromptHistoryError(str(exc)) from exc
         if rating is not None:
-            self._apply_rating(prompt_id, rating)
+            cast(Any, self)._apply_rating(prompt_id, rating)
         return execution
 
     def update_execution_note(
-        self: _PromptManager, execution_id: uuid.UUID, note: str | None
+        self, execution_id: uuid.UUID, note: str | None
     ) -> PromptExecution:
         """Update the note metadata for a history entry."""
         tracker = self._history_tracker
@@ -468,7 +468,7 @@ class ExecutionHistoryMixin:
             raise PromptHistoryError(str(exc)) from exc
 
     def list_recent_executions(
-        self: _PromptManager, *, limit: int = 20
+        self, *, limit: int = 20
     ) -> list[PromptExecution]:
         """Return recently logged executions if history tracking is enabled."""
         tracker = self._history_tracker
@@ -481,7 +481,7 @@ class ExecutionHistoryMixin:
             return []
 
     def list_executions_for_prompt(
-        self: _PromptManager,
+        self,
         prompt_id: uuid.UUID,
         *,
         limit: int = 20,
@@ -501,7 +501,7 @@ class ExecutionHistoryMixin:
             return []
 
     def query_executions(
-        self: _PromptManager,
+        self,
         *,
         status: ExecutionStatus | str | None = None,
         prompt_id: uuid.UUID | None = None,
@@ -532,7 +532,7 @@ class ExecutionHistoryMixin:
             return []
 
     def get_execution_analytics(
-        self: _PromptManager,
+        self,
         *,
         window_days: int | None = 30,
         prompt_limit: int = 5,
@@ -552,7 +552,7 @@ class ExecutionHistoryMixin:
             raise PromptHistoryError(str(exc)) from exc
 
     def _log_execution_success(
-        self: _PromptManager,
+        self,
         prompt_id: uuid.UUID,
         request_text: str,
         result: CodexExecutionResult,
@@ -594,7 +594,7 @@ class ExecutionHistoryMixin:
             return None
 
     def _log_execution_failure(
-        self: _PromptManager,
+        self,
         prompt_id: uuid.UUID,
         request_text: str,
         error_message: str,
