@@ -18,7 +18,11 @@ _LITELLM_IMPORT_ERROR: str | None = None
 
 try:  # pragma: no cover - optional dependency import
     import litellm
-    from litellm.exceptions import LiteLLMException
+    try:
+        from litellm.exceptions import LiteLLMException  # type: ignore[attr-defined]
+    except Exception as exc:  # pragma: no cover - missing attribute variations
+        LiteLLMException = RuntimeError  # type: ignore[assignment]
+        _LITELLM_IMPORT_ERROR = str(exc)
 except ModuleNotFoundError:  # pragma: no cover - handled at runtime
     litellm = None  # type: ignore[assignment]
     LiteLLMException = RuntimeError  # type: ignore[assignment]
