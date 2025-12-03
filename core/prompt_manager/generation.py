@@ -454,9 +454,18 @@ class GenerationMixin:
             tags = ", ".join(tag.strip() for tag in prompt.tags if tag and str(tag).strip())
             if tags:
                 segments.append(f"Common tags: {tags}.")
+            scenario_text = ""
+            for scenario in getattr(prompt, "scenarios", []) or []:
+                candidate = str(scenario or "").strip()
+                if candidate:
+                    scenario_text = candidate
+                    break
+            if scenario_text:
+                trimmed = scenario_text.rstrip(".")
+                segments.append(f"Example use: {trimmed}.")
         snippet = context.strip()
         if snippet:
-            segments.append(snippet[:200])
+            segments.append(f"Overview: {snippet[:200]}")
         if not segments:
-            return "General prompt for Prompt Manager."
+            return "No description available."
         return " ".join(segments)

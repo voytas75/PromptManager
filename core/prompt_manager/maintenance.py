@@ -11,6 +11,7 @@ import json
 import logging
 import shutil
 import sqlite3
+import sys
 import zipfile
 from dataclasses import asdict
 from datetime import UTC, datetime
@@ -34,6 +35,10 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers only
 logger = logging.getLogger(__name__)
 
 __all__ = ["MaintenanceMixin"]
+
+_parent_module = sys.modules.get("core.prompt_manager")
+if _parent_module is not None:
+    sqlite3 = getattr(_parent_module, "sqlite3", sqlite3)
 
 
 def _coerce_int(value: Any) -> int | None:
@@ -268,6 +273,24 @@ class MaintenanceMixin:
         if not db_path.exists():
             raise PromptStorageError(f"Chroma persistence database missing at {db_path}.")
 
+        try:
+            collection = self.collection
+        except PromptManagerError:
+            self._initialise_chroma_collection()
+            try:
+                collection = self.collection
+            except PromptManagerError as exc:
+                raise PromptStorageError("Unable to initialise Chroma collection") from exc
+
+        try:
+            document_count = int(collection.count())
+        except ChromaError as exc:  # pragma: no cover - backend specific
+            raise PromptStorageError("Unable to query Chroma collection") from exc
+        try:
+            collection.peek(limit=document_count or 1)
+        except ChromaError as exc:  # pragma: no cover - backend specific
+            raise PromptStorageError("Unable to inspect Chroma collection") from exc
+
         diagnostics: list[str] = []
         self._persist_chroma_client()
         try:
@@ -289,6 +312,13 @@ class MaintenanceMixin:
                 diagnostics.append("SQLite quick_check: ok")
         except sqlite3.Error as exc:
             raise PromptStorageError("Unable to verify Chroma vector store") from exc
+        diagnostics.append(f"Collection count: {document_count}")
+        summary = "\n".join(diagnostics)
+        logger.info(
+            "Chroma vector store verification completed successfully: %s",
+            summary.replace("\n", " | "),
+        )
+        return summary
 
     def compact_repository(self) -> None:
         """Vacuum the SQLite prompt repository to reclaim disk space."""
