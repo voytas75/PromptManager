@@ -87,7 +87,6 @@ class SettingsWorkflow:
             theme_mode=self._runtime_settings.get("theme_mode"),
             chat_colors=self._runtime_settings.get("chat_colors"),
             prompt_templates=self._runtime_settings.get("prompt_templates"),
-            settings=settings,
         )
         if dialog.exec() != SettingsDialog.Accepted:
             return
