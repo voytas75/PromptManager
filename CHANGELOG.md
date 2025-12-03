@@ -6,7 +6,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
-## [Unreleased]
+## [0.21.0] - 2025-12-03
 
 ### Added
 
