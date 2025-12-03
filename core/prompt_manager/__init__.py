@@ -1,6 +1,7 @@
 """Prompt Manager package façade and orchestration layer.
 
 Updates:
+  v0.14.10 - 2025-12-03 - Move search and suggestion APIs into dedicated mixin.
   v0.14.9 - 2025-12-03 - Move execution and benchmarking APIs into mixin module.
   v0.14.8 - 2025-12-02 - Move maintenance utilities into dedicated mixin module.
   v0.14.7 - 2025-12-02 - Extract category, response style, and note APIs into mixins.
@@ -69,7 +70,7 @@ from ..exceptions import (
     ScenarioGenerationError,
 )
 from ..execution import CodexExecutor
-from ..intent_classifier import IntentClassifier, IntentPrediction, rank_by_hints
+from ..intent_classifier import IntentClassifier
 from ..name_generation import (
     LiteLLMCategoryGenerator,
     LiteLLMDescriptionGenerator,
@@ -105,6 +106,7 @@ from .generation import GenerationMixin
 from .maintenance import MaintenanceMixin
 from .prompt_notes import PromptNoteSupport
 from .response_styles import ResponseStyleSupport
+from .search import IntentSuggestions as _IntentSuggestions, PromptSearchMixin
 from .storage import PromptStorage
 
 sqlite3 = _sqlite3
@@ -286,6 +288,7 @@ class PromptManager(
     ResponseStyleSupport,
     PromptNoteSupport,
     GenerationMixin,
+    PromptSearchMixin,
     MaintenanceMixin,
     ExecutionHistoryMixin,
 ):
@@ -565,14 +568,7 @@ class PromptManager(
             raise PromptStorageError(f"SQLite repository missing at {path}.")
         return path
 
-    @dataclass(slots=True)
-    class IntentSuggestions:
-        """Intent-aware search recommendations returned to callers."""
-
-        prediction: IntentPrediction
-        prompts: list[Prompt]
-        fallback_used: bool = False
-
+    IntentSuggestions = _IntentSuggestions
     ExecutionOutcome = _ExecutionOutcome
     BenchmarkRun = _BenchmarkRun
     BenchmarkReport = _BenchmarkReport
@@ -1596,234 +1592,6 @@ class PromptManager(
             return self._repository.get_prompt_parent_fork(prompt_id)
         except RepositoryError as exc:
             raise PromptVersionError("Unable to load fork lineage") from exc
-
-    def search_prompts(
-        self,
-        query_text: str,
-        limit: int = 5,
-        where: dict[str, Any] | None = None,
-        embedding: Sequence[float] | None = None,
-    ) -> list[Prompt]:
-        """Search prompts semantically using a text query or embedding."""
-        if not query_text and embedding is None:
-            raise ValueError("query_text or embedding must be provided")
-
-        collection = self.collection
-
-        query_embedding: list[float]
-        if embedding is not None:
-            query_embedding = [float(value) for value in embedding]
-        else:
-            try:
-                query_embedding = self._embedding_provider.embed(query_text)
-            except EmbeddingGenerationError as exc:
-                raise PromptStorageError("Failed to generate query embedding") from exc
-
-        try:
-            try:
-                results = cast(
-                    "dict[str, Any]",
-                    collection.query(
-                        query_texts=None,
-                        query_embeddings=[query_embedding],
-                        n_results=limit,
-                        where=where,
-                        include=["documents", "metadatas", "distances"],
-                    ),
-                )
-            except TypeError:
-                # Older Chroma client mocks (or versions) may not accept the
-                # *include* parameter.  Retry without it and tolerate missing
-                # distance information.
-                results = cast(
-                    "dict[str, Any]",
-                    collection.query(
-                        query_texts=None,
-                        query_embeddings=[query_embedding],
-                        n_results=limit,
-                        where=where,
-                    ),
-                )
-        except ChromaError as exc:
-            raise PromptStorageError("Failed to query prompts") from exc
-
-        prompts: list[Prompt] = []
-        ids = cast("list[str]", results.get("ids", [[]])[0])
-        documents = cast("list[str]", results.get("documents", [[]])[0])
-        metadatas = cast("list[dict[str, Any]]", results.get("metadatas", [[]])[0])
-        distance_values: list[float | None]
-        if "distances" in results:
-            distance_payload = cast("list[list[float | None]]", results.get("distances", []))
-            distance_values = distance_payload[0] if distance_payload else []
-        else:
-            distance_values = []
-        if len(distance_values) < len(ids):
-            distance_values = [
-                *distance_values,
-                *([None] * (len(ids) - len(distance_values))),
-            ]
-
-        distances = distance_values
-
-        for prompt_id, document, metadata, distance in zip(
-            ids,
-            documents,
-            metadatas,
-            distances,
-            strict=False,
-        ):
-            try:
-                prompt_uuid = uuid.UUID(prompt_id)
-            except ValueError:
-                logger.warning(
-                    "Invalid prompt UUID in Chroma results",
-                    extra={"prompt_id": prompt_id},
-                )
-                continue
-            try:
-                prompt_record = self._repository.get(prompt_uuid)
-            except RepositoryNotFoundError:
-                record = {"id": prompt_id, "document": document, "metadata": metadata}
-                prompt_record = Prompt.from_chroma(record)
-            except RepositoryError as exc:
-                raise PromptStorageError(
-                    f"Failed to hydrate prompt {prompt_id} from SQLite"
-                ) from exc
-            # Attach similarity score (1 - cosine distance) when distance is provided
-            try:
-                if distance is not None:
-                    similarity = 1.0 - float(distance)
-                    prompt_record.similarity = similarity
-            except Exception:  # pragma: no cover – defensive
-                pass
-
-            prompts.append(prompt_record)
-
-        # Ensure prompts are ordered by descending similarity if available
-        if any(p.similarity is not None for p in prompts):
-            prompts.sort(key=lambda p: p.similarity or 0.0, reverse=True)
-
-        return prompts
-
-    def suggest_prompts(
-        self, query_text: str, *, limit: int = 5
-    ) -> PromptManager.IntentSuggestions:
-        """Return intent-ranked prompt recommendations for the supplied query."""
-        if limit <= 0:
-            raise ValueError("limit must be a positive integer")
-
-        stripped = query_text.strip()
-        if not stripped:
-            try:
-                baseline = self.repository.list(limit=limit)
-            except RepositoryError as exc:
-                raise PromptStorageError("Unable to load prompts for suggestions") from exc
-            personalised = self._personalize_ranked_prompts(baseline)
-            return PromptManager.IntentSuggestions(
-                IntentPrediction.general(), personalised[:limit], fallback_used=True
-            )
-
-        prediction = (
-            self._intent_classifier.classify(stripped)
-            if self._intent_classifier is not None
-            else IntentPrediction.general()
-        )
-
-        augmented_query_parts = [stripped]
-        if prediction.category_hints:
-            augmented_query_parts.append(
-                "Intent categories: " + ", ".join(prediction.category_hints)
-            )
-        if prediction.tag_hints:
-            augmented_query_parts.append("Intent tags: " + ", ".join(prediction.tag_hints))
-        augmented_query = "\n".join(augmented_query_parts)
-
-        suggestions: list[Prompt] = []
-        fallback_used = False
-        try:
-            raw_results = self.search_prompts(augmented_query, limit=max(limit * 2, 10))
-        except PromptManagerError:
-            raw_results = []
-
-        ranked = rank_by_hints(
-            raw_results,
-            category_hints=prediction.category_hints,
-            tag_hints=prediction.tag_hints,
-        )
-        ranked = self._personalize_ranked_prompts(ranked)
-
-        seen_ids: set[uuid.UUID] = set()
-        for prompt in ranked:
-            if prompt.id in seen_ids:
-                continue
-            suggestions.append(prompt)
-            seen_ids.add(prompt.id)
-            if len(suggestions) >= limit:
-                break
-
-        if len(suggestions) < limit:
-            fallback_used = True
-            try:
-                fallback_results = self.search_prompts(stripped, limit=max(limit * 2, 10))
-            except PromptManagerError:
-                fallback_results = []
-            else:
-                fallback_results = self._personalize_ranked_prompts(fallback_results)
-            for prompt in fallback_results:
-                if prompt.id in seen_ids:
-                    continue
-                suggestions.append(prompt)
-                seen_ids.add(prompt.id)
-                if len(suggestions) >= limit:
-                    break
-
-        if not suggestions:
-            fallback_used = True
-            try:
-                suggestions = self.repository.list(limit=limit)
-            except RepositoryError as exc:
-                raise PromptStorageError("Unable to load prompts for suggestions") from exc
-
-        personalised = self._personalize_ranked_prompts(suggestions)
-        return PromptManager.IntentSuggestions(
-            prediction=prediction,
-            prompts=personalised[:limit],
-            fallback_used=fallback_used,
-        )
-
-    def _personalize_ranked_prompts(self, prompts: Sequence[Prompt]) -> list[Prompt]:
-        """Bias prompt order using stored user preferences while preserving stability."""
-        if not prompts:
-            return []
-        profile = self._user_profile
-        if profile is None:
-            return list(prompts)
-
-        favorite_categories = profile.favorite_categories(limit=5)
-        favorite_tags = profile.favorite_tags(limit=8)
-        if not favorite_categories and not favorite_tags:
-            return list(prompts)
-
-        category_weights = {
-            name: (len(favorite_categories) - idx) * 2
-            for idx, name in enumerate(favorite_categories)
-        }
-        tag_weights = {name: len(favorite_tags) - idx for idx, name in enumerate(favorite_tags)}
-
-        scored: list[tuple[float, int, Prompt]] = []
-        for index, prompt in enumerate(prompts):
-            score = 0.0
-            category = (prompt.category or "").strip()
-            if category in category_weights:
-                score += float(category_weights[category])
-            for tag in prompt.tags or []:
-                weight = tag_weights.get(tag)
-                if weight:
-                    score += float(weight)
-            scored.append((score, index, prompt))
-
-        scored.sort(key=lambda item: (-item[0], item[1]))
-        return [prompt for _, _, prompt in scored]
 
     def increment_usage(self, prompt_id: uuid.UUID) -> None:
         """Increment usage counter for a prompt."""
