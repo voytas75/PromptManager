@@ -209,9 +209,23 @@ class VoicePlaybackController(QObject):
         self._is_playing = False
         self._is_preparing = False
         if self._temp_path is not None:
-            self._temp_path.unlink(missing_ok=True)
+            if self._player is not None:
+                self._player.setSource(QUrl())
+            try:
+                self._temp_path.unlink()
+            except PermissionError:
+                cleanup_timer = threading.Timer(1.0, self._delayed_cleanup, args=(self._temp_path,))
+                cleanup_timer.daemon = True
+                cleanup_timer.start()
             self._temp_path = None
         self._stop_event.clear()
+
+    @staticmethod
+    def _delayed_cleanup(path: Path) -> None:  # pragma: no cover - timing dependent
+        try:
+            path.unlink(missing_ok=True)
+        except PermissionError:
+            pass
 
 
 __all__ = ["VoicePlaybackController", "VoicePlaybackError"]
