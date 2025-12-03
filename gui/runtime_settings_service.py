@@ -67,6 +67,7 @@ class RuntimeSettingsService:
             if settings and settings.litellm_drop_params
             else None,
             "litellm_reasoning_effort": settings.litellm_reasoning_effort if settings else None,
+            "litellm_tts_model": settings.litellm_tts_model if settings else None,
             "litellm_stream": settings.litellm_stream if settings is not None else None,
             "litellm_workflow_models": dict(settings.litellm_workflow_models)
             if settings and settings.litellm_workflow_models
@@ -109,6 +110,7 @@ class RuntimeSettingsService:
                     "litellm_api_base",
                     "litellm_api_version",
                     "litellm_reasoning_effort",
+                    "litellm_tts_model",
                     "embedding_backend",
                     "embedding_model",
                 ):
@@ -196,6 +198,7 @@ class RuntimeSettingsService:
             "litellm_api_base",
             "litellm_api_version",
             "litellm_reasoning_effort",
+            "litellm_tts_model",
         )
         for key in simple_keys:
             if key in updates:
@@ -317,6 +320,7 @@ class RuntimeSettingsService:
                 "litellm_api_base": runtime.get("litellm_api_base"),
                 "litellm_api_version": runtime.get("litellm_api_version"),
                 "litellm_reasoning_effort": runtime.get("litellm_reasoning_effort"),
+                "litellm_tts_model": runtime.get("litellm_tts_model"),
                 "litellm_workflow_models": runtime.get("litellm_workflow_models"),
                 "quick_actions": runtime.get("quick_actions"),
                 "litellm_drop_params": runtime.get("litellm_drop_params"),
@@ -343,6 +347,7 @@ class RuntimeSettingsService:
             settings_model.litellm_api_base = updates.get("litellm_api_base")
             settings_model.litellm_api_version = updates.get("litellm_api_version")
             settings_model.litellm_reasoning_effort = updates.get("litellm_reasoning_effort")
+            settings_model.litellm_tts_model = updates.get("litellm_tts_model")
             settings_model.litellm_workflow_models = cleaned_workflow_models
             settings_model.quick_actions = cleaned_quick_actions
             settings_model.litellm_drop_params = cleaned_drop_params

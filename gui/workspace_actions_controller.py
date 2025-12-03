@@ -197,6 +197,14 @@ class WorkspaceActionsController:
             return
         controller.copy_result_to_workspace()
 
+    def play_voice_result(self) -> None:
+        """Toggle LiteLLM voice playback for the current execution result."""
+        controller = self._execution_controller()
+        if controller is None:
+            self._error_callback("Workspace unavailable", "Execution controller is not ready.")
+            return
+        controller.toggle_voice_playback()
+
     def handle_note_update(self, execution_id: UUID, note: str) -> None:  # noqa: ARG002
         """Record analytics when execution notes are edited."""
         self._usage_logger.log_note_edit(note_length=len(note))

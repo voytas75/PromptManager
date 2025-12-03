@@ -1,6 +1,7 @@
 """Settings management utilities for Prompt Manager configuration.
 
 Updates:
+  v0.5.4 - 2025-12-03 - Add LiteLLM TTS model configuration for voice playback.
   v0.5.3 - 2025-11-30 - Fix validator docstring spacing for lint compliance.
   v0.5.2 - 2025-11-30 - Add category suggestion workflow to LiteLLM routing.
   v0.5.1 - 2025-11-23 - Added prompt template override settings.
@@ -154,6 +155,10 @@ class PromptManagerSettings(BaseSettings):
             "Optional reasoning effort level for OpenAI reasoning models (minimal, medium, high)."
         ),
     )
+    litellm_tts_model: str | None = Field(
+        default=None,
+        description="LiteLLM text-to-speech model used for workspace voice playback.",
+    )
     litellm_stream: bool = Field(
         default=False,
         description="Enable streaming responses when executing prompts via LiteLLM.",
@@ -250,6 +255,10 @@ class PromptManagerSettings(BaseSettings):
                     "LITELLM_REASONING_EFFORT",
                     "litellm_reasoning_effort",
                 ],
+                "litellm_tts_model": [
+                    "LITELLM_TTS_MODEL",
+                    "litellm_tts_model",
+                ],
                 "litellm_stream": ["LITELLM_STREAM", "litellm_stream"],
                 "litellm_workflow_models": ["LITELLM_WORKFLOW_MODELS", "litellm_workflow_models"],
                 "embedding_backend": ["EMBEDDING_BACKEND", "embedding_backend"],
@@ -322,6 +331,7 @@ class PromptManagerSettings(BaseSettings):
         "litellm_inference_model",
         "litellm_api_key",
         "litellm_api_base",
+        "litellm_tts_model",
         "embedding_model",
         "embedding_device",
         mode="before",
@@ -542,6 +552,10 @@ class PromptManagerSettings(BaseSettings):
                     "LITELLM_WORKFLOW_MODELS",
                     "litellm_workflow_models",
                 ],
+                "litellm_tts_model": [
+                    "LITELLM_TTS_MODEL",
+                    "litellm_tts_model",
+                ],
                 "embedding_backend": ["EMBEDDING_BACKEND", "embedding_backend"],
                 "embedding_model": ["EMBEDDING_MODEL", "embedding_model"],
                 "embedding_device": ["EMBEDDING_DEVICE", "embedding_device"],
@@ -643,6 +657,7 @@ class PromptManagerSettings(BaseSettings):
                     "litellm_reasoning_effort",
                     "litellm_stream",
                     "litellm_workflow_models",
+                    "litellm_tts_model",
                     "embedding_backend",
                     "embedding_model",
                     "embedding_device",

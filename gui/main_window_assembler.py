@@ -14,6 +14,7 @@ from .controllers.execution_controller import ExecutionController
 from .prompt_list_coordinator import PromptSortOrder
 from .prompt_list_presenter import PromptListCallbacks, PromptListPresenter
 from .quick_action_controller import QuickActionController
+from .voice_playback_controller import VoicePlaybackController
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from .main_window import MainWindow
@@ -95,6 +96,7 @@ def assemble_quick_action_controller(window: MainWindow) -> QuickActionControlle
 
 def assemble_execution_controller(window: MainWindow) -> ExecutionController:
     """Create the execution controller for prompt + chat runs."""
+    voice_controller = VoicePlaybackController(parent=window)  # type: ignore[arg-type]
     controller = ExecutionController(
         manager=window._manager,  # type: ignore[attr-defined]
         runtime_settings=window._runtime_settings,  # type: ignore[attr-defined]
@@ -111,12 +113,14 @@ def assemble_execution_controller(window: MainWindow) -> ExecutionController:
         copy_result_to_text_window_button=window._copy_result_to_text_window_button,  # type: ignore[attr-defined]
         save_button=window._save_button,  # type: ignore[attr-defined]
         share_result_button=window._share_result_button,  # type: ignore[attr-defined]
+        speak_result_button=window._speak_result_button,  # type: ignore[attr-defined]
         continue_chat_button=window._continue_chat_button,  # type: ignore[attr-defined]
         end_chat_button=window._end_chat_button,  # type: ignore[attr-defined]
         status_callback=window._show_status_message,  # type: ignore[attr-defined]
         clear_status_callback=window.statusBar().clearMessage,  # type: ignore[attr-defined]
         error_callback=window._show_error,  # type: ignore[attr-defined]
         toast_callback=window._show_toast,  # type: ignore[attr-defined]
+        voice_controller=voice_controller,
         settings=window._settings,  # type: ignore[attr-defined]
     )
     controller.notify_share_providers_changed()

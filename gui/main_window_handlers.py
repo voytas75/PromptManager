@@ -333,6 +333,10 @@ class WorkspaceInputHandler:
         """Copy the latest result back into the workspace input."""
         self._workspace_router.copy_result_to_workspace()
 
+    def play_result_audio(self) -> None:
+        """Toggle LiteLLM voice playback for the current result."""
+        self._workspace_router.play_voice_result()
+
     def handle_note_update(self, execution_id: UUID, note: str) -> None:
         """Record changes to execution notes."""
         self._workspace_router.handle_note_update(execution_id, note)

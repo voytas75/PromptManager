@@ -51,6 +51,7 @@ def test_load_settings_reads_json_and_env(monkeypatch: MonkeyPatch, tmp_path: Pa
     assert settings.litellm_model is None
     assert settings.litellm_inference_model is None
     assert settings.litellm_drop_params is None
+    assert settings.litellm_tts_model is None
 
 
 def test_json_precedes_env_when_both_provided(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
@@ -101,6 +102,7 @@ def test_json_with_litellm_api_key_is_ignored(
     assert settings.litellm_api_key is None
     assert settings.litellm_api_base == "https://azure.example.com"
     assert settings.litellm_drop_params is None
+    assert settings.litellm_tts_model is None
     assert "Ignoring LiteLLM secret key" in caplog.text
 
 
@@ -113,6 +115,7 @@ def test_litellm_settings_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> 
     monkeypatch.setenv("PROMPT_MANAGER_LITELLM_INFERENCE_MODEL", "gpt-4.1")
     monkeypatch.setenv("PROMPT_MANAGER_LITELLM_API_KEY", "secret-key")
     monkeypatch.setenv("PROMPT_MANAGER_LITELLM_API_BASE", "https://proxy.example.com")
+    monkeypatch.setenv("PROMPT_MANAGER_LITELLM_TTS_MODEL", "openai/tts-1")
     monkeypatch.setenv(
         "PROMPT_MANAGER_LITELLM_WORKFLOW_MODELS",
         json.dumps({"prompt_execution": "inference"}),
@@ -127,6 +130,19 @@ def test_litellm_settings_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> 
     assert settings.litellm_drop_params is None
     assert settings.litellm_stream is False
     assert settings.litellm_workflow_models == {"prompt_execution": "inference"}
+    assert settings.litellm_tts_model == "openai/tts-1"
+
+
+def test_litellm_tts_model_from_json(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    """Load LiteLLM TTS model selection from JSON configs."""
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps({"litellm_tts_model": "azure/voice"}), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
+
+    settings = load_settings()
+
+    assert settings.litellm_tts_model == "azure/voice"
 
 
 def test_litellm_inference_model_from_json(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:

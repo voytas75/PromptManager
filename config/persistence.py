@@ -1,10 +1,12 @@
 """Helpers for persisting runtime configuration without Qt dependencies.
 
-Updates: v0.2.5 - 2025-12-06 - Persist embedding backend/model selections and drop defaults.
-Updates: v0.2.4 - 2025-12-03 - Normalise chat palette overrides and skip default colours.
-Updates: v0.2.3 - 2025-11-05 - Persist theme mode and chat appearance overrides.
-Updates: v0.2.2 - 2025-11-05 - Persist chat appearance overrides.
-Updates: v0.2.1 - 2025-11-05 - Persist LiteLLM workflow routing selections.
+Updates:
+  v0.2.6 - 2025-12-03 - Persist LiteLLM TTS model selection for voice playback.
+  v0.2.5 - 2025-12-06 - Persist embedding backend/model selections and drop defaults.
+  v0.2.4 - 2025-12-03 - Normalise chat palette overrides and skip default colours.
+  v0.2.3 - 2025-11-05 - Persist theme mode and chat appearance overrides.
+  v0.2.2 - 2025-11-05 - Persist chat appearance overrides.
+  v0.2.1 - 2025-11-05 - Persist LiteLLM workflow routing selections.
 """
 
 from __future__ import annotations

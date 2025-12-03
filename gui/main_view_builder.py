@@ -20,10 +20,12 @@ from PySide6.QtWidgets import (
     QListView,
     QPlainTextEdit,
     QPushButton,
+    QStyle,
     QSizePolicy,
     QSplitter,
     QTabWidget,
     QTextEdit,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -74,6 +76,7 @@ class MainViewCallbacks:
     copy_result_to_text_window_clicked: Callable[[], None]
     save_result_clicked: Callable[[], None]
     share_result_clicked: Callable[[], None]
+    speak_result_clicked: Callable[[], None]
     filters_changed: Callable[..., None]
     sort_changed: Callable[[str], None]
     manage_categories_clicked: Callable[[], None]
@@ -109,6 +112,7 @@ class MainViewComponents:
     copy_result_to_text_window_button: QPushButton
     save_button: QPushButton
     share_result_button: QPushButton
+    speak_result_button: QToolButton
     intent_hint: QLabel
     filter_panel: PromptFilterPanel
     query_input: QPlainTextEdit
@@ -231,6 +235,13 @@ def build_main_view(
     share_result_button = QPushButton("Share Result", parent)
     share_result_button.clicked.connect(callbacks.share_result_clicked)  # type: ignore[arg-type]
 
+    speak_result_button = QToolButton(parent)
+    speak_result_button.setToolTip("Read the latest result aloud.")
+    speak_result_button.setIcon(parent.style().standardIcon(QStyle.SP_MediaPlay))
+    speak_result_button.setCheckable(True)
+    speak_result_button.setEnabled(False)
+    speak_result_button.clicked.connect(callbacks.speak_result_clicked)  # type: ignore[arg-type]
+
     intent_hint = QLabel("", parent)
     intent_hint.setObjectName("intentHintLabel")
     intent_hint.setStyleSheet("color: #5b5b5b; font-style: italic;")
@@ -329,6 +340,7 @@ def build_main_view(
             copy_result_button,
             copy_result_to_text_window_button,
             share_result_button,
+            speak_result_button,
         ]
     )
 
@@ -484,6 +496,7 @@ def build_main_view(
         copy_result_to_text_window_button=copy_result_to_text_window_button,
         save_button=save_button,
         share_result_button=share_result_button,
+        speak_result_button=speak_result_button,
         intent_hint=intent_hint,
         filter_panel=filter_panel,
         query_input=query_input,

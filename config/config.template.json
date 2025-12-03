@@ -9,6 +9,7 @@
   "litellm_stream": false,
   "litellm_drop_params": ["max_tokens", "max_output_tokens", "temperature", "timeout"],
   "litellm_reasoning_effort": null,
+  "litellm_tts_model": null,
   "litellm_workflow_models": {
     "prompt_execution": "inference",
     "prompt_structure_refinement": "inference"

@@ -85,5 +85,11 @@ class WorkspaceCommandRouter:
         if actions is not None:
             actions.copy_result_to_workspace()
 
+    def play_voice_result(self) -> None:
+        """Toggle LiteLLM voice playback when the controller is available."""
+        actions = self._supplier()
+        if actions is not None:
+            actions.play_voice_result()
+
 
 __all__ = ["WorkspaceCommandRouter"]

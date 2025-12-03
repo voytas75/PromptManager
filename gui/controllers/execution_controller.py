@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QGuiApplication, QTextCursor
+from PySide6.QtWidgets import QAbstractButton, QStyle
 
 from config import (
     DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR,
@@ -30,6 +31,7 @@ if TYPE_CHECKING:  # pragma: no cover - import for typing only
     from uuid import UUID
 
     from PySide6.QtWidgets import (
+        QAbstractButton,
         QCheckBox,
         QLabel,
         QPlainTextEdit,
@@ -37,10 +39,11 @@ if TYPE_CHECKING:  # pragma: no cover - import for typing only
         QTabWidget,
         QTextEdit,
     )
-
-    from gui.share_controller import ShareController
-    from gui.usage_logger import IntentUsageLogger
     from models.prompt_model import Prompt
+
+from gui.share_controller import ShareController
+from gui.usage_logger import IntentUsageLogger
+from gui.voice_playback_controller import VoicePlaybackController, VoicePlaybackError
 
 StatusCallback = Callable[[str, int], None]
 ClearStatusCallback = Callable[[], None]
@@ -69,12 +72,14 @@ class ExecutionController:
         copy_result_to_text_window_button: QPushButton,
         save_button: QPushButton,
         share_result_button: QPushButton,
+        speak_result_button: QAbstractButton,
         continue_chat_button: QPushButton,
         end_chat_button: QPushButton,
         status_callback: StatusCallback,
         clear_status_callback: ClearStatusCallback,
         error_callback: ErrorCallback,
         toast_callback: ToastCallback,
+        voice_controller: VoicePlaybackController | None,
         settings: PromptManagerSettings | None = None,
     ) -> None:
         """Store shared dependencies and references to workspace widgets."""
@@ -93,6 +98,7 @@ class ExecutionController:
         self._copy_result_to_text_window_button = copy_result_to_text_window_button
         self._save_button = save_button
         self._share_result_button = share_result_button
+        self._speak_result_button = speak_result_button
         self._continue_chat_button = continue_chat_button
         self._end_chat_button = end_chat_button
         self._status = status_callback
@@ -100,6 +106,11 @@ class ExecutionController:
         self._error = error_callback
         self._toast = toast_callback
         self._settings = settings
+        self._voice_controller = voice_controller
+        self._voice_supported = bool(voice_controller and voice_controller.is_supported)
+        self._speak_result_button_play_icon = speak_result_button.icon()
+        self._speak_result_button_stop_icon = speak_result_button.style().standardIcon(QStyle.SP_MediaStop)
+        self._speak_result_button.setCheckable(True)
 
         self._streaming_in_progress = False
         self._stream_prompt_id: UUID | None = None
@@ -117,6 +128,18 @@ class ExecutionController:
         self._share_result_button.setEnabled(False)
         self._continue_chat_button.setEnabled(False)
         self._end_chat_button.setEnabled(False)
+        self._speak_result_button.setEnabled(False)
+
+        if self._voice_controller and self._voice_supported:
+            self._voice_controller.playback_preparing.connect(self._on_voice_preparing)
+            self._voice_controller.playback_started.connect(self._on_voice_started)
+            self._voice_controller.playback_finished.connect(self._on_voice_finished)
+            self._voice_controller.playback_failed.connect(self._on_voice_failed)
+        else:
+            tooltip = (
+                "Voice playback requires Qt multimedia support and a configured LiteLLM TTS model."
+            )
+            self._speak_result_button.setToolTip(tooltip)
 
     @property
     def last_execution(self) -> PromptManager.ExecutionOutcome | None:
@@ -357,6 +380,7 @@ class ExecutionController:
 
     def clear_execution_result(self) -> None:
         """Reset all output controls to their default disabled state."""
+        self._stop_voice_playback()
         self._last_execution = None
         self._last_prompt_name = None
         self._result_label.setText("No prompt executed yet")
@@ -366,6 +390,7 @@ class ExecutionController:
         self._copy_result_to_text_window_button.setEnabled(False)
         self._save_button.setEnabled(False)
         self._share_result_button.setEnabled(False)
+        self._speak_result_button.setEnabled(False)
         self._reset_chat_session()
 
     def abort_streaming(self) -> None:
@@ -380,6 +405,7 @@ class ExecutionController:
         return bool(value)
 
     def _begin_streaming_run(self, prompt: Prompt) -> None:
+        self._stop_voice_playback()
         self._streaming_in_progress = True
         self._stream_prompt_id = prompt.id
         self._streaming_buffer = []
@@ -400,6 +426,7 @@ class ExecutionController:
         self._share_result_button.setEnabled(False)
         self._continue_chat_button.setEnabled(False)
         self._end_chat_button.setEnabled(False)
+        self._update_voice_button_state()
         self._status(f"Streaming '{prompt.name}'…", 0)
 
     def _handle_stream_chunk(self, chunk: str) -> None:
@@ -432,6 +459,7 @@ class ExecutionController:
             self._end_chat_button.setEnabled(bool(self._chat_conversation))
         self._stream_control_state = {}
         self._clear_status()
+        self._update_voice_button_state()
 
     def _display_execution_result(
         self,
@@ -616,3 +644,59 @@ class ExecutionController:
         if self._streaming_in_progress:
             return False
         return self._share_controller.has_providers() and bool(self._raw_result_text.strip())
+
+    def toggle_voice_playback(self) -> None:
+        """Toggle LiteLLM-powered voice playback for the current result."""
+
+        if not self._voice_controller or not self._voice_supported:
+            self._status("Voice playback requires Qt multimedia support.", 4000)
+            return
+        if not self._raw_result_text.strip():
+            self._status("Run a prompt to generate output before using voice playback.", 4000)
+            return
+        if self._voice_controller.is_active:
+            self._voice_controller.stop()
+            return
+        try:
+            self._voice_controller.play_text(self._raw_result_text, self._runtime_settings)
+        except VoicePlaybackError as exc:
+            self._status(str(exc), 5000)
+
+    def _on_voice_preparing(self) -> None:
+        self._speak_result_button.setEnabled(False)
+        self._speak_result_button.setChecked(True)
+        self._speak_result_button.setIcon(self._speak_result_button_stop_icon)
+        self._status("Generating audio…", 0)
+
+    def _on_voice_started(self) -> None:
+        self._speak_result_button.setEnabled(True)
+        self._speak_result_button.setChecked(True)
+        self._speak_result_button.setIcon(self._speak_result_button_stop_icon)
+        self._status("Playing voice output…", 0)
+
+    def _on_voice_finished(self) -> None:
+        self._speak_result_button.setChecked(False)
+        self._speak_result_button.setIcon(self._speak_result_button_play_icon)
+        self._update_voice_button_state()
+        self._status("Voice playback finished.", 3000)
+
+    def _on_voice_failed(self, message: str) -> None:
+        self._speak_result_button.setChecked(False)
+        self._speak_result_button.setIcon(self._speak_result_button_play_icon)
+        self._update_voice_button_state()
+        self._status(message, 5000)
+
+    def _stop_voice_playback(self) -> None:
+        if self._voice_controller and self._voice_controller.is_active:
+            self._voice_controller.stop()
+
+    def _update_voice_button_state(self) -> None:
+        enabled = (
+            self._voice_supported
+            and bool(self._raw_result_text.strip())
+            and not self._streaming_in_progress
+        )
+        self._speak_result_button.setEnabled(enabled)
+        if not enabled:
+            self._speak_result_button.setChecked(False)
+            self._speak_result_button.setIcon(self._speak_result_button_play_icon)

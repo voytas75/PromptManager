@@ -6,6 +6,13 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- Added a LiteLLM text-to-speech model configuration (GUI + JSON/env support) so upcoming voice playback flows can target dedicated TTS endpoints without overloading the fast/inference chat models.
+- Added a speaker button to the workspace result overlay that streams LiteLLM text-to-speech audio for the last run whenever `PROMPT_MANAGER_LITELLM_TTS_MODEL` and Qt Multimedia support are available.
+
 ## [0.20.0] - 2025-11-29
 
 ### Added

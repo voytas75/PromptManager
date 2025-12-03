@@ -92,6 +92,7 @@ def bind_main_view(
     window._copy_result_to_text_window_button = components.copy_result_to_text_window_button
     window._save_button = components.save_button
     window._share_result_button = components.share_result_button
+    window._speak_result_button = components.speak_result_button
     window._intent_hint = components.intent_hint
     window._filter_panel = components.filter_panel
     window._query_input = components.query_input

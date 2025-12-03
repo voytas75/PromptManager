@@ -137,6 +137,7 @@ def _print_settings_summary(settings: PromptManagerSettings) -> None:
     litellm_api_base = getattr(settings, "litellm_api_base", None)
     litellm_api_version = getattr(settings, "litellm_api_version", None)
     litellm_reasoning_effort = getattr(settings, "litellm_reasoning_effort", None)
+    litellm_tts_model = getattr(settings, "litellm_tts_model", None)
     litellm_stream = getattr(settings, "litellm_stream", False)
     litellm_workflow_models = getattr(settings, "litellm_workflow_models", None) or {}
     embedding_backend = getattr(settings, "embedding_backend", None)
@@ -168,6 +169,7 @@ def _print_settings_summary(settings: PromptManagerSettings) -> None:
         "---------------------",
         f"Fast model: {litellm_model or 'not set'}",
         f"Inference model: {litellm_inference_model or 'not set'}",
+        f"TTS model: {litellm_tts_model or 'not set'}",
         f"LiteLLM API key: {_mask_secret(litellm_api_key)}",
         f"LiteLLM API base: {litellm_api_base or 'not set'}",
         f"LiteLLM API version: {litellm_api_version or 'not set'}",

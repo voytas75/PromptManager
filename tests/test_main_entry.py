@@ -41,6 +41,7 @@ class _DummySettings(SimpleNamespace):
             litellm_api_version=None,
             litellm_drop_params=None,
             litellm_reasoning_effort=None,
+            litellm_tts_model=None,
             litellm_stream=False,
             embedding_backend=DEFAULT_EMBEDDING_BACKEND,
             embedding_model=DEFAULT_EMBEDDING_MODEL,
