@@ -427,8 +427,10 @@ class PromptManager(
         self._prompt_engineer = prompt_engineer
         self._prompt_structure_engineer = structure_prompt_engineer or prompt_engineer
         self._litellm_fast_model: str | None = self._normalise_model_identifier(fast_model)
-        if self._litellm_fast_model is None and getattr(name_generator, "model", None):
-            self._litellm_fast_model = self._normalise_model_identifier(name_generator.model)
+        if self._litellm_fast_model is None and name_generator is not None:
+            generator_model = getattr(name_generator, "model", None)
+            if generator_model:
+                self._litellm_fast_model = self._normalise_model_identifier(generator_model)
         self._litellm_inference_model: str | None = self._normalise_model_identifier(
             inference_model
         )

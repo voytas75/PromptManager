@@ -24,6 +24,9 @@ if TYPE_CHECKING:
     from ..category_registry import CategoryRegistry
     from ..embedding import EmbeddingProvider
     from ..repository import PromptRepository
+    from . import PromptManager as _PromptManager
+else:
+    _PromptManager = Any
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +108,7 @@ class AnalyticsMixin:
     _category_registry: CategoryRegistry
     _embedding_provider: EmbeddingProvider
 
-    def get_category_health(self) -> list[CategoryHealth]:
+    def get_category_health(self: _PromptManager) -> list[CategoryHealth]:
         """Return prompt and execution health metrics for each category."""
         try:
             prompt_counts = self._repository.get_category_prompt_counts()
@@ -181,7 +184,7 @@ class AnalyticsMixin:
         chroma_message = "Chroma collection unavailable."
         chroma_count: int | None = None
         try:
-            collection = self.collection  # type: ignore[attr-defined]
+            collection = self.collection
         except PromptManagerError as exc:
             chroma_message = str(exc)
         else:

@@ -51,7 +51,7 @@ class PromptSearchMixin:
     _user_profile: UserProfile | None
 
     def search_prompts(
-        self,
+        self: _PromptManager,
         query_text: str,
         limit: int = 5,
         where: dict[str, Any] | None = None,
@@ -136,7 +136,7 @@ class PromptSearchMixin:
         return prompts
 
     def suggest_prompts(
-        self,
+        self: _PromptManager,
         query_text: str,
         *,
         limit: int = 5,
@@ -266,7 +266,9 @@ class PromptSearchMixin:
             ]
         return distance_values
 
-    def _personalize_ranked_prompts(self, prompts: Sequence[Prompt]) -> list[Prompt]:
+    def _personalize_ranked_prompts(
+        self: _PromptManager, prompts: Sequence[Prompt]
+    ) -> list[Prompt]:
         """Bias prompt order using stored user preferences while preserving stability."""
         if not prompts:
             return []

@@ -22,6 +22,9 @@ from ..repository import RepositoryError, RepositoryNotFoundError
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers only
     from ..repository import PromptRepository
+    from . import PromptManager as _PromptManager
+else:
+    _PromptManager = Any
 
 __all__ = ["PromptVersionDiff", "PromptVersionMixin"]
 
@@ -45,7 +48,7 @@ class PromptVersionMixin:
     # Public APIs ------------------------------------------------------ #
 
     def list_prompt_versions(
-        self,
+        self: _PromptManager,
         prompt_id: uuid.UUID,
         *,
         limit: int | None = None,
@@ -56,7 +59,7 @@ class PromptVersionMixin:
         except RepositoryError as exc:
             raise PromptVersionError("Unable to load prompt versions") from exc
 
-    def get_prompt_version(self, version_id: int) -> PromptVersion:
+    def get_prompt_version(self: _PromptManager, version_id: int) -> PromptVersion:
         """Return a stored prompt version by identifier."""
         try:
             return self._repository.get_prompt_version(version_id)
@@ -65,7 +68,9 @@ class PromptVersionMixin:
         except RepositoryError as exc:
             raise PromptVersionError(f"Unable to load prompt version {version_id}") from exc
 
-    def get_latest_prompt_version(self, prompt_id: uuid.UUID) -> PromptVersion | None:
+    def get_latest_prompt_version(
+        self: _PromptManager, prompt_id: uuid.UUID
+    ) -> PromptVersion | None:
         """Return the most recent version for the prompt, if one exists."""
         try:
             return self._repository.get_prompt_latest_version(prompt_id)
@@ -73,7 +78,7 @@ class PromptVersionMixin:
             raise PromptVersionError("Unable to load latest prompt version") from exc
 
     def diff_prompt_versions(
-        self,
+        self: _PromptManager,
         base_version_id: int,
         target_version_id: int,
     ) -> PromptVersionDiff:
@@ -109,7 +114,7 @@ class PromptVersionMixin:
         )
 
     def restore_prompt_version(
-        self,
+        self: _PromptManager,
         version_id: int,
         *,
         commit_message: str | None = None,
@@ -122,7 +127,7 @@ class PromptVersionMixin:
         return self.update_prompt(prompt, commit_message=message)
 
     def merge_prompt_versions(
-        self,
+        self: _PromptManager,
         prompt_id: uuid.UUID,
         *,
         base_version_id: int,
@@ -185,7 +190,7 @@ class PromptVersionMixin:
         return stored, conflicts
 
     def fork_prompt(
-        self,
+        self: _PromptManager,
         prompt_id: uuid.UUID,
         *,
         name: str | None = None,
@@ -226,14 +231,18 @@ class PromptVersionMixin:
 
         return stored
 
-    def list_prompt_forks(self, prompt_id: uuid.UUID) -> list[PromptForkLink]:
+    def list_prompt_forks(
+        self: _PromptManager, prompt_id: uuid.UUID
+    ) -> list[PromptForkLink]:
         """Return lineage entries for children derived from the prompt."""
         try:
             return self._repository.list_prompt_children(prompt_id)
         except RepositoryError as exc:
             raise PromptVersionError("Unable to load prompt forks") from exc
 
-    def get_prompt_parent_fork(self, prompt_id: uuid.UUID) -> PromptForkLink | None:
+    def get_prompt_parent_fork(
+        self: _PromptManager, prompt_id: uuid.UUID
+    ) -> PromptForkLink | None:
         """Return the recorded parent for a forked prompt, if any."""
         try:
             return self._repository.get_prompt_parent_fork(prompt_id)
@@ -243,7 +252,7 @@ class PromptVersionMixin:
     # Internal helpers ------------------------------------------------- #
 
     def _commit_prompt_version(
-        self,
+        self: _PromptManager,
         prompt: Prompt,
         *,
         commit_message: str | None = None,

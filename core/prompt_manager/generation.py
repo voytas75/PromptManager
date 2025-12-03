@@ -27,8 +27,10 @@ from ..notifications import NotificationLevel
 
 if TYPE_CHECKING:  # pragma: no cover - typing-only imports
     from models.prompt_model import Prompt
+    from . import PromptManager as _PromptManager
 else:  # pragma: no cover - runtime fallback for typing name
-    Prompt = Any  # type: ignore[assignment]
+    Prompt = Any
+    _PromptManager = Any
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +84,7 @@ def _match_category_label(
 class GenerationMixin:
     """Prompt generation helpers shared across the manager and GUI flows."""
 
-    def generate_prompt_name(self, context: str) -> str:
+    def generate_prompt_name(self: _PromptManager, context: str) -> str:
         """Return a prompt name using the configured LiteLLM generator."""
         if self._name_generator is None:
             raise NameGenerationError(
@@ -106,7 +108,7 @@ class GenerationMixin:
         return suggestion
 
     def generate_prompt_description(
-        self,
+        self: _PromptManager,
         context: str,
         *,
         allow_fallback: bool = True,
@@ -148,7 +150,12 @@ class GenerationMixin:
                 raise DescriptionGenerationError(str(exc)) from exc
         return summary
 
-    def generate_prompt_scenarios(self, context: str, *, max_scenarios: int = 3) -> list[str]:
+    def generate_prompt_scenarios(
+        self: _PromptManager,
+        context: str,
+        *,
+        max_scenarios: int = 3,
+    ) -> list[str]:
         """Return usage scenarios for a prompt via the configured LiteLLM helper."""
         if self._scenario_generator is None:
             raise ScenarioGenerationError(
@@ -178,7 +185,7 @@ class GenerationMixin:
         return scenarios
 
     def refresh_prompt_scenarios(
-        self,
+        self: _PromptManager,
         prompt_id: uuid.UUID,
         *,
         max_scenarios: int = 3,
@@ -214,7 +221,7 @@ class GenerationMixin:
         except PromptManagerError as exc:
             raise PromptStorageError("Failed to persist refreshed scenarios") from exc
 
-    def generate_prompt_category(self, context: str) -> str:
+    def generate_prompt_category(self: _PromptManager, context: str) -> str:
         """Suggest a prompt category using LiteLLM with classifier-based fallback."""
         text = (context or "").strip()
         if not text:
@@ -233,7 +240,7 @@ class GenerationMixin:
         return self._fallback_category_from_context(text, categories)
 
     def _run_category_generator(
-        self,
+        self: _PromptManager,
         context: str,
         categories: Sequence[PromptCategory],
     ) -> str:
@@ -267,7 +274,7 @@ class GenerationMixin:
         return ""
 
     def _fallback_category_from_context(
-        self,
+        self: _PromptManager,
         context: str,
         categories: Sequence[PromptCategory],
     ) -> str:
@@ -300,7 +307,7 @@ class GenerationMixin:
         return categories[0].label if categories else "General"
 
     def _update_category_insight(
-        self,
+        self: _PromptManager,
         prompt: Prompt,
         *,
         previous_prompt: Prompt | None,

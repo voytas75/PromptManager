@@ -7,7 +7,7 @@ Updates:
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..exceptions import PromptEngineeringUnavailable
 from ..notifications import NotificationLevel
@@ -15,6 +15,9 @@ from ..prompt_engineering import PromptEngineer, PromptEngineeringError, PromptR
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from . import PromptManager as _PromptManager
+else:
+    _PromptManager = Any
 
 __all__ = ["PromptRefinementMixin"]
 
@@ -36,7 +39,7 @@ class PromptRefinementMixin:
         return self.prompt_engineer
 
     def refine_prompt_text(
-        self,
+        self: _PromptManager,
         prompt_text: str,
         *,
         name: str | None = None,
@@ -84,7 +87,7 @@ class PromptRefinementMixin:
                 raise PromptEngineeringError("Prompt refinement failed unexpectedly.") from exc
 
     def refine_prompt_structure(
-        self,
+        self: _PromptManager,
         prompt_text: str,
         *,
         name: str | None = None,

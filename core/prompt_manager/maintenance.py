@@ -31,6 +31,9 @@ from ..repository import (
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers only
     from collections.abc import Mapping
+    from . import PromptManager as _PromptManager
+else:
+    _PromptManager = Any
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +56,8 @@ def _coerce_int(value: Any) -> int | None:
 
 class MaintenanceMixin:
     """Operational helpers for repository, cache, and vector-store maintenance."""
-    def get_redis_details(self) -> dict[str, Any]:
+
+    def get_redis_details(self: _PromptManager) -> dict[str, Any]:
         """Return connection and usage details for the configured Redis cache."""
         details: dict[str, Any] = {"enabled": self._redis_client is not None}
         client = self._redis_client
@@ -126,7 +130,7 @@ class MaintenanceMixin:
             details["stats"] = stats
         return details
 
-    def get_chroma_details(self) -> dict[str, Any]:
+    def get_chroma_details(self: _PromptManager) -> dict[str, Any]:
         """Return filesystem and collection metrics for the configured Chroma store."""
         details: dict[str, Any] = {"enabled": self._collection is not None}
         details["path"] = self._chroma_path
@@ -153,7 +157,7 @@ class MaintenanceMixin:
             pass
         return details
 
-    def reset_prompt_repository(self) -> None:
+    def reset_prompt_repository(self: _PromptManager) -> None:
         """Clear all prompts, executions, and profiles from SQLite storage."""
         reset_func = getattr(self._repository, "reset_all_data", None)
         if not callable(reset_func):
@@ -165,7 +169,7 @@ class MaintenanceMixin:
         logger.info("Prompt repository reset completed.")
         self.refresh_user_profile()
 
-    def reset_vector_store(self) -> None:
+    def reset_vector_store(self: _PromptManager) -> None:
         """Remove all embeddings from the Chroma vector store."""
         if self._collection is None:
             return
@@ -180,7 +184,7 @@ class MaintenanceMixin:
             raise PromptStorageError("Unable to reset Chroma vector store") from exc
         logger.info("Chroma vector store reset completed.")
 
-    def rebuild_embeddings(self, *, reset_store: bool = False) -> tuple[int, int]:
+    def rebuild_embeddings(self: _PromptManager, *, reset_store: bool = False) -> tuple[int, int]:
         """Regenerate embeddings for all prompts and persist them to Chroma."""
         if reset_store:
             self.reset_vector_store()
@@ -233,7 +237,7 @@ class MaintenanceMixin:
         )
         return successes, failures
 
-    def compact_vector_store(self) -> None:
+    def compact_vector_store(self: _PromptManager) -> None:
         """Vacuum and truncate the persistent Chroma SQLite store."""
         db_path = Path(self._chroma_path) / "chroma.sqlite3"
         if not db_path.exists():
@@ -247,7 +251,7 @@ class MaintenanceMixin:
             raise PromptStorageError("Unable to compact Chroma vector store") from exc
         logger.info("Chroma vector store VACUUM completed at %s", db_path)
 
-    def optimize_vector_store(self) -> None:
+    def optimize_vector_store(self: _PromptManager) -> None:
         """Refresh SQLite statistics to optimize Chroma query planning."""
         db_path = Path(self._chroma_path) / "chroma.sqlite3"
         if not db_path.exists():
@@ -267,7 +271,7 @@ class MaintenanceMixin:
             raise PromptStorageError("Unable to optimize Chroma vector store") from exc
         logger.info("Chroma vector store optimization completed at %s", db_path)
 
-    def verify_vector_store(self) -> str:
+    def verify_vector_store(self: _PromptManager) -> str:
         """Run integrity checks against the persistent Chroma store."""
         db_path = Path(self._chroma_path) / "chroma.sqlite3"
         if not db_path.exists():
@@ -320,7 +324,7 @@ class MaintenanceMixin:
         )
         return summary
 
-    def compact_repository(self) -> None:
+    def compact_repository(self: _PromptManager) -> None:
         """Vacuum the SQLite prompt repository to reclaim disk space."""
         db_path = self._resolve_repository_path()
         try:
@@ -331,7 +335,7 @@ class MaintenanceMixin:
             raise PromptStorageError("Unable to compact SQLite repository") from exc
         logger.info("SQLite repository VACUUM completed at %s", db_path)
 
-    def optimize_repository(self) -> None:
+    def optimize_repository(self: _PromptManager) -> None:
         """Refresh SQLite statistics for the prompt repository."""
         db_path = self._resolve_repository_path()
         try:
@@ -348,7 +352,7 @@ class MaintenanceMixin:
             raise PromptStorageError("Unable to optimize SQLite repository") from exc
         logger.info("SQLite repository optimization completed at %s", db_path)
 
-    def verify_repository(self) -> str:
+    def verify_repository(self: _PromptManager) -> str:
         """Run integrity checks against the SQLite prompt repository."""
         db_path = self._resolve_repository_path()
         diagnostics: list[str] = []
@@ -384,7 +388,7 @@ class MaintenanceMixin:
         )
         return summary
 
-    def create_data_snapshot(self, destination: str | Path) -> Path:
+    def create_data_snapshot(self: _PromptManager, destination: str | Path) -> Path:
         """Zip the SQLite repository, Chroma store, and a manifest for backups."""
         db_path = self._resolve_repository_path()
         chroma_path = Path(self._chroma_path).expanduser()
@@ -416,7 +420,9 @@ class MaintenanceMixin:
         logger.info("Snapshot archive created at %s", archive_path)
         return archive_path
 
-    def clear_usage_logs(self, logs_path: str | Path | None = None) -> None:
+    def clear_usage_logs(
+        self: _PromptManager, logs_path: str | Path | None = None
+    ) -> None:
         """Remove persisted usage analytics logs while keeping settings intact."""
         path = Path(logs_path) if logs_path is not None else self._logs_path
         path = path.expanduser()
@@ -435,14 +441,16 @@ class MaintenanceMixin:
         path.mkdir(parents=True, exist_ok=True)
         logger.info("Usage logs cleared at %s", path)
 
-    def reset_application_data(self, *, clear_logs: bool = True) -> None:
+    def reset_application_data(
+        self: _PromptManager, *, clear_logs: bool = True
+    ) -> None:
         """Reset prompt data, embeddings, and optional usage logs."""
         self.reset_prompt_repository()
         self.reset_vector_store()
         if clear_logs:
             self.clear_usage_logs()
 
-    def get_prompt_catalogue_stats(self) -> PromptCatalogueStats:
+    def get_prompt_catalogue_stats(self: _PromptManager) -> PromptCatalogueStats:
         """Return aggregate prompt statistics for maintenance workflows."""
         try:
             return self._repository.get_prompt_catalogue_stats()

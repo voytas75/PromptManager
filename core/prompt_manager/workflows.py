@@ -18,6 +18,9 @@ from ..exceptions import NameGenerationError
 
 if TYPE_CHECKING:
     from ..intent_classifier import IntentClassifier
+    from . import PromptManager as _PromptManager
+else:
+    _PromptManager = Any
 
 __all__ = ["LiteLLMWorkflowMixin"]
 
@@ -64,7 +67,7 @@ class LiteLLMWorkflowMixin:
         return cleaned
 
     def set_name_generator(
-        self,
+        self: _PromptManager,
         model: str | None,
         api_key: str | None,
         api_base: str | None,
