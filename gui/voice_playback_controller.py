@@ -14,6 +14,13 @@ from typing import Mapping
 
 from PySide6.QtCore import QObject, QUrl, Signal
 
+try:  # pragma: no cover - optional dependency import
+    import litellm
+    from litellm.exceptions import LiteLLMException
+except Exception:  # pragma: no cover - handled at runtime
+    litellm = None  # type: ignore[assignment]
+    LiteLLMException = RuntimeError  # type: ignore[assignment]
+
 try:  # pragma: no cover - depends on optional Qt plugins
     from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
 except Exception:  # pragma: no cover - Qt multimedia missing
@@ -117,11 +124,7 @@ class VoicePlaybackController(QObject):
             self.playback_finished.emit()
 
     def _download_and_prepare(self, text: str, runtime_payload: Mapping[str, str | None]) -> None:
-        LiteLLMExceptionType: type[Exception] = Exception
-        try:
-            import litellm
-            from litellm.exceptions import LiteLLMException as LiteLLMExceptionType  # type: ignore
-        except Exception:  # pragma: no cover - optional dependency guard
+        if litellm is None:
             self.playback_failed.emit("LiteLLM is not installed; install litellm to enable voice playback.")
             self._is_preparing = False
             return
@@ -135,7 +138,7 @@ class VoicePlaybackController(QObject):
                 api_base=runtime_payload.get("api_base"),
                 api_version=runtime_payload.get("api_version"),
             )
-        except LiteLLMExceptionType as exc:  # pragma: no cover - requires API access
+        except LiteLLMException as exc:  # pragma: no cover - requires API access
             self.playback_failed.emit(f"LiteLLM TTS failed: {exc}")
             self._is_preparing = False
             return
