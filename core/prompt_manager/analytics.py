@@ -24,9 +24,6 @@ if TYPE_CHECKING:
     from ..category_registry import CategoryRegistry
     from ..embedding import EmbeddingProvider
     from ..repository import PromptRepository
-    from . import PromptManager as _PromptManager
-else:
-    _PromptManager = Any
 
 logger = logging.getLogger(__name__)
 
@@ -107,8 +104,9 @@ class AnalyticsMixin:
     _repository: PromptRepository
     _category_registry: CategoryRegistry
     _embedding_provider: EmbeddingProvider
+    collection: Any
 
-    def get_category_health(self: _PromptManager) -> list[CategoryHealth]:
+    def get_category_health(self) -> list[CategoryHealth]:
         """Return prompt and execution health metrics for each category."""
         try:
             prompt_counts = self._repository.get_category_prompt_counts()
@@ -230,7 +228,7 @@ class AnalyticsMixin:
             if reference_dimension is None:
                 reference_dimension = stored_dimension
                 inferred_dimension = stored_dimension
-            if reference_dimension is not None and stored_dimension != reference_dimension:
+            elif stored_dimension != reference_dimension:
                 mismatched.append(
                     EmbeddingDimensionMismatch(
                         prompt_id=prompt.id,
