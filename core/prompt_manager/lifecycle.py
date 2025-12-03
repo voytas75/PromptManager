@@ -15,7 +15,7 @@ from uuid import UUID
 
 from chromadb.errors import ChromaError
 
-from models.prompt_model import Prompt
+from models.prompt_model import Prompt, _ensure_uuid
 
 from ..embedding import EmbeddingGenerationError
 from ..exceptions import (
@@ -120,6 +120,11 @@ class PromptLifecycleMixin:
             },
         )
         return stored_prompt
+
+    def _ensure_uuid(self, value: UUID | str) -> UUID:
+        """Normalize user-supplied identifier inputs to UUID objects."""
+
+        return _ensure_uuid(value)
 
     def get_prompt(self, prompt_id: UUID) -> Prompt:
         """Retrieve a prompt from cache or SQLite."""
