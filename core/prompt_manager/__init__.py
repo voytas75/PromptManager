@@ -1,6 +1,7 @@
 """Prompt Manager package façade and orchestration layer.
 
 Updates:
+  v0.14.14 - 2025-12-03 - Move backend bootstrap helpers into dedicated module.
   v0.14.13 - 2025-12-03 - Extract LiteLLM workflows and prompt refinement helpers into mixins.
   v0.14.12 - 2025-12-03 - Extract prompt CRUD, caching, and embedding APIs into mixin.
   v0.14.11 - 2025-12-03 - Extract versioning, diff, and fork APIs into mixin module.
@@ -9,20 +10,15 @@ Updates:
   v0.14.8 - 2025-12-02 - Move maintenance utilities into dedicated mixin module.
   v0.14.7 - 2025-12-02 - Extract category, response style, and note APIs into mixins.
   v0.14.6 - 2025-11-30 - Ensure Chroma directories exist and stabilise Chroma client bootstrap.
-  v0.14.5 - 2025-11-29 - Reformat header/imports and wrap CLI analytics summaries.
-  pre-v0.14.5 - 2025-11-30 - Consolidated history covering releases v0.1.0–v0.14.4.
+  pre-v0.14.6 - 2025-11-30 - Consolidated history covering releases v0.1.0–v0.14.5.
 """
 
 from __future__ import annotations
 
 import logging
-import os
 import sqlite3 as _sqlite3
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, cast
-
-import chromadb
-from chromadb.errors import ChromaError
+from typing import TYPE_CHECKING, Any, cast
 
 # ---------------------------------------------------------------------------
 # NOTE: Transitional refactor
@@ -78,6 +74,15 @@ from ..prompt_engineering import (
 )
 from ..repository import PromptRepository, RepositoryError, RepositoryNotFoundError
 from ..scenario_generation import LiteLLMScenarioGenerator  # noqa: TCH001
+from .backends import (
+    CollectionProtocol,
+    NullEmbeddingWorker,
+    RedisClientProtocol,
+    RedisConnectionPoolProtocol,
+    RedisValue,
+    build_chroma_client,
+    mute_posthog_capture,
+)
 from .analytics import (
     AnalyticsMixin,
     CategoryHealth as _CategoryHealth,
@@ -113,8 +118,6 @@ sqlite3 = _sqlite3
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from collections.abc import Callable, Mapping, Sequence
     from types import TracebackType
-    from uuid import UUID
-
     from chromadb.api import ClientAPI
 
     from models.category_model import PromptCategory
@@ -127,34 +130,6 @@ else:  # pragma: no cover - typing fallback
     ClientAPI = Any  # type: ignore[assignment]
     TracebackType = type(None)
 
-os.environ.setdefault("CHROMA_TELEMETRY_IMPLEMENTATION", "none")
-os.environ.setdefault("CHROMA_ANONYMIZED_TELEMETRY", "0")
-
-
-def _mute_posthog_capture() -> None:
-    try:
-        import posthog  # type: ignore
-    except Exception:
-        return
-
-    def _noop_capture(*_: Any, **__: Any) -> None:
-        return None
-
-    try:
-        posthog.capture = _noop_capture  # type: ignore[attr-defined]
-    except Exception:
-        pass
-
-    try:
-        posthog.disabled = True  # type: ignore[attr-defined]
-    except Exception:
-        pass
-
-
-_mute_posthog_capture()
-
-
-
 try:
     from redis.exceptions import RedisError as _RedisErrorType
 except ImportError:  # pragma: no cover - redis optional during development
@@ -162,55 +137,7 @@ except ImportError:  # pragma: no cover - redis optional during development
 
 RedisError = _RedisErrorType
 
-
-# ---------------------------------------------------------------------------
-# Protocols for optional dependencies to keep type hints precise without
-# importing heavy runtime modules when they are absent in development.
-# ---------------------------------------------------------------------------
-RedisValue = str | bytes | memoryview
-
-
-class RedisConnectionPoolProtocol(Protocol):
-    """Subset of redis-py connection pool used for diagnostics."""
-
-    connection_kwargs: Mapping[str, Any]
-
-    def disconnect(self) -> None:
-        """Close all pooled connections."""
-
-
-class RedisClientProtocol(Protocol):
-    """Subset of redis-py client behaviour used within the manager."""
-
-    connection_pool: RedisConnectionPoolProtocol | None
-
-    def ping(self) -> bool: ...
-
-    def dbsize(self) -> int: ...
-
-    def info(self) -> Mapping[str, Any]: ...
-
-    def get(self, name: str) -> RedisValue | None: ...
-
-    def setex(self, name: str, time: int, value: RedisValue) -> bool: ...
-
-    def delete(self, *names: str) -> int: ...
-
-    def close(self) -> None: ...
-
-
-class CollectionProtocol(Protocol):
-    """Minimal Chroma collection surface consumed by the manager."""
-
-    def count(self) -> int: ...
-
-    def delete(self, **kwargs: Any) -> Any: ...
-
-    def upsert(self, **kwargs: Any) -> Any: ...
-
-    def query(self, **kwargs: Any) -> Mapping[str, Any]: ...
-
-    def peek(self, **kwargs: Any) -> Any: ...
+mute_posthog_capture()
 
 
 logger = logging.getLogger(__name__)
@@ -357,7 +284,6 @@ class PromptManager(
         self._collection: CollectionProtocol | None = None
         resolved_db_path = Path(db_path).expanduser() if db_path is not None else None
         resolved_chroma_path = Path(chroma_path).expanduser()
-        resolved_chroma_path.mkdir(parents=True, exist_ok=True)
         self._db_path = resolved_db_path
         self._chroma_path = str(resolved_chroma_path)
         self._collection_name = collection_name
@@ -368,43 +294,14 @@ class PromptManager(
         except RepositoryError as exc:
             raise PromptStorageError("Unable to initialise SQLite repository") from exc
         self._category_registry = CategoryRegistry(self._repository, category_definitions)
-        # Disable Chroma anonymized telemetry to avoid noisy PostHog errors in some environments
-        # and respect privacy defaults. Use persistent client at the configured path.
-        if chroma_client is None:
-            chroma_settings: Any | None = None
-            try:
-                from chromadb.config import Settings as ChromaSettings
-
-                chroma_settings = ChromaSettings(
-                    anonymized_telemetry=False,
-                    is_persistent=True,
-                    persist_directory=str(resolved_chroma_path),
-                )
-            except Exception:  # pragma: no cover - defensive guard for optional dependency
-                chroma_settings = None
-
-            persistent_kwargs: dict[str, Any] = {"path": str(resolved_chroma_path)}
-            if chroma_settings is not None:
-                persistent_kwargs["settings"] = chroma_settings
-            try:
-                try:
-                    persistent_client = chromadb.PersistentClient(**persistent_kwargs)
-                except TypeError as exc:
-                    if "unexpected keyword argument 'settings'" not in str(exc):
-                        raise
-                    persistent_kwargs.pop("settings", None)
-                    persistent_client = chromadb.PersistentClient(**persistent_kwargs)
-            except ChromaError as exc:
-                logger.warning(
-                    "Chroma persistent client unavailable, using in-memory fallback: %s",
-                    exc,
-                )
-                self._chroma_client = cast("Any", chromadb.EphemeralClient())
-            else:
-                self._chroma_client = cast("Any", persistent_client)
-        else:
-            self._chroma_client = cast("Any", chroma_client)
-        self._initialise_chroma_collection()
+        client, collection = build_chroma_client(
+            self._chroma_path,
+            self._collection_name,
+            embedding_function,
+            chroma_client=chroma_client,
+        )
+        self._chroma_client = cast("Any", client)
+        self._collection = collection
 
         self._notification_center = notification_center or default_notification_center
 
@@ -419,7 +316,7 @@ class PromptManager(
                 logger=worker_logger,
             )
         else:
-            self._embedding_worker = embedding_worker or _NullEmbeddingWorker()
+            self._embedding_worker = embedding_worker or NullEmbeddingWorker()
         self._name_generator = name_generator
         self._description_generator = description_generator
         self._scenario_generator = scenario_generator
@@ -516,18 +413,13 @@ class PromptManager(
 
     def _initialise_chroma_collection(self) -> None:
         """Create or refresh the Chroma collection backing prompt embeddings."""
-        try:
-            collection = cast(
-                "CollectionProtocol",
-                self._chroma_client.get_or_create_collection(
-                    name=self._collection_name,
-                    metadata={"hnsw:space": "cosine"},
-                    embedding_function=self._embedding_function,
-                ),
-            )
-            self._collection = collection
-        except ChromaError as exc:
-            raise PromptStorageError("Unable to initialise ChromaDB collection") from exc
+        self._chroma_client, collection = build_chroma_client(
+            self._chroma_path,
+            self._collection_name,
+            self._embedding_function,
+            chroma_client=self._chroma_client,
+        )
+        self._collection = collection
 
     def _persist_chroma_client(self) -> None:
         """Flush the Chroma client to disk when supported."""
@@ -700,19 +592,6 @@ class PromptManager(
     ) -> None:
         """Close resources when exiting a context manager block."""
         self.close()
-
-    # Cache helpers ----------------------------------------------------- #
-
-
-class _NullEmbeddingWorker:
-    """Embedding worker placeholder used when background sync is disabled."""
-
-    def schedule(self, _: UUID) -> None:  # pragma: no cover - trivial noop
-        return
-
-    def stop(self) -> None:  # pragma: no cover - trivial noop
-        return
-
 
 __all__ = [
     "PromptManager",
