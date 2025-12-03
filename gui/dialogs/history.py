@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import difflib
 import json
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -34,9 +35,14 @@ try:
 except ImportError:  # pragma: no cover - fallback when loaded outside package
     from gui.toast import show_toast
 
-if TYPE_CHECKING:
-    from collections.abc import Callable
+StatusReporter = Callable[[str, int], None]
 
+
+def _default_status_reporter(_message: str, _duration: int = 0) -> None:
+    return None
+
+
+if TYPE_CHECKING:
     from models.prompt_model import Prompt, PromptVersion
 
 
@@ -60,7 +66,7 @@ class PromptVersionHistoryDialog(QDialog):
         self._manager = manager
         self._prompt = prompt
         self._limit = max(1, limit)
-        self._status_callback = status_callback or (lambda _msg, _duration=0: None)
+        self._status_callback: StatusReporter = status_callback or _default_status_reporter
         self._versions: list[PromptVersion] = []
         self.last_restored_prompt: Prompt | None = None
         self.setWindowTitle(f"{prompt.name} – Version History")
@@ -191,7 +197,7 @@ class PromptVersionHistoryDialog(QDialog):
         indexes = selection.selectedRows()
         if not indexes:
             return None
-        row = indexes[0].row()
+        row = int(indexes[0].row())
         if 0 <= row < len(self._versions):
             return self._versions[row]
         return None

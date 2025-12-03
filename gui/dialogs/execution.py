@@ -9,7 +9,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import replace
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -30,6 +30,20 @@ from models.response_style import ResponseStyle
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+
+class ResponseStylePayload(TypedDict):
+    name: str
+    description: str
+    prompt_part: str
+    tone: str | None
+    voice: str | None
+    format_instructions: str
+    guidelines: str | None
+    tags: list[str]
+    examples: list[str]
+    version: str
+    is_active: bool
 
 
 class SaveResultDialog(QDialog):
@@ -275,7 +289,7 @@ class ResponseStyleDialog(QDialog):
         is_active = self._is_active_checkbox.isChecked()
         name = self._name_input.text().strip() or self._auto_generate_name(phrase)
 
-        payload = {
+        payload: ResponseStylePayload = {
             "name": name,
             "description": description,
             "prompt_part": prompt_part,

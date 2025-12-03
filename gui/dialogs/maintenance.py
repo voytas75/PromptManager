@@ -647,19 +647,20 @@ class PromptMaintenanceDialog(QDialog):
         """Prompt for a destination and create a maintenance snapshot."""
         default_name = datetime.now(UTC).strftime("prompt-manager-snapshot-%Y%m%d-%H%M%S.zip")
         default_path = str(Path.home() / default_name)
-        path, _ = QFileDialog.getSaveFileName(
+        file_path, _ = QFileDialog.getSaveFileName(
             self,
             "Save Maintenance Snapshot",
             default_path,
             "Zip Archives (*.zip)",
         )
-        if not path:
+        if not file_path:
             return
+        destination = Path(file_path)
 
         self._append_reset_log("Creating maintenance snapshot…")
         QApplication.setOverrideCursor(Qt.WaitCursor)
         try:
-            archive_path = self._manager.create_data_snapshot(path)
+            archive_path = self._manager.create_data_snapshot(destination)
         except PromptManagerError as exc:
             QMessageBox.critical(self, "Snapshot failed", str(exc))
             self._append_reset_log(f"Snapshot failed: {exc}")
@@ -876,7 +877,7 @@ class PromptMaintenanceDialog(QDialog):
         self._redis_status_label.setText(f"Status: {status}")
 
         connection = details.get("connection", {})
-        connection_parts = []
+        connection_parts: list[str] = []
         if connection.get("host"):
             host = connection["host"]
             port = connection.get("port")
@@ -941,7 +942,7 @@ class PromptMaintenanceDialog(QDialog):
         self._chroma_optimize_button.setEnabled(not has_error)
         self._chroma_verify_button.setEnabled(not has_error)
 
-        path_parts = []
+        path_parts: list[str] = []
         if path:
             path_parts.append(f"Path: {path}")
         if collection:

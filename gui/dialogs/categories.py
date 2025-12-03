@@ -6,6 +6,8 @@ Updates:
 
 from __future__ import annotations
 
+from typing import TypedDict
+
 from PySide6.QtCore import QEvent, QSettings
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -27,6 +29,18 @@ from core import CategoryNotFoundError, CategoryStorageError, PromptManager
 from models.category_model import PromptCategory, slugify_category
 
 
+class CategoryPayload(TypedDict):
+    label: str
+    slug: str
+    description: str
+    parent_slug: str | None
+    color: str | None
+    icon: str | None
+    min_quality: float | None
+    default_tags: list[str]
+    is_active: bool
+
+
 class CategoryEditorDialog(QDialog):
     """Collect category details for creation or editing workflows."""
 
@@ -39,7 +53,7 @@ class CategoryEditorDialog(QDialog):
         """Create the editor and optionally preload an existing category."""
         super().__init__(parent)
         self._source = category
-        self._payload: dict[str, object] = {}
+        self._payload: CategoryPayload | None = None
         self.setWindowTitle("Add Category" if category is None else "Edit Category")
         self.resize(460, 360)
         self._build_ui()
@@ -47,9 +61,11 @@ class CategoryEditorDialog(QDialog):
             self._populate(category)
 
     @property
-    def payload(self) -> dict[str, object]:
+    def payload(self) -> CategoryPayload:
         """Return the collected form data."""
-        return dict(self._payload)
+        if self._payload is None:
+            raise ValueError("Category payload is not available before acceptance.")
+        return self._payload
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -128,7 +144,8 @@ class CategoryEditorDialog(QDialog):
                 QMessageBox.warning(self, "Invalid category", "Minimum quality must be a number.")
                 return
         tags = [tag.strip() for tag in self._tags_input.text().split(",") if tag.strip()]
-        self._payload = {
+        is_active = self._source.is_active if self._source is not None else True
+        payload: CategoryPayload = {
             "label": label,
             "slug": slug,
             "description": description,
@@ -137,7 +154,9 @@ class CategoryEditorDialog(QDialog):
             "icon": self._icon_input.text().strip() or None,
             "min_quality": min_quality,
             "default_tags": tags,
+            "is_active": is_active,
         }
+        self._payload = payload
         self.accept()
 
 
@@ -221,6 +240,7 @@ class CategoryManagerDialog(QDialog):
         self._settings.setValue("width", self.width())
         self._settings.setValue("height", self.height())
         super().closeEvent(event)
+        return None
 
     def _load_categories(self) -> None:
         """Populate table with repository categories."""
@@ -248,7 +268,7 @@ class CategoryManagerDialog(QDialog):
         selected_rows = self._table.selectionModel().selectedRows()
         if not selected_rows:
             return None
-        index = selected_rows[0].row()
+        index = int(selected_rows[0].row())
         if index < 0 or index >= len(self._categories):
             return None
         return self._categories[index]
@@ -305,6 +325,7 @@ class CategoryManagerDialog(QDialog):
                 icon=data["icon"],
                 min_quality=data["min_quality"],
                 default_tags=data["default_tags"],
+                is_active=data["is_active"],
             )
         except CategoryNotFoundError as exc:
             QMessageBox.warning(self, "Edit failed", str(exc))

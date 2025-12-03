@@ -44,4 +44,4 @@ class Qt:
     TextBrowserInteraction: int
     PointingHandCursor: int
     MatchFixedString: int
-
+    WaitCursor: int

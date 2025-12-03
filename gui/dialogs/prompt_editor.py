@@ -9,7 +9,7 @@ from __future__ import annotations
 import uuid
 from copy import deepcopy
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QGuiApplication
@@ -131,7 +131,7 @@ class PromptDialog(QDialog):
 
     def __init__(
         self,
-        parent=None,
+        parent: QWidget | None = None,
         prompt: Prompt | None = None,
         category_provider: Callable[[], Sequence[PromptCategory]] | None = None,
         name_generator: Callable[[str], str] | None = None,
@@ -382,15 +382,17 @@ class PromptDialog(QDialog):
         self._buttons.accepted.connect(self._on_accept)  # type: ignore[arg-type]
         self._buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         if self._source_prompt is not None:
-            self._apply_button = self._buttons.addButton("Apply", QDialogButtonBox.ApplyRole)
-            self._apply_button.setToolTip("Save changes without closing the dialog.")
-            self._apply_button.clicked.connect(self._on_apply_clicked)  # type: ignore[arg-type]
-            self._delete_button = self._buttons.addButton(
+            apply_button = self._buttons.addButton("Apply", QDialogButtonBox.ApplyRole)
+            apply_button.setToolTip("Save changes without closing the dialog.")
+            apply_button.clicked.connect(self._on_apply_clicked)  # type: ignore[arg-type]
+            self._apply_button = apply_button
+            delete_button = self._buttons.addButton(
                 "Delete",
                 QDialogButtonBox.DestructiveRole,
             )
-            self._delete_button.setToolTip("Delete this prompt from the catalogue.")
-            self._delete_button.clicked.connect(self._on_delete_clicked)  # type: ignore[arg-type]
+            delete_button.setToolTip("Delete this prompt from the catalogue.")
+            delete_button.clicked.connect(self._on_delete_clicked)  # type: ignore[arg-type]
+            self._delete_button = delete_button
         main_layout.addWidget(self._buttons)
         self._context_input.textChanged.connect(self._on_context_changed)  # type: ignore[arg-type]
         self._update_version_controls(self._source_prompt.version if self._source_prompt else None)
@@ -455,12 +457,13 @@ class PromptDialog(QDialog):
         self,
         message: str,
         func: Callable[..., _TaskResult],
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> _TaskResult:
         """Execute *func* on a worker thread while showing a busy indicator."""
-        indicator = ProcessingIndicator(self, message)
-        return indicator.run(func, *args, **kwargs)
+        indicator = cast("Any", ProcessingIndicator(self, message))
+        result = indicator.run(func, *args, **kwargs)
+        return cast("_TaskResult", result)
 
     def _on_generate_name_clicked(self) -> None:
         """Generate a prompt name from the context field."""
@@ -559,8 +562,6 @@ class PromptDialog(QDialog):
 
     def _populate_category_options(self) -> None:
         """Populate the category selector from the registry provider."""
-        if self._category_input is None:
-            return
         categories = self._load_categories()
         current_text = self._category_input.currentText().strip()
         self._category_input.blockSignals(True)
@@ -586,8 +587,6 @@ class PromptDialog(QDialog):
 
     def _set_category_value(self, value: str | None) -> None:
         """Set the category selector text while aligning with registry labels."""
-        if self._category_input is None:
-            return
         resolved = self._resolve_category_label(value)
         if not resolved:
             self._category_input.setEditText("")
@@ -601,8 +600,6 @@ class PromptDialog(QDialog):
 
     def _current_category_value(self) -> str:
         """Return the canonical category text from the selector."""
-        if self._category_input is None:
-            return ""
         text = self._category_input.currentText().strip()
         if not text:
             return ""

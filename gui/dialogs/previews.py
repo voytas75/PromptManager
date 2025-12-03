@@ -7,6 +7,7 @@ Updates:
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, cast
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -20,6 +21,9 @@ from PySide6.QtWidgets import (
 )
 
 from .base import collect_system_info
+
+if TYPE_CHECKING:
+    from PySide6.QtGui import QIcon
 
 try:
     from ..resources import load_application_icon  # type: ignore
@@ -73,7 +77,7 @@ class InfoDialog(QDialog):
         self.setWindowTitle("About Prompt Manager")
         self.setModal(True)
         self.setMinimumWidth(420)
-        icon = load_application_icon()
+        icon: QIcon | None = load_application_icon()
         if icon is not None:
             self.setWindowIcon(icon)
 
@@ -168,9 +172,9 @@ class InfoDialog(QDialog):
             if not pyproject.exists():
                 return None
             data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
-            project_section = data.get("project") or {}
+            project_section = cast("dict[str, Any]", data.get("project") or {})
             resolved = project_section.get("version")
-            if resolved:
+            if resolved is not None:
                 return str(resolved)
         except Exception:
             return None
