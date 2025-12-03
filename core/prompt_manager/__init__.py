@@ -1,6 +1,7 @@
 """Prompt Manager package façade and orchestration layer.
 
 Updates:
+  v0.14.13 - 2025-12-03 - Extract LiteLLM workflows and prompt refinement helpers into mixins.
   v0.14.12 - 2025-12-03 - Extract prompt CRUD, caching, and embedding APIs into mixin.
   v0.14.11 - 2025-12-03 - Extract versioning, diff, and fork APIs into mixin module.
   v0.14.10 - 2025-12-03 - Move search and suggestion APIs into dedicated mixin.
@@ -9,11 +10,7 @@ Updates:
   v0.14.7 - 2025-12-02 - Extract category, response style, and note APIs into mixins.
   v0.14.6 - 2025-11-30 - Ensure Chroma directories exist and stabilise Chroma client bootstrap.
   v0.14.5 - 2025-11-29 - Reformat header/imports and wrap CLI analytics summaries.
-  v0.14.4 - 2025-02-14 - Add embedding diagnostics helper for CLI integration.
-  v0.14.3 - 2025-11-28 - Add data snapshot helper for maintenance workflows.
-  v0.14.2 - 2025-11-28 - Add benchmarks, scenario refresh APIs, and category health stats.
-  v0.14.1 - 2025-11-24 - Add LiteLLM category suggestion workflow with classifier fallback.
-  pre-v0.14.1 - 2025-11-30 - Consolidated history covering releases v0.1.0–v0.14.0.
+  pre-v0.14.5 - 2025-11-30 - Consolidated history covering releases v0.1.0–v0.14.4.
 """
 
 from __future__ import annotations
@@ -21,7 +18,6 @@ from __future__ import annotations
 import logging
 import os
 import sqlite3 as _sqlite3
-import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -41,7 +37,6 @@ from chromadb.errors import ChromaError
 # ---------------------------------------------------------------------------
 from config import LITELLM_ROUTED_WORKFLOWS
 from models.prompt_model import Prompt, UserProfile
-from prompt_templates import DEFAULT_PROMPT_TEMPLATES, PROMPT_TEMPLATE_KEYS
 
 from ..category_registry import CategoryRegistry
 from ..embedding import EmbeddingGenerationError, EmbeddingProvider, EmbeddingSyncWorker
@@ -69,7 +64,6 @@ from ..exceptions import (
     ResponseStyleStorageError,
     ScenarioGenerationError,
 )
-from ..execution import CodexExecutor
 from ..intent_classifier import IntentClassifier
 from ..name_generation import (
     LiteLLMCategoryGenerator,
@@ -77,18 +71,13 @@ from ..name_generation import (
     LiteLLMNameGenerator,
     NameGenerationError,
 )
-from ..notifications import (
-    NotificationCenter,
-    NotificationLevel,
-    notification_center as default_notification_center,
-)
+from ..notifications import NotificationCenter, notification_center as default_notification_center
 from ..prompt_engineering import (
     PromptEngineer,
     PromptEngineeringError,
     PromptRefinement,
 )
 from ..repository import PromptRepository, RepositoryError, RepositoryNotFoundError
-from ..scenario_generation import LiteLLMScenarioGenerator
 from .categories import CategorySupport
 from .engineering import PromptEngineerFacade
 from .execution import ExecutionResult, PromptExecutor
@@ -102,6 +91,7 @@ from .generation import GenerationMixin
 from .lifecycle import PromptLifecycleMixin
 from .maintenance import MaintenanceMixin
 from .prompt_notes import PromptNoteSupport
+from .refinement import PromptRefinementMixin
 from .response_styles import ResponseStyleSupport
 from .search import IntentSuggestions as _IntentSuggestions, PromptSearchMixin
 from .storage import PromptStorage
@@ -109,19 +99,23 @@ from .versioning import (
     PromptVersionDiff as _PromptVersionDiff,
     PromptVersionMixin,
 )
+from .workflows import LiteLLMWorkflowMixin
 
 sqlite3 = _sqlite3
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from collections.abc import Callable, Mapping, Sequence
     from types import TracebackType
+    from uuid import UUID
 
     from chromadb.api import ClientAPI
 
     from models.category_model import PromptCategory
     from models.prompt_model import Prompt, UserProfile
 
+    from ..execution import CodexExecutor
     from ..history_tracker import HistoryTracker
+    from ..scenario_generation import LiteLLMScenarioGenerator
 else:  # pragma: no cover - typing fallback
     ClientAPI = Any  # type: ignore[assignment]
     TracebackType = type(None)
@@ -287,6 +281,8 @@ class PromptManager(
     ResponseStyleSupport,
     PromptNoteSupport,
     GenerationMixin,
+    LiteLLMWorkflowMixin,
+    PromptRefinementMixin,
     PromptLifecycleMixin,
     PromptSearchMixin,
     PromptVersionMixin,
@@ -500,14 +496,6 @@ class PromptManager(
                 self._user_profile = None
         self._prompt_templates: dict[str, str] = self._normalise_prompt_templates(prompt_templates)
 
-    @staticmethod
-    def _normalise_model_identifier(value: str | None) -> str | None:
-        """Return a stripped model identifier when provided."""
-        if value is None:
-            return None
-        text = str(value).strip()
-        return text or None
-
     def _apply_category_metadata(self, prompt: Prompt) -> Prompt:
         """Ensure prompt categories map to registry entries."""
         category_value = (prompt.category or "").strip()
@@ -579,7 +567,7 @@ class PromptManager(
     class EmbeddingDimensionMismatch:
         """Stored prompt embedding vector that no longer matches the reference dimension."""
 
-        prompt_id: uuid.UUID
+        prompt_id: UUID
         prompt_name: str
         stored_dimension: int
 
@@ -587,7 +575,7 @@ class PromptManager(
     class MissingEmbedding:
         """Prompt record that is missing a persisted embedding vector."""
 
-        prompt_id: uuid.UUID
+        prompt_id: UUID
         prompt_name: str
 
     @dataclass(slots=True)
@@ -677,16 +665,6 @@ class PromptManager(
     def user_profile(self) -> UserProfile | None:
         """Return the stored single-user profile when available."""
         return self._user_profile
-
-    @property
-    def prompt_engineer(self) -> PromptEngineer | None:
-        """Return the configured prompt engineering helper, if any."""
-        return self._prompt_engineer
-
-    @property
-    def prompt_structure_engineer(self) -> PromptEngineer | None:
-        """Return the configured structure-only prompt engineering helper."""
-        return self._prompt_structure_engineer or self._prompt_engineer
 
     def get_category_health(self) -> list[PromptManager.CategoryHealth]:
         """Return prompt and execution health metrics for each category."""
@@ -880,248 +858,6 @@ class PromptManager(
             context["response_style"] = dict(response_style)
         return context
 
-    def refine_prompt_text(
-        self,
-        prompt_text: str,
-        *,
-        name: str | None = None,
-        description: str | None = None,
-        category: str | None = None,
-        tags: Sequence[str] | None = None,
-        negative_constraints: Sequence[str] | None = None,
-    ) -> PromptRefinement:
-        """Improve a prompt using the configured prompt engineer."""
-        if not prompt_text.strip():
-            raise PromptEngineeringError("Prompt refinement requires non-empty prompt text.")
-        engineer = self._prompt_structure_engineer or self._prompt_engineer
-        if engineer is None:
-            raise PromptEngineeringUnavailable(
-                "Prompt engineering is not configured. Set PROMPT_MANAGER_LITELLM_MODEL "
-                "to enable refinement."
-            )
-        task_id = f"prompt-refine:{uuid.uuid4()}"
-        metadata = {
-            "prompt_length": len(prompt_text or ""),
-            "has_name": bool(name),
-            "tag_count": len(tags or []),
-        }
-        with self._notification_center.track_task(
-            title="Prompt refinement",
-            task_id=task_id,
-            start_message="Analysing prompt via LiteLLM…",
-            success_message="Prompt refined.",
-            failure_message="Prompt refinement failed",
-            metadata=metadata,
-            level=NotificationLevel.INFO,
-        ):
-            try:
-                return engineer.refine(
-                    prompt_text,
-                    name=name,
-                    description=description,
-                    category=category,
-                    tags=tags,
-                    negative_constraints=negative_constraints,
-                )
-            except PromptEngineeringError:
-                raise
-            except Exception as exc:  # pragma: no cover - defensive
-                raise PromptEngineeringError("Prompt refinement failed unexpectedly.") from exc
-
-    def refine_prompt_structure(
-        self,
-        prompt_text: str,
-        *,
-        name: str | None = None,
-        description: str | None = None,
-        category: str | None = None,
-        tags: Sequence[str] | None = None,
-    ) -> PromptRefinement:
-        """Reformat a prompt to improve structure without changing intent."""
-        if not prompt_text.strip():
-            raise PromptEngineeringError("Prompt refinement requires non-empty prompt text.")
-        engineer = self._prompt_structure_engineer or self._prompt_engineer
-        if engineer is None:
-            raise PromptEngineeringUnavailable(
-                "Prompt engineering is not configured. Set PROMPT_MANAGER_LITELLM_MODEL "
-                "to enable refinement."
-            )
-        task_id = f"prompt-structure-refine:{uuid.uuid4()}"
-        metadata = {
-            "prompt_length": len(prompt_text or ""),
-            "mode": "structure",
-        }
-        with self._notification_center.track_task(
-            title="Prompt structure refinement",
-            task_id=task_id,
-            start_message="Reformatting prompt via LiteLLM…",
-            success_message="Prompt structure refined.",
-            failure_message="Prompt structure refinement failed",
-            metadata=metadata,
-            level=NotificationLevel.INFO,
-        ):
-            try:
-                return engineer.refine_structure(
-                    prompt_text,
-                    name=name,
-                    description=description,
-                    category=category,
-                    tags=tags,
-                )
-            except PromptEngineeringError:
-                raise
-            except Exception as exc:  # pragma: no cover - defensive
-                raise PromptEngineeringError("Prompt refinement failed unexpectedly.") from exc
-
-    def set_name_generator(
-        self,
-        model: str | None,
-        api_key: str | None,
-        api_base: str | None,
-        api_version: str | None,
-        *,
-        inference_model: str | None = None,
-        workflow_models: Mapping[str, str | None] | None = None,
-        drop_params: Sequence[str] | None = None,
-        reasoning_effort: str | None = None,
-        stream: bool | None = None,
-        prompt_templates: Mapping[str, object] | None = None,
-    ) -> None:
-        """Configure LiteLLM-backed workflows at runtime."""
-        self._litellm_fast_model = self._normalise_model_identifier(model)
-        self._litellm_inference_model = self._normalise_model_identifier(inference_model)
-        routing: dict[str, str] = {}
-        if workflow_models:
-            for key, value in workflow_models.items():
-                workflow_key = str(key).strip()
-                if workflow_key not in LITELLM_ROUTED_WORKFLOWS:
-                    continue
-                if value is None:
-                    continue
-                choice = str(value).strip().lower()
-                if choice == "inference":
-                    routing[workflow_key] = "inference"
-        self._litellm_workflow_models = routing
-
-        if drop_params is not None:
-            cleaned_params = [str(item).strip() for item in drop_params if str(item).strip()]
-            self._litellm_drop_params = tuple(cleaned_params) if cleaned_params else None
-        else:
-            self._litellm_drop_params = None
-
-        self._litellm_reasoning_effort = reasoning_effort
-        if stream is not None:
-            self._litellm_stream = bool(stream)
-
-        if prompt_templates is not None:
-            self._prompt_templates = self._normalise_prompt_templates(prompt_templates)
-
-        # Reset existing helpers before rebuilding.
-        self._name_generator = None
-        self._description_generator = None
-        self._prompt_engineer = None
-        self._prompt_structure_engineer = None
-        self._scenario_generator = None
-        self._category_generator = None
-        self._executor = None
-
-        if not (self._litellm_fast_model or self._litellm_inference_model):
-            self._litellm_reasoning_effort = None
-            self._litellm_stream = False
-            return
-
-        drop_params_payload = list(self._litellm_drop_params) if self._litellm_drop_params else None
-
-        def _select_model(workflow: str) -> str | None:
-            selection = self._litellm_workflow_models.get(workflow, "fast")
-            if selection == "inference":
-                return self._litellm_inference_model or self._litellm_fast_model
-            return self._litellm_fast_model or self._litellm_inference_model
-
-        def _construct(factory: Callable[..., Any], workflow: str, **extra: Any) -> Any | None:
-            selected_model = _select_model(workflow)
-            if not selected_model:
-                return None
-            return factory(
-                model=selected_model,
-                api_key=api_key,
-                api_base=api_base,
-                api_version=api_version,
-                drop_params=drop_params_payload,
-                **extra,
-            )
-
-        template_overrides = dict(self._prompt_templates)
-        try:
-            self._name_generator = _construct(
-                LiteLLMNameGenerator,
-                "name_generation",
-                system_prompt=template_overrides.get("name_generation"),
-            )
-            self._description_generator = _construct(
-                LiteLLMDescriptionGenerator,
-                "description_generation",
-                system_prompt=template_overrides.get("description_generation"),
-            )
-            self._prompt_engineer = _construct(
-                PromptEngineer,
-                "prompt_engineering",
-                system_prompt=template_overrides.get("prompt_engineering"),
-            )
-            structure_engineer = _construct(
-                PromptEngineer,
-                "prompt_structure_refinement",
-                system_prompt=template_overrides.get("prompt_engineering"),
-            )
-            self._prompt_structure_engineer = structure_engineer or self._prompt_engineer
-            self._scenario_generator = _construct(
-                LiteLLMScenarioGenerator,
-                "scenario_generation",
-                system_prompt=template_overrides.get("scenario_generation"),
-            )
-            self._category_generator = _construct(
-                LiteLLMCategoryGenerator,
-                "category_generation",
-                system_prompt=template_overrides.get("category_generation"),
-            )
-            self._executor = _construct(
-                CodexExecutor,
-                "prompt_execution",
-                reasoning_effort=self._litellm_reasoning_effort,
-                stream=self._litellm_stream,
-            )
-        except RuntimeError as exc:
-            raise NameGenerationError(str(exc)) from exc
-
-        if self._executor is not None:
-            if self._litellm_drop_params:
-                self._executor.drop_params = list(self._litellm_drop_params)
-            if self._litellm_reasoning_effort:
-                self._executor.reasoning_effort = self._litellm_reasoning_effort
-            self._executor.stream = self._litellm_stream
-
-        if self._intent_classifier is not None and (
-            self._litellm_fast_model or self._litellm_inference_model
-        ):
-            logger.debug("LiteLLM powered features enabled for intent classifier")
-
-    @staticmethod
-    def _normalise_prompt_templates(overrides: Mapping[str, object] | None) -> dict[str, str]:
-        """Return a cleaned mapping of workflow prompt overrides."""
-        if not overrides:
-            return {}
-        cleaned: dict[str, str] = {}
-        for key, text in overrides.items():
-            if key not in PROMPT_TEMPLATE_KEYS:
-                continue
-            if not isinstance(text, str):
-                continue
-            stripped = text.strip()
-            default_text = DEFAULT_PROMPT_TEMPLATES.get(key)
-            if stripped and stripped != default_text:
-                cleaned[key] = stripped
-        return cleaned
-
     def set_intent_classifier(self, classifier: IntentClassifier | None) -> None:
         """Replace the runtime intent classifier implementation."""
         self._intent_classifier = classifier
@@ -1198,7 +934,7 @@ class PromptManager(
 class _NullEmbeddingWorker:
     """Embedding worker placeholder used when background sync is disabled."""
 
-    def schedule(self, _: uuid.UUID) -> None:  # pragma: no cover - trivial noop
+    def schedule(self, _: UUID) -> None:  # pragma: no cover - trivial noop
         return
 
     def stop(self) -> None:  # pragma: no cover - trivial noop
