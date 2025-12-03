@@ -27,6 +27,7 @@ from ..notifications import NotificationLevel
 
 if TYPE_CHECKING:  # pragma: no cover - typing-only imports
     from models.prompt_model import Prompt
+
     from . import PromptManager as _PromptManager
 else:  # pragma: no cover - runtime fallback for typing name
     Prompt = Any

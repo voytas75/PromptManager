@@ -15,6 +15,7 @@ from ..prompt_engineering import PromptEngineer, PromptEngineeringError, PromptR
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
     from . import PromptManager as _PromptManager
 else:
     _PromptManager = Any

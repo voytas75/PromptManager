@@ -27,6 +27,9 @@ if TYPE_CHECKING:
 
     from ..intent_classifier import IntentClassifier
     from ..repository import PromptRepository
+    from . import PromptManager as _PromptManager
+else:
+    _PromptManager = Any
 
 logger = logging.getLogger(__name__)
 

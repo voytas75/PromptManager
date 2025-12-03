@@ -1,6 +1,7 @@
 """Prompt Manager package façade and orchestration layer.
 
 Updates:
+  v0.14.16 - 2025-12-03 - Extract backend bootstrap and LiteLLM wiring into mixins.
   v0.14.15 - 2025-12-03 - Move runtime lifecycle helpers into dedicated mixin module.
   v0.14.14 - 2025-12-03 - Move backend bootstrap helpers into dedicated module.
   v0.14.13 - 2025-12-03 - Extract LiteLLM workflows and prompt refinement helpers into mixins.
@@ -9,16 +10,14 @@ Updates:
   v0.14.10 - 2025-12-03 - Move search and suggestion APIs into dedicated mixin.
   v0.14.9 - 2025-12-03 - Move execution and benchmarking APIs into mixin module.
   v0.14.8 - 2025-12-02 - Move maintenance utilities into dedicated mixin module.
-  v0.14.7 - 2025-12-02 - Extract category, response style, and note APIs into mixins.
-  pre-v0.14.7 - 2025-11-30 - Consolidated history covering releases v0.1.0–v0.14.6.
+  pre-v0.14.8 - 2025-11-30 - Consolidated history covering releases v0.1.0–v0.14.7.
 """
 
 from __future__ import annotations
 
 import logging
 import sqlite3 as _sqlite3
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import chromadb as _chromadb
 from chromadb.errors import ChromaError
@@ -32,11 +31,8 @@ from chromadb.errors import ChromaError
 # classes have been migrated to ``core.exceptions`` so that they can be shared
 # across sub‑modules once the split is complete.
 # ---------------------------------------------------------------------------
-from config import LITELLM_ROUTED_WORKFLOWS
 from models.prompt_model import UserProfile
 
-from ..category_registry import CategoryRegistry
-from ..embedding import EmbeddingProvider, EmbeddingSyncWorker
 from ..exceptions import (
     CategoryError,
     CategoryNotFoundError,
@@ -62,14 +58,12 @@ from ..exceptions import (
     ScenarioGenerationError,
 )
 from ..execution import CodexExecutor  # noqa: TCH001
-from ..intent_classifier import IntentClassifier
 from ..name_generation import (
     LiteLLMCategoryGenerator,
     LiteLLMDescriptionGenerator,
     LiteLLMNameGenerator,
     NameGenerationError,
 )
-from ..notifications import NotificationCenter, notification_center as default_notification_center
 from ..prompt_engineering import (
     PromptEngineer,
     PromptEngineeringError,
@@ -84,13 +78,8 @@ from .analytics import (
     EmbeddingDimensionMismatch as _EmbeddingDimensionMismatch,
     MissingEmbedding as _MissingEmbedding,
 )
-from .backends import (
-    CollectionProtocol,
-    NullEmbeddingWorker,
-    RedisClientProtocol,
-    build_chroma_client,
-    mute_posthog_capture,
-)
+from .backends import RedisClientProtocol, mute_posthog_capture
+from .bootstrap import BackendBootstrapMixin
 from .categories import CategorySupport
 from .engineering import PromptEngineerFacade
 from .execution import ExecutionResult, PromptExecutor
@@ -102,6 +91,7 @@ from .execution_history import (
 )
 from .generation import GenerationMixin
 from .lifecycle import PromptLifecycleMixin
+from .litellm_helpers import LiteLLMWiringMixin
 from .maintenance import MaintenanceMixin
 from .prompt_notes import PromptNoteSupport
 from .refinement import PromptRefinementMixin
@@ -120,14 +110,18 @@ chromadb = _chromadb
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from collections.abc import Mapping, Sequence
+    from pathlib import Path
 
     from chromadb.api import ClientAPI
 
     from models.category_model import PromptCategory
     from models.prompt_model import UserProfile
 
+    from ..embedding import EmbeddingProvider, EmbeddingSyncWorker
     from ..execution import CodexExecutor
     from ..history_tracker import HistoryTracker
+    from ..intent_classifier import IntentClassifier
+    from ..notifications import NotificationCenter
     from ..scenario_generation import LiteLLMScenarioGenerator
 else:  # pragma: no cover - typing fallback
     ClientAPI = Any  # type: ignore[assignment]
@@ -201,6 +195,8 @@ __all__ = [
 
 
 class PromptManager(
+    BackendBootstrapMixin,
+    LiteLLMWiringMixin,
     PromptRuntimeMixin,
     CategorySupport,
     ResponseStyleSupport,
@@ -282,107 +278,36 @@ class PromptManager(
         if repository is None and db_path is None:
             raise ValueError("db_path must be provided when no repository is supplied")
 
-        self._closed = False
-        self._cache_ttl_seconds = cache_ttl_seconds
-        self._redis_client: RedisClientProtocol | None = redis_client
-        self._chroma_client: Any
-        self._collection: CollectionProtocol | None = None
-        resolved_db_path = Path(db_path).expanduser() if db_path is not None else None
-        resolved_chroma_path = Path(chroma_path).expanduser()
-        self._db_path = resolved_db_path
-        self._chroma_path = str(resolved_chroma_path)
-        self._collection_name = collection_name
-        self._embedding_function = embedding_function
-        self._logs_path = Path("data") / "logs"
-        try:
-            self._repository = repository or PromptRepository(str(resolved_db_path))
-        except RepositoryError as exc:
-            raise PromptStorageError("Unable to initialise SQLite repository") from exc
-        self._category_registry = CategoryRegistry(self._repository, category_definitions)
-        client, collection = build_chroma_client(
-            self._chroma_path,
-            self._collection_name,
-            embedding_function,
+        self._initialise_backends(
+            chroma_path=chroma_path,
+            db_path=db_path,
+            collection_name=collection_name,
+            cache_ttl_seconds=cache_ttl_seconds,
+            redis_client=redis_client,
             chroma_client=chroma_client,
+            embedding_function=embedding_function,
+            repository=repository,
+            category_definitions=category_definitions,
+            embedding_provider=embedding_provider,
+            embedding_worker=embedding_worker,
+            enable_background_sync=enable_background_sync,
+            notification_center=notification_center,
         )
-        self._chroma_client = client
-        self._collection = collection
 
-        self._notification_center = notification_center or default_notification_center
-
-        self._embedding_provider = embedding_provider or EmbeddingProvider(embedding_function)
-        if enable_background_sync:
-            worker_logger = logger.getChild("embedding_sync")
-            self._embedding_worker = embedding_worker or EmbeddingSyncWorker(
-                provider=self._embedding_provider,
-                fetch_prompt=self._repository.get,
-                persist_callback=self._persist_embedding_from_worker,
-                notification_center=self._notification_center,
-                logger=worker_logger,
-            )
-        else:
-            self._embedding_worker = embedding_worker or NullEmbeddingWorker()
-        self._name_generator = name_generator
-        self._description_generator = description_generator
-        self._scenario_generator = scenario_generator
-        self._category_generator = category_generator
-        self._prompt_engineer = prompt_engineer
-        self._prompt_structure_engineer = structure_prompt_engineer or prompt_engineer
-        self._litellm_fast_model: str | None = self._normalise_model_identifier(fast_model)
-        if self._litellm_fast_model is None and name_generator is not None:
-            generator_model = getattr(name_generator, "model", None)
-            if generator_model:
-                self._litellm_fast_model = self._normalise_model_identifier(generator_model)
-        self._litellm_inference_model: str | None = self._normalise_model_identifier(
-            inference_model
+        self._initialise_litellm_helpers(
+            name_generator=name_generator,
+            description_generator=description_generator,
+            scenario_generator=scenario_generator,
+            category_generator=category_generator,
+            prompt_engineer=prompt_engineer,
+            structure_prompt_engineer=structure_prompt_engineer,
+            fast_model=fast_model,
+            inference_model=inference_model,
+            workflow_models=workflow_models,
+            executor=executor,
+            intent_classifier=intent_classifier,
+            prompt_templates=prompt_templates,
         )
-        self._litellm_workflow_models: dict[str, str] = {}
-        if workflow_models:
-            for key, value in workflow_models.items():
-                key_str = str(key).strip()
-                if key_str not in LITELLM_ROUTED_WORKFLOWS:
-                    continue
-                if value is None:
-                    continue
-                choice = str(value).strip().lower()
-                if choice == "inference":
-                    self._litellm_workflow_models[key_str] = "inference"
-        self._litellm_stream: bool = False
-        self._litellm_drop_params: Sequence[str] | None = None
-        self._litellm_reasoning_effort: str | None = None
-        for candidate in (
-            name_generator,
-            scenario_generator,
-            prompt_engineer,
-            executor,
-            category_generator,
-        ):
-            if candidate is not None and getattr(candidate, "drop_params", None):
-                raw_params = cast("Sequence[str]", candidate.drop_params)
-                self._litellm_drop_params = tuple(str(param) for param in raw_params)
-                break
-        for candidate in (
-            executor,
-            name_generator,
-            scenario_generator,
-            prompt_engineer,
-            category_generator,
-        ):
-            if candidate is not None and hasattr(candidate, "stream"):
-                self._litellm_stream = bool(getattr(candidate, "stream", False))
-                if self._litellm_stream:
-                    break
-        if executor is not None and getattr(executor, "reasoning_effort", None):
-            effort = executor.reasoning_effort
-            self._litellm_reasoning_effort = str(effort) if effort else None
-        self._intent_classifier = intent_classifier or IntentClassifier()
-        self._executor = executor
-        if self._executor is not None:
-            if self._litellm_drop_params:
-                self._executor.drop_params = list(self._litellm_drop_params)
-            if self._litellm_reasoning_effort:
-                self._executor.reasoning_effort = self._litellm_reasoning_effort
-            self._executor.stream = self._litellm_stream
         self._history_tracker = history_tracker
         if user_profile is not None:
             self._user_profile: UserProfile | None = user_profile
@@ -392,8 +317,6 @@ class PromptManager(
             except RepositoryError:
                 logger.warning("Unable to load persisted user profile", exc_info=True)
                 self._user_profile = None
-        self._prompt_templates: dict[str, str] = self._normalise_prompt_templates(prompt_templates)
-
     IntentSuggestions = _IntentSuggestions
     PromptVersionDiff = _PromptVersionDiff
     ExecutionOutcome = _ExecutionOutcome

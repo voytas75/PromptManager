@@ -31,6 +31,7 @@ from ..repository import (
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers only
     from collections.abc import Mapping
+
     from . import PromptManager as _PromptManager
 else:
     _PromptManager = Any

@@ -9,8 +9,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Mapping, Protocol, cast
-from uuid import UUID
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import chromadb
 from chromadb.errors import ChromaError
@@ -18,6 +17,9 @@ from chromadb.errors import ChromaError
 from ..exceptions import PromptStorageError
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
+    from collections.abc import Mapping
+    from uuid import UUID
+
     from chromadb.api import ClientAPI
 
 logger = logging.getLogger(__name__)
@@ -48,42 +50,59 @@ class RedisConnectionPoolProtocol(Protocol):
 
 class RedisClientProtocol(Protocol):
     """Subset of redis-py client behaviour used within the manager."""
+
     connection_pool: RedisConnectionPoolProtocol | None
 
-    def ping(self) -> bool: ...
+    def ping(self) -> bool:
+        """Return True if the Redis server responds."""
 
-    def dbsize(self) -> int: ...
+    def dbsize(self) -> int:
+        """Return the number of keys stored in Redis."""
 
-    def info(self) -> Mapping[str, Any]: ...
+    def info(self) -> Mapping[str, Any]:
+        """Return diagnostic information from Redis."""
 
-    def get(self, name: str) -> RedisValue | None: ...
+    def get(self, name: str) -> RedisValue | None:
+        """Return a cached value when present."""
 
-    def setex(self, name: str, time: int, value: RedisValue) -> bool: ...
+    def setex(self, name: str, time: int, value: RedisValue) -> bool:
+        """Store a value with the specified TTL."""
 
-    def delete(self, *names: str) -> int: ...
+    def delete(self, *names: str) -> int:
+        """Remove one or more cache entries."""
 
-    def close(self) -> None: ...
+    def close(self) -> None:
+        """Release client resources."""
 
 
 class CollectionProtocol(Protocol):
     """Minimal Chroma collection surface consumed by the manager."""
-    def count(self) -> int: ...
 
-    def delete(self, **kwargs: Any) -> Any: ...
+    def count(self) -> int:
+        """Return the number of stored embeddings."""
 
-    def upsert(self, **kwargs: Any) -> Any: ...
+    def delete(self, **kwargs: Any) -> Any:
+        """Remove embeddings matching the supplied filters."""
 
-    def query(self, **kwargs: Any) -> Mapping[str, Any]: ...
+    def upsert(self, **kwargs: Any) -> Any:
+        """Insert or update embeddings."""
 
-    def peek(self, **kwargs: Any) -> Any: ...
+    def query(self, **kwargs: Any) -> Mapping[str, Any]:
+        """Run a similarity query against the collection."""
+
+    def peek(self, **kwargs: Any) -> Any:
+        """Inspect raw collection entries."""
 
 
 class NullEmbeddingWorker:
     """Embedding worker placeholder used when background sync is disabled."""
+
     def schedule(self, _: UUID) -> None:  # pragma: no cover - trivial noop
+        """Ignore schedule requests when sync is disabled."""
         return
 
     def stop(self) -> None:  # pragma: no cover - trivial noop
+        """No-op stop hook for interface parity."""
         return
 
 
