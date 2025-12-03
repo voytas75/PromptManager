@@ -421,9 +421,7 @@ class MaintenanceMixin:
         logger.info("Snapshot archive created at %s", archive_path)
         return archive_path
 
-    def clear_usage_logs(
-        self: _PromptManager, logs_path: str | Path | None = None
-    ) -> None:
+    def clear_usage_logs(self: _PromptManager, logs_path: str | Path | None = None) -> None:
         """Remove persisted usage analytics logs while keeping settings intact."""
         path = Path(logs_path) if logs_path is not None else self._logs_path
         path = path.expanduser()
@@ -442,9 +440,7 @@ class MaintenanceMixin:
         path.mkdir(parents=True, exist_ok=True)
         logger.info("Usage logs cleared at %s", path)
 
-    def reset_application_data(
-        self: _PromptManager, *, clear_logs: bool = True
-    ) -> None:
+    def reset_application_data(self: _PromptManager, *, clear_logs: bool = True) -> None:
         """Reset prompt data, embeddings, and optional usage logs."""
         self.reset_prompt_repository()
         self.reset_vector_store()

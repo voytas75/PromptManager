@@ -39,6 +39,7 @@ if TYPE_CHECKING:  # pragma: no cover - import for typing only
         QTabWidget,
         QTextEdit,
     )
+
     from models.prompt_model import Prompt
 
 from gui.share_controller import ShareController
@@ -109,7 +110,9 @@ class ExecutionController:
         self._voice_controller = voice_controller
         self._voice_supported = bool(voice_controller and voice_controller.is_supported)
         self._speak_result_button_play_icon = speak_result_button.icon()
-        self._speak_result_button_stop_icon = speak_result_button.style().standardIcon(QStyle.SP_MediaStop)
+        self._speak_result_button_stop_icon = speak_result_button.style().standardIcon(
+            QStyle.SP_MediaStop
+        )
         self._speak_result_button.setCheckable(True)
 
         self._streaming_in_progress = False
@@ -661,7 +664,6 @@ class ExecutionController:
 
     def toggle_voice_playback(self) -> None:
         """Toggle LiteLLM-powered voice playback for the current result."""
-
         if not self._voice_controller or not self._voice_supported:
             self._status("Voice playback requires Qt multimedia support.", 4000)
             return

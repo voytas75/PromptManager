@@ -68,9 +68,7 @@ class RuntimeSettingsService:
             else None,
             "litellm_reasoning_effort": settings.litellm_reasoning_effort if settings else None,
             "litellm_tts_model": settings.litellm_tts_model if settings else None,
-            "litellm_tts_stream": (
-                settings.litellm_tts_stream if settings is not None else True
-            ),
+            "litellm_tts_stream": (settings.litellm_tts_stream if settings is not None else True),
             "litellm_stream": settings.litellm_stream if settings is not None else None,
             "litellm_workflow_models": dict(settings.litellm_workflow_models)
             if settings and settings.litellm_workflow_models

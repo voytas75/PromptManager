@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import importlib.machinery
-import importlib.util
+import importlib
 import sys
 import types
-from pathlib import Path
 
 
 def _install_qt_stubs() -> None:
@@ -123,13 +121,7 @@ def _install_qt_stubs() -> None:
 
 
 _install_qt_stubs()
-loader = importlib.machinery.SourceFileLoader(
-    "dialog_module_for_tests", str(Path("gui/dialogs.py").resolve())
-)
-spec = importlib.util.spec_from_loader("dialog_module_for_tests", loader)
-assert spec and spec.loader
-dialogs = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(dialogs)  # type: ignore[attr-defined]
+dialogs = importlib.import_module("gui.dialogs")
 fallback_suggest_prompt_name = dialogs.fallback_suggest_prompt_name
 
 

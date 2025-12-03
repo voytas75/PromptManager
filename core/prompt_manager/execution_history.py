@@ -298,9 +298,7 @@ class ExecutionHistoryMixin:
         def _executor_for_model(model_name: str) -> CodexExecutor:
             if base_executor.model == model_name:
                 return base_executor
-            drop_params = (
-                list(base_executor.drop_params) if base_executor.drop_params else None
-            )
+            drop_params = list(base_executor.drop_params) if base_executor.drop_params else None
             return CodexExecutor(
                 model=model_name,
                 api_key=base_executor.api_key,
@@ -450,12 +448,10 @@ class ExecutionHistoryMixin:
         except HistoryTrackerError as exc:
             raise PromptHistoryError(str(exc)) from exc
         if rating is not None:
-            cast(Any, self)._apply_rating(prompt_id, rating)
+            cast("Any", self)._apply_rating(prompt_id, rating)
         return execution
 
-    def update_execution_note(
-        self, execution_id: uuid.UUID, note: str | None
-    ) -> PromptExecution:
+    def update_execution_note(self, execution_id: uuid.UUID, note: str | None) -> PromptExecution:
         """Update the note metadata for a history entry."""
         tracker = self._history_tracker
         if tracker is None:
@@ -467,9 +463,7 @@ class ExecutionHistoryMixin:
         except HistoryTrackerError as exc:
             raise PromptHistoryError(str(exc)) from exc
 
-    def list_recent_executions(
-        self, *, limit: int = 20
-    ) -> list[PromptExecution]:
+    def list_recent_executions(self, *, limit: int = 20) -> list[PromptExecution]:
         """Return recently logged executions if history tracking is enabled."""
         tracker = self._history_tracker
         if tracker is None:

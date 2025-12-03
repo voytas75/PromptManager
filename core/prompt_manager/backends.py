@@ -42,6 +42,7 @@ __all__ = [
 
 class RedisConnectionPoolProtocol(Protocol):
     """Subset of redis-py connection pool used for diagnostics."""
+
     connection_kwargs: Mapping[str, Any]
 
     def disconnect(self) -> None:

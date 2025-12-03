@@ -315,6 +315,7 @@ class PromptManager(
             history_tracker=history_tracker,
             user_profile=user_profile,
         )
+
     IntentSuggestions = _IntentSuggestions
     PromptVersionDiff = _PromptVersionDiff
     ExecutionOutcome = _ExecutionOutcome

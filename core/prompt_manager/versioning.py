@@ -65,9 +65,7 @@ class PromptVersionMixin:
         except RepositoryError as exc:
             raise PromptVersionError(f"Unable to load prompt version {version_id}") from exc
 
-    def get_latest_prompt_version(
-        self, prompt_id: uuid.UUID
-    ) -> PromptVersion | None:
+    def get_latest_prompt_version(self, prompt_id: uuid.UUID) -> PromptVersion | None:
         """Return the most recent version for the prompt, if one exists."""
         try:
             return self._repository.get_prompt_latest_version(prompt_id)
@@ -180,8 +178,7 @@ class PromptVersionMixin:
             return merged_prompt, conflicts
 
         message = commit_message or (
-            f"Merge versions {base_version.version_number} -> "
-            f"{incoming_version.version_number}"
+            f"Merge versions {base_version.version_number} -> {incoming_version.version_number}"
         )
         stored = cast("Any", self).update_prompt(merged_prompt, commit_message=message)
         return stored, conflicts

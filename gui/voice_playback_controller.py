@@ -9,8 +9,8 @@ from __future__ import annotations
 import os
 import tempfile
 import threading
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Mapping
 
 from PySide6.QtCore import QObject, QUrl, Signal
 
@@ -18,6 +18,7 @@ _LITELLM_IMPORT_ERROR: str | None = None
 
 try:  # pragma: no cover - optional dependency import
     import litellm
+
     try:
         from litellm.exceptions import LiteLLMException  # type: ignore[attr-defined]
     except Exception as exc:  # pragma: no cover - missing attribute variations
@@ -76,13 +77,11 @@ class VoicePlaybackController(QObject):
     @property
     def is_supported(self) -> bool:
         """Return ``True`` when Qt multimedia backends are available."""
-
         return self._supported
 
     @property
     def is_active(self) -> bool:
         """Return ``True`` while audio is preparing or playing."""
-
         return self._is_preparing or self._is_playing
 
     def play_text(
@@ -94,7 +93,6 @@ class VoicePlaybackController(QObject):
         stream_audio: bool = True,
     ) -> None:
         """Start LiteLLM text-to-speech playback for *text*."""
-
         if not self._supported:
             raise VoicePlaybackError("Qt multimedia backend is unavailable on this system.")
         if self._is_preparing or self._is_playing:
@@ -104,14 +102,22 @@ class VoicePlaybackController(QObject):
             raise VoicePlaybackError("No prompt result is available to read aloud.")
         tts_model = runtime.get("litellm_tts_model")
         if not isinstance(tts_model, str) or not tts_model.strip():
-            raise VoicePlaybackError("Set a LiteLLM TTS model in Settings before using voice playback.")
+            raise VoicePlaybackError(
+                "Set a LiteLLM TTS model in Settings before using voice playback."
+            )
         api_key = runtime.get("litellm_api_key")
         if not isinstance(api_key, str) or not api_key.strip():
             raise VoicePlaybackError("LiteLLM API key is required for voice playback.")
 
-        api_base = runtime.get("litellm_api_base") if isinstance(runtime.get("litellm_api_base"), str) else None
+        api_base = (
+            runtime.get("litellm_api_base")
+            if isinstance(runtime.get("litellm_api_base"), str)
+            else None
+        )
         api_version = (
-            runtime.get("litellm_api_version") if isinstance(runtime.get("litellm_api_version"), str) else None
+            runtime.get("litellm_api_version")
+            if isinstance(runtime.get("litellm_api_version"), str)
+            else None
         )
         self._is_preparing = True
         self.playback_preparing.emit()
@@ -132,9 +138,11 @@ class VoicePlaybackController(QObject):
 
     def stop(self) -> None:
         """Stop playback or cancel any in-flight preparation."""
-
         self._stop_event.set()
-        if self._player is not None and self._player.playbackState() != QMediaPlayer.PlaybackState.StoppedState:
+        if (
+            self._player is not None
+            and self._player.playbackState() != QMediaPlayer.PlaybackState.StoppedState
+        ):
             self._player.stop()
         else:
             self._finalise_stop()

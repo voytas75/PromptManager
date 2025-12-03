@@ -27,8 +27,6 @@ from ..exceptions import (
 from ..repository import RepositoryError, RepositoryNotFoundError
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers only
-    from collections.abc import Mapping
-
     from models.prompt_model import PromptCategory, PromptVersion
 
     from ..repository import PromptRepository
@@ -123,7 +121,6 @@ class PromptLifecycleMixin:
 
     def _ensure_uuid(self, value: UUID | str) -> UUID:
         """Normalize user-supplied identifier inputs to UUID objects."""
-
         return _ensure_uuid(value)
 
     def get_prompt(self, prompt_id: UUID) -> Prompt:
