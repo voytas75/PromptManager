@@ -61,6 +61,7 @@ All settings are defined via `pydantic-settings` in `config/settings.py`. Provid
 | `PROMPT_MANAGER_LITELLM_REASONING_EFFORT` | `minimal`, `medium`, or `high` for OpenAI reasoning models | `medium` |
 | `PROMPT_MANAGER_LITELLM_STREAM` | Enable streaming responses (`true`/`false`) | `true` |
 | `PROMPT_MANAGER_LITELLM_TTS_MODEL` | LiteLLM text-to-speech model id used for voice playback | `openai/tts-1` |
+| `PROMPT_MANAGER_LITELLM_TTS_STREAM` | Stream LiteLLM TTS audio so playback starts mid-download (`true`/`false`) | `true` |
 | `PROMPT_MANAGER_EMBEDDING_BACKEND` | `litellm`, `sentence-transformers`, or `deterministic` | `sentence-transformers` |
 | `PROMPT_MANAGER_EMBEDDING_MODEL` | Embedding model identifier | `text-embedding-3-large` |
 | `PROMPT_MANAGER_EMBEDDING_DEVICE` | Device hint for local embeddings | `cuda` |
@@ -133,6 +134,7 @@ Key UI capabilities:
 
 - Configure LiteLLM credentials via environment variables; the GUI never writes keys to disk.
 - Set `PROMPT_MANAGER_LITELLM_TTS_MODEL` to the provider-specific text-to-speech model when you want the workspace to read results aloud; keep it unset to prevent audio requests.
+- Leave `PROMPT_MANAGER_LITELLM_TTS_STREAM` at its default (`true`) to start playback while LiteLLM audio downloads, or set it to `false` if your environment requires fully downloaded files before playback.
 - The Output overlay includes a speaker icon that streams LiteLLM audio for the latest result; it automatically disables while prompts are streaming or when Qt Multimedia support is missing.
 - Running a prompt logs executions to the `prompt_executions` table with durations, statuses, token usage, errors, and snippets.
 - Continue conversations via **Continue Chat**; transcripts appear in the **Chat** tab and are persisted.

@@ -645,6 +645,20 @@ class ExecutionController:
             return False
         return self._share_controller.has_providers() and bool(self._raw_result_text.strip())
 
+    def _tts_stream_enabled(self) -> bool:
+        value = self._runtime_settings.get("litellm_tts_stream")
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            lowered = value.strip().lower()
+            if lowered in {"false", "0", "no", "off"}:
+                return False
+            if lowered in {"true", "1", "yes", "on"}:
+                return True
+        if self._settings is not None:
+            return bool(getattr(self._settings, "litellm_tts_stream", True))
+        return True
+
     def toggle_voice_playback(self) -> None:
         """Toggle LiteLLM-powered voice playback for the current result."""
 
@@ -658,7 +672,11 @@ class ExecutionController:
             self._voice_controller.stop()
             return
         try:
-            self._voice_controller.play_text(self._raw_result_text, self._runtime_settings)
+            self._voice_controller.play_text(
+                self._raw_result_text,
+                self._runtime_settings,
+                stream_audio=self._tts_stream_enabled(),
+            )
         except VoicePlaybackError as exc:
             self._status(str(exc), 5000)
 

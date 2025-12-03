@@ -85,7 +85,14 @@ class VoicePlaybackController(QObject):
 
         return self._is_preparing or self._is_playing
 
-    def play_text(self, text: str, runtime: Mapping[str, object | None], *, voice: str | None = None) -> None:
+    def play_text(
+        self,
+        text: str,
+        runtime: Mapping[str, object | None],
+        *,
+        voice: str | None = None,
+        stream_audio: bool = True,
+    ) -> None:
         """Start LiteLLM text-to-speech playback for *text*."""
 
         if not self._supported:
@@ -118,7 +125,7 @@ class VoicePlaybackController(QObject):
         }
         self._worker = threading.Thread(
             target=self._download_and_prepare,
-            args=(cleaned, runtime_payload),
+            args=(cleaned, runtime_payload, stream_audio),
             daemon=True,
         )
         self._worker.start()
@@ -133,7 +140,12 @@ class VoicePlaybackController(QObject):
             self._finalise_stop()
             self.playback_finished.emit()
 
-    def _download_and_prepare(self, text: str, runtime_payload: Mapping[str, str | None]) -> None:
+    def _download_and_prepare(
+        self,
+        text: str,
+        runtime_payload: Mapping[str, str | None],
+        stream_audio: bool,
+    ) -> None:
         if litellm is None:
             message = _LITELLM_IMPORT_ERROR or (
                 "LiteLLM is not installed; install litellm to enable voice playback."
@@ -163,31 +175,36 @@ class VoicePlaybackController(QObject):
         fd, tmp_path = tempfile.mkstemp(prefix="prompt_manager_tts_", suffix=".mp3")
         os.close(fd)
         path = Path(tmp_path)
-        try:
-            stream_to_file = getattr(response, "stream_to_file", None)
-            if callable(stream_to_file):
-                stream_to_file(path)
-            else:
-                content = getattr(response, "content", None)
-                if content is None and callable(getattr(response, "read", None)):
-                    content = response.read()
-                if content is None:
-                    raise RuntimeError("LiteLLM response did not expose audio content.")
-                path.write_bytes(content)
-        except Exception as exc:  # pragma: no cover - file write errors
-            path.unlink(missing_ok=True)
-            self.playback_failed.emit(f"Unable to store audio stream: {exc}")
-            self._is_preparing = False
-            return
-
-        if self._stop_event.is_set():
-            path.unlink(missing_ok=True)
-            self._is_preparing = False
-            return
-
         self._temp_path = path
-        self.playback_ready.emit(str(path))
-        self._is_preparing = False
+        try:
+            started, interrupted = self._write_response_to_file(response, path, stream_audio)
+        except VoicePlaybackError as exc:
+            path.unlink(missing_ok=True)
+            self._temp_path = None
+            self.playback_failed.emit(str(exc))
+            self._is_preparing = False
+            return
+        except LiteLLMException as exc:  # pragma: no cover - requires API access
+            path.unlink(missing_ok=True)
+            self._temp_path = None
+            self.playback_failed.emit(f"LiteLLM TTS failed: {exc}")
+            self._is_preparing = False
+            return
+        except Exception as exc:  # pragma: no cover - network/runtime errors
+            path.unlink(missing_ok=True)
+            self._temp_path = None
+            self.playback_failed.emit(f"Voice playback failed: {exc}")
+            self._is_preparing = False
+            return
+
+        if interrupted:
+            path.unlink(missing_ok=True)
+            self._temp_path = None
+            self._is_preparing = False
+            return
+
+        if not started:
+            self.playback_ready.emit(str(path))
 
     def _handle_playback_ready(self, path_str: str) -> None:
         if self._player is None:
@@ -204,6 +221,55 @@ class VoicePlaybackController(QObject):
         if state == QMediaPlayer.PlaybackState.StoppedState and self._is_playing:
             self._finalise_stop()
             self.playback_finished.emit()
+
+    def _write_response_to_file(
+        self,
+        response: object,
+        path: Path,
+        stream_audio: bool,
+    ) -> tuple[bool, bool]:
+        iterator_factory = getattr(response, "iter_bytes", None)
+        if not callable(iterator_factory):
+            stream_to_file = getattr(response, "stream_to_file", None)
+            if callable(stream_to_file):
+                stream_to_file(path)
+            else:
+                content = getattr(response, "content", None)
+                if content is None and callable(getattr(response, "read", None)):
+                    content = response.read()
+                if content is None:
+                    raise VoicePlaybackError("LiteLLM response did not expose audio content.")
+                path.write_bytes(content)
+            try:
+                size = path.stat().st_size
+            except FileNotFoundError:
+                size = 0
+            if size == 0:
+                raise VoicePlaybackError("LiteLLM returned an empty audio response.")
+            return False, False
+
+        started = False
+        interrupted = False
+        with path.open("wb") as handle:
+            for chunk in iterator_factory():
+                if self._stop_event.is_set():
+                    interrupted = True
+                    break
+                if not chunk:
+                    continue
+                handle.write(chunk)
+                handle.flush()
+                if stream_audio and not started:
+                    self.playback_ready.emit(str(path))
+                    started = True
+
+        try:
+            size = path.stat().st_size
+        except FileNotFoundError:
+            size = 0
+        if size == 0 and not interrupted:
+            raise VoicePlaybackError("LiteLLM returned an empty audio response.")
+        return started, interrupted
 
     def _finalise_stop(self) -> None:
         self._is_playing = False

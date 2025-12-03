@@ -68,6 +68,9 @@ class RuntimeSettingsService:
             else None,
             "litellm_reasoning_effort": settings.litellm_reasoning_effort if settings else None,
             "litellm_tts_model": settings.litellm_tts_model if settings else None,
+            "litellm_tts_stream": (
+                settings.litellm_tts_stream if settings is not None else True
+            ),
             "litellm_stream": settings.litellm_stream if settings is not None else None,
             "litellm_workflow_models": dict(settings.litellm_workflow_models)
             if settings and settings.litellm_workflow_models
@@ -111,6 +114,7 @@ class RuntimeSettingsService:
                     "litellm_api_version",
                     "litellm_reasoning_effort",
                     "litellm_tts_model",
+                    "litellm_tts_stream",
                     "embedding_backend",
                     "embedding_model",
                 ):
@@ -135,6 +139,16 @@ class RuntimeSettingsService:
                             runtime["litellm_stream"] = True
                         elif lowered in {"false", "0", "no", "off"}:
                             runtime["litellm_stream"] = False
+                if runtime.get("litellm_tts_stream") is None:
+                    tts_stream_value = data.get("litellm_tts_stream")
+                    if isinstance(tts_stream_value, bool):
+                        runtime["litellm_tts_stream"] = tts_stream_value
+                    elif isinstance(tts_stream_value, str):
+                        lowered = tts_stream_value.strip().lower()
+                        if lowered in {"false", "0", "no", "off"}:
+                            runtime["litellm_tts_stream"] = False
+                        elif lowered in {"true", "1", "yes", "on"}:
+                            runtime["litellm_tts_stream"] = True
                 if runtime.get("litellm_workflow_models") is None:
                     routing_value = data.get("litellm_workflow_models")
                     if isinstance(routing_value, dict):
@@ -177,6 +191,8 @@ class RuntimeSettingsService:
             )
         else:
             runtime["theme_mode"] = DEFAULT_THEME_MODE
+        if not isinstance(runtime.get("litellm_tts_stream"), bool):
+            runtime["litellm_tts_stream"] = True
         return runtime
 
     def apply_updates(
@@ -199,6 +215,7 @@ class RuntimeSettingsService:
             "litellm_api_version",
             "litellm_reasoning_effort",
             "litellm_tts_model",
+            "litellm_tts_stream",
         )
         for key in simple_keys:
             if key in updates:
@@ -321,6 +338,7 @@ class RuntimeSettingsService:
                 "litellm_api_version": runtime.get("litellm_api_version"),
                 "litellm_reasoning_effort": runtime.get("litellm_reasoning_effort"),
                 "litellm_tts_model": runtime.get("litellm_tts_model"),
+                "litellm_tts_stream": runtime.get("litellm_tts_stream"),
                 "litellm_workflow_models": runtime.get("litellm_workflow_models"),
                 "quick_actions": runtime.get("quick_actions"),
                 "litellm_drop_params": runtime.get("litellm_drop_params"),
@@ -348,6 +366,8 @@ class RuntimeSettingsService:
             settings_model.litellm_api_version = updates.get("litellm_api_version")
             settings_model.litellm_reasoning_effort = updates.get("litellm_reasoning_effort")
             settings_model.litellm_tts_model = updates.get("litellm_tts_model")
+            if "litellm_tts_stream" in updates:
+                settings_model.litellm_tts_stream = bool(updates.get("litellm_tts_stream"))
             settings_model.litellm_workflow_models = cleaned_workflow_models
             settings_model.quick_actions = cleaned_quick_actions
             settings_model.litellm_drop_params = cleaned_drop_params

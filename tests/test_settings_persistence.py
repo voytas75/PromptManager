@@ -19,6 +19,7 @@ def test_persist_settings_to_config(tmp_path, monkeypatch):
             "litellm_drop_params": ["max_tokens", "temperature"],
             "litellm_api_base": "https://example.com",
             "litellm_tts_model": "openai/tts-1",
+            "litellm_tts_stream": False,
         }
     )
 
@@ -27,6 +28,7 @@ def test_persist_settings_to_config(tmp_path, monkeypatch):
     data = json.loads(config_path.read_text(encoding="utf-8"))
     assert data["litellm_drop_params"] == ["max_tokens", "temperature"]
     assert data["litellm_tts_model"] == "openai/tts-1"
+    assert data["litellm_tts_stream"] is False
 
 
 def test_persist_settings_to_config_persists_chat_palette_override(tmp_path, monkeypatch):

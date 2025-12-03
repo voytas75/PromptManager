@@ -79,6 +79,7 @@ class SettingsWorkflow:
             litellm_drop_params=self._runtime_settings.get("litellm_drop_params"),
             litellm_reasoning_effort=self._runtime_settings.get("litellm_reasoning_effort"),
             litellm_tts_model=self._runtime_settings.get("litellm_tts_model"),
+            litellm_tts_stream=self._runtime_settings.get("litellm_tts_stream"),
             litellm_stream=self._runtime_settings.get("litellm_stream"),
             litellm_workflow_models=self._runtime_settings.get("litellm_workflow_models"),
             embedding_model=self._runtime_settings.get("embedding_model"),

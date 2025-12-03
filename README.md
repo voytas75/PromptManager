@@ -27,6 +27,8 @@ export PROMPT_MANAGER_CHROMA_PATH="data/chromadb"
 export PROMPT_MANAGER_LITELLM_MODEL="gpt-4o-mini"
 export PROMPT_MANAGER_LITELLM_API_KEY="sk-***"
 export PROMPT_MANAGER_LITELLM_TTS_MODEL="openai/tts-1"
+# Optional: disable streaming playback if your platform struggles with simultaneous read/write
+# export PROMPT_MANAGER_LITELLM_TTS_STREAM="false"
 
 # 2. Validate configuration and services
 python -m main --no-gui --print-settings
@@ -47,7 +49,7 @@ python -m main
 - Live Jinja2 template preview pane beside the workspace that renders prompts with JSON variables, ships custom filters (`truncate`, `slugify`, `json`), and validates payloads with optional JSON Schema or Pydantic feedback in real time.
 - Prompt Parts registry with a dedicated GUI tab, CRUD, clipboard/export helpers, and reusable tone/formatting presets that can be attached to executions for consistent voice.
 - Prompt execution workspace with LiteLLM-backed runs, streaming output, chat-style transcripts, rating-based quality feedback, export/import utilities, and persisted execution history complete with context metadata (model, streaming flag, style hints).
-- Voice playback button in the workspace overlay streams LiteLLM text-to-speech audio for the latest result so reviewers can listen to outputs (configure via `PROMPT_MANAGER_LITELLM_TTS_MODEL`).
+- Voice playback button in the workspace overlay streams LiteLLM text-to-speech audio as it downloads (enabled by default, toggle via `PROMPT_MANAGER_LITELLM_TTS_STREAM`).
 - Dedicated Prompt Template editor dialog (toolbar button) that exposes every LiteLLM system prompt with inline validation and reset-to-default controls so teams can fine-tune guidance without editing config files.
 - Prompt sharing workflows baked into the prompt detail pane: choose whether to publish just the body, body + description, or body + description + scenarios, optionally include metadata, and the app uploads to ShareText and copies the share URL to your clipboard.
 - Typed configuration loader (`config.settings`) that validates paths, TTLs, and provider settings from env vars or JSON, failing fast with actionable errors.

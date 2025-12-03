@@ -80,6 +80,7 @@ class SettingsDialog(QDialog):
         litellm_drop_params: Sequence[str] | None = None,
         litellm_reasoning_effort: str | None = None,
         litellm_tts_model: str | None = None,
+        litellm_tts_stream: bool | None = None,
         litellm_stream: bool | None = None,
         litellm_workflow_models: Mapping[str, str] | None = None,
         embedding_model: str | None = None,
@@ -111,6 +112,7 @@ class SettingsDialog(QDialog):
         self._litellm_drop_params = ", ".join(litellm_drop_params) if litellm_drop_params else ""
         self._litellm_reasoning_effort = (litellm_reasoning_effort or "").strip()
         self._litellm_tts_model = litellm_tts_model or ""
+        self._litellm_tts_stream = True if litellm_tts_stream is None else bool(litellm_tts_stream)
         self._litellm_stream = bool(litellm_stream)
         original_actions = [
             dict(entry) for entry in (quick_actions or []) if isinstance(entry, dict)
@@ -230,6 +232,10 @@ class SettingsDialog(QDialog):
         self._tts_model_input = QLineEdit(self._litellm_tts_model, litellm_tab)
         self._tts_model_input.setPlaceholderText("openai/tts-1")
         litellm_form.addRow("LiteLLM TTS model", self._tts_model_input)
+
+        self._tts_stream_checkbox = QCheckBox("Stream audio during download", litellm_tab)
+        self._tts_stream_checkbox.setChecked(self._litellm_tts_stream)
+        litellm_form.addRow("LiteLLM TTS streaming", self._tts_stream_checkbox)
 
         self._stream_checkbox = QCheckBox("Enable streaming responses", litellm_tab)
         self._stream_checkbox.setChecked(self._litellm_stream)
@@ -571,6 +577,7 @@ class SettingsDialog(QDialog):
             "litellm_drop_params": drop_params,
             "litellm_reasoning_effort": _clean(self._reasoning_effort_input.text()),
             "litellm_tts_model": _clean(self._tts_model_input.text()),
+            "litellm_tts_stream": self._tts_stream_checkbox.isChecked(),
             "litellm_stream": self._stream_checkbox.isChecked(),
             "litellm_workflow_models": workflow_models or None,
             "quick_actions": self._quick_actions_value,

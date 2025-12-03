@@ -24,8 +24,35 @@ from config import PromptManagerSettings, SettingsError, load_settings
 from config.settings import DEFAULT_EMBEDDING_BACKEND, DEFAULT_EMBEDDING_MODEL
 
 
+def _clear_litellm_env(monkeypatch: MonkeyPatch) -> None:
+    vars_to_clear = [
+        "PROMPT_MANAGER_LITELLM_MODEL",
+        "PROMPT_MANAGER_LITELLM_INFERENCE_MODEL",
+        "PROMPT_MANAGER_LITELLM_API_KEY",
+        "PROMPT_MANAGER_LITELLM_API_BASE",
+        "PROMPT_MANAGER_LITELLM_API_VERSION",
+        "PROMPT_MANAGER_LITELLM_WORKFLOW_MODELS",
+        "PROMPT_MANAGER_LITELLM_TTS_MODEL",
+        "PROMPT_MANAGER_LITELLM_TTS_STREAM",
+        "AZURE_OPENAI_API_KEY",
+        "AZURE_OPENAI_ENDPOINT",
+        "AZURE_OPENAI_API_VERSION",
+        "LITELLM_MODEL",
+        "LITELLM_INFERENCE_MODEL",
+        "LITELLM_API_KEY",
+        "LITELLM_API_BASE",
+        "LITELLM_API_VERSION",
+        "LITELLM_WORKFLOW_MODELS",
+        "LITELLM_TTS_MODEL",
+        "LITELLM_TTS_STREAM",
+    ]
+    for var in vars_to_clear:
+        monkeypatch.delenv(var, raising=False)
+
+
 def test_load_settings_reads_json_and_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     """Ensure JSON configuration is loaded and environment fills missing values."""
+    _clear_litellm_env(monkeypatch)
     db_path_value = str(tmp_path / "from_json.db")
     chroma_path_value = str(tmp_path / "chromadb")
     config_payload = {
@@ -52,10 +79,12 @@ def test_load_settings_reads_json_and_env(monkeypatch: MonkeyPatch, tmp_path: Pa
     assert settings.litellm_inference_model is None
     assert settings.litellm_drop_params is None
     assert settings.litellm_tts_model is None
+    assert settings.litellm_tts_stream is True
 
 
 def test_json_precedes_env_when_both_provided(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     """Application JSON settings override environment variables for overlapping keys."""
+    _clear_litellm_env(monkeypatch)
     # Use the repo's template as a base JSON.
     template_path = Path("config/config.template.json").resolve()
     assert template_path.exists(), "template config should exist"
@@ -83,6 +112,7 @@ def test_json_with_litellm_api_key_is_ignored(
     caplog: LogCaptureFixture,
 ) -> None:
     """Ensure LiteLLM API keys present in JSON configs are ignored."""
+    _clear_litellm_env(monkeypatch)
     config_payload = {
         "litellm_model": "azure/gpt-4o",
         "litellm_api_key": "from-json",
@@ -108,6 +138,7 @@ def test_json_with_litellm_api_key_is_ignored(
 
 def test_litellm_settings_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     """Load LiteLLM configuration entirely from environment variables."""
+    _clear_litellm_env(monkeypatch)
     tmp_config = tmp_path / "config.json"
     tmp_config.write_text("{}", encoding="utf-8")
     monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(tmp_config))
@@ -116,6 +147,7 @@ def test_litellm_settings_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> 
     monkeypatch.setenv("PROMPT_MANAGER_LITELLM_API_KEY", "secret-key")
     monkeypatch.setenv("PROMPT_MANAGER_LITELLM_API_BASE", "https://proxy.example.com")
     monkeypatch.setenv("PROMPT_MANAGER_LITELLM_TTS_MODEL", "openai/tts-1")
+    monkeypatch.setenv("PROMPT_MANAGER_LITELLM_TTS_STREAM", "false")
     monkeypatch.setenv(
         "PROMPT_MANAGER_LITELLM_WORKFLOW_MODELS",
         json.dumps({"prompt_execution": "inference"}),
@@ -131,22 +163,29 @@ def test_litellm_settings_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> 
     assert settings.litellm_stream is False
     assert settings.litellm_workflow_models == {"prompt_execution": "inference"}
     assert settings.litellm_tts_model == "openai/tts-1"
+    assert settings.litellm_tts_stream is False
 
 
 def test_litellm_tts_model_from_json(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     """Load LiteLLM TTS model selection from JSON configs."""
+    _clear_litellm_env(monkeypatch)
     config_path = tmp_path / "config.json"
-    config_path.write_text(json.dumps({"litellm_tts_model": "azure/voice"}), encoding="utf-8")
+    config_path.write_text(
+        json.dumps({"litellm_tts_model": "azure/voice", "litellm_tts_stream": False}),
+        encoding="utf-8",
+    )
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
 
     settings = load_settings()
 
     assert settings.litellm_tts_model == "azure/voice"
+    assert settings.litellm_tts_stream is False
 
 
 def test_litellm_inference_model_from_json(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     """Respect inference model overrides sourced from JSON config files."""
+    _clear_litellm_env(monkeypatch)
     config_path = tmp_path / "config.json"
     config_path.write_text(
         json.dumps(

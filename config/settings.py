@@ -1,6 +1,7 @@
 """Settings management utilities for Prompt Manager configuration.
 
 Updates:
+  v0.5.5 - 2025-12-03 - Add LiteLLM TTS streaming configuration toggle.
   v0.5.4 - 2025-12-03 - Add LiteLLM TTS model configuration for voice playback.
   v0.5.3 - 2025-11-30 - Fix validator docstring spacing for lint compliance.
   v0.5.2 - 2025-11-30 - Add category suggestion workflow to LiteLLM routing.
@@ -159,6 +160,10 @@ class PromptManagerSettings(BaseSettings):
         default=None,
         description="LiteLLM text-to-speech model used for workspace voice playback.",
     )
+    litellm_tts_stream: bool = Field(
+        default=True,
+        description="Stream LiteLLM TTS audio as it downloads to start playback sooner.",
+    )
     litellm_stream: bool = Field(
         default=False,
         description="Enable streaming responses when executing prompts via LiteLLM.",
@@ -258,6 +263,10 @@ class PromptManagerSettings(BaseSettings):
                 "litellm_tts_model": [
                     "LITELLM_TTS_MODEL",
                     "litellm_tts_model",
+                ],
+                "litellm_tts_stream": [
+                    "LITELLM_TTS_STREAM",
+                    "litellm_tts_stream",
                 ],
                 "litellm_stream": ["LITELLM_STREAM", "litellm_stream"],
                 "litellm_workflow_models": ["LITELLM_WORKFLOW_MODELS", "litellm_workflow_models"],
@@ -564,6 +573,10 @@ class PromptManagerSettings(BaseSettings):
                     "LITELLM_REASONING_EFFORT",
                     "litellm_reasoning_effort",
                 ],
+                "litellm_tts_stream": [
+                    "LITELLM_TTS_STREAM",
+                    "litellm_tts_stream",
+                ],
                 "litellm_stream": ["LITELLM_STREAM", "litellm_stream"],
             }
             for field, keys in mapping.items():
@@ -655,6 +668,7 @@ class PromptManagerSettings(BaseSettings):
                     "litellm_api_version",
                     "litellm_drop_params",
                     "litellm_reasoning_effort",
+                    "litellm_tts_stream",
                     "litellm_stream",
                     "litellm_workflow_models",
                     "litellm_tts_model",
