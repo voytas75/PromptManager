@@ -83,7 +83,11 @@ class PromptGenerationService:
             context_text: str,
             dialog: QWidget | None,
         ) -> None:
-            self._execute_context_handler(prompt_obj, dialog, context_text)
+            self._execute_context_handler(
+                prompt_obj,
+                parent=dialog,
+                context_override=context_text,
+            )
 
         dialog_factory = PromptDialogFactory(
             manager=self._manager,
