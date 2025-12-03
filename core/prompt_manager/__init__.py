@@ -1,6 +1,7 @@
 """Prompt Manager package façade and orchestration layer.
 
 Updates:
+  v0.14.17 - 2025-12-03 - Extract user state bootstrap into dedicated mixin.
   v0.14.16 - 2025-12-03 - Extract backend bootstrap and LiteLLM wiring into mixins.
   v0.14.15 - 2025-12-03 - Move runtime lifecycle helpers into dedicated mixin module.
   v0.14.14 - 2025-12-03 - Move backend bootstrap helpers into dedicated module.
@@ -9,8 +10,7 @@ Updates:
   v0.14.11 - 2025-12-03 - Extract versioning, diff, and fork APIs into mixin module.
   v0.14.10 - 2025-12-03 - Move search and suggestion APIs into dedicated mixin.
   v0.14.9 - 2025-12-03 - Move execution and benchmarking APIs into mixin module.
-  v0.14.8 - 2025-12-02 - Move maintenance utilities into dedicated mixin module.
-  pre-v0.14.8 - 2025-11-30 - Consolidated history covering releases v0.1.0–v0.14.7.
+  pre-v0.14.9 - 2025-11-30 - Consolidated history covering releases v0.1.0–v0.14.8.
 """
 
 from __future__ import annotations
@@ -98,6 +98,7 @@ from .refinement import PromptRefinementMixin
 from .response_styles import ResponseStyleSupport
 from .runtime import PromptRuntimeMixin
 from .search import IntentSuggestions as _IntentSuggestions, PromptSearchMixin
+from .state import UserStateMixin
 from .storage import PromptStorage
 from .versioning import (
     PromptVersionDiff as _PromptVersionDiff,
@@ -163,6 +164,7 @@ _REEXPORTED_EXCEPTIONS = (
     PromptNoteNotFoundError,
     PromptNoteStorageError,
     ScenarioGenerationError,
+    RepositoryError,
     RepositoryNotFoundError,
 )
 
@@ -198,6 +200,7 @@ class PromptManager(
     BackendBootstrapMixin,
     LiteLLMWiringMixin,
     PromptRuntimeMixin,
+    UserStateMixin,
     CategorySupport,
     ResponseStyleSupport,
     PromptNoteSupport,
@@ -308,15 +311,10 @@ class PromptManager(
             intent_classifier=intent_classifier,
             prompt_templates=prompt_templates,
         )
-        self._history_tracker = history_tracker
-        if user_profile is not None:
-            self._user_profile: UserProfile | None = user_profile
-        else:
-            try:
-                self._user_profile = self._repository.get_user_profile()
-            except RepositoryError:
-                logger.warning("Unable to load persisted user profile", exc_info=True)
-                self._user_profile = None
+        self._initialise_user_state(
+            history_tracker=history_tracker,
+            user_profile=user_profile,
+        )
     IntentSuggestions = _IntentSuggestions
     PromptVersionDiff = _PromptVersionDiff
     ExecutionOutcome = _ExecutionOutcome
@@ -337,6 +335,7 @@ __all__ = [
     "PromptExecutionUnavailable",
     "PromptExecutionError",
     "PromptEngineeringUnavailable",
+    "RepositoryError",
     # New storage façade
     "PromptStorage",
     # Execution facade
