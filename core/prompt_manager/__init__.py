@@ -20,6 +20,9 @@ import sqlite3 as _sqlite3
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+import chromadb as _chromadb
+from chromadb.errors import ChromaError
+
 # ---------------------------------------------------------------------------
 # NOTE: Transitional refactor
 # ---------------------------
@@ -113,6 +116,7 @@ from .versioning import (
 from .workflows import LiteLLMWorkflowMixin
 
 sqlite3 = _sqlite3
+chromadb = _chromadb
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from collections.abc import Mapping, Sequence
@@ -191,6 +195,8 @@ __all__ = [
     "PromptNoteStorageError",
     "ScenarioGenerationError",
     "RepositoryNotFoundError",
+    "ChromaError",
+    "chromadb",
 ]
 
 
@@ -299,7 +305,7 @@ class PromptManager(
             embedding_function,
             chroma_client=chroma_client,
         )
-        self._chroma_client = cast("Any", client)
+        self._chroma_client = client
         self._collection = collection
 
         self._notification_center = notification_center or default_notification_center
@@ -417,4 +423,6 @@ __all__ = [
     "PromptEngineerFacade",
     "PromptEngineeringError",
     "PromptRefinement",
+    "ChromaError",
+    "chromadb",
 ]

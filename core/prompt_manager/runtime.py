@@ -48,13 +48,12 @@ class PromptRuntimeMixin:
     _embedding_function: Any | None
     _db_path: Path | None
     _notification_center: NotificationCenter
+    _logs_path: Path
     _redis_client: RedisClientProtocol | None
     _embedding_worker: Any
     _closed: bool
     _history_tracker: HistoryTracker | None
-    _intent_classifier: IntentClassifier | None
     _executor: CodexExecutor | None
-    _user_profile: UserProfile | None
 
     def _apply_category_metadata(self, prompt: Prompt) -> Prompt:
         """Ensure prompt categories map to registry entries."""
@@ -142,7 +141,8 @@ class PromptRuntimeMixin:
     @property
     def intent_classifier(self) -> IntentClassifier | None:
         """Expose the configured intent classifier for tooling hooks."""
-        return self._intent_classifier
+        classifier: IntentClassifier | None = getattr(self, "_intent_classifier", None)
+        return classifier
 
     @property
     def executor(self) -> CodexExecutor | None:
@@ -170,15 +170,19 @@ class PromptRuntimeMixin:
     @property
     def user_profile(self) -> UserProfile | None:
         """Return the stored single-user profile when available."""
-        return self._user_profile
+        profile: UserProfile | None = getattr(self, "_user_profile", None)
+        return profile
 
     def refresh_user_profile(self) -> UserProfile | None:
         """Reload the persisted profile from the repository."""
         try:
-            self._user_profile = self._repository.get_user_profile()
+            profile = self._repository.get_user_profile()
         except RepositoryError:
             logger.warning("Unable to refresh user profile from storage", exc_info=True)
-        return self._user_profile
+            cached: UserProfile | None = getattr(self, "_user_profile", None)
+            return cached
+        self._user_profile = profile
+        return profile
 
     def set_intent_classifier(self, classifier: IntentClassifier | None) -> None:
         """Replace the runtime intent classifier implementation."""
