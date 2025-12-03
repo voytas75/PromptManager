@@ -62,6 +62,7 @@ from ..exceptions import (
     ResponseStyleStorageError,
     ScenarioGenerationError,
 )
+from ..execution import CodexExecutor  # noqa: TCH001
 from ..intent_classifier import IntentClassifier
 from ..name_generation import (
     LiteLLMCategoryGenerator,
@@ -76,6 +77,7 @@ from ..prompt_engineering import (
     PromptRefinement,
 )
 from ..repository import PromptRepository, RepositoryError, RepositoryNotFoundError
+from ..scenario_generation import LiteLLMScenarioGenerator  # noqa: TCH001
 from .analytics import (
     AnalyticsMixin,
     CategoryHealth as _CategoryHealth,

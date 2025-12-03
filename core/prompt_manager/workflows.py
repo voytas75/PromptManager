@@ -7,29 +7,30 @@ Updates:
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable, Mapping, Sequence  # noqa: TCH003
+from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
 from config import LITELLM_ROUTED_WORKFLOWS
 from prompt_templates import DEFAULT_PROMPT_TEMPLATES, PROMPT_TEMPLATE_KEYS
 
 from ..exceptions import NameGenerationError
-from ..execution import CodexExecutor
-from ..name_generation import (
-    LiteLLMCategoryGenerator,
-    LiteLLMDescriptionGenerator,
-    LiteLLMNameGenerator,
-)
-from ..prompt_engineering import PromptEngineer
-from ..scenario_generation import LiteLLMScenarioGenerator
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping, Sequence
-
     from ..intent_classifier import IntentClassifier
 
 __all__ = ["LiteLLMWorkflowMixin"]
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_factory(name: str) -> Callable[..., Any]:
+    """Return a constructor from the core.prompt_manager module."""
+    module = import_module("core.prompt_manager")
+    factory = getattr(module, name)
+    if not callable(factory):  # pragma: no cover - defensive
+        raise NameGenerationError(f"{name} is not callable.")
+    return factory
 
 
 class LiteLLMWorkflowMixin:
@@ -127,10 +128,11 @@ class LiteLLMWorkflowMixin:
                 return self._litellm_inference_model or self._litellm_fast_model
             return self._litellm_fast_model or self._litellm_inference_model
 
-        def _construct(factory: Callable[..., Any], workflow: str, **extra: Any) -> Any | None:
+        def _construct(factory_name: str, workflow: str, **extra: Any) -> Any | None:
             selected_model = _select_model(workflow)
             if not selected_model:
                 return None
+            factory = _resolve_factory(factory_name)
             return factory(
                 model=selected_model,
                 api_key=api_key,
@@ -143,38 +145,38 @@ class LiteLLMWorkflowMixin:
         template_overrides = dict(self._prompt_templates)
         try:
             self._name_generator = _construct(
-                LiteLLMNameGenerator,
+                "LiteLLMNameGenerator",
                 "name_generation",
                 system_prompt=template_overrides.get("name_generation"),
             )
             self._description_generator = _construct(
-                LiteLLMDescriptionGenerator,
+                "LiteLLMDescriptionGenerator",
                 "description_generation",
                 system_prompt=template_overrides.get("description_generation"),
             )
             self._prompt_engineer = _construct(
-                PromptEngineer,
+                "PromptEngineer",
                 "prompt_engineering",
                 system_prompt=template_overrides.get("prompt_engineering"),
             )
             structure_engineer = _construct(
-                PromptEngineer,
+                "PromptEngineer",
                 "prompt_structure_refinement",
                 system_prompt=template_overrides.get("prompt_engineering"),
             )
             self._prompt_structure_engineer = structure_engineer or self._prompt_engineer
             self._scenario_generator = _construct(
-                LiteLLMScenarioGenerator,
+                "LiteLLMScenarioGenerator",
                 "scenario_generation",
                 system_prompt=template_overrides.get("scenario_generation"),
             )
             self._category_generator = _construct(
-                LiteLLMCategoryGenerator,
+                "LiteLLMCategoryGenerator",
                 "category_generation",
                 system_prompt=template_overrides.get("category_generation"),
             )
             self._executor = _construct(
-                CodexExecutor,
+                "CodexExecutor",
                 "prompt_execution",
                 reasoning_effort=self._litellm_reasoning_effort,
                 stream=self._litellm_stream,
