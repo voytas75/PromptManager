@@ -58,6 +58,7 @@ class VoicePlaybackController(QObject):
     playback_ready = Signal(str)
 
     def __init__(self, *, parent: QObject | None = None) -> None:
+        """Initialise the controller with optional QObject *parent*."""
         super().__init__(parent)
         self._supported = bool(_MULTIMEDIA_AVAILABLE and QMediaPlayer and QAudioOutput)
         self._player: QMediaPlayer | None = None
@@ -66,7 +67,9 @@ class VoicePlaybackController(QObject):
             self._player = QMediaPlayer(self)
             self._audio_output = QAudioOutput(self)
             self._player.setAudioOutput(self._audio_output)
-            self._player.playbackStateChanged.connect(self._handle_state_changed)  # type: ignore[arg-type]
+            self._player.playbackStateChanged.connect(  # type: ignore[arg-type]
+                self._handle_state_changed
+            )
             self.playback_ready.connect(self._handle_playback_ready)
         self._worker: threading.Thread | None = None
         self._stop_event = threading.Event()
@@ -93,6 +96,8 @@ class VoicePlaybackController(QObject):
         stream_audio: bool = True,
     ) -> None:
         """Start LiteLLM text-to-speech playback for *text*."""
+        if not isinstance(runtime, Mapping):
+            raise VoicePlaybackError("Runtime settings must be a mapping.")
         if not self._supported:
             raise VoicePlaybackError("Qt multimedia backend is unavailable on this system.")
         if self._is_preparing or self._is_playing:
@@ -109,16 +114,10 @@ class VoicePlaybackController(QObject):
         if not isinstance(api_key, str) or not api_key.strip():
             raise VoicePlaybackError("LiteLLM API key is required for voice playback.")
 
-        api_base = (
-            runtime.get("litellm_api_base")
-            if isinstance(runtime.get("litellm_api_base"), str)
-            else None
-        )
-        api_version = (
-            runtime.get("litellm_api_version")
-            if isinstance(runtime.get("litellm_api_version"), str)
-            else None
-        )
+        api_base_value = runtime.get("litellm_api_base")
+        api_base = api_base_value if isinstance(api_base_value, str) else None
+        api_version_value = runtime.get("litellm_api_version")
+        api_version = api_version_value if isinstance(api_version_value, str) else None
         self._is_preparing = True
         self.playback_preparing.emit()
         self._stop_event.clear()

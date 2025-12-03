@@ -298,6 +298,10 @@ class ExecutionHistoryMixin:
         def _executor_for_model(model_name: str) -> CodexExecutor:
             if base_executor.model == model_name:
                 return base_executor
+            if not isinstance(base_executor, CodexExecutor):
+                raise PromptExecutionUnavailable(
+                    "Only configured LiteLLM executors can benchmark against multiple models."
+                )
             drop_params = list(base_executor.drop_params) if base_executor.drop_params else None
             return CodexExecutor(
                 model=model_name,

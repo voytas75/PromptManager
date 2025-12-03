@@ -9,7 +9,14 @@ from __future__ import annotations
 import textwrap
 from typing import TYPE_CHECKING
 
-from PySide6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QPlainTextEdit, QVBoxLayout
+from PySide6.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QLabel,
+    QPlainTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
 if TYPE_CHECKING:
     from core import CatalogDiff, CatalogDiffEntry
@@ -26,7 +33,7 @@ def _diff_entry_to_text(entry: CatalogDiffEntry) -> str:
 class CatalogPreviewDialog(QDialog):
     """Show a diff preview before applying catalogue changes."""
 
-    def __init__(self, diff: CatalogDiff, parent=None) -> None:
+    def __init__(self, diff: CatalogDiff, parent: QWidget | None = None) -> None:
         """Display the provided catalogue diff and capture user intent."""
         super().__init__(parent)
         self._diff = diff

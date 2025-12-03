@@ -42,9 +42,12 @@ if TYPE_CHECKING:  # pragma: no cover - import for typing only
 
     from models.prompt_model import Prompt
 
-from gui.share_controller import ShareController
-from gui.usage_logger import IntentUsageLogger
-from gui.voice_playback_controller import VoicePlaybackController, VoicePlaybackError
+from gui.voice_playback_controller import VoicePlaybackError
+
+if TYPE_CHECKING:  # pragma: no cover - import for typing only
+    from gui.share_controller import ShareController
+    from gui.usage_logger import IntentUsageLogger
+    from gui.voice_playback_controller import VoicePlaybackController
 
 StatusCallback = Callable[[str, int], None]
 ClearStatusCallback = Callable[[], None]
@@ -110,9 +113,8 @@ class ExecutionController:
         self._voice_controller = voice_controller
         self._voice_supported = bool(voice_controller and voice_controller.is_supported)
         self._speak_result_button_play_icon = speak_result_button.icon()
-        self._speak_result_button_stop_icon = speak_result_button.style().standardIcon(
-            QStyle.SP_MediaStop
-        )
+        button_style = speak_result_button.style()
+        self._speak_result_button_stop_icon = button_style.standardIcon(QStyle.SP_MediaStop)
         self._speak_result_button.setCheckable(True)
 
         self._streaming_in_progress = False
