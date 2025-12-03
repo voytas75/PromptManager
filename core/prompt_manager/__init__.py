@@ -1,6 +1,7 @@
 """Prompt Manager package façade and orchestration layer.
 
 Updates:
+  v0.14.15 - 2025-12-03 - Move runtime lifecycle helpers into dedicated mixin module.
   v0.14.14 - 2025-12-03 - Move backend bootstrap helpers into dedicated module.
   v0.14.13 - 2025-12-03 - Extract LiteLLM workflows and prompt refinement helpers into mixins.
   v0.14.12 - 2025-12-03 - Extract prompt CRUD, caching, and embedding APIs into mixin.
@@ -9,8 +10,7 @@ Updates:
   v0.14.9 - 2025-12-03 - Move execution and benchmarking APIs into mixin module.
   v0.14.8 - 2025-12-02 - Move maintenance utilities into dedicated mixin module.
   v0.14.7 - 2025-12-02 - Extract category, response style, and note APIs into mixins.
-  v0.14.6 - 2025-11-30 - Ensure Chroma directories exist and stabilise Chroma client bootstrap.
-  pre-v0.14.6 - 2025-11-30 - Consolidated history covering releases v0.1.0–v0.14.5.
+  pre-v0.14.7 - 2025-11-30 - Consolidated history covering releases v0.1.0–v0.14.6.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from typing import TYPE_CHECKING, Any, cast
 # across sub‑modules once the split is complete.
 # ---------------------------------------------------------------------------
 from config import LITELLM_ROUTED_WORKFLOWS
-from models.prompt_model import Prompt, UserProfile
+from models.prompt_model import UserProfile
 
 from ..category_registry import CategoryRegistry
 from ..embedding import EmbeddingProvider, EmbeddingSyncWorker
@@ -74,21 +74,19 @@ from ..prompt_engineering import (
 )
 from ..repository import PromptRepository, RepositoryError, RepositoryNotFoundError
 from ..scenario_generation import LiteLLMScenarioGenerator  # noqa: TCH001
-from .backends import (
-    CollectionProtocol,
-    NullEmbeddingWorker,
-    RedisClientProtocol,
-    RedisConnectionPoolProtocol,
-    RedisValue,
-    build_chroma_client,
-    mute_posthog_capture,
-)
 from .analytics import (
     AnalyticsMixin,
     CategoryHealth as _CategoryHealth,
     EmbeddingDiagnostics as _EmbeddingDiagnostics,
     EmbeddingDimensionMismatch as _EmbeddingDimensionMismatch,
     MissingEmbedding as _MissingEmbedding,
+)
+from .backends import (
+    CollectionProtocol,
+    NullEmbeddingWorker,
+    RedisClientProtocol,
+    build_chroma_client,
+    mute_posthog_capture,
 )
 from .categories import CategorySupport
 from .engineering import PromptEngineerFacade
@@ -105,6 +103,7 @@ from .maintenance import MaintenanceMixin
 from .prompt_notes import PromptNoteSupport
 from .refinement import PromptRefinementMixin
 from .response_styles import ResponseStyleSupport
+from .runtime import PromptRuntimeMixin
 from .search import IntentSuggestions as _IntentSuggestions, PromptSearchMixin
 from .storage import PromptStorage
 from .versioning import (
@@ -116,19 +115,18 @@ from .workflows import LiteLLMWorkflowMixin
 sqlite3 = _sqlite3
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
-    from collections.abc import Callable, Mapping, Sequence
-    from types import TracebackType
+    from collections.abc import Mapping, Sequence
+
     from chromadb.api import ClientAPI
 
     from models.category_model import PromptCategory
-    from models.prompt_model import Prompt, UserProfile
+    from models.prompt_model import UserProfile
 
     from ..execution import CodexExecutor
     from ..history_tracker import HistoryTracker
     from ..scenario_generation import LiteLLMScenarioGenerator
 else:  # pragma: no cover - typing fallback
     ClientAPI = Any  # type: ignore[assignment]
-    TracebackType = type(None)
 
 try:
     from redis.exceptions import RedisError as _RedisErrorType
@@ -197,6 +195,7 @@ __all__ = [
 
 
 class PromptManager(
+    PromptRuntimeMixin,
     CategorySupport,
     ResponseStyleSupport,
     PromptNoteSupport,
@@ -389,62 +388,6 @@ class PromptManager(
                 self._user_profile = None
         self._prompt_templates: dict[str, str] = self._normalise_prompt_templates(prompt_templates)
 
-    def _apply_category_metadata(self, prompt: Prompt) -> Prompt:
-        """Ensure prompt categories map to registry entries."""
-        category_value = (prompt.category or "").strip()
-        slug_candidate = prompt.category_slug or category_value
-        if not slug_candidate:
-            prompt.category = ""
-            prompt.category_slug = None
-            return prompt
-        try:
-            category = self._category_registry.ensure(
-                slug=slug_candidate,
-                label=category_value or slug_candidate,
-                description=prompt.description,
-            )
-        except CategoryStorageError as exc:
-            raise PromptStorageError("Unable to resolve prompt category") from exc
-        except CategoryError as exc:
-            raise PromptManagerError(str(exc)) from exc
-        prompt.category = category.label
-        prompt.category_slug = category.slug
-        return prompt
-
-    def _initialise_chroma_collection(self) -> None:
-        """Create or refresh the Chroma collection backing prompt embeddings."""
-        self._chroma_client, collection = build_chroma_client(
-            self._chroma_path,
-            self._collection_name,
-            self._embedding_function,
-            chroma_client=self._chroma_client,
-        )
-        self._collection = collection
-
-    def _persist_chroma_client(self) -> None:
-        """Flush the Chroma client to disk when supported."""
-        persist = getattr(self._chroma_client, "persist", None)
-        if not callable(persist):
-            return
-        try:
-            persist()
-        except Exception:  # noqa: BLE001
-            logger.warning("Unable to flush Chroma client persistence state", exc_info=True)
-
-    def _resolve_repository_path(self) -> Path:
-        """Return the path to the SQLite repository, ensuring it exists."""
-        candidate = self._db_path or getattr(self._repository, "_db_path", None)
-        if candidate is None:
-            raise PromptStorageError("SQLite repository path is not configured.")
-        if isinstance(candidate, Path):
-            path = candidate
-        else:
-            path = Path(str(candidate))
-        path = path.expanduser()
-        if not path.exists():
-            raise PromptStorageError(f"SQLite repository missing at {path}.")
-        return path
-
     IntentSuggestions = _IntentSuggestions
     PromptVersionDiff = _PromptVersionDiff
     ExecutionOutcome = _ExecutionOutcome
@@ -455,143 +398,6 @@ class PromptManager(
     EmbeddingDimensionMismatch = _EmbeddingDimensionMismatch
     MissingEmbedding = _MissingEmbedding
 
-    @property
-    def collection(self) -> CollectionProtocol:
-        """Expose the underlying Chroma collection."""
-        if self._collection is None:
-            raise PromptManagerError("Chroma collection is not initialised.")
-        return self._collection
-
-    @property
-    def repository(self) -> PromptRepository:
-        """Expose the SQLite repository."""
-        return self._repository
-
-    @property
-    def db_path(self) -> Path | None:
-        """Return the configured SQLite database path."""
-        return self._db_path
-
-    @property
-    def chroma_path(self) -> Path:
-        """Return the filesystem path backing the Chroma vector store."""
-        return Path(self._chroma_path)
-
-    @property
-    def logs_path(self) -> Path:
-        """Return the directory where application logs are written."""
-        return self._logs_path
-
-    @property
-    def intent_classifier(self) -> IntentClassifier | None:
-        """Expose the configured intent classifier for tooling hooks."""
-        return self._intent_classifier
-
-    @property
-    def executor(self) -> CodexExecutor | None:
-        """Return the configured prompt executor."""
-        return self._executor
-
-    def set_executor(self, executor: CodexExecutor | None) -> None:
-        """Assign or replace the Codex executor at runtime."""
-        self._executor = executor
-
-    @property
-    def history_tracker(self) -> HistoryTracker | None:
-        """Expose the execution history tracker if configured."""
-        return self._history_tracker
-
-    def set_history_tracker(self, tracker: HistoryTracker | None) -> None:
-        """Assign or replace the history tracker at runtime."""
-        self._history_tracker = tracker
-
-    @property
-    def notification_center(self) -> NotificationCenter:
-        """Expose the notification centre for UI and tooling integrations."""
-        return self._notification_center
-
-    @property
-    def user_profile(self) -> UserProfile | None:
-        """Return the stored single-user profile when available."""
-        return self._user_profile
-
-    def refresh_user_profile(self) -> UserProfile | None:
-        """Reload the persisted profile from the repository."""
-        try:
-            self._user_profile = self._repository.get_user_profile()
-        except RepositoryError:
-            logger.warning("Unable to refresh user profile from storage", exc_info=True)
-        return self._user_profile
-
-    def set_intent_classifier(self, classifier: IntentClassifier | None) -> None:
-        """Replace the runtime intent classifier implementation."""
-        self._intent_classifier = classifier
-
-    def close(self) -> None:
-        """Release background workers and backend connections."""
-        if self._closed:
-            return
-
-        self._closed = True
-
-        worker = getattr(self, "_embedding_worker", None)
-        stop = getattr(worker, "stop", None)
-        if callable(stop):
-            try:
-                stop()
-            except Exception:
-                logger.debug("Failed to stop embedding worker cleanly", exc_info=True)
-
-        if self._redis_client is not None:
-            redis_close = cast(
-                "Callable[[], Any] | None", getattr(self._redis_client, "close", None)
-            )
-            if callable(redis_close):
-                try:
-                    redis_close()
-                except Exception:
-                    logger.debug(
-                        "Failed to close Redis client cleanly",
-                        exc_info=True,
-                    )
-            pool = cast(
-                "RedisConnectionPoolProtocol | None",
-                getattr(self._redis_client, "connection_pool", None),
-            )
-            disconnect = cast("Callable[[], Any] | None", getattr(pool, "disconnect", None))
-            if callable(disconnect):
-                try:
-                    disconnect()
-                except Exception:
-                    logger.debug(
-                        "Failed to disconnect Redis connection pool cleanly",
-                        exc_info=True,
-                    )
-
-        chroma_client = getattr(self, "_chroma_client", None)
-        if chroma_client is not None:
-            close_fn = getattr(chroma_client, "close", None)
-            if callable(close_fn):
-                try:
-                    close_fn()
-                except Exception:
-                    logger.debug(
-                        "Failed to close Chroma client cleanly",
-                        exc_info=True,
-                    )
-
-    def __enter__(self) -> PromptManager:
-        """Support use of PromptManager as a context manager."""
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        tb: TracebackType | None,
-    ) -> None:
-        """Close resources when exiting a context manager block."""
-        self.close()
 
 __all__ = [
     "PromptManager",
