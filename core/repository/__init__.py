@@ -31,6 +31,7 @@ from .base import (
     json_loads_optional as _json_loads_optional,
     parse_optional_datetime as _parse_optional_datetime,
 )
+from .chains import ChainStoreMixin
 from .executions import ExecutionStoreMixin
 from .maintenance import RepositoryMaintenanceMixin
 from .notes import PromptNoteStoreMixin
@@ -46,6 +47,7 @@ class PromptRepository(
     ProfileStoreMixin,
     ResponseStyleStoreMixin,
     PromptNoteStoreMixin,
+    ChainStoreMixin,
 ):
     """Compose repository mixins for SQLite-backed storage."""
 

@@ -223,4 +223,58 @@ def parse_args() -> argparse.Namespace:
         help="Optional CSV path for analytics dataset export.",
     )
 
+    chain_list_parser = subparsers.add_parser(
+        "prompt-chain-list",
+        help="List configured prompt chains.",
+    )
+    chain_list_parser.add_argument(
+        "--include-inactive",
+        action="store_true",
+        help="Include inactive chains in the listing.",
+    )
+
+    chain_show_parser = subparsers.add_parser(
+        "prompt-chain-show",
+        help="Display a prompt chain and its steps.",
+    )
+    chain_show_parser.add_argument(
+        "chain_id",
+        type=str,
+        help="Prompt chain UUID.",
+    )
+
+    chain_apply_parser = subparsers.add_parser(
+        "prompt-chain-apply",
+        help="Create or update a prompt chain from a JSON definition.",
+    )
+    chain_apply_parser.add_argument(
+        "path",
+        type=Path,
+        help="Path to the JSON file containing the prompt chain definition.",
+    )
+
+    chain_run_parser = subparsers.add_parser(
+        "prompt-chain-run",
+        help="Execute a prompt chain with optional variable overrides.",
+    )
+    chain_run_parser.add_argument(
+        "chain_id",
+        type=str,
+        help="Prompt chain UUID to run.",
+    )
+    chain_run_parser.add_argument(
+        "--vars-file",
+        dest="vars_file",
+        type=Path,
+        default=None,
+        help="Path to a JSON file containing chain variables.",
+    )
+    chain_run_parser.add_argument(
+        "--vars-json",
+        dest="vars_json",
+        type=str,
+        default=None,
+        help="Inline JSON object describing chain variables.",
+    )
+
     return parser.parse_args()

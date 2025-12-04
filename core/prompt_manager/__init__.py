@@ -48,6 +48,10 @@ from ..exceptions import (
     ResponseStyleNotFoundError,
     ResponseStyleStorageError,
     ScenarioGenerationError,
+    PromptChainError,
+    PromptChainNotFoundError,
+    PromptChainStorageError,
+    PromptChainExecutionError,
 )
 from ..execution import CodexExecutor  # noqa: TCH001
 from ..name_generation import (
@@ -73,6 +77,7 @@ from .analytics import (
 from .backends import RedisClientProtocol, mute_posthog_capture
 from .bootstrap import BackendBootstrapMixin
 from .categories import CategorySupport
+from .chains import PromptChainMixin, PromptChainRunResult, PromptChainStepRun
 from .engineering import PromptEngineerFacade
 from .execution import ExecutionResult, PromptExecutor
 from .execution_history import (
@@ -158,6 +163,10 @@ _REEXPORTED_EXCEPTIONS = (
     ScenarioGenerationError,
     RepositoryError,
     RepositoryNotFoundError,
+    PromptChainError,
+    PromptChainNotFoundError,
+    PromptChainStorageError,
+    PromptChainExecutionError,
 )
 
 __all__ = [
@@ -205,6 +214,7 @@ class PromptManager(
     PromptVersionMixin,
     MaintenanceMixin,
     ExecutionHistoryMixin,
+    PromptChainMixin,
 ):
     """Manage prompt persistence, caching, and semantic search."""
 
@@ -340,4 +350,10 @@ __all__ = [
     "PromptRefinement",
     "ChromaError",
     "chromadb",
+    "PromptChainRunResult",
+    "PromptChainStepRun",
+    "PromptChainError",
+    "PromptChainNotFoundError",
+    "PromptChainStorageError",
+    "PromptChainExecutionError",
 ]

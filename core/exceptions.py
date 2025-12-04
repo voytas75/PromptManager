@@ -12,6 +12,7 @@ callers to catch a single base class for any manager-related failure while
 still distinguishing individual error categories when needed.
 
 Updates:
+  v0.20.0 - 2025-12-04 - Add prompt chain exception hierarchy.
   v0.19.0 - 2025-12-02 - Centralise LiteLLM generation errors and category suggestion failures.
   v0.18.0 - 2025-11-22 - Add category exception hierarchy.
   v0.17.0 - 2025-11-22 - Add prompt versioning exception hierarchy.
@@ -130,3 +131,19 @@ class PromptShareError(PromptManagerError):
 
 class ShareProviderError(PromptShareError):
     """Raised when a remote sharing provider rejects or fails a request."""
+
+
+class PromptChainError(PromptManagerError):
+    """Base class for prompt chain workflow failures."""
+
+
+class PromptChainNotFoundError(PromptChainError):
+    """Raised when a prompt chain cannot be located."""
+
+
+class PromptChainStorageError(PromptChainError):
+    """Raised when prompt chain persistence fails."""
+
+
+class PromptChainExecutionError(PromptChainError):
+    """Raised when executing a prompt chain fails."""

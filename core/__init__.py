@@ -95,6 +95,12 @@ from .prompt_manager import (
     ResponseStyleError,
     ResponseStyleNotFoundError,
     ResponseStyleStorageError,
+    PromptChainError,
+    PromptChainNotFoundError,
+    PromptChainStorageError,
+    PromptChainExecutionError,
+    PromptChainRunResult,
+    PromptChainStepRun,
 )
 from .repository import PromptRepository, RepositoryError, RepositoryNotFoundError
 from .scenario_generation import LiteLLMScenarioGenerator
@@ -119,6 +125,12 @@ __all__ = [
     "PromptNoteError",
     "PromptNoteNotFoundError",
     "PromptNoteStorageError",
+    "PromptChainError",
+    "PromptChainNotFoundError",
+    "PromptChainStorageError",
+    "PromptChainExecutionError",
+    "PromptChainRunResult",
+    "PromptChainStepRun",
     "CategoryError",
     "CategoryNotFoundError",
     "CategoryStorageError",

@@ -161,6 +161,43 @@ Every log entry also stores structured context metadata (prompt snapshot, execut
 | `python -m main reembed` | Rebuild the ChromaDB vector store after backend/model changes or corruption. |
 | `python -m main benchmark --prompt <uuid> [--model <id>] --request "…"` | Execute one or more prompts across configured LiteLLM models and compare duration/token usage alongside history stats. |
 | `python -m main refresh-scenarios <uuid> [--max-scenarios N]` | Regenerate and persist scenario lists for a prompt via LiteLLM or the heuristic fallback. |
+| `python -m main prompt-chain-list` | List stored prompt chains (add `--include-inactive` for archived definitions). |
+| `python -m main prompt-chain-show <uuid>` | Display a prompt chain with ordered steps and target prompts. |
+| `python -m main prompt-chain-apply path/to/chain.json` | Create or update a prompt chain from a JSON definition (`name`, `description`, `steps`, `prompt_id`, `input_template`, `output_variable`). |
+| `python -m main prompt-chain-run <uuid> [--vars-file variables.json] [--vars-json '{"key":"value"}']` | Execute a chain sequentially, injecting per-step variables, and log each step to execution history with chain metadata. |
+
+### Prompt Chain Definitions
+
+`prompt-chain-apply` expects a JSON object that defines the chain plus ordered steps:
+
+```json
+{
+  "id": "optional-uuid",
+  "name": "Content Review Workflow",
+  "description": "Extract, summarize, and critique content.",
+  "variables_schema": {
+    "type": "object",
+    "required": ["source_text"]
+  },
+  "steps": [
+    {
+      "order_index": 1,
+      "prompt_id": "uuid-of-extract-prompt",
+      "input_template": "{{ source_text }}",
+      "output_variable": "extracted_points"
+    },
+    {
+      "order_index": 2,
+      "prompt_id": "uuid-of-review-prompt",
+      "input_template": "Points: {{ extracted_points }}",
+      "output_variable": "review",
+      "stop_on_failure": true
+    }
+  ]
+}
+```
+
+Variables provided via `--vars-file`/`--vars-json` must satisfy `variables_schema` (Draft 2020-12). Each step response is stored under `output_variable` for downstream steps and emitted in `prompt-chain-run` output summaries.
 
 These commands share the same validation logic as the GUI; pass explicit paths as needed.
 

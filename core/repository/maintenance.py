@@ -83,6 +83,45 @@ class RepositoryMaintenanceMixin:
         )
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS prompt_chains (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                variables_schema TEXT,
+                metadata TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS prompt_chain_steps (
+                id TEXT PRIMARY KEY,
+                chain_id TEXT NOT NULL,
+                prompt_id TEXT NOT NULL,
+                order_index INTEGER NOT NULL,
+                input_template TEXT NOT NULL,
+                output_variable TEXT NOT NULL,
+                condition TEXT,
+                stop_on_failure INTEGER NOT NULL DEFAULT 1,
+                metadata TEXT,
+                FOREIGN KEY(chain_id) REFERENCES prompt_chains(id) ON DELETE CASCADE,
+                FOREIGN KEY(prompt_id) REFERENCES prompts(id) ON DELETE CASCADE
+            );
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_prompt_chain_steps_chain "
+            "ON prompt_chain_steps(chain_id);"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_prompt_chain_steps_order "
+            "ON prompt_chain_steps(chain_id, order_index);"
+        )
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS prompt_versions (
                 version_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 prompt_id TEXT NOT NULL,

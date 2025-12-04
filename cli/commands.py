@@ -11,15 +11,18 @@ from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Mapping
 
 from core import (
     PromptHistoryError,
     PromptManagerError,
+    PromptChainError,
+    PromptChainExecutionError,
     build_analytics_snapshot,
     export_prompt_catalog,
     snapshot_dataset_rows,
 )
+from models.prompt_chain_model import PromptChain, PromptChainStep
 
 from .utils import (
     format_metric,
@@ -42,6 +45,91 @@ class CommandSpec:
 
     handler: CommandHandler
     requires_manager: bool = True
+
+
+def _coerce_mapping(value: object) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    if isinstance(value, Mapping):
+        return {str(key): value[key] for key in value}
+    return None
+
+
+def _load_json_file(path: Path) -> Any:
+    try:
+        content = path.expanduser().read_text(encoding="utf-8")
+    except OSError as exc:  # pragma: no cover - IO error
+        raise ValueError(f"Unable to read {path}: {exc}") from exc
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid JSON in {path}: {exc}") from exc
+
+
+def _chain_from_payload(payload: Mapping[str, Any]) -> PromptChain:
+    name = str(payload.get("name") or "").strip()
+    if not name:
+        raise ValueError("Prompt chain requires a non-empty 'name' field.")
+    chain_id_text = payload.get("id")
+    chain_id = uuid.uuid4() if not chain_id_text else uuid.UUID(str(chain_id_text))
+    description = str(payload.get("description") or "")
+    steps_payload = payload.get("steps") or []
+    steps: list[PromptChainStep] = []
+    if not isinstance(steps_payload, list):
+        raise ValueError("'steps' must be an array.")
+    for index, step_payload in enumerate(steps_payload, start=1):
+        if not isinstance(step_payload, Mapping):
+            raise ValueError(f"Step {index} must be an object.")
+        prompt_id_value = step_payload.get("prompt_id")
+        if not prompt_id_value:
+            raise ValueError(f"Step {index} is missing 'prompt_id'.")
+        step_id_value = step_payload.get("id")
+        order_index = int(step_payload.get("order_index") or index)
+        input_template = str(step_payload.get("input_template") or "")
+        output_variable = str(
+            step_payload.get("output_variable") or f"step_{order_index}"
+        )
+        condition_text = str(step_payload.get("condition") or "").strip()
+        step = PromptChainStep(
+            id=uuid.uuid4() if not step_id_value else uuid.UUID(str(step_id_value)),
+            chain_id=chain_id,
+            prompt_id=uuid.UUID(str(prompt_id_value)),
+            order_index=order_index,
+            input_template=input_template,
+            output_variable=output_variable,
+            condition=condition_text or None,
+            stop_on_failure=bool(step_payload.get("stop_on_failure", True)),
+            metadata=_coerce_mapping(step_payload.get("metadata")),
+        )
+        steps.append(step)
+    chain = PromptChain(
+        id=chain_id,
+        name=name,
+        description=description,
+        is_active=bool(payload.get("is_active", True)),
+        variables_schema=_coerce_mapping(payload.get("variables_schema")),
+        metadata=_coerce_mapping(payload.get("metadata")),
+    )
+    return chain.with_steps(steps)
+
+
+def _load_chain_variables(
+    vars_file: Path | None,
+    vars_json: str | None,
+) -> dict[str, Any]:
+    data: Any = {}
+    if vars_file:
+        data = _load_json_file(vars_file)
+    elif vars_json:
+        try:
+            data = json.loads(vars_json)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Invalid inline JSON: {exc}") from exc
+    if data in (None, ""):
+        return {}
+    if not isinstance(data, Mapping):
+        raise ValueError("Chain variables must be a JSON object.")
+    return {str(key): value for key, value in data.items()}
 
 
 def run_catalog_export(
@@ -494,6 +582,150 @@ def _run_analytics_diagnostics(
     return 0
 
 
+def run_prompt_chain_list(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    if manager is None:
+        raise ValueError("Prompt Manager is required for prompt chain listing.")
+    include_inactive = bool(getattr(args, "include_inactive", False))
+    try:
+        chains = manager.list_prompt_chains(include_inactive=include_inactive)
+    except PromptChainError as exc:
+        logger.error("Unable to list prompt chains: %s", exc)
+        return 5
+    if not chains:
+        print("No prompt chains defined.")
+        return 0
+    print("\nPrompt Chains\n-------------")
+    for chain in chains:
+        status = "active" if chain.is_active else "inactive"
+        print(
+            f"- {chain.name} ({chain.id}) [{status}] "
+            f"steps={len(chain.steps)}"
+        )
+    return 0
+
+
+def run_prompt_chain_show(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    if manager is None:
+        raise ValueError("Prompt Manager is required for prompt chain inspection.")
+    try:
+        chain_id = uuid.UUID(str(args.chain_id))
+    except (TypeError, ValueError) as exc:
+        logger.error("Invalid chain id: %s", exc)
+        return 5
+    try:
+        chain = manager.get_prompt_chain(chain_id)
+    except PromptChainError as exc:
+        logger.error("Unable to load prompt chain: %s", exc)
+        return 5
+    status = "active" if chain.is_active else "inactive"
+    print(f"\nChain: {chain.name} ({chain.id}) [{status}]")
+    if chain.description:
+        print(f"Description: {chain.description}")
+    if chain.variables_schema:
+        print("Variables schema keys:", ", ".join(chain.variables_schema.keys()))
+    if not chain.steps:
+        print("Steps: (none)")
+        return 0
+    print("\nSteps:")
+    for step in chain.steps:
+        condition = f" when {step.condition}" if step.condition else ""
+        print(
+            f"  {step.order_index}. prompt={step.prompt_id} "
+            f"-> ${step.output_variable}{condition}"
+        )
+    return 0
+
+
+def run_prompt_chain_apply(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    if manager is None:
+        raise ValueError("Prompt Manager is required for prompt chain apply.")
+    path: Path = getattr(args, "path")
+    try:
+        payload = _load_json_file(path)
+    except ValueError as exc:
+        logger.error(str(exc))
+        return 5
+    if not isinstance(payload, Mapping):
+        logger.error("Chain definition must be a JSON object.")
+        return 5
+    is_update = bool(payload.get("id"))
+    try:
+        chain = _chain_from_payload(payload)
+    except ValueError as exc:
+        logger.error("Invalid chain definition: %s", exc)
+        return 5
+    try:
+        saved = manager.save_prompt_chain(chain)
+    except PromptChainError as exc:
+        logger.error("Failed to persist prompt chain: %s", exc)
+        return 5
+    action = "Updated" if is_update else "Created"
+    print(
+        f"{action} prompt chain '{saved.name}' ({saved.id}) with {len(saved.steps)} steps."
+    )
+    return 0
+
+
+def run_prompt_chain_run(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    if manager is None:
+        raise ValueError("Prompt Manager is required for prompt chain execution.")
+    try:
+        chain_id = uuid.UUID(str(args.chain_id))
+    except (TypeError, ValueError) as exc:
+        logger.error("Invalid chain id: %s", exc)
+        return 5
+    vars_file: Path | None = getattr(args, "vars_file", None)
+    vars_json: str | None = getattr(args, "vars_json", None)
+    try:
+        variables = _load_chain_variables(vars_file, vars_json)
+    except ValueError as exc:
+        logger.error("Invalid chain variables: %s", exc)
+        return 5
+    try:
+        result = manager.run_prompt_chain(chain_id, variables=variables)
+    except PromptChainExecutionError as exc:
+        logger.error("Chain execution failed: %s", exc)
+        return 5
+    except PromptChainError as exc:
+        logger.error("Unable to execute prompt chain: %s", exc)
+        return 5
+    print(f"\nChain '{result.chain.name}' outputs:")
+    if not result.outputs:
+        print("  (no outputs captured)")
+    else:
+        for key, value in result.outputs.items():
+            print(f"  {key}: {value}")
+    print("\nStep summary:")
+    for step_run in result.steps:
+        label = f"{step_run.step.order_index}. {step_run.step.output_variable}"
+        if step_run.status == "success":
+            preview = step_run.outcome.result.response_text if step_run.outcome else ""
+            if preview and len(preview) > 80:
+                preview = preview[:77].rstrip() + "..."
+            print(f"  [OK] {label} -> {preview or '(empty response)'}")
+        elif step_run.status == "skipped":
+            print(f"  [SKIP] {label}")
+        else:
+            print(f"  [ERR] {label}: {step_run.error}")
+    return 0
+
+
 def run_history_analytics(
     manager: PromptManager | None,
     args: argparse.Namespace,
@@ -643,6 +875,10 @@ COMMAND_SPECS: dict[str | None, CommandSpec] = {
     "benchmark": CommandSpec(run_benchmark),
     "refresh-scenarios": CommandSpec(run_refresh_scenarios),
     "diagnostics": CommandSpec(run_diagnostics),
+    "prompt-chain-list": CommandSpec(run_prompt_chain_list),
+    "prompt-chain-show": CommandSpec(run_prompt_chain_show),
+    "prompt-chain-apply": CommandSpec(run_prompt_chain_apply),
+    "prompt-chain-run": CommandSpec(run_prompt_chain_run),
 }
 
 
