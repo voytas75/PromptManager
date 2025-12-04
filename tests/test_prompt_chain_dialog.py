@@ -8,6 +8,7 @@ Updates:
 from __future__ import annotations
 
 import uuid
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -44,6 +45,9 @@ class _ManagerStub:
 
     def list_prompt_chains(self, include_inactive: bool = False):  # noqa: ARG002
         return list(self._chains)
+
+    def list_prompts(self, limit: int | None = None):  # noqa: ARG002
+        return [SimpleNamespace(id=uuid.uuid4(), name="Example Prompt")]
 
     def save_prompt_chain(self, chain: PromptChain) -> PromptChain:
         self.saved_chain = chain

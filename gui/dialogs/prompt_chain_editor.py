@@ -1,6 +1,7 @@
 """Prompt chain editor dialogs for creating and updating workflows.
 
 Updates:
+  v0.2.0 - 2025-12-04 - Add prompt picker combo box backed by catalog lookups.
   v0.1.0 - 2025-12-04 - Introduce editor dialogs for chain and step CRUD.
 """
 
@@ -11,8 +12,10 @@ import uuid
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -32,9 +35,8 @@ from PySide6.QtWidgets import (
 from models.prompt_chain_model import PromptChain, PromptChainStep
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers only
-    from collections.abc import Sequence
-
     from core import PromptManager
+    from models.prompt_model import Prompt
 
 
 class PromptChainEditorDialog(QDialog):
@@ -45,6 +47,7 @@ class PromptChainEditorDialog(QDialog):
         parent: QWidget | None,
         *,
         manager: PromptManager | None,
+        prompts: list[Prompt] | None = None,
         chain: PromptChain | None = None,
     ) -> None:
         """Initialise fields for a new or existing chain."""
@@ -53,6 +56,7 @@ class PromptChainEditorDialog(QDialog):
         self._source_chain = chain
         self._chain_id = chain.id if chain else uuid.uuid4()
         self._result_chain: PromptChain | None = None
+        self._prompts: list[Prompt] = list(prompts or [])
         self.setWindowTitle("Edit Prompt Chain" if chain else "New Prompt Chain")
         self.resize(800, 640)
 
@@ -134,7 +138,11 @@ class PromptChainEditorDialog(QDialog):
             self._steps_table.setItem(row, 4, QTableWidgetItem(condition))
 
     def _add_step(self) -> None:
-        dialog = PromptChainStepDialog(self, chain_id=self._chain_id)
+        dialog = PromptChainStepDialog(
+            self,
+            chain_id=self._chain_id,
+            prompts=self._prompts,
+        )
         dialog.set_order_index(len(self._steps) + 1)
         if dialog.exec() != QDialog.Accepted:
             return
@@ -148,7 +156,12 @@ class PromptChainEditorDialog(QDialog):
         row = self._steps_table.currentRow()
         if row < 0 or row >= len(self._steps):
             return
-        dialog = PromptChainStepDialog(self, chain_id=self._chain_id, step=self._steps[row])
+        dialog = PromptChainStepDialog(
+            self,
+            chain_id=self._chain_id,
+            step=self._steps[row],
+            prompts=self._prompts,
+        )
         if dialog.exec() != QDialog.Accepted:
             return
         step = dialog.result_step()
@@ -192,7 +205,7 @@ class PromptChainEditorDialog(QDialog):
         self._result_chain = chain
         self.accept()
 
-    def _reindexed_steps(self) -> Sequence[PromptChainStep]:
+    def _reindexed_steps(self) -> list[PromptChainStep]:
         for idx, step in enumerate(sorted(self._steps, key=lambda s: s.order_index), start=1):
             self._steps[idx - 1] = replace(step, order_index=idx)
         return self._steps
@@ -207,12 +220,14 @@ class PromptChainStepDialog(QDialog):
         *,
         chain_id: uuid.UUID,
         step: PromptChainStep | None = None,
+        prompts: list[Prompt] | None = None,
     ) -> None:
         """Prepare step editor inputs with optional preloaded data."""
         super().__init__(parent)
         self._chain_id = chain_id
         self._step = step
         self._result_step: PromptChainStep | None = None
+        self._prompt_options: list[Prompt] = list(prompts or [])
         self.setWindowTitle("Edit Chain Step" if step else "Add Chain Step")
         self.resize(520, 360)
 
@@ -221,8 +236,11 @@ class PromptChainStepDialog(QDialog):
         self._order_input.setMinimum(1)
         layout.addRow("Order", self._order_input)
 
-        self._prompt_input = QLineEdit(self)
-        layout.addRow("Prompt ID", self._prompt_input)
+        self._prompt_combo = QComboBox(self)
+        self._prompt_combo.setEditable(True)
+        self._prompt_combo.setInsertPolicy(QComboBox.NoInsert)
+        self._prompt_combo.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        layout.addRow("Prompt", self._prompt_combo)
 
         self._input_template = QPlainTextEdit(self)
         layout.addRow("Input template", self._input_template)
@@ -242,6 +260,7 @@ class PromptChainStepDialog(QDialog):
         buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(buttons)
 
+        self._populate_prompt_combo()
         if step is not None:
             self._load_step(step)
 
@@ -253,17 +272,38 @@ class PromptChainStepDialog(QDialog):
         """Return the saved step when available."""
         return self._result_step
 
+    def _populate_prompt_combo(self) -> None:
+        if not self._prompt_options:
+            self._prompt_combo.addItem("Enter prompt ID…")
+            return
+        for prompt in self._prompt_options:
+            label = f"{prompt.name} ({prompt.id})"
+            self._prompt_combo.addItem(label, str(prompt.id))
+
     def _load_step(self, step: PromptChainStep) -> None:
         self._order_input.setValue(step.order_index)
-        self._prompt_input.setText(str(step.prompt_id))
+        self._select_prompt(step.prompt_id)
         self._input_template.setPlainText(step.input_template)
         self._output_variable.setText(step.output_variable)
         self._condition_input.setText(step.condition or "")
         self._stop_checkbox.setChecked(step.stop_on_failure)
 
+    def _select_prompt(self, prompt_id: uuid.UUID) -> None:
+        target = str(prompt_id)
+        for index in range(self._prompt_combo.count()):
+            if str(self._prompt_combo.itemData(index)) == target:
+                self._prompt_combo.setCurrentIndex(index)
+                return
+        fallback_label = f"Unknown ({target})"
+        self._prompt_combo.addItem(fallback_label, target)
+        self._prompt_combo.setCurrentIndex(self._prompt_combo.count() - 1)
+
     def _handle_accept(self) -> None:
+        prompt_uuid_text = self._resolve_prompt_uuid_text()
+        if prompt_uuid_text is None:
+            return
         try:
-            prompt_id = uuid.UUID(self._prompt_input.text().strip())
+            prompt_id = uuid.UUID(prompt_uuid_text)
         except ValueError as exc:
             QMessageBox.critical(self, "Invalid prompt id", str(exc))
             return
@@ -287,6 +327,16 @@ class PromptChainStepDialog(QDialog):
             metadata=self._step.metadata if self._step else None,
         )
         self.accept()
+
+    def _resolve_prompt_uuid_text(self) -> str | None:
+        data = self._prompt_combo.currentData(Qt.UserRole)
+        if data:
+            return str(data)
+        text = self._prompt_combo.currentText().strip()
+        if not text:
+            QMessageBox.warning(self, "Validation", "Select a prompt for this step.")
+            return None
+        return text
 
 
 __all__ = ["PromptChainEditorDialog", "PromptChainStepDialog"]

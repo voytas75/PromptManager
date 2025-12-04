@@ -1,6 +1,7 @@
 """Prompt chain management dialog for the GUI.
 
 Updates:
+  v0.3.0 - 2025-12-04 - Prompt selector for chain steps plus inline CRUD actions.
   v0.2.0 - 2025-12-04 - Add create, edit, and delete actions via prompt chain editor dialog.
   v0.1.0 - 2025-12-04 - Introduce prompt chain manager dialog with run/import actions.
 """
@@ -8,6 +9,7 @@ Updates:
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -32,15 +34,25 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from core import PromptChainError, PromptChainExecutionError, PromptChainRunResult, PromptManager
+from core import (
+    PromptChainError,
+    PromptChainExecutionError,
+    PromptChainRunResult,
+    PromptManager,
+    PromptManagerError,
+)
 from models.prompt_chain_model import PromptChain, chain_from_payload
 
 from ..processing_indicator import ProcessingIndicator
 from ..toast import show_toast
 from .prompt_chain_editor import PromptChainEditorDialog
 
+logger = logging.getLogger(__name__)
+
 if TYPE_CHECKING:  # pragma: no cover - typing helpers only
     from uuid import UUID
+
+    from models.prompt_model import Prompt
 
 
 class PromptChainManagerDialog(QDialog):
@@ -328,7 +340,11 @@ class PromptChainManagerDialog(QDialog):
         show_toast(self, f"Prompt chain '{saved.name}' saved.")
 
     def _create_chain(self) -> None:
-        editor = PromptChainEditorDialog(self, manager=self._manager)
+        editor = PromptChainEditorDialog(
+            self,
+            manager=self._manager,
+            prompts=self._available_prompts(),
+        )
         if editor.exec() != QDialog.Accepted:
             return
         chain = editor.result_chain()
@@ -341,7 +357,12 @@ class PromptChainManagerDialog(QDialog):
         if chain is None:
             QMessageBox.information(self, "Select chain", "Choose a chain to edit first.")
             return
-        editor = PromptChainEditorDialog(self, manager=self._manager, chain=chain)
+        editor = PromptChainEditorDialog(
+            self,
+            manager=self._manager,
+            prompts=self._available_prompts(),
+            chain=chain,
+        )
         if editor.exec() != QDialog.Accepted:
             return
         updated = editor.result_chain()
@@ -379,6 +400,15 @@ class PromptChainManagerDialog(QDialog):
             return
         self._load_chains()
         show_toast(self, f"Prompt chain '{chain.name}' deleted.")
+
+    def _available_prompts(self) -> list[Prompt]:
+        if self._manager is None:
+            return []
+        try:
+            return self._manager.list_prompts(limit=500)
+        except PromptManagerError as exc:
+            logger.warning("Unable to load prompts for chain editor", exc_info=exc)
+            return []
 
     def _select_chain(self, chain_id: UUID) -> None:
         """Select the list entry matching ``chain_id``."""
