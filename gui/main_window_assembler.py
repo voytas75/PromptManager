@@ -1,6 +1,7 @@
 """Helper builders for gui.main_window controller wiring.
 
 Updates:
+  v0.16.1 - 2025-12-04 - Pass web search checkbox into execution controller.
   v0.16.0 - 2025-12-02 - Extract presenter, quick action, and execution controller setup.
 """
 
@@ -114,6 +115,7 @@ def assemble_execution_controller(window: MainWindow) -> ExecutionController:
         save_button=window._save_button,  # type: ignore[attr-defined]
         share_result_button=window._share_result_button,  # type: ignore[attr-defined]
         speak_result_button=window._speak_result_button,  # type: ignore[attr-defined]
+        web_search_checkbox=window._web_search_checkbox,  # type: ignore[attr-defined]
         continue_chat_button=window._continue_chat_button,  # type: ignore[attr-defined]
         end_chat_button=window._end_chat_button,  # type: ignore[attr-defined]
         status_callback=window._show_status_message,  # type: ignore[attr-defined]

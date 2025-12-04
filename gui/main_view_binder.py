@@ -1,6 +1,7 @@
 """Bind :mod:`gui.main_view_builder` components to the :class:`MainWindow`.
 
 Updates:
+  v0.15.82 - 2025-12-04 - Bind web search checkbox for execution controller.
   v0.15.81 - 2025-12-01 - Moved widget wiring and controller construction out of gui.main_window.
 """
 
@@ -88,6 +89,7 @@ def bind_main_view(
     window._continue_chat_button = components.continue_chat_button
     window._end_chat_button = components.end_chat_button
     window._copy_button = components.copy_button
+    window._web_search_checkbox = components.web_search_checkbox
     window._copy_result_button = components.copy_result_button
     window._copy_result_to_text_window_button = components.copy_result_to_text_window_button
     window._save_button = components.save_button

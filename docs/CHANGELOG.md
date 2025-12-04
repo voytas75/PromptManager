@@ -9,6 +9,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 - Captured the staged Exa integration plan in `docs/web_search_plan.md` and implemented a provider-agnostic web search service with an Exa-backed provider plus PromptManager wiring so future workflows can issue live searches.
 - Extended the configuration layer, CLI summary, runtime settings service, and persistence guards with `web_search_provider`/`EXA_API_KEY` awareness to keep credentials in memory only while still surfacing provider health in `python -m main --print-settings`.
 - Added an **Integrations** tab to the Settings dialog so operators can pick the active provider and enter their Exa API key without editing environment variables; values flow through the runtime settings service and remain transient on disk.
+- Workspace toolbar now includes a default-on “Use web search” checkbox; when enabled and Exa is configured, prompt executions automatically fetch the top summaries/highlights from the web and prepend them to the request so runs include fresh context. Uncheck it to force offline-only behaviour per run.
 
 ## [0.22.2] - 2025-12-04
 

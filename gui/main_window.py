@@ -1,6 +1,7 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.16.3 - 2025-12-04 - Track \"Use web search\" checkbox for execution controller.
   v0.16.2 - 2025-12-04 - Wire template preview bridge to handler so tab run works on load.
   v0.16.0 - 2025-12-02 - Delegate controller assembly, view callbacks, and handlers
     to helper modules for leaner MainWindow.
@@ -224,6 +225,7 @@ class MainWindow(QMainWindow):
         self._continue_chat_button: QPushButton = cast("QPushButton", None)
         self._end_chat_button: QPushButton = cast("QPushButton", None)
         self._copy_button: QPushButton = cast("QPushButton", None)
+        self._web_search_checkbox: QCheckBox = cast("QCheckBox", None)
         self._copy_result_button: QPushButton = cast("QPushButton", None)
         self._copy_result_to_text_window_button: QPushButton = cast("QPushButton", None)
         self._save_button: QPushButton = cast("QPushButton", None)

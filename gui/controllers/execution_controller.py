@@ -1,11 +1,13 @@
 """Coordinate prompt execution, streaming, and chat workspace logic.
 
 Updates:
+  v0.1.1 - 2025-12-04 - Add optional web search enrichment controlled by a UI toggle.
   v0.1.0 - 2025-11-30 - Extract execution and chat orchestration from main window.
 """
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable, Sequence
 from html import escape
 from typing import TYPE_CHECKING
@@ -25,6 +27,7 @@ from core import (
     PromptManager,
     PromptManagerError,
     PromptNotFoundError,
+    WebSearchError,
 )
 
 if TYPE_CHECKING:  # pragma: no cover - import for typing only
@@ -77,6 +80,7 @@ class ExecutionController:
         save_button: QPushButton,
         share_result_button: QPushButton,
         speak_result_button: QAbstractButton,
+        web_search_checkbox: QCheckBox | None,
         continue_chat_button: QPushButton,
         end_chat_button: QPushButton,
         status_callback: StatusCallback,
@@ -103,6 +107,7 @@ class ExecutionController:
         self._save_button = save_button
         self._share_result_button = share_result_button
         self._speak_result_button = speak_result_button
+        self._web_search_checkbox = web_search_checkbox
         self._continue_chat_button = continue_chat_button
         self._end_chat_button = end_chat_button
         self._status = status_callback
@@ -116,6 +121,7 @@ class ExecutionController:
         button_style = speak_result_button.style()
         self._speak_result_button_stop_icon = button_style.standardIcon(QStyle.SP_MediaStop)
         self._speak_result_button.setCheckable(True)
+        self._web_search_warning_shown = False
 
         self._streaming_in_progress = False
         self._stream_prompt_id: UUID | None = None
@@ -249,6 +255,7 @@ class ExecutionController:
             self._status(empty_text_message, 4000)
             return
 
+        payload = self._maybe_enrich_request(prompt, trimmed)
         streaming_enabled = self._is_streaming_enabled()
         callback = self._handle_stream_chunk if streaming_enabled else None
         if streaming_enabled:
@@ -256,7 +263,7 @@ class ExecutionController:
         try:
             outcome = self._manager.execute_prompt(
                 prompt.id,
-                trimmed,
+                payload,
                 stream=streaming_enabled,
                 on_stream=callback,
             )
@@ -323,6 +330,7 @@ class ExecutionController:
             self._reset_chat_session()
             return
 
+        payload = self._maybe_enrich_request(prompt, follow_up)
         streaming_enabled = self._is_streaming_enabled()
         callback = self._handle_stream_chunk if streaming_enabled else None
         if streaming_enabled:
@@ -330,7 +338,7 @@ class ExecutionController:
         try:
             outcome = self._manager.execute_prompt(
                 prompt.id,
-                follow_up,
+                payload,
                 conversation=self._chat_conversation,
                 stream=streaming_enabled,
                 on_stream=callback,
@@ -408,6 +416,74 @@ class ExecutionController:
         if value is None and self._settings is not None:
             return bool(getattr(self._settings, "litellm_stream", False))
         return bool(value)
+
+    def _web_search_enabled(self) -> bool:
+        checkbox = self._web_search_checkbox
+        if checkbox is None:
+            return True
+        return checkbox.isChecked()
+
+    def _maybe_enrich_request(self, prompt: Prompt, request_text: str) -> str:
+        if not request_text or not self._web_search_enabled():
+            return request_text
+        service = getattr(self._manager, "web_search_service", None)
+        if service is None or not getattr(service, "is_available", lambda: False)():
+            if not self._web_search_warning_shown:
+                self._toast("Web search is not configured; running prompt without it.", 3500)
+                self._web_search_warning_shown = True
+            return request_text
+        query = self._build_web_search_query(prompt, request_text)
+        if not query:
+            return request_text
+        self._status("Gathering live web context…", 0)
+        try:
+            result = asyncio.run(service.search(query, limit=3))
+        except WebSearchError as exc:
+            self._toast(f"Web search failed: {exc}", 4000)
+            return request_text
+        except Exception:
+            self._toast("Web search failed unexpectedly.", 4000)
+            return request_text
+        finally:
+            self._clear_status()
+        context_lines: list[str] = []
+        for doc in result.documents[:3]:
+            snippet = (doc.summary or " ".join(doc.highlights[:1]) or "").strip()
+            if not snippet:
+                continue
+            context_lines.append(f"- {snippet} (Source: {doc.url})")
+        if not context_lines:
+            return request_text
+        provider_label = result.provider.strip().title() if result.provider else "Web search"
+        context_block = "\n".join(context_lines)
+        return (
+            f"{provider_label} findings:\n"
+            f"{context_block}\n\n"
+            "User request:\n"
+            f"{request_text}"
+        )
+
+    def _build_web_search_query(self, prompt: Prompt, request_text: str) -> str:
+        parts: list[str] = []
+        if prompt.name:
+            parts.append(prompt.name.strip())
+        if prompt.category:
+            parts.append(prompt.category.strip())
+        if prompt.tags:
+            tags = ", ".join(tag for tag in prompt.tags[:3] if tag)
+            if tags:
+                parts.append(tags)
+        description = (prompt.description or "").strip()
+        if description:
+            parts.append(description[:160])
+        context = (prompt.context or "").strip()
+        if context:
+            parts.append(context[:160])
+        text = request_text.strip()
+        if text:
+            parts.append(text[:200])
+        query = " ".join(part for part in parts if part).strip()
+        return query[:512]
 
     def _begin_streaming_run(self, prompt: Prompt) -> None:
         self._stop_voice_playback()

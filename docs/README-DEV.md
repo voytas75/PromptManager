@@ -98,6 +98,7 @@ See [`docs/web_search_plan.md`](web_search_plan.md) for the staged Exa integrati
   - `deterministic`: offline hashing for smoke tests.
 - Search queries embed the entire user phrase and ask ChromaDB for nearest neighbours; results are already cosine-ranked and displayed as-is in the GUI.
 - The GUI shows similarity scores (`[0.91]`) when search is active; the sort dropdown is disabled to preserve ranking integrity.
+- When Exa is configured, the workspace exposes a “Use web search” checkbox (checked by default). Leaving it on runs an Exa query (prompt metadata + user input) before execution and injects the top summaries/highlights into the request body; unchecking it forces offline-only runs.
 
 ## Running the GUI
 

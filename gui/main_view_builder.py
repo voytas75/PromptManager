@@ -1,6 +1,7 @@
 """Composable builders for the Prompt Manager main window.
 
 Updates:
+  v0.2.1 - 2025-12-04 - Add \"Use web search\" toggle to the workspace actions row.
   v0.2.0 - 2025-12-04 - Wire prompt chain toolbar signal to callbacks bundle.
   v0.1.0 - 2025-11-30 - Extract main window UI assembly into reusable builder helpers.
 """
@@ -110,6 +111,7 @@ class MainViewComponents:
     continue_chat_button: QPushButton
     end_chat_button: QPushButton
     copy_button: QPushButton
+    web_search_checkbox: QCheckBox
     copy_result_button: QPushButton
     copy_result_to_text_window_button: QPushButton
     save_button: QPushButton
@@ -225,6 +227,13 @@ def build_main_view(
     copy_button = QPushButton("Copy Prompt", parent)
     copy_button.clicked.connect(callbacks.copy_prompt_clicked)  # type: ignore[arg-type]
     actions_layout.addWidget(copy_button)
+
+    web_search_checkbox = QCheckBox("Use web search", parent)
+    web_search_checkbox.setChecked(True)
+    web_search_checkbox.setToolTip(
+        "Include live web search context (Exa) before executing prompts."
+    )
+    actions_layout.addWidget(web_search_checkbox)
 
     copy_result_button = QPushButton("Copy Result", parent)
     copy_result_button.clicked.connect(callbacks.copy_result_clicked)  # type: ignore[arg-type]
@@ -495,6 +504,7 @@ def build_main_view(
         continue_chat_button=continue_chat_button,
         end_chat_button=end_chat_button,
         copy_button=copy_button,
+        web_search_checkbox=web_search_checkbox,
         copy_result_button=copy_result_button,
         copy_result_to_text_window_button=copy_result_to_text_window_button,
         save_button=save_button,
