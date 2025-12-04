@@ -1,6 +1,7 @@
 """Settings management utilities for Prompt Manager configuration.
 
 Updates:
+  v0.5.7 - 2025-12-04 - Load .env secrets so web search keys persist like LiteLLM keys.
   v0.5.6 - 2025-12-04 - Add Exa web search provider configuration.
   v0.5.5 - 2025-12-03 - Add LiteLLM TTS streaming configuration toggle.
   v0.5.4 - 2025-12-03 - Add LiteLLM TTS model configuration for voice playback.
@@ -30,6 +31,8 @@ from pydantic_settings import (
     PydanticBaseSettingsSource,
     SettingsConfigDict,
 )
+
+_DOTENV_FALLBACK_PATH = ".env"
 
 LITELLM_ROUTED_WORKFLOWS: OrderedDict[str, str] = OrderedDict(
     [
@@ -79,6 +82,54 @@ class ChatColors(BaseSettings):
 
 _CHAT_COLOR_PATTERN = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
 _THEME_CHOICES = {"light", "dark"}
+
+
+def _parse_dotenv_file(path: Path) -> dict[str, str]:
+    """Return key/value pairs from a simple ``.env`` style file."""
+
+    try:
+        contents = path.read_text(encoding="utf-8")
+    except OSError:
+        return {}
+    data: dict[str, str] = {}
+    for raw_line in contents.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export"):
+            line = line.removeprefix("export").strip()
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if not key:
+            continue
+        if value and value[0] == value[-1] and value[0] in {'"', "'"}:
+            value = value[1:-1]
+        data[key] = value
+    return data
+
+
+def _read_dotenv_values() -> dict[str, str]:
+    """Load ``.env`` entries into a mapping without mutating ``os.environ``."""
+
+    env_file_override = os.getenv("PROMPT_MANAGER_ENV_FILE")
+    if env_file_override is not None:
+        candidate = env_file_override.strip()
+        if not candidate:
+            return {}
+        path = Path(candidate).expanduser()
+    else:
+        path = Path(_DOTENV_FALLBACK_PATH).expanduser()
+    if not path.is_file():
+        return {}
+    try:  # pragma: no cover - python-dotenv optional dependency
+        from dotenv import dotenv_values
+    except ImportError:  # pragma: no cover - fallback parser only when dependency missing
+        return _parse_dotenv_file(path)
+    raw_values = dotenv_values(str(path))
+    return {str(key): str(value) for key, value in raw_values.items() if value is not None}
 
 
 class PromptTemplateOverrides(BaseModel):
@@ -555,6 +606,17 @@ class PromptManagerSettings(BaseSettings):
             data: dict[str, Any] = {}
             config_dict = cast("dict[str, Any]", cls.model_config)
             prefix = str(config_dict.get("env_prefix", ""))
+            dotenv_values = _read_dotenv_values()
+
+            def _lookup(candidate: str) -> str | None:
+                value = os.getenv(candidate)
+                if value is None:
+                    value = dotenv_values.get(candidate)
+                if value is None:
+                    return None
+                stripped_value = str(value).strip()
+                return stripped_value or None
+
             # Collect both alias and field-name keys from environment
             mapping = {
                 "db_path": ["DB_PATH", "DATABASE_PATH", "db_path", "database_path"],
@@ -607,13 +669,12 @@ class PromptManagerSettings(BaseSettings):
             }
             for field, keys in mapping.items():
                 for key in keys:
-                    val = os.getenv(f"{prefix}{key}")
-                    if val is None:
-                        val = os.getenv(f"{prefix}{key.upper()}")
-                    if val is None and key.isupper():
-                        val = os.getenv(key)
-                    if val is not None:
-                        if not val.strip():
+                    candidates = [f"{prefix}{key}", f"{prefix}{key.upper()}"]
+                    if key.isupper():
+                        candidates.append(key)
+                    for candidate in candidates:
+                        val = _lookup(candidate)
+                        if val is None:
                             continue
                         # Map to canonical field keys accepted by the model
                         if field in {"db_path", "chroma_path"}:
@@ -621,6 +682,9 @@ class PromptManagerSettings(BaseSettings):
                         else:
                             data[field] = val
                         break
+                    else:
+                        continue
+                    break
             return data
 
         return (

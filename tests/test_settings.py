@@ -1,6 +1,7 @@
 """Tests for configuration loading and validation logic.
 
 Updates:
+  v0.1.8 - 2025-12-04 - Cover .env sourcing for Exa API secrets.
   v0.1.7 - 2025-11-30 - Add docstrings to tests for lint compliance.
   v0.1.6 - 2025-11-30 - Cover routing for category suggestion workflow.
   v0.1.5 - 2025-11-29 - Wrap embedding backend tests for Ruff line length.
@@ -51,6 +52,7 @@ def _clear_litellm_env(monkeypatch: MonkeyPatch) -> None:
     ]
     for var in vars_to_clear:
         monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("PROMPT_MANAGER_ENV_FILE", "")
 
 
 def test_load_settings_reads_json_and_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
@@ -206,6 +208,46 @@ def test_exa_api_key_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     settings = load_settings()
 
     assert settings.exa_api_key == "exa-secret"
+    assert settings.web_search_provider == "exa"
+
+
+def test_exa_api_key_from_dotenv(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    """Load Exa API credentials from a .env file when env vars are unset."""
+
+    _clear_litellm_env(monkeypatch)
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    config_path = config_dir / "config.json"
+    config_path.write_text("{}", encoding="utf-8")
+    env_file = tmp_path / ".env"
+    env_file.write_text("PROMPT_MANAGER_EXA_API_KEY=exa-dotenv\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
+    monkeypatch.setenv("PROMPT_MANAGER_ENV_FILE", str(env_file))
+
+    settings = load_settings()
+
+    assert settings.exa_api_key == "exa-dotenv"
+    assert settings.web_search_provider == "exa"
+
+
+def test_exa_api_key_from_dotenv_alias(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    """Support alias-only variables such as EXA_API_KEY in .env files."""
+
+    _clear_litellm_env(monkeypatch)
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    config_path = config_dir / "config.json"
+    config_path.write_text("{}", encoding="utf-8")
+    env_file = tmp_path / ".env"
+    env_file.write_text("EXA_API_KEY=exa-alias\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
+    monkeypatch.setenv("PROMPT_MANAGER_ENV_FILE", str(env_file))
+
+    settings = load_settings()
+
+    assert settings.exa_api_key == "exa-alias"
     assert settings.web_search_provider == "exa"
 
 

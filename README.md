@@ -48,6 +48,16 @@ python -m main --no-gui --print-settings
 python -m main
 ```
 
+Secrets persist across restarts when stored in a local `.env` file; both LiteLLM and web search
+providers are loaded automatically:
+
+```bash
+cat <<'EOF' > .env
+PROMPT_MANAGER_LITELLM_API_KEY="sk-***"
+PROMPT_MANAGER_EXA_API_KEY="exa_***"
+EOF
+```
+
 - Copy `config/config.template.json` to `config/config.json` to persist non-secret defaults; environment variables always win.
 - Omit `PROMPT_MANAGER_LITELLM_API_KEY` to run without prompt execution; deterministic embeddings remain available for offline workflows.
 - Set `PROMPT_MANAGER_LITELLM_TTS_MODEL` when enabling the voice playback feature (defaults to disabled so no audio requests are issued).
