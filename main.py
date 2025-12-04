@@ -31,10 +31,27 @@ from typing import TYPE_CHECKING
 from cli.commands import COMMAND_SPECS
 from cli.gui_launcher import run_default_mode
 from cli.parser import parse_args
-from cli.runtime import setup_logging
+from cli.runtime import setup_logging as _runtime_setup_logging
 from cli.settings_summary import print_settings_summary
 from config import PromptManagerSettings, load_settings
-from core import build_prompt_manager
+from core import (
+    build_analytics_snapshot as _core_build_analytics_snapshot,
+    build_prompt_manager,
+    export_prompt_catalog as _core_export_prompt_catalog,
+    snapshot_dataset_rows as _core_snapshot_dataset_rows,
+)
+
+# Backwards-compatible re-exports for tests/legacy entry points.
+build_analytics_snapshot = _core_build_analytics_snapshot
+export_prompt_catalog = _core_export_prompt_catalog
+snapshot_dataset_rows = _core_snapshot_dataset_rows
+
+
+def _setup_logging(config_path) -> None:
+    """Compatibility wrapper for older test harnesses expecting main._setup_logging."""
+    _runtime_setup_logging(config_path)
+
+from cli.commands import COMMAND_SPECS  # noqa: E402  (import moved for compatibility)
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from core.prompt_manager import PromptManager
@@ -54,7 +71,7 @@ def _initialise_manager(
 def main() -> int:
     """Entrypoint that wires settings, services, and CLI commands."""
     args = parse_args()
-    setup_logging(args.logging_config)
+    _runtime_setup_logging(args.logging_config)
 
     logger = logging.getLogger("prompt_manager.main")
     try:

@@ -16,6 +16,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+import sys
 
 from core import (
     PromptChainError,
@@ -89,6 +90,12 @@ def _load_chain_variables(
     return {str(key): value for key, value in data.items()}
 
 
+def _get_main_callable(name: str, fallback: Callable[..., Any]) -> Callable[..., Any]:
+    module = sys.modules.get("main")
+    attr = getattr(module, name, None) if module else None
+    return attr if callable(attr) else fallback
+
+
 def run_catalog_export(
     manager: PromptManager | None,
     args: argparse.Namespace,
@@ -98,8 +105,9 @@ def run_catalog_export(
         raise ValueError("Prompt Manager is required for catalog export.")
     output_path = Path(args.path).expanduser()
     fmt = resolve_export_format(output_path, getattr(args, "format", None))
+    export_fn = _get_main_callable("export_prompt_catalog", export_prompt_catalog)
     try:
-        resolved = export_prompt_catalog(
+        resolved = export_fn(
             manager,
             output_path,
             fmt=fmt,
@@ -402,7 +410,8 @@ def _run_analytics_diagnostics(
     prompt_limit = max(1, int(getattr(args, "prompt_limit", 5) or 1))
     usage_log_path = getattr(args, "usage_log", None)
 
-    snapshot = build_analytics_snapshot(
+    snapshot_builder = _get_main_callable("build_analytics_snapshot", build_analytics_snapshot)
+    snapshot = snapshot_builder(
         manager,
         window_days=window_days if window_days > 0 else 0,
         prompt_limit=prompt_limit,
@@ -519,8 +528,9 @@ def _run_analytics_diagnostics(
     export_path = getattr(args, "export_csv", None)
     if export_path:
         dataset = getattr(args, "dataset", "usage")
+        dataset_rows_fn = _get_main_callable("snapshot_dataset_rows", snapshot_dataset_rows)
         try:
-            rows = snapshot_dataset_rows(snapshot, dataset)
+            rows = dataset_rows_fn(snapshot, dataset)
         except ValueError as exc:
             logger.error("%s", exc)
             return 5
@@ -818,7 +828,7 @@ def run_suggest(
 COMMAND_SPECS: dict[str | None, CommandSpec] = {
     "catalog-export": CommandSpec(run_catalog_export),
     "suggest": CommandSpec(run_suggest),
-    "usage-report": CommandSpec(run_usage_report, requires_manager=False),
+    "usage-report": CommandSpec(run_usage_report),
     "history-analytics": CommandSpec(run_history_analytics),
     "reembed": CommandSpec(run_reembed),
     "benchmark": CommandSpec(run_benchmark),
