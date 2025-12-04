@@ -79,11 +79,11 @@ Every run logs to SQLite with request/response snippets, latency, token usage, s
 
 ## Developer
 
-See the full contributor guide in [`README-DEV.md`](README-DEV.md) for development environment setup, environment variable matrix, testing/type-checking workflow, embedding and GUI deep dives, and maintenance procedures.
+See the full contributor guide in [`README-DEV.md`](docs/README-DEV.md) for development environment setup, environment variable matrix, testing/type-checking workflow, embedding and GUI deep dives, and maintenance procedures.
 
 ## Changelog
 
-Track release highlights and historical updates in [`CHANGELOG.md`](CHANGELOG.md).
+Track release highlights and historical updates in [`CHANGELOG.md`](docs/CHANGELOG.md).
 
 ## License
 
