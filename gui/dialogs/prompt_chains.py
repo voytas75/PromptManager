@@ -157,6 +157,7 @@ class PromptChainManagerDialog(QDialog):
 
         self._buttons = QDialogButtonBox(QDialogButtonBox.Close, detail_container)
         self._buttons.accepted.connect(self.accept)  # type: ignore[arg-type]
+        self._buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         detail_layout.addWidget(self._buttons)
 
         splitter.addWidget(detail_container)
