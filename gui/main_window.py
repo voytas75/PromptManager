@@ -1,6 +1,7 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.16.2 - 2025-12-04 - Wire template preview bridge to handler so tab run works on load.
   v0.16.0 - 2025-12-02 - Delegate controller assembly, view callbacks, and handlers
     to helper modules for leaner MainWindow.
   v0.15.82 - 2025-12-01 - Extract main window composition, workspace insight,
@@ -14,23 +15,7 @@ Updates:
   v0.15.78 - 2025-12-01 - Guard tab change handler until widgets are initialised.
   v0.15.77 - 2025-12-01 - Extract prompt list coordinator for loading/filtering/sorting logic.
   v0.15.76 - 2025-12-01 - Delegate layout persistence to WindowStateManager helper.
-  v0.15.75 - 2025-11-30 - Extract toolbar and filter panels into reusable widgets.
-  v0.15.74 - 2025-11-30 - Extract execution and chat controller plus delegate workspace actions.
-  v0.15.73 - 2025-11-30 - Extract widgets, list model, and layout persistence modules.
-  v0.15.72 - 2025-11-30 - Extract result overlay and share workflow helpers into modules.
-  v0.15.71 - 2025-11-30 - Add workspace result sharing via overlay action button.
-  v0.15.70 - 2025-11-29 - Make workspace splitter resize only the prompt input textarea.
-  v0.15.69 - 2025-11-29 - Toggle inline markdown rendering with a checkbox for output/chat.
-  v0.15.68 - 2025-11-29 - Embed result actions inside the output text area with overlay controls.
-  v0.15.67 - 2025-11-29 - Move result action buttons inside the output tab.
-  v0.15.66 - 2025-11-29 - Add Enhanced Prompt Workbench launcher and wiring.
-  v0.15.65 - 2025-11-29 - Remove QModelIndex default construction for Ruff B008 compliance.
-  v0.15.64 - 2025-11-29 - Added prompt template editor dialog shortcut.
-  v0.15.63 - 2025-11-28 - Added analytics dashboard tab with CSV export.
-  v0.15.62 - 2025-11-28 - Enabled ShareText publishing plus clipboard copy.
-  v0.15.61 - 2025-11-28 - Improved prompt list refresh when clearing search.
-  v0.15.60 - 2025-11-28 - Introduced background task center with toasts.
-  v0.15.59 - 2025-11-28 - Wired Refresh Scenarios action to LiteLLM.
+  v0.15.75-and-earlier - 2025-11-30 - Consolidated toolbar, overlay, and workspace refactors.
 """
 
 from __future__ import annotations
@@ -223,7 +208,7 @@ class MainWindow(QMainWindow):
             handler_supplier=lambda: self._workspace_input_handler,
         )
         self._template_preview_bridge = TemplatePreviewBridge(
-            handler_supplier=lambda: self._template_preview_controller,
+            handler_supplier=lambda: self._template_preview_handler,
         )
 
         self._list_view: QListView = cast("QListView", None)
