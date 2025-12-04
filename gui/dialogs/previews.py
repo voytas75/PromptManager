@@ -128,8 +128,14 @@ class InfoDialog(QDialog):
         architecture_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         form.addRow("Architecture:", architecture_label)
 
-        license_label = QLabel("opensource", self)
-        license_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        license_label = QLabel(
+            '<a href="https://github.com/voytas75/PromptManager/blob/master/LICENSE.md">'
+            "MIT License</a>",
+            self,
+        )
+        license_label.setTextFormat(Qt.RichText)
+        license_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        license_label.setOpenExternalLinks(True)
         form.addRow("License:", license_label)
 
         icon_source_label = QLabel('<a href="https://icons8.com/">Icons8</a>', self)

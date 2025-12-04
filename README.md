@@ -2,6 +2,14 @@
 
 PromptManager is a desktop-first prompt operations hub that catalogues, searches, and executes AI prompts with a PySide6 GUI, SQLite persistence, optional Redis caching, and ChromaDB-backed semantic retrieval. It targets Python 3.12+ and ships with strict typing, automated testing, and reproducible configuration baked in.
 
+<p align="center">
+  <img src="docs/images/main.png" alt="Prompt catalogue and workspace view" width="45%">
+  <img src="docs/images/template.png" alt="Template preview validating JSON variables" width="45%">
+</p>
+<p align="center">
+  <img src="docs/images/analytics.png" alt="Analytics dashboard with usage, cost, and benchmark charts" width="80%">
+</p>
+
 ## Installation
 
 ```bash
