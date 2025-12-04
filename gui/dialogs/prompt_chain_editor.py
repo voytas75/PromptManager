@@ -58,6 +58,10 @@ class PromptChainEditorDialog(QDialog):
         self._chain_id = chain.id if chain else uuid.uuid4()
         self._result_chain: PromptChain | None = None
         self._prompts: list[Prompt] = list(prompts or [])
+        self._prompt_lookup: dict[str, Prompt] = {
+            str(prompt.id): prompt
+            for prompt in self._prompts
+        }
         self.setWindowTitle("Edit Prompt Chain" if chain else "New Prompt Chain")
         self.resize(800, 640)
 
@@ -95,6 +99,7 @@ class PromptChainEditorDialog(QDialog):
             ["Order", "Prompt", "Input", "Output", "Condition"]
         )
         self._steps_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self._steps_table.itemDoubleClicked.connect(self._handle_step_double_click)  # type: ignore[arg-type]
         layout.addWidget(self._steps_table, 1)
 
         step_actions = QHBoxLayout()
@@ -142,7 +147,11 @@ class PromptChainEditorDialog(QDialog):
         self._steps_table.setRowCount(len(self._steps))
         for row, step in enumerate(self._steps):
             self._steps_table.setItem(row, 0, QTableWidgetItem(str(step.order_index)))
-            self._steps_table.setItem(row, 1, QTableWidgetItem(str(step.prompt_id)))
+            prompt_item = QTableWidgetItem(str(step.prompt_id))
+            prompt = self._prompt_lookup.get(str(step.prompt_id))
+            if prompt is not None:
+                prompt_item.setToolTip(self._build_prompt_tooltip(prompt))
+            self._steps_table.setItem(row, 1, prompt_item)
             self._steps_table.setItem(row, 2, QTableWidgetItem(step.input_template))
             self._steps_table.setItem(row, 3, QTableWidgetItem(step.output_variable))
             condition = step.condition or "Always"
@@ -235,6 +244,27 @@ class PromptChainEditorDialog(QDialog):
         label.setBuddy(widget)
         form.addRow(label, widget)
         return label
+
+    def _handle_step_double_click(self, item: QTableWidgetItem) -> None:
+        if item.column() != 1:
+            return
+        prompt = self._prompt_lookup.get(str(item.text()).strip())
+        if prompt is None:
+            QMessageBox.information(self, "Prompt", "Prompt not found in catalog.")
+            return
+        body = (prompt.context or prompt.description or "(no body)").strip()
+        preview = body if len(body) <= 600 else body[:597].rstrip() + "…"
+        QMessageBox.information(
+            self,
+            prompt.name,
+            preview or "Prompt has no saved body.",
+        )
+
+    def _build_prompt_tooltip(self, prompt: Prompt) -> str:
+        body = (prompt.context or prompt.description or "").strip()
+        if len(body) > 160:
+            body = body[:157].rstrip() + "…"
+        return f"{prompt.name}\n{body}"
 
 
 class PromptChainStepDialog(QDialog):

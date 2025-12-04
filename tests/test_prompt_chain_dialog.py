@@ -153,6 +153,41 @@ def test_prompt_chain_editor_dialog_creates_chain(qt_app: QApplication) -> None:
     assert len(chain.steps) == 1
 
 
+def test_prompt_chain_editor_prompt_tooltip_and_double_click(
+    qt_app: QApplication, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prompt = SimpleNamespace(
+        id=uuid.uuid4(),
+        name="Demo Prompt",
+        context="Body text",
+        description="",
+    )
+    editor = PromptChainEditorDialog(None, manager=None, prompts=[prompt])
+    step = PromptChainStep(
+        id=uuid.uuid4(),
+        chain_id=editor._chain_id,  # noqa: SLF001
+        prompt_id=prompt.id,
+        order_index=1,
+        input_template="{{ body }}",
+        output_variable="result",
+    )
+    editor._steps = [step]  # noqa: SLF001
+    editor._refresh_steps()  # noqa: SLF001
+    item = editor._steps_table.item(0, 1)  # noqa: SLF001
+    assert item is not None
+    assert "Demo Prompt" in (item.toolTip() or "")
+    captured: dict[str, str] = {}
+
+    def _capture(parent: object, title: str, text: str) -> None:  # noqa: ANN001
+        captured["title"] = title
+        captured["text"] = text
+
+    monkeypatch.setattr("gui.dialogs.prompt_chain_editor.QMessageBox.information", _capture)
+    editor._handle_step_double_click(item)  # noqa: SLF001
+    assert captured["title"] == "Demo Prompt"
+    assert "Body text" in captured["text"]
+
+
 def test_prompt_chain_manager_creates_chain_via_editor(
     qt_app: QApplication, monkeypatch: pytest.MonkeyPatch
 ) -> None:
