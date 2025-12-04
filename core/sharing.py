@@ -1,6 +1,7 @@
 """Prompt sharing helpers for external paste services.
 
 Updates:
+  v0.1.2 - 2025-12-04 - Append footer metadata with app name, author link, and share date.
   v0.1.1 - 2025-11-30 - Document ShareText provider methods for lint compliance.
   v0.1.0 - 2025-11-28 - Add ShareText provider and prompt formatting helper.
 """
@@ -10,6 +11,7 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
+from datetime import date
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
@@ -17,6 +19,9 @@ from core.exceptions import ShareProviderError
 
 if TYPE_CHECKING:
     from models.prompt_model import Prompt
+
+_APP_NAME = "PromptManager"
+_APP_AUTHOR_URL = "https://github.com/voytas75"
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,6 +109,10 @@ def format_prompt_for_share(
         metadata = prompt.to_metadata()
         lines.append("## Metadata")
         lines.append(json.dumps(metadata, ensure_ascii=False, indent=2))
+    footer_date = date.today().isoformat()
+    lines.append("")
+    lines.append("---")
+    lines.append(f"{_APP_NAME} | Author: {_APP_AUTHOR_URL} | Shared: {footer_date}")
     payload = "\n".join(lines).strip()
     return payload or "Prompt content unavailable."
 
