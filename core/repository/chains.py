@@ -217,8 +217,7 @@ class ChainStoreMixin:
             chain_id = row["chain_id"]
             if chain_id not in result:
                 result[chain_id] = []
-            metadata = _json_loads_optional(row.get("metadata"))
             row_map = dict(row)
-            row_map["metadata"] = metadata
+            row_map["metadata"] = _json_loads_optional(row_map.get("metadata"))
             result[chain_id].append(PromptChainStep.from_row(row_map))
         return result
