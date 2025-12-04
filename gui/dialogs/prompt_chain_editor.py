@@ -257,6 +257,9 @@ class PromptChainStepDialog(QDialog):
         layout.addRow("Output variable", self._output_variable)
 
         self._condition_input = QLineEdit(self)
+        self._condition_input.setPlaceholderText(
+            "Optional condition, e.g. {{ score > 0 }}"
+        )
         layout.addRow("Condition", self._condition_input)
 
         self._stop_checkbox = QCheckBox("Stop chain when this step fails", self)
