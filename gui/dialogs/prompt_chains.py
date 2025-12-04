@@ -405,10 +405,17 @@ class PromptChainManagerDialog(QDialog):
         if self._manager is None:
             return []
         try:
-            return self._manager.list_prompts(limit=500)
+            list_prompts = getattr(self._manager, "list_prompts", None)
+            if callable(list_prompts):
+                return list_prompts(limit=500)
+            repository = getattr(self._manager, "repository", None)
+            if repository is not None:
+                return repository.list(limit=500)
         except PromptManagerError as exc:
             logger.warning("Unable to load prompts for chain editor", exc_info=exc)
-            return []
+        except Exception:  # pragma: no cover - defensive guard
+            logger.warning("Unexpected prompt lookup failure", exc_info=True)
+        return []
 
     def _select_chain(self, chain_id: UUID) -> None:
         """Select the list entry matching ``chain_id``."""
