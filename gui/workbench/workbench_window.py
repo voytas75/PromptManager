@@ -1,12 +1,12 @@
 """Qt widgets for the Enhanced Prompt Workbench experience.
 
 Updates:
+  v0.1.22 - 2025-12-04 - Modularize dialogs, wizard, editor, and utilities into separate modules.
   v0.1.21 - 2025-11-30 - Skip busy indicator whenever LiteLLM streaming is enabled.
   v0.1.20 - 2025-11-30 - Respect LiteLLM streaming flag when running prompts.
   v0.1.19 - 2025-11-29 - Fix toast calls to pass the parent widget first.
   v0.1.18 - 2025-11-29 - Persist Workbench window geometry between sessions.
-  v0.1.17 - 2025-11-29 - Stack the prompt editor above Run Output/History in the
-    center column.
+  v0.1.17 - 2025-11-29 - Stack the prompt editor above Run Output/History in the center column.
   v0.1.16 - 2025-11-29 - Relocate output/history tabs into the center column and
     collapse the bottom panel.
   v0.1.15 - 2025-11-29 - Move output/history tabs below the editor and persist
@@ -14,47 +14,21 @@ Updates:
   v0.1.14 - 2025-11-29 - Replace QWizard with custom-styled dialog to control Guided
     mode appearance.
   v0.1.13 - 2025-11-29 - Manually paint wizard background with palette colors to avoid OS tinting.
-  v0.1.12 - 2025-11-29 - Force Fusion style for wizard to ensure palette-driven theming on Windows.
-  v0.1.11 - 2025-11-29 - Log resolved wizard palette roles for troubleshooting theme differences.
-  v0.1.10 - 2025-11-29 - Style wizard footer container explicitly to match host palette.
-  v0.1.9 - 2025-11-29 - Apply palette colors to wizard button boxes and buttons.
-  v0.1.8 - 2025-11-29 - Enforce palette-colored wizard backgrounds via style attributes.
-  v0.1.7 - 2025-11-29 - Force wizard/page styled backgrounds so palette colors render on Windows.
-  v0.1.6 - 2025-11-29 - Apply palette snapshots to wizard styling for consistent themes.
-  v0.1.5 - 2025-11-29 - Rely on native palette for wizard styling to match host themes.
-  v0.1.4 - 2025-11-29 - Apply palette-aware stylesheet for portable wizard colors.
-  v0.1.3 - 2025-11-29 - Prevent guided wizard palette updates from re-triggering change events.
-  v0.1.2 - 2025-11-29 - Keep guided wizard colors in sync with the current theme palette.
-  v0.1.1 - 2025-11-29 - Align guided wizard palette with the active application theme.
-  v0.1.0 - 2025-11-29 - Introduce guided Workbench window, mode selector, and export dialog.
+Earlier versions: v0.1.0-v0.1.12 - Introduced the guided Workbench window plus
+  iterative palette refinements.
 """
 
 from __future__ import annotations
 
 import logging
-import re
-import textwrap
 import threading
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypeVar
 
-from PySide6.QtCore import QByteArray, QEvent, QEventLoop, QObject, QSettings, Qt, Signal
-from PySide6.QtGui import (
-    QCloseEvent,
-    QGuiApplication,
-    QPainter,
-    QPaintEvent,
-    QPalette,
-    QTextCharFormat,
-    QTextCursor,
-)
+from PySide6.QtCore import QByteArray, QEventLoop, QSettings, Qt
+from PySide6.QtGui import QCloseEvent, QGuiApplication, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import (
-    QButtonGroup,
     QDialog,
-    QDialogButtonBox,
-    QFormLayout,
     QFrame,
-    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -65,7 +39,6 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QSplitter,
-    QStackedWidget,
     QStatusBar,
     QTabWidget,
     QTextEdit,
@@ -82,17 +55,16 @@ from core.history_tracker import HistoryTracker, HistoryTrackerError
 from ..processing_indicator import ProcessingIndicator
 from ..template_preview import TemplatePreviewWidget
 from ..toast import show_toast
-from .session import WorkbenchExecutionRecord, WorkbenchSession, WorkbenchVariable
-
-
-class _StreamRelay(QObject):
-    chunk = Signal(str)
-
+from .dialogs import VariableCaptureDialog, WorkbenchExportDialog, WorkbenchMode
+from .editor import WorkbenchPromptEditor
+from .session import WorkbenchExecutionRecord, WorkbenchSession
+from .utils import BLOCK_SNIPPETS, StreamRelay, normalise_variable_token, variable_at_cursor
+from .wizard import GuidedPromptWizard
 
 _T = TypeVar("_T")
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
-    from collections.abc import Callable, Mapping, Sequence
+    from collections.abc import Callable, Mapping
 
     from models.prompt_model import Prompt
 else:  # pragma: no cover - runtime placeholders for type-only imports
@@ -100,608 +72,9 @@ else:  # pragma: no cover - runtime placeholders for type-only imports
 
     Callable = _Any
     Mapping = _Any
-    Sequence = _Any
     Prompt = _Any
 
 logger = logging.getLogger("prompt_manager.gui.workbench")
-
-
-def _inherit_palette(widget: QWidget) -> None:
-    parent = widget.parent()
-    palette = parent.palette() if isinstance(parent, QWidget) else None
-    if palette is None:
-        app = QGuiApplication.instance()
-        palette = app.palette() if app is not None else None
-    if palette is None:
-        return
-    widget.setPalette(palette)
-    widget.setAutoFillBackground(True)
-
-
-_BLOCK_SNIPPETS: Mapping[str, str] = {
-    "System Role": textwrap.dedent(
-        """### System Role\nYou are a meticulous assistant that follows instructions exactly."""
-    ),
-    "Context": textwrap.dedent(
-        """### Context\nDescribe the task, background knowledge, and any important caveats here."""
-    ),
-    "Constraints": textwrap.dedent(
-        """### Constraints\n- Limit answers to 200 words.\n- Use professional tone."""
-    ),
-    "Examples": textwrap.dedent(
-        """### Examples\n**Input**\n<example input>\n\n**Expected Output**\n<example output>"""
-    ),
-    "JSON Response": textwrap.dedent(
-        """### Output Format
-Return a JSON object with these keys:
-- `summary`: One sentence overview.
-- `steps`: Array of ordered actions."""
-    ),
-}
-
-
-_JINJA_PATTERN = re.compile(r"{{\s*(?P<name>[A-Za-z0-9_\.]+)\s*(?:\|[^}]*)?}}")
-
-
-def _variable_at_cursor(cursor: QTextCursor) -> str | None:
-    block_text = cursor.block().text()
-    column = cursor.positionInBlock()
-    for match in _JINJA_PATTERN.finditer(block_text):
-        start, end = match.span()
-        if start <= column <= end:
-            return match.group("name")
-    return None
-
-
-def _normalise_variable_token(text: str) -> str | None:
-    stripped = text.strip()
-    if not stripped:
-        return None
-    match = _JINJA_PATTERN.search(stripped)
-    if match:
-        return match.group("name")
-    if stripped.isidentifier():
-        return stripped
-    return None
-
-
-class WorkbenchPromptEditor(QPlainTextEdit):
-    """Custom prompt editor that surfaces variable tokens on double-click."""
-
-    variableActivated = Signal(str)
-
-    def mouseDoubleClickEvent(self, event) -> None:  # type: ignore[override]
-        """Emit the variable token under the cursor when the user double-clicks."""
-        super().mouseDoubleClickEvent(event)
-        name = _variable_at_cursor(self.cursorForPosition(event.position().toPoint()))
-        if name:
-            self.variableActivated.emit(name)
-
-
-class WorkbenchMode:
-    """Enumeration representing the Workbench launch path."""
-
-    GUIDED = "guided"
-    BLANK = "blank"
-    TEMPLATE = "template"
-
-
-@dataclass(slots=True)
-class ModeSelection:
-    """Result payload returned by WorkbenchModeDialog."""
-
-    mode: str
-    template_prompt: Prompt | None
-
-
-class WorkbenchModeDialog(QDialog):
-    """Dialog that lets the user choose between guided, blank, or template modes."""
-
-    def __init__(self, prompts: Sequence[Prompt], parent: QWidget | None = None) -> None:
-        """Initialise the dialog and populate the template list."""
-        super().__init__(parent)
-        _inherit_palette(self)
-        self._prompts = list(prompts)
-        self._selection = ModeSelection(WorkbenchMode.GUIDED, None)
-        self.setWindowTitle("Start a New Prompt")
-        self._build_ui()
-
-    def result_selection(self) -> ModeSelection:
-        """Return the chosen mode and, when relevant, the template prompt."""
-        return self._selection
-
-    def _build_ui(self) -> None:
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(12)
-
-        description = QLabel(
-            "Select how you would like to begin. Guided mode walks through suggested "
-            "sections, blank mode opens the editor immediately, and template mode "
-            "loads an existing prompt for remixing.",
-            self,
-        )
-        description.setWordWrap(True)
-        layout.addWidget(description)
-
-        self._buttons = QButtonGroup(self)
-        self._buttons.setExclusive(True)
-        guided = self._add_mode_option(
-            layout,
-            "Guided wizard",
-            "Answer a few questions to scaffold the prompt automatically.",
-            WorkbenchMode.GUIDED,
-        )
-        guided.setChecked(True)
-        self._add_mode_option(
-            layout,
-            "Blank editor",
-            "Start from an empty canvas with all tooling enabled.",
-            WorkbenchMode.BLANK,
-        )
-        self._template_button = self._add_mode_option(
-            layout,
-            "Load template",
-            "Pick an existing prompt to refine inside the Workbench.",
-            WorkbenchMode.TEMPLATE,
-        )
-
-        self._template_list = QListWidget(self)
-        self._template_list.setEnabled(False)
-        for prompt in self._prompts:
-            item = QListWidgetItem(prompt.name)
-            item.setData(Qt.UserRole, prompt)
-            self._template_list.addItem(item)
-        layout.addWidget(self._template_list)
-
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-        buttons.accepted.connect(self._on_accept)  # type: ignore[arg-type]
-        buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
-        layout.addWidget(buttons)
-
-        self._buttons.idToggled.connect(self._on_mode_toggled)  # type: ignore[arg-type]
-
-    def _add_mode_option(
-        self,
-        layout: QVBoxLayout,
-        label: str,
-        description: str,
-        mode_value: str,
-    ) -> QToolButton:
-        button = QToolButton(self)
-        button.setCheckable(True)
-        button.setText(label)
-        button.setToolTip(description)
-        button.setStyleSheet("text-align: left; padding: 4px;")
-        layout.addWidget(button)
-        self._buttons.addButton(button)
-        self._buttons.setId(button, len(self._buttons.buttons()))
-        button._workbench_mode = mode_value  # type: ignore[attr-defined]
-        return button
-
-    def _on_mode_toggled(self, button_id: int, checked: bool) -> None:
-        button = self._buttons.button(button_id)
-        if not isinstance(button, QToolButton) or not checked:
-            return
-        mode = getattr(button, "_workbench_mode", WorkbenchMode.GUIDED)
-        self._selection.mode = mode
-        self._template_list.setEnabled(mode == WorkbenchMode.TEMPLATE)
-
-    def _on_accept(self) -> None:
-        if self._selection.mode == WorkbenchMode.TEMPLATE:
-            item = self._template_list.currentItem()
-            prompt = item.data(Qt.UserRole) if item else None
-            if prompt is None:
-                QMessageBox.warning(self, "Select template", "Choose a template first.")
-                return
-            self._selection = ModeSelection(WorkbenchMode.TEMPLATE, prompt)
-        self.accept()
-
-
-class VariableCaptureDialog(QDialog):
-    """Dialog for defining placeholder metadata and sample values."""
-
-    def __init__(
-        self,
-        name: str | None = None,
-        parent: QWidget | None = None,
-    ) -> None:
-        """Configure form fields for editing a single variable."""
-        super().__init__(parent)
-        _inherit_palette(self)
-        self.setWindowTitle("Configure Variable")
-        self._build_ui(name or "")
-
-    def result_variable(self) -> WorkbenchVariable | None:
-        """Return a WorkbenchVariable when the dialog is accepted."""
-        if self.result() != QDialog.Accepted:
-            return None
-        name = self._name_input.text().strip()
-        if not name:
-            return None
-        description = self._description_input.text().strip()
-        value = self._sample_input.toPlainText().strip()
-        return WorkbenchVariable(
-            name=name,
-            description=description or None,
-            sample_value=value or None,
-        )
-
-    def _build_ui(self, initial_name: str) -> None:
-        layout = QFormLayout(self)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(8)
-        self._name_input = QLineEdit(self)
-        self._name_input.setText(initial_name)
-        layout.addRow("Variable name", self._name_input)
-        self._description_input = QLineEdit(self)
-        layout.addRow("Description", self._description_input)
-        self._sample_input = QPlainTextEdit(self)
-        self._sample_input.setPlaceholderText("Sample value used for preview")
-        self._sample_input.setFixedHeight(80)
-        layout.addRow("Sample value", self._sample_input)
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-        buttons.accepted.connect(self.accept)  # type: ignore[arg-type]
-        buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
-        layout.addWidget(buttons)
-
-
-class _GoalWizardPage(QWidget):
-    def __init__(self, session: WorkbenchSession) -> None:
-        super().__init__()
-        layout = QFormLayout(self)
-        self.name_input = QLineEdit(self)
-        self.name_input.setPlaceholderText("Friendly prompt name…")
-        self.name_input.setText(session.prompt_name)
-        layout.addRow("Prompt name", self.name_input)
-        self.goal_input = QPlainTextEdit(self)
-        self.goal_input.setPlainText(session.goal_statement)
-        self.goal_input.setPlaceholderText("Describe what the prompt must achieve…")
-        self.goal_input.setFixedHeight(100)
-        layout.addRow("Goal", self.goal_input)
-        self.audience_input = QLineEdit(self)
-        self.audience_input.setPlaceholderText("Target audience (optional)…")
-        self.audience_input.setText(session.audience)
-        layout.addRow("Audience", self.audience_input)
-
-
-class _ContextWizardPage(QWidget):
-    def __init__(self, session: WorkbenchSession) -> None:
-        super().__init__()
-        layout = QFormLayout(self)
-        self.role_input = QPlainTextEdit(self)
-        self.role_input.setPlainText(session.system_role)
-        self.role_input.setPlaceholderText("Describe the assistant persona…")
-        self.role_input.setFixedHeight(100)
-        layout.addRow("System role", self.role_input)
-        self.context_input = QPlainTextEdit(self)
-        self.context_input.setPlainText(session.context)
-        self.context_input.setPlaceholderText("Describe background info, resources, etc.")
-        self.context_input.setFixedHeight(140)
-        layout.addRow("Context", self.context_input)
-
-
-class _DetailWizardPage(QWidget):
-    def __init__(self, session: WorkbenchSession) -> None:
-        super().__init__()
-        layout = QGridLayout(self)
-        constraint_label = QLabel("One constraint per line", self)
-        layout.addWidget(constraint_label, 0, 0)
-        self.constraint_input = QPlainTextEdit(self)
-        self.constraint_input.setPlaceholderText("Limit to 200 words\nRespond in JSON")
-        self.constraint_input.setPlainText("\n".join(session.constraints))
-        layout.addWidget(self.constraint_input, 1, 0)
-        variables_label = QLabel(
-            "Define variables as `name | description | sample value` per line.", self
-        )
-        layout.addWidget(variables_label, 0, 1)
-        self.variables_input = QPlainTextEdit(self)
-        preset_lines: list[str] = []
-        for variable in session.variables.values():
-            line = variable.name
-            if variable.description:
-                line += f" | {variable.description}"
-            if variable.sample_value:
-                line += f" | {variable.sample_value}"
-            preset_lines.append(line)
-        self.variables_input.setPlainText("\n".join(preset_lines))
-        layout.addWidget(self.variables_input, 1, 1)
-
-
-class GuidedPromptWizard(QDialog):
-    """Custom-styled wizard dialog that emits updates whenever fields change."""
-
-    updated = Signal(dict)
-
-    def __init__(self, session: WorkbenchSession, parent: QWidget | None = None) -> None:
-        """Build the wizard pages and sync palette styling."""
-        super().__init__(parent)
-        self._palette_updating = False
-        self.setAttribute(Qt.WA_StyledBackground, True)
-        self._session = session
-        self.setWindowTitle("Guided Prompt Wizard")
-        self.setModal(True)
-        self.resize(840, 640)
-        palette = self._resolve_theme_palette(parent)
-        if palette is not None:
-            logger.debug(
-                "GUIDED_WIZARD palette=%s",
-                {
-                    "window": palette.color(QPalette.Window).name(),
-                    "window_text": palette.color(QPalette.WindowText).name(),
-                    "base": palette.color(QPalette.Base).name(),
-                    "alternate": palette.color(QPalette.AlternateBase).name(),
-                    "button": palette.color(QPalette.Button).name(),
-                    "button_text": palette.color(QPalette.ButtonText).name(),
-                    "mid": palette.color(QPalette.Mid).name(),
-                    "midlight": palette.color(QPalette.Midlight).name(),
-                    "highlight": palette.color(QPalette.Highlight).name(),
-                    "highlighted_text": palette.color(QPalette.HighlightedText).name(),
-                },
-            )
-        self._goal_page = _GoalWizardPage(session)
-        self._context_page = _ContextWizardPage(session)
-        self._detail_page = _DetailWizardPage(session)
-        self._pages: list[tuple[str, QWidget]] = [
-            ("Goal and Audience", self._goal_page),
-            ("System Role and Context", self._context_page),
-            ("Variables and Constraints", self._detail_page),
-        ]
-        self._build_ui()
-        if palette is not None:
-            self._apply_palette(palette)
-        for widget in (
-            self._goal_page.name_input,
-            self._goal_page.goal_input,
-            self._goal_page.audience_input,
-            self._context_page.role_input,
-            self._context_page.context_input,
-            self._detail_page.constraint_input,
-            self._detail_page.variables_input,
-        ):
-            widget.textChanged.connect(self._emit_update)  # type: ignore[arg-type]
-        self._stack.currentChanged.connect(self._on_page_changed)
-        self._on_page_changed()
-        self._emit_update()
-
-    def _build_ui(self) -> None:
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
-        header = QVBoxLayout()
-        header.setSpacing(4)
-        self._title_label = QLabel("", self)
-        self._title_label.setStyleSheet("font-size: 20px; font-weight: 600;")
-        self._step_label = QLabel("", self)
-        self._step_label.setStyleSheet("color: rgba(255, 255, 255, 0.85);")
-        header.addWidget(self._title_label)
-        header.addWidget(self._step_label)
-        layout.addLayout(header)
-        self._stack = QStackedWidget(self)
-        self._stack.setObjectName("guidedWizardStack")
-        for _, widget in self._pages:
-            self._stack.addWidget(widget)
-        layout.addWidget(self._stack, 1)
-        self._footer_widget = QWidget(self)
-        button_row = QHBoxLayout(self._footer_widget)
-        button_row.setContentsMargins(0, 12, 0, 0)
-        button_row.addStretch(1)
-        self._back_button = QPushButton("Back", self)
-        self._next_button = QPushButton("Next", self)
-        self._finish_button = QPushButton("Finish", self)
-        self._cancel_button = QPushButton("Cancel", self)
-        for button in (
-            self._back_button,
-            self._next_button,
-            self._finish_button,
-            self._cancel_button,
-        ):
-            button.setMinimumWidth(110)
-        self._back_button.clicked.connect(self._go_back)
-        self._next_button.clicked.connect(self._go_next)
-        self._finish_button.clicked.connect(self._finish)
-        self._cancel_button.clicked.connect(self.reject)
-        button_row.addWidget(self._back_button)
-        button_row.addWidget(self._next_button)
-        button_row.addWidget(self._finish_button)
-        button_row.addWidget(self._cancel_button)
-        layout.addWidget(self._footer_widget)
-
-    def changeEvent(self, event: QEvent) -> None:  # type: ignore[override]
-        """Reapply palette styling when the application theme changes."""
-        super().changeEvent(event)
-        if self._palette_updating:
-            return
-        if event.type() in {QEvent.PaletteChange, QEvent.ApplicationPaletteChange}:
-            palette = self._resolve_theme_palette(self.parentWidget())
-            if palette is not None:
-                self._apply_palette(palette)
-
-    def paintEvent(self, event: QPaintEvent) -> None:  # type: ignore[override]
-        """Fill the wizard background using the active palette."""
-        painter = QPainter(self)
-        painter.fillRect(self.rect(), self.palette().color(QPalette.Window))
-        super().paintEvent(event)
-
-    def _resolve_theme_palette(self, parent: QWidget | None) -> QPalette | None:
-        app = QGuiApplication.instance()
-        if app is not None:
-            return QPalette(app.palette())
-        if parent is not None:
-            return QPalette(parent.palette())
-        return None
-
-    def _apply_palette(self, palette: QPalette) -> None:
-        if self._palette_updating:
-            return
-        self._palette_updating = True
-        try:
-            self.setPalette(palette)
-            self.setAutoFillBackground(True)
-            window_color = palette.color(QPalette.Window).name()
-            window_text = palette.color(QPalette.WindowText).name()
-            base_color = palette.color(QPalette.Base).name()
-            button_color = palette.color(QPalette.Button).name()
-            button_text = palette.color(QPalette.ButtonText).name()
-            mid_color = palette.color(QPalette.Mid).name()
-            highlight_color = palette.color(QPalette.Highlight).name()
-            palette_snapshot = {
-                "window": window_color,
-                "window_text": window_text,
-                "base": base_color,
-                "button": button_color,
-                "mid": mid_color,
-                "highlight": highlight_color,
-            }
-            logger.debug("GUIDED_PALETTE snapshot=%s", palette_snapshot)
-            stylesheet = textwrap.dedent(
-                f"""
-                GuidedPromptWizard {{
-                    background-color: {window_color};
-                    color: {window_text};
-                    border-radius: 8px;
-                }}
-                GuidedPromptWizard QLabel {{
-                    color: {window_text};
-                }}
-                #guidedWizardStack {{
-                    background-color: {base_color};
-                    border-radius: 6px;
-                }}
-                GuidedPromptWizard QLineEdit,
-                GuidedPromptWizard QPlainTextEdit,
-                GuidedPromptWizard QComboBox,
-                GuidedPromptWizard QTextEdit {{
-                    background-color: {base_color};
-                    color: {window_text};
-                    border: 1px solid {mid_color};
-                }}
-                GuidedPromptWizard QPushButton {{
-                    background-color: {button_color};
-                    color: {button_text};
-                    border: 1px solid {mid_color};
-                    border-radius: 4px;
-                    padding: 4px 10px;
-                }}
-                GuidedPromptWizard QPushButton:hover {{
-                    background-color: {highlight_color};
-                    color: {window_text};
-                }}
-                GuidedPromptWizard QPushButton:pressed {{
-                    background-color: {mid_color};
-                    color: {window_text};
-                }}
-                """
-            ).strip()
-            self.setStyleSheet(stylesheet)
-            for page in (self._goal_page, self._context_page, self._detail_page):
-                page.setPalette(palette)
-                page.setAutoFillBackground(True)
-                page.setAttribute(Qt.WA_StyledBackground, True)
-            self._stack.setPalette(palette)
-            self._stack.setAutoFillBackground(True)
-            self._stack.setAttribute(Qt.WA_StyledBackground, True)
-            self._footer_widget.setPalette(palette)
-            self._footer_widget.setAutoFillBackground(True)
-            self._footer_widget.setAttribute(Qt.WA_StyledBackground, True)
-        finally:
-            self._palette_updating = False
-
-    def _on_page_changed(self) -> None:
-        index = self._stack.currentIndex()
-        total = self._stack.count()
-        self._title_label.setText(self._pages[index][0])
-        self._step_label.setText(f"Step {index + 1} of {total}")
-        self._back_button.setEnabled(index > 0)
-        self._next_button.setVisible(index < total - 1)
-        self._finish_button.setVisible(index == total - 1)
-        self._emit_update()
-
-    def _go_next(self) -> None:
-        index = self._stack.currentIndex()
-        if index < self._stack.count() - 1:
-            self._stack.setCurrentIndex(index + 1)
-
-    def _go_back(self) -> None:
-        index = self._stack.currentIndex()
-        if index > 0:
-            self._stack.setCurrentIndex(index - 1)
-
-    def _finish(self) -> None:
-        self.accept()
-
-    def _emit_update(self) -> None:
-        variables: dict[str, WorkbenchVariable] = {}
-        for line in self._detail_page.variables_input.toPlainText().splitlines():
-            if not line.strip():
-                continue
-            parts = [part.strip() for part in line.split("|")]
-            name = parts[0]
-            if not name:
-                continue
-            description = parts[1] if len(parts) > 1 else None
-            sample = parts[2] if len(parts) > 2 else None
-            variables[name] = WorkbenchVariable(
-                name=name,
-                description=description,
-                sample_value=sample,
-            )
-        payload = {
-            "prompt_name": self._goal_page.name_input.text(),
-            "goal": self._goal_page.goal_input.toPlainText(),
-            "audience": self._goal_page.audience_input.text(),
-            "system_role": self._context_page.role_input.toPlainText(),
-            "context": self._context_page.context_input.toPlainText(),
-            "constraints": self._detail_page.constraint_input.toPlainText().splitlines(),
-            "variables": variables,
-        }
-        self.updated.emit(payload)
-
-
-class WorkbenchExportDialog(QDialog):
-    """Collect final metadata before persisting a prompt draft."""
-
-    def __init__(self, session: WorkbenchSession, parent: QWidget | None = None) -> None:
-        """Populate export fields using the provided session defaults."""
-        super().__init__(parent)
-        _inherit_palette(self)
-        self.setWindowTitle("Export Prompt")
-        self._build_ui(session)
-
-    def prompt_kwargs(self) -> dict[str, Any] | None:
-        """Return keyword arguments for prompt creation when accepted."""
-        if self.result() != QDialog.Accepted:
-            return None
-        tags = [tag.strip() for tag in self._tags_input.text().split(",") if tag.strip()]
-        return {
-            "name": self._name_input.text().strip(),
-            "category": self._category_input.text().strip() or "Workbench",
-            "language": self._language_input.text().strip() or "en",
-            "tags": tags,
-            "author": self._author_input.text().strip() or None,
-        }
-
-    def _build_ui(self, session: WorkbenchSession) -> None:
-        layout = QFormLayout(self)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(8)
-        self._name_input = QLineEdit(self)
-        self._name_input.setText(session.prompt_name or session.goal_statement or "Workbench Draft")
-        layout.addRow("Name", self._name_input)
-        self._category_input = QLineEdit(self)
-        self._category_input.setText("Workbench")
-        layout.addRow("Category", self._category_input)
-        self._language_input = QLineEdit(self)
-        self._language_input.setText("en")
-        layout.addRow("Language", self._language_input)
-        self._tags_input = QLineEdit(self)
-        layout.addRow("Tags", self._tags_input)
-        self._author_input = QLineEdit(self)
-        layout.addRow("Author", self._author_input)
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-        buttons.accepted.connect(self.accept)  # type: ignore[arg-type]
-        buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
-        layout.addRow(buttons)
 
 
 class WorkbenchWindow(QMainWindow):
@@ -726,7 +99,7 @@ class WorkbenchWindow(QMainWindow):
         self._active_refinement_target: str | None = None
         self._main_splitter: QSplitter | None = None
         self._middle_splitter: QSplitter | None = None
-        self._stream_relay = _StreamRelay(self)
+        self._stream_relay = StreamRelay(self)
         self._stream_relay.chunk.connect(self._handle_stream_chunk)
         self._streaming_active = False
         self._streaming_buffer: list[str] = []
@@ -783,7 +156,7 @@ class WorkbenchWindow(QMainWindow):
         palette_layout.setContentsMargins(8, 8, 8, 8)
         palette_layout.addWidget(QLabel("Guidance blocks", palette_frame))
         self._palette_list = QListWidget(palette_frame)
-        for label, snippet in _BLOCK_SNIPPETS.items():
+        for label, snippet in BLOCK_SNIPPETS.items():
             item = QListWidgetItem(label)
             item.setToolTip(snippet.splitlines()[0])
             self._palette_list.addItem(item)
@@ -925,7 +298,7 @@ class WorkbenchWindow(QMainWindow):
         self._sync_preview()
 
     def _insert_block(self, item: QListWidgetItem) -> None:
-        snippet = _BLOCK_SNIPPETS.get(item.text())
+        snippet = BLOCK_SNIPPETS.get(item.text())
         if not snippet:
             return
         cursor = self._editor.textCursor()
@@ -973,9 +346,9 @@ class WorkbenchWindow(QMainWindow):
     def _link_variable(self) -> None:
         cursor = self._editor.textCursor()
         if cursor.hasSelection():
-            candidate = _normalise_variable_token(cursor.selectedText())
+            candidate = normalise_variable_token(cursor.selectedText())
         else:
-            candidate = _variable_at_cursor(cursor)
+            candidate = variable_at_cursor(cursor)
         dialog = VariableCaptureDialog(candidate, self)
         if dialog.exec() != QDialog.Accepted:
             return

@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 from core import PromptManager, RepositoryError
 
 from .dialogs import InfoDialog, PromptVersionHistoryDialog
-from .workbench.workbench_window import WorkbenchModeDialog, WorkbenchWindow
+from .workbench import WorkbenchModeDialog, WorkbenchWindow
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from collections.abc import Callable

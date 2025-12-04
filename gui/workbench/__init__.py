@@ -6,8 +6,9 @@ Updates:
 
 from __future__ import annotations
 
+from .dialogs import WorkbenchMode, WorkbenchModeDialog
 from .session import WorkbenchExecutionRecord, WorkbenchSession, WorkbenchVariable
-from .workbench_window import WorkbenchMode, WorkbenchModeDialog, WorkbenchWindow
+from .workbench_window import WorkbenchWindow
 
 __all__ = [
     "WorkbenchExecutionRecord",
