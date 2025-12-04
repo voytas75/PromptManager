@@ -2,6 +2,14 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.22.0] - 2025-12-04
+
+### Added
+
+- Introduced prompt chain data models, repository storage, and a PromptManager mixin so multi-step workflows can sequence prompts with JSON-schema validated variables, per-step history logging, and notification tracking.
+- Added `prompt-chain-list`, `prompt-chain-show`, `prompt-chain-apply`, and `prompt-chain-run` CLI commands to manage chain definitions from JSON files, inspect step wiring, and execute chains with inline or file-provided variables.
+- Updated README and developer guide with prompt chaining guidance, including JSON templates and feature overviews, ensuring teams can deploy the new automation workflow without reading code.
+
 ## [0.21.0] - 2025-12-03
 
 ### Added
