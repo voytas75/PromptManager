@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Mapping
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -450,6 +451,8 @@ class PromptChainManagerDialog(QDialog):
             variables = {}
 
         indicator = ProcessingIndicator(self, f"Running '{chain.name}'…", title="Prompt Chain")
+        previous_status = self._detail_status.text()
+        self._detail_status.setText(f"Running '{chain.name}'…")
         try:
             result = indicator.run(
                 self._manager.run_prompt_chain,
@@ -458,10 +461,15 @@ class PromptChainManagerDialog(QDialog):
             )
         except PromptChainExecutionError as exc:
             QMessageBox.critical(self, "Chain failed", str(exc))
+            self._detail_status.setText(previous_status)
             return
         except PromptChainError as exc:
             QMessageBox.critical(self, "Unable to run chain", str(exc))
+            self._detail_status.setText(previous_status)
             return
+        else:
+            timestamp = datetime.now().strftime("%H:%M:%S")  # noqa: DTZ005
+            self._detail_status.setText(f"Last run succeeded at {timestamp}")
         self._display_run_result(result)
         show_toast(self, f"Chain '{chain.name}' completed.")
 
