@@ -1,6 +1,7 @@
 """Coordinate prompt execution, streaming, and chat workspace logic.
 
 Updates:
+  v0.1.2 - 2025-12-04 - Surface web context source counts before each workspace result.
   v0.1.1 - 2025-12-04 - Add optional web search enrichment controlled by a UI toggle.
   v0.1.0 - 2025-11-30 - Extract execution and chat orchestration from main window.
 """
@@ -122,6 +123,9 @@ class ExecutionController:
         self._speak_result_button_stop_icon = button_style.standardIcon(QStyle.SP_MediaStop)
         self._speak_result_button.setCheckable(True)
         self._web_search_warning_shown = False
+        self._last_web_context_sources = 0
+        self._last_web_context_provider: str | None = None
+        self._web_context_preface = ""
 
         self._streaming_in_progress = False
         self._stream_prompt_id: UUID | None = None
@@ -405,6 +409,7 @@ class ExecutionController:
         self._share_result_button.setEnabled(False)
         self._speak_result_button.setEnabled(False)
         self._reset_chat_session()
+        self._set_web_context_summary(0, None)
 
     def abort_streaming(self) -> None:
         """Stop any in-flight streaming run without marking it successful."""
@@ -423,7 +428,17 @@ class ExecutionController:
             return True
         return checkbox.isChecked()
 
+    def _set_web_context_summary(self, count: int, provider_label: str | None) -> None:
+        safe_count = max(0, int(count))
+        provider_name = (provider_label or "").strip()
+        heading = f"{provider_name.title()} context" if provider_name else "Web context"
+        plural = "source" if safe_count == 1 else "sources"
+        self._last_web_context_sources = safe_count
+        self._last_web_context_provider = provider_name.title() if provider_name else None
+        self._web_context_preface = f"{heading} ({safe_count} {plural} added).\n\n"
+
     def _maybe_enrich_request(self, prompt: Prompt, request_text: str) -> str:
+        self._set_web_context_summary(0, None)
         if not request_text or not self._web_search_enabled():
             return request_text
         service = getattr(self._manager, "web_search_service", None)
@@ -455,6 +470,7 @@ class ExecutionController:
         if not context_lines:
             return request_text
         provider_label = result.provider.strip().title() if result.provider else "Web search"
+        self._set_web_context_summary(len(context_lines), provider_label)
         context_block = "\n".join(context_lines)
         return (
             f"{provider_label} findings:\n"
@@ -500,7 +516,7 @@ class ExecutionController:
         }
         self._result_label.setText(f"Streaming — {prompt.name}")
         self._result_meta.setText("Receiving response…")
-        self._set_result_text_content("")
+        self._set_result_text_content(self._web_context_preface)
         self._copy_result_button.setEnabled(False)
         self._copy_result_to_text_window_button.setEnabled(False)
         self._save_button.setEnabled(False)
@@ -558,7 +574,8 @@ class ExecutionController:
             executed_at = history_entry.executed_at.astimezone()
             meta_parts.append(f"Logged: {executed_at.strftime('%Y-%m-%d %H:%M:%S %Z')}")
         self._result_meta.setText(" | ".join(meta_parts))
-        response_text = outcome.result.response_text or ""
+        response_body = outcome.result.response_text or ""
+        response_text = f"{self._web_context_preface}{response_body}".rstrip()
         self._set_result_text_content(response_text)
         self._result_tabs.setCurrentIndex(0)
         has_response = bool(response_text)
