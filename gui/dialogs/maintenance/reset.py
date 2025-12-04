@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -27,6 +28,7 @@ from core import PromptManagerError
 class ResetMaintenanceMixin:
     """Provide snapshot creation and destructive reset routines."""
 
+    _manager: Any
     _reset_log_view: QPlainTextEdit
 
     def _build_reset_tab(self, parent: QWidget) -> QWidget:

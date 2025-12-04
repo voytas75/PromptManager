@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -38,6 +38,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
 class CatalogueMaintenanceMixin:
     """Provide catalogue overview and metadata generation helpers."""
 
+    _manager: Any
     _stats_labels: dict[str, QLabel]
     _log_view: QPlainTextEdit
     _category_table: QTableWidget

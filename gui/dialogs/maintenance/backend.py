@@ -7,6 +7,7 @@ Updates:
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -24,6 +25,7 @@ from core import PromptManagerError, RepositoryError
 class BackendMaintenanceMixin:
     """Provide backend inspection and maintenance utilities."""
 
+    _manager: Any
     _redis_status_label: QLabel
     _redis_connection_label: QLabel
     _redis_stats_view: QPlainTextEdit
