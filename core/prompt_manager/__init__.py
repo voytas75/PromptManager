@@ -1,6 +1,7 @@
 """Prompt Manager package façade and orchestration layer.
 
 Updates:
+  v0.14.18 - 2025-12-04 - Remove stale transitional NOTE block.
   v0.14.17 - 2025-12-03 - Extract user state bootstrap into dedicated mixin.
   v0.14.16 - 2025-12-03 - Extract backend bootstrap and LiteLLM wiring into mixins.
   v0.14.15 - 2025-12-03 - Move runtime lifecycle helpers into dedicated mixin module.
@@ -22,15 +23,6 @@ from typing import TYPE_CHECKING, Any
 import chromadb as _chromadb
 from chromadb.errors import ChromaError
 
-# ---------------------------------------------------------------------------
-# NOTE: Transitional refactor
-# ---------------------------
-# This module is in the process of being split into a dedicated package
-# `core.prompt_manager` as part of the ongoing modularisation effort
-# (see AGENTS.md guidelines – KISS, DRY, maintainability).  Common exception
-# classes have been migrated to ``core.exceptions`` so that they can be shared
-# across sub‑modules once the split is complete.
-# ---------------------------------------------------------------------------
 from models.prompt_model import UserProfile
 
 from ..exceptions import (
