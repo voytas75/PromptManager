@@ -40,6 +40,8 @@ export PROMPT_MANAGER_WEB_SEARCH_PROVIDER="exa"
 export PROMPT_MANAGER_EXA_API_KEY="exa_***"
 # Optional: disable streaming playback if your platform struggles with simultaneous read/write
 # export PROMPT_MANAGER_LITELLM_TTS_STREAM="false"
+# Optional: keep share links in clipboard only
+# export PROMPT_MANAGER_AUTO_OPEN_SHARE_LINKS="false"
 
 # 2. Validate configuration and services
 python -m main --no-gui --print-settings

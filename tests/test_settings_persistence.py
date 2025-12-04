@@ -84,3 +84,19 @@ def test_persist_settings_to_config_omits_exa_api_key(tmp_path, monkeypatch):
     data = json.loads(Path("config/config.json").read_text(encoding="utf-8"))
     assert "exa_api_key" not in data
     assert data["web_search_provider"] == "exa"
+
+
+def test_persist_settings_to_config_auto_open_flag(tmp_path, monkeypatch):
+    """Write the share auto-open flag only when disabled."""
+
+    monkeypatch.chdir(tmp_path)
+
+    from config.persistence import persist_settings_to_config
+
+    persist_settings_to_config({"auto_open_share_links": False})
+    data = json.loads(Path("config/config.json").read_text(encoding="utf-8"))
+    assert data["auto_open_share_links"] is False
+
+    persist_settings_to_config({"auto_open_share_links": True})
+    data = json.loads(Path("config/config.json").read_text(encoding="utf-8"))
+    assert "auto_open_share_links" not in data

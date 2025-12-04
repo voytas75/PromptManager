@@ -1,6 +1,7 @@
 """Settings dialog for configuring Prompt Manager runtime options.
 
 Updates:
+  v0.2.13 - 2025-12-04 - Add auto-open share link preference toggle.
   v0.2.12 - 2025-12-04 - Add web search integrations tab and Exa API key field.
   v0.2.11 - 2025-12-03 - Add LiteLLM TTS model configuration field.
   v0.2.10 - 2025-11-29 - Wrap quick action/parameter parsing for Ruff line length.
@@ -87,6 +88,7 @@ class SettingsDialog(QDialog):
         prompt_templates: dict[str, str] | None = None,
         web_search_provider: str | None = None,
         exa_api_key: str | None = None,
+        auto_open_share_links: bool | None = None,
     ) -> None:
         """Build the settings UI with existing runtime values pre-populated."""
         super().__init__(parent)
@@ -153,6 +155,8 @@ class SettingsDialog(QDialog):
         self._prompt_template_initials: dict[str, str] = {}
         self._web_search_provider_combo: QComboBox | None = None
         self._exa_api_key_input: QLineEdit | None = None
+        self._auto_open_share_links = True if auto_open_share_links is None else bool(auto_open_share_links)
+        self._share_auto_open_checkbox: QCheckBox | None = None
         provided_templates = prompt_templates or {}
         for key in PROMPT_TEMPLATE_KEYS:
             incoming = provided_templates.get(key)
@@ -243,6 +247,14 @@ class SettingsDialog(QDialog):
         self._stream_checkbox = QCheckBox("Enable streaming responses", litellm_tab)
         self._stream_checkbox.setChecked(self._litellm_stream)
         litellm_form.addRow("LiteLLM streaming", self._stream_checkbox)
+
+        share_checkbox = QCheckBox(
+            "Open share links in the default browser after upload",
+            litellm_tab,
+        )
+        share_checkbox.setChecked(self._auto_open_share_links)
+        self._share_auto_open_checkbox = share_checkbox
+        litellm_form.addRow("Share links", share_checkbox)
 
         tab_widget.addTab(litellm_tab, "LiteLLM")
 
@@ -625,6 +637,11 @@ class SettingsDialog(QDialog):
             "prompt_templates": self._prompt_templates_value,
             "web_search_provider": provider_choice,
             "exa_api_key": exa_api_key,
+            "auto_open_share_links": (
+                bool(self._share_auto_open_checkbox.isChecked())
+                if self._share_auto_open_checkbox
+                else True
+            ),
         }
 
     def _reset_prompt_template(self, key: str) -> None:

@@ -1,6 +1,7 @@
 """Settings management utilities for Prompt Manager configuration.
 
 Updates:
+  v0.5.8 - 2025-12-04 - Add auto-open share link preference with GUI binding.
   v0.5.7 - 2025-12-04 - Load .env secrets so web search keys persist like LiteLLM keys.
   v0.5.6 - 2025-12-04 - Add Exa web search provider configuration.
   v0.5.5 - 2025-12-03 - Add LiteLLM TTS streaming configuration toggle.
@@ -11,7 +12,6 @@ Updates:
   v0.5.0 - 2025-11-22 - Added structure-only prompt refinement routing.
   v0.4.9 - 2025-12-06 - Required LiteLLM-backed embeddings with UI fields.
   v0.4.8 - 2025-12-03 - Persisted chat colour palette overrides.
-  v0.4.7 - 2025-11-05 - Added theme mode and chat appearance options.
 """
 
 from __future__ import annotations
@@ -266,6 +266,10 @@ class PromptManagerSettings(BaseSettings):
         default_factory=ChatColors,
         description="Colour palette for chat bubbles.",
     )
+    auto_open_share_links: bool = Field(
+        default=True,
+        description="Open share URLs in the default browser after successful uploads.",
+    )
     embedding_backend: str = Field(
         default=DEFAULT_EMBEDDING_BACKEND,
         description="Embedding backend to use (deterministic, LiteLLM, sentence-transformers).",
@@ -342,6 +346,12 @@ class PromptManagerSettings(BaseSettings):
                 "prompt_templates": ["PROMPT_TEMPLATES", "prompt_templates"],
                 "web_search_provider": ["WEB_SEARCH_PROVIDER", "web_search_provider"],
                 "exa_api_key": ["EXA_API_KEY", "exa_api_key"],
+                "auto_open_share_links": [
+                    "AUTO_OPEN_SHARE_LINKS",
+                    "auto_open_share_links",
+                    "SHARE_AUTO_OPEN_BROWSER",
+                    "share_auto_open_browser",
+                ],
             },
         },
     )
@@ -666,6 +676,12 @@ class PromptManagerSettings(BaseSettings):
                 "litellm_stream": ["LITELLM_STREAM", "litellm_stream"],
                 "web_search_provider": ["WEB_SEARCH_PROVIDER", "web_search_provider"],
                 "exa_api_key": ["EXA_API_KEY", "exa_api_key"],
+                "auto_open_share_links": [
+                    "AUTO_OPEN_SHARE_LINKS",
+                    "auto_open_share_links",
+                    "SHARE_AUTO_OPEN_BROWSER",
+                    "share_auto_open_browser",
+                ],
             }
             for field, keys in mapping.items():
                 for key in keys:
@@ -773,6 +789,7 @@ class PromptManagerSettings(BaseSettings):
                     "theme_mode",
                     "prompt_templates",
                     "web_search_provider",
+                    "auto_open_share_links",
                 ):
                     if key in data_dict:
                         mapped[key] = data_dict[key]

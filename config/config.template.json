@@ -17,5 +17,6 @@
   },
   "embedding_backend": "litellm",
   "embedding_model": "text-embedding-3-large",
-  "web_search_provider": "exa"
+  "web_search_provider": "exa",
+  "auto_open_share_links": true
 }

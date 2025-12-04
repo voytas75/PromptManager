@@ -34,6 +34,7 @@ def print_settings_summary(settings: PromptManagerSettings) -> None:
     embedding_model = getattr(settings, "embedding_model", None)
     web_search_provider = getattr(settings, "web_search_provider", None)
     exa_api_key = getattr(settings, "exa_api_key", None)
+    auto_open_share_links = getattr(settings, "auto_open_share_links", True)
 
     db_path_desc = describe_path(
         settings.db_path,
@@ -89,6 +90,10 @@ def print_settings_summary(settings: PromptManagerSettings) -> None:
             "-----------",
             f"Provider: {web_search_provider or 'disabled'}",
             f"Exa API key: {mask_secret(exa_api_key)}",
+            "",
+            "Sharing",
+            "--------",
+            f"Auto-open share links: {'yes' if auto_open_share_links else 'no'}",
         ]
     )
     print("\n".join(lines))

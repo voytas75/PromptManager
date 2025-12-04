@@ -49,6 +49,10 @@ def _clear_litellm_env(monkeypatch: MonkeyPatch) -> None:
         "PROMPT_MANAGER_WEB_SEARCH_PROVIDER",
         "PROMPT_MANAGER_EXA_API_KEY",
         "EXA_API_KEY",
+        "PROMPT_MANAGER_AUTO_OPEN_SHARE_LINKS",
+        "AUTO_OPEN_SHARE_LINKS",
+        "PROMPT_MANAGER_SHARE_AUTO_OPEN_BROWSER",
+        "SHARE_AUTO_OPEN_BROWSER",
     ]
     for var in vars_to_clear:
         monkeypatch.delenv(var, raising=False)
@@ -249,6 +253,39 @@ def test_exa_api_key_from_dotenv_alias(monkeypatch: MonkeyPatch, tmp_path: Path)
 
     assert settings.exa_api_key == "exa-alias"
     assert settings.web_search_provider == "exa"
+
+
+def test_auto_open_share_links_default(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    """Enable browser auto-open by default when configuration is absent."""
+
+    _clear_litellm_env(monkeypatch)
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    config_path = config_dir / "config.json"
+    config_path.write_text("{}", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
+
+    settings = load_settings()
+
+    assert settings.auto_open_share_links is True
+
+
+def test_auto_open_share_links_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    """Override auto-open preference via environment variables."""
+
+    _clear_litellm_env(monkeypatch)
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    config_path = config_dir / "config.json"
+    config_path.write_text("{}", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
+    monkeypatch.setenv("PROMPT_MANAGER_AUTO_OPEN_SHARE_LINKS", "false")
+
+    settings = load_settings()
+
+    assert settings.auto_open_share_links is False
 
 
 def test_web_search_provider_from_json(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:

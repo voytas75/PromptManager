@@ -1,6 +1,7 @@
 """Centralised share-provider orchestration for prompt and result payloads.
 
 Updates:
+  v0.1.1 - 2025-12-04 - Auto-open share URLs based on runtime preference.
   v0.1.0 - 2025-11-30 - Introduce ShareController to manage provider menus and execution.
 """
 
@@ -8,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
+import webbrowser
 
 from PySide6.QtCore import QObject
 from PySide6.QtGui import QGuiApplication
@@ -36,6 +38,7 @@ class ShareController(QObject):
         status_callback: Callable[[str, int], None],
         error_callback: Callable[[str, str], None],
         usage_logger: IntentUsageLogger,
+        preference_supplier: Callable[[], bool] | None = None,
     ) -> None:
         """Initialise share helpers and callbacks required for feedback."""
         super().__init__(parent)
@@ -45,6 +48,7 @@ class ShareController(QObject):
         self._error_callback = self._ensure_callable(error_callback, "error_callback")
         self._usage_logger = usage_logger
         self._providers: dict[str, ShareProvider] = {}
+        self._should_auto_open = preference_supplier or (lambda: True)
 
     def register_provider(self, provider: ShareProvider) -> None:
         """Store a share provider so it can be offered to users."""
@@ -122,7 +126,19 @@ class ShareController(QObject):
                 f"Delete this share later via: {result.delete_url}",
                 10000,
             )
+        self._open_share_url(result.url)
         return True
+
+    def _open_share_url(self, url: str) -> None:
+        if not url or not self._should_auto_open():
+            return
+        try:
+            opened = webbrowser.open(url, new=2)
+        except Exception:
+            self._toast_callback("Share link copied; unable to launch browser automatically.")
+            return
+        if not opened:
+            self._toast_callback("Share link copied; open it manually in your browser.")
 
     @staticmethod
     def _ensure_callable(

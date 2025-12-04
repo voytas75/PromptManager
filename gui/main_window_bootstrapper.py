@@ -129,6 +129,9 @@ class MainWindowBootstrapper:
             status_callback=self._status_callback,
             error_callback=self._error_callback,
             usage_logger=usage_logger,
+            preference_supplier=lambda: bool(
+                runtime_settings.get("auto_open_share_links", True)
+            ),
         )
         share_workflow = ShareWorkflowCoordinator(
             share_controller,

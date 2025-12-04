@@ -1,6 +1,7 @@
 """Runtime settings helpers for Prompt Manager GUI.
 
 Updates:
+  v0.1.2 - 2025-12-04 - Persist auto-open share preference across restarts.
   v0.1.1 - 2025-12-04 - Track web search provider/runtime secrets.
   v0.1.0 - 2025-12-01 - Extracted runtime settings snapshot + apply helpers.
 """
@@ -98,6 +99,9 @@ class RuntimeSettingsService:
             ),
             "web_search_provider": settings.web_search_provider if settings else None,
             "exa_api_key": settings.exa_api_key if settings else None,
+            "auto_open_share_links": (
+                settings.auto_open_share_links if settings is not None else True
+            ),
         }
 
         config_path = Path("config/config.json")
@@ -175,6 +179,12 @@ class RuntimeSettingsService:
                 theme_value = data.get("theme_mode")
                 if isinstance(theme_value, str) and theme_value.strip():
                     runtime["theme_mode"] = theme_value.strip()
+                share_auto_open = data.get("auto_open_share_links")
+                if (
+                    runtime.get("auto_open_share_links") is None
+                    and isinstance(share_auto_open, bool)
+                ):
+                    runtime["auto_open_share_links"] = share_auto_open
         raw_colour = runtime.get("chat_user_bubble_color")
         if isinstance(raw_colour, str):
             candidate_colour = QColor(raw_colour)
@@ -220,6 +230,7 @@ class RuntimeSettingsService:
             "litellm_tts_stream",
             "web_search_provider",
             "exa_api_key",
+            "auto_open_share_links",
         )
         for key in simple_keys:
             if key in updates:
@@ -359,6 +370,7 @@ class RuntimeSettingsService:
                 "theme_mode": runtime.get("theme_mode"),
                 "prompt_templates": runtime.get("prompt_templates"),
                 "web_search_provider": runtime.get("web_search_provider"),
+                "auto_open_share_links": runtime.get("auto_open_share_links"),
             }
         )
 
@@ -373,6 +385,10 @@ class RuntimeSettingsService:
             settings_model.litellm_tts_model = updates.get("litellm_tts_model")
             settings_model.web_search_provider = updates.get("web_search_provider")
             settings_model.exa_api_key = updates.get("exa_api_key")
+            if "auto_open_share_links" in updates:
+                settings_model.auto_open_share_links = bool(
+                    updates.get("auto_open_share_links")
+                )
             if "litellm_tts_stream" in updates:
                 settings_model.litellm_tts_stream = bool(updates.get("litellm_tts_stream"))
             settings_model.litellm_workflow_models = cleaned_workflow_models

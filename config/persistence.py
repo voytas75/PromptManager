@@ -1,6 +1,7 @@
 """Helpers for persisting runtime configuration without Qt dependencies.
 
 Updates:
+  v0.2.9 - 2025-12-04 - Persist share auto-open preference when disabled.
   v0.2.8 - 2025-12-04 - Guard Exa API keys and persist web search provider selection.
   v0.2.7 - 2025-12-03 - Persist LiteLLM TTS streaming flag.
   v0.2.6 - 2025-12-03 - Persist LiteLLM TTS model selection for voice playback.
@@ -166,6 +167,11 @@ def persist_settings_to_config(updates: dict[str, object | None]) -> None:
             if bool(value):
                 value = None
             elif value is not None:
+                value = False
+        if key == "auto_open_share_links":
+            if value is None or bool(value):
+                value = None
+            else:
                 value = False
         if value is not None:
             config_data[key] = value
