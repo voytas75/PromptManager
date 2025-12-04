@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QHeaderView,
+    QLabel,
     QLineEdit,
     QMessageBox,
     QPlainTextEdit,
@@ -244,6 +245,13 @@ class PromptChainStepDialog(QDialog):
 
         self._input_template = QPlainTextEdit(self)
         layout.addRow("Input template", self._input_template)
+        self._input_hint = QLabel(
+            "Jinja-style template that receives chain variables (e.g. {{ source_text }})",
+            self,
+        )
+        self._input_hint.setWordWrap(True)
+        self._input_hint.setObjectName("inputTemplateHint")
+        layout.addRow("", self._input_hint)
 
         self._output_variable = QLineEdit(self)
         layout.addRow("Output variable", self._output_variable)
