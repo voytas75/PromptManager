@@ -2,10 +2,6 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
-# Changelog
-
-All notable changes to **Prompt Manager** will be documented in this file.
-
 ## [0.21.0] - 2025-12-03
 
 ### Added
