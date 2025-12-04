@@ -154,7 +154,7 @@ Every log entry also stores structured context metadata (prompt snapshot, execut
 
 | Command | Purpose |
 | --- | --- |
-| `python -m main catalog-export <path> [--format json|yaml]` | Export prompts; YAML requires PyYAML (already bundled). |
+| `python -m main catalog-export <path> [--format json\|yaml]` | Export prompts; YAML requires PyYAML (already bundled). |
 | `python -m main suggest "search query"` | Run semantic retrieval and print top matches with intent metadata. |
 | `python -m main usage-report [--path <file>]` | Summarize anonymized GUI analytics (counts, intents, recommendations). |
 | `python -m main history-analytics [--window-days N --limit M --trend-window K]` | Display execution success rates, durations, and ratings for recent prompts. |
