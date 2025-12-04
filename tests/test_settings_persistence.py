@@ -66,3 +66,21 @@ def test_persist_settings_to_config_ignores_default_palette(tmp_path, monkeypatc
 
     data = json.loads(Path("config/config.json").read_text(encoding="utf-8"))
     assert "chat_colors" not in data
+
+
+def test_persist_settings_to_config_omits_exa_api_key(tmp_path, monkeypatch):
+    """Never persist Exa API credentials but keep provider selection."""
+    monkeypatch.chdir(tmp_path)
+
+    from config.persistence import persist_settings_to_config
+
+    persist_settings_to_config(
+        {
+            "exa_api_key": "exa-secret",
+            "web_search_provider": "exa",
+        }
+    )
+
+    data = json.loads(Path("config/config.json").read_text(encoding="utf-8"))
+    assert "exa_api_key" not in data
+    assert data["web_search_provider"] == "exa"

@@ -45,6 +45,9 @@ def _clear_litellm_env(monkeypatch: MonkeyPatch) -> None:
         "LITELLM_WORKFLOW_MODELS",
         "LITELLM_TTS_MODEL",
         "LITELLM_TTS_STREAM",
+        "PROMPT_MANAGER_WEB_SEARCH_PROVIDER",
+        "PROMPT_MANAGER_EXA_API_KEY",
+        "EXA_API_KEY",
     ]
     for var in vars_to_clear:
         monkeypatch.delenv(var, raising=False)
@@ -133,7 +136,32 @@ def test_json_with_litellm_api_key_is_ignored(
     assert settings.litellm_api_base == "https://azure.example.com"
     assert settings.litellm_drop_params is None
     assert settings.litellm_tts_model is None
-    assert "Ignoring LiteLLM secret key" in caplog.text
+    assert "Ignoring secret key" in caplog.text
+
+
+def test_json_with_exa_api_key_is_ignored(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+    caplog: LogCaptureFixture,
+) -> None:
+    """Ensure Exa API keys present in JSON configs are ignored."""
+    _clear_litellm_env(monkeypatch)
+    config_payload = {
+        "web_search_provider": "exa",
+        "exa_api_key": "json-secret",
+    }
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    config_path = config_dir / "config.json"
+    config_path.write_text(json.dumps(config_payload), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    with caplog.at_level(logging.WARNING, logger="prompt_manager.settings"):
+        settings = load_settings()
+
+    assert settings.web_search_provider == "exa"
+    assert settings.exa_api_key is None
+    assert "Ignoring secret key" in caplog.text
 
 
 def test_litellm_settings_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
@@ -164,6 +192,48 @@ def test_litellm_settings_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> 
     assert settings.litellm_workflow_models == {"prompt_execution": "inference"}
     assert settings.litellm_tts_model == "openai/tts-1"
     assert settings.litellm_tts_stream is False
+
+
+def test_exa_api_key_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    """Load Exa API credentials from environment variables."""
+    _clear_litellm_env(monkeypatch)
+    tmp_config = tmp_path / "config.json"
+    tmp_config.write_text("{}", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(tmp_config))
+    monkeypatch.setenv("PROMPT_MANAGER_EXA_API_KEY", "exa-secret")
+
+    settings = load_settings()
+
+    assert settings.exa_api_key == "exa-secret"
+    assert settings.web_search_provider == "exa"
+
+
+def test_web_search_provider_from_json(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    """Load the web search provider from JSON configuration."""
+    _clear_litellm_env(monkeypatch)
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps({"web_search_provider": "exa"}), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
+
+    settings = load_settings()
+
+    assert settings.web_search_provider == "exa"
+
+
+def test_web_search_provider_disable_via_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    """Disable the provider by setting the environment variable to an off value."""
+    _clear_litellm_env(monkeypatch)
+    tmp_config = tmp_path / "config.json"
+    tmp_config.write_text("{}", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(tmp_config))
+    monkeypatch.setenv("PROMPT_MANAGER_WEB_SEARCH_PROVIDER", "disabled")
+
+    settings = load_settings()
+
+    assert settings.web_search_provider is None
 
 
 def test_litellm_tts_model_from_json(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:

@@ -1,6 +1,7 @@
 """Factories for constructing PromptManager instances from validated settings.
 
 Updates:
+  v0.7.7 - 2025-12-04 - Wire web search service creation into manager factory.
   v0.7.6 - 2025-11-30 - Remove docstring padding for Ruff compliance.
   v0.7.5 - 2025-11-29 - Move config imports behind type checks and wrap long strings.
   v0.7.4 - 2025-11-24 - Wire LiteLLM category suggestion helper into manager construction.
@@ -34,6 +35,7 @@ from .prompt_engineering import PromptEngineer
 from .prompt_manager import NameGenerationError, PromptCacheError, PromptManager
 from .repository import PromptRepository
 from .scenario_generation import LiteLLMScenarioGenerator
+from .web_search import ExaWebSearchProvider, WebSearchService
 
 try:  # pragma: no cover - redis optional dependency
     import redis
@@ -89,6 +91,17 @@ def _resolve_embedding_components(
     if embedding_provider is not None:
         return resolved_function, embedding_provider
     return resolved_function, EmbeddingProvider(resolved_function)
+
+
+def _build_web_search_service(settings: PromptManagerSettings) -> WebSearchService:
+    """Return a WebSearchService configured from settings."""
+    provider_slug = getattr(settings, "web_search_provider", None)
+    provider = None
+    if provider_slug == "exa":
+        api_key = getattr(settings, "exa_api_key", None)
+        if api_key:
+            provider = ExaWebSearchProvider(api_key=api_key)
+    return WebSearchService(provider)
 
 
 def build_prompt_manager(
@@ -223,6 +236,7 @@ def build_prompt_manager(
         reasoning_effort=settings.litellm_reasoning_effort,
         stream=settings.litellm_stream,
     )
+    web_search_service = _build_web_search_service(settings)
 
     manager_kwargs: dict[str, Any] = {
         "chroma_path": str(settings.chroma_path),
@@ -244,6 +258,7 @@ def build_prompt_manager(
         "intent_classifier": intent_classifier,
         "notification_center": notification_center or default_notification_center,
         "prompt_templates": prompt_template_overrides or None,
+        "web_search_service": web_search_service,
     }
     if scenario_generator is not None:
         manager_kwargs["scenario_generator"] = scenario_generator

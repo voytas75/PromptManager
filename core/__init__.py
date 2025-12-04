@@ -46,6 +46,9 @@ from .exceptions import (
     PromptShareError,
     ScenarioGenerationError,
     ShareProviderError,
+    WebSearchError,
+    WebSearchProviderError,
+    WebSearchUnavailable,
 )
 from .execution import CodexExecutionResult, CodexExecutor, ExecutionError
 from .factory import build_prompt_manager
@@ -104,6 +107,7 @@ from .prompt_manager import (
 )
 from .repository import PromptRepository, RepositoryError, RepositoryNotFoundError
 from .scenario_generation import LiteLLMScenarioGenerator
+from .web_search import ExaWebSearchProvider, WebSearchService
 
 __all__ = [
     "PromptManager",
@@ -119,6 +123,9 @@ __all__ = [
     "PromptVersionNotFoundError",
     "PromptShareError",
     "ShareProviderError",
+    "WebSearchError",
+    "WebSearchProviderError",
+    "WebSearchUnavailable",
     "ResponseStyleError",
     "ResponseStyleNotFoundError",
     "ResponseStyleStorageError",
@@ -162,6 +169,8 @@ __all__ = [
     "LiteLLMDescriptionGenerator",
     "LiteLLMCategoryGenerator",
     "LiteLLMScenarioGenerator",
+    "WebSearchService",
+    "ExaWebSearchProvider",
     "CodexExecutor",
     "CodexExecutionResult",
     "ExecutionError",

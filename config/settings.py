@@ -1,6 +1,7 @@
 """Settings management utilities for Prompt Manager configuration.
 
 Updates:
+  v0.5.6 - 2025-12-04 - Add Exa web search provider configuration.
   v0.5.5 - 2025-12-03 - Add LiteLLM TTS streaming configuration toggle.
   v0.5.4 - 2025-12-03 - Add LiteLLM TTS model configuration for voice playback.
   v0.5.3 - 2025-11-30 - Fix validator docstring spacing for lint compliance.
@@ -175,6 +176,15 @@ class PromptManagerSettings(BaseSettings):
             "'fast' or 'inference'."
         ),
     )
+    web_search_provider: Literal["exa"] | None = Field(
+        default="exa",
+        description="Configured web search provider slug (set empty to disable).",
+    )
+    exa_api_key: str | None = Field(
+        default=None,
+        description="API key used for Exa-powered web search features.",
+        repr=False,
+    )
     quick_actions: list[dict[str, object]] | None = Field(
         default=None,
         description="Optional list of custom quick action definitions for the command palette.",
@@ -279,6 +289,8 @@ class PromptManagerSettings(BaseSettings):
                 "theme_mode": ["THEME_MODE", "theme_mode"],
                 "chat_user_bubble_color": ["CHAT_USER_BUBBLE_COLOR", "chat_user_bubble_color"],
                 "prompt_templates": ["PROMPT_TEMPLATES", "prompt_templates"],
+                "web_search_provider": ["WEB_SEARCH_PROVIDER", "web_search_provider"],
+                "exa_api_key": ["EXA_API_KEY", "exa_api_key"],
             },
         },
     )
@@ -343,6 +355,7 @@ class PromptManagerSettings(BaseSettings):
         "litellm_tts_model",
         "embedding_model",
         "embedding_device",
+        "exa_api_key",
         mode="before",
     )
     def _strip_strings(cls, value: str | None) -> str | None:
@@ -363,6 +376,17 @@ class PromptManagerSettings(BaseSettings):
         if backend in {"sentence-transformers", "sentence_transformers", "st"}:
             return "sentence-transformers"
         raise ValueError(f"Unsupported embedding backend '{value}'")
+
+    @field_validator("web_search_provider", mode="before")
+    def _normalise_web_search_provider(cls, value: object | None) -> str | None:
+        if value in (None, "", False):  # type: ignore[comparison-overlap]
+            return None
+        text = str(value).strip().lower()
+        if text in {"none", "disabled", "off"}:
+            return None
+        if text != "exa":
+            raise ValueError("web_search_provider must be set to 'exa' or left empty")
+        return "exa"
 
     @field_validator("theme_mode", mode="before")
     def _normalise_theme_mode(cls, value: str | None) -> str:
@@ -578,6 +602,8 @@ class PromptManagerSettings(BaseSettings):
                     "litellm_tts_stream",
                 ],
                 "litellm_stream": ["LITELLM_STREAM", "litellm_stream"],
+                "web_search_provider": ["WEB_SEARCH_PROVIDER", "web_search_provider"],
+                "exa_api_key": ["EXA_API_KEY", "exa_api_key"],
             }
             for field, keys in mapping.items():
                 for key in keys:
@@ -644,6 +670,8 @@ class PromptManagerSettings(BaseSettings):
                 disallowed_secret_keys = {
                     "litellm_api_key",
                     "AZURE_OPENAI_API_KEY",
+                    "exa_api_key",
+                    "EXA_API_KEY",
                 }
                 removed_secrets = [
                     key
@@ -652,7 +680,7 @@ class PromptManagerSettings(BaseSettings):
                 ]
                 if removed_secrets:
                     logger.warning(
-                        "Ignoring LiteLLM secret key(s) %s in configuration file %s; "
+                        "Ignoring secret key(s) %s in configuration file %s; "
                         "set credentials via environment variables instead.",
                         ", ".join(sorted(removed_secrets)),
                         path,
@@ -680,6 +708,7 @@ class PromptManagerSettings(BaseSettings):
                     "chat_colors",
                     "theme_mode",
                     "prompt_templates",
+                    "web_search_provider",
                 ):
                     if key in data_dict:
                         mapped[key] = data_dict[key]

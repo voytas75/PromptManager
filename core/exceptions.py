@@ -12,6 +12,7 @@ callers to catch a single base class for any manager-related failure while
 still distinguishing individual error categories when needed.
 
 Updates:
+  v0.21.0 - 2025-12-04 - Add web search exception hierarchy.
   v0.20.0 - 2025-12-04 - Add prompt chain exception hierarchy.
   v0.19.0 - 2025-12-02 - Centralise LiteLLM generation errors and category suggestion failures.
   v0.18.0 - 2025-11-22 - Add category exception hierarchy.
@@ -131,6 +132,18 @@ class PromptShareError(PromptManagerError):
 
 class ShareProviderError(PromptShareError):
     """Raised when a remote sharing provider rejects or fails a request."""
+
+
+class WebSearchError(PromptManagerError):
+    """Base class for external web search workflow failures."""
+
+
+class WebSearchUnavailable(WebSearchError):
+    """Raised when a web search provider is not configured."""
+
+
+class WebSearchProviderError(WebSearchError):
+    """Raised when a web search provider encounters an error."""
 
 
 class PromptChainError(PromptManagerError):

@@ -1,6 +1,7 @@
 """Prompt Manager package façade and orchestration layer.
 
 Updates:
+  v0.14.20 - 2025-12-04 - Wire optional web search service into the manager.
   v0.14.19 - 2025-12-04 - Group prompt chain exception imports for Ruff sorting.
   v0.14.18 - 2025-12-04 - Remove stale transitional NOTE block.
   v0.14.17 - 2025-12-03 - Extract user state bootstrap into dedicated mixin.
@@ -10,8 +11,7 @@ Updates:
   v0.14.13 - 2025-12-03 - Extract LiteLLM workflows and prompt refinement helpers into mixins.
   v0.14.12 - 2025-12-03 - Extract prompt CRUD, caching, and embedding APIs into mixin.
   v0.14.11 - 2025-12-03 - Extract versioning, diff, and fork APIs into mixin module.
-  v0.14.10 - 2025-12-03 - Move search and suggestion APIs into dedicated mixin.
-  pre-v0.14.10 - 2025-11-30 - Consolidated history covering releases v0.1.0–v0.14.9.
+  pre-v0.14.11 - 2025-11-30 - Consolidated history covering releases v0.1.0–v0.14.10.
 """
 
 from __future__ import annotations
@@ -67,6 +67,7 @@ from ..prompt_engineering import (
 )
 from ..repository import PromptRepository, RepositoryError, RepositoryNotFoundError
 from ..scenario_generation import LiteLLMScenarioGenerator  # noqa: TCH001
+from ..web_search import WebSearchService  # noqa: TCH001
 from .analytics import (
     AnalyticsMixin,
     CategoryHealth as _CategoryHealth,
@@ -120,7 +121,6 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from ..history_tracker import HistoryTracker
     from ..intent_classifier import IntentClassifier
     from ..notifications import NotificationCenter
-    from ..scenario_generation import LiteLLMScenarioGenerator
 else:  # pragma: no cover - typing fallback
     ClientAPI = Any  # type: ignore[assignment]
 
@@ -247,6 +247,7 @@ class PromptManager(
         user_profile: UserProfile | None = None,
         history_tracker: HistoryTracker | None = None,
         prompt_templates: Mapping[str, object] | None = None,
+        web_search_service: WebSearchService | None = None,
     ) -> None:
         """Initialise the manager with data backends.
 
@@ -278,6 +279,7 @@ class PromptManager(
             structure_prompt_engineer: Optional helper focusing on prompt structure tweaks.
             prompt_templates: Optional mapping of workflow identifiers to system prompt overrides.
             category_generator: Optional LiteLLM helper for suggesting prompt categories.
+            web_search_service: Optional service delegating to configured web search providers.
         """
         # Allow tests to supply repository directly; only require db_path when building one.
         if repository is None and db_path is None:
@@ -317,6 +319,8 @@ class PromptManager(
             history_tracker=history_tracker,
             user_profile=user_profile,
         )
+        self.web_search_service = web_search_service or WebSearchService()
+        self.web_search = self.web_search_service
 
     IntentSuggestions = _IntentSuggestions
     PromptVersionDiff = _PromptVersionDiff

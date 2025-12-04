@@ -1,6 +1,7 @@
 """Helpers for persisting runtime configuration without Qt dependencies.
 
 Updates:
+  v0.2.8 - 2025-12-04 - Guard Exa API keys and persist web search provider selection.
   v0.2.7 - 2025-12-03 - Persist LiteLLM TTS streaming flag.
   v0.2.6 - 2025-12-03 - Persist LiteLLM TTS model selection for voice playback.
   v0.2.5 - 2025-12-06 - Persist embedding backend/model selections and drop defaults.
@@ -118,7 +119,7 @@ def persist_settings_to_config(updates: dict[str, object | None]) -> None:
         except json.JSONDecodeError:
             config_data = {}
 
-    secret_keys = {"litellm_api_key"}
+    secret_keys = {"litellm_api_key", "exa_api_key"}
     for key, value in updates.items():
         if key in secret_keys:
             config_data.pop(key, None)

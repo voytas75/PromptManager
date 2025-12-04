@@ -1,6 +1,7 @@
 """Settings dialog for configuring Prompt Manager runtime options.
 
 Updates:
+  v0.2.12 - 2025-12-04 - Add web search integrations tab and Exa API key field.
   v0.2.11 - 2025-12-03 - Add LiteLLM TTS model configuration field.
   v0.2.10 - 2025-11-29 - Wrap quick action/parameter parsing for Ruff line length.
   v0.2.9 - 2025-11-28 - Persist dialog geometry between sessions.
@@ -9,12 +10,7 @@ Updates:
   v0.2.6 - 2025-11-05 - Add theme mode toggle to the appearance settings.
   v0.2.5 - 2025-11-05 - Add chat appearance controls to settings dialog.
   v0.2.4 - 2025-11-05 - Add LiteLLM routing matrix for fast vs inference models.
-  v0.2.3 - 2025-11-05 - Introduce LiteLLM inference model field and tabbed layout.
-  v0.2.2 - 2025-11-26 - Add LiteLLM streaming toggle to runtime settings UI.
-  v0.2.1 - 2025-11-17 - Remove catalogue path configuration; imports now require explicit selection.
-  v0.2.0 - 2025-11-16 - Apply palette-aware border styling to match main window chrome.
-  v0.1.1 - 2025-11-15 - Avoid persisting LiteLLM API secrets to disk.
-  v0.1.0 - 2025-11-04 - Initial settings dialog implementation.
+  pre-v0.2.4 - 2025-11-04 - Initial dialog history covering releases v0.1.0–v0.2.3.
 """
 
 from __future__ import annotations
@@ -89,6 +85,8 @@ class SettingsDialog(QDialog):
         theme_mode: str | None = None,
         chat_colors: dict[str, str] | None = None,
         prompt_templates: dict[str, str] | None = None,
+        web_search_provider: str | None = None,
+        exa_api_key: str | None = None,
     ) -> None:
         """Build the settings UI with existing runtime values pre-populated."""
         super().__init__(parent)
@@ -114,6 +112,9 @@ class SettingsDialog(QDialog):
         self._litellm_tts_model = litellm_tts_model or ""
         self._litellm_tts_stream = True if litellm_tts_stream is None else bool(litellm_tts_stream)
         self._litellm_stream = bool(litellm_stream)
+        provider_choice = (web_search_provider or "").strip().lower()
+        self._web_search_provider = provider_choice if provider_choice in {"exa"} else None
+        self._exa_api_key = exa_api_key or ""
         original_actions = [
             dict(entry) for entry in (quick_actions or []) if isinstance(entry, dict)
         ]
@@ -150,6 +151,8 @@ class SettingsDialog(QDialog):
         self._prompt_template_inputs: dict[str, QPlainTextEdit] = {}
         self._prompt_templates_value: dict[str, str] | None = None
         self._prompt_template_initials: dict[str, str] = {}
+        self._web_search_provider_combo: QComboBox | None = None
+        self._exa_api_key_input: QLineEdit | None = None
         provided_templates = prompt_templates or {}
         for key in PROMPT_TEMPLATE_KEYS:
             incoming = provided_templates.get(key)
@@ -302,6 +305,35 @@ class SettingsDialog(QDialog):
         routing_layout.addStretch(1)
 
         tab_widget.addTab(routing_tab, "Routing")
+
+        integrations_tab = QWidget(self)
+        integrations_form = QFormLayout(integrations_tab)
+        integrations_form.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
+
+        provider_combo = QComboBox(integrations_tab)
+        provider_combo.addItem("Disabled", userData=None)
+        provider_combo.addItem("Exa", userData="exa")
+        if self._web_search_provider == "exa":
+            provider_combo.setCurrentIndex(1)
+        else:
+            provider_combo.setCurrentIndex(0)
+        self._web_search_provider_combo = provider_combo
+        integrations_form.addRow("Web search provider", provider_combo)
+
+        exa_api_key_input = QLineEdit(self._exa_api_key, integrations_tab)
+        exa_api_key_input.setEchoMode(QLineEdit.Password)
+        exa_api_key_input.setPlaceholderText("exa_********************************")
+        self._exa_api_key_input = exa_api_key_input
+        integrations_form.addRow("Exa API key", exa_api_key_input)
+
+        integrations_hint = QLabel(
+            "Provider API keys remain in memory only; they are never written to configuration files.",
+            integrations_tab,
+        )
+        integrations_hint.setWordWrap(True)
+        integrations_form.addRow(integrations_hint)
+
+        tab_widget.addTab(integrations_tab, "Integrations")
 
         appearance_tab = QWidget(self)
         appearance_form = QFormLayout(appearance_tab)
@@ -565,6 +597,12 @@ class SettingsDialog(QDialog):
             choice = str(button.property("routeChoice") or "").strip().lower()
             if choice == "inference":
                 workflow_models[key] = "inference"
+        provider_choice = None
+        if self._web_search_provider_combo is not None:
+            provider_choice = self._web_search_provider_combo.currentData()
+        exa_api_key = (
+            _clean(self._exa_api_key_input.text()) if self._exa_api_key_input else None
+        )
 
         return {
             "litellm_model": _clean(self._model_input.text()),
@@ -585,6 +623,8 @@ class SettingsDialog(QDialog):
             "chat_colors": self._chat_colors_value,
             "theme_mode": self._theme_mode,
             "prompt_templates": self._prompt_templates_value,
+            "web_search_provider": provider_choice,
+            "exa_api_key": exa_api_key,
         }
 
     def _reset_prompt_template(self, key: str) -> None:

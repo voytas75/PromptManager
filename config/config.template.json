@@ -16,5 +16,6 @@
     "prompt_structure_refinement": "inference"
   },
   "embedding_backend": "litellm",
-  "embedding_model": "text-embedding-3-large"
+  "embedding_model": "text-embedding-3-large",
+  "web_search_provider": "exa"
 }

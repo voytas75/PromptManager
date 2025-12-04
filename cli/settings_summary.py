@@ -1,6 +1,7 @@
 """Printable summaries for Prompt Manager configuration.
 
 Updates:
+  v0.1.1 - 2025-12-04 - Surface web search provider status in CLI summary.
   v0.1.0 - 2025-12-04 - Extract CLI settings summary rendering.
 """
 
@@ -31,6 +32,8 @@ def print_settings_summary(settings: PromptManagerSettings) -> None:
     litellm_workflow_models = getattr(settings, "litellm_workflow_models", None) or {}
     embedding_backend = getattr(settings, "embedding_backend", None)
     embedding_model = getattr(settings, "embedding_model", None)
+    web_search_provider = getattr(settings, "web_search_provider", None)
+    exa_api_key = getattr(settings, "exa_api_key", None)
 
     db_path_desc = describe_path(
         settings.db_path,
@@ -81,6 +84,11 @@ def print_settings_summary(settings: PromptManagerSettings) -> None:
             "-----------------------",
             f"Backend: {embedding_backend or DEFAULT_EMBEDDING_BACKEND}",
             f"Model: {resolved_model}",
+            "",
+            "Web search",
+            "-----------",
+            f"Provider: {web_search_provider or 'disabled'}",
+            f"Exa API key: {mask_secret(exa_api_key)}",
         ]
     )
     print("\n".join(lines))

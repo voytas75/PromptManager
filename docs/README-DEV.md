@@ -62,12 +62,16 @@ All settings are defined via `pydantic-settings` in `config/settings.py`. Provid
 | `PROMPT_MANAGER_LITELLM_STREAM` | Enable streaming responses (`true`/`false`) | `true` |
 | `PROMPT_MANAGER_LITELLM_TTS_MODEL` | LiteLLM text-to-speech model id used for voice playback | `openai/tts-1` |
 | `PROMPT_MANAGER_LITELLM_TTS_STREAM` | Stream LiteLLM TTS audio so playback starts mid-download (`true`/`false`) | `true` |
+| `PROMPT_MANAGER_WEB_SEARCH_PROVIDER` | Web search provider slug (`exa` or leave empty to disable) | `exa` |
+| `PROMPT_MANAGER_EXA_API_KEY` / `EXA_API_KEY` | Exa web search API key (environment only) | `exa_***` |
 | `PROMPT_MANAGER_EMBEDDING_BACKEND` | `litellm`, `sentence-transformers`, or `deterministic` | `sentence-transformers` |
 | `PROMPT_MANAGER_EMBEDDING_MODEL` | Embedding model identifier | `text-embedding-3-large` |
 | `PROMPT_MANAGER_EMBEDDING_DEVICE` | Device hint for local embeddings | `cuda` |
 | `PROMPT_MANAGER_CHROMA_TELEMETRY` | Opt-in flag for Chroma telemetry (`1` to enable) | `0` |
 
 Secrets must never be committed; rely on `.env` files ignored by git or host-level secret stores.
+
+See [`docs/web_search_plan.md`](web_search_plan.md) for the staged Exa integration plan if you are extending the provider surface.
 
 ## Detailed Getting Started
 
@@ -119,7 +123,7 @@ Key UI capabilities:
 - A Template Preview frame below the workspace renders the selected prompt as a strict Jinja2 template, accepts JSON variables, and surfaces validation/missing-field issues instantly.
 - Command palette (`Ctrl+K` / `Ctrl+Shift+P`) and shortcuts (`Ctrl+1`–`Ctrl+4`) jump directly into explain/fix/document/enhance workflows.
 - Category/tag/quality filters plus taxonomy manager keep catalogues organized.
-- Settings dialog controls LiteLLM routing, streaming, quick actions, and embedding configuration; API keys entered in the GUI stay in memory only.
+- Settings dialog controls LiteLLM routing, streaming, quick actions, embedding configuration, and now the Integrations tab for web search providers; API keys entered in the GUI stay in memory only.
 - Share panel (bordered row beneath the action buttons) lets users pick what to publish (body-only, body + description, or body + description + scenarios), toggle metadata inclusion, and then pick a provider (ShareText today). Uploads happen on a worker thread, and the resulting URL is copied to the clipboard automatically.
 
 ### Template Preview & Validation

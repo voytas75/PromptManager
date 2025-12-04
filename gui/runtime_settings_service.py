@@ -1,6 +1,7 @@
 """Runtime settings helpers for Prompt Manager GUI.
 
 Updates:
+  v0.1.1 - 2025-12-04 - Track web search provider/runtime secrets.
   v0.1.0 - 2025-12-01 - Extracted runtime settings snapshot + apply helpers.
 """
 
@@ -95,6 +96,8 @@ class RuntimeSettingsService:
                 if settings and settings.prompt_templates
                 else None
             ),
+            "web_search_provider": settings.web_search_provider if settings else None,
+            "exa_api_key": settings.exa_api_key if settings else None,
         }
 
         config_path = Path("config/config.json")
@@ -115,6 +118,7 @@ class RuntimeSettingsService:
                     "litellm_tts_stream",
                     "embedding_backend",
                     "embedding_model",
+                    "web_search_provider",
                 ):
                     if runtime.get(key) is None and isinstance(data.get(key), str):
                         runtime[key] = data[key]
@@ -214,6 +218,8 @@ class RuntimeSettingsService:
             "litellm_reasoning_effort",
             "litellm_tts_model",
             "litellm_tts_stream",
+            "web_search_provider",
+            "exa_api_key",
         )
         for key in simple_keys:
             if key in updates:
@@ -352,6 +358,7 @@ class RuntimeSettingsService:
                 ),
                 "theme_mode": runtime.get("theme_mode"),
                 "prompt_templates": runtime.get("prompt_templates"),
+                "web_search_provider": runtime.get("web_search_provider"),
             }
         )
 
@@ -364,6 +371,8 @@ class RuntimeSettingsService:
             settings_model.litellm_api_version = updates.get("litellm_api_version")
             settings_model.litellm_reasoning_effort = updates.get("litellm_reasoning_effort")
             settings_model.litellm_tts_model = updates.get("litellm_tts_model")
+            settings_model.web_search_provider = updates.get("web_search_provider")
+            settings_model.exa_api_key = updates.get("exa_api_key")
             if "litellm_tts_stream" in updates:
                 settings_model.litellm_tts_stream = bool(updates.get("litellm_tts_stream"))
             settings_model.litellm_workflow_models = cleaned_workflow_models

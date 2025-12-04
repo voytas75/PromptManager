@@ -35,6 +35,9 @@ export PROMPT_MANAGER_CHROMA_PATH="data/chromadb"
 export PROMPT_MANAGER_LITELLM_MODEL="gpt-4o-mini"
 export PROMPT_MANAGER_LITELLM_API_KEY="sk-***"
 export PROMPT_MANAGER_LITELLM_TTS_MODEL="openai/tts-1"
+# Optional: configure the Exa web search provider (Integrations tab mirrors these values)
+export PROMPT_MANAGER_WEB_SEARCH_PROVIDER="exa"
+export PROMPT_MANAGER_EXA_API_KEY="exa_***"
 # Optional: disable streaming playback if your platform struggles with simultaneous read/write
 # export PROMPT_MANAGER_LITELLM_TTS_STREAM="false"
 
@@ -58,6 +61,7 @@ python -m main
 - Prompt Parts registry with a dedicated GUI tab, CRUD, clipboard/export helpers, and reusable tone/formatting presets that can be attached to executions for consistent voice.
 - Prompt execution workspace with LiteLLM-backed runs, streaming output, chat-style transcripts, rating-based quality feedback, export/import utilities, and persisted execution history complete with context metadata (model, streaming flag, style hints).
 - Voice playback button in the workspace overlay streams LiteLLM text-to-speech audio as it downloads (enabled by default, toggle via `PROMPT_MANAGER_LITELLM_TTS_STREAM`).
+- Provider-agnostic web search integrations (starting with Exa) so authors can pull live references or troubleshooting notes directly from the Settings → Integrations tab without committing API keys to disk.
 - Dedicated Prompt Template editor dialog (toolbar button) that exposes every LiteLLM system prompt with inline validation and reset-to-default controls so teams can fine-tune guidance without editing config files.
 - Prompt chaining pipelines with CLI management (`prompt-chain-*` commands) and a dedicated GUI dialog (toolbar button) so teams can create/edit/delete chains, pick prompts from the catalog drop-down, validate inputs, and replay workflows with a single command or via the desktop app, capturing per-step history and outputs.
 - Prompt sharing workflows baked into the prompt detail pane: choose whether to publish just the body, body + description, or body + description + scenarios, optionally include metadata, and the app uploads to ShareText and copies the share URL to your clipboard.
@@ -89,6 +93,7 @@ Every run logs to SQLite with request/response snippets, latency, token usage, s
 ## Developer
 
 See the full contributor guide in [`README-DEV.md`](docs/README-DEV.md) for development environment setup, environment variable matrix, testing/type-checking workflow, embedding and GUI deep dives, and maintenance procedures.
+The staged Exa web search rollout plan lives in [`docs/web_search_plan.md`](docs/web_search_plan.md).
 
 ## Changelog
 
