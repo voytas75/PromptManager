@@ -1,15 +1,17 @@
 """Prompt chain data models.
 
 Updates:
+  v0.2.0 - 2025-12-04 - Add chain_from_payload helper for GUI and CLI imports.
   v0.1.0 - 2025-12-04 - Introduce prompt chain and step dataclasses.
 """
 
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping, MutableMapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
-from typing import Any, Mapping, MutableMapping, Sequence
+from typing import Any
 
 
 def _utc_now() -> datetime:
@@ -145,3 +147,66 @@ class PromptChain:
         )
         return chain
 
+
+__all__ = [
+    "PromptChain",
+    "PromptChainStep",
+    "chain_from_payload",
+]
+
+
+def chain_from_payload(payload: Mapping[str, Any]) -> PromptChain:
+    """Return a :class:`PromptChain` built from a JSON-like mapping.
+
+    Args:
+        payload: Mapping containing ``name``, ``description``, and ``steps`` fields.
+
+    Returns:
+        PromptChain: The hydrated chain with ordered steps attached.
+
+    Raises:
+        ValueError: If required keys are missing or malformed.
+    """
+    name = str(payload.get("name") or "").strip()
+    if not name:
+        raise ValueError("Prompt chain requires a non-empty 'name' field.")
+    chain_id_text = payload.get("id")
+    chain_id = uuid.uuid4() if not chain_id_text else uuid.UUID(str(chain_id_text))
+    description = str(payload.get("description") or "")
+    steps_payload = payload.get("steps") or []
+    steps: list[PromptChainStep] = []
+    if not isinstance(steps_payload, list):
+        raise ValueError("'steps' must be an array.")
+    for index, step_payload in enumerate(steps_payload, start=1):
+        if not isinstance(step_payload, Mapping):
+            raise ValueError(f"Step {index} must be an object.")
+        prompt_id_value = step_payload.get("prompt_id")
+        if not prompt_id_value:
+            raise ValueError(f"Step {index} is missing 'prompt_id'.")
+        step_id_value = step_payload.get("id")
+        order_index = int(step_payload.get("order_index") or index)
+        input_template = str(step_payload.get("input_template") or "")
+        output_variable = str(step_payload.get("output_variable") or f"step_{order_index}")
+        condition_text = str(step_payload.get("condition") or "").strip()
+        steps.append(
+            PromptChainStep(
+                id=uuid.uuid4() if not step_id_value else uuid.UUID(str(step_id_value)),
+                chain_id=chain_id,
+                prompt_id=uuid.UUID(str(prompt_id_value)),
+                order_index=order_index,
+                input_template=input_template,
+                output_variable=output_variable,
+                condition=condition_text or None,
+                stop_on_failure=bool(step_payload.get("stop_on_failure", True)),
+                metadata=_coerce_metadata(step_payload.get("metadata")),
+            )
+        )
+    chain = PromptChain(
+        id=chain_id,
+        name=name,
+        description=description,
+        is_active=bool(payload.get("is_active", True)),
+        variables_schema=_coerce_metadata(payload.get("variables_schema")),
+        metadata=_coerce_metadata(payload.get("metadata")),
+    )
+    return chain.with_steps(steps)

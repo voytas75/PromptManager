@@ -9,13 +9,10 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING, Any
 
 from jsonschema import Draft202012Validator, exceptions as jsonschema_exceptions
 
-from models.prompt_chain_model import PromptChain, PromptChainStep
-
-from ..execution import ExecutionError
 from ..exceptions import (
     PromptChainExecutionError,
     PromptChainNotFoundError,
@@ -23,13 +20,15 @@ from ..exceptions import (
     PromptExecutionError,
     PromptManagerError,
 )
+from ..execution import ExecutionError
 from ..repository import RepositoryError, RepositoryNotFoundError
 from ..templating import TemplateRenderer
 from .execution_history import ExecutionOutcome, _normalise_conversation
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers only
-    from collections.abc import Mapping as ABCMapping
+    from collections.abc import Mapping
 
+    from models.prompt_chain_model import PromptChain, PromptChainStep
     from models.prompt_model import Prompt
 
     from ..notifications import NotificationCenter
@@ -114,7 +113,7 @@ class PromptChainMixin:
         self,
         chain_id: uuid.UUID,
         *,
-        variables: ABCMapping[str, Any] | None = None,
+        variables: Mapping[str, Any] | None = None,
     ) -> PromptChainRunResult:
         """Execute the specified prompt chain sequentially."""
         chain = self.get_prompt_chain(chain_id)
@@ -178,12 +177,19 @@ class PromptChainMixin:
                         PromptChainStepRun(step=step, status=status, outcome=None, error=error)
                     )
                     if step.stop_on_failure:
-                        raise PromptChainExecutionError(
-                            f"Prompt chain '{chain.name}' failed at step {step.order_index}: {error}"
-                        ) from exc
+                        message = (
+                            f"Prompt chain '{chain.name}' failed at step "
+                            f"{step.order_index}: {error}"
+                        )
+                        raise PromptChainExecutionError(message) from exc
                     continue
                 step_runs.append(PromptChainStepRun(step=step, status=status, outcome=outcome))
-        return PromptChainRunResult(chain=chain, variables=context, outputs=outputs, steps=step_runs)
+        return PromptChainRunResult(
+            chain=chain,
+            variables=context,
+            outputs=outputs,
+            steps=step_runs,
+        )
 
     # Internal helpers ------------------------------------------------- #
 

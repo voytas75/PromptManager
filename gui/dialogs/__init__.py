@@ -1,6 +1,7 @@
 """Dialog widgets used by the Prompt Manager GUI.
 
 Updates:
+  v0.12.1 - 2025-12-04 - Export prompt chain manager dialog for GUI workflows.
   v0.12.0 - 2025-12-03 - Split monolithic module into package modules and re-exported APIs.
   v0.11.14 - 2025-11-29 - Shorten update summaries and wrap maintenance tooltips.
   v0.11.13 - 2025-11-28 - Keep maintenance button pinned below scroll surface.
@@ -29,6 +30,7 @@ from .history import PromptVersionHistoryDialog
 from .maintenance import PromptMaintenanceDialog
 from .notes import PromptNoteDialog
 from .previews import InfoDialog, MarkdownPreviewDialog
+from .prompt_chains import PromptChainManagerDialog
 from .prompt_editor import PromptDialog, PromptRefinedDialog
 
 _strip_scenarios_metadata = strip_scenarios_metadata
@@ -43,6 +45,7 @@ __all__ = [
     "PromptDialog",
     "PromptMaintenanceDialog",
     "PromptNoteDialog",
+    "PromptChainManagerDialog",
     "PromptRefinedDialog",
     "PromptVersionHistoryDialog",
     "ResponseStyleDialog",

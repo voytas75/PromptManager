@@ -1,6 +1,7 @@
 """Core service layer for Prompt Manager.
 
 Updates:
+  v0.11.1 - 2025-12-04 - Keep prompt chain exports grouped to satisfy Ruff import sorting.
   v0.11.0 - 2025-12-02 - Import LiteLLM generation errors from the central exceptions module.
   v0.10.0 - 2025-11-28 - Export analytics dashboard helpers for diagnostics dashboards.
   v0.9.0 - 2025-12-06 - Export PromptNote models and exception helpers.
@@ -9,8 +10,7 @@ Updates:
   v0.5.0 - 2025-11-07 - Export embedding factory helper for external use.
   v0.4.0 - 2025-11-06 - Export intent classifier utilities for GUI integration.
   v0.3.0 - 2025-11-03 - Export build_prompt_manager factory for shared bootstrap.
-  v0.2.0 - 2025-10-31 - Surface PromptRepository alongside PromptManager.
-  v0.1.0 - 2025-10-30 - Expose PromptManager API.
+  v0.2.0-and-earlier - 2025-10-31 - Surface PromptRepository and the initial PromptManager API.
 """
 
 from models.category_model import PromptCategory
@@ -79,6 +79,12 @@ from .prompt_manager import (
     CategoryNotFoundError,
     CategoryStorageError,
     PromptCacheError,
+    PromptChainError,
+    PromptChainExecutionError,
+    PromptChainNotFoundError,
+    PromptChainRunResult,
+    PromptChainStepRun,
+    PromptChainStorageError,
     PromptEngineeringUnavailable,
     PromptExecutionError,
     PromptExecutionUnavailable,
@@ -95,12 +101,6 @@ from .prompt_manager import (
     ResponseStyleError,
     ResponseStyleNotFoundError,
     ResponseStyleStorageError,
-    PromptChainError,
-    PromptChainNotFoundError,
-    PromptChainStorageError,
-    PromptChainExecutionError,
-    PromptChainRunResult,
-    PromptChainStepRun,
 )
 from .repository import PromptRepository, RepositoryError, RepositoryNotFoundError
 from .scenario_generation import LiteLLMScenarioGenerator

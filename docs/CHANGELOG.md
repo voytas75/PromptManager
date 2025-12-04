@@ -2,6 +2,13 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.22.1] - 2025-12-04
+
+### Added
+
+- Added a **Prompt Chains** toolbar button and management dialog so operators can review chain descriptions, steps, and variable schemas inside the GUI, import JSON definitions, and run chains with busy-indicator wrapped execution plus toast-confirmed refresh/import flows.
+- Introduced a shared `chain_from_payload` helper that powers both the CLI (`prompt-chain-apply`) and the new GUI import action, ensuring JSON validation rules stay in sync across surfaces.
+
 ## [0.22.0] - 2025-12-04
 
 ### Added

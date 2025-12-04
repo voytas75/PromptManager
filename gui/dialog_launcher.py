@@ -1,6 +1,7 @@
 """Dialog helpers used by the Prompt Manager main window.
 
 Updates:
+  v0.15.83 - 2025-12-04 - Add prompt chain dialog launcher wiring.
   v0.15.82 - 2025-12-01 - Extract info/workbench/version dialogs from gui.main_window.
 """
 
@@ -10,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from core import PromptManager, RepositoryError
 
-from .dialogs import InfoDialog, PromptVersionHistoryDialog
+from .dialogs import InfoDialog, PromptChainManagerDialog, PromptVersionHistoryDialog
 from .workbench import WorkbenchModeDialog, WorkbenchWindow
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
@@ -97,6 +98,11 @@ class DialogLauncher:
             self._load_prompts(self._current_search_text())
             self._select_prompt(dialog.last_restored_prompt)
             self._parent.statusBar().showMessage("Prompt restored to selected version.", 4000)
+
+    def open_prompt_chains_dialog(self) -> None:
+        """Launch the prompt chain management dialog."""
+        dialog = PromptChainManagerDialog(self._manager, self._parent)
+        dialog.exec()
 
     # ------------------------------------------------------------------
     # Internal helpers

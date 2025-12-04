@@ -1,6 +1,7 @@
 """Composable builders for the Prompt Manager main window.
 
 Updates:
+  v0.2.0 - 2025-12-04 - Wire prompt chain toolbar signal to callbacks bundle.
   v0.1.0 - 2025-11-30 - Extract main window UI assembly into reusable builder helpers.
 """
 
@@ -56,6 +57,7 @@ class MainViewCallbacks:
     refresh_requested: Callable[[], None]
     add_requested: Callable[[], None]
     workbench_requested: Callable[[], None]
+    chains_requested: Callable[[], None]
     import_requested: Callable[[], None]
     export_requested: Callable[[], None]
     maintenance_requested: Callable[[], None]
@@ -168,6 +170,7 @@ def build_main_view(
     toolbar.refresh_requested.connect(callbacks.refresh_requested)
     toolbar.add_requested.connect(callbacks.add_requested)
     toolbar.workbench_requested.connect(callbacks.workbench_requested)
+    toolbar.chains_requested.connect(callbacks.chains_requested)
     toolbar.import_requested.connect(callbacks.import_requested)
     toolbar.export_requested.connect(callbacks.export_requested)
     toolbar.maintenance_requested.connect(callbacks.maintenance_requested)

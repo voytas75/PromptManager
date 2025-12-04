@@ -1,8 +1,10 @@
 """Guided wizard dialog for scaffolding Enhanced Prompt Workbench prompts.
 
 Updates:
+  v0.1.1 - 2025-12-04 - Apply Ruff formatting to satisfy formatter checks.
   v0.1.0 - 2025-12-04 - Extract guided wizard pages and dialog from workbench_window.
 """
+
 from __future__ import annotations
 
 import logging

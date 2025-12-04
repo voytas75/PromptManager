@@ -1,4 +1,8 @@
-"""CLI command handlers for Prompt Manager."""
+"""CLI command handlers for Prompt Manager.
+
+Updates:
+  v0.32.0 - 2025-12-04 - Reuse shared chain_from_payload helper for JSON imports.
+"""
 
 from __future__ import annotations
 
@@ -8,21 +12,21 @@ import logging
 import textwrap
 import uuid
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING, Any
 
 from core import (
-    PromptHistoryError,
-    PromptManagerError,
     PromptChainError,
     PromptChainExecutionError,
+    PromptHistoryError,
+    PromptManagerError,
     build_analytics_snapshot,
     export_prompt_catalog,
     snapshot_dataset_rows,
 )
-from models.prompt_chain_model import PromptChain, PromptChainStep
+from models.prompt_chain_model import chain_from_payload
 
 from .utils import (
     format_metric,
@@ -64,53 +68,6 @@ def _load_json_file(path: Path) -> Any:
         return json.loads(content)
     except json.JSONDecodeError as exc:
         raise ValueError(f"Invalid JSON in {path}: {exc}") from exc
-
-
-def _chain_from_payload(payload: Mapping[str, Any]) -> PromptChain:
-    name = str(payload.get("name") or "").strip()
-    if not name:
-        raise ValueError("Prompt chain requires a non-empty 'name' field.")
-    chain_id_text = payload.get("id")
-    chain_id = uuid.uuid4() if not chain_id_text else uuid.UUID(str(chain_id_text))
-    description = str(payload.get("description") or "")
-    steps_payload = payload.get("steps") or []
-    steps: list[PromptChainStep] = []
-    if not isinstance(steps_payload, list):
-        raise ValueError("'steps' must be an array.")
-    for index, step_payload in enumerate(steps_payload, start=1):
-        if not isinstance(step_payload, Mapping):
-            raise ValueError(f"Step {index} must be an object.")
-        prompt_id_value = step_payload.get("prompt_id")
-        if not prompt_id_value:
-            raise ValueError(f"Step {index} is missing 'prompt_id'.")
-        step_id_value = step_payload.get("id")
-        order_index = int(step_payload.get("order_index") or index)
-        input_template = str(step_payload.get("input_template") or "")
-        output_variable = str(
-            step_payload.get("output_variable") or f"step_{order_index}"
-        )
-        condition_text = str(step_payload.get("condition") or "").strip()
-        step = PromptChainStep(
-            id=uuid.uuid4() if not step_id_value else uuid.UUID(str(step_id_value)),
-            chain_id=chain_id,
-            prompt_id=uuid.UUID(str(prompt_id_value)),
-            order_index=order_index,
-            input_template=input_template,
-            output_variable=output_variable,
-            condition=condition_text or None,
-            stop_on_failure=bool(step_payload.get("stop_on_failure", True)),
-            metadata=_coerce_mapping(step_payload.get("metadata")),
-        )
-        steps.append(step)
-    chain = PromptChain(
-        id=chain_id,
-        name=name,
-        description=description,
-        is_active=bool(payload.get("is_active", True)),
-        variables_schema=_coerce_mapping(payload.get("variables_schema")),
-        metadata=_coerce_mapping(payload.get("metadata")),
-    )
-    return chain.with_steps(steps)
 
 
 def _load_chain_variables(
@@ -474,7 +431,7 @@ def _run_analytics_diagnostics(
         print(
             textwrap.dedent(
                 f"""
-                Execution summary (last {window_days or 'all'} days)
+                Execution summary (last {window_days or "all"} days)
                   runs: {execution.total_runs}
                   success rate: {_pct(execution.success_rate)}
                   average duration: {avg_duration}
@@ -551,9 +508,7 @@ def _run_analytics_diagnostics(
                 value=embedding.backend_dimension or embedding.inferred_dimension or "n/a",
             )
         )
-        print(
-            f"  chroma: {'ok' if embedding.chroma_ok else 'error'} ({embedding.chroma_message})"
-        )
+        print(f"  chroma: {'ok' if embedding.chroma_ok else 'error'} ({embedding.chroma_message})")
         if embedding.consistent_counts is not None:
             status = "matched" if embedding.consistent_counts else "mismatch"
             print(
@@ -601,10 +556,7 @@ def run_prompt_chain_list(
     print("\nPrompt Chains\n-------------")
     for chain in chains:
         status = "active" if chain.is_active else "inactive"
-        print(
-            f"- {chain.name} ({chain.id}) [{status}] "
-            f"steps={len(chain.steps)}"
-        )
+        print(f"- {chain.name} ({chain.id}) [{status}] steps={len(chain.steps)}")
     return 0
 
 
@@ -638,8 +590,7 @@ def run_prompt_chain_show(
     for step in chain.steps:
         condition = f" when {step.condition}" if step.condition else ""
         print(
-            f"  {step.order_index}. prompt={step.prompt_id} "
-            f"-> ${step.output_variable}{condition}"
+            f"  {step.order_index}. prompt={step.prompt_id} -> ${step.output_variable}{condition}"
         )
     return 0
 
@@ -651,7 +602,7 @@ def run_prompt_chain_apply(
 ) -> int:
     if manager is None:
         raise ValueError("Prompt Manager is required for prompt chain apply.")
-    path: Path = getattr(args, "path")
+    path: Path = args.path
     try:
         payload = _load_json_file(path)
     except ValueError as exc:
@@ -662,7 +613,7 @@ def run_prompt_chain_apply(
         return 5
     is_update = bool(payload.get("id"))
     try:
-        chain = _chain_from_payload(payload)
+        chain = chain_from_payload(payload)
     except ValueError as exc:
         logger.error("Invalid chain definition: %s", exc)
         return 5
@@ -672,9 +623,7 @@ def run_prompt_chain_apply(
         logger.error("Failed to persist prompt chain: %s", exc)
         return 5
     action = "Updated" if is_update else "Created"
-    print(
-        f"{action} prompt chain '{saved.name}' ({saved.id}) with {len(saved.steps)} steps."
-    )
+    print(f"{action} prompt chain '{saved.name}' ({saved.id}) with {len(saved.steps)} steps.")
     return 0
 
 
@@ -857,7 +806,7 @@ def run_suggest(
         print(
             textwrap.dedent(
                 f"""\
-                {index}. {prompt.name} [{prompt.category or 'Uncategorised'}]
+                {index}. {prompt.name} [{prompt.category or "Uncategorised"}]
                    Quality: {quality}  Tags: {tags}
                    Description: {prompt.description}
                 """

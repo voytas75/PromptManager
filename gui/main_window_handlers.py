@@ -1,6 +1,7 @@
 """Handlers extracted from :mod:`gui.main_window` for clarity.
 
 Updates:
+  v0.15.83 - 2025-12-04 - Add prompt chain dialog launcher wiring.
   v0.15.82 - 2025-12-01 - Introduce prompt, workspace, and template handlers.
 """
 
@@ -243,6 +244,13 @@ class PromptActionsHandler:
         if launcher is None:
             return
         launcher.open_workbench()
+
+    def open_prompt_chains_dialog(self) -> None:
+        """Open the prompt chain management dialog."""
+        launcher = self._dialog_launcher_supplier()
+        if launcher is None:
+            return
+        launcher.open_prompt_chains_dialog()
 
     # ------------------------------------------------------------------
     # Share + execution helpers

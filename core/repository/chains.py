@@ -7,7 +7,7 @@ Updates:
 from __future__ import annotations
 
 import sqlite3
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING, Any
 
 from models.prompt_chain_model import PromptChain, PromptChainStep
 
@@ -22,7 +22,7 @@ from .base import (
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     import uuid
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
 
 class ChainStoreMixin:
@@ -69,10 +69,7 @@ class ChainStoreMixin:
                 )
         except sqlite3.Error as exc:
             raise RepositoryError("Failed to list prompt chains") from exc
-        return [
-            self._row_to_chain(row, steps=steps_map.get(row["id"], []))
-            for row in rows
-        ]
+        return [self._row_to_chain(row, steps=steps_map.get(row["id"], [])) for row in rows]
 
     def get_chain(self, chain_id: uuid.UUID, *, include_steps: bool = True) -> PromptChain:
         """Return a single prompt chain by identifier."""
@@ -101,7 +98,8 @@ class ChainStoreMixin:
         payload = self._chain_to_row(chain)
         steps = chain.steps or []
         placeholders = ", ".join(f":{column}" for column in self._CHAIN_COLUMNS)
-        query = f"INSERT INTO prompt_chains ({', '.join(self._CHAIN_COLUMNS)}) VALUES ({placeholders});"
+        columns = ", ".join(self._CHAIN_COLUMNS)
+        query = f"INSERT INTO prompt_chains ({columns}) VALUES ({placeholders});"
         try:
             with _connect(self._db_path) as conn:
                 conn.execute(query, payload)
@@ -224,4 +222,3 @@ class ChainStoreMixin:
             row_map["metadata"] = metadata
             result[chain_id].append(PromptChainStep.from_row(row_map))
         return result
-

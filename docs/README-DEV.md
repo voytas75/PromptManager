@@ -166,6 +166,13 @@ Every log entry also stores structured context metadata (prompt snapshot, execut
 | `python -m main prompt-chain-apply path/to/chain.json` | Create or update a prompt chain from a JSON definition (`name`, `description`, `steps`, `prompt_id`, `input_template`, `output_variable`). |
 | `python -m main prompt-chain-run <uuid> [--vars-file variables.json] [--vars-json '{"key":"value"}']` | Execute a chain sequentially, injecting per-step variables, and log each step to execution history with chain metadata. |
 
+### GUI Prompt Chain Manager
+
+- Click the **Prompt Chains** toolbar button in the GUI to launch the management dialog.
+- The left pane lists every stored chain (active + inactive) with refresh and JSON import controls; imports reuse the same validation as the CLI helper.
+- The right pane surfaces description, variables schema, ordered steps, and a JSON editor for chain variables before execution.
+- Running a chain triggers the busy indicator (required for LLM work) while toast notifications confirm non-LLM actions such as refresh/import; results capture outputs plus per-step summaries for quick inspection.
+
 ### Prompt Chain Definitions
 
 `prompt-chain-apply` expects a JSON object that defines the chain plus ordered steps:

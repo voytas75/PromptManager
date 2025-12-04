@@ -1,6 +1,7 @@
 """Toolbar widget containing search and primary catalog actions.
 
 Updates:
+  v0.2.0 - 2025-12-04 - Add prompt chain button and signal wiring.
   v0.1.0 - 2025-11-30 - Introduce reusable prompt toolbar widget.
 """
 
@@ -25,6 +26,7 @@ class PromptToolbar(QWidget):
     refresh_requested = Signal()
     add_requested = Signal()
     workbench_requested = Signal()
+    chains_requested = Signal()
     import_requested = Signal()
     export_requested = Signal()
     maintenance_requested = Signal()
@@ -65,6 +67,11 @@ class PromptToolbar(QWidget):
         self._workbench_button.setToolTip("Open the Enhanced Prompt Workbench.")
         self._workbench_button.clicked.connect(self.workbench_requested)  # type: ignore[arg-type]
         layout.addWidget(self._workbench_button)
+
+        self._chains_button = QPushButton("Prompt Chains", self)
+        self._chains_button.setToolTip("Manage and run prompt chains.")
+        self._chains_button.clicked.connect(self.chains_requested)  # type: ignore[arg-type]
+        layout.addWidget(self._chains_button)
 
         self._import_button = QPushButton("Import", self)
         self._import_button.clicked.connect(self.import_requested)  # type: ignore[arg-type]
