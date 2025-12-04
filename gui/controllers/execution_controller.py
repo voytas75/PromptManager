@@ -1,6 +1,7 @@
 """Coordinate prompt execution, streaming, and chat workspace logic.
 
 Updates:
+  v0.1.3 - 2025-12-04 - Include all web snippets and summarize >5k words via fast LiteLLM.
   v0.1.2 - 2025-12-04 - Surface web context source counts before each workspace result.
   v0.1.1 - 2025-12-04 - Add optional web search enrichment controlled by a UI toggle.
   v0.1.0 - 2025-11-30 - Extract execution and chat orchestration from main window.
@@ -9,6 +10,7 @@ Updates:
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Callable, Sequence
 from html import escape
 from typing import TYPE_CHECKING
@@ -29,6 +31,13 @@ from core import (
     PromptManagerError,
     PromptNotFoundError,
     WebSearchError,
+)
+from core.litellm_adapter import (
+    LiteLLMNotInstalledError,
+    apply_configured_drop_params,
+    call_completion_with_fallback,
+    get_completion,
+    serialise_litellm_response,
 )
 
 if TYPE_CHECKING:  # pragma: no cover - import for typing only
@@ -57,6 +66,18 @@ StatusCallback = Callable[[str, int], None]
 ClearStatusCallback = Callable[[], None]
 ErrorCallback = Callable[[str, str], None]
 ToastCallback = Callable[[str, int], None]
+
+
+WEB_SEARCH_RESULT_LIMIT = 10
+WEB_CONTEXT_SUMMARY_WORD_LIMIT = 5000
+WEB_CONTEXT_SUMMARY_SYSTEM_PROMPT = (
+    "You are a fast research assistant who condenses multiple web search excerpts "
+    "into a concise, factual briefing for another model. Highlight consensus, note "
+    "conflicts, and reference the provided source URLs inline when helpful. Respond "
+    "in no more than 400 words."
+)
+
+logger = logging.getLogger(__name__)
 
 
 class ExecutionController:
@@ -428,14 +449,21 @@ class ExecutionController:
             return True
         return checkbox.isChecked()
 
-    def _set_web_context_summary(self, count: int, provider_label: str | None) -> None:
+    def _set_web_context_summary(
+        self,
+        count: int,
+        provider_label: str | None,
+        *,
+        summarized: bool = False,
+    ) -> None:
         safe_count = max(0, int(count))
         provider_name = (provider_label or "").strip()
         heading = f"{provider_name.title()} context" if provider_name else "Web context"
         plural = "source" if safe_count == 1 else "sources"
         self._last_web_context_sources = safe_count
         self._last_web_context_provider = provider_name.title() if provider_name else None
-        self._web_context_preface = f"{heading} ({safe_count} {plural} added).\n\n"
+        summary_note = " (summarized)" if summarized and safe_count else ""
+        self._web_context_preface = f"{heading} ({safe_count} {plural} added{summary_note}).\n\n"
 
     def _maybe_enrich_request(self, prompt: Prompt, request_text: str) -> str:
         self._set_web_context_summary(0, None)
@@ -452,7 +480,7 @@ class ExecutionController:
             return request_text
         self._status("Gathering live web context…", 0)
         try:
-            result = asyncio.run(service.search(query, limit=3))
+            result = asyncio.run(service.search(query, limit=WEB_SEARCH_RESULT_LIMIT))
         except WebSearchError as exc:
             self._toast(f"Web search failed: {exc}", 4000)
             return request_text
@@ -461,17 +489,22 @@ class ExecutionController:
             return request_text
         finally:
             self._clear_status()
-        context_lines: list[str] = []
-        for doc in result.documents[:3]:
-            snippet = (doc.summary or " ".join(doc.highlights[:1]) or "").strip()
-            if not snippet:
-                continue
-            context_lines.append(f"- {snippet} (Source: {doc.url})")
+        context_lines, total_words = self._collect_web_context_lines(result.documents)
         if not context_lines:
             return request_text
         provider_label = result.provider.strip().title() if result.provider else "Web search"
-        self._set_web_context_summary(len(context_lines), provider_label)
         context_block = "\n".join(context_lines)
+        summarized = False
+        if total_words > WEB_CONTEXT_SUMMARY_WORD_LIMIT:
+            self._status("Summarizing web context…", 0)
+            try:
+                summary_text = self._summarize_web_context(context_block)
+            finally:
+                self._clear_status()
+            if summary_text:
+                context_block = summary_text
+                summarized = True
+        self._set_web_context_summary(len(context_lines), provider_label, summarized=summarized)
         return (
             f"{provider_label} findings:\n"
             f"{context_block}\n\n"
@@ -500,6 +533,111 @@ class ExecutionController:
             parts.append(text[:200])
         query = " ".join(part for part in parts if part).strip()
         return query[:512]
+
+    def _collect_web_context_lines(
+        self,
+        documents: Sequence[object],
+    ) -> tuple[list[str], int]:
+        context_lines: list[str] = []
+        total_words = 0
+        for doc in documents:
+            if doc is None:
+                continue
+            url = str(getattr(doc, "url", "") or "").strip()
+            if not url:
+                continue
+            snippet = self._extract_document_snippet(doc)
+            if not snippet:
+                continue
+            total_words += len(snippet.split())
+            title = str(getattr(doc, "title", "") or "").strip()
+            title_prefix = f"{title}: " if title else ""
+            context_lines.append(f"- {title_prefix}{snippet} (Source: {url})")
+        return context_lines, total_words
+
+    @staticmethod
+    def _extract_document_snippet(document: object) -> str:
+        segments: list[str] = []
+        summary = getattr(document, "summary", None)
+        if summary:
+            summary_text = str(summary).strip()
+            if summary_text:
+                segments.append(summary_text)
+        highlights = getattr(document, "highlights", None) or []
+        for entry in highlights:
+            highlight_text = str(entry or "").strip()
+            if highlight_text:
+                segments.append(highlight_text)
+        return " ".join(segments).strip()
+
+    def _summarize_web_context(self, context_block: str) -> str | None:
+        settings = self._settings
+        if settings is None:
+            return None
+        model = (getattr(settings, "litellm_model", None) or "").strip()
+        if not model:
+            logger.debug("Fast LiteLLM model is not configured; skipping web context summary")
+            return None
+        text = context_block.strip()
+        if not text:
+            return None
+        try:
+            completion, LiteLLMException = get_completion()
+        except LiteLLMNotInstalledError:
+            logger.debug("LiteLLM is not installed; skipping web context summary")
+            return None
+        request: dict[str, object] = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": WEB_CONTEXT_SUMMARY_SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": (
+                        "Summarize the following aggregated web search findings so they can be "
+                        "prepended to another LLM request:\n\n"
+                        f"{text}"
+                    ),
+                },
+            ],
+            "temperature": 0.2,
+            "max_tokens": 512,
+        }
+        api_key = getattr(settings, "litellm_api_key", None)
+        if api_key:
+            request["api_key"] = api_key
+        api_base = getattr(settings, "litellm_api_base", None)
+        if api_base:
+            request["api_base"] = api_base
+        api_version = getattr(settings, "litellm_api_version", None)
+        if api_version:
+            request["api_version"] = api_version
+        drop_params = getattr(settings, "litellm_drop_params", None)
+        dropped = apply_configured_drop_params(request, drop_params)
+        try:
+            response = call_completion_with_fallback(
+                request,
+                completion,
+                LiteLLMException,
+                drop_candidates={"max_tokens", "max_output_tokens", "temperature", "timeout"},
+                pre_dropped=dropped,
+            )
+        except LiteLLMException:
+            logger.warning("LiteLLM web context summarization failed", exc_info=True)
+            return None
+        except Exception:
+            logger.warning("Unexpected error while summarizing web context", exc_info=True)
+            return None
+        payload = serialise_litellm_response(response)
+        if payload is None:
+            return None
+        try:
+            message = payload["choices"][0]["message"].get("content")  # type: ignore[index]
+        except (KeyError, IndexError, AttributeError, TypeError):
+            return None
+        if not isinstance(message, str):
+            return None
+        summary = message.strip()
+        return summary or None
 
     def _begin_streaming_run(self, prompt: Prompt) -> None:
         self._stop_voice_playback()

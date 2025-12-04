@@ -11,6 +11,10 @@ All notable changes to **Prompt Manager** will be documented in this file.
 - Added an **Integrations** tab to the Settings dialog so operators can pick the active provider and enter their Exa API key without editing environment variables; values flow through the runtime settings service and remain transient on disk.
 - Workspace toolbar now includes a default-on “Use web search” checkbox; when enabled and Exa is configured, prompt executions automatically fetch the top summaries/highlights from the web and prepend them to the request so runs include fresh context. Uncheck it to force offline-only behaviour per run.
 
+### Changed
+
+- Workspace web context enrichment now includes every available snippet/highlight returned by the provider and, whenever the combined snippets exceed ~5,000 words, compacts them via the configured fast LiteLLM model before prepending to prompt executions.
+
 ## [0.22.2] - 2025-12-04
 
 ### Added
