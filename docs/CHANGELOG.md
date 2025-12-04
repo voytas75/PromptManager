@@ -2,6 +2,13 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.22.2] - 2025-12-04
+
+### Added
+
+- Introduced a native Prompt Chain editor dialog so operators can create, edit, and delete chains inside the GUI, complete with schema fields, ordered step management, and per-step condition controls.
+- Wired the Prompt Chains manager to the new editor, added toolbar actions for New/Edit/Delete, and documented the workflow so teams no longer need to hand-edit JSON for routine changes.
+
 ## [0.22.1] - 2025-12-04
 
 ### Added

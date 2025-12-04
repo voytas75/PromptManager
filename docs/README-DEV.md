@@ -169,6 +169,7 @@ Every log entry also stores structured context metadata (prompt snapshot, execut
 ### GUI Prompt Chain Manager
 
 - Click the **Prompt Chains** toolbar button in the GUI to launch the management dialog.
+- Use **New/Edit/Delete** in that dialog to manage chains without touching JSON; the editor exposes name/description/schema fields and an ordered step table with prompt IDs, templates, and conditions.
 - The left pane lists every stored chain (active + inactive) with refresh and JSON import controls; imports reuse the same validation as the CLI helper.
 - The right pane surfaces description, variables schema, ordered steps, and a JSON editor for chain variables before execution.
 - Running a chain triggers the busy indicator (required for LLM work) while toast notifications confirm non-LLM actions such as refresh/import; results capture outputs plus per-step summaries for quick inspection.

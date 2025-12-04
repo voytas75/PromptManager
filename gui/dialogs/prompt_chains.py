@@ -1,6 +1,7 @@
 """Prompt chain management dialog for the GUI.
 
 Updates:
+  v0.2.0 - 2025-12-04 - Add create, edit, and delete actions via prompt chain editor dialog.
   v0.1.0 - 2025-12-04 - Introduce prompt chain manager dialog with run/import actions.
 """
 
@@ -36,6 +37,7 @@ from models.prompt_chain_model import PromptChain, chain_from_payload
 
 from ..processing_indicator import ProcessingIndicator
 from ..toast import show_toast
+from .prompt_chain_editor import PromptChainEditorDialog
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers only
     from uuid import UUID
@@ -91,6 +93,15 @@ class PromptChainManagerDialog(QDialog):
         self._import_button = QPushButton("Import JSON…", list_container)
         self._import_button.clicked.connect(self._import_chain_from_file)  # type: ignore[arg-type]
         import_run_row.addWidget(self._import_button)
+        self._new_button = QPushButton("New", list_container)
+        self._new_button.clicked.connect(self._create_chain)  # type: ignore[arg-type]
+        import_run_row.addWidget(self._new_button)
+        self._edit_button = QPushButton("Edit", list_container)
+        self._edit_button.clicked.connect(self._edit_chain)  # type: ignore[arg-type]
+        import_run_row.addWidget(self._edit_button)
+        self._delete_button = QPushButton("Delete", list_container)
+        self._delete_button.clicked.connect(self._delete_chain)  # type: ignore[arg-type]
+        import_run_row.addWidget(self._delete_button)
         import_run_row.addStretch(1)
         list_layout.addLayout(import_run_row)
 
@@ -209,6 +220,14 @@ class PromptChainManagerDialog(QDialog):
             self._chain_list.blockSignals(False)
         self._render_chain_details(selected_chain)
 
+    def _current_chain(self) -> PromptChain | None:
+        if not self._selected_chain_id:
+            return None
+        return next(
+            (chain for chain in self._chains if str(chain.id) == self._selected_chain_id),
+            None,
+        )
+
     def _handle_selection_changed(self, row: int) -> None:
         """Render details for the currently selected chain."""
         if row < 0:
@@ -307,6 +326,59 @@ class PromptChainManagerDialog(QDialog):
         self._load_chains()
         self._select_chain(saved.id)
         show_toast(self, f"Prompt chain '{saved.name}' saved.")
+
+    def _create_chain(self) -> None:
+        editor = PromptChainEditorDialog(self, manager=self._manager)
+        if editor.exec() != QDialog.Accepted:
+            return
+        chain = editor.result_chain()
+        if chain is None:
+            return
+        self._persist_chain(chain)
+
+    def _edit_chain(self) -> None:
+        chain = self._current_chain()
+        if chain is None:
+            QMessageBox.information(self, "Select chain", "Choose a chain to edit first.")
+            return
+        editor = PromptChainEditorDialog(self, manager=self._manager, chain=chain)
+        if editor.exec() != QDialog.Accepted:
+            return
+        updated = editor.result_chain()
+        if updated is None:
+            return
+        self._persist_chain(updated)
+
+    def _persist_chain(self, chain: PromptChain) -> None:
+        try:
+            saved = self._manager.save_prompt_chain(chain)
+        except PromptChainError as exc:
+            QMessageBox.critical(self, "Unable to save chain", str(exc))
+            return
+        self._load_chains()
+        self._select_chain(saved.id)
+        show_toast(self, f"Prompt chain '{saved.name}' saved.")
+
+    def _delete_chain(self) -> None:
+        chain = self._current_chain()
+        if chain is None:
+            return
+        confirmation = QMessageBox.question(
+            self,
+            "Delete prompt chain",
+            f"Delete '{chain.name}' and all of its steps?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if confirmation != QMessageBox.Yes:
+            return
+        try:
+            self._manager.delete_prompt_chain(chain.id)
+        except PromptChainError as exc:
+            QMessageBox.critical(self, "Unable to delete chain", str(exc))
+            return
+        self._load_chains()
+        show_toast(self, f"Prompt chain '{chain.name}' deleted.")
 
     def _select_chain(self, chain_id: UUID) -> None:
         """Select the list entry matching ``chain_id``."""

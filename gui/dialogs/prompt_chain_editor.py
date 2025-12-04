@@ -1,0 +1,292 @@
+"""Prompt chain editor dialogs for creating and updating workflows.
+
+Updates:
+  v0.1.0 - 2025-12-04 - Introduce editor dialogs for chain and step CRUD.
+"""
+
+from __future__ import annotations
+
+import json
+import uuid
+from dataclasses import replace
+from typing import TYPE_CHECKING
+
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QHBoxLayout,
+    QHeaderView,
+    QLineEdit,
+    QMessageBox,
+    QPlainTextEdit,
+    QPushButton,
+    QSpinBox,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
+
+from models.prompt_chain_model import PromptChain, PromptChainStep
+
+if TYPE_CHECKING:  # pragma: no cover - typing helpers only
+    from collections.abc import Sequence
+
+    from core import PromptManager
+
+
+class PromptChainEditorDialog(QDialog):
+    """Dialog that edits prompt chain metadata and steps."""
+
+    def __init__(
+        self,
+        parent: QWidget | None,
+        *,
+        manager: PromptManager | None,
+        chain: PromptChain | None = None,
+    ) -> None:
+        """Initialise fields for a new or existing chain."""
+        super().__init__(parent)
+        self._manager = manager
+        self._source_chain = chain
+        self._chain_id = chain.id if chain else uuid.uuid4()
+        self._result_chain: PromptChain | None = None
+        self.setWindowTitle("Edit Prompt Chain" if chain else "New Prompt Chain")
+        self.resize(800, 640)
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        self._name_input = QLineEdit(self)
+        form.addRow("Name", self._name_input)
+
+        self._description_input = QPlainTextEdit(self)
+        form.addRow("Description", self._description_input)
+
+        self._schema_input = QPlainTextEdit(self)
+        self._schema_input.setPlaceholderText("Optional JSON schema for variables")
+        form.addRow("Variables schema", self._schema_input)
+
+        self._active_checkbox = QCheckBox("Chain is active", self)
+        self._active_checkbox.setChecked(True)
+        form.addRow("Active", self._active_checkbox)
+        layout.addLayout(form)
+
+        self._steps_table = QTableWidget(0, 5, self)
+        self._steps_table.setHorizontalHeaderLabels(
+            ["Order", "Prompt", "Input", "Output", "Condition"]
+        )
+        self._steps_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        layout.addWidget(self._steps_table, 1)
+
+        step_actions = QHBoxLayout()
+        self._add_step_button = QPushButton("Add Step", self)
+        self._add_step_button.clicked.connect(self._add_step)  # type: ignore[arg-type]
+        step_actions.addWidget(self._add_step_button)
+
+        self._edit_step_button = QPushButton("Edit Step", self)
+        self._edit_step_button.clicked.connect(self._edit_selected_step)  # type: ignore[arg-type]
+        step_actions.addWidget(self._edit_step_button)
+
+        self._remove_step_button = QPushButton("Remove Step", self)
+        self._remove_step_button.clicked.connect(self._remove_selected_step)  # type: ignore[arg-type]
+        step_actions.addWidget(self._remove_step_button)
+        step_actions.addStretch(1)
+        layout.addLayout(step_actions)
+
+        self._buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel, self)
+        self._buttons.accepted.connect(self._handle_accept)  # type: ignore[arg-type]
+        self._buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
+        layout.addWidget(self._buttons)
+
+        self._steps: list[PromptChainStep] = []
+        if chain is not None:
+            self._load_chain(chain)
+
+    def result_chain(self) -> PromptChain | None:
+        """Return the saved chain instance when available."""
+        return self._result_chain
+
+    # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
+    def _load_chain(self, chain: PromptChain) -> None:
+        self._name_input.setText(chain.name)
+        self._description_input.setPlainText(chain.description)
+        if chain.variables_schema:
+            self._schema_input.setPlainText(json.dumps(chain.variables_schema, indent=2))
+        self._active_checkbox.setChecked(chain.is_active)
+        self._steps = [replace(step) for step in chain.steps]
+        self._refresh_steps()
+
+    def _refresh_steps(self) -> None:
+        self._steps.sort(key=lambda step: step.order_index)
+        self._steps_table.setRowCount(len(self._steps))
+        for row, step in enumerate(self._steps):
+            self._steps_table.setItem(row, 0, QTableWidgetItem(str(step.order_index)))
+            self._steps_table.setItem(row, 1, QTableWidgetItem(str(step.prompt_id)))
+            self._steps_table.setItem(row, 2, QTableWidgetItem(step.input_template))
+            self._steps_table.setItem(row, 3, QTableWidgetItem(step.output_variable))
+            condition = step.condition or "Always"
+            if not step.stop_on_failure:
+                condition = f"{condition} (continues on failure)"
+            self._steps_table.setItem(row, 4, QTableWidgetItem(condition))
+
+    def _add_step(self) -> None:
+        dialog = PromptChainStepDialog(self, chain_id=self._chain_id)
+        dialog.set_order_index(len(self._steps) + 1)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        step = dialog.result_step()
+        if step is None:
+            return
+        self._steps.append(step)
+        self._refresh_steps()
+
+    def _edit_selected_step(self) -> None:
+        row = self._steps_table.currentRow()
+        if row < 0 or row >= len(self._steps):
+            return
+        dialog = PromptChainStepDialog(self, chain_id=self._chain_id, step=self._steps[row])
+        if dialog.exec() != QDialog.Accepted:
+            return
+        step = dialog.result_step()
+        if step is None:
+            return
+        self._steps[row] = step
+        self._refresh_steps()
+
+    def _remove_selected_step(self) -> None:
+        row = self._steps_table.currentRow()
+        if row < 0 or row >= len(self._steps):
+            return
+        del self._steps[row]
+        self._refresh_steps()
+
+    def _handle_accept(self) -> None:
+        name = self._name_input.text().strip()
+        if not name:
+            QMessageBox.warning(self, "Validation", "Enter a name for the prompt chain.")
+            return
+        if not self._steps:
+            QMessageBox.warning(self, "Validation", "Add at least one step before saving.")
+            return
+        schema_text = self._schema_input.toPlainText().strip()
+        schema = None
+        if schema_text:
+            try:
+                schema = json.loads(schema_text)
+            except json.JSONDecodeError as exc:
+                QMessageBox.critical(self, "Invalid schema", str(exc))
+                return
+        description = self._description_input.toPlainText().strip()
+        chain = PromptChain(
+            id=self._chain_id,
+            name=name,
+            description=description,
+            is_active=self._active_checkbox.isChecked(),
+            variables_schema=schema if schema else None,
+            metadata=None,
+        ).with_steps(self._reindexed_steps())
+        self._result_chain = chain
+        self.accept()
+
+    def _reindexed_steps(self) -> Sequence[PromptChainStep]:
+        for idx, step in enumerate(sorted(self._steps, key=lambda s: s.order_index), start=1):
+            self._steps[idx - 1] = replace(step, order_index=idx)
+        return self._steps
+
+
+class PromptChainStepDialog(QDialog):
+    """Dialog for creating or editing a single prompt chain step."""
+
+    def __init__(
+        self,
+        parent: QWidget | None,
+        *,
+        chain_id: uuid.UUID,
+        step: PromptChainStep | None = None,
+    ) -> None:
+        """Prepare step editor inputs with optional preloaded data."""
+        super().__init__(parent)
+        self._chain_id = chain_id
+        self._step = step
+        self._result_step: PromptChainStep | None = None
+        self.setWindowTitle("Edit Chain Step" if step else "Add Chain Step")
+        self.resize(520, 360)
+
+        layout = QFormLayout(self)
+        self._order_input = QSpinBox(self)
+        self._order_input.setMinimum(1)
+        layout.addRow("Order", self._order_input)
+
+        self._prompt_input = QLineEdit(self)
+        layout.addRow("Prompt ID", self._prompt_input)
+
+        self._input_template = QPlainTextEdit(self)
+        layout.addRow("Input template", self._input_template)
+
+        self._output_variable = QLineEdit(self)
+        layout.addRow("Output variable", self._output_variable)
+
+        self._condition_input = QLineEdit(self)
+        layout.addRow("Condition", self._condition_input)
+
+        self._stop_checkbox = QCheckBox("Stop chain when this step fails", self)
+        self._stop_checkbox.setChecked(True)
+        layout.addRow("Stop on failure", self._stop_checkbox)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel, self)
+        buttons.accepted.connect(self._handle_accept)  # type: ignore[arg-type]
+        buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
+        layout.addWidget(buttons)
+
+        if step is not None:
+            self._load_step(step)
+
+    def set_order_index(self, value: int) -> None:
+        """Update the default order index displayed to the user."""
+        self._order_input.setValue(max(1, value))
+
+    def result_step(self) -> PromptChainStep | None:
+        """Return the saved step when available."""
+        return self._result_step
+
+    def _load_step(self, step: PromptChainStep) -> None:
+        self._order_input.setValue(step.order_index)
+        self._prompt_input.setText(str(step.prompt_id))
+        self._input_template.setPlainText(step.input_template)
+        self._output_variable.setText(step.output_variable)
+        self._condition_input.setText(step.condition or "")
+        self._stop_checkbox.setChecked(step.stop_on_failure)
+
+    def _handle_accept(self) -> None:
+        try:
+            prompt_id = uuid.UUID(self._prompt_input.text().strip())
+        except ValueError as exc:
+            QMessageBox.critical(self, "Invalid prompt id", str(exc))
+            return
+        input_template = self._input_template.toPlainText().strip()
+        if not input_template:
+            QMessageBox.warning(self, "Validation", "Enter an input template for the step.")
+            return
+        order_index = self._order_input.value()
+        output_variable = self._output_variable.text().strip() or f"step_{order_index}"
+        condition = self._condition_input.text().strip() or None
+        step_id = self._step.id if self._step else uuid.uuid4()
+        self._result_step = PromptChainStep(
+            id=step_id,
+            chain_id=self._chain_id,
+            prompt_id=prompt_id,
+            order_index=self._order_input.value(),
+            input_template=input_template,
+            output_variable=output_variable,
+            condition=condition,
+            stop_on_failure=self._stop_checkbox.isChecked(),
+            metadata=self._step.metadata if self._step else None,
+        )
+        self.accept()
+
+
+__all__ = ["PromptChainEditorDialog", "PromptChainStepDialog"]
