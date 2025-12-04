@@ -64,14 +64,26 @@ class PromptChainEditorDialog(QDialog):
         layout = QVBoxLayout(self)
         form = QFormLayout()
         self._name_input = QLineEdit(self)
-        form.addRow("Name", self._name_input)
+        self._name_input.setPlaceholderText("e.g. Content Review Flow")
+        self._add_form_row(form, "Name", self._name_input, "Friendly chain label shown in lists.")
 
         self._description_input = QPlainTextEdit(self)
-        form.addRow("Description", self._description_input)
+        self._description_input.setPlaceholderText("Describe what the chain does…")
+        self._add_form_row(
+            form,
+            "Description",
+            self._description_input,
+            "Optional summary to help collaborators understand the workflow.",
+        )
 
         self._schema_input = QPlainTextEdit(self)
-        self._schema_input.setPlaceholderText("Optional JSON schema for variables")
-        form.addRow("Variables schema", self._schema_input)
+        self._schema_input.setPlaceholderText("JSON Schema (Draft 2020-12) describing variables…")
+        self._add_form_row(
+            form,
+            "Variables schema",
+            self._schema_input,
+            "Validates the variables provided before execution.",
+        )
 
         self._active_checkbox = QCheckBox("Chain is active", self)
         self._active_checkbox.setChecked(True)
@@ -211,6 +223,19 @@ class PromptChainEditorDialog(QDialog):
             self._steps[idx - 1] = replace(step, order_index=idx)
         return self._steps
 
+    def _add_form_row(
+        self,
+        form: QFormLayout,
+        label_text: str,
+        widget: QWidget,
+        tooltip: str,
+    ) -> QLabel:
+        label = QLabel(label_text, self)
+        label.setToolTip(tooltip)
+        label.setBuddy(widget)
+        form.addRow(label, widget)
+        return label
+
 
 class PromptChainStepDialog(QDialog):
     """Dialog for creating or editing a single prompt chain step."""
@@ -235,16 +260,27 @@ class PromptChainStepDialog(QDialog):
         layout = QFormLayout(self)
         self._order_input = QSpinBox(self)
         self._order_input.setMinimum(1)
-        layout.addRow("Order", self._order_input)
+        self._add_step_row(layout, "Order", self._order_input, "Determines the execution sequence.")
 
         self._prompt_combo = QComboBox(self)
         self._prompt_combo.setEditable(True)
         self._prompt_combo.setInsertPolicy(QComboBox.NoInsert)
         self._prompt_combo.setSizeAdjustPolicy(QComboBox.AdjustToContents)
-        layout.addRow("Prompt", self._prompt_combo)
+        self._add_step_row(
+            layout,
+            "Prompt",
+            self._prompt_combo,
+            "Select the catalog prompt to run for this step.",
+        )
 
         self._input_template = QPlainTextEdit(self)
-        layout.addRow("Input template", self._input_template)
+        self._input_template.setPlaceholderText("e.g. Questions: {{ extracted_points }}")
+        self._add_step_row(
+            layout,
+            "Input template",
+            self._input_template,
+            "Jinja template rendered with chain variables for the prompt body.",
+        )
         self._input_hint = QLabel(
             "Jinja-style template that receives chain variables (e.g. {{ source_text }})",
             self,
@@ -254,17 +290,31 @@ class PromptChainStepDialog(QDialog):
         layout.addRow("", self._input_hint)
 
         self._output_variable = QLineEdit(self)
-        layout.addRow("Output variable", self._output_variable)
+        self._output_variable.setPlaceholderText("e.g. review_summary")
+        self._add_step_row(
+            layout,
+            "Output variable",
+            self._output_variable,
+            "Name stored in context for later steps (e.g. summary_text).",
+        )
 
         self._condition_input = QLineEdit(self)
-        self._condition_input.setPlaceholderText(
-            "Optional condition, e.g. {{ score > 0 }}"
+        self._condition_input.setPlaceholderText("Optional condition, e.g. {{ score > 0 }}")
+        self._add_step_row(
+            layout,
+            "Condition",
+            self._condition_input,
+            "If this renders to false/empty the step is skipped.",
         )
-        layout.addRow("Condition", self._condition_input)
 
         self._stop_checkbox = QCheckBox("Stop chain when this step fails", self)
         self._stop_checkbox.setChecked(True)
-        layout.addRow("Stop on failure", self._stop_checkbox)
+        self._add_step_row(
+            layout,
+            "Stop on failure",
+            self._stop_checkbox,
+            "If unchecked the chain continues even when this step errors.",
+        )
 
         buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel, self)
         buttons.accepted.connect(self._handle_accept)  # type: ignore[arg-type]
@@ -348,6 +398,18 @@ class PromptChainStepDialog(QDialog):
             QMessageBox.warning(self, "Validation", "Select a prompt for this step.")
             return None
         return text
+
+    def _add_step_row(
+        self,
+        layout: QFormLayout,
+        label_text: str,
+        widget: QWidget,
+        tooltip: str,
+    ) -> None:
+        label = QLabel(label_text, self)
+        label.setToolTip(tooltip)
+        label.setBuddy(widget)
+        layout.addRow(label, widget)
 
 
 __all__ = ["PromptChainEditorDialog", "PromptChainStepDialog"]
