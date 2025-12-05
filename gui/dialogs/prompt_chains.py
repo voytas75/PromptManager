@@ -1,6 +1,7 @@
 """Prompt chain management surfaces for the GUI.
 
 Updates:
+  v0.5.2 - 2025-12-05 - Persist chain splitters immediately so tabbed windows remember widths.
   v0.5.1 - 2025-12-05 - Add Markdown toggle for execution results with rich-text rendering.
   v0.5.0 - 2025-12-05 - Split execution results into a dedicated column with persisted splitter state.
   v0.4.1 - 2025-12-05 - Document dialog passthrough helper for lint compliance.
@@ -225,6 +226,8 @@ class PromptChainManagerPanel(QWidget):
         self._outer_splitter.addWidget(results_container)
         self._outer_splitter.setStretchFactor(0, 3)
         self._outer_splitter.setStretchFactor(1, 2)
+        self._outer_splitter.splitterMoved.connect(self._handle_splitter_moved)  # type: ignore[arg-type]
+        self._management_splitter.splitterMoved.connect(self._handle_splitter_moved)  # type: ignore[arg-type]
 
         self._restore_splitter_state()
         self._load_chains()
@@ -608,6 +611,10 @@ class PromptChainManagerPanel(QWidget):
                 self._result_view.setPlainText(self._result_plaintext)
             else:
                 self._result_view.clear()
+
+    def _handle_splitter_moved(self, _: int, __: int) -> None:
+        """Persist splitter state whenever the user resizes panes."""
+        self._persist_splitter_state()
 
 
 class PromptChainManagerDialog(QDialog):
