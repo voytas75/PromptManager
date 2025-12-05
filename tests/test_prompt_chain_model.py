@@ -1,6 +1,7 @@
 """Prompt chain model helper tests.
 
 Updates:
+  v0.2.0 - 2025-12-05 - Validate summarize-last-response flag parsing.
   v0.1.0 - 2025-12-04 - Cover chain_from_payload parsing and validation cases.
 """
 
@@ -56,3 +57,27 @@ def test_chain_from_payload_requires_name() -> None:
 
     with pytest.raises(ValueError):
         chain_from_payload({"steps": []})
+
+
+def test_chain_from_payload_allows_summary_toggle() -> None:
+    """Summarize flag should be read from JSON payloads when provided."""
+
+    prompt_id = uuid.uuid4()
+    payload = {
+        "id": str(uuid.uuid4()),
+        "name": "Summaries",
+        "description": "",
+        "summarize_last_response": False,
+        "steps": [
+            {
+                "prompt_id": str(prompt_id),
+                "order_index": 1,
+                "input_template": "{{ body }}",
+                "output_variable": "result",
+            }
+        ],
+    }
+
+    chain = chain_from_payload(payload)
+
+    assert chain.summarize_last_response is False

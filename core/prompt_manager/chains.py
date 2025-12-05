@@ -1,6 +1,7 @@
 """Prompt chain orchestration helpers for Prompt Manager.
 
 Updates:
+  v0.1.2 - 2025-12-05 - Summarize the last step response when chains request it.
   v0.1.1 - 2025-12-05 - Surface streaming callbacks during prompt chain execution.
   v0.1.0 - 2025-12-04 - Introduce prompt chain CRUD and execution mixin.
 """
@@ -8,9 +9,10 @@ Updates:
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from jsonschema import Draft202012Validator, exceptions as jsonschema_exceptions
 
@@ -27,7 +29,7 @@ from ..templating import TemplateRenderer
 from .execution_history import ExecutionOutcome, _normalise_conversation
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers only
-    from collections.abc import Mapping
+    from collections.abc import Callable, Mapping
 
     from models.prompt_chain_model import PromptChain, PromptChainStep
     from models.prompt_model import Prompt
@@ -62,6 +64,7 @@ class PromptChainRunResult:
     variables: dict[str, Any]
     outputs: dict[str, Any]
     steps: list[PromptChainStepRun]
+    summary: str | None = None
 
 
 class PromptChainMixin:
@@ -192,11 +195,17 @@ class PromptChainMixin:
                         raise PromptChainExecutionError(message) from exc
                     continue
                 step_runs.append(PromptChainStepRun(step=step, status=status, outcome=outcome))
+        summary_text = (
+            self._build_chain_summary(step_runs)
+            if chain.summarize_last_response
+            else None
+        )
         return PromptChainRunResult(
             chain=chain,
             variables=context,
             outputs=outputs,
             steps=step_runs,
+            summary=summary_text,
         )
 
     # Internal helpers ------------------------------------------------- #
@@ -348,3 +357,47 @@ class PromptChainMixin:
             history_entry=history_entry,
             conversation=augmented_conversation,
         )
+
+    @staticmethod
+    def _build_chain_summary(step_runs: list[PromptChainStepRun]) -> str | None:
+        """Return a compact summary from the last successful step output."""
+        for step_run in reversed(step_runs):
+            outcome = step_run.outcome
+            if outcome is None:
+                continue
+            response_text = (outcome.result.response_text or "").strip()
+            if response_text:
+                return _summarize_response_text(response_text)
+        return None
+
+
+_SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?])\s+")
+
+
+def _summarize_response_text(text: str, *, max_length: int = 360) -> str:
+    """Return a deterministic summary suitable for UI display."""
+    collapsed = " ".join(text.split())
+    if not collapsed:
+        return ""
+    if len(collapsed) <= max_length:
+        return collapsed
+    sentences = [
+        segment.strip()
+        for segment in _SENTENCE_BOUNDARY.split(collapsed)
+        if segment.strip()
+    ]
+    summary_parts: list[str] = []
+    for sentence in sentences:
+        summary_parts.append(sentence)
+        joined = " ".join(summary_parts)
+        if len(joined) >= max_length * 0.7:
+            break
+    summary = " ".join(summary_parts).strip()
+    if len(summary) > max_length:
+        summary = summary[:max_length].rstrip()
+        last_space = summary.rfind(" ")
+        if last_space > max_length * 0.4:
+            summary = summary[:last_space]
+    if len(summary) < len(collapsed):
+        summary = summary.rstrip(".") + "…"
+    return summary

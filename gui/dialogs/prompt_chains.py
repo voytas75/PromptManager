@@ -1,6 +1,7 @@
 """Prompt chain management surfaces for the GUI.
 
 Updates:
+  v0.5.9 - 2025-12-05 - Display chain summary preference and render condensed outputs.
   v0.5.8 - 2025-12-05 - Render step inputs/outputs without code fences for Markdown previews.
   v0.5.7 - 2025-12-05 - Preserve chain results when toggling Markdown formatting.
   v0.5.6 - 2025-12-05 - Add auto-scroll toggle for streaming/results pane.
@@ -10,7 +11,8 @@ Updates:
   v0.5.2 - 2025-12-05 - Persist chain splitters immediately so tabbed windows remember widths.
   v0.5.1 - 2025-12-05 - Add Markdown toggle for execution results with rich-text rendering.
   v0.5.0 - 2025-12-05 - Split execution results into dedicated column with persisted splitter state.
-  v0.4.1-v0.1.0 - 2025-12-04 - Earlier releases introduced the dialog, editor, and CRUD/import flows.
+  v0.4.1-v0.1.0 - 2025-12-04 - Earlier releases introduced the dialog and editor flows,
+    including CRUD/import helpers.
 """
 
 from __future__ import annotations
@@ -371,9 +373,14 @@ class PromptChainManagerPanel(QWidget):
         self._detail_title.setText(chain.name)
         status = "Active" if chain.is_active else "Inactive"
         updated_at_text = chain.updated_at.strftime("%Y-%m-%d %H:%M")  # noqa: DTZ005
-        self._detail_status.setText(
-            f"Status: {status} • Steps: {len(chain.steps)} • Updated {updated_at_text}"
-        )
+        summary_pref = "On" if chain.summarize_last_response else "Off"
+        detail_parts = [
+            f"Status: {status}",
+            f"Steps: {len(chain.steps)}",
+            f"Updated {updated_at_text}",
+            f"Summary: {summary_pref}",
+        ]
+        self._detail_status.setText(" • ".join(detail_parts))
         self._description_label.setText(chain.description or "(No description provided.)")
         schema_text = (
             json.dumps(chain.variables_schema, indent=2, sort_keys=True)
@@ -616,6 +623,16 @@ class PromptChainManagerPanel(QWidget):
             markdown_lines.extend(["", "## Chain outputs", "- (no outputs)"])
         plain_sections.append("")
 
+        if result.summary:
+            summary_text = result.summary.strip()
+            if summary_text:
+                plain_sections.append("Chain summary")
+                plain_sections.extend(_indent_lines(summary_text))
+                plain_sections.append("")
+                markdown_lines.extend(["", "## Chain summary", ""])
+                markdown_lines.extend(summary_text.splitlines())
+                markdown_lines.append("")
+
         # Steps
         if result.steps:
             markdown_lines.append("")
@@ -671,7 +688,6 @@ class PromptChainManagerPanel(QWidget):
         empty_placeholder: str,
     ) -> None:
         """Append step IO text so Markdown formatting is preserved."""
-
         markdown_lines.append(header)
         markdown_lines.append("")
         if content:

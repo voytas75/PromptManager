@@ -1,6 +1,7 @@
 """Prompt chain data models.
 
 Updates:
+  v0.3.0 - 2025-12-05 - Persist summarize-last-response preference on chains.
   v0.2.0 - 2025-12-04 - Add chain_from_payload helper for GUI and CLI imports.
   v0.1.0 - 2025-12-04 - Introduce prompt chain and step dataclasses.
 """
@@ -12,6 +13,8 @@ from collections.abc import Mapping, MutableMapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from typing import Any
+
+_SUMMARY_METADATA_KEY = "summarize_last_response"
 
 
 def _utc_now() -> datetime:
@@ -105,19 +108,22 @@ class PromptChain:
     is_active: bool = True
     variables_schema: MutableMapping[str, Any] | None = None
     metadata: MutableMapping[str, Any] | None = None
+    summarize_last_response: bool = True
     created_at: datetime = field(default_factory=_utc_now)
     updated_at: datetime = field(default_factory=_utc_now)
     steps: list[PromptChainStep] = field(default_factory=list)
 
     def to_record(self) -> dict[str, Any]:
         """Return a dictionary suitable for SQLite persistence."""
+        metadata = dict(self.metadata or {})
+        metadata[_SUMMARY_METADATA_KEY] = bool(self.summarize_last_response)
         return {
             "id": str(self.id),
             "name": self.name,
             "description": self.description,
             "is_active": 1 if self.is_active else 0,
             "variables_schema": self.variables_schema,
-            "metadata": self.metadata,
+            "metadata": metadata,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
         }
@@ -134,13 +140,21 @@ class PromptChain:
         steps: Sequence[PromptChainStep] | None = None,
     ) -> PromptChain:
         """Hydrate a chain from a SQLite row payload."""
+        metadata = _coerce_metadata(row.get("metadata"))
+        metadata_dict = dict(metadata) if metadata is not None else None
+        summarize_last_response = True
+        if metadata_dict is not None and _SUMMARY_METADATA_KEY in metadata_dict:
+            summarize_last_response = bool(metadata_dict.pop(_SUMMARY_METADATA_KEY))
+            if not metadata_dict:
+                metadata_dict = None
         chain = cls(
             id=_ensure_uuid(row.get("id")),
             name=str(row.get("name") or ""),
             description=str(row.get("description") or ""),
             is_active=bool(int(row.get("is_active", 1))),
             variables_schema=_coerce_metadata(row.get("variables_schema")),
-            metadata=_coerce_metadata(row.get("metadata")),
+            metadata=metadata_dict,
+            summarize_last_response=summarize_last_response,
             created_at=_ensure_datetime(row.get("created_at")),
             updated_at=_ensure_datetime(row.get("updated_at")),
             steps=list(sorted(steps or [], key=lambda step: step.order_index)),
@@ -201,6 +215,7 @@ def chain_from_payload(payload: Mapping[str, Any]) -> PromptChain:
                 metadata=_coerce_metadata(step_payload.get("metadata")),
             )
         )
+    summarize_last_response = bool(payload.get("summarize_last_response", True))
     chain = PromptChain(
         id=chain_id,
         name=name,
@@ -208,5 +223,6 @@ def chain_from_payload(payload: Mapping[str, Any]) -> PromptChain:
         is_active=bool(payload.get("is_active", True)),
         variables_schema=_coerce_metadata(payload.get("variables_schema")),
         metadata=_coerce_metadata(payload.get("metadata")),
+        summarize_last_response=summarize_last_response,
     )
     return chain.with_steps(steps)

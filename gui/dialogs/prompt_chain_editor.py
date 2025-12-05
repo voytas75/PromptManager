@@ -1,6 +1,7 @@
 """Prompt chain editor dialogs for creating and updating workflows.
 
 Updates:
+  v0.3.0 - 2025-12-05 - Surface summarize toggle for prompt chain results.
   v0.2.0 - 2025-12-04 - Add prompt picker combo box backed by catalog lookups.
   v0.1.0 - 2025-12-04 - Introduce editor dialogs for chain and step CRUD.
 """
@@ -92,6 +93,15 @@ class PromptChainEditorDialog(QDialog):
         self._active_checkbox = QCheckBox("Chain is active", self)
         self._active_checkbox.setChecked(True)
         form.addRow("Active", self._active_checkbox)
+
+        self._summarize_checkbox = QCheckBox("Summarize final step output", self)
+        self._summarize_checkbox.setChecked(True)
+        self._add_form_row(
+            form,
+            "Summarize",
+            self._summarize_checkbox,
+            "If enabled, the chain produces a condensed summary from the last step response.",
+        )
         layout.addLayout(form)
 
         self._steps_table = QTableWidget(0, 5, self)
@@ -139,6 +149,7 @@ class PromptChainEditorDialog(QDialog):
         if chain.variables_schema:
             self._schema_input.setPlainText(json.dumps(chain.variables_schema, indent=2))
         self._active_checkbox.setChecked(chain.is_active)
+        self._summarize_checkbox.setChecked(chain.summarize_last_response)
         self._steps = [replace(step) for step in chain.steps]
         self._refresh_steps()
 
@@ -223,6 +234,7 @@ class PromptChainEditorDialog(QDialog):
             is_active=self._active_checkbox.isChecked(),
             variables_schema=schema if schema else None,
             metadata=None,
+            summarize_last_response=self._summarize_checkbox.isChecked(),
         ).with_steps(self._reindexed_steps())
         self._result_chain = chain
         self.accept()

@@ -1,6 +1,7 @@
 """Prompt chain manager dialog tests.
 
 Updates:
+  v0.2.6 - 2025-12-05 - Cover summarize toggle persistence and UI output section.
   v0.2.5 - 2025-12-05 - Ensure step IO renders outside code fences for Markdown formatting.
   v0.2.4 - 2025-12-05 - Verify Markdown toggle preserves rendered text.
   v0.2.3 - 2025-12-05 - Cover streaming preview rendering and settings detection.
@@ -14,7 +15,7 @@ from __future__ import annotations
 
 import uuid
 from types import SimpleNamespace
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -27,6 +28,9 @@ from core.prompt_manager.execution_history import ExecutionOutcome
 from gui.dialogs.prompt_chain_editor import PromptChainEditorDialog
 from gui.dialogs.prompt_chains import PromptChainManagerDialog
 from models.prompt_chain_model import PromptChain, PromptChainStep
+
+if TYPE_CHECKING:  # pragma: no cover - typing helper
+    from collections.abc import Callable
 
 
 @pytest.fixture(scope="module")
@@ -115,6 +119,7 @@ class _ManagerStub:
                     error=None,
                 )
             ],
+            summary="Demo summary",
         )
 
     def delete_prompt_chain(self, chain_id: uuid.UUID) -> None:
@@ -168,6 +173,21 @@ def test_prompt_chain_dialog_runs_chain(qt_app: QApplication) -> None:
         text = dialog._result_view.toPlainText()  # noqa: SLF001
         assert "Input to chain" in text
         assert "Chain outputs" in text
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
+def test_prompt_chain_dialog_renders_chain_summary(qt_app: QApplication) -> None:
+    """Execution results should include the final summary section when present."""
+
+    manager = _ManagerStub()
+    dialog = PromptChainManagerDialog(manager)
+    try:
+        dialog._run_selected_chain()  # noqa: SLF001
+        text = dialog._result_view.toPlainText()  # noqa: SLF001
+        assert "Chain summary" in text
+        assert "Demo summary" in text
     finally:
         dialog.close()
         dialog.deleteLater()
@@ -235,6 +255,20 @@ def test_prompt_chain_editor_dialog_creates_chain(qt_app: QApplication) -> None:
     assert chain is not None
     assert chain.name == "New Chain"
     assert len(chain.steps) == 1
+    assert chain.summarize_last_response is True
+
+
+def test_prompt_chain_editor_respects_summary_flag(qt_app: QApplication) -> None:
+    """Editing an existing chain should reflect and persist the summary preference."""
+
+    chain = _make_chain()
+    chain.summarize_last_response = False
+    editor = PromptChainEditorDialog(None, manager=None, chain=chain)
+    assert editor._summarize_checkbox.isChecked() is False  # noqa: SLF001
+    editor._handle_accept()  # noqa: SLF001
+    updated = editor.result_chain()
+    assert updated is not None
+    assert updated.summarize_last_response is False
 
 
 def test_prompt_chain_editor_prompt_tooltip_and_double_click(
