@@ -1,6 +1,7 @@
 """Prompt chain orchestration helpers for Prompt Manager.
 
 Updates:
+  v0.1.5 - 2025-12-06 - Honor prompt template overrides for chain summaries.
   v0.1.4 - 2025-12-06 - Summarize final chain output via LiteLLM when chains opt in.
   v0.1.3 - 2025-12-05 - Add optional web search enrichment ahead of each chain step.
   v0.1.2 - 2025-12-05 - Summarize the last step response when chains request it.
@@ -18,6 +19,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Sequence
 
 from jsonschema import Draft202012Validator, exceptions as jsonschema_exceptions
+from prompt_templates import get_default_prompt
 
 from ..exceptions import (
     PromptChainExecutionError,
@@ -58,7 +60,7 @@ __all__ = [
 
 _CHAIN_WEB_SEARCH_RESULT_LIMIT = 10
 _CHAIN_SUMMARY_MAX_TOKENS = 220
-_CHAIN_SUMMARY_SYSTEM_PROMPT = (
+_CHAIN_SUMMARY_SYSTEM_PROMPT = get_default_prompt("chain_summary") or (
     "You summarise the outcome of automated multi-step workflows for prompt engineers. "
     "Capture the key result, blockers, or next actions in two concise sentences. "
     "Do not invent information, include markdown headings, or reference step numbers."
@@ -523,6 +525,8 @@ class PromptChainMixin:
         trimmed = response_text.strip()
         if not trimmed:
             return None
+        prompt_overrides = getattr(self, "_prompt_templates", None) or {}
+        system_prompt = prompt_overrides.get("chain_summary") or _CHAIN_SUMMARY_SYSTEM_PROMPT
         executor = getattr(self, "_executor", None)
         model = (
             getattr(self, "_litellm_fast_model", None)
@@ -540,7 +544,7 @@ class PromptChainMixin:
         request: dict[str, object] = {
             "model": model,
             "messages": [
-                {"role": "system", "content": _CHAIN_SUMMARY_SYSTEM_PROMPT},
+                {"role": "system", "content": system_prompt},
                 {
                     "role": "user",
                     "content": (

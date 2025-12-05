@@ -1,6 +1,7 @@
 """Prompt chain backend summary tests.
 
 Updates:
+  v0.1.1 - 2025-12-06 - Assert chain summary prompt overrides propagate to LiteLLM calls.
   v0.1.0 - 2025-12-06 - Cover LiteLLM-driven summaries and deterministic fallback.
 """
 
@@ -23,6 +24,7 @@ class _ChainSummaryHarness(PromptChainMixin):
         self._litellm_fast_model = "fast-model"
         self._litellm_inference_model = None
         self._litellm_drop_params = None
+        self._prompt_templates: dict[str, str] = {}
         self._executor = SimpleNamespace(
             model="fast-model",
             api_key="test-key",
@@ -86,6 +88,32 @@ def test_chain_summary_prefers_litellm_last_step(monkeypatch: pytest.MonkeyPatch
     assert request.get("model") == "fast-model"
     user_prompt = request["messages"][1]["content"]  # type: ignore[index]
     assert "Final output to summarise." in user_prompt
+
+
+def test_chain_summary_respects_prompt_template_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    harness = _ChainSummaryHarness()
+    harness._prompt_templates = {"chain_summary": "Override summary prompt."}
+    captured: dict[str, object] = {}
+
+    def fake_get_completion():  # noqa: ANN202 - helper for monkeypatch
+        return (lambda **_kwargs: None, Exception)
+
+    def fake_call_completion(request, *_args, **_kwargs):  # noqa: ANN202
+        captured["request"] = request
+        return {"choices": [{"message": {"content": "Result"}}]}
+
+    monkeypatch.setattr("core.prompt_manager.chains.get_completion", fake_get_completion)
+    monkeypatch.setattr(
+        "core.prompt_manager.chains.call_completion_with_fallback",
+        fake_call_completion,
+    )
+
+    harness._build_chain_summary([_step_run(1, "Content")])
+    request = captured["request"]
+    messages = request["messages"]  # type: ignore[index]
+    assert messages[0]["content"] == "Override summary prompt."
 
 
 def test_chain_summary_falls_back_without_litellm(monkeypatch: pytest.MonkeyPatch) -> None:

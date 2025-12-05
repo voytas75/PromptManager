@@ -1,7 +1,9 @@
 """Default prompt templates surfaced across Prompt Manager workflows.
 
-Updates: v0.1.1 - 2025-11-24 - Add category suggestion template for LiteLLM workflows.
-Updates: v0.1.0 - 2025-11-23 - Centralise prompt template defaults for runtime overrides.
+Updates:
+  v0.1.2 - 2025-12-06 - Add chain summary template override for prompt chains.
+  v0.1.1 - 2025-11-24 - Add category suggestion template for LiteLLM workflows.
+  v0.1.0 - 2025-11-23 - Centralise prompt template defaults for runtime overrides.
 """
 
 from __future__ import annotations
@@ -73,12 +75,19 @@ CATEGORY_GENERATION_PROMPT = (
     "Return only the label text without explanations or extra words."
 )
 
+CHAIN_SUMMARY_PROMPT = (
+    "You summarise the outcome of automated multi-step workflows for prompt engineers. "
+    "Capture the key result, blockers, or next actions in two concise sentences. "
+    "Do not invent information, include markdown headings, or reference step numbers."
+)
+
 PROMPT_TEMPLATE_KEYS = (
     "name_generation",
     "description_generation",
     "scenario_generation",
     "prompt_engineering",
     "category_generation",
+    "chain_summary",
 )
 
 PROMPT_TEMPLATE_LABELS: dict[str, str] = {
@@ -87,6 +96,7 @@ PROMPT_TEMPLATE_LABELS: dict[str, str] = {
     "scenario_generation": "Scenario drafting",
     "prompt_engineering": "Prompt refinement",
     "category_generation": "Prompt category suggestions",
+    "chain_summary": "Prompt chain summary",
 }
 
 PROMPT_TEMPLATE_DESCRIPTIONS: dict[str, str] = {
@@ -95,6 +105,7 @@ PROMPT_TEMPLATE_DESCRIPTIONS: dict[str, str] = {
     "scenario_generation": "LLM system prompt used to draft usage scenarios for prompts.",
     "prompt_engineering": "LLM system prompt used when refining prompts with the engineer.",
     "category_generation": "LLM system prompt used to classify prompts into catalogue categories.",
+    "chain_summary": "LLM system prompt used when condensing the final chain step output.",
 }
 
 DEFAULT_PROMPT_TEMPLATES: dict[str, str] = {
@@ -103,6 +114,7 @@ DEFAULT_PROMPT_TEMPLATES: dict[str, str] = {
     "scenario_generation": SCENARIO_GENERATION_PROMPT,
     "prompt_engineering": PROMPT_ENGINEERING_PROMPT,
     "category_generation": CATEGORY_GENERATION_PROMPT,
+    "chain_summary": CHAIN_SUMMARY_PROMPT,
 }
 
 
@@ -137,6 +149,7 @@ __all__ = [
     "SCENARIO_GENERATION_PROMPT",
     "PROMPT_ENGINEERING_PROMPT",
     "CATEGORY_GENERATION_PROMPT",
+    "CHAIN_SUMMARY_PROMPT",
     "get_default_prompt",
     "normalise_prompt_templates",
 ]

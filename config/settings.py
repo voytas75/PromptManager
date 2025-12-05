@@ -152,6 +152,10 @@ class PromptTemplateOverrides(BaseModel):
         default=None,
         description="System prompt text for the category suggestion workflow.",
     )
+    chain_summary: str | None = Field(
+        default=None,
+        description="System prompt text for the prompt chain summary workflow.",
+    )
 
 
 class SettingsError(Exception):
