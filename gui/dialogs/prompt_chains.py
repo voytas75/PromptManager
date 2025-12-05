@@ -1,6 +1,7 @@
 """Prompt chain management surfaces for the GUI.
 
 Updates:
+  v0.5.11 - 2025-12-05 - Ensure wrapped results by removing code fences from chain IO sections.
   v0.5.10 - 2025-12-05 - Add line wrap toggle for execution results pane (on by default).
   v0.5.9 - 2025-12-05 - Display chain summary preference and render condensed outputs.
   v0.5.8 - 2025-12-05 - Render step inputs/outputs without code fences for Markdown previews.
@@ -609,25 +610,31 @@ class PromptChainManagerPanel(QWidget):
 
         # Chain inputs
         plain_sections.append("Input to chain")
+        markdown_lines.append("## Input to chain")
+        markdown_lines.append("")
         if result.variables:
             chain_input = self._format_json(result.variables)
             plain_sections.extend(_indent_lines(chain_input))
-            markdown_lines.extend(["## Input to chain", "```json", chain_input, "```"])
+            markdown_lines.extend(chain_input.splitlines())
         else:
             plain_sections.append("  (no chain variables provided)")
-            markdown_lines.extend(["## Input to chain", "- (no chain variables provided)"])
+            markdown_lines.append("- (no chain variables provided)")
         plain_sections.append("")
+        markdown_lines.append("")
 
         # Chain outputs
         plain_sections.append("Chain Outputs")
+        markdown_lines.append("## Chain outputs")
+        markdown_lines.append("")
         if result.outputs:
             outputs_text = self._format_json(result.outputs)
             plain_sections.extend(_indent_lines(outputs_text))
-            markdown_lines.extend(["", "## Chain outputs", "```json", outputs_text, "```"])
+            markdown_lines.extend(outputs_text.splitlines())
         else:
             plain_sections.append("  (no outputs)")
-            markdown_lines.extend(["", "## Chain outputs", "- (no outputs)"])
+            markdown_lines.append("- (no outputs)")
         plain_sections.append("")
+        markdown_lines.append("")
 
         if result.summary:
             summary_text = result.summary.strip()

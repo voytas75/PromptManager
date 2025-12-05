@@ -230,6 +230,19 @@ def test_prompt_chain_dialog_wrap_toggle_changes_line_mode(qt_app: QApplication)
         dialog.deleteLater()
 
 
+def test_prompt_chain_markdown_omits_code_fences(qt_app: QApplication) -> None:
+    """Markdown output should avoid code fences so wrapping works everywhere."""
+
+    manager = _ManagerStub()
+    dialog = PromptChainManagerDialog(manager)
+    try:
+        dialog._run_selected_chain()  # noqa: SLF001
+        assert "```" not in dialog._result_markdown  # noqa: SLF001
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
 def test_prompt_chain_step_markdown_renders_without_code_fences(qt_app: QApplication) -> None:
     """Step inputs/outputs should render markdown content directly."""
 
