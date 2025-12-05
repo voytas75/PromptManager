@@ -1,6 +1,7 @@
 """Analytics dashboard panel wiring for the Prompt Manager GUI.
 
 Updates:
+  v0.1.2 - 2025-12-05 - Make usage table prompts clickable to open the editor.
   v0.1.1 - 2025-11-29 - Wrap analytics strings to satisfy Ruff line-length rules.
   v0.1.0 - 2025-11-28 - Introduce dashboard tab with charts and CSV export.
 """
@@ -10,7 +11,8 @@ from __future__ import annotations
 import csv
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
+from uuid import UUID
 
 from PySide6.QtCharts import (
     QBarCategoryAxis,
@@ -25,6 +27,7 @@ from PySide6.QtCharts import (
 from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QComboBox,
     QFileDialog,
     QHBoxLayout,
@@ -63,6 +66,7 @@ class AnalyticsDashboardPanel(QWidget):
         parent: QWidget | None = None,
         *,
         usage_log_path: Path | None = None,
+        prompt_edit_callback: Callable[[UUID], None] | None = None,
     ) -> None:
         """Initialise analytics widgets and load persisted preferences."""
         super().__init__(parent)
@@ -80,6 +84,8 @@ class AnalyticsDashboardPanel(QWidget):
         self._settings = QSettings("PromptManager", "AnalyticsPanel")
         self._initial_window_days = self._settings.value("windowDays", 30, int)
         self._initial_prompt_limit = self._settings.value("promptLimit", 5, int)
+        self._prompt_edit_callback = prompt_edit_callback
+        self._usage_row_prompt_ids: dict[int, UUID] = {}
         self._build_ui()
         self._apply_initial_preferences()
         self.refresh()
@@ -143,7 +149,10 @@ class AnalyticsDashboardPanel(QWidget):
         self._table.setColumnCount(0)
         self._table.setRowCount(0)
         self._table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self._table.setSelectionMode(QTableWidget.NoSelection)
+        self._table.setSelectionMode(QAbstractItemView.SingleSelection)
+        self._table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self._table.cellDoubleClicked.connect(self._handle_table_cell_activated)  # type: ignore[arg-type]
+        self._table.itemActivated.connect(self._handle_table_item_activated)  # type: ignore[arg-type]
         layout.addWidget(self._table, stretch=1)
 
         self._embedding_summary.setWordWrap(True)
@@ -306,10 +315,11 @@ class AnalyticsDashboardPanel(QWidget):
 
         headers: list[str]
         rows: list[list[str]]
+        self._usage_row_prompt_ids.clear()
         if dataset_key == "usage":
             headers = ["Prompt", "Usage Count", "Success Rate", "Last Used"]
             rows = []
-            for entry in snapshot.usage_frequency:
+            for index, entry in enumerate(snapshot.usage_frequency):
                 last_used = (
                     entry.last_executed_at.isoformat(timespec="seconds")
                     if entry.last_executed_at
@@ -323,6 +333,7 @@ class AnalyticsDashboardPanel(QWidget):
                         last_used,
                     ]
                 )
+                self._usage_row_prompt_ids[index] = entry.prompt_id
         elif dataset_key == "model_costs":
             headers = ["Model", "Runs", "Prompt Tokens", "Completion Tokens", "Total Tokens"]
             rows = [
@@ -382,6 +393,7 @@ class AnalyticsDashboardPanel(QWidget):
                     ["Missing", str(len(report.missing_prompts))],
                     ["Dimension mismatches", str(len(report.mismatched_prompts))],
                 ]
+            self._usage_row_prompt_ids.clear()
 
         self._table.setColumnCount(len(headers))
         self._table.setHorizontalHeaderLabels(headers)
@@ -390,6 +402,24 @@ class AnalyticsDashboardPanel(QWidget):
             for column_index, value in enumerate(row):
                 self._table.setItem(row_index, column_index, QTableWidgetItem(value))
         self._table.resizeColumnsToContents()
+
+    def _handle_table_cell_activated(self, row: int, _: int) -> None:
+        self._activate_usage_row(row)
+
+    def _handle_table_item_activated(self, item: QTableWidgetItem) -> None:
+        if item is None:
+            return
+        self._activate_usage_row(item.row())
+
+    def _activate_usage_row(self, row: int) -> None:
+        if self._dataset_combo.currentData() != "usage":
+            return
+        if self._prompt_edit_callback is None:
+            return
+        prompt_id = self._usage_row_prompt_ids.get(row)
+        if prompt_id is None:
+            return
+        self._prompt_edit_callback(prompt_id)
 
     def _update_embedding_summary(self) -> None:
         snapshot = self._snapshot

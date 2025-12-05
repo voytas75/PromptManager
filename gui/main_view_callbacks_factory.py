@@ -52,6 +52,7 @@ def build_main_view_callbacks(window: MainWindow) -> MainViewCallbacks:
         save_result_clicked=workspace_input.save_result,
         share_result_clicked=prompt_actions.share_result,
         speak_result_clicked=workspace_input.play_result_audio,
+        edit_prompt_by_id=window._prompt_actions_bridge.edit_prompt_by_id,  # type: ignore[attr-defined]
         filters_changed=prompt_search.filters_changed,
         sort_changed=prompt_search.sort_changed,
         manage_categories_clicked=prompt_actions.manage_categories,

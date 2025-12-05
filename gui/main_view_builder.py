@@ -83,6 +83,7 @@ class MainViewCallbacks:
     save_result_clicked: Callable[[], None]
     share_result_clicked: Callable[[], None]
     speak_result_clicked: Callable[[], None]
+    edit_prompt_by_id: Callable[[UUID], None]
     filters_changed: Callable[..., None]
     sort_changed: Callable[[str], None]
     manage_categories_clicked: Callable[[], None]
@@ -416,6 +417,7 @@ def build_main_view(
         manager,
         parent,
         usage_log_path=usage_log_path,
+        prompt_edit_callback=callbacks.edit_prompt_by_id,
     )
 
     tab_widget.addTab(result_tab, "Prompts")

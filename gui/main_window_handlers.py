@@ -109,6 +109,22 @@ class PromptActionsHandler:
             return
         flow.edit_prompt(target)
 
+    def edit_prompt_by_id(self, prompt_id: UUID) -> None:
+        """Fetch a prompt by *prompt_id* and open it in the editor."""
+        try:
+            prompt = self._manager.get_prompt(prompt_id)
+        except PromptNotFoundError:
+            QMessageBox.warning(
+                self._parent,
+                "Prompt missing",
+                "The selected prompt no longer exists in the catalogue.",
+            )
+            return
+        except PromptStorageError as exc:
+            QMessageBox.critical(self._parent, "Unable to load prompt", str(exc))
+            return
+        self.edit_prompt(prompt)
+
     def fork_prompt(self) -> None:
         """Fork the currently selected prompt."""
         prompt = self._current_prompt_supplier()
