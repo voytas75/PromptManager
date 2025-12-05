@@ -1,6 +1,7 @@
 """Prompt chain manager dialog tests.
 
 Updates:
+  v0.2.2 - 2025-12-05 - Validate expanded chain result text sections.
   v0.2.1 - 2025-12-05 - Adjust assertions for new description label.
   v0.2.0 - 2025-12-04 - Cover GUI CRUD helpers via editor and manager dialog actions.
   v0.1.0 - 2025-12-04 - Ensure dialog populates details and executes chains.
@@ -125,7 +126,9 @@ def test_prompt_chain_dialog_runs_chain(qt_app: QApplication) -> None:
         dialog._run_selected_chain()  # noqa: SLF001
         assert manager.runs
         assert manager.runs[0]["variables"] == {"foo": "bar"}
-        assert "Outputs" in dialog._result_view.toPlainText()  # noqa: SLF001
+        text = dialog._result_view.toPlainText()  # noqa: SLF001
+        assert "Input to chain" in text
+        assert "Chain outputs" in text
     finally:
         dialog.close()
         dialog.deleteLater()

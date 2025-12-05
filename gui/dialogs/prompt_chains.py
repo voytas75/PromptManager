@@ -1,6 +1,7 @@
 """Prompt chain management surfaces for the GUI.
 
 Updates:
+  v0.5.4 - 2025-12-05 - Expand execution results with labeled inputs/outputs per step.
   v0.5.3 - 2025-12-05 - Split detail column vertically, persist run variables, and replace description editor with static text.
   v0.5.2 - 2025-12-05 - Persist chain splitters immediately so tabbed windows remember widths.
   v0.5.1 - 2025-12-05 - Add Markdown toggle for execution results with rich-text rendering.
@@ -561,47 +562,80 @@ class PromptChainManagerPanel(QWidget):
 
     def _display_run_result(self, result: PromptChainRunResult) -> None:
         """Render execution outputs and per-step summary for *result*."""
-        outputs_section = ["Outputs:"]
-        if not result.outputs:
-            outputs_section.append("  (no outputs)")
-        else:
-            for key, value in result.outputs.items():
-                outputs_section.append(f"  {key}: {value}")
+        def _dump_json(payload: Mapping[str, Any]) -> str:
+            try:
+                return json.dumps(payload, indent=2, sort_keys=True, default=str)
+            except TypeError:
+                return json.dumps(
+                    {str(key): str(value) for key, value in payload.items()},
+                    indent=2,
+                    sort_keys=True,
+                )
 
-        steps_section = ["\nSteps:"]
+        def _indent_lines(text: str, prefix: str = "  ") -> list[str]:
+            if not text.strip():
+                return [f"{prefix}(empty)"]
+            return [f"{prefix}{line}" for line in text.splitlines()]
+
+        plain_sections: list[str] = []
+        markdown_lines: list[str] = []
+
+        # Chain inputs
+        plain_sections.append("Input to chain")
+        if result.variables:
+            chain_input = _dump_json(result.variables)
+            plain_sections.extend(_indent_lines(chain_input))
+            markdown_lines.extend(["## Input to chain", "```json", chain_input, "```"])
+        else:
+            plain_sections.append("  (no chain variables provided)")
+            markdown_lines.extend(["## Input to chain", "- (no chain variables provided)"])
+        plain_sections.append("")
+
+        # Chain outputs
+        plain_sections.append("Chain Outputs")
+        if result.outputs:
+            outputs_text = _dump_json(result.outputs)
+            plain_sections.extend(_indent_lines(outputs_text))
+            markdown_lines.extend(["", "## Chain outputs", "```json", outputs_text, "```"])
+        else:
+            plain_sections.append("  (no outputs)")
+            markdown_lines.extend(["", "## Chain outputs", "- (no outputs)"])
+        plain_sections.append("")
+
+        # Steps
+        if result.steps:
+            markdown_lines.append("")
+            markdown_lines.append("## Step details")
         for step_run in result.steps:
-            prefix = {
-                "success": "[OK]",
-                "skipped": "[SKIP]",
-            }.get(step_run.status, "[ERR]")
-            summary = f"{prefix} {step_run.step.order_index}. {step_run.step.output_variable}"
-            has_success = step_run.status == "success"
-            has_response = bool(step_run.outcome and step_run.outcome.result.response_text)
-            if has_success and has_response:
-                preview = step_run.outcome.result.response_text.strip()
-                if len(preview) > 120:
-                    preview = preview[:117].rstrip() + "…"
-                summary += f" -> {preview or '(empty response)'}"
+            step = step_run.step
+            step_label = step.output_variable or str(step.prompt_id)
+            plain_sections.append(f"Step {step.order_index}: {step_label}")
+            plain_sections.append(f"  Status: {step_run.status}")
+            markdown_lines.append(f"### Step {step.order_index} – {step_label}")
+            markdown_lines.append(f"- **Status:** `{step_run.status}`")
+            if step_run.error:
+                plain_sections.append(f"  Error: {step_run.error}")
+                markdown_lines.append(f"- **Error:** {step_run.error}")
             elif step_run.status == "skipped":
-                summary += " (condition false)"
-            elif step_run.error:
-                summary += f": {step_run.error}"
-            steps_section.append(summary)
+                plain_sections.append("  Skipped because condition evaluated to false.")
+                markdown_lines.append("- _Skipped because condition evaluated to false._")
+            outcome = step_run.outcome
+            if outcome:
+                request_text = outcome.result.request_text.strip()
+                response_text = outcome.result.response_text.strip()
+                plain_sections.append("  Input to step:")
+                plain_sections.extend(_indent_lines(request_text or "(empty input)"))
+                plain_sections.append("  Output of step:")
+                plain_sections.extend(_indent_lines(response_text or "(empty response)"))
+                markdown_lines.append("**Input to step:**")
+                markdown_lines.extend(["```", request_text or "(empty input)", "```"])
+                markdown_lines.append("**Output of step:**")
+                markdown_lines.extend(["```", response_text or "(empty response)", "```"])
+            plain_sections.append("")
+            markdown_lines.append("")
 
-        plain_text = "\n".join(outputs_section + steps_section)
-        markdown_lines = ["## Outputs"]
-        if not result.outputs:
-            markdown_lines.append("- (no outputs)")
-        else:
-            for key, value in result.outputs.items():
-                markdown_lines.append(f"- **{key}**: {value}")
-        markdown_lines.extend(["", "## Steps"])
-        if not result.steps:
-            markdown_lines.append("- (no steps recorded)")
-        else:
-            for summary in steps_section[1:]:
-                markdown_lines.append(f"- {summary.strip()}")
-        markdown_text = "\n".join(markdown_lines)
+        plain_text = "\n".join(plain_sections).strip()
+        markdown_text = "\n".join(markdown_lines).strip()
         self._result_plaintext = plain_text
         self._result_markdown = markdown_text
         self._apply_result_view()
