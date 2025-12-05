@@ -1,6 +1,7 @@
 """Prompt chain management surfaces for the GUI.
 
 Updates:
+  v0.5.10 - 2025-12-05 - Add line wrap toggle for execution results pane (on by default).
   v0.5.9 - 2025-12-05 - Display chain summary preference and render condensed outputs.
   v0.5.8 - 2025-12-05 - Render step inputs/outputs without code fences for Markdown previews.
   v0.5.7 - 2025-12-05 - Preserve chain results when toggling Markdown formatting.
@@ -249,11 +250,16 @@ class PromptChainManagerPanel(QWidget):
         self._auto_scroll_checkbox = QCheckBox("Auto-scroll", results_container)
         self._auto_scroll_checkbox.setChecked(True)
         results_header.addWidget(self._auto_scroll_checkbox)
+        self._wrap_checkbox = QCheckBox("Wrap lines", results_container)
+        self._wrap_checkbox.setChecked(True)
+        self._wrap_checkbox.toggled.connect(self._handle_wrap_changed)  # type: ignore[arg-type]
+        results_header.addWidget(self._wrap_checkbox)
 
         self._result_view = QTextEdit(results_container)
         self._result_view.setReadOnly(True)
         self._result_view.setPlaceholderText("Execution results, outputs, and per-step summary.")
         self._result_view.setAcceptRichText(True)
+        self._handle_wrap_changed(True)
         results_layout.addWidget(self._result_view, 1)
         self._stream_preview_active = False
         self._stream_buffers: dict[str, str] = {}
@@ -729,6 +735,13 @@ class PromptChainManagerPanel(QWidget):
     def _handle_result_format_changed(self, _: bool) -> None:
         """Switch between Markdown and plain text views."""
         self._apply_result_view()
+
+    def _handle_wrap_changed(self, checked: bool) -> None:
+        """Toggle line wrapping for the execution results view."""
+        if checked:
+            self._result_view.setLineWrapMode(QTextEdit.WidgetWidth)
+        else:
+            self._result_view.setLineWrapMode(QTextEdit.NoWrap)
 
     def _apply_result_view(self) -> None:
         """Render stored results using the current format preference."""

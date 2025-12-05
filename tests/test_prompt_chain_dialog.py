@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 pytest.importorskip("PySide6")
-from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
+from PySide6.QtWidgets import QApplication, QDialog, QMessageBox, QTextEdit
 
 from core import PromptChainRunResult, PromptChainStepRun
 from core.execution import CodexExecutionResult
@@ -210,6 +210,21 @@ def test_prompt_chain_markdown_toggle_preserves_text(qt_app: QApplication) -> No
         assert toggled_text
         assert "Input to chain" in toggled_text
         assert "Chain Outputs" in toggled_text
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
+def test_prompt_chain_dialog_wrap_toggle_changes_line_mode(qt_app: QApplication) -> None:
+    """Wrap checkbox should control the result view line wrap mode."""
+
+    manager = _ManagerStub()
+    dialog = PromptChainManagerDialog(manager)
+    try:
+        assert dialog._wrap_checkbox.isChecked() is True  # noqa: SLF001
+        assert dialog._result_view.lineWrapMode() == QTextEdit.WidgetWidth  # noqa: SLF001
+        dialog._wrap_checkbox.setChecked(False)  # noqa: SLF001
+        assert dialog._result_view.lineWrapMode() == QTextEdit.NoWrap  # noqa: SLF001
     finally:
         dialog.close()
         dialog.deleteLater()
