@@ -1,6 +1,7 @@
 """Prompt chain manager dialog tests.
 
 Updates:
+  v0.2.1 - 2025-12-05 - Adjust assertions for new description label.
   v0.2.0 - 2025-12-04 - Cover GUI CRUD helpers via editor and manager dialog actions.
   v0.1.0 - 2025-12-04 - Ensure dialog populates details and executes chains.
 """
@@ -108,8 +109,7 @@ def test_prompt_chain_dialog_populates_details(qt_app: QApplication) -> None:
     try:
         assert dialog._chain_list.count() == 1  # noqa: SLF001 - accessed for test visibility
         assert dialog._detail_title.text() == "Demo Chain"
-        assert "Steps" not in dialog._description_view.placeholderText()
-        assert "Example" in dialog._description_view.toPlainText()
+        assert "Example" in dialog._description_label.text()
     finally:
         dialog.close()
         dialog.deleteLater()

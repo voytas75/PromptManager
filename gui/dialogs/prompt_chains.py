@@ -1,6 +1,7 @@
 """Prompt chain management surfaces for the GUI.
 
 Updates:
+  v0.5.3 - 2025-12-05 - Split detail column vertically, persist run variables, and replace description editor with static text.
   v0.5.2 - 2025-12-05 - Persist chain splitters immediately so tabbed windows remember widths.
   v0.5.1 - 2025-12-05 - Add Markdown toggle for execution results with rich-text rendering.
   v0.5.0 - 2025-12-05 - Split execution results into a dedicated column with persisted splitter state.
@@ -76,6 +77,8 @@ class PromptChainManagerPanel(QWidget):
         self._settings = QSettings("PromptManager", "PromptChainManagerPanel")
         self._result_plaintext: str = ""
         self._result_markdown: str = ""
+        self._suppress_variable_signal = False
+        self._current_variables_chain_id: str | None = None
 
         layout = QVBoxLayout(self)
         intro = QLabel(
@@ -142,53 +145,81 @@ class PromptChainManagerPanel(QWidget):
         detail_layout.setContentsMargins(8, 8, 8, 8)
         detail_layout.setSpacing(10)
 
-        self._detail_title = QLabel("Select a prompt chain to view details.", detail_container)
+        self._detail_splitter = QSplitter(Qt.Vertical, detail_container)
+        self._detail_splitter.setObjectName("promptChainDetailSplitter")
+        detail_layout.addWidget(self._detail_splitter, 1)
+
+        info_container = QFrame(self._detail_splitter)
+        info_layout = QVBoxLayout(info_container)
+        info_layout.setContentsMargins(0, 0, 0, 0)
+        info_layout.setSpacing(6)
+
+        self._detail_title = QLabel("Select a prompt chain to view details.", info_container)
         self._detail_title.setObjectName("promptChainDetailTitle")
         self._detail_title.setStyleSheet("font-size:16px;font-weight:600;")
-        detail_layout.addWidget(self._detail_title)
+        info_layout.addWidget(self._detail_title)
 
-        self._detail_status = QLabel("", detail_container)
-        detail_layout.addWidget(self._detail_status)
+        self._detail_status = QLabel("", info_container)
+        info_layout.addWidget(self._detail_status)
 
-        self._description_view = QPlainTextEdit(detail_container)
-        self._description_view.setReadOnly(True)
-        self._description_view.setPlaceholderText("Chain description")
-        detail_layout.addWidget(self._description_view)
+        self._description_label = QLabel("(No description provided.)", info_container)
+        self._description_label.setWordWrap(True)
+        self._description_label.setObjectName("promptChainDescription")
+        self._description_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        info_layout.addWidget(self._description_label)
 
-        self._schema_view = QPlainTextEdit(detail_container)
+        self._schema_view = QPlainTextEdit(info_container)
         self._schema_view.setReadOnly(True)
         self._schema_view.setPlaceholderText("Variables schema (JSON schema, optional)")
-        detail_layout.addWidget(self._schema_view)
+        info_layout.addWidget(self._schema_view, 1)
 
-        steps_label = QLabel("Steps", detail_container)
-        detail_layout.addWidget(steps_label)
+        steps_container = QFrame(self._detail_splitter)
+        steps_layout = QVBoxLayout(steps_container)
+        steps_layout.setContentsMargins(0, 0, 0, 0)
+        steps_layout.setSpacing(6)
 
-        self._steps_table = QTableWidget(0, 5, detail_container)
+        steps_label = QLabel("Steps", steps_container)
+        steps_layout.addWidget(steps_label)
+
+        self._steps_table = QTableWidget(0, 5, steps_container)
         self._steps_table.setHorizontalHeaderLabels(
             ["Order", "Prompt", "Input", "Output variable", "Condition"]
         )
         self._steps_table.horizontalHeader().setStretchLastSection(True)
         self._steps_table.verticalHeader().setVisible(False)
         self._steps_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        detail_layout.addWidget(self._steps_table, 1)
+        steps_layout.addWidget(self._steps_table, 1)
 
-        run_header = QLabel("Run Chain", detail_container)
+        run_container = QFrame(self._detail_splitter)
+        run_layout = QVBoxLayout(run_container)
+        run_layout.setContentsMargins(0, 0, 0, 0)
+        run_layout.setSpacing(6)
+
+        run_header = QLabel("Run Chain", run_container)
         run_header.setStyleSheet("font-weight:600;")
-        detail_layout.addWidget(run_header)
+        run_layout.addWidget(run_header)
 
-        self._variables_input = QPlainTextEdit(detail_container)
+        self._variables_input = QPlainTextEdit(run_container)
         self._variables_input.setPlaceholderText("Enter JSON object for chain variables")
-        detail_layout.addWidget(self._variables_input)
+        self._variables_input.textChanged.connect(self._handle_variables_changed)  # type: ignore[arg-type]
+        run_layout.addWidget(self._variables_input, 1)
 
         actions_row = QHBoxLayout()
-        self._run_button = QPushButton("Run Chain", detail_container)
+        self._run_button = QPushButton("Run Chain", run_container)
         self._run_button.clicked.connect(self._run_selected_chain)  # type: ignore[arg-type]
         actions_row.addWidget(self._run_button)
-        self._clear_vars_button = QPushButton("Clear Variables", detail_container)
+        self._clear_vars_button = QPushButton("Clear Variables", run_container)
         self._clear_vars_button.clicked.connect(self._variables_input.clear)  # type: ignore[arg-type]
         actions_row.addWidget(self._clear_vars_button)
         actions_row.addStretch(1)
-        detail_layout.addLayout(actions_row)
+        run_layout.addLayout(actions_row)
+
+        self._detail_splitter.addWidget(info_container)
+        self._detail_splitter.addWidget(steps_container)
+        self._detail_splitter.addWidget(run_container)
+        self._detail_splitter.setStretchFactor(0, 1)
+        self._detail_splitter.setStretchFactor(1, 2)
+        self._detail_splitter.setStretchFactor(2, 1)
 
         results_container = QFrame(self._outer_splitter)
         results_layout = QVBoxLayout(results_container)
@@ -228,6 +259,7 @@ class PromptChainManagerPanel(QWidget):
         self._outer_splitter.setStretchFactor(1, 2)
         self._outer_splitter.splitterMoved.connect(self._handle_splitter_moved)  # type: ignore[arg-type]
         self._management_splitter.splitterMoved.connect(self._handle_splitter_moved)  # type: ignore[arg-type]
+        self._detail_splitter.splitterMoved.connect(self._handle_splitter_moved)  # type: ignore[arg-type]
 
         self._restore_splitter_state()
         self._load_chains()
@@ -312,11 +344,13 @@ class PromptChainManagerPanel(QWidget):
         if chain is None:
             self._detail_title.setText("Select a prompt chain to view details.")
             self._detail_status.setText("")
-            self._description_view.clear()
+            self._description_label.setText("(No description provided.)")
             self._schema_view.clear()
             self._steps_table.setRowCount(0)
             self._result_view.clear()
             self._run_button.setEnabled(False)
+            self._current_variables_chain_id = None
+            self._set_variables_text("")
             return
 
         self._detail_title.setText(chain.name)
@@ -325,7 +359,7 @@ class PromptChainManagerPanel(QWidget):
         self._detail_status.setText(
             f"Status: {status} • Steps: {len(chain.steps)} • Updated {updated_at_text}"
         )
-        self._description_view.setPlainText(chain.description or "(No description provided.)")
+        self._description_label.setText(chain.description or "(No description provided.)")
         schema_text = (
             json.dumps(chain.variables_schema, indent=2, sort_keys=True)
             if chain.variables_schema
@@ -335,6 +369,8 @@ class PromptChainManagerPanel(QWidget):
         self._populate_steps_table(chain)
         self._result_view.clear()
         self._run_button.setEnabled(chain.is_active and bool(chain.steps))
+        self._current_variables_chain_id = str(chain.id)
+        self._set_variables_text(self._load_variables_text(self._current_variables_chain_id))
 
     def _populate_steps_table(self, chain: PromptChain) -> None:
         """Fill the steps table using ``chain.steps``."""
@@ -583,11 +619,15 @@ class PromptChainManagerPanel(QWidget):
         inner_state = self._settings.value("managementSplitterState")
         if isinstance(inner_state, QByteArray):
             self._management_splitter.restoreState(inner_state)
+        detail_state = self._settings.value("detailSplitterState")
+        if isinstance(detail_state, QByteArray):
+            self._detail_splitter.restoreState(detail_state)
 
     def _persist_splitter_state(self) -> None:
         """Save splitter positions for the next session."""
         self._settings.setValue("outerSplitterState", self._outer_splitter.saveState())
         self._settings.setValue("managementSplitterState", self._management_splitter.saveState())
+        self._settings.setValue("detailSplitterState", self._detail_splitter.saveState())
 
     def _handle_clear_results(self) -> None:
         """Reset the execution results pane."""
@@ -615,6 +655,39 @@ class PromptChainManagerPanel(QWidget):
     def _handle_splitter_moved(self, _: int, __: int) -> None:
         """Persist splitter state whenever the user resizes panes."""
         self._persist_splitter_state()
+
+    def _handle_variables_changed(self) -> None:
+        """Persist chain variable text whenever it changes."""
+        if self._suppress_variable_signal:
+            return
+        chain_id = self._current_variables_chain_id
+        if not chain_id:
+            return
+        self._settings.setValue(
+            self._variables_settings_key(chain_id),
+            self._variables_input.toPlainText(),
+        )
+
+    def _set_variables_text(self, text: str) -> None:
+        """Apply text to the variables editor without triggering persistence."""
+        self._suppress_variable_signal = True
+        self._variables_input.setPlainText(text)
+        self._suppress_variable_signal = False
+
+    def _load_variables_text(self, chain_id: str | None) -> str:
+        """Load saved variable JSON for the given chain."""
+        if not chain_id:
+            return ""
+        stored = self._settings.value(self._variables_settings_key(chain_id))
+        if isinstance(stored, str):
+            return stored
+        if stored is None:
+            return ""
+        return str(stored)
+
+    def _variables_settings_key(self, chain_id: str) -> str:
+        """Return the QSettings key for persisted variable payloads."""
+        return f"chainVariables/{chain_id}"
 
 
 class PromptChainManagerDialog(QDialog):
