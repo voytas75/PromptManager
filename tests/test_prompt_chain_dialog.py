@@ -1,6 +1,7 @@
 """Prompt chain manager dialog tests.
 
 Updates:
+  v0.2.7 - 2025-12-05 - Cover default-on web search toggle behaviour for chains.
   v0.2.6 - 2025-12-05 - Cover summarize toggle persistence and UI output section.
   v0.2.5 - 2025-12-05 - Ensure step IO renders outside code fences for Markdown formatting.
   v0.2.4 - 2025-12-05 - Verify Markdown toggle preserves rendered text.
@@ -20,6 +21,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 pytest.importorskip("PySide6")
+from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QApplication, QDialog, QMessageBox, QTextEdit
 
 from core import PromptChainRunResult, PromptChainStepRun
@@ -43,6 +45,16 @@ def qt_app() -> QApplication:
     return app
 
 
+@pytest.fixture(autouse=True)
+def reset_chain_panel_settings() -> None:
+    """Reset QSettings used by the chain panel between tests."""
+
+    settings = QSettings("PromptManager", "PromptChainManagerPanel")
+    settings.clear()
+    yield
+    settings.clear()
+
+
 class _ManagerStub:
     def __init__(
         self,
@@ -64,6 +76,7 @@ class _ManagerStub:
         self._step_request_text = step_request_text
         self._step_response_text = step_response_text
         self._step_reasoning_text = step_reasoning_text
+        self.last_use_web_search: bool | None = None
 
     @property
     def repository(self):  # pragma: no cover - only used by DialogLauncher in real app
@@ -91,9 +104,19 @@ class _ManagerStub:
         *,
         variables: dict[str, Any] | None = None,
         stream_callback: Callable[[PromptChainStep, str, bool], None] | None = None,
+        use_web_search: bool | None = None,
+        web_search_limit: int = 10,
     ):
-        self.runs.append({"chain_id": chain_id, "variables": variables or {}})
+        self.runs.append(
+            {
+                "chain_id": chain_id,
+                "variables": variables or {},
+                "use_web_search": use_web_search,
+                "web_search_limit": web_search_limit,
+            }
+        )
         self.received_stream_callback = stream_callback
+        self.last_use_web_search = use_web_search
         chain = next((entry for entry in self._chains if entry.id == chain_id), self._chains[0])
         if stream_callback is not None:
             for chunk in self._stream_chunks:
@@ -183,6 +206,7 @@ def test_prompt_chain_dialog_runs_chain(qt_app: QApplication) -> None:
         dialog._run_selected_chain()  # noqa: SLF001
         assert manager.runs
         assert manager.runs[0]["variables"] == {"foo": "bar"}
+        assert manager.runs[0]["use_web_search"] is True
         text = dialog._result_view.toPlainText()  # noqa: SLF001
         assert "Input to chain" in text
         assert "Chain outputs" in text
@@ -201,6 +225,23 @@ def test_prompt_chain_dialog_renders_chain_summary(qt_app: QApplication) -> None
         text = dialog._result_view.toPlainText()  # noqa: SLF001
         assert "Chain summary" in text
         assert "Demo summary" in text
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
+def test_prompt_chain_dialog_respects_web_search_toggle(qt_app: QApplication) -> None:
+    """Web search checkbox should control manager invocation flag."""
+
+    manager = _ManagerStub()
+    dialog = PromptChainManagerDialog(manager)
+    try:
+        dialog._web_search_checkbox.setChecked(False)  # noqa: SLF001
+        dialog._run_selected_chain()  # noqa: SLF001
+        assert manager.last_use_web_search is False
+        dialog._web_search_checkbox.setChecked(True)  # noqa: SLF001
+        dialog._run_selected_chain()  # noqa: SLF001
+        assert manager.last_use_web_search is True
     finally:
         dialog.close()
         dialog.deleteLater()

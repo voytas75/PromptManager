@@ -2,6 +2,12 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.22.5] - 2025-12-05
+
+### Added
+
+- Prompt chain executions now share the default-on “Use web search” enrichment: the Chain tab exposes a persisted checkbox, the CLI gained a `--no-web-search` override, and the backend injects provider snippets ahead of every step when a web search service is configured.
+
 ## [0.22.4] - 2025-12-05
 
 ### Added

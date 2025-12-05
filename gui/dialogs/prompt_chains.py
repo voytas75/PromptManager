@@ -1,6 +1,7 @@
 """Prompt chain management surfaces for the GUI.
 
 Updates:
+  v0.5.13 - 2025-12-05 - Add default-on web search toggle for chain executions.
   v0.5.12 - 2025-12-05 - Color-code results sections and surface reasoning summaries.
   v0.5.11 - 2025-12-05 - Ensure wrapped results by removing code fences from chain IO sections.
   v0.5.10 - 2025-12-05 - Add line wrap toggle for execution results pane (on by default).
@@ -164,6 +165,7 @@ class PromptChainManagerPanel(QWidget):
         self._result_richtext: str = ""
         self._suppress_variable_signal = False
         self._current_variables_chain_id: str | None = None
+        self._web_search_checkbox: QCheckBox | None = None
 
         layout = QVBoxLayout(self)
         intro = QLabel(
@@ -296,6 +298,15 @@ class PromptChainManagerPanel(QWidget):
         self._clear_vars_button = QPushButton("Clear Variables", run_container)
         self._clear_vars_button.clicked.connect(self._variables_input.clear)  # type: ignore[arg-type]
         actions_row.addWidget(self._clear_vars_button)
+        self._web_search_checkbox = QCheckBox("Use web search", run_container)
+        self._web_search_checkbox.setChecked(self._load_web_search_preference())
+        self._web_search_checkbox.setToolTip(
+            "Include live web search findings before each chain step executes."
+        )
+        self._web_search_checkbox.stateChanged.connect(  # type: ignore[arg-type]
+            self._handle_web_search_toggle
+        )
+        actions_row.addWidget(self._web_search_checkbox)
         actions_row.addStretch(1)
         run_layout.addLayout(actions_row)
 
@@ -451,6 +462,8 @@ class PromptChainManagerPanel(QWidget):
             self._steps_table.setRowCount(0)
             self._result_view.clear()
             self._run_button.setEnabled(False)
+            if self._web_search_checkbox is not None:
+                self._web_search_checkbox.setEnabled(False)
             self._current_variables_chain_id = None
             self._set_variables_text("")
             return
@@ -476,6 +489,8 @@ class PromptChainManagerPanel(QWidget):
         self._populate_steps_table(chain)
         self._result_view.clear()
         self._run_button.setEnabled(chain.is_active and bool(chain.steps))
+        if self._web_search_checkbox is not None:
+            self._web_search_checkbox.setEnabled(bool(chain.steps))
         self._current_variables_chain_id = str(chain.id)
         self._set_variables_text(self._load_variables_text(self._current_variables_chain_id))
 
@@ -646,12 +661,19 @@ class PromptChainManagerPanel(QWidget):
             variables = {}
 
         previous_status = self._detail_status.text()
+        use_web_search = bool(self._web_search_checkbox.isChecked()) if self._web_search_checkbox else True
         self._detail_status.setText(f"Running '{chain.name}'…")
         streaming_enabled = self._is_streaming_enabled()
         stream_callback = self._handle_step_stream if streaming_enabled else None
         if streaming_enabled:
             self._begin_stream_preview(chain, variables)
-            self._run_chain_async(chain, variables, previous_status, stream_callback)
+            self._run_chain_async(
+                chain,
+                variables,
+                previous_status,
+                stream_callback,
+                use_web_search,
+            )
             return
 
         indicator = ProcessingIndicator(self, f"Running '{chain.name}'…", title="Prompt Chain")
@@ -661,6 +683,7 @@ class PromptChainManagerPanel(QWidget):
                 chain.id,
                 variables=variables,
                 stream_callback=stream_callback,
+                use_web_search=use_web_search,
             )
         except PromptChainExecutionError as exc:
             QMessageBox.critical(self, "Chain failed", str(exc))
@@ -1057,6 +1080,21 @@ class PromptChainManagerPanel(QWidget):
         self._variables_input.setPlainText(text)
         self._suppress_variable_signal = False
 
+    def _load_web_search_preference(self) -> bool:
+        stored = self._settings.value("chainWebSearchEnabled", True)
+        if isinstance(stored, bool):
+            return stored
+        if isinstance(stored, str):
+            lowered = stored.strip().lower()
+            if lowered in {"true", "1", "yes"}:
+                return True
+            if lowered in {"false", "0", "no"}:
+                return False
+        return True
+
+    def _handle_web_search_toggle(self, state: int) -> None:
+        self._settings.setValue("chainWebSearchEnabled", state == Qt.Checked)
+
     def _load_variables_text(self, chain_id: str | None) -> str:
         """Load saved variable JSON for the given chain."""
         if not chain_id:
@@ -1078,6 +1116,7 @@ class PromptChainManagerPanel(QWidget):
         variables: Mapping[str, Any],
         previous_status: str,
         stream_callback: Callable[[PromptChainStep, str, bool], None] | None,
+        use_web_search: bool,
     ) -> None:
         """Execute the chain on a worker thread while showing live stream updates."""
         payload: dict[str, object] = {}
@@ -1088,6 +1127,7 @@ class PromptChainManagerPanel(QWidget):
                     chain.id,
                     variables=variables,
                     stream_callback=stream_callback,
+                    use_web_search=use_web_search,
                 )
             except Exception as exc:  # noqa: BLE001 - propagate via UI thread handler
                 payload["error"] = exc

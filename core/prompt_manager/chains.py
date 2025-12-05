@@ -1,6 +1,7 @@
 """Prompt chain orchestration helpers for Prompt Manager.
 
 Updates:
+  v0.1.3 - 2025-12-05 - Add optional web search enrichment ahead of each chain step.
   v0.1.2 - 2025-12-05 - Summarize the last step response when chains request it.
   v0.1.1 - 2025-12-05 - Surface streaming callbacks during prompt chain execution.
   v0.1.0 - 2025-12-04 - Introduce prompt chain CRUD and execution mixin.
@@ -8,11 +9,12 @@ Updates:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Sequence
 
 from jsonschema import Draft202012Validator, exceptions as jsonschema_exceptions
 
@@ -22,6 +24,7 @@ from ..exceptions import (
     PromptChainStorageError,
     PromptExecutionError,
     PromptManagerError,
+    WebSearchError,
 )
 from ..execution import ExecutionError
 from ..repository import RepositoryError, RepositoryNotFoundError
@@ -44,6 +47,8 @@ __all__ = [
     "PromptChainRunResult",
     "PromptChainStepRun",
 ]
+
+_CHAIN_WEB_SEARCH_RESULT_LIMIT = 10
 
 
 @dataclass(slots=True)
@@ -119,6 +124,8 @@ class PromptChainMixin:
         *,
         variables: Mapping[str, Any] | None = None,
         stream_callback: Callable[[PromptChainStep, str, bool], None] | None = None,
+        use_web_search: bool | None = None,
+        web_search_limit: int = _CHAIN_WEB_SEARCH_RESULT_LIMIT,
     ) -> PromptChainRunResult:
         """Execute the specified prompt chain sequentially."""
         chain = self.get_prompt_chain(chain_id)
@@ -145,6 +152,8 @@ class PromptChainMixin:
         outputs: dict[str, Any] = {}
         step_runs: list[PromptChainStepRun] = []
         task_id = f"prompt-chain:{chain.id}:{uuid.uuid4()}"
+        web_search_enabled = bool(use_web_search)
+        safe_search_limit = max(1, int(web_search_limit or _CHAIN_WEB_SEARCH_RESULT_LIMIT))
         with self._notification_center.track_task(
             title="Prompt chain",
             task_id=task_id,
@@ -168,6 +177,12 @@ class PromptChainMixin:
                         f"Step {step.order_index} in '{chain.name}' produced an empty request."
                     )
                 prompt = self.get_prompt(step.prompt_id)
+                request_text = self._maybe_enrich_with_web_search(
+                    prompt,
+                    request_text,
+                    use_web_search=web_search_enabled,
+                    web_search_limit=safe_search_limit,
+                )
                 try:
                     outcome = self._execute_chain_step(
                         chain,
@@ -209,6 +224,115 @@ class PromptChainMixin:
         )
 
     # Internal helpers ------------------------------------------------- #
+
+    def _maybe_enrich_with_web_search(
+        self,
+        prompt: Prompt,
+        request_text: str,
+        *,
+        use_web_search: bool,
+        web_search_limit: int,
+    ) -> str:
+        """Prepend live web context to *request_text* when enabled."""
+        if not use_web_search:
+            return request_text
+        trimmed = request_text.strip()
+        if not trimmed:
+            return request_text
+        service = getattr(self, "web_search_service", None)
+        is_available = bool(getattr(service, "is_available", lambda: False)())
+        if service is None or not is_available:
+            return request_text
+        query = self._build_web_search_query(prompt, trimmed)
+        if not query:
+            return request_text
+        try:
+            result = asyncio.run(service.search(query, limit=web_search_limit))
+        except RuntimeError:
+            logger.debug("Event loop already running; skipping web search enrichment")
+            return request_text
+        except WebSearchError:
+            logger.debug(
+                "Web search provider failed during prompt chain run",
+                exc_info=True,
+                extra={"prompt_id": str(prompt.id)},
+            )
+            return request_text
+        except Exception:  # pragma: no cover - defensive
+            logger.debug("Unexpected error running web search", exc_info=True)
+            return request_text
+        documents = getattr(result, "documents", [])
+        lines = self._collect_web_context_lines(documents)
+        if not lines:
+            return request_text
+        provider_label = (result.provider or "Web search").strip() or "Web search"
+        context_block = "\n".join(lines)
+        return (
+            f"{provider_label} findings:\n"
+            f"{context_block}\n\n"
+            "User request:\n"
+            f"{request_text}"
+        )
+
+    @staticmethod
+    def _build_web_search_query(prompt: Prompt, request_text: str) -> str:
+        parts: list[str] = []
+        if prompt.name:
+            parts.append(prompt.name.strip())
+        if prompt.category:
+            parts.append(prompt.category.strip())
+        tags = getattr(prompt, "tags", None) or []
+        if tags:
+            parts.append(
+                ", ".join(tag.strip() for tag in tags[:3] if isinstance(tag, str) and tag.strip())
+            )
+        description = (getattr(prompt, "description", "") or "").strip()
+        if description:
+            parts.append(description[:160])
+        context = (getattr(prompt, "context", "") or "").strip()
+        if context:
+            parts.append(context[:160])
+        text = request_text.strip()
+        if text:
+            parts.append(text[:200])
+        query = " ".join(part for part in parts if part).strip()
+        return query[:512]
+
+    @classmethod
+    def _collect_web_context_lines(
+        cls,
+        documents: Sequence[object],
+    ) -> list[str]:
+        lines: list[str] = []
+        for document in documents:
+            if document is None:
+                continue
+            url = str(getattr(document, "url", "") or "").strip()
+            if not url:
+                continue
+            snippet = cls._extract_document_snippet(document)
+            if not snippet:
+                continue
+            title = str(getattr(document, "title", "") or "").strip()
+            prefix = f"{title}: " if title else ""
+            lines.append(f"- {prefix}{snippet} (Source: {url})")
+        return lines
+
+    @staticmethod
+    def _extract_document_snippet(document: object) -> str:
+        parts: list[str] = []
+        summary = getattr(document, "summary", None)
+        if summary:
+            summary_text = str(summary).strip()
+            if summary_text:
+                parts.append(summary_text)
+        highlights = getattr(document, "highlights", None) or []
+        if isinstance(highlights, Sequence) and not isinstance(highlights, (str, bytes, bytearray)):
+            for entry in highlights:
+                text = str(entry or "").strip()
+                if text:
+                    parts.append(text)
+        return " ".join(parts).strip()
 
     def _build_validator(self, chain: PromptChain) -> Draft202012Validator | None:
         schema = chain.variables_schema

@@ -1,6 +1,7 @@
 """CLI command handlers for Prompt Manager.
 
 Updates:
+  v0.32.2 - 2025-12-05 - Add prompt chain web search toggle wiring for CLI runs.
   v0.32.1 - 2025-12-05 - Sort imports for lint compliance.
   v0.32.0 - 2025-12-04 - Reuse shared chain_from_payload helper for JSON imports.
 """
@@ -657,8 +658,13 @@ def run_prompt_chain_run(
     except ValueError as exc:
         logger.error("Invalid chain variables: %s", exc)
         return 5
+    use_web_search = not bool(getattr(args, "no_web_search", False))
     try:
-        result = manager.run_prompt_chain(chain_id, variables=variables)
+        result = manager.run_prompt_chain(
+            chain_id,
+            variables=variables,
+            use_web_search=use_web_search,
+        )
     except PromptChainExecutionError as exc:
         logger.error("Chain execution failed: %s", exc)
         return 5

@@ -1,4 +1,8 @@
-"""Argument parser for Prompt Manager CLI."""
+"""Argument parser for Prompt Manager CLI.
+
+Updates:
+  v0.3.0 - 2025-12-05 - Add prompt chain web search toggle flags.
+"""
 
 from __future__ import annotations
 
@@ -275,6 +279,11 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default=None,
         help="Inline JSON object describing chain variables.",
+    )
+    chain_run_parser.add_argument(
+        "--no-web-search",
+        action="store_true",
+        help="Disable live web search enrichment for prompt chain runs.",
     )
 
     return parser.parse_args()

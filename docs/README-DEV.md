@@ -99,7 +99,7 @@ See [`docs/web_search_plan.md`](web_search_plan.md) for the staged Exa integrati
   - `deterministic`: offline hashing for smoke tests.
 - Search queries embed the entire user phrase and ask ChromaDB for nearest neighbours; results are already cosine-ranked and displayed as-is in the GUI.
 - The GUI shows similarity scores (`[0.91]`) when search is active; the sort dropdown is disabled to preserve ranking integrity.
-- When Exa is configured, the workspace exposes a “Use web search” checkbox (checked by default). Leaving it on runs an Exa query (prompt metadata + user input) before execution and injects every available summary/highlight into the request body (source links included); if the aggregate context exceeds ~5,000 words, the fast LiteLLM model condenses it before prepending. Unchecking the box forces offline-only runs.
+- When Exa is configured, the workspace and Chain tab expose a “Use web search” checkbox (checked by default). Leaving it on runs an Exa query (prompt metadata + user input) before execution and injects every available summary/highlight into the request body (source links included); if the aggregate context exceeds ~5,000 words, the fast LiteLLM model condenses it before prepending. Unchecking the box (or running `prompt-chain-run --no-web-search`) forces offline-only runs.
 
 ## Running the GUI
 
@@ -170,7 +170,7 @@ Every log entry also stores structured context metadata (prompt snapshot, execut
 | `python -m main prompt-chain-list` | List stored prompt chains (add `--include-inactive` for archived definitions). |
 | `python -m main prompt-chain-show <uuid>` | Display a prompt chain with ordered steps and target prompts. |
 | `python -m main prompt-chain-apply path/to/chain.json` | Create or update a prompt chain from a JSON definition (`name`, `description`, `steps`, `prompt_id`, `input_template`, `output_variable`). |
-| `python -m main prompt-chain-run <uuid> [--vars-file variables.json] [--vars-json '{"key":"value"}']` | Execute a chain sequentially, injecting per-step variables, and log each step to execution history with chain metadata. |
+| `python -m main prompt-chain-run <uuid> [--vars-file variables.json] [--vars-json '{"key":"value"}'] [--no-web-search]` | Execute a chain sequentially, injecting per-step variables, enriching each step with live web context (disable via `--no-web-search`), and log every step to execution history with chain metadata. |
 
 ### GUI Prompt Chain Manager
 
@@ -180,6 +180,7 @@ Every log entry also stores structured context metadata (prompt snapshot, execut
 - The left pane lists every stored chain (active + inactive) with refresh and JSON import controls; imports reuse the same validation as the CLI helper.
 - The right pane surfaces description, variables schema, ordered steps, and a JSON editor for chain variables before execution.
 - Running a chain triggers the busy indicator (required for LLM work) while toast notifications confirm non-LLM actions such as refresh/import; results capture outputs plus per-step summaries for quick inspection.
+- The Run Chain panel includes a persistent “Use web search” checkbox (default on) that mirrors the workspace toggle so each step can preload live context when a provider is configured; uncheck it to keep runs offline.
 
 ### Prompt Chain Definitions
 
