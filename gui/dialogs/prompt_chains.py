@@ -1,6 +1,7 @@
 """Prompt chain management surfaces for the GUI.
 
 Updates:
+  v0.5.16 - 2025-12-06 - Limit reasoning summaries to opted-in chains and final steps; fix colors.
   v0.5.15 - 2025-12-05 - Double-clicking chains opens the editor; steps still show prompt names.
   v0.5.14 - 2025-12-05 - Show prompt names in step tables and enable editing via activation.
   v0.5.13 - 2025-12-05 - Add default-on web search toggle for chain executions.
@@ -117,7 +118,7 @@ _RESULT_STYLE = """
   border-radius: 8px;
   padding: 10px;
   margin-bottom: 12px;
-  background-color: #ffffff;
+  background-color: transparent;
 }
 .chain-step-title {
   font-weight: 600;
@@ -140,6 +141,8 @@ _RESULT_STYLE = """
   padding: 6px;
   border-radius: 4px;
   border: 1px solid #ececec;
+  background-color: transparent;
+  color: inherit;
 }
 </style>
 """
@@ -746,6 +749,14 @@ class PromptChainManagerPanel(QWidget):
         plain_sections: list[str] = []
         html_sections: list[str] = [_RESULT_STYLE, '<div class="chain-results">']
         step_html_sections: list[str] = []
+        summarize_enabled = bool(getattr(result.chain, "summarize_last_response", True))
+        last_success_index: int | None = None
+        if summarize_enabled:
+            for index in range(len(result.steps) - 1, -1, -1):
+                candidate = result.steps[index]
+                if candidate.outcome is not None and candidate.status == "success":
+                    last_success_index = index
+                    break
 
         # Chain inputs
         plain_sections.append("Input to chain")
@@ -784,7 +795,7 @@ class PromptChainManagerPanel(QWidget):
             )
         )
 
-        if result.summary:
+        if summarize_enabled and result.summary:
             summary_text = result.summary.strip()
             if summary_text:
                 plain_sections.append("Chain summary")
@@ -803,7 +814,7 @@ class PromptChainManagerPanel(QWidget):
         # Steps
         if result.steps:
             html_sections.append('<div class="chain-steps">')
-        for step_run in result.steps:
+        for index, step_run in enumerate(result.steps):
             step = step_run.step
             step_label = step.output_variable or str(step.prompt_id)
             plain_sections.append(f"Step {step.order_index}: {step_label}")
@@ -816,6 +827,12 @@ class PromptChainManagerPanel(QWidget):
             request_text = ""
             response_text = ""
             reasoning_text = None
+            should_render_reasoning = (
+                summarize_enabled
+                and last_success_index is not None
+                and index == last_success_index
+                and outcome is not None
+            )
             if outcome:
                 request_text = outcome.result.request_text.strip()
                 response_text = outcome.result.response_text.strip()
@@ -823,10 +840,11 @@ class PromptChainManagerPanel(QWidget):
                 plain_sections.extend(_indent_lines(request_text or "(empty input)"))
                 plain_sections.append("  Output of step:")
                 plain_sections.extend(_indent_lines(response_text or "(empty response)"))
-                reasoning_text = self._extract_reasoning_summary(outcome)
-                if reasoning_text:
-                    plain_sections.append("  Reasoning summary:")
-                    plain_sections.extend(_indent_lines(reasoning_text))
+                if should_render_reasoning:
+                    reasoning_text = self._extract_reasoning_summary(outcome)
+                    if reasoning_text:
+                        plain_sections.append("  Reasoning summary:")
+                        plain_sections.extend(_indent_lines(reasoning_text))
             step_html_sections.append(
                 self._build_step_html_block(
                     step_run,

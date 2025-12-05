@@ -1,6 +1,7 @@
 """Prompt chain manager dialog tests.
 
 Updates:
+  v0.3.0 - 2025-12-06 - Gate reasoning summary rendering and extend coverage.
   v0.2.9 - 2025-12-05 - Cover schema toggle visibility and chain list activation.
   v0.2.8 - 2025-12-05 - Cover prompt name rendering and editor activation from the Chain tab.
   v0.2.7 - 2025-12-05 - Cover default-on web search toggle behaviour for chains.
@@ -189,6 +190,36 @@ def _make_chain() -> PromptChain:
         description="Example",
         steps=[step],
     )
+
+
+def _make_outcome(
+    *,
+    request_text: str,
+    response_text: str,
+    reasoning_text: str | None = None,
+) -> ExecutionOutcome:
+    """Build an execution outcome with optional reasoning payload."""
+
+    raw_response: dict[str, Any] = {}
+    if reasoning_text:
+        raw_response = {
+            "output": [
+                {
+                    "content": [
+                        {"type": "reasoning", "text": reasoning_text},
+                    ]
+                }
+            ]
+        }
+    execution_result = CodexExecutionResult(
+        prompt_id=uuid.uuid4(),
+        request_text=request_text,
+        response_text=response_text,
+        duration_ms=1,
+        usage={},
+        raw_response=raw_response,
+    )
+    return ExecutionOutcome(result=execution_result, history_entry=None, conversation=[])
 
 
 def test_prompt_chain_dialog_populates_details(qt_app: QApplication) -> None:
@@ -381,6 +412,82 @@ def test_prompt_chain_dialog_renders_reasoning_summary(qt_app: QApplication) -> 
         assert "Reasoning summary" in plain
         assert "Deliberate reasoning path." in plain
         assert "#1e88e5" in dialog._result_richtext  # noqa: SLF001
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
+def test_prompt_chain_dialog_omits_reasoning_when_summary_disabled(
+    qt_app: QApplication,
+) -> None:
+    """Reasoning and chain summary must disappear when the preference is off."""
+
+    manager = _ManagerStub(step_reasoning_text="Should not appear.")
+    manager._chains[0].summarize_last_response = False
+    dialog = PromptChainManagerDialog(manager)
+    try:
+        dialog._run_selected_chain()  # noqa: SLF001
+        plain = dialog._result_view.toPlainText()  # noqa: SLF001
+        assert "Reasoning summary" not in plain
+        assert "Chain summary" not in plain
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
+def test_prompt_chain_dialog_only_last_step_has_reasoning_summary(
+    qt_app: QApplication,
+) -> None:
+    """Only the final successful step should surface the reasoning summary."""
+
+    manager = _ManagerStub()
+    dialog = PromptChainManagerDialog(manager)
+    try:
+        base_chain = _make_chain()
+        step_one = base_chain.steps[0]
+        step_two = PromptChainStep(
+            id=uuid.uuid4(),
+            chain_id=base_chain.id,
+            prompt_id=uuid.uuid4(),
+            order_index=2,
+            input_template="{{ body }}",
+            output_variable="final",
+        )
+        base_chain.steps = [step_one, step_two]
+        result = PromptChainRunResult(
+            chain=base_chain,
+            variables={},
+            outputs={"final": "done"},
+            steps=[
+                PromptChainStepRun(
+                    step=step_one,
+                    status="success",
+                    outcome=_make_outcome(
+                        request_text="req1",
+                        response_text="res1",
+                        reasoning_text="First reason",
+                    ),
+                ),
+                PromptChainStepRun(
+                    step=step_two,
+                    status="success",
+                    outcome=_make_outcome(
+                        request_text="req2",
+                        response_text="res2",
+                        reasoning_text="Final reason",
+                    ),
+                ),
+            ],
+            summary="Demo summary",
+        )
+        dialog._display_run_result(result)  # noqa: SLF001
+        plain = dialog._result_plaintext  # noqa: SLF001
+        assert plain.count("Reasoning summary") == 1
+        assert "Final reason" in plain
+        assert "First reason" not in plain
+        rich = dialog._result_richtext  # noqa: SLF001
+        assert "Final reason" in rich
+        assert "First reason" not in rich
     finally:
         dialog.close()
         dialog.deleteLater()
