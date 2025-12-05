@@ -1,6 +1,7 @@
 """Prompt chain management surfaces for the GUI.
 
 Updates:
+  v0.5.6 - 2025-12-05 - Add auto-scroll toggle for streaming/results pane.
   v0.5.5 - 2025-12-05 - Enable LiteLLM streaming preview without blocking busy indicator.
   v0.5.4 - 2025-12-05 - Expand execution results with labeled inputs/outputs per step.
   v0.5.3 - 2025-12-05 - Split detail column vertically, persist run variables, and replace description editor with static text.
@@ -244,6 +245,9 @@ class PromptChainManagerPanel(QWidget):
         self._result_format_checkbox.setChecked(True)
         self._result_format_checkbox.toggled.connect(self._handle_result_format_changed)  # type: ignore[arg-type]
         results_header.addWidget(self._result_format_checkbox)
+        self._auto_scroll_checkbox = QCheckBox("Auto-scroll", results_container)
+        self._auto_scroll_checkbox.setChecked(True)
+        results_header.addWidget(self._auto_scroll_checkbox)
 
         self._result_view = QTextEdit(results_container)
         self._result_view.setReadOnly(True)
@@ -693,6 +697,7 @@ class PromptChainManagerPanel(QWidget):
                 self._result_view.setPlainText(self._result_plaintext)
             else:
                 self._result_view.clear()
+        self._maybe_scroll_results()
 
     def _is_streaming_enabled(self) -> bool:
         """Return True when LiteLLM streaming is enabled in runtime settings."""
@@ -772,6 +777,7 @@ class PromptChainManagerPanel(QWidget):
                 lines.append("(awaiting tokens…)")
             lines.append("")
         self._result_view.setPlainText("\n".join(lines).rstrip())
+        self._maybe_scroll_results()
 
     def _end_stream_preview(self) -> None:
         """Clear streaming preview state."""
@@ -886,6 +892,14 @@ class PromptChainManagerPanel(QWidget):
                 indent=2,
                 sort_keys=True,
             )
+
+    def _maybe_scroll_results(self) -> None:
+        """Scroll the results view to bottom when auto-scroll is enabled."""
+        if not self._auto_scroll_checkbox.isChecked():
+            return
+        bar = self._result_view.verticalScrollBar()
+        if bar is not None:
+            bar.setValue(bar.maximum())
 
 
 class PromptChainManagerDialog(QDialog):
