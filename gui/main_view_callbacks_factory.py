@@ -1,6 +1,7 @@
 """Factories that build callback bundles for gui.main_window.
 
 Updates:
+  v0.16.4 - 2025-12-05 - Remove prompt template callback after toolbar removal.
   v0.16.3 - 2025-12-05 - Remove chains toolbar callback now that the Chain tab is built-in.
   v0.16.2 - 2025-12-05 - Route chains toolbar action to focus the Chain tab.
   v0.16.1 - 2025-12-04 - Add prompt chain dialog callback wiring.
@@ -36,7 +37,6 @@ def build_main_view_callbacks(window: MainWindow) -> MainViewCallbacks:
         maintenance_requested=prompt_actions.open_maintenance_dialog,
         notifications_requested=window._on_notifications_clicked,  # type: ignore[attr-defined]
         info_requested=prompt_actions.open_info_dialog,
-        templates_requested=prompt_actions.open_prompt_templates_dialog,
         settings_requested=lambda: prompt_actions.open_settings_dialog(window._settings),  # type: ignore[attr-defined]
         exit_requested=prompt_actions.close_application,
         show_command_palette=window._show_command_palette,  # type: ignore[attr-defined]

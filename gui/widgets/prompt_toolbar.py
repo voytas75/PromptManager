@@ -1,6 +1,7 @@
 """Toolbar widget containing search and primary catalog actions.
 
 Updates:
+  v0.2.2 - 2025-12-05 - Remove Prompt Templates toolbar button.
   v0.2.1 - 2025-12-05 - Remove Prompt Chains toolbar button now that the Chain tab is embedded.
   v0.2.0 - 2025-12-04 - Add prompt chain button and signal wiring.
   v0.1.0 - 2025-11-30 - Introduce reusable prompt toolbar widget.
@@ -32,7 +33,6 @@ class PromptToolbar(QWidget):
     maintenance_requested = Signal()
     notifications_requested = Signal()
     info_requested = Signal()
-    templates_requested = Signal()
     settings_requested = Signal()
     exit_requested = Signal()
 
@@ -87,11 +87,6 @@ class PromptToolbar(QWidget):
         self._info_button = QPushButton("Info", self)
         self._info_button.clicked.connect(self.info_requested)  # type: ignore[arg-type]
         layout.addWidget(self._info_button)
-
-        self._templates_button = QPushButton("Prompt Templates", self)
-        self._templates_button.setToolTip("Edit LiteLLM system prompt overrides")
-        self._templates_button.clicked.connect(self.templates_requested)  # type: ignore[arg-type]
-        layout.addWidget(self._templates_button)
 
         self._settings_button = QPushButton("Settings", self)
         self._settings_button.clicked.connect(self.settings_requested)  # type: ignore[arg-type]

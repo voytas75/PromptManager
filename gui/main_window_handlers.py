@@ -1,6 +1,7 @@
 """Handlers extracted from :mod:`gui.main_window` for clarity.
 
 Updates:
+  v0.15.84 - 2025-12-05 - Remove standalone prompt templates action after toolbar update.
   v0.15.83 - 2025-12-04 - Add prompt chain dialog launcher wiring.
   v0.15.82 - 2025-12-01 - Introduce prompt, workspace, and template handlers.
 """
@@ -230,13 +231,6 @@ class PromptActionsHandler:
         if workflow is None:
             return
         workflow.open_settings_dialog(settings)
-
-    def open_prompt_templates_dialog(self) -> None:
-        """Open the prompt templates dialog."""
-        workflow = self._settings_workflow_supplier()
-        if workflow is None:
-            return
-        workflow.open_prompt_templates_dialog()
 
     def open_workbench(self) -> None:
         """Launch the Enhanced Prompt Workbench."""

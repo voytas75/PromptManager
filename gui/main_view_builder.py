@@ -1,6 +1,7 @@
 """Composable builders for the Prompt Manager main window.
 
 Updates:
+  v0.2.4 - 2025-12-05 - Remove prompt template toolbar wiring.
   v0.2.3 - 2025-12-05 - Drop prompt chain toolbar wiring; Chain tab is always visible.
   v0.2.2 - 2025-12-05 - Embed prompt chain manager panel as a Chain tab.
   v0.2.1 - 2025-12-04 - Add \"Use web search\" toggle to the workspace actions row.
@@ -66,7 +67,6 @@ class MainViewCallbacks:
     maintenance_requested: Callable[[], None]
     notifications_requested: Callable[[], None]
     info_requested: Callable[[], None]
-    templates_requested: Callable[[], None]
     settings_requested: Callable[[], None]
     exit_requested: Callable[[], None]
     show_command_palette: Callable[[], None]
@@ -180,7 +180,6 @@ def build_main_view(
     toolbar.maintenance_requested.connect(callbacks.maintenance_requested)
     toolbar.notifications_requested.connect(callbacks.notifications_requested)
     toolbar.info_requested.connect(callbacks.info_requested)
-    toolbar.templates_requested.connect(callbacks.templates_requested)
     toolbar.settings_requested.connect(callbacks.settings_requested)
     toolbar.exit_requested.connect(callbacks.exit_requested)
     layout.addWidget(toolbar)
