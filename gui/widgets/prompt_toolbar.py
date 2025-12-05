@@ -1,6 +1,7 @@
 """Toolbar widget containing search and primary catalog actions.
 
 Updates:
+  v0.2.4 - 2025-12-05 - Move import/export/maintenance/notifications into the Settings menu.
   v0.2.3 - 2025-12-05 - Combine Add/New prompt actions into a single menu button.
   v0.2.2 - 2025-12-05 - Remove Prompt Templates toolbar button.
   v0.2.1 - 2025-12-05 - Remove Prompt Chains toolbar button now that the Chain tab is embedded.
@@ -79,29 +80,36 @@ class PromptToolbar(QWidget):
         )
         self._new_button.setMenu(self._new_button_menu)
 
-        self._import_button = QPushButton("Import", self)
-        self._import_button.clicked.connect(self.import_requested)  # type: ignore[arg-type]
-        layout.addWidget(self._import_button)
-
-        self._export_button = QPushButton("Export", self)
-        self._export_button.clicked.connect(self.export_requested)  # type: ignore[arg-type]
-        layout.addWidget(self._export_button)
-
-        self._maintenance_button = QPushButton("Maintenance", self)
-        self._maintenance_button.clicked.connect(self.maintenance_requested)  # type: ignore[arg-type]
-        layout.addWidget(self._maintenance_button)
-
-        self._notifications_button = QPushButton("Notifications", self)
-        self._notifications_button.clicked.connect(self.notifications_requested)  # type: ignore[arg-type]
-        layout.addWidget(self._notifications_button)
-
         self._info_button = QPushButton("Info", self)
         self._info_button.clicked.connect(self.info_requested)  # type: ignore[arg-type]
         layout.addWidget(self._info_button)
 
-        self._settings_button = QPushButton("Settings", self)
+        self._settings_button = QToolButton(self)
+        self._settings_button.setText("Settings")
+        self._settings_button.setToolTip("Open settings and administrative utilities.")
+        self._settings_button.setPopupMode(QToolButton.MenuButtonPopup)
         self._settings_button.clicked.connect(self.settings_requested)  # type: ignore[arg-type]
         layout.addWidget(self._settings_button)
+
+        settings_menu = QMenu(self._settings_button)
+        settings_action = settings_menu.addAction("Settings…")
+        settings_action.triggered.connect(  # pragma: no cover
+            lambda *_: self.settings_requested.emit()
+        )
+        settings_menu.addSeparator()
+        import_action = settings_menu.addAction("Import Catalog…")
+        import_action.triggered.connect(lambda *_: self.import_requested.emit())  # pragma: no cover
+        export_action = settings_menu.addAction("Export Catalog…")
+        export_action.triggered.connect(lambda *_: self.export_requested.emit())  # pragma: no cover
+        maintenance_action = settings_menu.addAction("Maintenance…")
+        maintenance_action.triggered.connect(  # pragma: no cover
+            lambda *_: self.maintenance_requested.emit()
+        )
+        notifications_action = settings_menu.addAction("Notifications…")
+        notifications_action.triggered.connect(  # pragma: no cover
+            lambda *_: self.notifications_requested.emit()
+        )
+        self._settings_button.setMenu(settings_menu)
 
         self._exit_button = QToolButton(self)
         self._exit_button.setIcon(self.style().standardIcon(QStyle.SP_TitleBarCloseButton))
