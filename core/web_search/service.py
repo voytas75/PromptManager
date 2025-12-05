@@ -1,22 +1,26 @@
 """Coordinator for configured web search providers.
 
 Updates:
+  v0.1.1 - 2025-12-05 - Limit type-only imports to TYPE_CHECKING and document __init__.
   v0.1.0 - 2025-12-04 - Add provider-aware service with availability checks.
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..exceptions import WebSearchUnavailable
-from .models import WebSearchResult
-from .providers import WebSearchProvider
+
+if TYPE_CHECKING:
+    from .models import WebSearchResult
+    from .providers import WebSearchProvider
 
 
 class WebSearchService:
     """High-level interface that delegates to the configured provider."""
 
     def __init__(self, provider: WebSearchProvider | None = None) -> None:
+        """Initialise the service with an optional provider."""
         self._provider = provider
 
     @property

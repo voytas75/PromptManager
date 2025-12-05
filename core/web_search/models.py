@@ -1,14 +1,17 @@
 """Shared data models for external web search integrations.
 
 Updates:
+  v0.1.1 - 2025-12-05 - Gate datetime import behind TYPE_CHECKING.
   v0.1.0 - 2025-12-04 - Introduce provider-agnostic result dataclasses.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 @dataclass(slots=True)

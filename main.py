@@ -1,6 +1,7 @@
 """Application entry point for Prompt Manager.
 
 Updates:
+  v0.9.1 - 2025-12-05 - Remove duplicate COMMAND_SPECS import flagged by Ruff.
   v0.9.0 - 2025-12-04 - Modularise CLI parsing, commands, and GUI launcher helpers.
   v0.8.3 - 2025-11-30 - Restore stdout messaging for CLI commands and relax history imports.
   v0.8.2 - 2025-11-29 - Reformat CLI summary output and modernise type hints.
@@ -10,17 +11,7 @@ Updates:
   v0.7.8 - 2025-12-07 - Add CLI command to rebuild embeddings from scratch.
   v0.7.7 - 2025-11-05 - Surface LiteLLM workflow routing details in CLI summaries.
   v0.7.6 - 2025-11-05 - Expand CLI settings summary to list fast and inference models.
-  v0.7.5 - 2025-11-30 - Remove catalogue import command and startup messaging.
-  v0.7.4 - 2025-11-26 - Surface LiteLLM streaming configuration in CLI summaries.
-  v0.7.3 - 2025-11-17 - Require explicit catalogue paths; skip built-in seeding.
-  v0.7.2 - 2025-11-15 - Extend --print-settings with health checks and masked output.
-  v0.7.1 - 2025-11-14 - Simplify GUI dependency guidance for unified installs.
-  v0.7.0 - 2025-11-07 - Add semantic suggestion CLI to verify embedding backends.
-  v0.4.1 - 2025-11-05 - Launch GUI by default and add --no-gui flag.
-  v0.4.0 - 2025-11-05 - Ensure manager shutdown occurs on exit and update GUI guidance.
-  v0.3.0 - 2025-11-05 - Gracefully handle missing GUI dependencies.
-  v0.2.0 - 2025-11-04 - Add optional PySide6 GUI launcher toggle.
-  v0.1.0 - 2025-10-30 - Initial CLI bootstrap loading settings and building services.
+  pre-v0.7.6 - 2025-11-30 - Earlier CLI bootstrap and GUI launch history covering v0.7.5–v0.1.0.
 """
 
 from __future__ import annotations
@@ -28,7 +19,6 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from cli.commands import COMMAND_SPECS
 from cli.gui_launcher import run_default_mode
 from cli.parser import parse_args
 from cli.runtime import setup_logging as _runtime_setup_logging

@@ -1,6 +1,7 @@
-"""Composable builders for the Prompt Manager main window.
+r"""Composable builders for the Prompt Manager main window.
 
 Updates:
+  v0.2.5 - 2025-12-05 - Mark module docstring as raw for lint compliance.
   v0.2.4 - 2025-12-05 - Remove prompt template toolbar wiring.
   v0.2.3 - 2025-12-05 - Drop prompt chain toolbar wiring; Chain tab is always visible.
   v0.2.2 - 2025-12-05 - Embed prompt chain manager panel as a Chain tab.

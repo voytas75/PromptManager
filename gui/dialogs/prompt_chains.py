@@ -1,6 +1,7 @@
 """Prompt chain management surfaces for the GUI.
 
 Updates:
+  v0.4.1 - 2025-12-05 - Document dialog passthrough helper for lint compliance.
   v0.4.0 - 2025-12-05 - Extract reusable panel for embedding plus dialog wrapper.
   v0.3.0 - 2025-12-04 - Prompt selector for chain steps plus inline CRUD actions.
   v0.2.0 - 2025-12-04 - Add create, edit, and delete actions via prompt chain editor dialog.
@@ -527,6 +528,7 @@ class PromptChainManagerDialog(QDialog):
         self._panel.refresh()
 
     def __getattr__(self, name: str) -> Any:  # pragma: no cover - passthrough helper
+        """Proxy attribute lookups to the embedded panel when possible."""
         panel = self.__dict__.get("_panel")
         if panel is not None and hasattr(panel, name):
             return getattr(panel, name)

@@ -1,6 +1,7 @@
 """CLI command handlers for Prompt Manager.
 
 Updates:
+  v0.32.1 - 2025-12-05 - Sort imports for lint compliance.
   v0.32.0 - 2025-12-04 - Reuse shared chain_from_payload helper for JSON imports.
 """
 
@@ -9,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import sys
 import textwrap
 import uuid
 from collections import Counter
@@ -16,7 +18,6 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-import sys
 
 from core import (
     PromptChainError,

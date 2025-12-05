@@ -1,6 +1,7 @@
 """Settings management utilities for Prompt Manager configuration.
 
 Updates:
+  v0.5.9 - 2025-12-05 - Tighten dotenv helpers for lint compliance.
   v0.5.8 - 2025-12-04 - Add auto-open share link preference with GUI binding.
   v0.5.7 - 2025-12-04 - Load .env secrets so web search keys persist like LiteLLM keys.
   v0.5.6 - 2025-12-04 - Add Exa web search provider configuration.
@@ -10,8 +11,6 @@ Updates:
   v0.5.2 - 2025-11-30 - Add category suggestion workflow to LiteLLM routing.
   v0.5.1 - 2025-11-23 - Added prompt template override settings.
   v0.5.0 - 2025-11-22 - Added structure-only prompt refinement routing.
-  v0.4.9 - 2025-12-06 - Required LiteLLM-backed embeddings with UI fields.
-  v0.4.8 - 2025-12-03 - Persisted chat colour palette overrides.
 """
 
 from __future__ import annotations
@@ -86,7 +85,6 @@ _THEME_CHOICES = {"light", "dark"}
 
 def _parse_dotenv_file(path: Path) -> dict[str, str]:
     """Return key/value pairs from a simple ``.env`` style file."""
-
     try:
         contents = path.read_text(encoding="utf-8")
     except OSError:
@@ -113,7 +111,6 @@ def _parse_dotenv_file(path: Path) -> dict[str, str]:
 
 def _read_dotenv_values() -> dict[str, str]:
     """Load ``.env`` entries into a mapping without mutating ``os.environ``."""
-
     env_file_override = os.getenv("PROMPT_MANAGER_ENV_FILE")
     if env_file_override is not None:
         candidate = env_file_override.strip()

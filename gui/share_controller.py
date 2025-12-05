@@ -1,15 +1,16 @@
 """Centralised share-provider orchestration for prompt and result payloads.
 
 Updates:
+  v0.1.2 - 2025-12-05 - Reorder module imports for Ruff lint compliance.
   v0.1.1 - 2025-12-04 - Auto-open share URLs based on runtime preference.
   v0.1.0 - 2025-11-30 - Introduce ShareController to manage provider menus and execution.
 """
 
 from __future__ import annotations
 
+import webbrowser
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
-import webbrowser
 
 from PySide6.QtCore import QObject
 from PySide6.QtGui import QGuiApplication

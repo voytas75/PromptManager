@@ -1,6 +1,7 @@
 """Settings dialog for configuring Prompt Manager runtime options.
 
 Updates:
+  v0.2.14 - 2025-12-05 - Break share preference assignments over multiple lines for linting.
   v0.2.13 - 2025-12-04 - Add auto-open share link preference toggle.
   v0.2.12 - 2025-12-04 - Add web search integrations tab and Exa API key field.
   v0.2.11 - 2025-12-03 - Add LiteLLM TTS model configuration field.
@@ -10,7 +11,6 @@ Updates:
   v0.2.7 - 2025-12-06 - Surface LiteLLM embedding model configuration.
   v0.2.6 - 2025-11-05 - Add theme mode toggle to the appearance settings.
   v0.2.5 - 2025-11-05 - Add chat appearance controls to settings dialog.
-  v0.2.4 - 2025-11-05 - Add LiteLLM routing matrix for fast vs inference models.
   pre-v0.2.4 - 2025-11-04 - Initial dialog history covering releases v0.1.0–v0.2.3.
 """
 
@@ -155,7 +155,10 @@ class SettingsDialog(QDialog):
         self._prompt_template_initials: dict[str, str] = {}
         self._web_search_provider_combo: QComboBox | None = None
         self._exa_api_key_input: QLineEdit | None = None
-        self._auto_open_share_links = True if auto_open_share_links is None else bool(auto_open_share_links)
+        default_share_toggle = (
+            True if auto_open_share_links is None else bool(auto_open_share_links)
+        )
+        self._auto_open_share_links = default_share_toggle
         self._share_auto_open_checkbox: QCheckBox | None = None
         provided_templates = prompt_templates or {}
         for key in PROMPT_TEMPLATE_KEYS:
@@ -339,7 +342,10 @@ class SettingsDialog(QDialog):
         integrations_form.addRow("Exa API key", exa_api_key_input)
 
         integrations_hint = QLabel(
-            "Provider API keys remain in memory only; they are never written to configuration files.",
+            (
+                "Provider API keys remain in memory only; they are never written "
+                "to configuration files."
+            ),
             integrations_tab,
         )
         integrations_hint.setWordWrap(True)

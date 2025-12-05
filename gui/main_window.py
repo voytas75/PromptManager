@@ -1,6 +1,7 @@
-"""Main window widgets and models for the Prompt Manager GUI.
+r"""Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.16.6 - 2025-12-05 - Normalize module docstring quoting and reorder imports for lint compliance.
   v0.16.5 - 2025-12-05 - Remove prompt chain toolbar shortcut; Chain tab remains embedded.
   v0.16.4 - 2025-12-05 - Embed prompt chain panel and add toolbar shortcut to focus Chain tab.
   v0.16.3 - 2025-12-04 - Track \"Use web search\" checkbox for execution controller.
@@ -15,8 +16,6 @@ Updates:
     notifications, and prompt actions into dedicated controllers.
   v0.15.79 - 2025-12-01 - Delegated theme/palette, runtime settings, catalog,
     and share workflows to helpers.
-  v0.15.78 - 2025-12-01 - Guard tab change handler until widgets are initialised.
-  v0.15.77-and-earlier - 2025-11-30 - Consolidated toolbar, overlay, and workspace refactors.
 """
 
 from __future__ import annotations
@@ -87,8 +86,8 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from .analytics_panel import AnalyticsDashboardPanel
     from .catalog_workflow_controller import CatalogWorkflowController
     from .code_highlighter import CodeHighlighter
-    from .dialogs.prompt_chains import PromptChainManagerPanel
     from .controllers.execution_controller import ExecutionController
+    from .dialogs.prompt_chains import PromptChainManagerPanel
     from .history_panel import HistoryPanel
     from .notes_panel import NotesPanel
     from .prompt_actions_controller import PromptActionsController

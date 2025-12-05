@@ -1,6 +1,7 @@
 """Provider protocol definitions and concrete Exa implementation.
 
 Updates:
+  v0.1.1 - 2025-12-05 - Move typing-only imports behind TYPE_CHECKING and document __post_init__.
   v0.1.0 - 2025-12-04 - Introduce provider abstraction and Exa HTTP client.
 """
 
@@ -8,12 +9,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Callable, Mapping, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 import httpx
 
 from ..exceptions import WebSearchProviderError
 from .models import WebSearchDocument, WebSearchResult
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping
 
 MAX_RESULTS = 25
 
@@ -97,6 +101,7 @@ class ExaWebSearchProvider:
     client_factory: Callable[[], httpx.AsyncClient] | None = None
 
     def __post_init__(self) -> None:
+        """Validate provided API key and normalise spacing."""
         if not self.api_key or not self.api_key.strip():
             raise ValueError("Exa API key is required")
         self.api_key = self.api_key.strip()

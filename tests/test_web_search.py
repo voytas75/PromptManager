@@ -1,16 +1,22 @@
 """Tests for the web search provider/service scaffolding.
 
 Updates:
+  v0.1.1 - 2025-12-05 - Reorder imports and wrap long lines for lint compliance.
   v0.1.0 - 2025-12-04 - Cover Exa provider and service scaffolding.
 """
 
 from __future__ import annotations
 
-import pytest
 import httpx
+import pytest
 
 from core.exceptions import WebSearchProviderError, WebSearchUnavailable
-from core.web_search import ExaWebSearchProvider, WebSearchDocument, WebSearchResult, WebSearchService
+from core.web_search import (
+    ExaWebSearchProvider,
+    WebSearchDocument,
+    WebSearchResult,
+    WebSearchService,
+)
 
 
 def _build_mock_client(response: httpx.Response) -> httpx.AsyncClient:

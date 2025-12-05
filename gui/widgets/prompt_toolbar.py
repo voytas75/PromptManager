@@ -70,7 +70,9 @@ class PromptToolbar(QWidget):
 
         self._new_button_menu = QMenu(self._new_button)
         new_prompt_action = self._new_button_menu.addAction("New Prompt…")
-        new_prompt_action.triggered.connect(lambda *_: self.add_requested.emit())  # pragma: no cover
+        new_prompt_action.triggered.connect(  # pragma: no cover
+            lambda *_: self.add_requested.emit()
+        )
         workbench_action = self._new_button_menu.addAction("Workbench Session…")
         workbench_action.triggered.connect(  # pragma: no cover
             lambda *_: self.workbench_requested.emit()

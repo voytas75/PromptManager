@@ -1,6 +1,7 @@
 """Prompt sharing helpers for external paste services.
 
 Updates:
+  v0.1.3 - 2025-12-05 - Sort imports for lint compliance.
   v0.1.2 - 2025-12-04 - Append footer metadata with app name, author link, and share date.
   v0.1.1 - 2025-11-30 - Document ShareText provider methods for lint compliance.
   v0.1.0 - 2025-11-28 - Add ShareText provider and prompt formatting helper.
@@ -11,8 +12,8 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
-from datetime import date
 from dataclasses import dataclass
+from datetime import date
 from typing import TYPE_CHECKING, Protocol
 
 from core.exceptions import ShareProviderError

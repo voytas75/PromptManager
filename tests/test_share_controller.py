@@ -19,7 +19,11 @@ class _DummyProvider:
         )
 
     def share(self, payload: str, prompt: Any | None = None) -> ShareResult:
-        return ShareResult(provider=self.info, url="https://example.com/share", payload_chars=len(payload))
+        return ShareResult(
+            provider=self.info,
+            url="https://example.com/share",
+            payload_chars=len(payload),
+        )
 
 
 class _DummyUsageLogger:
@@ -52,7 +56,10 @@ def test_share_controller_opens_browser(monkeypatch: pytest.MonkeyPatch) -> None
     """Open the default browser automatically when preference is enabled."""
 
     opened: list[str] = []
-    monkeypatch.setattr("gui.share_controller.webbrowser.open", lambda url, new=2: opened.append(url) or True)
+    monkeypatch.setattr(
+        "gui.share_controller.webbrowser.open",
+        lambda url, new=2: opened.append(url) or True,
+    )
     clipboard = _DummyClipboard()
     monkeypatch.setattr("PySide6.QtGui.QGuiApplication.clipboard", lambda: clipboard)
 
