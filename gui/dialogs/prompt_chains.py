@@ -706,9 +706,9 @@ class PromptChainManagerPanel(QWidget):
     def _is_streaming_enabled(self) -> bool:
         """Return True when LiteLLM streaming is enabled in runtime settings."""
         executor = getattr(self._manager, "_executor", None)
-        if executor is not None and bool(getattr(executor, "stream", False)):
-            return True
-        return bool(getattr(self._manager, "_litellm_stream", False))
+        if executor is None:
+            return False
+        return bool(getattr(executor, "stream", False))
 
     def _begin_stream_preview(self, chain_name: str) -> None:
         """Initialise buffers used to show streaming output per step."""
