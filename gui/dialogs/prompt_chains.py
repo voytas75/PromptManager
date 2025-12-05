@@ -1,6 +1,7 @@
 """Prompt chain management surfaces for the GUI.
 
 Updates:
+  v0.5.15 - 2025-12-05 - Double-clicking chains opens the editor; steps still show prompt names.
   v0.5.14 - 2025-12-05 - Show prompt names in step tables and enable editing via activation.
   v0.5.13 - 2025-12-05 - Add default-on web search toggle for chain executions.
   v0.5.12 - 2025-12-05 - Color-code results sections and surface reasoning summaries.
@@ -217,6 +218,7 @@ class PromptChainManagerPanel(QWidget):
 
         self._chain_list = QListWidget(list_container)
         self._chain_list.currentRowChanged.connect(self._handle_selection_changed)  # type: ignore[arg-type]
+        self._chain_list.itemActivated.connect(self._handle_chain_activation)  # type: ignore[arg-type]
         list_layout.addWidget(self._chain_list, 1)
 
         import_run_row = QHBoxLayout()
@@ -1152,6 +1154,12 @@ class PromptChainManagerPanel(QWidget):
         self._schema_toggle.setChecked(visible)
         self._schema_toggle.blockSignals(False)
         self._handle_schema_toggle(visible)
+
+    def _handle_chain_activation(self, item: QListWidgetItem | None) -> None:
+        if item is None:
+            return
+        self._chain_list.setCurrentItem(item)
+        self._edit_chain()
 
     def _resolve_prompt_label(self, prompt_id: UUID) -> str:
         cached = self._prompt_name_cache.get(prompt_id)

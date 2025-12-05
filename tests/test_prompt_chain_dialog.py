@@ -1,6 +1,7 @@
 """Prompt chain manager dialog tests.
 
 Updates:
+  v0.2.9 - 2025-12-05 - Cover schema toggle visibility and chain list activation.
   v0.2.8 - 2025-12-05 - Cover prompt name rendering and editor activation from the Chain tab.
   v0.2.7 - 2025-12-05 - Cover default-on web search toggle behaviour for chains.
   v0.2.6 - 2025-12-05 - Cover summarize toggle persistence and UI output section.
@@ -482,6 +483,38 @@ def test_prompt_chain_editor_schema_toggle_controls_visibility(qt_app: QApplicat
     assert editor._schema_input.isHidden() is True  # noqa: SLF001
     editor._schema_toggle.setChecked(True)  # noqa: SLF001
     assert editor._schema_input.isHidden() is False  # noqa: SLF001
+
+
+def test_prompt_chain_list_activation_opens_editor(
+    qt_app: QApplication, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Double-clicking a chain should invoke the editor workflow."""
+
+    manager = _ManagerStub()
+    dialog = PromptChainManagerDialog(manager)
+
+    class _EditorStub:
+        def __init__(self, *_: object, **kwargs: object) -> None:
+            called["chain"] = kwargs.get("chain")
+
+        def exec(self) -> int:
+            return QDialog.Accepted
+
+        def result_chain(self) -> PromptChain:
+            return called["chain"]  # type: ignore[return-value]
+
+    called: dict[str, object] = {}
+    monkeypatch.setattr(
+        "gui.dialogs.prompt_chains.PromptChainEditorDialog",
+        _EditorStub,
+    )
+    try:
+        item = dialog._chain_list.item(0)  # noqa: SLF001
+        dialog._handle_chain_activation(item)  # noqa: SLF001
+        assert called["chain"] is not None
+    finally:
+        dialog.close()
+        dialog.deleteLater()
 
 
 def test_prompt_chain_manager_creates_chain_via_editor(
