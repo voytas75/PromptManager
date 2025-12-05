@@ -1,6 +1,7 @@
-"""Prompt chain management dialog for the GUI.
+"""Prompt chain management surfaces for the GUI.
 
 Updates:
+  v0.4.0 - 2025-12-05 - Extract reusable panel for embedding plus dialog wrapper.
   v0.3.0 - 2025-12-04 - Prompt selector for chain steps plus inline CRUD actions.
   v0.2.0 - 2025-12-04 - Add create, edit, and delete actions via prompt chain editor dialog.
   v0.1.0 - 2025-12-04 - Introduce prompt chain manager dialog with run/import actions.
@@ -56,17 +57,15 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers only
     from models.prompt_model import Prompt
 
 
-class PromptChainManagerDialog(QDialog):
-    """Dialog that lists, imports, and runs stored prompt chains."""
+class PromptChainManagerPanel(QWidget):
+    """Widget that lists, imports, and runs stored prompt chains."""
 
     def __init__(self, manager: PromptManager, parent: QWidget | None = None) -> None:
-        """Create the dialog and load the initial chain list."""
+        """Create the panel and load the initial chain list."""
         super().__init__(parent)
         self._manager = manager
         self._chains: list[PromptChain] = []
         self._selected_chain_id: str | None = None
-        self.setWindowTitle("Prompt Chains")
-        self.resize(960, 640)
 
         layout = QVBoxLayout(self)
         intro = QLabel(
@@ -179,14 +178,16 @@ class PromptChainManagerDialog(QDialog):
         self._result_view.setPlaceholderText("Execution results, outputs, and per-step summary.")
         detail_layout.addWidget(self._result_view)
 
-        self._buttons = QDialogButtonBox(QDialogButtonBox.Close, detail_container)
-        self._buttons.accepted.connect(self.accept)  # type: ignore[arg-type]
-        self._buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
-        detail_layout.addWidget(self._buttons)
-
         splitter.addWidget(detail_container)
         splitter.setStretchFactor(1, 2)
 
+        self._load_chains()
+
+    # ------------------------------------------------------------------
+    # Public helpers
+    # ------------------------------------------------------------------
+    def refresh(self) -> None:
+        """Reload the prompt chain list from the repository."""
         self._load_chains()
 
     # ------------------------------------------------------------------
@@ -505,4 +506,31 @@ class PromptChainManagerDialog(QDialog):
         self._result_view.setPlainText("\n".join(outputs_section + steps_section))
 
 
-__all__ = ["PromptChainManagerDialog"]
+class PromptChainManagerDialog(QDialog):
+    """Dialog wrapper that hosts :class:`PromptChainManagerPanel`."""
+
+    def __init__(self, manager: PromptManager, parent: QWidget | None = None) -> None:
+        """Create the dialog and embed the shared panel widget."""
+        super().__init__(parent)
+        self.setWindowTitle("Prompt Chains")
+        self.resize(960, 640)
+        layout = QVBoxLayout(self)
+        self._panel = PromptChainManagerPanel(manager, parent=self)
+        layout.addWidget(self._panel)
+        buttons = QDialogButtonBox(QDialogButtonBox.Close, self)
+        buttons.accepted.connect(self.accept)  # type: ignore[arg-type]
+        buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
+        layout.addWidget(buttons)
+
+    def refresh(self) -> None:
+        """Reload prompt chains via the embedded panel."""
+        self._panel.refresh()
+
+    def __getattr__(self, name: str) -> Any:  # pragma: no cover - passthrough helper
+        panel = self.__dict__.get("_panel")
+        if panel is not None and hasattr(panel, name):
+            return getattr(panel, name)
+        raise AttributeError(name)
+
+
+__all__ = ["PromptChainManagerPanel", "PromptChainManagerDialog"]

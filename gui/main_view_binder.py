@@ -129,6 +129,7 @@ def bind_main_view(
     window._notes_panel = components.notes_panel
     window._response_styles_panel = components.response_styles_panel
     window._analytics_panel = components.analytics_panel
+    window._chain_panel = components.chain_panel
     window._template_list_view = components.template_list_view
     window._template_detail_widget = components.template_detail_widget
     window._template_preview = components.template_preview

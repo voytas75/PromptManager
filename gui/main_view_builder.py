@@ -1,6 +1,7 @@
 """Composable builders for the Prompt Manager main window.
 
 Updates:
+  v0.2.2 - 2025-12-05 - Embed prompt chain manager panel as a Chain tab.
   v0.2.1 - 2025-12-04 - Add \"Use web search\" toggle to the workspace actions row.
   v0.2.0 - 2025-12-04 - Wire prompt chain toolbar signal to callbacks bundle.
   v0.1.0 - 2025-11-30 - Extract main window UI assembly into reusable builder helpers.
@@ -33,6 +34,7 @@ from PySide6.QtWidgets import (
 )
 
 from .analytics_panel import AnalyticsDashboardPanel
+from .dialogs.prompt_chains import PromptChainManagerPanel
 from .history_panel import HistoryPanel
 from .notes_panel import NotesPanel
 from .response_styles_panel import ResponseStylesPanel
@@ -136,6 +138,7 @@ class MainViewComponents:
     notes_panel: NotesPanel
     response_styles_panel: ResponseStylesPanel
     analytics_panel: AnalyticsDashboardPanel
+    chain_panel: PromptChainManagerPanel
     template_preview_splitter: QSplitter
     template_preview_list_splitter: QSplitter
     template_list_view: QListView
@@ -488,6 +491,9 @@ def build_main_view(
     preview_layout.addLayout(template_actions)
     tab_widget.addTab(preview_tab, "Template")
 
+    chain_panel = PromptChainManagerPanel(manager, parent)
+    tab_widget.addTab(chain_panel, "Chain")
+
     layout.addWidget(tab_widget, stretch=1)
 
     return MainViewComponents(
@@ -529,6 +535,7 @@ def build_main_view(
         notes_panel=notes_panel,
         response_styles_panel=response_styles_panel,
         analytics_panel=analytics_panel,
+        chain_panel=chain_panel,
         template_preview_splitter=template_preview_splitter,
         template_preview_list_splitter=template_preview_list_splitter,
         template_list_view=template_list_view,

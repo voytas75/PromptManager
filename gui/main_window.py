@@ -1,6 +1,7 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.16.4 - 2025-12-05 - Embed prompt chain panel and add toolbar shortcut to focus Chain tab.
   v0.16.3 - 2025-12-04 - Track \"Use web search\" checkbox for execution controller.
   v0.16.2 - 2025-12-04 - Wire template preview bridge to handler so tab run works on load.
   v0.16.0 - 2025-12-02 - Delegate controller assembly, view callbacks, and handlers
@@ -14,9 +15,7 @@ Updates:
   v0.15.79 - 2025-12-01 - Delegated theme/palette, runtime settings, catalog,
     and share workflows to helpers.
   v0.15.78 - 2025-12-01 - Guard tab change handler until widgets are initialised.
-  v0.15.77 - 2025-12-01 - Extract prompt list coordinator for loading/filtering/sorting logic.
-  v0.15.76 - 2025-12-01 - Delegate layout persistence to WindowStateManager helper.
-  v0.15.75-and-earlier - 2025-11-30 - Consolidated toolbar, overlay, and workspace refactors.
+  v0.15.77-and-earlier - 2025-11-30 - Consolidated toolbar, overlay, and workspace refactors.
 """
 
 from __future__ import annotations
@@ -87,6 +86,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from .analytics_panel import AnalyticsDashboardPanel
     from .catalog_workflow_controller import CatalogWorkflowController
     from .code_highlighter import CodeHighlighter
+    from .dialogs.prompt_chains import PromptChainManagerPanel
     from .controllers.execution_controller import ExecutionController
     from .history_panel import HistoryPanel
     from .notes_panel import NotesPanel
@@ -110,6 +110,7 @@ else:  # pragma: no cover - runtime placeholders for type-only imports
     NotesPanel = _Any
     ResponseStylesPanel = _Any
     AnalyticsDashboardPanel = _Any
+    PromptChainManagerPanel = _Any
     Prompt = _Any
     PromptDetailWidget = _Any
     PromptFilterPanel = _Any
@@ -246,6 +247,7 @@ class MainWindow(QMainWindow):
         self._notes_panel: NotesPanel | None = None
         self._response_styles_panel: ResponseStylesPanel | None = None
         self._analytics_panel: AnalyticsDashboardPanel | None = None
+        self._chain_panel: PromptChainManagerPanel | None = None
         self._template_list_view: QListView = cast("QListView", None)
         self._template_detail_widget: PromptDetailWidget = cast("PromptDetailWidget", None)
         self._template_run_shortcut_button: QPushButton = cast("QPushButton", None)
@@ -544,6 +546,17 @@ class MainWindow(QMainWindow):
         if self._quick_action_controller is None:
             return
         self._quick_action_controller.show_command_palette()
+
+    def _focus_chain_tab(self) -> None:
+        """Switch to the Chain tab and refresh its contents when requested."""
+        if self._tab_widget is None or self._chain_panel is None:
+            return
+        index = self._tab_widget.indexOf(self._chain_panel)
+        if index < 0:
+            return
+        if self._tab_widget.currentIndex() != index:
+            self._chain_panel.refresh()
+        self._tab_widget.setCurrentIndex(index)
 
     def _on_detect_intent_clicked(self) -> None:
         """Run intent detection on the free-form query input."""
