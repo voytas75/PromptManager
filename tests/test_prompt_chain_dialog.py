@@ -30,7 +30,7 @@ from gui.dialogs.prompt_chains import PromptChainManagerDialog
 from models.prompt_chain_model import PromptChain, PromptChainStep
 
 if TYPE_CHECKING:  # pragma: no cover - typing helper
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping
 
 
 @pytest.fixture(scope="module")
@@ -51,6 +51,7 @@ class _ManagerStub:
         stream_chunks: tuple[str, ...] = (),
         step_request_text: str = "{{ body }}",
         step_response_text: str = "Demo response",
+        step_reasoning_text: str | None = None,
     ) -> None:
         self._chains = [_make_chain()]
         self.saved_chain: PromptChain | None = None
@@ -62,6 +63,7 @@ class _ManagerStub:
         self.received_stream_callback: Callable[[PromptChainStep, str], None] | None = None
         self._step_request_text = step_request_text
         self._step_response_text = step_response_text
+        self._step_reasoning_text = step_reasoning_text
 
     @property
     def repository(self):  # pragma: no cover - only used by DialogLauncher in real app
@@ -98,13 +100,24 @@ class _ManagerStub:
                 stream_callback(chain.steps[0], chunk, False)
             stream_callback(chain.steps[0], "final text", True)
         step = chain.steps[0]
+        raw_response: Mapping[str, Any] = {}
+        if self._step_reasoning_text:
+            raw_response = {
+                "output": [
+                    {
+                        "content": [
+                            {"type": "reasoning", "text": self._step_reasoning_text},
+                        ]
+                    }
+                ]
+            }
         execution_result = CodexExecutionResult(
             prompt_id=step.prompt_id,
             request_text=self._step_request_text,
             response_text=self._step_response_text,
             duration_ms=123,
             usage={},
-            raw_response={},
+            raw_response=raw_response,
         )
         outcome = ExecutionOutcome(result=execution_result, history_entry=None, conversation=[])
         return PromptChainRunResult(
@@ -202,7 +215,7 @@ def test_prompt_chain_markdown_toggle_preserves_text(qt_app: QApplication) -> No
         dialog._run_selected_chain()  # noqa: SLF001 - exercising private helper for test
         initial_plain = dialog._result_view.toPlainText().strip()  # noqa: SLF001
         assert initial_plain
-        assert dialog._result_markdown.strip()  # noqa: SLF001
+        assert dialog._result_richtext.strip()  # noqa: SLF001
         dialog._result_plaintext = ""  # noqa: SLF001 - simulate missing plain text snapshot
         dialog._result_format_checkbox.setChecked(True)  # noqa: SLF001
         dialog._result_format_checkbox.setChecked(False)  # noqa: SLF001
@@ -237,7 +250,39 @@ def test_prompt_chain_markdown_omits_code_fences(qt_app: QApplication) -> None:
     dialog = PromptChainManagerDialog(manager)
     try:
         dialog._run_selected_chain()  # noqa: SLF001
-        assert "```" not in dialog._result_markdown  # noqa: SLF001
+        assert "```" not in dialog._result_richtext  # noqa: SLF001
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
+def test_prompt_chain_results_use_colored_sections(qt_app: QApplication) -> None:
+    """Rich text output should include styled blocks for key sections."""
+
+    manager = _ManagerStub()
+    dialog = PromptChainManagerDialog(manager)
+    try:
+        dialog._run_selected_chain()  # noqa: SLF001
+        rich = dialog._result_richtext  # noqa: SLF001
+        assert "chain-block--input" in rich
+        assert "chain-block--summary" in rich
+        assert "#e8f5e9" in rich  # light green blocks
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
+def test_prompt_chain_dialog_renders_reasoning_summary(qt_app: QApplication) -> None:
+    """Reasoning snippets should appear with dedicated styling when available."""
+
+    manager = _ManagerStub(step_reasoning_text="Deliberate reasoning path.")
+    dialog = PromptChainManagerDialog(manager)
+    try:
+        dialog._run_selected_chain()  # noqa: SLF001
+        plain = dialog._result_view.toPlainText()  # noqa: SLF001
+        assert "Reasoning summary" in plain
+        assert "Deliberate reasoning path." in plain
+        assert "#e3f2fd" in dialog._result_richtext  # noqa: SLF001
     finally:
         dialog.close()
         dialog.deleteLater()
@@ -253,11 +298,10 @@ def test_prompt_chain_step_markdown_renders_without_code_fences(qt_app: QApplica
     dialog = PromptChainManagerDialog(manager)
     try:
         dialog._run_selected_chain()  # noqa: SLF001
-        markdown = dialog._result_markdown  # noqa: SLF001
-        assert "**Output of step:**" in markdown
-        after_label = markdown.split("**Output of step:**", 1)[1].lstrip()
-        assert not after_label.startswith("```")
-        assert "### Step output" in after_label
+        rich = dialog._result_richtext  # noqa: SLF001
+        assert "chain-step-output" in rich
+        assert "### Step output" in rich
+        assert "```" not in rich
     finally:
         dialog.close()
         dialog.deleteLater()

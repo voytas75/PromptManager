@@ -1,6 +1,7 @@
 """Prompt chain management surfaces for the GUI.
 
 Updates:
+  v0.5.12 - 2025-12-05 - Color-code results sections and surface reasoning summaries.
   v0.5.11 - 2025-12-05 - Ensure wrapped results by removing code fences from chain IO sections.
   v0.5.10 - 2025-12-05 - Add line wrap toggle for execution results pane (on by default).
   v0.5.9 - 2025-12-05 - Display chain summary preference and render condensed outputs.
@@ -19,15 +20,17 @@ Updates:
 
 from __future__ import annotations
 
+import html
 import json
 import logging
 import threading
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from PySide6.QtCore import QByteArray, QSettings, Qt, QTimer
+from PySide6.QtGui import QTextDocument
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -53,6 +56,7 @@ from core import (
     PromptChainError,
     PromptChainExecutionError,
     PromptChainRunResult,
+    PromptChainStepRun,
     PromptManager,
     PromptManagerError,
 )
@@ -64,11 +68,92 @@ from .prompt_chain_editor import PromptChainEditorDialog
 
 logger = logging.getLogger(__name__)
 
+_CHAIN_INPUT_BG = "#e8f5e9"
+_CHAIN_OUTPUT_BG = "#e8f5e9"
+_CHAIN_SUMMARY_BG = "#c8e6c9"
+_STEP_OUTPUT_BG = "#f8f9fa"
+_REASONING_BG = "#e3f2fd"
+
+_RESULT_STYLE = """
+<style>
+.chain-results {
+  font-family: "Inter", "Segoe UI", sans-serif;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.chain-block {
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  border: 1px solid #dfe5dc;
+}
+.chain-block-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.chain-block-body {
+  white-space: pre-wrap;
+}
+.chain-block-body--mono {
+  font-family: "JetBrains Mono", "SFMono-Regular", monospace;
+}
+.chain-block pre {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: "JetBrains Mono", "SFMono-Regular", monospace;
+  font-size: 12px;
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+.chain-steps {
+  margin-top: 12px;
+}
+.chain-step {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 12px;
+  background-color: #ffffff;
+}
+.chain-step-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.chain-step-status {
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.chain-step-error {
+  color: #c62828;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.chain-step-detail {
+  margin: 6px 0;
+}
+.chain-step-detail pre {
+  margin-top: 4px;
+  padding: 6px;
+  border-radius: 4px;
+  border: 1px solid #ececec;
+}
+.chain-step-output pre {
+  background-color: #f8f9fa;
+}
+.chain-step-reasoning pre {
+  background-color: #e3f2fd;
+  border-color: #c5dff6;
+}
+</style>
+"""
+
 if TYPE_CHECKING:  # pragma: no cover - typing helpers only
     from uuid import UUID
 
     from PySide6.QtGui import QCloseEvent
 
+    from core.prompt_manager.execution_history import ExecutionOutcome
     from models.prompt_model import Prompt
 
 
@@ -83,7 +168,7 @@ class PromptChainManagerPanel(QWidget):
         self._selected_chain_id: str | None = None
         self._settings = QSettings("PromptManager", "PromptChainManagerPanel")
         self._result_plaintext: str = ""
-        self._result_markdown: str = ""
+        self._result_richtext: str = ""
         self._suppress_variable_signal = False
         self._current_variables_chain_id: str | None = None
 
@@ -606,35 +691,45 @@ class PromptChainManagerPanel(QWidget):
             return [f"{prefix}{line}" for line in text.splitlines()]
 
         plain_sections: list[str] = []
-        markdown_lines: list[str] = []
+        html_sections: list[str] = [_RESULT_STYLE, '<div class="chain-results">']
+        step_html_sections: list[str] = []
 
         # Chain inputs
         plain_sections.append("Input to chain")
-        markdown_lines.append("## Input to chain")
-        markdown_lines.append("")
+        chain_input_text = ""
         if result.variables:
-            chain_input = self._format_json(result.variables)
-            plain_sections.extend(_indent_lines(chain_input))
-            markdown_lines.extend(chain_input.splitlines())
+            chain_input_text = self._format_json(result.variables)
+        html_sections.append(
+            self._format_colored_block_html(
+                "Input to chain",
+                chain_input_text or "- (no chain variables provided)",
+                color=_CHAIN_INPUT_BG,
+                class_name="chain-block--input",
+            )
+        )
+        if chain_input_text:
+            plain_sections.extend(_indent_lines(chain_input_text))
         else:
             plain_sections.append("  (no chain variables provided)")
-            markdown_lines.append("- (no chain variables provided)")
         plain_sections.append("")
-        markdown_lines.append("")
 
         # Chain outputs
         plain_sections.append("Chain Outputs")
-        markdown_lines.append("## Chain outputs")
-        markdown_lines.append("")
+        outputs_text = ""
         if result.outputs:
             outputs_text = self._format_json(result.outputs)
             plain_sections.extend(_indent_lines(outputs_text))
-            markdown_lines.extend(outputs_text.splitlines())
         else:
             plain_sections.append("  (no outputs)")
-            markdown_lines.append("- (no outputs)")
         plain_sections.append("")
-        markdown_lines.append("")
+        html_sections.append(
+            self._format_colored_block_html(
+                "Chain outputs",
+                outputs_text or "- (no outputs)",
+                color=_CHAIN_OUTPUT_BG,
+                class_name="chain-block--outputs",
+            )
+        )
 
         if result.summary:
             summary_text = result.summary.strip()
@@ -642,28 +737,32 @@ class PromptChainManagerPanel(QWidget):
                 plain_sections.append("Chain summary")
                 plain_sections.extend(_indent_lines(summary_text))
                 plain_sections.append("")
-                markdown_lines.extend(["", "## Chain summary", ""])
-                markdown_lines.extend(summary_text.splitlines())
-                markdown_lines.append("")
+                html_sections.append(
+                    self._format_colored_block_html(
+                        "Chain summary",
+                        summary_text,
+                        color=_CHAIN_SUMMARY_BG,
+                        class_name="chain-block--summary",
+                        monospace=False,
+                    )
+                )
 
         # Steps
         if result.steps:
-            markdown_lines.append("")
-            markdown_lines.append("## Step details")
+            html_sections.append('<div class="chain-steps">')
         for step_run in result.steps:
             step = step_run.step
             step_label = step.output_variable or str(step.prompt_id)
             plain_sections.append(f"Step {step.order_index}: {step_label}")
             plain_sections.append(f"  Status: {step_run.status}")
-            markdown_lines.append(f"### Step {step.order_index} – {step_label}")
-            markdown_lines.append(f"- **Status:** `{step_run.status}`")
             if step_run.error:
                 plain_sections.append(f"  Error: {step_run.error}")
-                markdown_lines.append(f"- **Error:** {step_run.error}")
             elif step_run.status == "skipped":
                 plain_sections.append("  Skipped because condition evaluated to false.")
-                markdown_lines.append("- _Skipped because condition evaluated to false._")
             outcome = step_run.outcome
+            request_text = ""
+            response_text = ""
+            reasoning_text = None
             if outcome:
                 request_text = outcome.result.request_text.strip()
                 response_text = outcome.result.response_text.strip()
@@ -671,43 +770,120 @@ class PromptChainManagerPanel(QWidget):
                 plain_sections.extend(_indent_lines(request_text or "(empty input)"))
                 plain_sections.append("  Output of step:")
                 plain_sections.extend(_indent_lines(response_text or "(empty response)"))
-                self._append_markdown_step_block(
-                    markdown_lines,
-                    header="**Input to step:**",
-                    content=request_text,
-                    empty_placeholder="_(empty input)_",
+                reasoning_text = self._extract_reasoning_summary(outcome)
+                if reasoning_text:
+                    plain_sections.append("  Reasoning summary:")
+                    plain_sections.extend(_indent_lines(reasoning_text))
+            step_html_sections.append(
+                self._build_step_html_block(
+                    step_run,
+                    request_text,
+                    response_text,
+                    reasoning_text,
                 )
-                self._append_markdown_step_block(
-                    markdown_lines,
-                    header="**Output of step:**",
-                    content=response_text,
-                    empty_placeholder="_(empty response)_",
-                )
+            )
             plain_sections.append("")
-            markdown_lines.append("")
-
+        if result.steps:
+            html_sections.extend(step_html_sections)
+            html_sections.append("</div>")
+        html_sections.append("</div>")
         plain_text = "\n".join(plain_sections).strip()
-        markdown_text = "\n".join(markdown_lines).strip()
+        html_text = "\n".join(html_sections).strip()
         self._result_plaintext = plain_text
-        self._result_markdown = markdown_text
+        self._result_richtext = html_text
         self._apply_result_view()
 
     @staticmethod
-    def _append_markdown_step_block(
-        markdown_lines: list[str],
+    def _format_colored_block_html(
+        title: str,
+        body_text: str,
         *,
-        header: str,
-        content: str,
-        empty_placeholder: str,
-    ) -> None:
-        """Append step IO text so Markdown formatting is preserved."""
-        markdown_lines.append(header)
-        markdown_lines.append("")
-        if content:
-            markdown_lines.extend(content.splitlines())
+        color: str,
+        class_name: str,
+        monospace: bool = True,
+    ) -> str:
+        """Return an HTML block with consistent styling and background color."""
+        safe_title = html.escape(title)
+        safe_body = html.escape(body_text or "(empty)")
+        if monospace:
+            body_html = (
+                f'<pre class="chain-block-body chain-block-body--mono">{safe_body}</pre>'
+            )
         else:
-            markdown_lines.append(empty_placeholder)
-        markdown_lines.append("")
+            body_html = f'<div class="chain-block-body">{safe_body}</div>'
+        return (
+            f'<div class="chain-block {class_name}" style="background-color:{color};">'
+            f"<div class='chain-block-title'>{safe_title}</div>"
+            f"{body_html}"
+            "</div>"
+        )
+
+    def _build_step_html_block(
+        self,
+        step_run: PromptChainStepRun,
+        request_text: str,
+        response_text: str,
+        reasoning_text: str | None,
+    ) -> str:
+        """Return styled HTML for a single step entry."""
+        step = step_run.step
+        label = step.output_variable or str(step.prompt_id)
+        parts = ["<div class=\"chain-step\">"]
+        parts.append(
+            f"<div class='chain-step-title'>Step {step.order_index} – {html.escape(label)}</div>"
+        )
+        parts.append(
+            "<div class='chain-step-status'>"
+            f"Status: <code>{html.escape(step_run.status)}</code>"
+            "</div>"
+        )
+        if step_run.error:
+            parts.append(f"<div class='chain-step-error'>{html.escape(step_run.error)}</div>")
+        elif step_run.status == "skipped":
+            parts.append(
+                "<div class='chain-step-detail'>"
+                "Skipped because condition evaluated to false."
+                "</div>"
+            )
+        if request_text:
+            parts.append(
+                self._format_colored_block_html(
+                    "Input to step",
+                    request_text or "(empty input)",
+                    color="#ffffff",
+                    class_name="chain-step-detail chain-step-input",
+                )
+            )
+        parts.append(
+            self._format_colored_block_html(
+                "Output of step",
+                response_text or "(empty response)",
+                color=_STEP_OUTPUT_BG,
+                class_name="chain-step-detail chain-step-output",
+            )
+        )
+        if reasoning_text:
+            parts.append(
+                self._format_colored_block_html(
+                    "Reasoning summary",
+                    reasoning_text,
+                    color=_REASONING_BG,
+                    class_name="chain-step-detail chain-step-reasoning",
+                    monospace=False,
+                )
+            )
+        parts.append("</div>")
+        return "".join(parts)
+
+    @staticmethod
+    def _extract_reasoning_summary(outcome: ExecutionOutcome | None) -> str | None:
+        """Attempt to pull reasoning content from the raw response payload."""
+        if outcome is None:
+            return None
+        raw = getattr(outcome.result, "raw_response", None)
+        if not isinstance(raw, Mapping):
+            return None
+        return _search_reasoning_payload(raw)
 
     def closeEvent(self, event: QCloseEvent) -> None:  # type: ignore[override]
         """Persist splitter state before closing."""
@@ -736,7 +912,7 @@ class PromptChainManagerPanel(QWidget):
         """Reset the execution results pane."""
         self._end_stream_preview()
         self._result_plaintext = ""
-        self._result_markdown = ""
+        self._result_richtext = ""
         self._apply_result_view()
 
     def _handle_result_format_changed(self, _: bool) -> None:
@@ -753,14 +929,14 @@ class PromptChainManagerPanel(QWidget):
     def _apply_result_view(self) -> None:
         """Render stored results using the current format preference."""
         prefers_markdown = self._result_format_checkbox.isChecked()
-        markdown_text = self._result_markdown
+        rich_text = self._result_richtext
         plain_text = self._result_plaintext
-        has_markdown = bool(markdown_text.strip())
+        has_rich = bool(rich_text.strip())
         has_plain_text = bool(plain_text.strip())
 
         if prefers_markdown:
-            if has_markdown:
-                self._result_view.setMarkdown(markdown_text)
+            if has_rich:
+                self._result_view.setHtml(rich_text)
             elif has_plain_text:
                 self._result_view.setPlainText(plain_text)
             else:
@@ -768,9 +944,10 @@ class PromptChainManagerPanel(QWidget):
         else:
             if has_plain_text:
                 self._result_view.setPlainText(plain_text)
-            elif has_markdown:
-                # Fall back to the markdown payload so toggling never drops content.
-                self._result_view.setPlainText(markdown_text)
+            elif has_rich:
+                doc = QTextDocument()
+                doc.setHtml(rich_text)
+                self._result_view.setPlainText(doc.toPlainText())
             else:
                 self._result_view.clear()
         self._maybe_scroll_results()
@@ -1008,3 +1185,47 @@ class PromptChainManagerDialog(QDialog):
 
 
 __all__ = ["PromptChainManagerPanel", "PromptChainManagerDialog"]
+
+
+_REASONING_KEYS = (
+    "reasoning",
+    "reasoning_summary",
+    "reasoning_content",
+    "chain_of_thought",
+    "thoughts",
+)
+
+
+def _search_reasoning_payload(value: object) -> str | None:
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        if len(stripped) >= 12 or " " in stripped:
+            return stripped
+        return None
+    if isinstance(value, Mapping):
+        for key in _REASONING_KEYS:
+            if key in value:
+                found = _search_reasoning_payload(value[key])
+                if found:
+                    return found
+        type_value = value.get("type")
+        if isinstance(type_value, str) and type_value.lower() in {
+            "reasoning",
+            "thought",
+            "thinking",
+        }:
+            found = _search_reasoning_payload(value.get("text") or value.get("content"))
+            if found:
+                return found
+        for child in value.values():
+            found = _search_reasoning_payload(child)
+            if found:
+                return found
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        for item in value:
+            found = _search_reasoning_payload(item)
+            if found:
+                return found
+    return None
