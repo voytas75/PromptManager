@@ -1,6 +1,7 @@
 """Prompt chain management surfaces for the GUI.
 
 Updates:
+  v0.5.17 - 2025-12-06 - Ignore reasoning payload tokens that look like opaque IDs.
   v0.5.16 - 2025-12-06 - Limit reasoning summaries to opted-in chains and final steps; fix colors.
   v0.5.15 - 2025-12-05 - Double-clicking chains opens the editor; steps still show prompt names.
   v0.5.14 - 2025-12-05 - Show prompt names in step tables and enable editing via activation.
@@ -1343,7 +1344,7 @@ def _search_reasoning_payload(value: object) -> str | None:
         stripped = value.strip()
         if not stripped:
             return None
-        if len(stripped) >= 12 or " " in stripped:
+        if any(char.isspace() for char in stripped):
             return stripped
         return None
     if isinstance(value, Mapping):

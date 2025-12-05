@@ -1,6 +1,7 @@
 """Prompt chain orchestration helpers for Prompt Manager.
 
 Updates:
+  v0.1.4 - 2025-12-06 - Summarize final chain output via LiteLLM when chains opt in.
   v0.1.3 - 2025-12-05 - Add optional web search enrichment ahead of each chain step.
   v0.1.2 - 2025-12-05 - Summarize the last step response when chains request it.
   v0.1.1 - 2025-12-05 - Surface streaming callbacks during prompt chain execution.
@@ -27,6 +28,13 @@ from ..exceptions import (
     WebSearchError,
 )
 from ..execution import ExecutionError
+from ..litellm_adapter import (
+    LiteLLMNotInstalledError,
+    apply_configured_drop_params,
+    call_completion_with_fallback,
+    get_completion,
+    serialise_litellm_response,
+)
 from ..repository import RepositoryError, RepositoryNotFoundError
 from ..templating import TemplateRenderer
 from .execution_history import ExecutionOutcome, _normalise_conversation
@@ -49,6 +57,12 @@ __all__ = [
 ]
 
 _CHAIN_WEB_SEARCH_RESULT_LIMIT = 10
+_CHAIN_SUMMARY_MAX_TOKENS = 220
+_CHAIN_SUMMARY_SYSTEM_PROMPT = (
+    "You summarise the outcome of automated multi-step workflows for prompt engineers. "
+    "Capture the key result, blockers, or next actions in two concise sentences. "
+    "Do not invent information, include markdown headings, or reference step numbers."
+)
 
 
 @dataclass(slots=True)
@@ -482,17 +496,105 @@ class PromptChainMixin:
             conversation=augmented_conversation,
         )
 
+    def _build_chain_summary(self, step_runs: list[PromptChainStepRun]) -> str | None:
+        """Return a compact summary sourced from the final successful step output."""
+        response_text = self._last_successful_response(step_runs)
+        if not response_text:
+            return None
+        summary = self._summarize_response_with_litellm(response_text)
+        if summary:
+            return summary
+        return _summarize_response_text(response_text)
+
     @staticmethod
-    def _build_chain_summary(step_runs: list[PromptChainStepRun]) -> str | None:
-        """Return a compact summary from the last successful step output."""
+    def _last_successful_response(step_runs: list[PromptChainStepRun]) -> str | None:
+        """Return the response text from the final successful step in *step_runs*."""
         for step_run in reversed(step_runs):
             outcome = step_run.outcome
-            if outcome is None:
+            if outcome is None or step_run.status != "success":
                 continue
             response_text = (outcome.result.response_text or "").strip()
             if response_text:
-                return _summarize_response_text(response_text)
+                return response_text
         return None
+
+    def _summarize_response_with_litellm(self, response_text: str) -> str | None:
+        """Generate a condensed summary via LiteLLM when models are configured."""
+        trimmed = response_text.strip()
+        if not trimmed:
+            return None
+        executor = getattr(self, "_executor", None)
+        model = (
+            getattr(self, "_litellm_fast_model", None)
+            or getattr(self, "_litellm_inference_model", None)
+            or getattr(executor, "model", None)
+        )
+        if not model:
+            return None
+        try:
+            completion, LiteLLMException = get_completion()
+        except LiteLLMNotInstalledError:
+            logger.debug("LiteLLM unavailable; falling back to deterministic chain summary")
+            return None
+
+        request: dict[str, object] = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": _CHAIN_SUMMARY_SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": (
+                        "Summarize the following response from a prompt chain so collaborators "
+                        "understand the outcome in two concise sentences. Focus on the "
+                        "result and any follow-up actions, avoid markdown, and never invent "
+                        f"details.\n\n{trimmed}"
+                    ),
+                },
+            ],
+            "temperature": 0.2,
+            "max_tokens": _CHAIN_SUMMARY_MAX_TOKENS,
+        }
+        timeout_seconds = getattr(executor, "timeout_seconds", None)
+        if timeout_seconds is not None:
+            request["timeout"] = timeout_seconds
+        for attr_name in ("api_key", "api_base", "api_version"):
+            value = getattr(executor, attr_name, None)
+            if value:
+                request[attr_name] = value
+        drop_params = getattr(self, "_litellm_drop_params", None)
+        if drop_params is None and executor is not None:
+            drop_params = getattr(executor, "drop_params", None)
+        dropped = apply_configured_drop_params(request, drop_params)
+        try:
+            response = call_completion_with_fallback(
+                request,
+                completion,
+                LiteLLMException,
+                drop_candidates={
+                    "max_tokens",
+                    "max_output_tokens",
+                    "temperature",
+                    "timeout",
+                },
+                pre_dropped=dropped,
+            )
+        except LiteLLMException:
+            logger.warning("LiteLLM chain summary generation failed", exc_info=True)
+            return None
+        except Exception:
+            logger.warning("Unexpected error while summarizing chain output", exc_info=True)
+            return None
+        payload = serialise_litellm_response(response)
+        if payload is None:
+            return None
+        try:
+            message = payload["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError):
+            return None
+        if not isinstance(message, str):
+            return None
+        summary = message.strip()
+        return summary or None
 
 
 _SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?])\s+")
