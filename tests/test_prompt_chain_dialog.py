@@ -1,6 +1,7 @@
 """Prompt chain manager dialog tests.
 
 Updates:
+  v0.2.4 - 2025-12-05 - Verify Markdown toggle preserves rendered text.
   v0.2.3 - 2025-12-05 - Cover streaming preview rendering and settings detection.
   v0.2.2 - 2025-12-05 - Validate expanded chain result text sections.
   v0.2.1 - 2025-12-05 - Adjust assertions for new description label.
@@ -145,6 +146,28 @@ def test_prompt_chain_dialog_runs_chain(qt_app: QApplication) -> None:
         text = dialog._result_view.toPlainText()  # noqa: SLF001
         assert "Input to chain" in text
         assert "Chain outputs" in text
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
+def test_prompt_chain_markdown_toggle_preserves_text(qt_app: QApplication) -> None:
+    """Disabling Markdown rendering must not clear previously rendered results."""
+
+    manager = _ManagerStub()
+    dialog = PromptChainManagerDialog(manager)
+    try:
+        dialog._run_selected_chain()  # noqa: SLF001 - exercising private helper for test
+        initial_plain = dialog._result_view.toPlainText().strip()  # noqa: SLF001
+        assert initial_plain
+        assert dialog._result_markdown.strip()  # noqa: SLF001
+        dialog._result_plaintext = ""  # noqa: SLF001 - simulate missing plain text snapshot
+        dialog._result_format_checkbox.setChecked(True)  # noqa: SLF001
+        dialog._result_format_checkbox.setChecked(False)  # noqa: SLF001
+        toggled_text = dialog._result_view.toPlainText().strip()  # noqa: SLF001
+        assert toggled_text
+        assert "Input to chain" in toggled_text
+        assert "Chain Outputs" in toggled_text
     finally:
         dialog.close()
         dialog.deleteLater()

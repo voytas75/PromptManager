@@ -1,6 +1,7 @@
 """Prompt chain management surfaces for the GUI.
 
 Updates:
+  v0.5.7 - 2025-12-05 - Preserve chain results when toggling Markdown formatting.
   v0.5.6 - 2025-12-05 - Add auto-scroll toggle for streaming/results pane.
   v0.5.5 - 2025-12-05 - Enable LiteLLM streaming preview without blocking busy indicator.
   v0.5.4 - 2025-12-05 - Expand execution results with labeled inputs/outputs per step.
@@ -9,10 +10,7 @@ Updates:
   v0.5.1 - 2025-12-05 - Add Markdown toggle for execution results with rich-text rendering.
   v0.5.0 - 2025-12-05 - Split execution results into dedicated column with persisted splitter state.
   v0.4.1 - 2025-12-05 - Document dialog passthrough helper for lint compliance.
-  v0.4.0 - 2025-12-05 - Extract reusable panel for embedding plus dialog wrapper.
-  v0.3.0 - 2025-12-04 - Prompt selector for chain steps plus inline CRUD actions.
-  v0.2.0 - 2025-12-04 - Add create, edit, and delete actions via prompt chain editor dialog.
-  v0.1.0 - 2025-12-04 - Introduce prompt chain manager dialog with run/import actions.
+  v0.4.0-v0.1.0 - 2025-12-04 - Earlier releases introduced the dialog, editor, and CRUD/import flows.
 """
 
 from __future__ import annotations
@@ -692,14 +690,25 @@ class PromptChainManagerPanel(QWidget):
 
     def _apply_result_view(self) -> None:
         """Render stored results using the current format preference."""
-        if self._result_format_checkbox.isChecked():
-            if self._result_markdown:
-                self._result_view.setMarkdown(self._result_markdown)
+        prefers_markdown = self._result_format_checkbox.isChecked()
+        markdown_text = self._result_markdown
+        plain_text = self._result_plaintext
+        has_markdown = bool(markdown_text.strip())
+        has_plain_text = bool(plain_text.strip())
+
+        if prefers_markdown:
+            if has_markdown:
+                self._result_view.setMarkdown(markdown_text)
+            elif has_plain_text:
+                self._result_view.setPlainText(plain_text)
             else:
                 self._result_view.clear()
         else:
-            if self._result_plaintext:
-                self._result_view.setPlainText(self._result_plaintext)
+            if has_plain_text:
+                self._result_view.setPlainText(plain_text)
+            elif has_markdown:
+                # Fall back to the markdown payload so toggling never drops content.
+                self._result_view.setPlainText(markdown_text)
             else:
                 self._result_view.clear()
         self._maybe_scroll_results()
