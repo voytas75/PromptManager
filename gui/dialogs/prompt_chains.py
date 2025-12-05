@@ -1,6 +1,7 @@
 """Prompt chain management surfaces for the GUI.
 
 Updates:
+  v0.5.0 - 2025-12-05 - Split execution results into a dedicated column with persisted splitter state.
   v0.4.1 - 2025-12-05 - Document dialog passthrough helper for lint compliance.
   v0.4.0 - 2025-12-05 - Extract reusable panel for embedding plus dialog wrapper.
   v0.3.0 - 2025-12-04 - Prompt selector for chain steps plus inline CRUD actions.
@@ -17,7 +18,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QByteArray, QSettings, Qt
+from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -67,6 +69,7 @@ class PromptChainManagerPanel(QWidget):
         self._manager = manager
         self._chains: list[PromptChain] = []
         self._selected_chain_id: str | None = None
+        self._settings = QSettings("PromptManager", "PromptChainManagerPanel")
 
         layout = QVBoxLayout(self)
         intro = QLabel(
@@ -78,12 +81,21 @@ class PromptChainManagerPanel(QWidget):
         intro.setWordWrap(True)
         layout.addWidget(intro)
 
-        splitter = QSplitter(Qt.Horizontal, self)
-        splitter.setObjectName("promptChainSplitter")
-        layout.addWidget(splitter, 1)
+        self._outer_splitter = QSplitter(Qt.Horizontal, self)
+        self._outer_splitter.setObjectName("promptChainOuterSplitter")
+        layout.addWidget(self._outer_splitter, 1)
+
+        management_container = QFrame(self._outer_splitter)
+        management_layout = QVBoxLayout(management_container)
+        management_layout.setContentsMargins(0, 0, 0, 0)
+        management_layout.setSpacing(0)
+
+        self._management_splitter = QSplitter(Qt.Horizontal, management_container)
+        self._management_splitter.setObjectName("promptChainSplitter")
+        management_layout.addWidget(self._management_splitter, 1)
 
         # Left column (chain list + actions)
-        list_container = QFrame(splitter)
+        list_container = QFrame(self._management_splitter)
         list_layout = QVBoxLayout(list_container)
         list_layout.setContentsMargins(8, 8, 8, 8)
         list_layout.setSpacing(8)
@@ -118,10 +130,8 @@ class PromptChainManagerPanel(QWidget):
         import_run_row.addStretch(1)
         list_layout.addLayout(import_run_row)
 
-        splitter.addWidget(list_container)
-
         # Right column (details + run form)
-        detail_container = QFrame(splitter)
+        detail_container = QFrame(self._management_splitter)
         detail_layout = QVBoxLayout(detail_container)
         detail_layout.setContentsMargins(8, 8, 8, 8)
         detail_layout.setSpacing(10)
@@ -174,14 +184,38 @@ class PromptChainManagerPanel(QWidget):
         actions_row.addStretch(1)
         detail_layout.addLayout(actions_row)
 
-        self._result_view = QPlainTextEdit(detail_container)
+        results_container = QFrame(self._outer_splitter)
+        results_layout = QVBoxLayout(results_container)
+        results_layout.setContentsMargins(8, 8, 8, 8)
+        results_layout.setSpacing(8)
+
+        results_header = QHBoxLayout()
+        results_header.setContentsMargins(0, 0, 0, 0)
+        results_title = QLabel("Execution results", results_container)
+        results_title.setStyleSheet("font-size:15px;font-weight:600;")
+        results_header.addWidget(results_title)
+        self._clear_results_button = QPushButton("Clear", results_container)
+        self._clear_results_button.clicked.connect(self._handle_clear_results)  # type: ignore[arg-type]
+        results_header.addWidget(self._clear_results_button)
+        results_header.addStretch(1)
+        results_layout.addLayout(results_header)
+
+        self._result_view = QPlainTextEdit(results_container)
         self._result_view.setReadOnly(True)
         self._result_view.setPlaceholderText("Execution results, outputs, and per-step summary.")
-        detail_layout.addWidget(self._result_view)
+        results_layout.addWidget(self._result_view, 1)
 
-        splitter.addWidget(detail_container)
-        splitter.setStretchFactor(1, 2)
+        self._management_splitter.addWidget(list_container)
+        self._management_splitter.addWidget(detail_container)
+        self._management_splitter.setStretchFactor(0, 1)
+        self._management_splitter.setStretchFactor(1, 2)
 
+        self._outer_splitter.addWidget(management_container)
+        self._outer_splitter.addWidget(results_container)
+        self._outer_splitter.setStretchFactor(0, 3)
+        self._outer_splitter.setStretchFactor(1, 2)
+
+        self._restore_splitter_state()
         self._load_chains()
 
     # ------------------------------------------------------------------
@@ -505,6 +539,29 @@ class PromptChainManagerPanel(QWidget):
             steps_section.append(summary)
 
         self._result_view.setPlainText("\n".join(outputs_section + steps_section))
+
+    def closeEvent(self, event: QCloseEvent) -> None:  # type: ignore[override]
+        """Persist splitter state before closing."""
+        self._persist_splitter_state()
+        super().closeEvent(event)
+
+    def _restore_splitter_state(self) -> None:
+        """Restore splitter positions from persisted settings."""
+        outer_state = self._settings.value("outerSplitterState")
+        if isinstance(outer_state, QByteArray):
+            self._outer_splitter.restoreState(outer_state)
+        inner_state = self._settings.value("managementSplitterState")
+        if isinstance(inner_state, QByteArray):
+            self._management_splitter.restoreState(inner_state)
+
+    def _persist_splitter_state(self) -> None:
+        """Save splitter positions for the next session."""
+        self._settings.setValue("outerSplitterState", self._outer_splitter.saveState())
+        self._settings.setValue("managementSplitterState", self._management_splitter.saveState())
+
+    def _handle_clear_results(self) -> None:
+        """Reset the execution results pane."""
+        self._result_view.clear()
 
 
 class PromptChainManagerDialog(QDialog):
