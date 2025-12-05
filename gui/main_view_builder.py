@@ -1,6 +1,7 @@
 r"""Composable builders for the Prompt Manager main window.
 
 Updates:
+  v0.2.6 - 2025-12-05 - Pass prompt edit callbacks into analytics and chain panels.
   v0.2.5 - 2025-12-05 - Mark module docstring as raw for lint compliance.
   v0.2.4 - 2025-12-05 - Remove prompt template toolbar wiring.
   v0.2.3 - 2025-12-05 - Drop prompt chain toolbar wiring; Chain tab is always visible.
@@ -492,7 +493,11 @@ def build_main_view(
     preview_layout.addLayout(template_actions)
     tab_widget.addTab(preview_tab, "Template")
 
-    chain_panel = PromptChainManagerPanel(manager, parent)
+    chain_panel = PromptChainManagerPanel(
+        manager,
+        parent,
+        prompt_edit_callback=callbacks.edit_prompt_by_id,
+    )
     tab_widget.addTab(chain_panel, "Chain")
 
     layout.addWidget(tab_widget, stretch=1)

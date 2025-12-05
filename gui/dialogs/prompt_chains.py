@@ -1,6 +1,7 @@
 """Prompt chain management surfaces for the GUI.
 
 Updates:
+  v0.5.14 - 2025-12-05 - Show prompt names in step tables and enable editing via activation.
   v0.5.13 - 2025-12-05 - Add default-on web search toggle for chain executions.
   v0.5.12 - 2025-12-05 - Color-code results sections and surface reasoning summaries.
   v0.5.11 - 2025-12-05 - Ensure wrapped results by removing code fences from chain IO sections.
@@ -154,7 +155,13 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers only
 class PromptChainManagerPanel(QWidget):
     """Widget that lists, imports, and runs stored prompt chains."""
 
-    def __init__(self, manager: PromptManager, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        manager: PromptManager,
+        parent: QWidget | None = None,
+        *,
+        prompt_edit_callback: Callable[[UUID], None] | None = None,
+    ) -> None:
         """Create the panel and load the initial chain list."""
         super().__init__(parent)
         self._manager = manager
@@ -166,6 +173,9 @@ class PromptChainManagerPanel(QWidget):
         self._suppress_variable_signal = False
         self._current_variables_chain_id: str | None = None
         self._web_search_checkbox: QCheckBox | None = None
+        self._prompt_edit_callback = prompt_edit_callback
+        self._prompt_name_cache: dict[UUID, str] = {}
+        self._step_prompt_ids: dict[int, UUID] = {}
 
         layout = QVBoxLayout(self)
         intro = QLabel(
@@ -275,6 +285,9 @@ class PromptChainManagerPanel(QWidget):
         self._steps_table.horizontalHeader().setStretchLastSection(True)
         self._steps_table.verticalHeader().setVisible(False)
         self._steps_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self._steps_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self._steps_table.setSelectionMode(QTableWidget.SingleSelection)
+        self._steps_table.cellActivated.connect(self._handle_step_table_activated)  # type: ignore[arg-type]
         steps_layout.addWidget(self._steps_table, 1)
 
         run_container = QFrame(self._detail_splitter)
@@ -388,6 +401,7 @@ class PromptChainManagerPanel(QWidget):
     def _load_chains(self) -> None:
         """Refresh the chain list from the repository."""
         previous_id = self._selected_chain_id
+        self._prompt_name_cache.clear()
         try:
             chains = self._manager.list_prompt_chains(include_inactive=True)
         except PromptChainError as exc:
@@ -460,6 +474,7 @@ class PromptChainManagerPanel(QWidget):
             self._description_label.setText("(No description provided.)")
             self._schema_view.clear()
             self._steps_table.setRowCount(0)
+            self._step_prompt_ids.clear()
             self._result_view.clear()
             self._run_button.setEnabled(False)
             if self._web_search_checkbox is not None:
@@ -497,15 +512,20 @@ class PromptChainManagerPanel(QWidget):
     def _populate_steps_table(self, chain: PromptChain) -> None:
         """Fill the steps table using ``chain.steps``."""
         self._steps_table.setRowCount(len(chain.steps))
+        self._step_prompt_ids.clear()
         for row, step in enumerate(chain.steps):
             self._steps_table.setItem(row, 0, QTableWidgetItem(str(step.order_index)))
-            self._steps_table.setItem(row, 1, QTableWidgetItem(str(step.prompt_id)))
+            prompt_label = self._resolve_prompt_label(step.prompt_id)
+            prompt_item = QTableWidgetItem(prompt_label)
+            prompt_item.setToolTip(str(step.prompt_id))
+            self._steps_table.setItem(row, 1, prompt_item)
             self._steps_table.setItem(row, 2, QTableWidgetItem(step.input_template or ""))
             self._steps_table.setItem(row, 3, QTableWidgetItem(step.output_variable))
             condition = step.condition or "Always"
             if not step.stop_on_failure:
                 condition = f"{condition} (continues on failure)"
             self._steps_table.setItem(row, 4, QTableWidgetItem(condition))
+            self._step_prompt_ids[row] = step.prompt_id
         self._steps_table.resizeColumnsToContents()
 
     # ------------------------------------------------------------------
@@ -1095,6 +1115,33 @@ class PromptChainManagerPanel(QWidget):
     def _handle_web_search_toggle(self, state: int) -> None:
         self._settings.setValue("chainWebSearchEnabled", state == Qt.Checked)
 
+    def _handle_step_table_activated(self, row: int, _: int) -> None:
+        prompt_id = self._step_prompt_ids.get(row)
+        if prompt_id is None:
+            return
+        if self._prompt_edit_callback is None:
+            QMessageBox.information(
+                self,
+                "Prompt editor unavailable",
+                "Prompt editing is unavailable in this context.",
+            )
+            return
+        self._prompt_edit_callback(prompt_id)
+
+    def _resolve_prompt_label(self, prompt_id: UUID) -> str:
+        cached = self._prompt_name_cache.get(prompt_id)
+        if cached:
+            return cached
+        try:
+            prompt = self._manager.get_prompt(prompt_id)
+        except PromptManagerError:
+            label = str(prompt_id)
+        else:
+            name = (prompt.name or "").strip()
+            label = name or str(prompt_id)
+        self._prompt_name_cache[prompt_id] = label
+        return label
+
     def _load_variables_text(self, chain_id: str | None) -> str:
         """Load saved variable JSON for the given chain."""
         if not chain_id:
@@ -1193,13 +1240,23 @@ class PromptChainManagerPanel(QWidget):
 class PromptChainManagerDialog(QDialog):
     """Dialog wrapper that hosts :class:`PromptChainManagerPanel`."""
 
-    def __init__(self, manager: PromptManager, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        manager: PromptManager,
+        parent: QWidget | None = None,
+        *,
+        prompt_edit_callback: Callable[[UUID], None] | None = None,
+    ) -> None:
         """Create the dialog and embed the shared panel widget."""
         super().__init__(parent)
         self.setWindowTitle("Prompt Chains")
         self.resize(960, 640)
         layout = QVBoxLayout(self)
-        self._panel = PromptChainManagerPanel(manager, parent=self)
+        self._panel = PromptChainManagerPanel(
+            manager,
+            parent=self,
+            prompt_edit_callback=prompt_edit_callback,
+        )
         layout.addWidget(self._panel)
         buttons = QDialogButtonBox(QDialogButtonBox.Close, self)
         buttons.accepted.connect(self.accept)  # type: ignore[arg-type]

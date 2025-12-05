@@ -1,6 +1,7 @@
 r"""Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.16.7 - 2025-12-05 - Route prompt edit callbacks into chain dialogs and panels.
   v0.16.6 - 2025-12-05 - Normalize module docstring quoting and reorder imports for lint compliance.
   v0.16.5 - 2025-12-05 - Remove prompt chain toolbar shortcut; Chain tab remains embedded.
   v0.16.4 - 2025-12-05 - Embed prompt chain panel and add toolbar shortcut to focus Chain tab.
@@ -434,6 +435,7 @@ class MainWindow(QMainWindow):
             select_prompt=lambda prompt: self._workspace_history_controller.select_prompt(prompt.id)
             if self._workspace_history_controller is not None
             else None,
+            prompt_edit_callback=self._prompt_actions_bridge.edit_prompt_by_id,
         )
         self._workspace_router = WorkspaceCommandRouter(lambda: self._workspace_actions)
         self._workspace_input_handler = WorkspaceInputHandler(

@@ -1,6 +1,7 @@
 """Dialog helpers used by the Prompt Manager main window.
 
 Updates:
+  v0.15.84 - 2025-12-05 - Pipe prompt edit callbacks through the chain dialog launcher.
   v0.15.83 - 2025-12-04 - Add prompt chain dialog launcher wiring.
   v0.15.82 - 2025-12-01 - Extract info/workbench/version dialogs from gui.main_window.
 """
@@ -20,6 +21,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from PySide6.QtWidgets import QWidget
 
     from models.prompt_model import Prompt
+    from uuid import UUID
 else:  # pragma: no cover - runtime placeholders for type-only imports
     from typing import Any as _Any
 
@@ -40,6 +42,7 @@ class DialogLauncher:
         load_prompts: Callable[[str], None],
         current_search_text: Callable[[], str],
         select_prompt: Callable[[Prompt], None],
+        prompt_edit_callback: Callable[[UUID], None] | None = None,
     ) -> None:
         """Store shared collaborators used by dialog helpers."""
         self._parent = parent
@@ -48,6 +51,7 @@ class DialogLauncher:
         self._load_prompts = load_prompts
         self._current_search_text = current_search_text
         self._select_prompt = select_prompt
+        self._prompt_edit_callback = prompt_edit_callback
         self._workbench_windows: list[WorkbenchWindow] = []
 
     # ------------------------------------------------------------------
@@ -101,7 +105,11 @@ class DialogLauncher:
 
     def open_prompt_chains_dialog(self) -> None:
         """Launch the prompt chain management dialog."""
-        dialog = PromptChainManagerDialog(self._manager, self._parent)
+        dialog = PromptChainManagerDialog(
+            self._manager,
+            self._parent,
+            prompt_edit_callback=self._prompt_edit_callback,
+        )
         dialog.exec()
 
     # ------------------------------------------------------------------

@@ -1,6 +1,7 @@
 """Prompt chain manager dialog tests.
 
 Updates:
+  v0.2.8 - 2025-12-05 - Cover prompt name rendering and editor activation from the Chain tab.
   v0.2.7 - 2025-12-05 - Cover default-on web search toggle behaviour for chains.
   v0.2.6 - 2025-12-05 - Cover summarize toggle persistence and UI output section.
   v0.2.5 - 2025-12-05 - Ensure step IO renders outside code fences for Markdown formatting.
@@ -24,7 +25,7 @@ pytest.importorskip("PySide6")
 from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QApplication, QDialog, QMessageBox, QTextEdit
 
-from core import PromptChainRunResult, PromptChainStepRun
+from core import PromptChainRunResult, PromptChainStepRun, PromptManagerError
 from core.execution import CodexExecutionResult
 from core.prompt_manager.execution_history import ExecutionOutcome
 from gui.dialogs.prompt_chain_editor import PromptChainEditorDialog
@@ -77,6 +78,8 @@ class _ManagerStub:
         self._step_response_text = step_response_text
         self._step_reasoning_text = step_reasoning_text
         self.last_use_web_search: bool | None = None
+        prompt_id = self._chains[0].steps[0].prompt_id
+        self._prompt_record = SimpleNamespace(id=prompt_id, name="Example Prompt")
 
     @property
     def repository(self):  # pragma: no cover - only used by DialogLauncher in real app
@@ -86,7 +89,12 @@ class _ManagerStub:
         return list(self._chains)
 
     def list_prompts(self, limit: int | None = None):  # noqa: ARG002
-        return [SimpleNamespace(id=uuid.uuid4(), name="Example Prompt")]
+        return [self._prompt_record]
+
+    def get_prompt(self, prompt_id: uuid.UUID):  # noqa: D401
+        if prompt_id == self._prompt_record.id:
+            return self._prompt_record
+        raise PromptManagerError("Prompt not found")
 
     def save_prompt_chain(self, chain: PromptChain) -> PromptChain:
         self.saved_chain = chain
@@ -242,6 +250,38 @@ def test_prompt_chain_dialog_respects_web_search_toggle(qt_app: QApplication) ->
         dialog._web_search_checkbox.setChecked(True)  # noqa: SLF001
         dialog._run_selected_chain()  # noqa: SLF001
         assert manager.last_use_web_search is True
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
+def test_prompt_chain_dialog_displays_prompt_names(qt_app: QApplication) -> None:
+    """Steps table should render prompt names instead of UUIDs."""
+
+    manager = _ManagerStub()
+    dialog = PromptChainManagerDialog(manager)
+    try:
+        item = dialog._steps_table.item(0, 1)  # noqa: SLF001
+        assert item is not None
+        assert item.text() == "Example Prompt"
+        assert item.toolTip() == str(manager._prompt_record.id)
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
+def test_prompt_chain_step_activation_opens_prompt_editor(qt_app: QApplication) -> None:
+    """Double-clicking a step should invoke the prompt edit callback."""
+
+    manager = _ManagerStub()
+    invoked: list[uuid.UUID] = []
+    dialog = PromptChainManagerDialog(
+        manager,
+        prompt_edit_callback=lambda prompt_id: invoked.append(prompt_id),
+    )
+    try:
+        dialog._handle_step_table_activated(0, 0)  # noqa: SLF001
+        assert invoked == [manager._prompt_record.id]
     finally:
         dialog.close()
         dialog.deleteLater()
