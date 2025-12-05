@@ -719,7 +719,7 @@ class PromptChainManagerPanel(QWidget):
         """Schedule GUI updates for streamed chain step output."""
         if not chunk:
             return
-        QTimer.singleShot(0, lambda: self._register_stream_chunk(step, chunk, is_final))
+        QTimer.singleShot(0, self, lambda: self._register_stream_chunk(step, chunk, is_final))
 
     def _register_stream_chunk(self, step: PromptChainStep, chunk: str, is_final: bool) -> None:
         """Append *chunk* to the preview buffer for *step*."""
@@ -824,7 +824,7 @@ class PromptChainManagerPanel(QWidget):
         chain: PromptChain,
         variables: Mapping[str, Any],
         previous_status: str,
-        stream_callback: Callable[[PromptChainStep, str], None] | None,
+        stream_callback: Callable[[PromptChainStep, str, bool], None] | None,
     ) -> None:
         """Execute the chain on a worker thread while showing live stream updates."""
         payload: dict[str, object] = {}
