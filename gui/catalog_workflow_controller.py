@@ -1,6 +1,7 @@
 """Controllers for catalogue import/export and maintenance flows.
 
 Updates:
+  v0.1.1 - 2025-12-05 - Avoid reopening dialogs on cancel by confirming directory import.
   v0.1.0 - 2025-12-01 - Extracted catalogue workflows from MainWindow.
 """
 
@@ -64,10 +65,19 @@ class CatalogWorkflowController:
             "",
             "JSON Files (*.json);;All Files (*)",
         )
-        catalog_path: Path | None
+        catalog_path: Path | None = None
         if file_path:
             catalog_path = Path(file_path)
         else:
+            use_directory = QMessageBox.question(
+                self._parent,
+                "Import directory?",
+                "No file selected. Do you want to import all JSON files from a directory instead?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if use_directory != QMessageBox.Yes:
+                return
             directory = QFileDialog.getExistingDirectory(
                 self._parent,
                 "Select catalogue directory",
