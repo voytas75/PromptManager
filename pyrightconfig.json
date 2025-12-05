@@ -1,0 +1,11 @@
+{
+  "include": [
+    "."
+  ],
+  "extraPaths": [
+    "typings"
+  ],
+  "stubPath": "typings",
+  "venvPath": ".",
+  "venv": ".venv"
+}

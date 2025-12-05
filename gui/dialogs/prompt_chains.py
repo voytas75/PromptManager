@@ -23,7 +23,7 @@ import threading
 from collections.abc import Callable, Mapping
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from PySide6.QtCore import QByteArray, QSettings, Qt, QTimer
 from PySide6.QtWidgets import (
@@ -315,6 +315,8 @@ class PromptChainManagerPanel(QWidget):
                 target_id = preferred_id or str(self._chains[0].id)
                 for row in range(self._chain_list.count()):
                     item = self._chain_list.item(row)
+                    if item is None:
+                        continue
                     if item.data(Qt.UserRole) == target_id:
                         self._chain_list.setCurrentRow(row)
                         selected_chain = self._chains[row]
@@ -509,10 +511,10 @@ class PromptChainManagerPanel(QWidget):
         try:
             list_prompts = getattr(self._manager, "list_prompts", None)
             if callable(list_prompts):
-                return list_prompts(limit=500)
+                return cast("list[Prompt]", list_prompts(limit=500))
             repository = getattr(self._manager, "repository", None)
             if repository is not None:
-                return repository.list(limit=500)
+                return cast("list[Prompt]", repository.list(limit=500))
         except PromptManagerError as exc:
             logger.warning("Unable to load prompts for chain editor", exc_info=exc)
         except Exception:  # pragma: no cover - defensive guard
@@ -524,6 +526,8 @@ class PromptChainManagerPanel(QWidget):
         chain_id_text = str(chain_id)
         for row in range(self._chain_list.count()):
             item = self._chain_list.item(row)
+            if item is None:
+                continue
             if item.data(Qt.UserRole) == chain_id_text:
                 self._chain_list.setCurrentRow(row)
                 return
@@ -848,6 +852,7 @@ class PromptChainManagerPanel(QWidget):
             finally:
                 QTimer.singleShot(
                     0,
+                    self,
                     lambda: self._handle_stream_completion(chain, previous_status, payload),
                 )
 
