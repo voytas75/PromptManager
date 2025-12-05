@@ -715,18 +715,28 @@ class PromptChainManagerPanel(QWidget):
             self._declare_stream_step(step)
         self._refresh_stream_preview()
 
-    def _handle_step_stream(self, step: PromptChainStep, chunk: str) -> None:
+    def _handle_step_stream(self, step: PromptChainStep, chunk: str, is_final: bool) -> None:
         """Schedule GUI updates for streamed chain step output."""
         if not chunk:
             return
-        QTimer.singleShot(0, lambda: self._register_stream_chunk(step, chunk))
+        QTimer.singleShot(0, lambda: self._register_stream_chunk(step, chunk, is_final))
 
-    def _register_stream_chunk(self, step: PromptChainStep, chunk: str) -> None:
+    def _register_stream_chunk(self, step: PromptChainStep, chunk: str, is_final: bool) -> None:
         """Append *chunk* to the preview buffer for *step*."""
         if not self._stream_preview_active:
             return
         step_id = self._declare_stream_step(step)
-        self._stream_buffers[step_id] += chunk
+        existing = self._stream_buffers.get(step_id) or ""
+        text = chunk
+        if existing:
+            existing += text
+        else:
+            existing = text
+        self._stream_buffers[step_id] = existing
+        if is_final:
+            label = self._stream_labels.get(step_id, "")
+            if label and "(completed)" not in label:
+                self._stream_labels[step_id] = f"{label} (completed)"
         self._refresh_stream_preview()
 
     def _declare_stream_step(self, step: PromptChainStep) -> str:

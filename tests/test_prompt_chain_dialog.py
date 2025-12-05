@@ -71,14 +71,15 @@ class _ManagerStub:
         chain_id: uuid.UUID,
         *,
         variables: dict[str, Any] | None = None,
-        stream_callback: Callable[[PromptChainStep, str], None] | None = None,
+        stream_callback: Callable[[PromptChainStep, str, bool], None] | None = None,
     ):
         self.runs.append({"chain_id": chain_id, "variables": variables or {}})
         self.received_stream_callback = stream_callback
         chain = next((entry for entry in self._chains if entry.id == chain_id), self._chains[0])
         if stream_callback is not None:
             for chunk in self._stream_chunks:
-                stream_callback(chain.steps[0], chunk)
+                stream_callback(chain.steps[0], chunk, False)
+            stream_callback(chain.steps[0], "final text", True)
         return PromptChainRunResult(
             chain=chain,
             variables=variables or {},
@@ -257,7 +258,7 @@ def test_prompt_chain_dialog_stream_preview_renders(qt_app: QApplication) -> Non
     step = manager._chains[0].steps[0]  # noqa: SLF001
     try:
         dialog._begin_stream_preview(manager._chains[0], {"foo": "bar"})  # noqa: SLF001
-        dialog._register_stream_chunk(step, "partial response")  # noqa: SLF001
+        dialog._register_stream_chunk(step, "partial response", False)  # noqa: SLF001
         text = dialog._result_view.toPlainText()  # noqa: SLF001
         assert "Input to chain" in text
         assert '"foo": "bar"' in text

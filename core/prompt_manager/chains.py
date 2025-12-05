@@ -115,7 +115,7 @@ class PromptChainMixin:
         chain_id: uuid.UUID,
         *,
         variables: Mapping[str, Any] | None = None,
-        stream_callback: Callable[[PromptChainStep, str], None] | None = None,
+        stream_callback: Callable[[PromptChainStep, str, bool], None] | None = None,
     ) -> PromptChainRunResult:
         """Execute the specified prompt chain sequentially."""
         chain = self.get_prompt_chain(chain_id)
@@ -243,7 +243,7 @@ class PromptChainMixin:
         prompt: Prompt,
         request_text: str,
         *,
-        stream_callback: Callable[[PromptChainStep, str], None] | None = None,
+        stream_callback: Callable[[PromptChainStep, str, bool], None] | None = None,
     ) -> ExecutionOutcome:
         """Execute a single prompt without emitting GUI toasts per step."""
         executor = getattr(self, "_executor", None)
@@ -259,7 +259,7 @@ class PromptChainMixin:
             if not chunk:
                 return
             try:
-                stream_callback(step, chunk)
+                stream_callback(step, chunk, False)
             except Exception:  # pragma: no cover - callback failures should not bubble
                 logger.debug("Prompt chain stream callback failed", exc_info=True)
 
@@ -270,6 +270,11 @@ class PromptChainMixin:
                 conversation=conversation_history,
                 on_stream=_handle_stream if stream_callback else None,
             )
+            if stream_callback is not None and result.response_text:
+                try:
+                    stream_callback(step, result.response_text, True)
+                except Exception:  # pragma: no cover - defensive
+                    logger.debug("Prompt chain final stream callback failed", exc_info=True)
         except ExecutionError as exc:
             failed_messages = list(conversation_history)
             failed_messages.append({"role": "user", "content": request_text.strip()})
