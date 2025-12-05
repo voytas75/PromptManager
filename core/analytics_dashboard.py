@@ -1,6 +1,7 @@
 """High-level analytics aggregation helpers for dashboards and diagnostics.
 
 Updates:
+  v0.1.3 - 2025-12-05 - Treat window filtering as day-based so bucket boundaries match dashboard expectations.
   v0.1.2 - 2025-11-30 - Move typing-only imports into TYPE_CHECKING for lint compliance.
   v0.1.1 - 2025-11-30 - Fix function docstring spacing for lint compliance.
   v0.1.0 - 2025-11-28 - Introduce analytics snapshot builder for CLI and GUI surfaces.
@@ -320,6 +321,11 @@ def _collect_intent_success_trend(
         logger.debug("Unable to read usage log", exc_info=exc)
         return []
 
+    day_threshold: datetime | None = None
+    if since is not None:
+        tzinfo = since.tzinfo or UTC
+        day_threshold = datetime.combine(since.date(), datetime.min.time(), tzinfo=tzinfo)
+
     buckets: dict[date, dict[str, int]] = {}
     for line in lines:
         if not line.strip():
@@ -333,7 +339,7 @@ def _collect_intent_success_trend(
         timestamp = _coerce_datetime(payload.get("timestamp"))
         if timestamp is None:
             continue
-        if since is not None and timestamp < since:
+        if day_threshold is not None and timestamp < day_threshold:
             continue
         bucket_day = timestamp.date()
         bucket = buckets.setdefault(bucket_day, {"success": 0, "total": 0})
