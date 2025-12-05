@@ -4,10 +4,10 @@ Updates:
   v0.5.6 - 2025-12-05 - Add auto-scroll toggle for streaming/results pane.
   v0.5.5 - 2025-12-05 - Enable LiteLLM streaming preview without blocking busy indicator.
   v0.5.4 - 2025-12-05 - Expand execution results with labeled inputs/outputs per step.
-  v0.5.3 - 2025-12-05 - Split detail column vertically, persist run variables, and replace description editor with static text.
+  v0.5.3 - 2025-12-05 - Split detail column vertically, persist variables, swap description editor.
   v0.5.2 - 2025-12-05 - Persist chain splitters immediately so tabbed windows remember widths.
   v0.5.1 - 2025-12-05 - Add Markdown toggle for execution results with rich-text rendering.
-  v0.5.0 - 2025-12-05 - Split execution results into a dedicated column with persisted splitter state.
+  v0.5.0 - 2025-12-05 - Split execution results into dedicated column with persisted splitter state.
   v0.4.1 - 2025-12-05 - Document dialog passthrough helper for lint compliance.
   v0.4.0 - 2025-12-05 - Extract reusable panel for embedding plus dialog wrapper.
   v0.3.0 - 2025-12-04 - Prompt selector for chain steps plus inline CRUD actions.
@@ -19,14 +19,13 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Mapping
+import threading
+from collections.abc import Callable, Mapping
 from datetime import datetime
 from pathlib import Path
-import threading
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import QByteArray, QSettings, Qt, QTimer
-from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -65,6 +64,8 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers only
     from uuid import UUID
+
+    from PySide6.QtGui import QCloseEvent
 
     from models.prompt_model import Prompt
 
