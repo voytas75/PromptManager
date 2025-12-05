@@ -1,6 +1,7 @@
 """Toolbar widget containing search and primary catalog actions.
 
 Updates:
+  v0.2.3 - 2025-12-05 - Combine Add/New prompt actions into a single menu button.
   v0.2.2 - 2025-12-05 - Remove Prompt Templates toolbar button.
   v0.2.1 - 2025-12-05 - Remove Prompt Chains toolbar button now that the Chain tab is embedded.
   v0.2.0 - 2025-12-04 - Add prompt chain button and signal wiring.
@@ -13,6 +14,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLineEdit,
+    QMenu,
     QPushButton,
     QStyle,
     QToolButton,
@@ -59,14 +61,21 @@ class PromptToolbar(QWidget):
         self._refresh_button.clicked.connect(self.refresh_requested)  # type: ignore[arg-type]
         layout.addWidget(self._refresh_button)
 
-        self._add_button = QPushButton("Add", self)
-        self._add_button.clicked.connect(self.add_requested)  # type: ignore[arg-type]
-        layout.addWidget(self._add_button)
+        self._new_button = QToolButton(self)
+        self._new_button.setText("🆕 New")
+        self._new_button.setToolTip("Create a prompt or open the Enhanced Prompt Workbench.")
+        self._new_button.setPopupMode(QToolButton.MenuButtonPopup)
+        self._new_button.clicked.connect(self.add_requested)  # type: ignore[arg-type]
+        layout.addWidget(self._new_button)
 
-        self._workbench_button = QPushButton("🆕 New", self)
-        self._workbench_button.setToolTip("Open the Enhanced Prompt Workbench.")
-        self._workbench_button.clicked.connect(self.workbench_requested)  # type: ignore[arg-type]
-        layout.addWidget(self._workbench_button)
+        self._new_button_menu = QMenu(self._new_button)
+        new_prompt_action = self._new_button_menu.addAction("New Prompt…")
+        new_prompt_action.triggered.connect(lambda *_: self.add_requested.emit())  # pragma: no cover
+        workbench_action = self._new_button_menu.addAction("Workbench Session…")
+        workbench_action.triggered.connect(  # pragma: no cover
+            lambda *_: self.workbench_requested.emit()
+        )
+        self._new_button.setMenu(self._new_button_menu)
 
         self._import_button = QPushButton("Import", self)
         self._import_button.clicked.connect(self.import_requested)  # type: ignore[arg-type]
