@@ -1,6 +1,7 @@
 """Prompt chain editor dialogs for creating and updating workflows.
 
 Updates:
+  v0.3.1 - 2025-12-05 - Hide the variables schema editor behind a toggle button.
   v0.3.0 - 2025-12-05 - Surface summarize toggle for prompt chain results.
   v0.2.0 - 2025-12-04 - Add prompt picker combo box backed by catalog lookups.
   v0.1.0 - 2025-12-04 - Introduce editor dialogs for chain and step CRUD.
@@ -81,12 +82,28 @@ class PromptChainEditorDialog(QDialog):
             "Optional summary to help collaborators understand the workflow.",
         )
 
+        schema_widget = QWidget(self)
+        schema_layout = QVBoxLayout(schema_widget)
+        schema_layout.setContentsMargins(0, 0, 0, 0)
+        schema_layout.setSpacing(4)
+        toggle_row = QHBoxLayout()
+        toggle_row.setContentsMargins(0, 0, 0, 0)
+        self._schema_toggle = QPushButton("Schema", schema_widget)
+        self._schema_toggle.setCheckable(True)
+        self._schema_toggle.setChecked(False)
+        self._schema_toggle.toggled.connect(self._handle_schema_toggle)  # type: ignore[arg-type]
+        toggle_row.addWidget(self._schema_toggle)
+        toggle_row.addStretch(1)
+        schema_layout.addLayout(toggle_row)
+
         self._schema_input = QPlainTextEdit(self)
         self._schema_input.setPlaceholderText("JSON Schema (Draft 2020-12) describing variables…")
+        self._schema_input.setVisible(False)
+        schema_layout.addWidget(self._schema_input)
         self._add_form_row(
             form,
             "Variables schema",
-            self._schema_input,
+            schema_widget,
             "Validates the variables provided before execution.",
         )
 
@@ -148,6 +165,7 @@ class PromptChainEditorDialog(QDialog):
         self._description_input.setPlainText(chain.description)
         if chain.variables_schema:
             self._schema_input.setPlainText(json.dumps(chain.variables_schema, indent=2))
+        self._schema_toggle.setChecked(False)
         self._active_checkbox.setChecked(chain.is_active)
         self._summarize_checkbox.setChecked(chain.summarize_last_response)
         self._steps = [replace(step) for step in chain.steps]
@@ -158,8 +176,10 @@ class PromptChainEditorDialog(QDialog):
         self._steps_table.setRowCount(len(self._steps))
         for row, step in enumerate(self._steps):
             self._steps_table.setItem(row, 0, QTableWidgetItem(str(step.order_index)))
-            prompt_item = QTableWidgetItem(str(step.prompt_id))
             prompt = self._prompt_lookup.get(str(step.prompt_id))
+            prompt_label = (prompt.name if prompt and prompt.name else None)
+            prompt_item = QTableWidgetItem(prompt_label or str(step.prompt_id))
+            prompt_item.setData(Qt.ItemDataRole.UserRole, str(step.prompt_id))
             if prompt is not None:
                 prompt_item.setToolTip(self._build_prompt_tooltip(prompt))
             self._steps_table.setItem(row, 1, prompt_item)
@@ -239,6 +259,10 @@ class PromptChainEditorDialog(QDialog):
         self._result_chain = chain
         self.accept()
 
+    def _handle_schema_toggle(self, checked: bool) -> None:
+        self._schema_input.setVisible(checked)
+        self._schema_toggle.setText("Hide schema" if checked else "Schema")
+
     def _reindexed_steps(self) -> list[PromptChainStep]:
         for idx, step in enumerate(sorted(self._steps, key=lambda s: s.order_index), start=1):
             self._steps[idx - 1] = replace(step, order_index=idx)
@@ -260,7 +284,8 @@ class PromptChainEditorDialog(QDialog):
     def _handle_step_double_click(self, item: QTableWidgetItem) -> None:
         if item.column() != 1:
             return
-        prompt = self._prompt_lookup.get(str(item.text()).strip())
+        prompt_id = item.data(Qt.ItemDataRole.UserRole)
+        prompt = self._prompt_lookup.get(str(prompt_id))
         if prompt is None:
             QMessageBox.information(self, "Prompt", "Prompt not found in catalog.")
             return

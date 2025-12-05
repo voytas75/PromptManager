@@ -265,9 +265,22 @@ class PromptChainManagerPanel(QWidget):
         self._description_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         info_layout.addWidget(self._description_label)
 
+        schema_header = QHBoxLayout()
+        schema_header.setContentsMargins(0, 0, 0, 0)
+        schema_label = QLabel("Variables schema", info_container)
+        schema_header.addWidget(schema_label)
+        schema_header.addStretch(1)
+        self._schema_toggle = QPushButton("Schema", info_container)
+        self._schema_toggle.setCheckable(True)
+        self._schema_toggle.setChecked(False)
+        self._schema_toggle.toggled.connect(self._handle_schema_toggle)  # type: ignore[arg-type]
+        schema_header.addWidget(self._schema_toggle)
+        info_layout.addLayout(schema_header)
+
         self._schema_view = QPlainTextEdit(info_container)
         self._schema_view.setReadOnly(True)
         self._schema_view.setPlaceholderText("Variables schema (JSON schema, optional)")
+        self._schema_view.setVisible(False)
         info_layout.addWidget(self._schema_view, 1)
 
         steps_container = QFrame(self._detail_splitter)
@@ -473,6 +486,7 @@ class PromptChainManagerPanel(QWidget):
             self._detail_status.setText("")
             self._description_label.setText("(No description provided.)")
             self._schema_view.clear()
+            self._set_schema_panel_visible(False)
             self._steps_table.setRowCount(0)
             self._step_prompt_ids.clear()
             self._result_view.clear()
@@ -501,6 +515,7 @@ class PromptChainManagerPanel(QWidget):
             else "(No variables schema defined.)"
         )
         self._schema_view.setPlainText(schema_text)
+        self._set_schema_panel_visible(False)
         self._populate_steps_table(chain)
         self._result_view.clear()
         self._run_button.setEnabled(chain.is_active and bool(chain.steps))
@@ -1127,6 +1142,16 @@ class PromptChainManagerPanel(QWidget):
             )
             return
         self._prompt_edit_callback(prompt_id)
+
+    def _handle_schema_toggle(self, checked: bool) -> None:
+        self._schema_view.setVisible(checked)
+        self._schema_toggle.setText("Hide schema" if checked else "Schema")
+
+    def _set_schema_panel_visible(self, visible: bool) -> None:
+        self._schema_toggle.blockSignals(True)
+        self._schema_toggle.setChecked(visible)
+        self._schema_toggle.blockSignals(False)
+        self._handle_schema_toggle(visible)
 
     def _resolve_prompt_label(self, prompt_id: UUID) -> str:
         cached = self._prompt_name_cache.get(prompt_id)

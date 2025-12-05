@@ -255,6 +255,22 @@ def test_prompt_chain_dialog_respects_web_search_toggle(qt_app: QApplication) ->
         dialog.deleteLater()
 
 
+def test_prompt_chain_manager_schema_toggle_controls_visibility(qt_app: QApplication) -> None:
+    """Schema button should show and hide the variables schema view."""
+
+    manager = _ManagerStub()
+    dialog = PromptChainManagerDialog(manager)
+    try:
+        assert dialog._schema_view.isHidden() is True  # noqa: SLF001
+        dialog._schema_toggle.setChecked(True)  # noqa: SLF001
+        assert dialog._schema_view.isHidden() is False  # noqa: SLF001
+        dialog._schema_toggle.setChecked(False)  # noqa: SLF001
+        assert dialog._schema_view.isHidden() is True  # noqa: SLF001
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
 def test_prompt_chain_dialog_displays_prompt_names(qt_app: QApplication) -> None:
     """Steps table should render prompt names instead of UUIDs."""
 
@@ -457,6 +473,15 @@ def test_prompt_chain_editor_prompt_tooltip_and_double_click(
     editor._handle_step_double_click(item)  # noqa: SLF001
     assert captured["title"] == "Demo Prompt"
     assert "Body text" in captured["text"]
+
+
+def test_prompt_chain_editor_schema_toggle_controls_visibility(qt_app: QApplication) -> None:
+    """Schema text area should remain hidden until the button is toggled."""
+
+    editor = PromptChainEditorDialog(None, manager=None)
+    assert editor._schema_input.isHidden() is True  # noqa: SLF001
+    editor._schema_toggle.setChecked(True)  # noqa: SLF001
+    assert editor._schema_input.isHidden() is False  # noqa: SLF001
 
 
 def test_prompt_chain_manager_creates_chain_via_editor(
