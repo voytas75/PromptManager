@@ -1,6 +1,7 @@
 """Prompt chain management surfaces for the GUI.
 
 Updates:
+  v0.5.1 - 2025-12-05 - Add Markdown toggle for execution results with rich-text rendering.
   v0.5.0 - 2025-12-05 - Split execution results into a dedicated column with persisted splitter state.
   v0.4.1 - 2025-12-05 - Document dialog passthrough helper for lint compliance.
   v0.4.0 - 2025-12-05 - Extract reusable panel for embedding plus dialog wrapper.
@@ -21,6 +22,7 @@ from typing import TYPE_CHECKING, Any
 from PySide6.QtCore import QByteArray, QSettings, Qt
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
+    QCheckBox,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
@@ -35,6 +37,7 @@ from PySide6.QtWidgets import (
     QSplitter,
     QTableWidget,
     QTableWidgetItem,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -70,6 +73,8 @@ class PromptChainManagerPanel(QWidget):
         self._chains: list[PromptChain] = []
         self._selected_chain_id: str | None = None
         self._settings = QSettings("PromptManager", "PromptChainManagerPanel")
+        self._result_plaintext: str = ""
+        self._result_markdown: str = ""
 
         layout = QVBoxLayout(self)
         intro = QLabel(
@@ -200,9 +205,15 @@ class PromptChainManagerPanel(QWidget):
         results_header.addStretch(1)
         results_layout.addLayout(results_header)
 
-        self._result_view = QPlainTextEdit(results_container)
+        self._result_format_checkbox = QCheckBox("Markdown", results_container)
+        self._result_format_checkbox.setChecked(True)
+        self._result_format_checkbox.toggled.connect(self._handle_result_format_changed)  # type: ignore[arg-type]
+        results_header.addWidget(self._result_format_checkbox)
+
+        self._result_view = QTextEdit(results_container)
         self._result_view.setReadOnly(True)
         self._result_view.setPlaceholderText("Execution results, outputs, and per-step summary.")
+        self._result_view.setAcceptRichText(True)
         results_layout.addWidget(self._result_view, 1)
 
         self._management_splitter.addWidget(list_container)
@@ -538,7 +549,23 @@ class PromptChainManagerPanel(QWidget):
                 summary += f": {step_run.error}"
             steps_section.append(summary)
 
-        self._result_view.setPlainText("\n".join(outputs_section + steps_section))
+        plain_text = "\n".join(outputs_section + steps_section)
+        markdown_lines = ["## Outputs"]
+        if not result.outputs:
+            markdown_lines.append("- (no outputs)")
+        else:
+            for key, value in result.outputs.items():
+                markdown_lines.append(f"- **{key}**: {value}")
+        markdown_lines.extend(["", "## Steps"])
+        if not result.steps:
+            markdown_lines.append("- (no steps recorded)")
+        else:
+            for summary in steps_section[1:]:
+                markdown_lines.append(f"- {summary.strip()}")
+        markdown_text = "\n".join(markdown_lines)
+        self._result_plaintext = plain_text
+        self._result_markdown = markdown_text
+        self._apply_result_view()
 
     def closeEvent(self, event: QCloseEvent) -> None:  # type: ignore[override]
         """Persist splitter state before closing."""
@@ -561,7 +588,26 @@ class PromptChainManagerPanel(QWidget):
 
     def _handle_clear_results(self) -> None:
         """Reset the execution results pane."""
-        self._result_view.clear()
+        self._result_plaintext = ""
+        self._result_markdown = ""
+        self._apply_result_view()
+
+    def _handle_result_format_changed(self, _: bool) -> None:
+        """Switch between Markdown and plain text views."""
+        self._apply_result_view()
+
+    def _apply_result_view(self) -> None:
+        """Render stored results using the current format preference."""
+        if self._result_format_checkbox.isChecked():
+            if self._result_markdown:
+                self._result_view.setMarkdown(self._result_markdown)
+            else:
+                self._result_view.clear()
+        else:
+            if self._result_plaintext:
+                self._result_view.setPlainText(self._result_plaintext)
+            else:
+                self._result_view.clear()
 
 
 class PromptChainManagerDialog(QDialog):
