@@ -1,6 +1,7 @@
 """Prompt chain management surfaces for the GUI.
 
 Updates:
+  v0.5.5 - 2025-12-05 - Enable LiteLLM streaming preview without blocking busy indicator.
   v0.5.4 - 2025-12-05 - Expand execution results with labeled inputs/outputs per step.
   v0.5.3 - 2025-12-05 - Split detail column vertically, persist run variables, and replace description editor with static text.
   v0.5.2 - 2025-12-05 - Persist chain splitters immediately so tabbed windows remember widths.
@@ -20,7 +21,8 @@ import logging
 from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+import threading
+from typing import TYPE_CHECKING, Any, Callable
 
 from PySide6.QtCore import QByteArray, QSettings, Qt, QTimer
 from PySide6.QtGui import QCloseEvent
@@ -253,6 +255,7 @@ class PromptChainManagerPanel(QWidget):
         self._stream_labels: dict[str, str] = {}
         self._stream_order: list[str] = []
         self._stream_chain_title = ""
+        self._active_stream_thread: threading.Thread | None = None
 
         self._management_splitter.addWidget(list_container)
         self._management_splitter.addWidget(detail_container)
@@ -542,13 +545,16 @@ class PromptChainManagerPanel(QWidget):
         else:
             variables = {}
 
-        indicator = ProcessingIndicator(self, f"Running '{chain.name}'…", title="Prompt Chain")
         previous_status = self._detail_status.text()
         self._detail_status.setText(f"Running '{chain.name}'…")
         streaming_enabled = self._is_streaming_enabled()
+        stream_callback = self._handle_step_stream if streaming_enabled else None
         if streaming_enabled:
             self._begin_stream_preview(chain.name)
-        stream_callback = self._handle_step_stream if streaming_enabled else None
+            self._run_chain_async(chain, variables, previous_status, stream_callback)
+            return
+
+        indicator = ProcessingIndicator(self, f"Running '{chain.name}'…", title="Prompt Chain")
         try:
             result = indicator.run(
                 self._manager.run_prompt_chain,
@@ -559,20 +565,14 @@ class PromptChainManagerPanel(QWidget):
         except PromptChainExecutionError as exc:
             QMessageBox.critical(self, "Chain failed", str(exc))
             self._detail_status.setText(previous_status)
-            if streaming_enabled:
-                self._end_stream_preview()
             return
         except PromptChainError as exc:
             QMessageBox.critical(self, "Unable to run chain", str(exc))
             self._detail_status.setText(previous_status)
-            if streaming_enabled:
-                self._end_stream_preview()
             return
         else:
             timestamp = datetime.now().strftime("%H:%M:%S")  # noqa: DTZ005
             self._detail_status.setText(f"Last run succeeded at {timestamp}")
-        if streaming_enabled:
-            self._end_stream_preview()
         self._display_run_result(result)
         show_toast(self, f"Chain '{chain.name}' completed.")
 
@@ -799,6 +799,63 @@ class PromptChainManagerPanel(QWidget):
     def _variables_settings_key(self, chain_id: str) -> str:
         """Return the QSettings key for persisted variable payloads."""
         return f"chainVariables/{chain_id}"
+
+    def _run_chain_async(
+        self,
+        chain: PromptChain,
+        variables: Mapping[str, Any],
+        previous_status: str,
+        stream_callback: Callable[[PromptChainStep, str], None] | None,
+    ) -> None:
+        """Execute the chain on a worker thread while showing live stream updates."""
+        payload: dict[str, object] = {}
+
+        def _worker() -> None:
+            try:
+                payload["result"] = self._manager.run_prompt_chain(
+                    chain.id,
+                    variables=variables,
+                    stream_callback=stream_callback,
+                )
+            except Exception as exc:  # noqa: BLE001 - propagate via UI thread handler
+                payload["error"] = exc
+            finally:
+                QTimer.singleShot(
+                    0,
+                    lambda: self._handle_stream_completion(chain, previous_status, payload),
+                )
+
+        thread = threading.Thread(target=_worker, daemon=True)
+        self._active_stream_thread = thread
+        thread.start()
+
+    def _handle_stream_completion(
+        self,
+        chain: PromptChain,
+        previous_status: str,
+        payload: dict[str, object],
+    ) -> None:
+        """Handle completion (success or failure) of the streaming worker."""
+        self._active_stream_thread = None
+        self._end_stream_preview()
+        error = payload.get("error")
+        if error is not None:
+            self._detail_status.setText(previous_status)
+            if isinstance(error, PromptChainExecutionError):
+                QMessageBox.critical(self, "Chain failed", str(error))
+            elif isinstance(error, PromptChainError):
+                QMessageBox.critical(self, "Unable to run chain", str(error))
+            else:  # pragma: no cover - defensive guard
+                QMessageBox.critical(self, "Chain failed", str(error))
+            return
+        result = payload.get("result")
+        if not isinstance(result, PromptChainRunResult):
+            self._detail_status.setText(previous_status)
+            return
+        timestamp = datetime.now().strftime("%H:%M:%S")  # noqa: DTZ005
+        self._detail_status.setText(f"Last run succeeded at {timestamp}")
+        self._display_run_result(result)
+        show_toast(self, f"Chain '{chain.name}' completed.")
 
 
 class PromptChainManagerDialog(QDialog):
