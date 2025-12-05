@@ -22,7 +22,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from PySide6.QtCore import QByteArray, QSettings, Qt
+from PySide6.QtCore import QByteArray, QSettings, Qt, QTimer
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -52,7 +52,7 @@ from core import (
     PromptManager,
     PromptManagerError,
 )
-from models.prompt_chain_model import PromptChain, chain_from_payload
+from models.prompt_chain_model import PromptChain, PromptChainStep, chain_from_payload
 
 from ..processing_indicator import ProcessingIndicator
 from ..toast import show_toast
@@ -248,6 +248,11 @@ class PromptChainManagerPanel(QWidget):
         self._result_view.setPlaceholderText("Execution results, outputs, and per-step summary.")
         self._result_view.setAcceptRichText(True)
         results_layout.addWidget(self._result_view, 1)
+        self._stream_preview_active = False
+        self._stream_buffers: dict[str, str] = {}
+        self._stream_labels: dict[str, str] = {}
+        self._stream_order: list[str] = []
+        self._stream_chain_title = ""
 
         self._management_splitter.addWidget(list_container)
         self._management_splitter.addWidget(detail_container)
@@ -540,23 +545,34 @@ class PromptChainManagerPanel(QWidget):
         indicator = ProcessingIndicator(self, f"Running '{chain.name}'…", title="Prompt Chain")
         previous_status = self._detail_status.text()
         self._detail_status.setText(f"Running '{chain.name}'…")
+        streaming_enabled = self._is_streaming_enabled()
+        if streaming_enabled:
+            self._begin_stream_preview(chain.name)
+        stream_callback = self._handle_step_stream if streaming_enabled else None
         try:
             result = indicator.run(
                 self._manager.run_prompt_chain,
                 chain.id,
                 variables=variables,
+                stream_callback=stream_callback,
             )
         except PromptChainExecutionError as exc:
             QMessageBox.critical(self, "Chain failed", str(exc))
             self._detail_status.setText(previous_status)
+            if streaming_enabled:
+                self._end_stream_preview()
             return
         except PromptChainError as exc:
             QMessageBox.critical(self, "Unable to run chain", str(exc))
             self._detail_status.setText(previous_status)
+            if streaming_enabled:
+                self._end_stream_preview()
             return
         else:
             timestamp = datetime.now().strftime("%H:%M:%S")  # noqa: DTZ005
             self._detail_status.setText(f"Last run succeeded at {timestamp}")
+        if streaming_enabled:
+            self._end_stream_preview()
         self._display_run_result(result)
         show_toast(self, f"Chain '{chain.name}' completed.")
 
@@ -665,6 +681,7 @@ class PromptChainManagerPanel(QWidget):
 
     def _handle_clear_results(self) -> None:
         """Reset the execution results pane."""
+        self._end_stream_preview()
         self._result_plaintext = ""
         self._result_markdown = ""
         self._apply_result_view()
@@ -685,6 +702,66 @@ class PromptChainManagerPanel(QWidget):
                 self._result_view.setPlainText(self._result_plaintext)
             else:
                 self._result_view.clear()
+
+    def _is_streaming_enabled(self) -> bool:
+        """Return True when LiteLLM streaming is enabled in runtime settings."""
+        executor = getattr(self._manager, "_executor", None)
+        if executor is not None and bool(getattr(executor, "stream", False)):
+            return True
+        return bool(getattr(self._manager, "_litellm_stream", False))
+
+    def _begin_stream_preview(self, chain_name: str) -> None:
+        """Initialise buffers used to show streaming output per step."""
+        self._stream_preview_active = True
+        self._stream_chain_title = chain_name
+        self._stream_buffers.clear()
+        self._stream_labels.clear()
+        self._stream_order.clear()
+        self._result_view.setPlainText(f"Streaming '{chain_name}'…")
+
+    def _handle_step_stream(self, step: PromptChainStep, chunk: str) -> None:
+        """Schedule GUI updates for streamed chain step output."""
+        if not chunk:
+            return
+        QTimer.singleShot(0, lambda: self._register_stream_chunk(step, chunk))
+
+    def _register_stream_chunk(self, step: PromptChainStep, chunk: str) -> None:
+        """Append *chunk* to the preview buffer for *step*."""
+        if not self._stream_preview_active:
+            return
+        step_id = str(step.id)
+        if step_id not in self._stream_buffers:
+            label = f"Step {step.order_index} – {step.output_variable or step.prompt_id}"
+            self._stream_order.append(step_id)
+            self._stream_labels[step_id] = label
+            self._stream_buffers[step_id] = ""
+        self._stream_buffers[step_id] += chunk
+        self._refresh_stream_preview()
+
+    def _refresh_stream_preview(self) -> None:
+        """Render the live streaming preview text."""
+        if not self._stream_preview_active:
+            return
+        header = self._stream_chain_title or "prompt chain"
+        lines = [f"Streaming '{header}'…", ""]
+        for step_id in self._stream_order:
+            label = self._stream_labels.get(step_id, step_id)
+            lines.append(label)
+            text = self._stream_buffers.get(step_id, "")
+            if text.strip():
+                lines.append(text)
+            else:
+                lines.append("(awaiting tokens…)")
+            lines.append("")
+        self._result_view.setPlainText("\n".join(lines).rstrip())
+
+    def _end_stream_preview(self) -> None:
+        """Clear streaming preview state."""
+        self._stream_preview_active = False
+        self._stream_chain_title = ""
+        self._stream_buffers.clear()
+        self._stream_labels.clear()
+        self._stream_order.clear()
 
     def _handle_splitter_moved(self, _: int, __: int) -> None:
         """Persist splitter state whenever the user resizes panes."""

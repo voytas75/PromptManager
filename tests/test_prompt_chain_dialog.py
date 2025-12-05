@@ -1,6 +1,7 @@
 """Prompt chain manager dialog tests.
 
 Updates:
+  v0.2.3 - 2025-12-05 - Cover streaming preview rendering and settings detection.
   v0.2.2 - 2025-12-05 - Validate expanded chain result text sections.
   v0.2.1 - 2025-12-05 - Adjust assertions for new description label.
   v0.2.0 - 2025-12-04 - Cover GUI CRUD helpers via editor and manager dialog actions.
@@ -11,7 +12,7 @@ from __future__ import annotations
 
 import uuid
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Callable
 
 import pytest
 
@@ -35,11 +36,15 @@ def qt_app() -> QApplication:
 
 
 class _ManagerStub:
-    def __init__(self) -> None:
+    def __init__(self, *, stream_enabled: bool = False, stream_chunks: tuple[str, ...] = ()) -> None:
         self._chains = [_make_chain()]
         self.saved_chain: PromptChain | None = None
         self.runs: list[dict[str, Any]] = []
         self.deleted_chain_ids: list[uuid.UUID] = []
+        self._executor = SimpleNamespace(stream=stream_enabled) if stream_enabled else None
+        self._litellm_stream = stream_enabled
+        self._stream_chunks = stream_chunks
+        self.received_stream_callback: Callable[[PromptChainStep, str], None] | None = None
 
     @property
     def repository(self):  # pragma: no cover - only used by DialogLauncher in real app
@@ -61,9 +66,19 @@ class _ManagerStub:
             self._chains.append(chain)
         return chain
 
-    def run_prompt_chain(self, chain_id: uuid.UUID, *, variables: dict[str, Any] | None = None):
+    def run_prompt_chain(
+        self,
+        chain_id: uuid.UUID,
+        *,
+        variables: dict[str, Any] | None = None,
+        stream_callback: Callable[[PromptChainStep, str], None] | None = None,
+    ):
         self.runs.append({"chain_id": chain_id, "variables": variables or {}})
+        self.received_stream_callback = stream_callback
         chain = next((entry for entry in self._chains if entry.id == chain_id), self._chains[0])
+        if stream_callback is not None:
+            for chunk in self._stream_chunks:
+                stream_callback(chain.steps[0], chunk)
         return PromptChainRunResult(
             chain=chain,
             variables=variables or {},
@@ -234,3 +249,29 @@ def test_prompt_chain_manager_deletes_chain(
     assert manager.deleted_chain_ids
     dialog.close()
     dialog.deleteLater()
+def test_prompt_chain_dialog_stream_preview_renders(qt_app: QApplication) -> None:
+    """Streaming preview should show incremental text in the result area."""
+
+    manager = _ManagerStub()
+    dialog = PromptChainManagerDialog(manager)
+    step = manager._chains[0].steps[0]  # noqa: SLF001
+    try:
+        dialog._begin_stream_preview("Demo Chain")  # noqa: SLF001
+        dialog._register_stream_chunk(step, "partial response")  # noqa: SLF001
+        assert "partial response" in dialog._result_view.toPlainText()  # noqa: SLF001
+    finally:
+        dialog._end_stream_preview()  # noqa: SLF001
+        dialog.close()
+        dialog.deleteLater()
+
+
+def test_prompt_chain_dialog_stream_detection_uses_executor(qt_app: QApplication) -> None:
+    """Streaming flag should be inferred from the manager executor."""
+
+    manager = _ManagerStub(stream_enabled=True)
+    dialog = PromptChainManagerDialog(manager)
+    try:
+        assert dialog._is_streaming_enabled() is True  # noqa: SLF001
+    finally:
+        dialog.close()
+        dialog.deleteLater()

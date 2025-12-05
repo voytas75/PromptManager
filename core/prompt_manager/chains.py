@@ -1,6 +1,7 @@
 """Prompt chain orchestration helpers for Prompt Manager.
 
 Updates:
+  v0.1.1 - 2025-12-05 - Surface streaming callbacks during prompt chain execution.
   v0.1.0 - 2025-12-04 - Introduce prompt chain CRUD and execution mixin.
 """
 
@@ -9,7 +10,7 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 from jsonschema import Draft202012Validator, exceptions as jsonschema_exceptions
 
@@ -114,6 +115,7 @@ class PromptChainMixin:
         chain_id: uuid.UUID,
         *,
         variables: Mapping[str, Any] | None = None,
+        stream_callback: Callable[[PromptChainStep, str], None] | None = None,
     ) -> PromptChainRunResult:
         """Execute the specified prompt chain sequentially."""
         chain = self.get_prompt_chain(chain_id)
@@ -164,7 +166,13 @@ class PromptChainMixin:
                     )
                 prompt = self.get_prompt(step.prompt_id)
                 try:
-                    outcome = self._execute_chain_step(chain, step, prompt, request_text)
+                    outcome = self._execute_chain_step(
+                        chain,
+                        step,
+                        prompt,
+                        request_text,
+                        stream_callback=stream_callback,
+                    )
                     status = "success"
                     response_text = outcome.result.response_text
                     context[step.output_variable] = response_text
@@ -234,6 +242,8 @@ class PromptChainMixin:
         step: PromptChainStep,
         prompt: Prompt,
         request_text: str,
+        *,
+        stream_callback: Callable[[PromptChainStep, str], None] | None = None,
     ) -> ExecutionOutcome:
         """Execute a single prompt without emitting GUI toasts per step."""
         executor = getattr(self, "_executor", None)
@@ -243,8 +253,23 @@ class PromptChainMixin:
             )
         conversation_history = _normalise_conversation(None)
         stream_enabled = executor.stream
+        def _handle_stream(chunk: str) -> None:
+            if stream_callback is None:
+                return
+            if not chunk:
+                return
+            try:
+                stream_callback(step, chunk)
+            except Exception:  # pragma: no cover - callback failures should not bubble
+                logger.debug("Prompt chain stream callback failed", exc_info=True)
+
         try:
-            result = executor.execute(prompt, request_text, conversation=conversation_history)
+            result = executor.execute(
+                prompt,
+                request_text,
+                conversation=conversation_history,
+                on_stream=_handle_stream if stream_callback else None,
+            )
         except ExecutionError as exc:
             failed_messages = list(conversation_history)
             failed_messages.append({"role": "user", "content": request_text.strip()})
