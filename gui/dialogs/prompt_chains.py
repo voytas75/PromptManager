@@ -68,11 +68,11 @@ from .prompt_chain_editor import PromptChainEditorDialog
 
 logger = logging.getLogger(__name__)
 
-_CHAIN_INPUT_BG = "#e8f5e9"
-_CHAIN_OUTPUT_BG = "#e8f5e9"
-_CHAIN_SUMMARY_BG = "#c8e6c9"
-_STEP_OUTPUT_BG = "#f8f9fa"
-_REASONING_BG = "#e3f2fd"
+_CHAIN_INPUT_COLOR = "#66bb6a"
+_CHAIN_OUTPUT_COLOR = "#66bb6a"
+_CHAIN_SUMMARY_COLOR = "#2e7d32"
+_STEP_OUTPUT_COLOR = "#cfd8dc"
+_REASONING_COLOR = "#1e88e5"
 
 _RESULT_STYLE = """
 <style>
@@ -137,13 +137,6 @@ _RESULT_STYLE = """
   padding: 6px;
   border-radius: 4px;
   border: 1px solid #ececec;
-}
-.chain-step-output pre {
-  background-color: #f8f9fa;
-}
-.chain-step-reasoning pre {
-  background-color: #e3f2fd;
-  border-color: #c5dff6;
 }
 </style>
 """
@@ -703,7 +696,7 @@ class PromptChainManagerPanel(QWidget):
             self._format_colored_block_html(
                 "Input to chain",
                 chain_input_text or "- (no chain variables provided)",
-                color=_CHAIN_INPUT_BG,
+                color=_CHAIN_INPUT_COLOR,
                 class_name="chain-block--input",
             )
         )
@@ -726,7 +719,7 @@ class PromptChainManagerPanel(QWidget):
             self._format_colored_block_html(
                 "Chain outputs",
                 outputs_text or "- (no outputs)",
-                color=_CHAIN_OUTPUT_BG,
+                color=_CHAIN_OUTPUT_COLOR,
                 class_name="chain-block--outputs",
             )
         )
@@ -741,7 +734,7 @@ class PromptChainManagerPanel(QWidget):
                     self._format_colored_block_html(
                         "Chain summary",
                         summary_text,
-                        color=_CHAIN_SUMMARY_BG,
+                        color=_CHAIN_SUMMARY_COLOR,
                         class_name="chain-block--summary",
                         monospace=False,
                     )
@@ -798,11 +791,11 @@ class PromptChainManagerPanel(QWidget):
         title: str,
         body_text: str,
         *,
-        color: str,
+        color: str | None,
         class_name: str,
         monospace: bool = True,
     ) -> str:
-        """Return an HTML block with consistent styling and background color."""
+        """Return an HTML block with consistent styling and text color."""
         safe_title = html.escape(title)
         safe_body = html.escape(body_text or "(empty)")
         if monospace:
@@ -811,8 +804,9 @@ class PromptChainManagerPanel(QWidget):
             )
         else:
             body_html = f'<div class="chain-block-body">{safe_body}</div>'
+        style_attr = f' style="color:{color};"' if color else ""
         return (
-            f'<div class="chain-block {class_name}" style="background-color:{color};">'
+            f'<div class="chain-block {class_name}"{style_attr}>'
             f"<div class='chain-block-title'>{safe_title}</div>"
             f"{body_html}"
             "</div>"
@@ -850,7 +844,7 @@ class PromptChainManagerPanel(QWidget):
                 self._format_colored_block_html(
                     "Input to step",
                     request_text or "(empty input)",
-                    color="#ffffff",
+                    color=None,
                     class_name="chain-step-detail chain-step-input",
                 )
             )
@@ -858,7 +852,7 @@ class PromptChainManagerPanel(QWidget):
             self._format_colored_block_html(
                 "Output of step",
                 response_text or "(empty response)",
-                color=_STEP_OUTPUT_BG,
+                color=_STEP_OUTPUT_COLOR,
                 class_name="chain-step-detail chain-step-output",
             )
         )
@@ -867,7 +861,7 @@ class PromptChainManagerPanel(QWidget):
                 self._format_colored_block_html(
                     "Reasoning summary",
                     reasoning_text,
-                    color=_REASONING_BG,
+                    color=_REASONING_COLOR,
                     class_name="chain-step-detail chain-step-reasoning",
                     monospace=False,
                 )

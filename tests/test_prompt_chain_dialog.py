@@ -266,7 +266,7 @@ def test_prompt_chain_results_use_colored_sections(qt_app: QApplication) -> None
         rich = dialog._result_richtext  # noqa: SLF001
         assert "chain-block--input" in rich
         assert "chain-block--summary" in rich
-        assert "#e8f5e9" in rich  # light green blocks
+        assert "#66bb6a" in rich  # light green text
     finally:
         dialog.close()
         dialog.deleteLater()
@@ -282,7 +282,7 @@ def test_prompt_chain_dialog_renders_reasoning_summary(qt_app: QApplication) -> 
         plain = dialog._result_view.toPlainText()  # noqa: SLF001
         assert "Reasoning summary" in plain
         assert "Deliberate reasoning path." in plain
-        assert "#e3f2fd" in dialog._result_richtext  # noqa: SLF001
+        assert "#1e88e5" in dialog._result_richtext  # noqa: SLF001
     finally:
         dialog.close()
         dialog.deleteLater()
