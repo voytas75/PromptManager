@@ -1,6 +1,7 @@
 """Analytics dashboard panel wiring for the Prompt Manager GUI.
 
 Updates:
+  v0.1.3 - 2025-12-05 - Prevent duplicate edit launches by using a single activation signal.
   v0.1.2 - 2025-12-05 - Make usage table prompts clickable to open the editor.
   v0.1.1 - 2025-11-29 - Wrap analytics strings to satisfy Ruff line-length rules.
   v0.1.0 - 2025-11-28 - Introduce dashboard tab with charts and CSV export.
@@ -151,8 +152,7 @@ class AnalyticsDashboardPanel(QWidget):
         self._table.setEditTriggers(QTableWidget.NoEditTriggers)
         self._table.setSelectionMode(QAbstractItemView.SingleSelection)
         self._table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self._table.cellDoubleClicked.connect(self._handle_table_cell_activated)  # type: ignore[arg-type]
-        self._table.itemActivated.connect(self._handle_table_item_activated)  # type: ignore[arg-type]
+        self._table.cellActivated.connect(self._handle_table_cell_activated)  # type: ignore[arg-type]
         layout.addWidget(self._table, stretch=1)
 
         self._embedding_summary.setWordWrap(True)
@@ -405,11 +405,6 @@ class AnalyticsDashboardPanel(QWidget):
 
     def _handle_table_cell_activated(self, row: int, _: int) -> None:
         self._activate_usage_row(row)
-
-    def _handle_table_item_activated(self, item: QTableWidgetItem) -> None:
-        if item is None:
-            return
-        self._activate_usage_row(item.row())
 
     def _activate_usage_row(self, row: int) -> None:
         if self._dataset_combo.currentData() != "usage":

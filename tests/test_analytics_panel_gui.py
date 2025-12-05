@@ -87,8 +87,5 @@ def test_usage_prompt_activation_opens_editor(qt_app: QApplication) -> None:
         panel._populate_table()  # type: ignore[attr-defined]
         panel._handle_table_cell_activated(0, 0)  # type: ignore[attr-defined]
         assert fired == [prompt_id]
-        item = panel._table.item(0, 0)  # type: ignore[attr-defined]
-        panel._handle_table_item_activated(item)  # type: ignore[attr-defined]
-        assert fired == [prompt_id, prompt_id]
     finally:
         panel.deleteLater()
