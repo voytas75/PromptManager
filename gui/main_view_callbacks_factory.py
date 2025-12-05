@@ -1,6 +1,7 @@
 """Factories that build callback bundles for gui.main_window.
 
 Updates:
+  v0.16.3 - 2025-12-05 - Remove chains toolbar callback now that the Chain tab is built-in.
   v0.16.2 - 2025-12-05 - Route chains toolbar action to focus the Chain tab.
   v0.16.1 - 2025-12-04 - Add prompt chain dialog callback wiring.
   v0.16.0 - 2025-12-02 - Move MainViewCallbacks assembly out of MainWindow.
@@ -30,7 +31,6 @@ def build_main_view_callbacks(window: MainWindow) -> MainViewCallbacks:
         refresh_requested=prompt_actions.refresh_prompts,
         add_requested=prompt_actions.add_prompt,
         workbench_requested=prompt_actions.open_workbench,
-        chains_requested=window._focus_chain_tab,  # type: ignore[attr-defined]
         import_requested=prompt_actions.import_catalog,
         export_requested=prompt_actions.export_catalog,
         maintenance_requested=prompt_actions.open_maintenance_dialog,

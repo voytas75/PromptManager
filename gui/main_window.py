@@ -1,6 +1,7 @@
 """Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.16.5 - 2025-12-05 - Remove prompt chain toolbar shortcut; Chain tab remains embedded.
   v0.16.4 - 2025-12-05 - Embed prompt chain panel and add toolbar shortcut to focus Chain tab.
   v0.16.3 - 2025-12-04 - Track \"Use web search\" checkbox for execution controller.
   v0.16.2 - 2025-12-04 - Wire template preview bridge to handler so tab run works on load.
@@ -546,17 +547,6 @@ class MainWindow(QMainWindow):
         if self._quick_action_controller is None:
             return
         self._quick_action_controller.show_command_palette()
-
-    def _focus_chain_tab(self) -> None:
-        """Switch to the Chain tab and refresh its contents when requested."""
-        if self._tab_widget is None or self._chain_panel is None:
-            return
-        index = self._tab_widget.indexOf(self._chain_panel)
-        if index < 0:
-            return
-        if self._tab_widget.currentIndex() != index:
-            self._chain_panel.refresh()
-        self._tab_widget.setCurrentIndex(index)
 
     def _on_detect_intent_clicked(self) -> None:
         """Run intent detection on the free-form query input."""

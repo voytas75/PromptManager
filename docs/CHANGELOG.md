@@ -6,7 +6,11 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Added
 
-- Embedded the Prompt Chain manager directly inside the main window as a **Chain** tab (next to Template) and updated the toolbar shortcut to focus it so operators can review/import/run chains without opening a separate dialog.
+- Embedded the Prompt Chain manager directly inside the main window as a **Chain** tab (next to Template) so operators can review/import/run chains without opening a separate dialog.
+
+### Removed
+
+- Removed the redundant Prompt Chains toolbar button now that the Chain tab is always visible.
 
 ## [0.22.3] - 2025-12-04
 
