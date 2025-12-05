@@ -1,6 +1,7 @@
 """Prompt chain manager dialog tests.
 
 Updates:
+  v0.2.5 - 2025-12-05 - Ensure step IO renders outside code fences for Markdown formatting.
   v0.2.4 - 2025-12-05 - Verify Markdown toggle preserves rendered text.
   v0.2.3 - 2025-12-05 - Cover streaming preview rendering and settings detection.
   v0.2.2 - 2025-12-05 - Validate expanded chain result text sections.
@@ -21,6 +22,8 @@ pytest.importorskip("PySide6")
 from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
 
 from core import PromptChainRunResult, PromptChainStepRun
+from core.execution import CodexExecutionResult
+from core.prompt_manager.execution_history import ExecutionOutcome
 from gui.dialogs.prompt_chain_editor import PromptChainEditorDialog
 from gui.dialogs.prompt_chains import PromptChainManagerDialog
 from models.prompt_chain_model import PromptChain, PromptChainStep
@@ -37,7 +40,14 @@ def qt_app() -> QApplication:
 
 
 class _ManagerStub:
-    def __init__(self, *, stream_enabled: bool = False, stream_chunks: tuple[str, ...] = ()) -> None:
+    def __init__(
+        self,
+        *,
+        stream_enabled: bool = False,
+        stream_chunks: tuple[str, ...] = (),
+        step_request_text: str = "{{ body }}",
+        step_response_text: str = "Demo response",
+    ) -> None:
         self._chains = [_make_chain()]
         self.saved_chain: PromptChain | None = None
         self.runs: list[dict[str, Any]] = []
@@ -46,6 +56,8 @@ class _ManagerStub:
         self._litellm_stream = stream_enabled
         self._stream_chunks = stream_chunks
         self.received_stream_callback: Callable[[PromptChainStep, str], None] | None = None
+        self._step_request_text = step_request_text
+        self._step_response_text = step_response_text
 
     @property
     def repository(self):  # pragma: no cover - only used by DialogLauncher in real app
@@ -81,15 +93,25 @@ class _ManagerStub:
             for chunk in self._stream_chunks:
                 stream_callback(chain.steps[0], chunk, False)
             stream_callback(chain.steps[0], "final text", True)
+        step = chain.steps[0]
+        execution_result = CodexExecutionResult(
+            prompt_id=step.prompt_id,
+            request_text=self._step_request_text,
+            response_text=self._step_response_text,
+            duration_ms=123,
+            usage={},
+            raw_response={},
+        )
+        outcome = ExecutionOutcome(result=execution_result, history_entry=None, conversation=[])
         return PromptChainRunResult(
             chain=chain,
             variables=variables or {},
             outputs={"summary": "ok"},
             steps=[
                 PromptChainStepRun(
-                    step=chain.steps[0],
+                    step=step,
                     status="success",
-                    outcome=None,
+                    outcome=outcome,
                     error=None,
                 )
             ],
@@ -168,6 +190,26 @@ def test_prompt_chain_markdown_toggle_preserves_text(qt_app: QApplication) -> No
         assert toggled_text
         assert "Input to chain" in toggled_text
         assert "Chain Outputs" in toggled_text
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
+def test_prompt_chain_step_markdown_renders_without_code_fences(qt_app: QApplication) -> None:
+    """Step inputs/outputs should render markdown content directly."""
+
+    manager = _ManagerStub(
+        step_request_text="### Step input heading",
+        step_response_text="### Step output\n\n- Item one",
+    )
+    dialog = PromptChainManagerDialog(manager)
+    try:
+        dialog._run_selected_chain()  # noqa: SLF001
+        markdown = dialog._result_markdown  # noqa: SLF001
+        assert "**Output of step:**" in markdown
+        after_label = markdown.split("**Output of step:**", 1)[1].lstrip()
+        assert not after_label.startswith("```")
+        assert "### Step output" in after_label
     finally:
         dialog.close()
         dialog.deleteLater()

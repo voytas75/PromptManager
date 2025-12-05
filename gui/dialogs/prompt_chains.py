@@ -1,6 +1,7 @@
 """Prompt chain management surfaces for the GUI.
 
 Updates:
+  v0.5.8 - 2025-12-05 - Render step inputs/outputs without code fences for Markdown previews.
   v0.5.7 - 2025-12-05 - Preserve chain results when toggling Markdown formatting.
   v0.5.6 - 2025-12-05 - Add auto-scroll toggle for streaming/results pane.
   v0.5.5 - 2025-12-05 - Enable LiteLLM streaming preview without blocking busy indicator.
@@ -9,8 +10,7 @@ Updates:
   v0.5.2 - 2025-12-05 - Persist chain splitters immediately so tabbed windows remember widths.
   v0.5.1 - 2025-12-05 - Add Markdown toggle for execution results with rich-text rendering.
   v0.5.0 - 2025-12-05 - Split execution results into dedicated column with persisted splitter state.
-  v0.4.1 - 2025-12-05 - Document dialog passthrough helper for lint compliance.
-  v0.4.0-v0.1.0 - 2025-12-04 - Earlier releases introduced the dialog, editor, and CRUD/import flows.
+  v0.4.1-v0.1.0 - 2025-12-04 - Earlier releases introduced the dialog, editor, and CRUD/import flows.
 """
 
 from __future__ import annotations
@@ -641,10 +641,18 @@ class PromptChainManagerPanel(QWidget):
                 plain_sections.extend(_indent_lines(request_text or "(empty input)"))
                 plain_sections.append("  Output of step:")
                 plain_sections.extend(_indent_lines(response_text or "(empty response)"))
-                markdown_lines.append("**Input to step:**")
-                markdown_lines.extend(["```", request_text or "(empty input)", "```"])
-                markdown_lines.append("**Output of step:**")
-                markdown_lines.extend(["```", response_text or "(empty response)", "```"])
+                self._append_markdown_step_block(
+                    markdown_lines,
+                    header="**Input to step:**",
+                    content=request_text,
+                    empty_placeholder="_(empty input)_",
+                )
+                self._append_markdown_step_block(
+                    markdown_lines,
+                    header="**Output of step:**",
+                    content=response_text,
+                    empty_placeholder="_(empty response)_",
+                )
             plain_sections.append("")
             markdown_lines.append("")
 
@@ -653,6 +661,24 @@ class PromptChainManagerPanel(QWidget):
         self._result_plaintext = plain_text
         self._result_markdown = markdown_text
         self._apply_result_view()
+
+    @staticmethod
+    def _append_markdown_step_block(
+        markdown_lines: list[str],
+        *,
+        header: str,
+        content: str,
+        empty_placeholder: str,
+    ) -> None:
+        """Append step IO text so Markdown formatting is preserved."""
+
+        markdown_lines.append(header)
+        markdown_lines.append("")
+        if content:
+            markdown_lines.extend(content.splitlines())
+        else:
+            markdown_lines.append(empty_placeholder)
+        markdown_lines.append("")
 
     def closeEvent(self, event: QCloseEvent) -> None:  # type: ignore[override]
         """Persist splitter state before closing."""
