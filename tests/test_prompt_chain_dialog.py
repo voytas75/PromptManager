@@ -256,9 +256,12 @@ def test_prompt_chain_dialog_stream_preview_renders(qt_app: QApplication) -> Non
     dialog = PromptChainManagerDialog(manager)
     step = manager._chains[0].steps[0]  # noqa: SLF001
     try:
-        dialog._begin_stream_preview("Demo Chain")  # noqa: SLF001
+        dialog._begin_stream_preview(manager._chains[0], {"foo": "bar"})  # noqa: SLF001
         dialog._register_stream_chunk(step, "partial response")  # noqa: SLF001
-        assert "partial response" in dialog._result_view.toPlainText()  # noqa: SLF001
+        text = dialog._result_view.toPlainText()  # noqa: SLF001
+        assert "Input to chain" in text
+        assert '"foo": "bar"' in text
+        assert "partial response" in text
     finally:
         dialog._end_stream_preview()  # noqa: SLF001
         dialog.close()

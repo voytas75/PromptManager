@@ -255,6 +255,7 @@ class PromptChainManagerPanel(QWidget):
         self._stream_labels: dict[str, str] = {}
         self._stream_order: list[str] = []
         self._stream_chain_title = ""
+        self._stream_chain_variables_text = ""
         self._active_stream_thread: threading.Thread | None = None
 
         self._management_splitter.addWidget(list_container)
@@ -550,7 +551,7 @@ class PromptChainManagerPanel(QWidget):
         streaming_enabled = self._is_streaming_enabled()
         stream_callback = self._handle_step_stream if streaming_enabled else None
         if streaming_enabled:
-            self._begin_stream_preview(chain.name)
+            self._begin_stream_preview(chain, variables)
             self._run_chain_async(chain, variables, previous_status, stream_callback)
             return
 
@@ -578,16 +579,6 @@ class PromptChainManagerPanel(QWidget):
 
     def _display_run_result(self, result: PromptChainRunResult) -> None:
         """Render execution outputs and per-step summary for *result*."""
-        def _dump_json(payload: Mapping[str, Any]) -> str:
-            try:
-                return json.dumps(payload, indent=2, sort_keys=True, default=str)
-            except TypeError:
-                return json.dumps(
-                    {str(key): str(value) for key, value in payload.items()},
-                    indent=2,
-                    sort_keys=True,
-                )
-
         def _indent_lines(text: str, prefix: str = "  ") -> list[str]:
             if not text.strip():
                 return [f"{prefix}(empty)"]
@@ -599,7 +590,7 @@ class PromptChainManagerPanel(QWidget):
         # Chain inputs
         plain_sections.append("Input to chain")
         if result.variables:
-            chain_input = _dump_json(result.variables)
+            chain_input = self._format_json(result.variables)
             plain_sections.extend(_indent_lines(chain_input))
             markdown_lines.extend(["## Input to chain", "```json", chain_input, "```"])
         else:
@@ -610,7 +601,7 @@ class PromptChainManagerPanel(QWidget):
         # Chain outputs
         plain_sections.append("Chain Outputs")
         if result.outputs:
-            outputs_text = _dump_json(result.outputs)
+            outputs_text = self._format_json(result.outputs)
             plain_sections.extend(_indent_lines(outputs_text))
             markdown_lines.extend(["", "## Chain outputs", "```json", outputs_text, "```"])
         else:
@@ -710,14 +701,19 @@ class PromptChainManagerPanel(QWidget):
             return False
         return bool(getattr(executor, "stream", False))
 
-    def _begin_stream_preview(self, chain_name: str) -> None:
+    def _begin_stream_preview(self, chain: PromptChain, variables: Mapping[str, Any]) -> None:
         """Initialise buffers used to show streaming output per step."""
         self._stream_preview_active = True
-        self._stream_chain_title = chain_name
+        self._stream_chain_title = chain.name
         self._stream_buffers.clear()
         self._stream_labels.clear()
         self._stream_order.clear()
-        self._result_view.setPlainText(f"Streaming '{chain_name}'…")
+        self._stream_chain_variables_text = ""
+        if variables:
+            self._stream_chain_variables_text = self._format_json(dict(variables))
+        for step in chain.steps:
+            self._declare_stream_step(step)
+        self._refresh_stream_preview()
 
     def _handle_step_stream(self, step: PromptChainStep, chunk: str) -> None:
         """Schedule GUI updates for streamed chain step output."""
@@ -729,14 +725,19 @@ class PromptChainManagerPanel(QWidget):
         """Append *chunk* to the preview buffer for *step*."""
         if not self._stream_preview_active:
             return
+        step_id = self._declare_stream_step(step)
+        self._stream_buffers[step_id] += chunk
+        self._refresh_stream_preview()
+
+    def _declare_stream_step(self, step: PromptChainStep) -> str:
+        """Ensure streaming buffers exist for *step* and return its identifier."""
         step_id = str(step.id)
         if step_id not in self._stream_buffers:
             label = f"Step {step.order_index} – {step.output_variable or step.prompt_id}"
             self._stream_order.append(step_id)
             self._stream_labels[step_id] = label
             self._stream_buffers[step_id] = ""
-        self._stream_buffers[step_id] += chunk
-        self._refresh_stream_preview()
+        return step_id
 
     def _refresh_stream_preview(self) -> None:
         """Render the live streaming preview text."""
@@ -744,6 +745,13 @@ class PromptChainManagerPanel(QWidget):
             return
         header = self._stream_chain_title or "prompt chain"
         lines = [f"Streaming '{header}'…", ""]
+        if self._stream_chain_variables_text:
+            lines.append("Input to chain")
+            lines.extend(self._stream_chain_variables_text.splitlines())
+            lines.append("")
+        if self._stream_order:
+            lines.append("Step details")
+            lines.append("")
         for step_id in self._stream_order:
             label = self._stream_labels.get(step_id, step_id)
             lines.append(label)
@@ -759,6 +767,7 @@ class PromptChainManagerPanel(QWidget):
         """Clear streaming preview state."""
         self._stream_preview_active = False
         self._stream_chain_title = ""
+        self._stream_chain_variables_text = ""
         self._stream_buffers.clear()
         self._stream_labels.clear()
         self._stream_order.clear()
@@ -856,6 +865,17 @@ class PromptChainManagerPanel(QWidget):
         self._detail_status.setText(f"Last run succeeded at {timestamp}")
         self._display_run_result(result)
         show_toast(self, f"Chain '{chain.name}' completed.")
+
+    def _format_json(self, payload: Mapping[str, Any]) -> str:
+        """Render mapping payloads as pretty JSON text."""
+        try:
+            return json.dumps(payload, indent=2, sort_keys=True, default=str)
+        except TypeError:
+            return json.dumps(
+                {str(key): str(value) for key, value in payload.items()},
+                indent=2,
+                sort_keys=True,
+            )
 
 
 class PromptChainManagerDialog(QDialog):
