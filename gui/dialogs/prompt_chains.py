@@ -1,6 +1,7 @@
 """Prompt chain management surfaces for the GUI.
 
 Updates:
+  v0.5.18 - 2025-12-06 - Improve default contrast and satisfy lint/type checks for toggles.
   v0.5.17 - 2025-12-06 - Ignore reasoning payload tokens that look like opaque IDs.
   v0.5.16 - 2025-12-06 - Limit reasoning summaries to opted-in chains and final steps; fix colors.
   v0.5.15 - 2025-12-05 - Double-clicking chains opens the editor; steps still show prompt names.
@@ -35,7 +36,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from PySide6.QtCore import QByteArray, QSettings, Qt, QTimer
-from PySide6.QtGui import QTextDocument
+from PySide6.QtGui import QTextDocument  # type: ignore[attr-defined]
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -539,7 +540,7 @@ class PromptChainManagerPanel(QWidget):
             self._steps_table.setItem(row, 0, QTableWidgetItem(str(step.order_index)))
             prompt_label = self._resolve_prompt_label(step.prompt_id)
             prompt_item = QTableWidgetItem(prompt_label)
-            prompt_item.setToolTip(str(step.prompt_id))
+            prompt_item.setToolTip(str(step.prompt_id))  # pyright: ignore[reportAttributeAccessIssue]
             self._steps_table.setItem(row, 1, prompt_item)
             self._steps_table.setItem(row, 2, QTableWidgetItem(step.input_template or ""))
             self._steps_table.setItem(row, 3, QTableWidgetItem(step.output_variable))
@@ -703,7 +704,11 @@ class PromptChainManagerPanel(QWidget):
             variables = {}
 
         previous_status = self._detail_status.text()
-        use_web_search = bool(self._web_search_checkbox.isChecked()) if self._web_search_checkbox else True
+        use_web_search = (
+            bool(self._web_search_checkbox.isChecked())
+            if self._web_search_checkbox
+            else True
+        )
         self._detail_status.setText(f"Running '{chain.name}'…")
         streaming_enabled = self._is_streaming_enabled()
         stream_callback = self._handle_step_stream if streaming_enabled else None
@@ -995,10 +1000,11 @@ class PromptChainManagerPanel(QWidget):
 
     def _handle_wrap_changed(self, checked: bool) -> None:
         """Toggle line wrapping for the execution results view."""
+        text_edit_cls = cast(Any, QTextEdit)
         if checked:
-            self._result_view.setLineWrapMode(QTextEdit.WidgetWidth)
+            self._result_view.setLineWrapMode(text_edit_cls.LineWrapMode.WidgetWidth)
         else:
-            self._result_view.setLineWrapMode(QTextEdit.NoWrap)
+            self._result_view.setLineWrapMode(text_edit_cls.LineWrapMode.NoWrap)
 
     def _apply_result_view(self) -> None:
         """Render stored results using the current format preference."""
@@ -1138,7 +1144,9 @@ class PromptChainManagerPanel(QWidget):
         self._suppress_variable_signal = False
 
     def _load_web_search_preference(self) -> bool:
-        stored = self._settings.value("chainWebSearchEnabled", True)
+        stored = self._settings.value("chainWebSearchEnabled")
+        if stored is None:
+            return True
         if isinstance(stored, bool):
             return stored
         if isinstance(stored, str):
@@ -1150,7 +1158,11 @@ class PromptChainManagerPanel(QWidget):
         return True
 
     def _handle_web_search_toggle(self, state: int) -> None:
-        self._settings.setValue("chainWebSearchEnabled", state == Qt.Checked)
+        qt_namespace = cast(Any, Qt)
+        self._settings.setValue(
+            "chainWebSearchEnabled",
+            state == qt_namespace.CheckState.Checked,
+        )
 
     def _handle_step_table_activated(self, row: int, _: int) -> None:
         prompt_id = self._step_prompt_ids.get(row)
