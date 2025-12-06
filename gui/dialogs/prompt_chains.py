@@ -78,7 +78,7 @@ logger = logging.getLogger(__name__)
 _CHAIN_INPUT_COLOR = "#66bb6a"
 _CHAIN_OUTPUT_COLOR = "#66bb6a"
 _CHAIN_SUMMARY_COLOR = "#2e7d32"
-_STEP_OUTPUT_COLOR = "#cfd8dc"
+_STEP_MUTED_COLOR = "#737373"
 _REASONING_COLOR = "#1e88e5"
 
 _RESULT_STYLE_TEMPLATE = """
@@ -727,6 +727,9 @@ class PromptChainManagerPanel(QWidget):
         html_sections: list[str] = [self._result_style_css(), '<div class="chain-results">']
         step_html_sections: list[str] = []
         summarize_enabled = bool(getattr(result.chain, "summarize_last_response", True))
+        summary_text: str | None = None
+        if summarize_enabled and result.summary:
+            summary_text = result.summary.strip() or None
         last_success_index: int | None = None
         if summarize_enabled:
             for index in range(len(result.steps) - 1, -1, -1):
@@ -770,22 +773,6 @@ class PromptChainManagerPanel(QWidget):
             )
         )
 
-        if summarize_enabled and result.summary:
-            summary_text = result.summary.strip()
-            if summary_text:
-                plain_sections.append("Chain summary")
-                plain_sections.extend(_indent_lines(summary_text))
-                plain_sections.append("")
-                html_sections.append(
-                    self._format_colored_block_html(
-                        "Chain summary",
-                        summary_text,
-                        color=_CHAIN_SUMMARY_COLOR,
-                        class_name="chain-block--summary",
-                        monospace=False,
-                    )
-                )
-
         # Steps
         if result.steps:
             html_sections.append('<div class="chain-steps">')
@@ -808,11 +795,13 @@ class PromptChainManagerPanel(QWidget):
                 and index == last_success_index
                 and outcome is not None
             )
+            include_step_input = index == 0
             if outcome:
                 request_text = outcome.result.request_text.strip()
                 response_text = outcome.result.response_text.strip()
-                plain_sections.append("  Input to step:")
-                plain_sections.extend(_indent_lines(request_text or "(empty input)"))
+                if include_step_input:
+                    plain_sections.append("  Input to step:")
+                    plain_sections.extend(_indent_lines(request_text or "(empty input)"))
                 plain_sections.append("  Output of step:")
                 plain_sections.extend(_indent_lines(response_text or "(empty response)"))
                 if should_render_reasoning:
@@ -826,12 +815,26 @@ class PromptChainManagerPanel(QWidget):
                     request_text,
                     response_text,
                     reasoning_text,
+                    include_step_input,
                 )
             )
             plain_sections.append("")
         if result.steps:
             html_sections.extend(step_html_sections)
             html_sections.append("</div>")
+        if summary_text:
+            plain_sections.append("Chain summary")
+            plain_sections.extend(_indent_lines(summary_text))
+            plain_sections.append("")
+            html_sections.append(
+                self._format_colored_block_html(
+                    "Chain summary",
+                    summary_text,
+                    color=_CHAIN_SUMMARY_COLOR,
+                    class_name="chain-block--summary",
+                    monospace=False,
+                )
+            )
         html_sections.append("</div>")
         plain_text = "\n".join(plain_sections).strip()
         html_text = "\n".join(html_sections).strip()
@@ -902,6 +905,7 @@ class PromptChainManagerPanel(QWidget):
         request_text: str,
         response_text: str,
         reasoning_text: str | None,
+        show_request_block: bool,
     ) -> str:
         """Return styled HTML for a single step entry."""
         step = step_run.step
@@ -923,12 +927,12 @@ class PromptChainManagerPanel(QWidget):
                 "Skipped because condition evaluated to false."
                 "</div>"
             )
-        if request_text:
+        if request_text and show_request_block:
             parts.append(
                 self._format_colored_block_html(
                     "Input to step",
                     request_text or "(empty input)",
-                    color=None,
+                    color=_STEP_MUTED_COLOR,
                     class_name="chain-step-detail chain-step-input",
                 )
             )
@@ -936,7 +940,7 @@ class PromptChainManagerPanel(QWidget):
             self._format_colored_block_html(
                 "Output of step",
                 response_text or "(empty response)",
-                color=_STEP_OUTPUT_COLOR,
+                color=_STEP_MUTED_COLOR,
                 class_name="chain-step-detail chain-step-output",
             )
         )
