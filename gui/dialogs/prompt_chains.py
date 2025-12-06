@@ -801,13 +801,15 @@ class PromptChainManagerPanel(QWidget):
             )
             include_step_input = index == 0
             is_last_step = index == total_steps - 1
+            show_response_block = True
             if outcome:
                 request_text = outcome.result.request_text.strip()
                 response_text = outcome.result.response_text.strip()
                 if include_step_input:
                     plain_sections.append("  Input to step:")
                     plain_sections.extend(_indent_lines(request_text or "(empty input)"))
-                if not is_last_step:
+                show_response_block = not (is_last_step and should_render_reasoning)
+                if show_response_block:
                     plain_sections.append("  Output of step:")
                     plain_sections.extend(_indent_lines(response_text or "(empty response)"))
                 if should_render_reasoning:
@@ -822,7 +824,7 @@ class PromptChainManagerPanel(QWidget):
                     response_text,
                     reasoning_text,
                     include_step_input,
-                    not is_last_step,
+                    show_response_block,
                 )
             )
             plain_sections.append("")
