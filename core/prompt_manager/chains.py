@@ -15,10 +15,12 @@ import asyncio
 import logging
 import re
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any, cast
 
 from jsonschema import Draft202012Validator, exceptions as jsonschema_exceptions
+
 from prompt_templates import get_default_prompt
 
 from ..exceptions import (
@@ -43,12 +45,53 @@ from .execution_history import ExecutionOutcome, _normalise_conversation
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers only
     from collections.abc import Callable, Mapping
+    from typing import Protocol
 
     from models.prompt_chain_model import PromptChain, PromptChainStep
-    from models.prompt_model import Prompt
+    from models.prompt_model import Prompt, PromptExecution
 
+    from ..execution import CodexExecutionResult
     from ..notifications import NotificationCenter
     from ..repository import PromptRepository
+
+    class _PromptChainHost(Protocol):
+        def get_prompt(self, prompt_id: uuid.UUID) -> Prompt: ...
+
+        def _build_execution_context_metadata(  # noqa: D401 - typing helper only
+            self,
+            prompt: Prompt,
+            *,
+            stream_enabled: bool,
+            executor_model: str | None,
+            conversation_length: int,
+            request_text: str,
+            response_text: str,
+            response_style: Mapping[str, Any] | None = None,
+        ) -> dict[str, Any]: ...
+
+        def _log_execution_failure(
+            self,
+            prompt_id: uuid.UUID,
+            request_text: str,
+            error_message: str,
+            *,
+            conversation: Sequence[Mapping[str, str]] | None = None,
+            context_metadata: Mapping[str, Any] | None = None,
+            extra_metadata: Mapping[str, Any] | None = None,
+        ) -> PromptExecution | None: ...
+
+        def _log_execution_success(
+            self,
+            prompt_id: uuid.UUID,
+            request_text: str,
+            result: CodexExecutionResult,
+            *,
+            conversation: Sequence[Mapping[str, str]] | None = None,
+            context_metadata: Mapping[str, Any] | None = None,
+            extra_metadata: Mapping[str, Any] | None = None,
+        ) -> PromptExecution | None: ...
+
+        def increment_usage(self, prompt_id: uuid.UUID) -> None: ...
 
 logger = logging.getLogger(__name__)
 
@@ -144,6 +187,7 @@ class PromptChainMixin:
         web_search_limit: int = _CHAIN_WEB_SEARCH_RESULT_LIMIT,
     ) -> PromptChainRunResult:
         """Execute the specified prompt chain sequentially."""
+        host = cast("_PromptChainHost", self)
         chain = self.get_prompt_chain(chain_id)
         if not chain.is_active:
             raise PromptChainExecutionError(f"Prompt chain '{chain.name}' is inactive.")
@@ -192,7 +236,7 @@ class PromptChainMixin:
                     raise PromptChainExecutionError(
                         f"Step {step.order_index} in '{chain.name}' produced an empty request."
                     )
-                prompt = self.get_prompt(step.prompt_id)
+                prompt = host.get_prompt(step.prompt_id)
                 request_text = self._maybe_enrich_with_web_search(
                     prompt,
                     request_text,
@@ -395,6 +439,7 @@ class PromptChainMixin:
         stream_callback: Callable[[PromptChainStep, str, bool], None] | None = None,
     ) -> ExecutionOutcome:
         """Execute a single prompt without emitting GUI toasts per step."""
+        host = cast("_PromptChainHost", self)
         executor = getattr(self, "_executor", None)
         if executor is None:
             raise PromptChainExecutionError(
@@ -427,7 +472,7 @@ class PromptChainMixin:
         except ExecutionError as exc:
             failed_messages = list(conversation_history)
             failed_messages.append({"role": "user", "content": request_text.strip()})
-            failure_context = self._build_execution_context_metadata(
+            failure_context = host._build_execution_context_metadata(
                 prompt,
                 stream_enabled=stream_enabled,
                 executor_model=getattr(executor, "model", None),
@@ -435,7 +480,7 @@ class PromptChainMixin:
                 request_text=request_text,
                 response_text="",
             )
-            self._log_execution_failure(
+            host._log_execution_failure(
                 prompt.id,
                 request_text,
                 str(exc),
@@ -459,7 +504,7 @@ class PromptChainMixin:
         augmented_conversation.append({"role": "user", "content": request_text.strip()})
         if result.response_text:
             augmented_conversation.append({"role": "assistant", "content": result.response_text})
-        context_metadata = self._build_execution_context_metadata(
+        context_metadata = host._build_execution_context_metadata(
             prompt,
             stream_enabled=stream_enabled,
             executor_model=getattr(executor, "model", None),
@@ -467,7 +512,7 @@ class PromptChainMixin:
             request_text=request_text,
             response_text=result.response_text,
         )
-        history_entry = self._log_execution_success(
+        history_entry = host._log_execution_success(
             prompt.id,
             request_text,
             result,
@@ -485,7 +530,7 @@ class PromptChainMixin:
             },
         )
         try:
-            self.increment_usage(prompt.id)
+            host.increment_usage(prompt.id)
         except PromptManagerError:
             logger.debug(
                 "Failed to increment usage after chain step",
