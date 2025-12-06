@@ -106,7 +106,7 @@ _RESULT_STYLE_TEMPLATE = """
   font-family: "JetBrains Mono", "SFMono-Regular", monospace;
 }
 .chain-block-body--muted {
-  color: #737373;
+  color: #A8A8A8;
 }
 .chain-block pre {
   margin: 0;
