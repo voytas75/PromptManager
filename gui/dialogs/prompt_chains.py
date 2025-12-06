@@ -36,7 +36,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from PySide6.QtCore import QByteArray, QSettings, Qt, QTimer
-from PySide6.QtGui import QTextDocument  # type: ignore[attr-defined]
+from PySide6.QtGui import QPalette, QTextDocument  # type: ignore[attr-defined]
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -80,13 +80,13 @@ _CHAIN_SUMMARY_COLOR = "#2e7d32"
 _STEP_OUTPUT_COLOR = "#cfd8dc"
 _REASONING_COLOR = "#1e88e5"
 
-_RESULT_STYLE = """
+_RESULT_STYLE_TEMPLATE = """
 <style>
 .chain-results {
   font-family: "Inter", "Segoe UI", sans-serif;
   font-size: 12px;
   line-height: 1.45;
-  color: #1c2837;
+  color: {text_color};
 }
 .chain-block {
   border-radius: 6px;
@@ -754,7 +754,7 @@ class PromptChainManagerPanel(QWidget):
             return [f"{prefix}{line}" for line in text.splitlines()]
 
         plain_sections: list[str] = []
-        html_sections: list[str] = [_RESULT_STYLE, '<div class="chain-results">']
+        html_sections: list[str] = [self._result_style_css(), '<div class="chain-results">']
         step_html_sections: list[str] = []
         summarize_enabled = bool(getattr(result.chain, "summarize_last_response", True))
         last_success_index: int | None = None
@@ -897,6 +897,37 @@ class PromptChainManagerPanel(QWidget):
             "</div>"
         )
 
+    def _result_style_css(self) -> str:
+        palette = self._result_view.palette()
+        color_role_enum = getattr(QPalette, "ColorRole", None)
+        base_role = getattr(color_role_enum, "Base", getattr(QPalette, "Base"))
+        text_role = getattr(color_role_enum, "Text", getattr(QPalette, "Text"))
+        base_color = palette.color(base_role)
+        text_color = palette.color(text_role)
+        chosen = self._pick_accessible_text_color(base_color, text_color)
+        return _RESULT_STYLE_TEMPLATE.format(text_color=chosen)
+
+    @staticmethod
+    def _pick_accessible_text_color(base_color: Any, text_color: Any) -> str:
+        def _luminance(color: Any) -> float:
+            red = float(getattr(color, "redF", lambda: 0.0)())
+            green = float(getattr(color, "greenF", lambda: 0.0)())
+            blue = float(getattr(color, "blueF", lambda: 0.0)())
+            return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+
+        base_lum = _luminance(base_color)
+        if base_lum < 0.4:
+            return "#f5f7ff"
+        hex_value = PromptChainManagerPanel._color_to_hex(text_color)
+        return hex_value or "#1c2837"
+
+    @staticmethod
+    def _color_to_hex(color: Any) -> str:
+        red = int(max(0, min(255, getattr(color, "red", lambda: 0)())))
+        green = int(max(0, min(255, getattr(color, "green", lambda: 0)())))
+        blue = int(max(0, min(255, getattr(color, "blue", lambda: 0)())))
+        return f"#{red:02x}{green:02x}{blue:02x}"
+
     def _build_step_html_block(
         self,
         step_run: PromptChainStepRun,
@@ -1000,11 +1031,11 @@ class PromptChainManagerPanel(QWidget):
 
     def _handle_wrap_changed(self, checked: bool) -> None:
         """Toggle line wrapping for the execution results view."""
-        text_edit_cls = cast(Any, QTextEdit)
-        if checked:
-            self._result_view.setLineWrapMode(text_edit_cls.LineWrapMode.WidgetWidth)
-        else:
-            self._result_view.setLineWrapMode(text_edit_cls.LineWrapMode.NoWrap)
+        line_wrap_enum = getattr(QTextEdit, "LineWrapMode", None)
+        if line_wrap_enum is None:
+            return
+        mode = line_wrap_enum.WidgetWidth if checked else line_wrap_enum.NoWrap
+        self._result_view.setLineWrapMode(mode)
 
     def _apply_result_view(self) -> None:
         """Render stored results using the current format preference."""
@@ -1158,11 +1189,7 @@ class PromptChainManagerPanel(QWidget):
         return True
 
     def _handle_web_search_toggle(self, state: int) -> None:
-        qt_namespace = cast(Any, Qt)
-        self._settings.setValue(
-            "chainWebSearchEnabled",
-            state == qt_namespace.CheckState.Checked,
-        )
+        self._settings.setValue("chainWebSearchEnabled", bool(state))
 
     def _handle_step_table_activated(self, row: int, _: int) -> None:
         prompt_id = self._step_prompt_ids.get(row)
