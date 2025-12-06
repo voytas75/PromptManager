@@ -87,7 +87,7 @@ def test_chain_summary_prefers_litellm_last_step(monkeypatch: pytest.MonkeyPatch
     assert isinstance(request, dict)
     assert request.get("model") == "fast-model"
     user_prompt = request["messages"][1]["content"]  # type: ignore[index]
-    assert "Final output to summarise." in user_prompt
+    assert user_prompt == "Final output to summarise."
 
 
 def test_chain_summary_respects_prompt_template_override(

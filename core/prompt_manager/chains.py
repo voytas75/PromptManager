@@ -547,12 +547,7 @@ class PromptChainMixin:
                 {"role": "system", "content": system_prompt},
                 {
                     "role": "user",
-                    "content": (
-                        "Summarize the following response from a prompt chain so collaborators "
-                        "understand the outcome in two concise sentences. Focus on the "
-                        "result and any follow-up actions, avoid markdown, and never invent "
-                        f"details.\n\n{trimmed}"
-                    ),
+                    "content": trimmed,
                 },
             ],
             "temperature": 0.2,
