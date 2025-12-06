@@ -106,7 +106,7 @@ _RESULT_STYLE_TEMPLATE = """
   font-family: "JetBrains Mono", "SFMono-Regular", monospace;
 }
 .chain-block-body--muted {
-  color: #ff0000;
+  color: #A8A8A8;
 }
 .chain-block pre {
   margin: 0;
@@ -858,20 +858,22 @@ class PromptChainManagerPanel(QWidget):
         class_name: str,
         monospace: bool = True,
         body_class: str | None = None,
+        body_color: str | None = None,
     ) -> str:
         """Return an HTML block with consistent styling and text color."""
         safe_title = html.escape(title)
         safe_body = html.escape(body_text or "(empty)")
         base_classes = ["chain-block-body"]
+        body_style_attr = f' style="color:{body_color};"' if body_color else ""
         if monospace:
             base_classes.append("chain-block-body--mono")
         if body_class:
             base_classes.append(body_class)
         body_class_attr = " ".join(base_classes)
         if monospace:
-            body_html = f'<pre class="{body_class_attr}">{safe_body}</pre>'
+            body_html = f'<pre class="{body_class_attr}"{body_style_attr}>{safe_body}</pre>'
         else:
-            body_html = f'<div class="{body_class_attr}">{safe_body}</div>'
+            body_html = f'<div class="{body_class_attr}"{body_style_attr}>{safe_body}</div>'
         style_attr = f' style="color:{color};"' if color else ""
         return (
             f'<div class="chain-block {class_name}"{style_attr}>'
@@ -948,6 +950,7 @@ class PromptChainManagerPanel(QWidget):
                     color=None,
                     class_name="chain-step-detail chain-step-input",
                     body_class="chain-block-body--muted",
+                    body_color=_STEP_MUTED_COLOR,
                 )
             )
         if show_response_block:
@@ -958,6 +961,7 @@ class PromptChainManagerPanel(QWidget):
                     color=None,
                     class_name="chain-step-detail chain-step-output",
                     body_class="chain-block-body--muted",
+                    body_color=_STEP_MUTED_COLOR,
                 )
             )
         if reasoning_text:
