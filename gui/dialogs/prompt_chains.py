@@ -85,6 +85,7 @@ _RESULT_STYLE = """
   font-family: "Inter", "Segoe UI", sans-serif;
   font-size: 12px;
   line-height: 1.45;
+  color: #1c2837;
 }
 .chain-block {
   border-radius: 6px;
