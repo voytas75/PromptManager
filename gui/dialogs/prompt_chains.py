@@ -105,6 +105,9 @@ _RESULT_STYLE_TEMPLATE = """
 .chain-block-body--mono {
   font-family: "JetBrains Mono", "SFMono-Regular", monospace;
 }
+.chain-block-body--muted {
+  color: #737373;
+}
 .chain-block pre {
   margin: 0;
   white-space: pre-wrap;
@@ -850,16 +853,21 @@ class PromptChainManagerPanel(QWidget):
         color: str | None,
         class_name: str,
         monospace: bool = True,
+        body_class: str | None = None,
     ) -> str:
         """Return an HTML block with consistent styling and text color."""
         safe_title = html.escape(title)
         safe_body = html.escape(body_text or "(empty)")
+        base_classes = ["chain-block-body"]
         if monospace:
-            body_html = (
-                f'<pre class="chain-block-body chain-block-body--mono">{safe_body}</pre>'
-            )
+            base_classes.append("chain-block-body--mono")
+        if body_class:
+            base_classes.append(body_class)
+        body_class_attr = " ".join(base_classes)
+        if monospace:
+            body_html = f'<pre class="{body_class_attr}">{safe_body}</pre>'
         else:
-            body_html = f'<div class="chain-block-body">{safe_body}</div>'
+            body_html = f'<div class="{body_class_attr}">{safe_body}</div>'
         style_attr = f' style="color:{color};"' if color else ""
         return (
             f'<div class="chain-block {class_name}"{style_attr}>'
@@ -932,16 +940,18 @@ class PromptChainManagerPanel(QWidget):
                 self._format_colored_block_html(
                     "Input to step",
                     request_text or "(empty input)",
-                    color=_STEP_MUTED_COLOR,
+                    color=None,
                     class_name="chain-step-detail chain-step-input",
+                    body_class="chain-block-body--muted",
                 )
             )
         parts.append(
             self._format_colored_block_html(
                 "Output of step",
                 response_text or "(empty response)",
-                color=_STEP_MUTED_COLOR,
+                color=None,
                 class_name="chain-step-detail chain-step-output",
+                body_class="chain-block-body--muted",
             )
         )
         if reasoning_text:
