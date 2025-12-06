@@ -779,6 +779,7 @@ class PromptChainManagerPanel(QWidget):
         # Steps
         if result.steps:
             html_sections.append('<div class="chain-steps">')
+        total_steps = len(result.steps)
         for index, step_run in enumerate(result.steps):
             step = step_run.step
             step_label = step.output_variable or str(step.prompt_id)
@@ -799,14 +800,16 @@ class PromptChainManagerPanel(QWidget):
                 and outcome is not None
             )
             include_step_input = index == 0
+            is_last_step = index == total_steps - 1
             if outcome:
                 request_text = outcome.result.request_text.strip()
                 response_text = outcome.result.response_text.strip()
                 if include_step_input:
                     plain_sections.append("  Input to step:")
                     plain_sections.extend(_indent_lines(request_text or "(empty input)"))
-                plain_sections.append("  Output of step:")
-                plain_sections.extend(_indent_lines(response_text or "(empty response)"))
+                if not is_last_step:
+                    plain_sections.append("  Output of step:")
+                    plain_sections.extend(_indent_lines(response_text or "(empty response)"))
                 if should_render_reasoning:
                     reasoning_text = self._extract_reasoning_summary(outcome)
                     if reasoning_text:
@@ -819,6 +822,7 @@ class PromptChainManagerPanel(QWidget):
                     response_text,
                     reasoning_text,
                     include_step_input,
+                    not is_last_step,
                 )
             )
             plain_sections.append("")
@@ -914,6 +918,7 @@ class PromptChainManagerPanel(QWidget):
         response_text: str,
         reasoning_text: str | None,
         show_request_block: bool,
+        show_response_block: bool,
     ) -> str:
         """Return styled HTML for a single step entry."""
         step = step_run.step
@@ -945,15 +950,16 @@ class PromptChainManagerPanel(QWidget):
                     body_class="chain-block-body--muted",
                 )
             )
-        parts.append(
-            self._format_colored_block_html(
-                "Output of step",
-                response_text or "(empty response)",
-                color=None,
-                class_name="chain-step-detail chain-step-output",
-                body_class="chain-block-body--muted",
+        if show_response_block:
+            parts.append(
+                self._format_colored_block_html(
+                    "Output of step",
+                    response_text or "(empty response)",
+                    color=None,
+                    class_name="chain-step-detail chain-step-output",
+                    body_class="chain-block-body--muted",
+                )
             )
-        )
         if reasoning_text:
             parts.append(
                 self._format_colored_block_html(

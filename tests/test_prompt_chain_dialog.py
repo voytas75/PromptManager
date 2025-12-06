@@ -497,9 +497,11 @@ def test_prompt_chain_step_markdown_renders_without_code_fences(qt_app: QApplica
         dialog._chain_input_edit.setPlainText("Markdown step input")  # noqa: SLF001
         dialog._run_selected_chain()  # noqa: SLF001
         rich = dialog._result_richtext  # noqa: SLF001
-        assert "chain-step-output" in rich
-        assert "### Step output" in rich
+        assert "chain-block--outputs" in rich
         assert "```" not in rich
+        plain = dialog._result_plaintext  # noqa: SLF001
+        assert "Chain summary" in plain
+        assert "### Step output" not in plain
     finally:
         dialog.close()
         dialog.deleteLater()
