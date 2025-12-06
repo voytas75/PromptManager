@@ -1,6 +1,7 @@
 """Prompt chain editor dialogs for creating and updating workflows.
 
 Updates:
+  v0.4.0 - 2025-12-06 - Simplify chain editor for plain-text linear chaining.
   v0.3.1 - 2025-12-05 - Hide the variables schema editor behind a toggle button.
   v0.3.0 - 2025-12-05 - Surface summarize toggle for prompt chain results.
   v0.2.0 - 2025-12-04 - Add prompt picker combo box backed by catalog lookups.
@@ -8,8 +9,6 @@ Updates:
 """
 
 from __future__ import annotations
-
-import json
 import uuid
 from dataclasses import replace
 from typing import TYPE_CHECKING
@@ -82,30 +81,12 @@ class PromptChainEditorDialog(QDialog):
             "Optional summary to help collaborators understand the workflow.",
         )
 
-        schema_widget = QWidget(self)
-        schema_layout = QVBoxLayout(schema_widget)
-        schema_layout.setContentsMargins(0, 0, 0, 0)
-        schema_layout.setSpacing(4)
-        toggle_row = QHBoxLayout()
-        toggle_row.setContentsMargins(0, 0, 0, 0)
-        self._schema_toggle = QPushButton("Schema", schema_widget)
-        self._schema_toggle.setCheckable(True)
-        self._schema_toggle.setChecked(False)
-        self._schema_toggle.toggled.connect(self._handle_schema_toggle)  # type: ignore[arg-type]
-        toggle_row.addWidget(self._schema_toggle)
-        toggle_row.addStretch(1)
-        schema_layout.addLayout(toggle_row)
-
-        self._schema_input = QPlainTextEdit(self)
-        self._schema_input.setPlaceholderText("JSON Schema (Draft 2020-12) describing variables…")
-        self._schema_input.setVisible(False)
-        schema_layout.addWidget(self._schema_input)
-        self._add_form_row(
-            form,
-            "Variables schema",
-            schema_widget,
-            "Validates the variables provided before execution.",
+        info_label = QLabel(
+            "Chains no longer define variables or templates—each step receives the previous output.",
+            self,
         )
+        info_label.setWordWrap(True)
+        form.addRow("", info_label)
 
         self._active_checkbox = QCheckBox("Chain is active", self)
         self._active_checkbox.setChecked(True)
@@ -121,9 +102,9 @@ class PromptChainEditorDialog(QDialog):
         )
         layout.addLayout(form)
 
-        self._steps_table = QTableWidget(0, 5, self)
+        self._steps_table = QTableWidget(0, 3, self)
         self._steps_table.setHorizontalHeaderLabels(
-            ["Order", "Prompt", "Input", "Output", "Condition"]
+            ["Order", "Prompt", "Failure handling"]
         )
         self._steps_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self._steps_table.itemDoubleClicked.connect(self._handle_step_double_click)  # type: ignore[arg-type]
@@ -163,9 +144,6 @@ class PromptChainEditorDialog(QDialog):
     def _load_chain(self, chain: PromptChain) -> None:
         self._name_input.setText(chain.name)
         self._description_input.setPlainText(chain.description)
-        if chain.variables_schema:
-            self._schema_input.setPlainText(json.dumps(chain.variables_schema, indent=2))
-        self._schema_toggle.setChecked(False)
         self._active_checkbox.setChecked(chain.is_active)
         self._summarize_checkbox.setChecked(chain.summarize_last_response)
         self._steps = [replace(step) for step in chain.steps]
@@ -183,12 +161,8 @@ class PromptChainEditorDialog(QDialog):
             if prompt is not None:
                 prompt_item.setToolTip(self._build_prompt_tooltip(prompt))
             self._steps_table.setItem(row, 1, prompt_item)
-            self._steps_table.setItem(row, 2, QTableWidgetItem(step.input_template))
-            self._steps_table.setItem(row, 3, QTableWidgetItem(step.output_variable))
-            condition = step.condition or "Always"
-            if not step.stop_on_failure:
-                condition = f"{condition} (continues on failure)"
-            self._steps_table.setItem(row, 4, QTableWidgetItem(condition))
+            behaviour = "Stop chain on failure" if step.stop_on_failure else "Continue on failure"
+            self._steps_table.setItem(row, 2, QTableWidgetItem(behaviour))
 
     def _add_step(self) -> None:
         dialog = PromptChainStepDialog(
@@ -238,30 +212,18 @@ class PromptChainEditorDialog(QDialog):
         if not self._steps:
             QMessageBox.warning(self, "Validation", "Add at least one step before saving.")
             return
-        schema_text = self._schema_input.toPlainText().strip()
-        schema = None
-        if schema_text:
-            try:
-                schema = json.loads(schema_text)
-            except json.JSONDecodeError as exc:
-                QMessageBox.critical(self, "Invalid schema", str(exc))
-                return
         description = self._description_input.toPlainText().strip()
         chain = PromptChain(
             id=self._chain_id,
             name=name,
             description=description,
             is_active=self._active_checkbox.isChecked(),
-            variables_schema=schema if schema else None,
+            variables_schema=None,
             metadata=None,
             summarize_last_response=self._summarize_checkbox.isChecked(),
         ).with_steps(self._reindexed_steps())
         self._result_chain = chain
         self.accept()
-
-    def _handle_schema_toggle(self, checked: bool) -> None:
-        self._schema_input.setVisible(checked)
-        self._schema_toggle.setText("Hide schema" if checked else "Schema")
 
     def _reindexed_steps(self) -> list[PromptChainStep]:
         for idx, step in enumerate(sorted(self._steps, key=lambda s: s.order_index), start=1):
@@ -340,40 +302,6 @@ class PromptChainStepDialog(QDialog):
             "Select the catalog prompt to run for this step.",
         )
 
-        self._input_template = QPlainTextEdit(self)
-        self._input_template.setPlaceholderText("e.g. Questions: {{ extracted_points }}")
-        self._add_step_row(
-            layout,
-            "Input template",
-            self._input_template,
-            "Jinja template rendered with chain variables for the prompt body.",
-        )
-        self._input_hint = QLabel(
-            "Jinja-style template that receives chain variables (e.g. {{ source_text }})",
-            self,
-        )
-        self._input_hint.setWordWrap(True)
-        self._input_hint.setObjectName("inputTemplateHint")
-        layout.addRow("", self._input_hint)
-
-        self._output_variable = QLineEdit(self)
-        self._output_variable.setPlaceholderText("e.g. review_summary")
-        self._add_step_row(
-            layout,
-            "Output variable",
-            self._output_variable,
-            "Name stored in context for later steps (e.g. summary_text).",
-        )
-
-        self._condition_input = QLineEdit(self)
-        self._condition_input.setPlaceholderText("Optional condition, e.g. {{ score > 0 }}")
-        self._add_step_row(
-            layout,
-            "Condition",
-            self._condition_input,
-            "If this renders to false/empty the step is skipped.",
-        )
-
         self._stop_checkbox = QCheckBox("Stop chain when this step fails", self)
         self._stop_checkbox.setChecked(True)
         self._add_step_row(
@@ -411,9 +339,6 @@ class PromptChainStepDialog(QDialog):
     def _load_step(self, step: PromptChainStep) -> None:
         self._order_input.setValue(step.order_index)
         self._select_prompt(step.prompt_id)
-        self._input_template.setPlainText(step.input_template)
-        self._output_variable.setText(step.output_variable)
-        self._condition_input.setText(step.condition or "")
         self._stop_checkbox.setChecked(step.stop_on_failure)
 
     def _select_prompt(self, prompt_id: uuid.UUID) -> None:
@@ -435,22 +360,16 @@ class PromptChainStepDialog(QDialog):
         except ValueError as exc:
             QMessageBox.critical(self, "Invalid prompt id", str(exc))
             return
-        input_template = self._input_template.toPlainText().strip()
-        if not input_template:
-            QMessageBox.warning(self, "Validation", "Enter an input template for the step.")
-            return
         order_index = self._order_input.value()
-        output_variable = self._output_variable.text().strip() or f"step_{order_index}"
-        condition = self._condition_input.text().strip() or None
         step_id = self._step.id if self._step else uuid.uuid4()
         self._result_step = PromptChainStep(
             id=step_id,
             chain_id=self._chain_id,
             prompt_id=prompt_id,
             order_index=self._order_input.value(),
-            input_template=input_template,
-            output_variable=output_variable,
-            condition=condition,
+            input_template="",
+            output_variable=f"step_{order_index}",
+            condition=None,
             stop_on_failure=self._stop_checkbox.isChecked(),
             metadata=self._step.metadata if self._step else None,
         )

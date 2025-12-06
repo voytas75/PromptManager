@@ -1,6 +1,7 @@
 """Prompt chain management surfaces for the GUI.
 
 Updates:
+  v0.6.0 - 2025-12-06 - Redesign chain manager for plain-text inputs and linear chaining.
   v0.5.18 - 2025-12-06 - Improve default contrast and satisfy lint/type checks for toggles.
   v0.5.17 - 2025-12-06 - Ignore reasoning payload tokens that look like opaque IDs.
   v0.5.16 - 2025-12-06 - Limit reasoning summaries to opted-in chains and final steps; fix colors.
@@ -177,8 +178,8 @@ class PromptChainManagerPanel(QWidget):
         self._settings = QSettings("PromptManager", "PromptChainManagerPanel")
         self._result_plaintext: str = ""
         self._result_richtext: str = ""
-        self._suppress_variable_signal = False
-        self._current_variables_chain_id: str | None = None
+        self._suppress_input_signal = False
+        self._current_input_chain_id: str | None = None
         self._web_search_checkbox: QCheckBox | None = None
         self._prompt_edit_callback = prompt_edit_callback
         self._prompt_name_cache: dict[UUID, str] = {}
@@ -187,8 +188,8 @@ class PromptChainManagerPanel(QWidget):
         layout = QVBoxLayout(self)
         intro = QLabel(
             "Manage prompt chains defined in the shared repository. "
-            "Select a chain to review its steps, optionally import JSON definitions, "
-            "and provide variables before executing the workflow.",
+            "Select a chain to review its steps, optionally import definitions, "
+            "and type the plain-text input that feeds the first step before executing.",
             self,
         )
         intro.setWordWrap(True)
@@ -273,23 +274,14 @@ class PromptChainManagerPanel(QWidget):
         self._description_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         info_layout.addWidget(self._description_label)
 
-        schema_header = QHBoxLayout()
-        schema_header.setContentsMargins(0, 0, 0, 0)
-        schema_label = QLabel("Variables schema", info_container)
-        schema_header.addWidget(schema_label)
-        schema_header.addStretch(1)
-        self._schema_toggle = QPushButton("Schema", info_container)
-        self._schema_toggle.setCheckable(True)
-        self._schema_toggle.setChecked(False)
-        self._schema_toggle.toggled.connect(self._handle_schema_toggle)  # type: ignore[arg-type]
-        schema_header.addWidget(self._schema_toggle)
-        info_layout.addLayout(schema_header)
-
-        self._schema_view = QPlainTextEdit(info_container)
-        self._schema_view.setReadOnly(True)
-        self._schema_view.setPlaceholderText("Variables schema (JSON schema, optional)")
-        self._schema_view.setVisible(False)
-        info_layout.addWidget(self._schema_view, 1)
+        guidance = QLabel(
+            "Steps automatically receive the previous response. "
+            "Provide a single plain-text input when running the chain.",
+            info_container,
+        )
+        guidance.setWordWrap(True)
+        guidance.setObjectName("promptChainGuidance")
+        info_layout.addWidget(guidance)
 
         steps_container = QFrame(self._detail_splitter)
         steps_layout = QVBoxLayout(steps_container)
@@ -299,9 +291,9 @@ class PromptChainManagerPanel(QWidget):
         steps_label = QLabel("Steps", steps_container)
         steps_layout.addWidget(steps_label)
 
-        self._steps_table = QTableWidget(0, 5, steps_container)
+        self._steps_table = QTableWidget(0, 3, steps_container)
         self._steps_table.setHorizontalHeaderLabels(
-            ["Order", "Prompt", "Input", "Output variable", "Condition"]
+            ["Order", "Prompt", "Failure handling"]
         )
         self._steps_table.horizontalHeader().setStretchLastSection(True)
         self._steps_table.verticalHeader().setVisible(False)
@@ -320,18 +312,18 @@ class PromptChainManagerPanel(QWidget):
         run_header.setStyleSheet("font-weight:600;")
         run_layout.addWidget(run_header)
 
-        self._variables_input = QPlainTextEdit(run_container)
-        self._variables_input.setPlaceholderText("Enter JSON object for chain variables")
-        self._variables_input.textChanged.connect(self._handle_variables_changed)  # type: ignore[arg-type]
-        run_layout.addWidget(self._variables_input, 1)
+        self._chain_input_edit = QPlainTextEdit(run_container)
+        self._chain_input_edit.setPlaceholderText("Type the text you want to feed into the first step…")
+        self._chain_input_edit.textChanged.connect(self._handle_chain_input_changed)  # type: ignore[arg-type]
+        run_layout.addWidget(self._chain_input_edit, 1)
 
         actions_row = QHBoxLayout()
         self._run_button = QPushButton("Run Chain", run_container)
         self._run_button.clicked.connect(self._run_selected_chain)  # type: ignore[arg-type]
         actions_row.addWidget(self._run_button)
-        self._clear_vars_button = QPushButton("Clear Variables", run_container)
-        self._clear_vars_button.clicked.connect(self._variables_input.clear)  # type: ignore[arg-type]
-        actions_row.addWidget(self._clear_vars_button)
+        self._clear_input_button = QPushButton("Clear Input", run_container)
+        self._clear_input_button.clicked.connect(self._chain_input_edit.clear)  # type: ignore[arg-type]
+        actions_row.addWidget(self._clear_input_button)
         self._web_search_checkbox = QCheckBox("Use web search", run_container)
         self._web_search_checkbox.setChecked(self._load_web_search_preference())
         self._web_search_checkbox.setToolTip(
@@ -390,7 +382,7 @@ class PromptChainManagerPanel(QWidget):
         self._stream_labels: dict[str, str] = {}
         self._stream_order: list[str] = []
         self._stream_chain_title = ""
-        self._stream_chain_variables_text = ""
+        self._stream_chain_input_text = ""
         self._active_stream_thread: threading.Thread | None = None
 
         self._management_splitter.addWidget(list_container)
@@ -493,16 +485,14 @@ class PromptChainManagerPanel(QWidget):
             self._detail_title.setText("Select a prompt chain to view details.")
             self._detail_status.setText("")
             self._description_label.setText("(No description provided.)")
-            self._schema_view.clear()
-            self._set_schema_panel_visible(False)
             self._steps_table.setRowCount(0)
             self._step_prompt_ids.clear()
             self._result_view.clear()
             self._run_button.setEnabled(False)
             if self._web_search_checkbox is not None:
                 self._web_search_checkbox.setEnabled(False)
-            self._current_variables_chain_id = None
-            self._set_variables_text("")
+            self._current_input_chain_id = None
+            self._set_chain_input_text("")
             return
 
         self._detail_title.setText(chain.name)
@@ -517,20 +507,13 @@ class PromptChainManagerPanel(QWidget):
         ]
         self._detail_status.setText(" • ".join(detail_parts))
         self._description_label.setText(chain.description or "(No description provided.)")
-        schema_text = (
-            json.dumps(chain.variables_schema, indent=2, sort_keys=True)
-            if chain.variables_schema
-            else "(No variables schema defined.)"
-        )
-        self._schema_view.setPlainText(schema_text)
-        self._set_schema_panel_visible(False)
         self._populate_steps_table(chain)
         self._result_view.clear()
         self._run_button.setEnabled(chain.is_active and bool(chain.steps))
         if self._web_search_checkbox is not None:
             self._web_search_checkbox.setEnabled(bool(chain.steps))
-        self._current_variables_chain_id = str(chain.id)
-        self._set_variables_text(self._load_variables_text(self._current_variables_chain_id))
+        self._current_input_chain_id = str(chain.id)
+        self._set_chain_input_text(self._load_chain_input_text(self._current_input_chain_id))
 
     def _populate_steps_table(self, chain: PromptChain) -> None:
         """Fill the steps table using ``chain.steps``."""
@@ -542,12 +525,8 @@ class PromptChainManagerPanel(QWidget):
             prompt_item = QTableWidgetItem(prompt_label)
             prompt_item.setToolTip(str(step.prompt_id))  # pyright: ignore[reportAttributeAccessIssue]
             self._steps_table.setItem(row, 1, prompt_item)
-            self._steps_table.setItem(row, 2, QTableWidgetItem(step.input_template or ""))
-            self._steps_table.setItem(row, 3, QTableWidgetItem(step.output_variable))
-            condition = step.condition or "Always"
-            if not step.stop_on_failure:
-                condition = f"{condition} (continues on failure)"
-            self._steps_table.setItem(row, 4, QTableWidgetItem(condition))
+            behaviour = "Stop chain on failure" if step.stop_on_failure else "Continue on failure"
+            self._steps_table.setItem(row, 2, QTableWidgetItem(behaviour))
             self._step_prompt_ids[row] = step.prompt_id
         self._steps_table.resizeColumnsToContents()
 
@@ -681,7 +660,7 @@ class PromptChainManagerPanel(QWidget):
                 return
 
     def _run_selected_chain(self) -> None:
-        """Execute the currently selected chain with provided variables."""
+        """Execute the currently selected chain with the provided plain-text input."""
         chain = next(
             (entry for entry in self._chains if str(entry.id) == self._selected_chain_id),
             None,
@@ -689,19 +668,10 @@ class PromptChainManagerPanel(QWidget):
         if chain is None:
             QMessageBox.information(self, "Select chain", "Choose a chain to run first.")
             return
-        variables_text = self._variables_input.toPlainText().strip()
-        if variables_text:
-            try:
-                variables_obj = json.loads(variables_text)
-            except json.JSONDecodeError as exc:
-                QMessageBox.critical(self, "Invalid variables", f"JSON decode error: {exc}")
-                return
-            if not isinstance(variables_obj, Mapping):
-                QMessageBox.warning(self, "Invalid format", "Variables must be a JSON object.")
-                return
-            variables: Mapping[str, Any] | None = variables_obj
-        else:
-            variables = {}
+        chain_input_text = self._chain_input_edit.toPlainText()
+        if not chain_input_text.strip():
+            QMessageBox.warning(self, "Chain input", "Enter text to feed into the first step.")
+            return
 
         previous_status = self._detail_status.text()
         use_web_search = (
@@ -713,10 +683,10 @@ class PromptChainManagerPanel(QWidget):
         streaming_enabled = self._is_streaming_enabled()
         stream_callback = self._handle_step_stream if streaming_enabled else None
         if streaming_enabled:
-            self._begin_stream_preview(chain, variables)
+            self._begin_stream_preview(chain, chain_input_text)
             self._run_chain_async(
                 chain,
-                variables,
+                chain_input_text,
                 previous_status,
                 stream_callback,
                 use_web_search,
@@ -728,7 +698,7 @@ class PromptChainManagerPanel(QWidget):
             result = indicator.run(
                 self._manager.run_prompt_chain,
                 chain.id,
-                variables=variables,
+                chain_input=chain_input_text,
                 stream_callback=stream_callback,
                 use_web_search=use_web_search,
             )
@@ -767,13 +737,11 @@ class PromptChainManagerPanel(QWidget):
 
         # Chain inputs
         plain_sections.append("Input to chain")
-        chain_input_text = ""
-        if result.variables:
-            chain_input_text = self._format_json(result.variables)
+        chain_input_text = result.chain_input or ""
         html_sections.append(
             self._format_colored_block_html(
                 "Input to chain",
-                chain_input_text or "- (no chain variables provided)",
+                chain_input_text or "- (no input provided)",
                 color=_CHAIN_INPUT_COLOR,
                 class_name="chain-block--input",
             )
@@ -781,7 +749,7 @@ class PromptChainManagerPanel(QWidget):
         if chain_input_text:
             plain_sections.extend(_indent_lines(chain_input_text))
         else:
-            plain_sections.append("  (no chain variables provided)")
+            plain_sections.append("  (no input provided)")
         plain_sections.append("")
 
         # Chain outputs
@@ -905,7 +873,7 @@ class PromptChainManagerPanel(QWidget):
         base_color = palette.color(base_role)
         text_color = palette.color(text_role)
         chosen = self._pick_accessible_text_color(base_color, text_color)
-        return _RESULT_STYLE_TEMPLATE.format(text_color=chosen)
+        return _RESULT_STYLE_TEMPLATE.replace("{text_color}", chosen)
 
     @staticmethod
     def _pick_accessible_text_color(base_color: Any, text_color: Any) -> str:
@@ -1070,16 +1038,14 @@ class PromptChainManagerPanel(QWidget):
             return False
         return bool(getattr(executor, "stream", False))
 
-    def _begin_stream_preview(self, chain: PromptChain, variables: Mapping[str, Any]) -> None:
+    def _begin_stream_preview(self, chain: PromptChain, chain_input: str) -> None:
         """Initialise buffers used to show streaming output per step."""
         self._stream_preview_active = True
         self._stream_chain_title = chain.name
         self._stream_buffers.clear()
         self._stream_labels.clear()
         self._stream_order.clear()
-        self._stream_chain_variables_text = ""
-        if variables:
-            self._stream_chain_variables_text = self._format_json(dict(variables))
+        self._stream_chain_input_text = chain_input
         for step in chain.steps:
             self._declare_stream_step(step)
         self._refresh_stream_preview()
@@ -1124,9 +1090,9 @@ class PromptChainManagerPanel(QWidget):
             return
         header = self._stream_chain_title or "prompt chain"
         lines = [f"Streaming '{header}'…", ""]
-        if self._stream_chain_variables_text:
+        if self._stream_chain_input_text:
             lines.append("Input to chain")
-            lines.extend(self._stream_chain_variables_text.splitlines())
+            lines.extend(self._stream_chain_input_text.splitlines())
             lines.append("")
         if self._stream_order:
             lines.append("Step details")
@@ -1147,7 +1113,7 @@ class PromptChainManagerPanel(QWidget):
         """Clear streaming preview state."""
         self._stream_preview_active = False
         self._stream_chain_title = ""
-        self._stream_chain_variables_text = ""
+        self._stream_chain_input_text = ""
         self._stream_buffers.clear()
         self._stream_labels.clear()
         self._stream_order.clear()
@@ -1156,23 +1122,23 @@ class PromptChainManagerPanel(QWidget):
         """Persist splitter state whenever the user resizes panes."""
         self._persist_splitter_state()
 
-    def _handle_variables_changed(self) -> None:
-        """Persist chain variable text whenever it changes."""
-        if self._suppress_variable_signal:
+    def _handle_chain_input_changed(self) -> None:
+        """Persist chain input text whenever it changes."""
+        if self._suppress_input_signal:
             return
-        chain_id = self._current_variables_chain_id
+        chain_id = self._current_input_chain_id
         if not chain_id:
             return
         self._settings.setValue(
-            self._variables_settings_key(chain_id),
-            self._variables_input.toPlainText(),
+            self._chain_input_settings_key(chain_id),
+            self._chain_input_edit.toPlainText(),
         )
 
-    def _set_variables_text(self, text: str) -> None:
-        """Apply text to the variables editor without triggering persistence."""
-        self._suppress_variable_signal = True
-        self._variables_input.setPlainText(text)
-        self._suppress_variable_signal = False
+    def _set_chain_input_text(self, text: str) -> None:
+        """Apply text to the chain input editor without triggering persistence."""
+        self._suppress_input_signal = True
+        self._chain_input_edit.setPlainText(text)
+        self._suppress_input_signal = False
 
     def _load_web_search_preference(self) -> bool:
         stored = self._settings.value("chainWebSearchEnabled")
@@ -1204,16 +1170,6 @@ class PromptChainManagerPanel(QWidget):
             return
         self._prompt_edit_callback(prompt_id)
 
-    def _handle_schema_toggle(self, checked: bool) -> None:
-        self._schema_view.setVisible(checked)
-        self._schema_toggle.setText("Hide schema" if checked else "Schema")
-
-    def _set_schema_panel_visible(self, visible: bool) -> None:
-        self._schema_toggle.blockSignals(True)
-        self._schema_toggle.setChecked(visible)
-        self._schema_toggle.blockSignals(False)
-        self._handle_schema_toggle(visible)
-
     def _handle_chain_activation(self, item: QListWidgetItem | None) -> None:
         if item is None:
             return
@@ -1234,25 +1190,27 @@ class PromptChainManagerPanel(QWidget):
         self._prompt_name_cache[prompt_id] = label
         return label
 
-    def _load_variables_text(self, chain_id: str | None) -> str:
-        """Load saved variable JSON for the given chain."""
+    def _load_chain_input_text(self, chain_id: str | None) -> str:
+        """Load saved chain input for the given chain."""
         if not chain_id:
             return ""
-        stored = self._settings.value(self._variables_settings_key(chain_id))
+        stored = self._settings.value(self._chain_input_settings_key(chain_id))
+        if stored is None:
+            stored = self._settings.value(f"chainVariables/{chain_id}")
         if isinstance(stored, str):
             return stored
         if stored is None:
             return ""
         return str(stored)
 
-    def _variables_settings_key(self, chain_id: str) -> str:
-        """Return the QSettings key for persisted variable payloads."""
-        return f"chainVariables/{chain_id}"
+    def _chain_input_settings_key(self, chain_id: str) -> str:
+        """Return the QSettings key for persisted chain inputs."""
+        return f"chainInput/{chain_id}"
 
     def _run_chain_async(
         self,
         chain: PromptChain,
-        variables: Mapping[str, Any],
+        chain_input: str,
         previous_status: str,
         stream_callback: Callable[[PromptChainStep, str, bool], None] | None,
         use_web_search: bool,
@@ -1264,7 +1222,7 @@ class PromptChainManagerPanel(QWidget):
             try:
                 payload["result"] = self._manager.run_prompt_chain(
                     chain.id,
-                    variables=variables,
+                    chain_input=chain_input,
                     stream_callback=stream_callback,
                     use_web_search=use_web_search,
                 )

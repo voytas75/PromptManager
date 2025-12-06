@@ -1,6 +1,7 @@
 """CLI command handlers for Prompt Manager.
 
 Updates:
+  v0.33.0 - 2025-12-06 - Switch prompt chain CLI to plain-text inputs.
   v0.32.2 - 2025-12-05 - Add prompt chain web search toggle wiring for CLI runs.
   v0.32.1 - 2025-12-05 - Sort imports for lint compliance.
   v0.32.0 - 2025-12-04 - Reuse shared chain_from_payload helper for JSON imports.
@@ -73,23 +74,22 @@ def _load_json_file(path: Path) -> Any:
         raise ValueError(f"Invalid JSON in {path}: {exc}") from exc
 
 
-def _load_chain_variables(
-    vars_file: Path | None,
-    vars_json: str | None,
-) -> dict[str, Any]:
-    data: Any = {}
-    if vars_file:
-        data = _load_json_file(vars_file)
-    elif vars_json:
+def _resolve_chain_input(
+    inline_text: str | None,
+    file_path: Path | None,
+) -> str:
+    if inline_text and file_path:
+        raise ValueError("Specify only one of --input or --input-file.")
+    raw_text = inline_text or ""
+    if file_path:
         try:
-            data = json.loads(vars_json)
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"Invalid inline JSON: {exc}") from exc
-    if data in (None, ""):
-        return {}
-    if not isinstance(data, Mapping):
-        raise ValueError("Chain variables must be a JSON object.")
-    return {str(key): value for key, value in data.items()}
+            raw_text = file_path.expanduser().read_text(encoding="utf-8")
+        except OSError as exc:
+            raise ValueError(f"Unable to read {file_path}: {exc}") from exc
+    trimmed = raw_text.strip()
+    if not trimmed:
+        raise ValueError("Chain input must not be empty.")
+    return raw_text
 
 
 def _get_main_callable(name: str, fallback: Callable[..., Any]) -> Callable[..., Any]:
@@ -593,17 +593,13 @@ def run_prompt_chain_show(
     print(f"\nChain: {chain.name} ({chain.id}) [{status}]")
     if chain.description:
         print(f"Description: {chain.description}")
-    if chain.variables_schema:
-        print("Variables schema keys:", ", ".join(chain.variables_schema.keys()))
     if not chain.steps:
         print("Steps: (none)")
         return 0
     print("\nSteps:")
     for step in chain.steps:
-        condition = f" when {step.condition}" if step.condition else ""
-        print(
-            f"  {step.order_index}. prompt={step.prompt_id} -> ${step.output_variable}{condition}"
-        )
+        continuation = "stops on failure" if step.stop_on_failure else "continues on failure"
+        print(f"  {step.order_index}. prompt={step.prompt_id} ({continuation})")
     return 0
 
 
@@ -651,18 +647,19 @@ def run_prompt_chain_run(
     except (TypeError, ValueError) as exc:
         logger.error("Invalid chain id: %s", exc)
         return 5
-    vars_file: Path | None = getattr(args, "vars_file", None)
-    vars_json: str | None = getattr(args, "vars_json", None)
     try:
-        variables = _load_chain_variables(vars_file, vars_json)
+        chain_input = _resolve_chain_input(
+            getattr(args, "chain_input", None),
+            getattr(args, "chain_input_file", None),
+        )
     except ValueError as exc:
-        logger.error("Invalid chain variables: %s", exc)
+        logger.error("Invalid chain input: %s", exc)
         return 5
     use_web_search = not bool(getattr(args, "no_web_search", False))
     try:
         result = manager.run_prompt_chain(
             chain_id,
-            variables=variables,
+            chain_input=chain_input,
             use_web_search=use_web_search,
         )
     except PromptChainExecutionError as exc:
@@ -671,7 +668,11 @@ def run_prompt_chain_run(
     except PromptChainError as exc:
         logger.error("Unable to execute prompt chain: %s", exc)
         return 5
-    print(f"\nChain '{result.chain.name}' outputs:")
+    print(f"\nChain '{result.chain.name}'")
+    print("Input:")
+    chain_input_text = result.chain_input or ""
+    print(textwrap.indent(chain_input_text or "(empty input)", "  "))
+    print("\nOutputs:")
     if not result.outputs:
         print("  (no outputs captured)")
     else:
@@ -679,7 +680,7 @@ def run_prompt_chain_run(
             print(f"  {key}: {value}")
     print("\nStep summary:")
     for step_run in result.steps:
-        label = f"{step_run.step.order_index}. {step_run.step.output_variable}"
+        label = f"Step {step_run.step.order_index}"
         if step_run.status == "success":
             preview = step_run.outcome.result.response_text if step_run.outcome else ""
             if preview and len(preview) > 80:

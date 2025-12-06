@@ -1,6 +1,7 @@
 """Prompt chain orchestration helpers for Prompt Manager.
 
 Updates:
+  v0.2.0 - 2025-12-06 - Switch chains to plain-text inputs and linear step piping.
   v0.1.5 - 2025-12-06 - Honor prompt template overrides for chain summaries.
   v0.1.4 - 2025-12-06 - Summarize final chain output via LiteLLM when chains opt in.
   v0.1.3 - 2025-12-05 - Add optional web search enrichment ahead of each chain step.
@@ -18,8 +19,6 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
-
-from jsonschema import Draft202012Validator, exceptions as jsonschema_exceptions
 
 from prompt_templates import get_default_prompt
 
@@ -40,7 +39,6 @@ from ..litellm_adapter import (
     serialise_litellm_response,
 )
 from ..repository import RepositoryError, RepositoryNotFoundError
-from ..templating import TemplateRenderer
 from .execution_history import ExecutionOutcome, _normalise_conversation
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers only
@@ -125,8 +123,8 @@ class PromptChainRunResult:
     """Aggregate response returned after executing a prompt chain."""
 
     chain: PromptChain
-    variables: dict[str, Any]
-    outputs: dict[str, Any]
+    chain_input: str
+    outputs: dict[str, str]
     steps: list[PromptChainStepRun]
     summary: str | None = None
 
@@ -181,7 +179,7 @@ class PromptChainMixin:
         self,
         chain_id: uuid.UUID,
         *,
-        variables: Mapping[str, Any] | None = None,
+        chain_input: str,
         stream_callback: Callable[[PromptChainStep, str, bool], None] | None = None,
         use_web_search: bool | None = None,
         web_search_limit: int = _CHAIN_WEB_SEARCH_RESULT_LIMIT,
@@ -198,18 +196,12 @@ class PromptChainMixin:
                 "Prompt execution is not configured. Provide LiteLLM credentials before "
                 "running prompt chains."
             )
-        context: dict[str, Any] = dict(variables or {})
-        validator = self._build_validator(chain)
-        if validator is not None:
-            try:
-                validator.validate(context)
-            except jsonschema_exceptions.ValidationError as exc:
-                raise PromptChainExecutionError(
-                    f"Prompt chain variables failed validation: {exc.message}"
-                ) from exc
+        raw_input = chain_input or ""
+        if not raw_input.strip():
+            raise PromptChainExecutionError("Prompt chain input must not be empty.")
 
-        renderer = TemplateRenderer()
-        outputs: dict[str, Any] = {}
+        previous_response = raw_input
+        outputs: dict[str, str] = {}
         step_runs: list[PromptChainStepRun] = []
         task_id = f"prompt-chain:{chain.id}:{uuid.uuid4()}"
         web_search_enabled = bool(use_web_search)
@@ -225,16 +217,10 @@ class PromptChainMixin:
                 status = "pending"
                 outcome: ExecutionOutcome | None = None
                 error: str | None = None
-                if step.condition:
-                    should_run = self._evaluate_condition(renderer, step.condition, context)
-                    if not should_run:
-                        status = "skipped"
-                        step_runs.append(PromptChainStepRun(step=step, status=status, outcome=None))
-                        continue
-                request_text = self._render_template(renderer, step.input_template, context)
-                if not request_text.strip():
+                request_text = previous_response
+                if not request_text.strip() and step.order_index == 1:
                     raise PromptChainExecutionError(
-                        f"Step {step.order_index} in '{chain.name}' produced an empty request."
+                        f"Step {step.order_index} in '{chain.name}' received empty input."
                     )
                 prompt = host.get_prompt(step.prompt_id)
                 request_text = self._maybe_enrich_with_web_search(
@@ -252,10 +238,9 @@ class PromptChainMixin:
                         stream_callback=stream_callback,
                     )
                     status = "success"
-                    response_text = outcome.result.response_text
-                    context[step.output_variable] = response_text
-                    outputs[step.output_variable] = response_text
-                    context["_last_response"] = response_text
+                    response_text = outcome.result.response_text or ""
+                    previous_response = response_text
+                    outputs[f"step_{step.order_index}"] = response_text
                 except PromptExecutionError as exc:
                     status = "failed"
                     error = str(exc)
@@ -277,7 +262,7 @@ class PromptChainMixin:
         )
         return PromptChainRunResult(
             chain=chain,
-            variables=context,
+            chain_input=raw_input,
             outputs=outputs,
             steps=step_runs,
             summary=summary_text,
@@ -393,41 +378,6 @@ class PromptChainMixin:
                 if text:
                     parts.append(text)
         return " ".join(parts).strip()
-
-    def _build_validator(self, chain: PromptChain) -> Draft202012Validator | None:
-        schema = chain.variables_schema
-        if not schema:
-            return None
-        try:
-            return Draft202012Validator(schema)
-        except jsonschema_exceptions.SchemaError:
-            logger.warning(
-                "Ignoring invalid variables_schema for chain",
-                extra={"chain_id": str(chain.id), "chain_name": chain.name},
-                exc_info=True,
-            )
-            return None
-
-    def _render_template(
-        self,
-        renderer: TemplateRenderer,
-        template_text: str,
-        variables: Mapping[str, Any],
-    ) -> str:
-        result = renderer.render(template_text, variables)
-        if result.errors:
-            raise PromptChainExecutionError("; ".join(result.errors))
-        return result.rendered_text
-
-    def _evaluate_condition(
-        self,
-        renderer: TemplateRenderer,
-        template_text: str,
-        variables: Mapping[str, Any],
-    ) -> bool:
-        rendered = self._render_template(renderer, template_text, variables)
-        normalised = rendered.strip().lower()
-        return normalised not in {"", "0", "false", "no"}
 
     def _execute_chain_step(
         self,

@@ -1,6 +1,7 @@
 """Prompt chain model helper tests.
 
 Updates:
+  v0.3.0 - 2025-12-06 - Align payload parsing tests with plain-text chaining.
   v0.2.0 - 2025-12-05 - Validate summarize-last-response flag parsing.
   v0.1.0 - 2025-12-04 - Cover chain_from_payload parsing and validation cases.
 """
@@ -27,18 +28,13 @@ def test_chain_from_payload_creates_ordered_steps() -> None:
             {
                 "prompt_id": str(prompt_b),
                 "order_index": 2,
-                "input_template": "{{ value }}",
-                "output_variable": "second",
-                "condition": "{{ first }}",
+                "stop_on_failure": False,
             },
             {
                 "prompt_id": str(prompt_a),
                 "order_index": 1,
-                "input_template": "{{ source }}",
-                "output_variable": "first",
             },
         ],
-        "variables_schema": {"type": "object"},
     }
 
     chain = chain_from_payload(payload)
@@ -48,8 +44,7 @@ def test_chain_from_payload_creates_ordered_steps() -> None:
     assert chain.steps[0].order_index == 1
     assert chain.steps[0].prompt_id == prompt_a
     assert chain.steps[1].order_index == 2
-    assert chain.steps[1].condition == "{{ first }}"
-    assert chain.variables_schema == {"type": "object"}
+    assert chain.steps[1].stop_on_failure is False
 
 
 def test_chain_from_payload_requires_name() -> None:
@@ -68,16 +63,10 @@ def test_chain_from_payload_allows_summary_toggle() -> None:
         "name": "Summaries",
         "description": "",
         "summarize_last_response": False,
-        "steps": [
-            {
-                "prompt_id": str(prompt_id),
-                "order_index": 1,
-                "input_template": "{{ body }}",
-                "output_variable": "result",
-            }
-        ],
+        "steps": [{"prompt_id": str(prompt_id)}],
     }
 
     chain = chain_from_payload(payload)
 
     assert chain.summarize_last_response is False
+    assert chain.steps[0].output_variable == "step_1"

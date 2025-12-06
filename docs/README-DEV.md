@@ -169,16 +169,16 @@ Every log entry also stores structured context metadata (prompt snapshot, execut
 | `python -m main refresh-scenarios <uuid> [--max-scenarios N]` | Regenerate and persist scenario lists for a prompt via LiteLLM or the heuristic fallback. |
 | `python -m main prompt-chain-list` | List stored prompt chains (add `--include-inactive` for archived definitions). |
 | `python -m main prompt-chain-show <uuid>` | Display a prompt chain with ordered steps and target prompts. |
-| `python -m main prompt-chain-apply path/to/chain.json` | Create or update a prompt chain from a JSON definition (`name`, `description`, `steps`, `prompt_id`, `input_template`, `output_variable`). |
-| `python -m main prompt-chain-run <uuid> [--vars-file variables.json] [--vars-json '{"key":"value"}'] [--no-web-search]` | Execute a chain sequentially, injecting per-step variables, enriching each step with live web context (disable via `--no-web-search`), and log every step to execution history with chain metadata. |
+| `python -m main prompt-chain-apply path/to/chain.json` | Create or update a prompt chain from a JSON definition (`name`, `description`, and ordered `steps` that only specify `prompt_id`, `order_index`, and optional `stop_on_failure`). |
+| `python -m main prompt-chain-run <uuid> [--input "text"\|--input-file path] [--no-web-search]` | Execute a chain sequentially by feeding the provided plain-text input into the first step, automatically piping each response into the next step while optionally enriching every hop with live web context. |
 
 ### GUI Prompt Chain Manager
 
 - Open the **Chain** tab (next to Template) in the main window to access the embedded manager, which reuses the full JSON import, CRUD, and run controls without a separate dialog.
-- Use **New/Edit/Delete** in that tab to manage chains without touching JSON; the editor exposes name/description/schema fields and an ordered step table with prompt IDs, templates, and conditions.
+- Use **New/Edit/Delete** in that tab to manage chains without touching JSON; the editor exposes name/description toggles, an ordered step table with prompt IDs, and a per-step “stop on failure” option—no templates or custom variables are required anymore.
 - Prompt selection uses a searchable combo box populated from the prompt catalog, so you can reference prompts by name instead of pasting UUIDs.
 - The left pane lists every stored chain (active + inactive) with refresh and JSON import controls; imports reuse the same validation as the CLI helper.
-- The right pane surfaces description, variables schema, ordered steps, and a JSON editor for chain variables before execution.
+- The right pane surfaces description, ordered steps, and a plain-text field where you type the input that feeds the first step; that text is persisted per chain so you can rerun workflows quickly.
 - Running a chain triggers the busy indicator (required for LLM work) while toast notifications confirm non-LLM actions such as refresh/import; results capture outputs plus per-step summaries for quick inspection.
 - The Run Chain panel includes a persistent “Use web search” checkbox (default on) that mirrors the workspace toggle so each step can preload live context when a provider is configured; uncheck it to keep runs offline.
 
@@ -191,29 +191,21 @@ Every log entry also stores structured context metadata (prompt snapshot, execut
   "id": "optional-uuid",
   "name": "Content Review Workflow",
   "description": "Extract, summarize, and critique content.",
-  "variables_schema": {
-    "type": "object",
-    "required": ["source_text"]
-  },
   "steps": [
     {
       "order_index": 1,
-      "prompt_id": "uuid-of-extract-prompt",
-      "input_template": "{{ source_text }}",
-      "output_variable": "extracted_points"
+      "prompt_id": "uuid-of-extract-prompt"
     },
     {
       "order_index": 2,
       "prompt_id": "uuid-of-review-prompt",
-      "input_template": "Points: {{ extracted_points }}",
-      "output_variable": "review",
-      "stop_on_failure": true
+      "stop_on_failure": false
     }
   ]
 }
 ```
 
-Variables provided via `--vars-file`/`--vars-json` must satisfy `variables_schema` (Draft 2020-12). Each step response is stored under `output_variable` for downstream steps and emitted in `prompt-chain-run` output summaries.
+Each step automatically receives the previous step’s response as its input, so you only provide the initial plain-text request when running a chain. Use `stop_on_failure: false` if a given prompt should not abort the flow on errors.
 
 These commands share the same validation logic as the GUI; pass explicit paths as needed.
 

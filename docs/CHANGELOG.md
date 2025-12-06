@@ -2,6 +2,13 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.22.6] - 2025-12-06
+
+### Changed
+
+- Simplified prompt chains to accept a single plain-text input that automatically flows through each step: the Chain tab now drops JSON variable editors and schema panels in favour of a persistent text field, the editor trims away per-step templates/conditions, and the CLI replaces `--vars-*` flags with `--input`/`--input-file`.
+- Chain execution results and streaming previews now display the raw input text rather than JSON payloads, and the CLI/GUI both reflect the new failure-handling flag per step (defaulting to “stop chain”).
+
 ## [0.22.5] - 2025-12-05
 
 ### Added

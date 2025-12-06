@@ -259,7 +259,7 @@ def parse_args() -> argparse.Namespace:
 
     chain_run_parser = subparsers.add_parser(
         "prompt-chain-run",
-        help="Execute a prompt chain with optional variable overrides.",
+        help="Execute a prompt chain with plain-text input.",
     )
     chain_run_parser.add_argument(
         "chain_id",
@@ -267,18 +267,18 @@ def parse_args() -> argparse.Namespace:
         help="Prompt chain UUID to run.",
     )
     chain_run_parser.add_argument(
-        "--vars-file",
-        dest="vars_file",
-        type=Path,
-        default=None,
-        help="Path to a JSON file containing chain variables.",
-    )
-    chain_run_parser.add_argument(
-        "--vars-json",
-        dest="vars_json",
+        "--input",
+        dest="chain_input",
         type=str,
         default=None,
-        help="Inline JSON object describing chain variables.",
+        help="Plain-text input sent to the first step (omit to use --input-file).",
+    )
+    chain_run_parser.add_argument(
+        "--input-file",
+        dest="chain_input_file",
+        type=Path,
+        default=None,
+        help="Path to a UTF-8 text file whose contents feed the first step.",
     )
     chain_run_parser.add_argument(
         "--no-web-search",
