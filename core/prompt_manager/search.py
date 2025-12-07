@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from chromadb.errors import ChromaError
 
@@ -53,8 +53,12 @@ class PromptSearchMixin:
     _intent_classifier: IntentClassifier | None
     _user_profile: UserProfile | None
 
+    def _as_prompt_manager(self) -> _PromptManager:
+        """Return self casted to PromptManager for shared dependencies."""
+        return cast("_PromptManager", self)
+
     def search_prompts(
-        self: _PromptManager,
+        self,
         query_text: str,
         limit: int = 5,
         where: dict[str, Any] | None = None,
@@ -64,7 +68,8 @@ class PromptSearchMixin:
         if not query_text and embedding is None:
             raise ValueError("query_text or embedding must be provided")
 
-        collection = self.collection
+        manager = self._as_prompt_manager()
+        collection = manager.collection
 
         query_embedding: list[float]
         if embedding is not None:
@@ -139,7 +144,7 @@ class PromptSearchMixin:
         return prompts
 
     def suggest_prompts(
-        self: _PromptManager,
+        self,
         query_text: str,
         *,
         limit: int = 5,
@@ -151,7 +156,7 @@ class PromptSearchMixin:
         stripped = query_text.strip()
         if not stripped:
             try:
-                baseline = self.repository.list(limit=limit)
+                baseline = self._as_prompt_manager().repository.list(limit=limit)
             except RepositoryError as exc:
                 raise PromptStorageError("Unable to load prompts for suggestions") from exc
             personalised = self._personalize_ranked_prompts(baseline)
@@ -218,7 +223,7 @@ class PromptSearchMixin:
         if not suggestions:
             fallback_used = True
             try:
-                suggestions = self.repository.list(limit=limit)
+                suggestions = self._as_prompt_manager().repository.list(limit=limit)
             except RepositoryError as exc:
                 raise PromptStorageError("Unable to load prompts for suggestions") from exc
 
@@ -269,9 +274,7 @@ class PromptSearchMixin:
             ]
         return distance_values
 
-    def _personalize_ranked_prompts(
-        self: _PromptManager, prompts: Sequence[Prompt]
-    ) -> list[Prompt]:
+    def _personalize_ranked_prompts(self, prompts: Sequence[Prompt]) -> list[Prompt]:
         """Bias prompt order using stored user preferences while preserving stability."""
         if not prompts:
             return []

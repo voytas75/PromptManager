@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from pathlib import Path
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -32,6 +33,8 @@ if TYPE_CHECKING:
 
 class PromptStoreMixin:
     """Shared prompt/category/version persistence helpers."""
+
+    _db_path: Path
 
     _COLUMNS: ClassVar[Sequence[str]] = (
         "id",

@@ -67,7 +67,7 @@ class LiteLLMWorkflowMixin:
         return cleaned
 
     def set_name_generator(
-        self: _PromptManager,
+        self,
         model: str | None,
         api_key: str | None,
         api_base: str | None,
@@ -145,7 +145,7 @@ class LiteLLMWorkflowMixin:
                 **extra,
             )
 
-        template_overrides = dict(self._prompt_templates)
+        template_overrides = dict(getattr(self, "_prompt_templates", {}))
         try:
             self._name_generator = _construct(
                 "LiteLLMNameGenerator",

@@ -7,6 +7,7 @@ Updates:
 from __future__ import annotations
 
 import sqlite3
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from models.prompt_chain_model import PromptChain, PromptChainStep
@@ -27,6 +28,8 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 
 class ChainStoreMixin:
     """Mixin exposing CRUD helpers for prompt chain definitions."""
+
+    _db_path: Path
 
     _CHAIN_COLUMNS = (
         "id",

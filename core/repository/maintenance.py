@@ -7,6 +7,7 @@ Updates:
 from __future__ import annotations
 
 import sqlite3
+from pathlib import Path
 from datetime import UTC, datetime
 
 from models.category_model import slugify_category
@@ -17,6 +18,8 @@ from .base import RepositoryError, connect as _connect, logger, stringify_uuid a
 
 class RepositoryMaintenanceMixin:
     """Tasks that create, migrate, and reset repository storage."""
+
+    _db_path: Path
 
     def _ensure_schema(self, conn: sqlite3.Connection) -> None:
         """Create required tables if they do not exist."""

@@ -7,6 +7,7 @@ Updates:
 from __future__ import annotations
 
 import sqlite3
+from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 from models.prompt_note import PromptNote
@@ -24,6 +25,8 @@ if TYPE_CHECKING:
 
 class PromptNoteStoreMixin:
     """CRUD helpers for prompt notes."""
+
+    _db_path: Path
 
     _NOTE_COLUMNS: ClassVar[tuple[str, ...]] = ("id", "note", "created_at", "last_modified")
 

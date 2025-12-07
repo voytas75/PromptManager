@@ -7,6 +7,7 @@ Updates:
 from __future__ import annotations
 
 import sqlite3
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from models.prompt_model import PromptExecution
@@ -26,6 +27,8 @@ if TYPE_CHECKING:
 
 class ExecutionStoreMixin:
     """Execution persistence helpers shared across repository implementations."""
+
+    _db_path: Path
 
     _EXECUTION_COLUMNS: ClassVar[tuple[str, ...]] = (
         "id",

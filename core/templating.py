@@ -12,11 +12,12 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import Any, Callable, cast
 
 from jinja2 import Environment, StrictUndefined, Template, TemplateSyntaxError, UndefinedError, meta
 from jsonschema import Draft202012Validator, exceptions as jsonschema_exceptions
 from pydantic import BaseModel, Field, ValidationError, create_model
+from pydantic.fields import FieldInfo
 
 from models.category_model import slugify_category
 
@@ -308,7 +309,7 @@ class SchemaValidator:
             raise ValueError("Schema must define object properties for Pydantic validation")
 
         required = set(schema.get("required", []))
-        fields: dict[str, tuple[Any, Any]] = {}
+        fields: dict[str, tuple[type[Any], FieldInfo | Any]] = {}
         for name, definition in properties.items():
             if not isinstance(definition, Mapping):
                 raise ValueError(f"Schema property '{name}' must be an object definition")
@@ -316,10 +317,12 @@ class SchemaValidator:
             default = definition.get("default", ... if name in required else None)
             constraints = self._field_constraints(definition)
             field_info = Field(default, description=definition.get("description"), **constraints)
-            fields[name] = (python_type, field_info)
+            field_type = cast("type[Any]", python_type)
+            fields[name] = (field_type, field_info)
 
         model_name = str(schema.get("title") or "PromptVariables")
-        return create_model(model_name, **fields)
+        create_dynamic_model = cast("Callable[..., type[BaseModel]]", create_model)
+        return create_dynamic_model(model_name, **fields)
 
     @staticmethod
     def _resolve_python_type(definition: Mapping[str, Any]) -> Any:

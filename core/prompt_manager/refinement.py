@@ -7,7 +7,7 @@ Updates:
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from ..exceptions import PromptEngineeringUnavailable
 from ..notifications import NotificationLevel
@@ -26,6 +26,10 @@ __all__ = ["PromptRefinementMixin"]
 class PromptRefinementMixin:
     """Mixin encapsulating prompt refinement workflows."""
 
+    def _as_prompt_manager(self) -> _PromptManager:
+        """Return self casted to PromptManager for shared dependencies."""
+        return cast("_PromptManager", self)
+
     @property
     def prompt_engineer(self) -> PromptEngineer | None:
         """Return the configured prompt engineering helper, if any."""
@@ -40,7 +44,7 @@ class PromptRefinementMixin:
         return self.prompt_engineer
 
     def refine_prompt_text(
-        self: _PromptManager,
+        self,
         prompt_text: str,
         *,
         name: str | None = None,
@@ -64,7 +68,8 @@ class PromptRefinementMixin:
             "has_name": bool(name),
             "tag_count": len(tags or []),
         }
-        with self._notification_center.track_task(  # noqa: SLF001
+        manager = self._as_prompt_manager()
+        with manager._notification_center.track_task(  # noqa: SLF001
             title="Prompt refinement",
             task_id=task_id,
             start_message="Analysing prompt via LiteLLM…",
@@ -88,7 +93,7 @@ class PromptRefinementMixin:
                 raise PromptEngineeringError("Prompt refinement failed unexpectedly.") from exc
 
     def refine_prompt_structure(
-        self: _PromptManager,
+        self,
         prompt_text: str,
         *,
         name: str | None = None,
@@ -110,7 +115,8 @@ class PromptRefinementMixin:
             "prompt_length": len(prompt_text or ""),
             "mode": "structure",
         }
-        with self._notification_center.track_task(  # noqa: SLF001
+        manager = self._as_prompt_manager()
+        with manager._notification_center.track_task(  # noqa: SLF001
             title="Prompt structure refinement",
             task_id=task_id,
             start_message="Reformatting prompt via LiteLLM…",

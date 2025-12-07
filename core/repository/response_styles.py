@@ -7,6 +7,7 @@ Updates:
 from __future__ import annotations
 
 import sqlite3
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from models.response_style import ResponseStyle
@@ -27,6 +28,8 @@ if TYPE_CHECKING:
 
 class ResponseStyleStoreMixin:
     """CRUD helpers for response style definitions."""
+
+    _db_path: Path
 
     _RESPONSE_STYLE_COLUMNS: ClassVar[tuple[str, ...]] = (
         "id",

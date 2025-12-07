@@ -7,6 +7,7 @@ Updates:
 from __future__ import annotations
 
 import sqlite3
+from pathlib import Path
 from typing import Any, ClassVar
 
 from models.prompt_model import Prompt, UserProfile
@@ -23,6 +24,8 @@ from .base import (
 
 class ProfileStoreMixin:
     """Profile CRUD helpers shared across repository implementations."""
+
+    _db_path: Path
 
     _PROFILE_COLUMNS: ClassVar[tuple[str, ...]] = (
         "id",

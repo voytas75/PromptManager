@@ -27,9 +27,11 @@ from ..exceptions import (
 from ..repository import RepositoryError, RepositoryNotFoundError
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers only
-    from models.prompt_model import PromptCategory, PromptVersion
+    from models.category_model import PromptCategory
+    from models.prompt_model import PromptVersion
 
     from ..repository import PromptRepository
+    from . import PromptManager as _PromptManager
 
     class _CategoryInsightAccessor(Protocol):
         def list_categories(self) -> list[PromptCategory]: ...
@@ -42,6 +44,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers only
         ) -> None: ...
 else:  # pragma: no cover - typing fallback
     _CategoryInsightAccessor = Any
+    _PromptManager = Any
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +62,10 @@ class PromptLifecycleMixin:
     _redis_client: Any | None
     _cache_ttl_seconds: int
 
+    def _as_prompt_manager(self) -> _PromptManager:
+        """Return self casted to PromptManager for cross-mixin helpers."""
+        return cast("_PromptManager", self)
+
     def create_prompt(
         self,
         prompt: Prompt,
@@ -67,7 +74,8 @@ class PromptLifecycleMixin:
         commit_message: str | None = None,
     ) -> Prompt:
         """Persist a new prompt in SQLite/ChromaDB and prime the cache."""
-        prompt = self._apply_category_metadata(prompt)
+        manager = self._as_prompt_manager()
+        prompt = manager._apply_category_metadata(prompt)
         insight_accessor = cast("_CategoryInsightAccessor", self)
         insight_accessor._update_category_insight(prompt, previous_prompt=None)
         generated_embedding: list[float] | None = None
@@ -108,7 +116,7 @@ class PromptLifecycleMixin:
                     "Prompt created but not cached",
                     extra={"prompt_id": str(prompt.id)},
                 )
-        version = self._commit_prompt_version(stored_prompt, commit_message=commit_message)
+        version = manager._commit_prompt_version(stored_prompt, commit_message=commit_message)
         logger.debug(
             "Prompt version committed",
             extra={
@@ -152,7 +160,8 @@ class PromptLifecycleMixin:
         commit_message: str | None = None,
     ) -> Prompt:
         """Update an existing prompt with new metadata."""
-        prompt = self._apply_category_metadata(prompt)
+        manager = self._as_prompt_manager()
+        prompt = manager._apply_category_metadata(prompt)
         try:
             previous_prompt = self._repository.get(prompt.id)
         except RepositoryNotFoundError as exc:
@@ -226,7 +235,7 @@ class PromptLifecycleMixin:
                     extra={"prompt_id": str(prompt.id)},
                 )
         if should_commit_version:
-            version = self._commit_prompt_version(updated_prompt, commit_message=commit_message)
+            version = manager._commit_prompt_version(updated_prompt, commit_message=commit_message)
             logger.debug(
                 "Prompt version committed",
                 extra={
@@ -245,6 +254,7 @@ class PromptLifecycleMixin:
 
     def delete_prompt(self, prompt_id: UUID) -> None:
         """Remove a prompt from all data stores."""
+        manager = self._as_prompt_manager()
         prompt_id = self._ensure_uuid(prompt_id)
         try:
             self._repository.delete(prompt_id)
@@ -253,7 +263,7 @@ class PromptLifecycleMixin:
         except RepositoryError as exc:
             raise PromptStorageError(f"Failed to delete prompt {prompt_id} from SQLite") from exc
         try:
-            self.collection.delete(ids=[str(prompt_id)])
+            manager.collection.delete(ids=[str(prompt_id)])
         except ChromaError as exc:
             raise PromptStorageError(f"Failed to delete prompt {prompt_id}") from exc
         try:
@@ -381,6 +391,7 @@ class PromptLifecycleMixin:
         is_new: bool,
     ) -> None:
         """Persist embeddings to Chroma and refresh caches."""
+        manager = self._as_prompt_manager()
         if not isinstance(embedding, Sequence):
             raise TypeError("Embedding payload must be a sequence.")
         payload: dict[str, Any] = {
@@ -389,7 +400,7 @@ class PromptLifecycleMixin:
             "metadatas": [prompt.to_metadata()],
             "embeddings": [list(embedding)],
         }
-        collection = self.collection
+        collection = manager.collection
         try:
             collection.upsert(**payload)
         except ChromaError as exc:
