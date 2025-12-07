@@ -1,6 +1,7 @@
 """Coordinate prompt execution, streaming, and chat workspace logic.
 
 Updates:
+  v0.1.8 - 2025-12-07 - Enable saving workspace text-only results with output.
   v0.1.7 - 2025-12-07 - Append share footer to result payloads.
   v0.1.6 - 2025-12-07 - Enable chat continuation for workspace text runs.
   v0.1.5 - 2025-12-07 - Support promptless workspace text execution.
@@ -410,6 +411,7 @@ class ExecutionController:
         conversation = [{"role": "user", "content": trimmed}]
         if result.response_text:
             conversation.append({"role": "assistant", "content": result.response_text})
+        has_response = bool((result.response_text or "").strip())
         outcome = PromptManager.ExecutionOutcome(
             result=result,
             history_entry=None,
@@ -418,7 +420,7 @@ class ExecutionController:
         self._display_execution_result(
             prompt,
             outcome,
-            enable_save=False,
+            enable_save=has_response,
             freeform_chat=True,
         )
         self._usage_logger.log_execute(
@@ -569,6 +571,7 @@ class ExecutionController:
         conversation.append({"role": "user", "content": payload})
         if result.response_text:
             conversation.append({"role": "assistant", "content": result.response_text})
+        has_response = bool((result.response_text or "").strip())
         outcome = PromptManager.ExecutionOutcome(
             result=result,
             history_entry=None,
@@ -577,7 +580,7 @@ class ExecutionController:
         self._display_execution_result(
             prompt,
             outcome,
-            enable_save=False,
+            enable_save=has_response,
             freeform_chat=True,
         )
         self._usage_logger.log_execute(
