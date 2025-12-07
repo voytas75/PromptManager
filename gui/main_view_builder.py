@@ -1,6 +1,7 @@
 r"""Composable builders for the Prompt Manager main window.
 
 Updates:
+  v0.2.9 - 2025-12-07 - Embed the Workbench tab alongside Chain for inline sessions.
   v0.2.8 - 2025-12-07 - Convert Run Prompt button into split actions for prompt/text runs.
   v0.2.7 - 2025-12-07 - Provide provider-agnostic default tooltip for web search toggle.
   v0.2.6 - 2025-12-05 - Pass prompt edit callbacks into analytics and chain panels.
@@ -9,8 +10,7 @@ Updates:
   v0.2.3 - 2025-12-05 - Drop prompt chain toolbar wiring; Chain tab is always visible.
   v0.2.2 - 2025-12-05 - Embed prompt chain manager panel as a Chain tab.
   v0.2.1 - 2025-12-04 - Add \"Use web search\" toggle to the workspace actions row.
-  v0.2.0 - 2025-12-04 - Wire prompt chain toolbar signal to callbacks bundle.
-  v0.1.0 - 2025-11-30 - Extract main window UI assembly into reusable builder helpers.
+  v0.2.0-and-earlier - 2025-11-30 - Extract main window UI assembly into reusable builder helpers.
 """
 
 from __future__ import annotations
@@ -48,6 +48,7 @@ from .response_styles_panel import ResponseStylesPanel
 from .result_overlay import ResultActionsOverlay
 from .template_preview import TemplatePreviewWidget
 from .widgets import FlowLayout, PromptDetailWidget, PromptFilterPanel, PromptToolbar
+from .workbench import WorkbenchMode, WorkbenchWindow
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from collections.abc import Callable, Sequence
@@ -146,6 +147,7 @@ class MainViewComponents:
     response_styles_panel: ResponseStylesPanel
     analytics_panel: AnalyticsDashboardPanel
     chain_panel: PromptChainManagerPanel
+    workbench_panel: WorkbenchWindow
     template_preview_splitter: QSplitter
     template_preview_list_splitter: QSplitter
     template_list_view: QListView
@@ -510,6 +512,13 @@ def build_main_view(
     )
     tab_widget.addTab(chain_panel, "Chain")
 
+    workbench_panel = WorkbenchWindow(
+        manager,
+        mode=WorkbenchMode.BLANK,
+        parent=parent,
+    )
+    tab_widget.addTab(workbench_panel, "Workbench")
+
     layout.addWidget(tab_widget, stretch=1)
 
     return MainViewComponents(
@@ -552,6 +561,7 @@ def build_main_view(
         response_styles_panel=response_styles_panel,
         analytics_panel=analytics_panel,
         chain_panel=chain_panel,
+        workbench_panel=workbench_panel,
         template_preview_splitter=template_preview_splitter,
         template_preview_list_splitter=template_preview_list_splitter,
         template_list_view=template_list_view,

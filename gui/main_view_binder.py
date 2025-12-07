@@ -1,6 +1,7 @@
 """Bind :mod:`gui.main_view_builder` components to the :class:`MainWindow`.
 
 Updates:
+  v0.15.83 - 2025-12-07 - Store Workbench panel reference for tab activation.
   v0.15.82 - 2025-12-04 - Bind web search checkbox for execution controller.
   v0.15.81 - 2025-12-01 - Moved widget wiring and controller construction out of gui.main_window.
 """
@@ -130,6 +131,7 @@ def bind_main_view(
     window._response_styles_panel = components.response_styles_panel
     window._analytics_panel = components.analytics_panel
     window._chain_panel = components.chain_panel
+    window._workbench_window = components.workbench_panel
     window._template_list_view = components.template_list_view
     window._template_detail_widget = components.template_detail_widget
     window._template_preview = components.template_preview

@@ -1,6 +1,7 @@
 """Qt widgets for the Enhanced Prompt Workbench experience.
 
 Updates:
+  v0.1.23 - 2025-12-07 - Support embedded tab sessions and add begin_session helper.
   v0.1.22 - 2025-12-04 - Modularize dialogs, wizard, editor, and utilities into separate modules.
   v0.1.21 - 2025-11-30 - Skip busy indicator whenever LiteLLM streaming is enabled.
   v0.1.20 - 2025-11-30 - Respect LiteLLM streaming flag when running prompts.
@@ -13,8 +14,7 @@ Updates:
     output splitter widths.
   v0.1.14 - 2025-11-29 - Replace QWizard with custom-styled dialog to control Guided
     mode appearance.
-  v0.1.13 - 2025-11-29 - Manually paint wizard background with palette colors to avoid OS tinting.
-Earlier versions: v0.1.0-v0.1.12 - Introduced the guided Workbench window plus
+Earlier versions: v0.1.0-v0.1.13 - Introduced the guided Workbench window plus
   iterative palette refinements.
 """
 
@@ -108,8 +108,9 @@ class WorkbenchWindow(QMainWindow):
 
     def _build_ui(self) -> None:
         self.setWindowTitle("Enhanced Prompt Workbench")
-        self.setWindowModality(Qt.ApplicationModal)
-        self.resize(1280, 860)
+        if self.isWindow():
+            self.setWindowModality(Qt.ApplicationModal)
+            self.resize(1280, 860)
 
         toolbar = QToolBar("Workbench Controls", self)
         toolbar.setMovable(False)
@@ -239,7 +240,24 @@ class WorkbenchWindow(QMainWindow):
         self._persist_layout_state()
         super().closeEvent(event)
 
+    def begin_session(self, mode: str, template_prompt: Prompt | None = None) -> None:
+        """Start a fresh Workbench session, clearing editor, output, and history."""
+        self._session = WorkbenchSession()
+        self._active_refinement_target = None
+        self._streaming_active = False
+        self._streaming_buffer = []
+        self._summary_label.clear()
+        self._editor.clear()
+        self._output_view.clear()
+        self._history_list.clear()
+        self._feedback_input.clear()
+        self._test_input.clear()
+        self._status.clearMessage()
+        self._load_initial_state(mode, template_prompt)
+
     def _restore_layout_state(self) -> None:
+        if not self.isWindow():
+            return
         geometry = self._settings.value("windowGeometry")
         if isinstance(geometry, QByteArray):
             self.restoreGeometry(geometry)
@@ -251,6 +269,8 @@ class WorkbenchWindow(QMainWindow):
             self._middle_splitter.restoreState(middle_state)
 
     def _persist_layout_state(self) -> None:
+        if not self.isWindow():
+            return
         self._settings.setValue("windowGeometry", self.saveGeometry())
         if self._main_splitter is not None:
             self._settings.setValue("mainSplitterState", self._main_splitter.saveState())

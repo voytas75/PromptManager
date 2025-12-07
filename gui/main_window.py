@@ -1,6 +1,7 @@
 r"""Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.16.12 - 2025-12-07 - Embed Workbench tab and expose activation hook.
   v0.16.11 - 2025-12-07 - Convert Run Prompt into a split button with text-only option.
   v0.16.10 - 2025-12-07 - Include SerpApi in workspace web search tooltip messaging.
   v0.16.9 - 2025-12-07 - Describe Serper provider in workspace web search tooltips.
@@ -9,8 +10,7 @@ Updates:
   v0.16.6 - 2025-12-05 - Normalize module docstring quoting and reorder imports for lint compliance.
   v0.16.5 - 2025-12-05 - Remove prompt chain toolbar shortcut; Chain tab remains embedded.
   v0.16.4 - 2025-12-05 - Embed prompt chain panel and add toolbar shortcut to focus Chain tab.
-  v0.16.3 - 2025-12-04 - Track \"Use web search\" checkbox for execution controller.
-  v0.16.2-and-earlier - 2025-12-04 - Delegated controller assembly plus earlier layout/runtime mods.
+  v0.16.3-and-earlier - 2025-12-04 - Track \"Use web search\" checkbox plus prior layout/runtime mods.
 """
 
 from __future__ import annotations
@@ -97,6 +97,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from .widgets import PromptDetailWidget, PromptFilterPanel, PromptToolbar
     from .workspace_actions_controller import WorkspaceActionsController
     from .workspace_view_controller import WorkspaceViewController
+    from .workbench import WorkbenchWindow
 else:  # pragma: no cover - runtime placeholders for type-only imports
     from typing import Any as _Any
 
@@ -119,6 +120,7 @@ else:  # pragma: no cover - runtime placeholders for type-only imports
     PromptDialogFactory = _Any
     PromptEditorFlow = _Any
     PromptActionsController = _Any
+    WorkbenchWindow = _Any
 
 
 def _match_category_label(  # pyright: ignore[reportUnusedFunction]
@@ -244,6 +246,7 @@ class MainWindow(QMainWindow):
         self._response_styles_panel: ResponseStylesPanel | None = None
         self._analytics_panel: AnalyticsDashboardPanel | None = None
         self._chain_panel: PromptChainManagerPanel | None = None
+        self._workbench_window: WorkbenchWindow | None = None
         self._template_list_view: QListView = cast("QListView", None)
         self._template_detail_widget: PromptDetailWidget = cast("PromptDetailWidget", None)
         self._template_run_shortcut_button: QPushButton = cast("QPushButton", None)
@@ -614,6 +617,18 @@ class MainWindow(QMainWindow):
         if controller is None:
             return
         controller.detect_intent()
+
+    def activate_workbench_tab(self, mode: str, template_prompt: Prompt | None) -> None:
+        """Focus the embedded Workbench tab and start a new session."""
+        tab_widget = self._tab_widget
+        workbench = self._workbench_window
+        if tab_widget is None or workbench is None:
+            return
+        workbench.begin_session(mode=mode, template_prompt=template_prompt)
+        index = tab_widget.indexOf(workbench)
+        if index == -1:
+            return
+        tab_widget.setCurrentIndex(index)
 
     def _on_suggest_prompt_clicked(self) -> None:
         """Generate prompt suggestions from the free-form query input."""

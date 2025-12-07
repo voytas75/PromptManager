@@ -1,6 +1,7 @@
 """Dialog helpers used by the Prompt Manager main window.
 
 Updates:
+  v0.15.85 - 2025-12-07 - Focus embedded Workbench tab instead of spawning windows.
   v0.15.84 - 2025-12-05 - Pipe prompt edit callbacks through the chain dialog launcher.
   v0.15.83 - 2025-12-04 - Add prompt chain dialog launcher wiring.
   v0.15.82 - 2025-12-01 - Extract info/workbench/version dialogs from gui.main_window.
@@ -13,7 +14,7 @@ from typing import TYPE_CHECKING
 from core import PromptManager, RepositoryError
 
 from .dialogs import InfoDialog, PromptChainManagerDialog, PromptVersionHistoryDialog
-from .workbench import WorkbenchModeDialog, WorkbenchWindow
+from .workbench import WorkbenchModeDialog
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from collections.abc import Callable
@@ -52,7 +53,6 @@ class DialogLauncher:
         self._current_search_text = current_search_text
         self._select_prompt = select_prompt
         self._prompt_edit_callback = prompt_edit_callback
-        self._workbench_windows: list[WorkbenchWindow] = []
 
     # ------------------------------------------------------------------
     # Public API
@@ -72,17 +72,9 @@ class DialogLauncher:
         if dialog.exec() != WorkbenchModeDialog.Accepted:
             return
         selection = dialog.result_selection()
-        window = WorkbenchWindow(
-            self._manager,
-            mode=selection.mode,
-            template_prompt=selection.template_prompt,
-            parent=self._parent,
-        )
-        self._workbench_windows.append(window)
-        window.destroyed.connect(  # type: ignore[arg-type]
-            lambda *_: self._remove_workbench_window(window)
-        )
-        window.show()
+        activator = getattr(self._parent, "activate_workbench_tab", None)
+        if callable(activator):
+            activator(selection.mode, selection.template_prompt)
 
     def open_version_history_dialog(self, prompt: Prompt | None = None) -> None:
         """Display the version history for *prompt* or the current selection."""
@@ -115,11 +107,5 @@ class DialogLauncher:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
-    def _remove_workbench_window(self, window: WorkbenchWindow) -> None:
-        try:
-            self._workbench_windows.remove(window)
-        except ValueError:
-            return
-
 
 __all__ = ["DialogLauncher"]
