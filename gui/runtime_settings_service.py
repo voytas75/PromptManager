@@ -462,7 +462,7 @@ class RuntimeSettingsService:
             settings_model.embedding_backend = embedding_backend_value
             settings_model.embedding_model = cast("str | None", runtime.get("embedding_model"))
             settings_model.chat_user_bubble_color = chat_colour
-            settings_model.theme_mode = cast(Literal["light", "dark"], theme_choice)
+            settings_model.theme_mode = cast("Literal['light', 'dark']", theme_choice)
             if cleaned_palette:
                 palette_model = getattr(settings_model, "chat_colors", None)
                 if isinstance(palette_model, ChatColors):

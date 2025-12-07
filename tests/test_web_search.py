@@ -16,11 +16,11 @@ import pytest
 
 from core.exceptions import WebSearchProviderError, WebSearchUnavailable
 from core.web_search import (
-    ExaWebSearchProvider,
-    RandomWebSearchProvider,
     SEARCH_RESULTS_END_MARKER,
     SEARCH_RESULTS_NOTE,
     SEARCH_RESULTS_START_MARKER,
+    ExaWebSearchProvider,
+    RandomWebSearchProvider,
     SerpApiWebSearchProvider,
     SerperWebSearchProvider,
     TavilyWebSearchProvider,
