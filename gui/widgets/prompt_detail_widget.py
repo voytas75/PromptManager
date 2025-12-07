@@ -1,6 +1,7 @@
 """Prompt detail panel shared between main and template tabs.
 
 Updates:
+  v0.1.1 - 2025-12-08 - Reworked prompt detail layout with grouped actions.
   v0.1.0 - 2025-11-30 - Extract prompt detail widget for reuse/testing.
 """
 
@@ -15,7 +16,7 @@ from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
-    QFrame,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QPlainTextEdit,
@@ -55,6 +56,16 @@ class PromptDetailWidget(QWidget):
         content = QWidget(self._scroll_area)
         content_layout = QVBoxLayout(content)
         content_layout.setContentsMargins(12, 12, 12, 12)
+
+        edit_button_row = QHBoxLayout()
+        edit_button_row.setContentsMargins(0, 0, 0, 0)
+        edit_button_row.addStretch(1)
+        self._edit_button = QPushButton("Edit Prompt", content)
+        self._edit_button.setObjectName("editPromptButton")
+        self._edit_button.setEnabled(False)
+        self._edit_button.clicked.connect(self.edit_requested.emit)  # type: ignore[arg-type]
+        edit_button_row.addWidget(self._edit_button)
+        content_layout.addLayout(edit_button_row)
 
         self._name_label = QLabel("Select a prompt to view details", content)
         self._name_label.setObjectName("promptTitle")
@@ -112,8 +123,10 @@ class PromptDetailWidget(QWidget):
         content_layout.addWidget(self._examples)
         content_layout.addSpacing(8)
 
-        metadata_buttons = QHBoxLayout()
-        metadata_buttons.setContentsMargins(0, 0, 0, 0)
+        metadata_group = QGroupBox("Metadata Views", content)
+        metadata_group.setObjectName("metadataToggleGroup")
+        metadata_buttons = QHBoxLayout(metadata_group)
+        metadata_buttons.setContentsMargins(12, 8, 12, 8)
         metadata_buttons.setSpacing(8)
 
         self._basic_metadata_button = QPushButton("Basic Metadata", content)
@@ -129,7 +142,7 @@ class PromptDetailWidget(QWidget):
         metadata_buttons.addWidget(self._all_metadata_button)
 
         metadata_buttons.addStretch(1)
-        content_layout.addLayout(metadata_buttons)
+        content_layout.addWidget(metadata_group)
 
         metadata_header = QHBoxLayout()
         metadata_header.setContentsMargins(0, 0, 0, 0)
@@ -164,15 +177,30 @@ class PromptDetailWidget(QWidget):
         self._basic_metadata_text = ""
         self._current_prompt: Prompt | None = None
 
-        actions_layout = QHBoxLayout()
-        actions_layout.setContentsMargins(0, 0, 0, 0)
-        actions_layout.addStretch(1)
+        fork_delete_group = QGroupBox("Fork / Delete", content)
+        fork_delete_layout = QHBoxLayout(fork_delete_group)
+        fork_delete_layout.setContentsMargins(12, 8, 12, 8)
+        fork_delete_layout.setSpacing(8)
 
         self._fork_button = QPushButton("Fork Prompt", content)
         self._fork_button.setObjectName("forkPromptButton")
         self._fork_button.setEnabled(False)
         self._fork_button.clicked.connect(self.fork_requested.emit)  # type: ignore[arg-type]
-        actions_layout.addWidget(self._fork_button)
+        fork_delete_layout.addWidget(self._fork_button)
+
+        self._delete_button = QPushButton("Delete Prompt", content)
+        self._delete_button.setObjectName("deletePromptButton")
+        self._delete_button.setEnabled(False)
+        self._delete_button.setStyleSheet("color: #dc2626;")
+        self._delete_button.clicked.connect(self.delete_requested.emit)  # type: ignore[arg-type]
+        fork_delete_layout.addWidget(self._delete_button)
+        fork_delete_layout.addStretch(1)
+        content_layout.addWidget(fork_delete_group)
+
+        history_group = QGroupBox("History & Scenarios", content)
+        history_layout = QHBoxLayout(history_group)
+        history_layout.setContentsMargins(12, 8, 12, 8)
+        history_layout.setSpacing(8)
 
         self._version_history_button = QPushButton("Version History", content)
         self._version_history_button.setObjectName("versionHistoryButton")
@@ -180,7 +208,7 @@ class PromptDetailWidget(QWidget):
         self._version_history_button.clicked.connect(  # type: ignore[arg-type]
             self.version_history_requested.emit
         )
-        actions_layout.addWidget(self._version_history_button)
+        history_layout.addWidget(self._version_history_button)
 
         self._refresh_scenarios_button = QPushButton("Refresh Scenarios", content)
         self._refresh_scenarios_button.setObjectName("refreshScenariosButton")
@@ -188,35 +216,26 @@ class PromptDetailWidget(QWidget):
         self._refresh_scenarios_button.clicked.connect(  # type: ignore[arg-type]
             self.refresh_scenarios_requested.emit
         )
-        actions_layout.addWidget(self._refresh_scenarios_button)
+        history_layout.addWidget(self._refresh_scenarios_button)
+        history_layout.addStretch(1)
+        content_layout.addWidget(history_group)
 
-        self._edit_button = QPushButton("Edit Prompt", content)
-        self._edit_button.setObjectName("editPromptButton")
-        self._edit_button.setEnabled(False)
-        self._edit_button.clicked.connect(self.edit_requested.emit)  # type: ignore[arg-type]
-        actions_layout.addWidget(self._edit_button)
-
-        self._delete_button = QPushButton("Delete Prompt", content)
-        self._delete_button.setObjectName("deletePromptButton")
-        self._delete_button.setEnabled(False)
-        self._delete_button.clicked.connect(self.delete_requested.emit)  # type: ignore[arg-type]
-        actions_layout.addWidget(self._delete_button)
-
-        content_layout.addLayout(actions_layout)
-
-        share_frame = QFrame(content)
-        share_frame.setObjectName("shareOptionsFrame")
-        share_frame.setFrameStyle(QFrame.StyledPanel | QFrame.Plain)
-        share_frame.setLineWidth(1)
-        share_layout = QHBoxLayout(share_frame)
+        share_group = QGroupBox("Share", content)
+        share_group.setObjectName("shareOptionsFrame")
+        share_group.setFlat(False)
+        share_layout = QVBoxLayout(share_group)
         share_layout.setContentsMargins(12, 8, 12, 8)
         share_layout.setSpacing(8)
 
-        share_payload_label = QLabel("Share data:", share_frame)
-        share_payload_label.setObjectName("sharePayloadLabel")
-        share_layout.addWidget(share_payload_label)
+        share_payload_row = QHBoxLayout()
+        share_payload_row.setContentsMargins(0, 0, 0, 0)
+        share_payload_row.setSpacing(8)
 
-        self._share_payload_combo = QComboBox(share_frame)
+        share_payload_label = QLabel("Share data:", share_group)
+        share_payload_label.setObjectName("sharePayloadLabel")
+        share_payload_row.addWidget(share_payload_label)
+
+        self._share_payload_combo = QComboBox(share_group)
         self._share_payload_combo.addItem("Prompt body only", "body")
         self._share_payload_combo.addItem("Body + description", "body_description")
         self._share_payload_combo.addItem(
@@ -224,20 +243,25 @@ class PromptDetailWidget(QWidget):
             "body_description_scenarios",
         )
         self._share_payload_combo.setEnabled(False)
-        share_layout.addWidget(self._share_payload_combo)
+        share_payload_row.addWidget(self._share_payload_combo, 1)
 
-        self._share_metadata_checkbox = QCheckBox("Add metadata", share_frame)
+        self._share_metadata_checkbox = QCheckBox("Add metadata", share_group)
         self._share_metadata_checkbox.setChecked(False)
         self._share_metadata_checkbox.setEnabled(False)
-        share_layout.addWidget(self._share_metadata_checkbox)
+        share_payload_row.addWidget(self._share_metadata_checkbox)
+        share_payload_row.addStretch(1)
+        share_layout.addLayout(share_payload_row)
 
-        share_layout.addStretch(1)
-        self._share_button = QPushButton("Share Prompt", share_frame)
+        share_button_row = QHBoxLayout()
+        share_button_row.setContentsMargins(0, 0, 0, 0)
+        share_button_row.addStretch(1)
+        self._share_button = QPushButton("Share Prompt", share_group)
         self._share_button.setObjectName("sharePromptButton")
         self._share_button.setEnabled(False)
         self._share_button.clicked.connect(self.share_requested.emit)  # type: ignore[arg-type]
-        share_layout.addWidget(self._share_button)
-        content_layout.addWidget(share_frame)
+        share_button_row.addWidget(self._share_button)
+        share_layout.addLayout(share_button_row)
+        content_layout.addWidget(share_group)
         content_layout.addStretch(1)
 
         self._scroll_area.setWidget(content)
