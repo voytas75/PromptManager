@@ -182,6 +182,7 @@ class CodexExecutor:
             response_text, usage, raw_payload = _consume_streaming_response(
                 stream_iter,
                 on_stream,
+                LiteLLMException,
             )
         else:
             payload_mapping: Mapping[str, Any]
@@ -261,26 +262,32 @@ def _extract_completion_text(payload: Mapping[str, Any]) -> str:
 def _consume_streaming_response(
     stream: Iterable[Any],
     on_stream: Callable[[str], None] | None = None,
+    lite_llm_exception: type[Exception] | None = None,
 ) -> tuple[str, dict[str, Any], dict[str, Any]]:
     """Aggregate LiteLLM streaming chunks into final response text and metadata."""
     accumulated: list[str] = []
     usage: dict[str, Any] = {}
     serialised_chunks: list[Any] = []
 
-    for chunk in stream:
-        serialised = _serialise_chunk(chunk)
-        serialised_chunks.append(serialised)
-        text_delta = _extract_stream_text(serialised)
-        if text_delta:
-            accumulated.append(text_delta)
-            if on_stream is not None:
-                try:
-                    on_stream(text_delta)
-                except Exception:  # pragma: no cover - callback failures should not bubble
-                    logger.warning("Streaming callback raised an exception", exc_info=True)
-        chunk_usage = _extract_stream_usage(serialised)
-        if chunk_usage:
-            usage = dict(chunk_usage)
+    try:
+        for chunk in stream:
+            serialised = _serialise_chunk(chunk)
+            serialised_chunks.append(serialised)
+            text_delta = _extract_stream_text(serialised)
+            if text_delta:
+                accumulated.append(text_delta)
+                if on_stream is not None:
+                    try:
+                        on_stream(text_delta)
+                    except Exception:  # pragma: no cover - callback failures should not bubble
+                        logger.warning("Streaming callback raised an exception", exc_info=True)
+            chunk_usage = _extract_stream_usage(serialised)
+            if chunk_usage:
+                usage = dict(chunk_usage)
+    except Exception as exc:
+        if lite_llm_exception is not None and isinstance(exc, lite_llm_exception):
+            raise ExecutionError(f"Streaming interrupted: {exc}") from exc
+        raise ExecutionError("Unexpected error while streaming LiteLLM response") from exc
 
     final_text = "".join(accumulated)
     raw_payload: dict[str, Any] = {
