@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, cast
 
 from PySide6.QtGui import QColor
 
@@ -34,9 +34,12 @@ from .appearance_controller import normalise_chat_palette, palette_differs_from_
 from .settings_dialog import persist_settings_to_config
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from core import PromptManager
 
 RuntimeSettings = dict[str, object | None]
+WorkflowRouting = dict[str, Literal["fast", "inference"]]
 
 
 @dataclass(slots=True)
@@ -284,7 +287,11 @@ class RuntimeSettingsService:
             )
             runtime["embedding_backend"] = backend_value
             runtime["embedding_model"] = model_value
-        embedding_backend_value = runtime.get("embedding_backend", DEFAULT_EMBEDDING_BACKEND)
+        backend_runtime_value = runtime.get("embedding_backend")
+        if isinstance(backend_runtime_value, str) and backend_runtime_value.strip():
+            embedding_backend_value = backend_runtime_value
+        else:
+            embedding_backend_value = DEFAULT_EMBEDDING_BACKEND
 
         cleaned_drop_params: list[str] | None = runtime.get("litellm_drop_params")  # type: ignore[assignment]
         if "litellm_drop_params" in updates:
@@ -306,14 +313,14 @@ class RuntimeSettingsService:
             stream_flag = bool(updates.get("litellm_stream"))
             runtime["litellm_stream"] = stream_flag
 
-        def _normalise_workflows(value: object | None) -> dict[str, str] | None:
+        def _normalise_workflows(value: object | None) -> WorkflowRouting | None:
             if not isinstance(value, dict):
                 return None
-            return {
-                str(key): "inference"
-                for key, route in value.items()
-                if isinstance(route, str) and route.strip().lower() == "inference"
-            }
+            cleaned: WorkflowRouting = {}
+            for key, route in value.items():
+                if isinstance(route, str) and route.strip().lower() == "inference":
+                    cleaned[str(key)] = "inference"
+            return cleaned or None
 
         cleaned_workflow_models = _normalise_workflows(runtime.get("litellm_workflow_models"))
         if "litellm_workflow_models" in updates:
@@ -336,7 +343,11 @@ class RuntimeSettingsService:
                 cleaned_quick_actions = None
             runtime["quick_actions"] = cleaned_quick_actions
 
-        chat_colour = runtime.get("chat_user_bubble_color", DEFAULT_CHAT_USER_BUBBLE_COLOR)
+        raw_chat_colour = runtime.get("chat_user_bubble_color")
+        if isinstance(raw_chat_colour, str) and QColor(raw_chat_colour).isValid():
+            chat_colour = QColor(raw_chat_colour).name().lower()
+        else:
+            chat_colour = DEFAULT_CHAT_USER_BUBBLE_COLOR
         if "chat_user_bubble_color" in updates:
             color_value = updates.get("chat_user_bubble_color")
             if isinstance(color_value, str) and QColor(color_value).isValid():
@@ -346,16 +357,22 @@ class RuntimeSettingsService:
             runtime["chat_user_bubble_color"] = chat_colour
 
         cleaned_palette = normalise_chat_palette(
-            runtime.get("chat_colors") if isinstance(runtime.get("chat_colors"), dict) else None
+            cast("Mapping[str, object] | None", runtime.get("chat_colors"))
         )
         if "chat_colors" in updates:
-            palette_input = (
-                updates.get("chat_colors") if isinstance(updates.get("chat_colors"), dict) else None
-            )
+            palette_input = cast("Mapping[str, object] | None", updates.get("chat_colors"))
             cleaned_palette = normalise_chat_palette(palette_input)
             runtime["chat_colors"] = cleaned_palette or None
 
-        theme_choice = runtime.get("theme_mode", DEFAULT_THEME_MODE)
+        raw_theme_choice = runtime.get("theme_mode")
+        if isinstance(raw_theme_choice, str):
+            candidate_theme = raw_theme_choice.strip().lower()
+            if candidate_theme in {"light", "dark"}:
+                theme_choice = candidate_theme
+            else:
+                theme_choice = DEFAULT_THEME_MODE
+        else:
+            theme_choice = DEFAULT_THEME_MODE
         if "theme_mode" in updates:
             theme_value = updates.get("theme_mode")
             if isinstance(theme_value, str) and theme_value.strip().lower() in {"light", "dark"}:
@@ -366,7 +383,7 @@ class RuntimeSettingsService:
         if theme_choice not in {"light", "dark"}:
             theme_choice = DEFAULT_THEME_MODE
 
-        prompt_templates_payload: dict[str, str] | None = runtime.get("prompt_templates")  # type: ignore[assignment]
+        prompt_templates_payload = cast("dict[str, str] | None", runtime.get("prompt_templates"))
         if "prompt_templates" in updates:
             prompt_templates_value = updates.get("prompt_templates")
             if isinstance(prompt_templates_value, dict):
@@ -380,6 +397,7 @@ class RuntimeSettingsService:
                 prompt_templates_payload = None
             runtime["prompt_templates"] = prompt_templates_payload
 
+        palette_for_diff = cast("Mapping[str, str] | None", runtime.get("chat_colors"))
         persist_settings_to_config(
             {
                 "litellm_model": runtime.get("litellm_model"),
@@ -401,9 +419,7 @@ class RuntimeSettingsService:
                 "embedding_model": runtime.get("embedding_model"),
                 "chat_user_bubble_color": runtime.get("chat_user_bubble_color"),
                 "chat_colors": (
-                    runtime.get("chat_colors")
-                    if palette_differs_from_defaults(runtime.get("chat_colors"))
-                    else None
+                    palette_for_diff if palette_differs_from_defaults(palette_for_diff) else None
                 ),
                 "theme_mode": runtime.get("theme_mode"),
                 "prompt_templates": runtime.get("prompt_templates"),
@@ -414,18 +430,27 @@ class RuntimeSettingsService:
 
         settings_model = self._settings
         if settings_model is not None:
-            settings_model.litellm_model = updates.get("litellm_model")
-            settings_model.litellm_inference_model = updates.get("litellm_inference_model")
-            settings_model.litellm_api_key = updates.get("litellm_api_key")
-            settings_model.litellm_api_base = updates.get("litellm_api_base")
-            settings_model.litellm_api_version = updates.get("litellm_api_version")
-            settings_model.litellm_reasoning_effort = updates.get("litellm_reasoning_effort")
-            settings_model.litellm_tts_model = updates.get("litellm_tts_model")
-            settings_model.web_search_provider = updates.get("web_search_provider")
-            settings_model.exa_api_key = updates.get("exa_api_key")
-            settings_model.tavily_api_key = updates.get("tavily_api_key")
-            settings_model.serper_api_key = updates.get("serper_api_key")
-            settings_model.serpapi_api_key = updates.get("serpapi_api_key")
+            settings_model.litellm_model = cast("str | None", updates.get("litellm_model"))
+            settings_model.litellm_inference_model = cast(
+                "str | None", updates.get("litellm_inference_model")
+            )
+            settings_model.litellm_api_key = cast("str | None", updates.get("litellm_api_key"))
+            settings_model.litellm_api_base = cast("str | None", updates.get("litellm_api_base"))
+            settings_model.litellm_api_version = cast(
+                "str | None", updates.get("litellm_api_version")
+            )
+            settings_model.litellm_reasoning_effort = cast(
+                "str | None", updates.get("litellm_reasoning_effort")
+            )
+            settings_model.litellm_tts_model = cast("str | None", updates.get("litellm_tts_model"))
+            settings_model.web_search_provider = cast(
+                "Literal['exa', 'tavily', 'serper', 'serpapi', 'random'] | None",
+                updates.get("web_search_provider"),
+            )
+            settings_model.exa_api_key = cast("str | None", updates.get("exa_api_key"))
+            settings_model.tavily_api_key = cast("str | None", updates.get("tavily_api_key"))
+            settings_model.serper_api_key = cast("str | None", updates.get("serper_api_key"))
+            settings_model.serpapi_api_key = cast("str | None", updates.get("serpapi_api_key"))
             if "auto_open_share_links" in updates:
                 settings_model.auto_open_share_links = bool(updates.get("auto_open_share_links"))
             if "litellm_tts_stream" in updates:
@@ -435,9 +460,9 @@ class RuntimeSettingsService:
             settings_model.litellm_drop_params = cleaned_drop_params
             settings_model.litellm_stream = stream_flag
             settings_model.embedding_backend = embedding_backend_value
-            settings_model.embedding_model = runtime.get("embedding_model")
+            settings_model.embedding_model = cast("str | None", runtime.get("embedding_model"))
             settings_model.chat_user_bubble_color = chat_colour
-            settings_model.theme_mode = theme_choice
+            settings_model.theme_mode = cast(Literal["light", "dark"], theme_choice)
             if cleaned_palette:
                 palette_model = getattr(settings_model, "chat_colors", None)
                 if isinstance(palette_model, ChatColors):
@@ -459,18 +484,26 @@ class RuntimeSettingsService:
             else:
                 settings_model.prompt_templates = PromptTemplateOverrides()
 
+        litellm_model_value = cast("str | None", runtime.get("litellm_model"))
+        litellm_inference_value = cast("str | None", runtime.get("litellm_inference_model"))
+        litellm_api_key_value = cast("str | None", runtime.get("litellm_api_key"))
+        litellm_api_base_value = cast("str | None", runtime.get("litellm_api_base"))
+        litellm_api_version_value = cast("str | None", runtime.get("litellm_api_version"))
+        litellm_reasoning_value = cast("str | None", runtime.get("litellm_reasoning_effort"))
+        prompt_templates_value = cast("Mapping[str, object] | None", prompt_templates_payload)
+
         self._refresh_web_search_provider(runtime)
         self._manager.set_name_generator(
-            runtime.get("litellm_model"),
-            runtime.get("litellm_api_key"),
-            runtime.get("litellm_api_base"),
-            runtime.get("litellm_api_version"),
-            inference_model=runtime.get("litellm_inference_model"),
-            workflow_models=runtime.get("litellm_workflow_models"),
-            drop_params=runtime.get("litellm_drop_params"),
-            reasoning_effort=runtime.get("litellm_reasoning_effort"),
-            stream=runtime.get("litellm_stream"),
-            prompt_templates=runtime.get("prompt_templates"),
+            litellm_model_value,
+            litellm_api_key_value,
+            litellm_api_base_value,
+            litellm_api_version_value,
+            inference_model=litellm_inference_value,
+            workflow_models=cleaned_workflow_models,
+            drop_params=cleaned_drop_params,
+            reasoning_effort=litellm_reasoning_value,
+            stream=stream_flag,
+            prompt_templates=prompt_templates_value,
         )
 
         return RuntimeSettingsResult(

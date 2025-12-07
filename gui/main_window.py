@@ -501,7 +501,7 @@ class MainWindow(QMainWindow):
         provider_value = self._runtime_settings.get("web_search_provider")
         if provider_value is None and self._settings is not None:
             provider_value = getattr(self._settings, "web_search_provider", None)
-        provider_slug = (str(provider_value or "").strip().lower() or None)
+        provider_slug = str(provider_value or "").strip().lower() or None
 
         has_exa = bool(
             self._runtime_settings.get("exa_api_key")

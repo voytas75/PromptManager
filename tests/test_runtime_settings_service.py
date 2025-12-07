@@ -6,7 +6,7 @@ Updates:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 from pytest import MonkeyPatch
@@ -19,6 +19,11 @@ from core.web_search import (
     WebSearchService,
 )
 from gui.runtime_settings_service import RuntimeSettingsService
+
+if TYPE_CHECKING:
+    from core import PromptManager
+else:  # pragma: no cover - runtime fallback for typing-only import
+    PromptManager = Any
 
 
 class _DummyPromptManager:
@@ -81,7 +86,7 @@ def test_apply_updates_reconfigures_web_search_provider() -> None:
     manager = _DummyPromptManager()
     initial_service = manager.web_search_service
     initial_service.configure(SerpApiWebSearchProvider(api_key="serpapi-secret"))
-    service = RuntimeSettingsService(manager, None)
+    service = RuntimeSettingsService(cast("PromptManager", manager), None)
 
     service.apply_updates(
         runtime,
@@ -111,7 +116,7 @@ def test_apply_updates_clears_web_search_provider_when_disabled() -> None:
     )
     manager = _DummyPromptManager()
     manager.web_search_service.configure(TavilyWebSearchProvider(api_key="tavily-secret"))
-    service = RuntimeSettingsService(manager, None)
+    service = RuntimeSettingsService(cast("PromptManager", manager), None)
 
     service.apply_updates(runtime, {"web_search_provider": None})
 
