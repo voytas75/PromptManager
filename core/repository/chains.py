@@ -1,13 +1,13 @@
 """Prompt chain persistence helpers.
 
 Updates:
+  v0.1.1 - 2025-12-07 - Restrict Path import to type-checking contexts.
   v0.1.0 - 2025-12-04 - Introduce prompt chain and step CRUD mixin.
 """
 
 from __future__ import annotations
 
 import sqlite3
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from models.prompt_chain_model import PromptChain, PromptChainStep
@@ -24,6 +24,7 @@ from .base import (
 if TYPE_CHECKING:  # pragma: no cover - typing only
     import uuid
     from collections.abc import Mapping, Sequence
+    from pathlib import Path
 
 
 class ChainStoreMixin:

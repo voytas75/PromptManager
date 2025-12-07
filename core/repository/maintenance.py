@@ -1,17 +1,21 @@
 """Schema bootstrap and maintenance helpers for the repository.
 
 Updates:
+  v0.11.1 - 2025-12-07 - Restrict Path import to type checking contexts.
   v0.11.0 - 2025-12-04 - Extract schema management and reset helpers.
 """
 
 from __future__ import annotations
 
 import sqlite3
-from pathlib import Path
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from models.category_model import slugify_category
 from models.prompt_model import DEFAULT_PROFILE_ID
+
+if TYPE_CHECKING:  # pragma: no cover - typing helpers
+    from pathlib import Path
 
 from .base import RepositoryError, connect as _connect, logger, stringify_uuid as _stringify_uuid
 

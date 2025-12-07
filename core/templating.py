@@ -1,25 +1,30 @@
 """Jinja2 templating utilities for workspace previews and validation.
 
-Updates: v0.1.1 - 2025-11-27 - Add contextual hints to Jinja2 syntax errors.
-Updates: v0.1.0 - 2025-11-25 - Add strict Jinja2 renderer, custom filters,
-and schema validation helpers.
+Updates:
+  v0.1.2 - 2025-12-07 - Move FieldInfo import behind TYPE_CHECKING and normalize history.
+  v0.1.1 - 2025-11-27 - Add contextual hints to Jinja2 syntax errors.
+  v0.1.0 - 2025-11-25 - Add strict Jinja2 renderer, custom filters, and schema validation helpers.
 """
 
 from __future__ import annotations
 
 import json
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from jinja2 import Environment, StrictUndefined, Template, TemplateSyntaxError, UndefinedError, meta
 from jsonschema import Draft202012Validator, exceptions as jsonschema_exceptions
 from pydantic import BaseModel, Field, ValidationError, create_model
-from pydantic.fields import FieldInfo
 
 from models.category_model import slugify_category
+
+if TYPE_CHECKING:  # pragma: no cover - typing helpers
+    from pydantic.fields import FieldInfo
+else:  # pragma: no cover - runtime placeholder
+    FieldInfo = Any
 
 
 def _truncate_filter(value: Any, limit: int = 500, suffix: str = "…") -> str:

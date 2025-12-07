@@ -1,13 +1,13 @@
 """Prompt note persistence helpers.
 
 Updates:
+  v0.11.1 - 2025-12-07 - Limit Path import to type-checking contexts.
   v0.11.0 - 2025-12-04 - Extract prompt note CRUD into mixin.
 """
 
 from __future__ import annotations
 
 import sqlite3
-from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 from models.prompt_note import PromptNote
@@ -21,6 +21,7 @@ from .base import (
 
 if TYPE_CHECKING:
     import uuid
+    from pathlib import Path
 
 
 class PromptNoteStoreMixin:

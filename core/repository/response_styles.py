@@ -1,13 +1,13 @@
 """Response style persistence helpers.
 
 Updates:
+  v0.11.1 - 2025-12-07 - Restrict Path import to type-checking contexts.
   v0.11.0 - 2025-12-04 - Extract response style CRUD into mixin.
 """
 
 from __future__ import annotations
 
 import sqlite3
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from models.response_style import ResponseStyle
@@ -24,6 +24,7 @@ from .base import (
 
 if TYPE_CHECKING:
     import uuid
+    from pathlib import Path
 
 
 class ResponseStyleStoreMixin:

@@ -1,13 +1,13 @@
 """Prompt execution persistence, filtering, and analytics helpers.
 
 Updates:
+  v0.11.1 - 2025-12-07 - Move Path import under TYPE_CHECKING for lint compliance.
   v0.11.0 - 2025-12-04 - Extract execution CRUD and analytics into mixin.
 """
 
 from __future__ import annotations
 
 import sqlite3
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from models.prompt_model import PromptExecution
@@ -23,6 +23,7 @@ from .base import (
 if TYPE_CHECKING:
     import uuid
     from datetime import datetime
+    from pathlib import Path
 
 
 class ExecutionStoreMixin:

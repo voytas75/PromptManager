@@ -1,6 +1,7 @@
 """Maintenance mixin providing operational utilities for Prompt Manager.
 
 Updates:
+  v0.1.1 - 2025-12-07 - Gate CollectionProtocol import behind TYPE_CHECKING.
   v0.1.0 - 2025-12-02 - Extract maintenance helpers from core.prompt_manager.__init__.
 """
 
@@ -28,14 +29,15 @@ from ..repository import (
     RepositoryError,
     RepositoryNotFoundError,
 )
-from .backends import CollectionProtocol
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers only
     from collections.abc import Mapping
 
     from . import PromptManager as _PromptManager
+    from .backends import CollectionProtocol
 else:
     _PromptManager = Any
+    CollectionProtocol = Any
 
 logger = logging.getLogger(__name__)
 

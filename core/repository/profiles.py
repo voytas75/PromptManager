@@ -1,16 +1,19 @@
 """User profile persistence helpers for Prompt Manager repository.
 
 Updates:
+  v0.11.1 - 2025-12-07 - Restrict Path import to type-checking contexts.
   v0.11.0 - 2025-12-04 - Extract profile CRUD into dedicated mixin.
 """
 
 from __future__ import annotations
 
 import sqlite3
-from pathlib import Path
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from models.prompt_model import Prompt, UserProfile
+
+if TYPE_CHECKING:  # pragma: no cover - typing helpers
+    from pathlib import Path
 
 from .base import (
     RepositoryError,

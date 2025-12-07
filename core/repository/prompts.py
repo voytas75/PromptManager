@@ -1,6 +1,7 @@
 """Prompt persistence, categories, versions, and list helpers.
 
 Updates:
+  v0.11.1 - 2025-12-07 - Restrict Path import to type-checking contexts.
   v0.11.0 - 2025-12-04 - Extract prompt CRUD/category/version helpers into mixin.
 """
 
@@ -8,7 +9,6 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from pathlib import Path
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -29,6 +29,7 @@ from .base import (
 if TYPE_CHECKING:
     import uuid
     from collections.abc import Sequence
+    from pathlib import Path
 
 
 class PromptStoreMixin:
