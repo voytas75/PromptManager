@@ -1,6 +1,7 @@
 """Settings management utilities for Prompt Manager configuration.
 
 Updates:
+  v0.5.12 - 2025-12-07 - Add SerpApi web search provider configuration and env parsing.
   v0.5.11 - 2025-12-07 - Add Serper web search provider configuration and env parsing.
   v0.5.10 - 2025-12-07 - Allow random web search provider selection and validation.
   v0.5.9 - 2025-12-05 - Tighten dotenv helpers for lint compliance.
@@ -229,12 +230,12 @@ class PromptManagerSettings(BaseSettings):
             "'fast' or 'inference'."
         ),
     )
-    web_search_provider: Literal["exa", "tavily", "serper", "random"] | None = Field(
+    web_search_provider: Literal["exa", "tavily", "serper", "serpapi", "random"] | None = Field(
         default="exa",
         description=(
-            "Configured web search provider slug ('exa', 'tavily', 'serper', 'random'; set "
-            "empty to disable). The 'random' option rotates between providers that have API "
-            "keys configured before each search."
+            "Configured web search provider slug ('exa', 'tavily', 'serper', "
+            "'serpapi', 'random'; set empty to disable). The 'random' option rotates between "
+            "providers that have API keys configured before each search."
         ),
     )
     exa_api_key: str | None = Field(
@@ -250,6 +251,11 @@ class PromptManagerSettings(BaseSettings):
     serper_api_key: str | None = Field(
         default=None,
         description="API key used for Serper-powered web search features.",
+        repr=False,
+    )
+    serpapi_api_key: str | None = Field(
+        default=None,
+        description="API key used for SerpApi-powered web search features.",
         repr=False,
     )
     quick_actions: list[dict[str, object]] | None = Field(
@@ -364,6 +370,7 @@ class PromptManagerSettings(BaseSettings):
                 "exa_api_key": ["EXA_API_KEY", "exa_api_key"],
                 "tavily_api_key": ["TAVILY_API_KEY", "tavily_api_key"],
                 "serper_api_key": ["SERPER_API_KEY", "serper_api_key"],
+                "serpapi_api_key": ["SERPAPI_API_KEY", "serpapi_api_key"],
                 "auto_open_share_links": [
                     "AUTO_OPEN_SHARE_LINKS",
                     "auto_open_share_links",
@@ -437,6 +444,7 @@ class PromptManagerSettings(BaseSettings):
         "exa_api_key",
         "tavily_api_key",
         "serper_api_key",
+        "serpapi_api_key",
         mode="before",
     )
     def _strip_strings(cls, value: str | None) -> str | None:
@@ -465,9 +473,10 @@ class PromptManagerSettings(BaseSettings):
         text = str(value).strip().lower()
         if text in {"none", "disabled", "off"}:
             return None
-        if text not in {"exa", "tavily", "serper", "random"}:
+        if text not in {"exa", "tavily", "serper", "serpapi", "random"}:
             raise ValueError(
-                "web_search_provider must be set to 'exa', 'tavily', 'serper', 'random', or left empty"
+                "web_search_provider must be set to 'exa', 'tavily', 'serper', "
+                "'serpapi', 'random', or left empty"
             )
         return text
 
@@ -700,6 +709,7 @@ class PromptManagerSettings(BaseSettings):
                 "exa_api_key": ["EXA_API_KEY", "exa_api_key"],
                 "tavily_api_key": ["TAVILY_API_KEY", "tavily_api_key"],
                 "serper_api_key": ["SERPER_API_KEY", "serper_api_key"],
+                "serpapi_api_key": ["SERPAPI_API_KEY", "serpapi_api_key"],
                 "auto_open_share_links": [
                     "AUTO_OPEN_SHARE_LINKS",
                     "auto_open_share_links",
@@ -780,6 +790,8 @@ class PromptManagerSettings(BaseSettings):
                     "TAVILY_API_KEY",
                     "serper_api_key",
                     "SERPER_API_KEY",
+                    "serpapi_api_key",
+                    "SERPAPI_API_KEY",
                 }
                 removed_secrets = [
                     key

@@ -1,6 +1,7 @@
 """Provider protocol definitions and concrete provider implementations.
 
 Updates:
+  v0.1.5 - 2025-12-07 - Add SerpApi provider and organic result normalisation helper.
   v0.1.4 - 2025-12-07 - Add Serper provider and response normalisation helpers.
   v0.1.3 - 2025-12-07 - Add RandomWebSearchProvider to rotate between configured services.
   v0.1.2 - 2025-12-07 - Add Tavily provider and generalise document parsing.
@@ -109,7 +110,7 @@ def _extract_documents(payload: Mapping[str, Any], provider_slug: str) -> list[W
 
 
 def _normalise_serper_results(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """Normalise Serper \"organic\" entries into the canonical result schema."""
+    r"""Normalise Serper "organic" entries into the canonical result schema."""
     organic_entries = payload.get("organic") or []
     if not isinstance(organic_entries, list):
         return []
@@ -135,6 +136,56 @@ def _normalise_serper_results(payload: Mapping[str, Any]) -> list[dict[str, Any]
                 "score": entry.get("score"),
                 "publishedDate": entry.get("date"),
                 "author": entry.get("source"),
+                "raw": entry,
+            }
+        )
+    return normalised
+
+
+def _normalise_serpapi_results(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Normalise SerpApi organic results into the canonical result schema."""
+    organic_entries = (
+        payload.get("organic_results")
+        or payload.get("organic")
+        or payload.get("search_results")
+        or []
+    )
+    if not isinstance(organic_entries, list):
+        return []
+    normalised: list[dict[str, Any]] = []
+    for entry in organic_entries:
+        if not isinstance(entry, dict):
+            continue
+        title = str(entry.get("title") or "").strip()
+        url = str(entry.get("link") or entry.get("url") or "").strip()
+        if not title or not url:
+            continue
+        snippet = str(entry.get("snippet") or "").strip() or None
+        highlights_source = (
+            entry.get("snippet_highlighted_words")
+            or entry.get("snippetHighlightedWords")
+            or entry.get("snippetHighlighted")
+            or []
+        )
+        highlights: list[str] = []
+        if isinstance(highlights_source, list):
+            highlights = [str(item).strip() for item in highlights_source if str(item).strip()]
+        score_value = None
+        position_value = entry.get("position") or entry.get("rank")
+        if position_value is not None:
+            try:
+                score_value = float(position_value)
+            except (TypeError, ValueError):
+                score_value = None
+        normalised.append(
+            {
+                "title": title,
+                "url": url,
+                "summary": snippet,
+                "highlights": highlights,
+                "score": score_value,
+                "publishedDate": entry.get("date"),
+                "author": entry.get("source") or entry.get("displayed_link"),
                 "raw": entry,
             }
         )
@@ -318,6 +369,125 @@ class SerperWebSearchProvider:
 
 
 @dataclass(slots=True)
+class SerpApiWebSearchProvider:
+    """HTTPX-backed SerpApi web search provider."""
+
+    api_key: str
+    base_url: str = "https://serpapi.com"
+    timeout: float = 15.0
+    slug: str = "serpapi"
+    display_name: str = "SerpApi Web Search"
+    client_factory: Callable[[], httpx.AsyncClient] | None = None
+
+    def __post_init__(self) -> None:
+        """Validate provided API key and normalise spacing."""
+        if not self.api_key or not self.api_key.strip():
+            raise ValueError("SerpApi API key is required")
+        self.api_key = self.api_key.strip()
+
+    async def search(
+        self,
+        query: str,
+        *,
+        limit: int = 5,
+        engine: str | None = None,
+        google_domain: str | None = None,
+        gl: str | None = None,
+        hl: str | None = None,
+        location: str | None = None,
+        uule: str | None = None,
+        tbs: str | None = None,
+        tbm: str | None = None,
+        start: int | None = None,
+        safe: str | None = None,
+        device: str | None = None,
+        no_cache: bool | None = None,
+        additional_params: Mapping[str, Any] | None = None,
+        **extra: Any,
+    ) -> WebSearchResult:
+        """Perform a search request against SerpApi's REST API."""
+        cleaned_query = query.strip()
+        if not cleaned_query:
+            raise ValueError("query must be a non-empty string")
+        clamped_limit = max(1, min(limit, MAX_RESULTS))
+        params: dict[str, Any] = {
+            "q": cleaned_query,
+            "num": clamped_limit,
+            "api_key": self.api_key,
+            "engine": (engine or "google").strip() or "google",
+        }
+
+        def _assign_text(key: str, value: str | None) -> None:
+            if value is None:
+                return
+            stripped = value.strip()
+            if stripped:
+                params[key] = stripped
+
+        _assign_text("google_domain", google_domain)
+        _assign_text("gl", gl)
+        _assign_text("hl", hl)
+        _assign_text("location", location)
+        _assign_text("uule", uule)
+        _assign_text("tbs", tbs)
+        _assign_text("tbm", tbm)
+        _assign_text("safe", safe)
+        _assign_text("device", device)
+
+        if start is not None:
+            try:
+                params["start"] = max(0, int(start))
+            except (TypeError, ValueError) as exc:
+                raise ValueError("start must be an integer when provided") from exc
+        if no_cache is not None:
+            params["no_cache"] = bool(no_cache)
+
+        def _assign_mapping(values: Mapping[str, Any] | None) -> None:
+            if not values:
+                return
+            for key, value in values.items():
+                if value in (None, "", []):
+                    continue
+                params[str(key)] = value
+
+        _assign_mapping(additional_params)
+        if extra:
+            _assign_mapping(extra)
+
+        manage_client = self.client_factory is None
+        if self.client_factory is None:
+            client = httpx.AsyncClient(
+                base_url=self.base_url,
+                timeout=self.timeout,
+            )
+        else:
+            client = self.client_factory()
+        try:
+            response = await client.get("/search", params=params)
+            response.raise_for_status()
+        except httpx.HTTPError as exc:  # pragma: no cover - exercised via tests
+            raise WebSearchProviderError("SerpApi search request failed") from exc
+        finally:
+            if manage_client:
+                await client.aclose()
+
+        try:
+            data = response.json()
+        except ValueError as exc:  # pragma: no cover - invalid provider payload
+            raise WebSearchProviderError("SerpApi returned invalid JSON") from exc
+        documents = _extract_documents(
+            {"results": _normalise_serpapi_results(data)},
+            self.slug,
+        )
+        return WebSearchResult(
+            provider=self.slug,
+            query=cleaned_query,
+            documents=documents,
+            raw=data,
+        )
+
+
+@dataclass(slots=True)
 class TavilyWebSearchProvider:
     """HTTPX-backed Tavily web search provider."""
 
@@ -447,6 +617,7 @@ class RandomWebSearchProvider:
 __all__ = [
     "ExaWebSearchProvider",
     "RandomWebSearchProvider",
+    "SerpApiWebSearchProvider",
     "SerperWebSearchProvider",
     "TavilyWebSearchProvider",
     "WebSearchProvider",

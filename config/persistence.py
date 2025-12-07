@@ -1,6 +1,7 @@
 """Helpers for persisting runtime configuration without Qt dependencies.
 
 Updates:
+  v0.3.2 - 2025-12-07 - Guard SerpApi API keys alongside other secrets during persistence.
   v0.3.1 - 2025-12-07 - Guard Serper API keys alongside other secrets during persistence.
   v0.3.0 - 2025-12-07 - Guard Tavily API keys alongside other secrets during persistence.
   v0.2.9 - 2025-12-04 - Persist share auto-open preference when disabled.
@@ -121,7 +122,13 @@ def persist_settings_to_config(updates: dict[str, object | None]) -> None:
         except json.JSONDecodeError:
             config_data = {}
 
-    secret_keys = {"litellm_api_key", "exa_api_key", "tavily_api_key", "serper_api_key"}
+    secret_keys = {
+        "litellm_api_key",
+        "exa_api_key",
+        "tavily_api_key",
+        "serper_api_key",
+        "serpapi_api_key",
+    }
     for key, value in updates.items():
         if key in secret_keys:
             config_data.pop(key, None)

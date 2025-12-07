@@ -62,10 +62,11 @@ All settings are defined via `pydantic-settings` in `config/settings.py`. Provid
 | `PROMPT_MANAGER_LITELLM_STREAM` | Enable streaming responses (`true`/`false`) | `true` |
 | `PROMPT_MANAGER_LITELLM_TTS_MODEL` | LiteLLM text-to-speech model id used for voice playback | `openai/tts-1` |
 | `PROMPT_MANAGER_LITELLM_TTS_STREAM` | Stream LiteLLM TTS audio so playback starts mid-download (`true`/`false`) | `true` |
-| `PROMPT_MANAGER_WEB_SEARCH_PROVIDER` | Web search provider slug (`exa`, `tavily`, `serper`, `random`, or leave empty to disable) | `tavily` |
+| `PROMPT_MANAGER_WEB_SEARCH_PROVIDER` | Web search provider slug (`exa`, `tavily`, `serper`, `serpapi`, `random`, or leave empty to disable) | `tavily` |
 | `PROMPT_MANAGER_EXA_API_KEY` / `EXA_API_KEY` | Exa web search API key (environment only) | `exa_***` |
 | `PROMPT_MANAGER_TAVILY_API_KEY` / `TAVILY_API_KEY` | Tavily web search API key (environment only) | `tvly-***` |
 | `PROMPT_MANAGER_SERPER_API_KEY` / `SERPER_API_KEY` | Serper.dev web search API key (environment only) | `serper-***` |
+| `PROMPT_MANAGER_SERPAPI_API_KEY` / `SERPAPI_API_KEY` | SerpApi web search API key (environment only) | `serpapi-***` |
 | `PROMPT_MANAGER_AUTO_OPEN_SHARE_LINKS` | Auto-open shared URLs in the default browser (`true`/`false`) | `true` |
 | `PROMPT_MANAGER_EMBEDDING_BACKEND` | `litellm`, `sentence-transformers`, or `deterministic` | `sentence-transformers` |
 | `PROMPT_MANAGER_EMBEDDING_MODEL` | Embedding model identifier | `text-embedding-3-large` |
@@ -76,7 +77,7 @@ Secrets must never be committed; rely on `.env` files ignored by git or host-lev
 
 Selecting `PROMPT_MANAGER_WEB_SEARCH_PROVIDER="random"` rotates calls between whichever providers currently have API keys configured; if only one provider has a key, Random behaves like that provider until another key is available.
 
-See [`docs/web_search_plan.md`](web_search_plan.md) for the staged web search integration plan (Exa + Tavily + Serper) if you are extending the provider surface.
+See [`docs/web_search_plan.md`](web_search_plan.md) for the staged web search integration plan (Exa + Tavily + Serper + SerpApi) if you are extending the provider surface.
 
 ## Detailed Getting Started
 
@@ -103,7 +104,7 @@ See [`docs/web_search_plan.md`](web_search_plan.md) for the staged web search in
   - `deterministic`: offline hashing for smoke tests.
 - Search queries embed the entire user phrase and ask ChromaDB for nearest neighbours; results are already cosine-ranked and displayed as-is in the GUI.
 - The GUI shows similarity scores (`[0.91]`) when search is active; the sort dropdown is disabled to preserve ranking integrity.
-- When a provider (Exa, Tavily, or Serper) is configured, the workspace and Chain tab expose a “Use web search” checkbox (checked by default). Leaving it on runs a provider query (prompt metadata + user input) before execution and injects every available summary/highlight into the request body (source links included); if the aggregate context exceeds ~5,000 words, the fast LiteLLM model condenses it before prepending. Unchecking the box (or running `prompt-chain-run --no-web-search`) forces offline-only runs.
+- When a provider (Exa, Tavily, Serper, or SerpApi) is configured, the workspace and Chain tab expose a “Use web search” checkbox (checked by default). Leaving it on runs a provider query (prompt metadata + user input) before execution and injects every available summary/highlight into the request body (source links included); if the aggregate context exceeds ~5,000 words, the fast LiteLLM model condenses it before prepending. Unchecking the box (or running `prompt-chain-run --no-web-search`) forces offline-only runs.
 
 ## Running the GUI
 

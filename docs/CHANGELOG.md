@@ -2,6 +2,13 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.22.9] - 2025-12-07
+
+### Added
+
+- Added SerpApi as the fourth web search provider: `PromptManagerSettings` now accepts `web_search_provider="serpapi"` with a `PROMPT_MANAGER_SERPAPI_API_KEY`/`SERPAPI_API_KEY` secret, the factory wires a `SerpApiWebSearchProvider`, tooltip copy and the settings dialog gained a SerpApi option, CLI/settings summaries mask the new credential, runtime persistence skips the secret, and tests cover HTTP success/error flows plus env loading and JSON persistence.
+- Updated README, README-DEV, and `docs/web_search_plan.md` with the SerpApi configuration details and cited [serpapi.com/search-api](https://serpapi.com/search-api) (retrieved 2025-12-07) so contributors know how to issue `GET https://serpapi.com/search` with `q`/`num`/localization parameters and parse the resulting `organic_results`.
+
 ## [0.22.8] - 2025-12-07
 
 ### Added

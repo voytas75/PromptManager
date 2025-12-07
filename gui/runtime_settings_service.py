@@ -1,6 +1,7 @@
 """Runtime settings helpers for Prompt Manager GUI.
 
 Updates:
+  v0.1.5 - 2025-12-07 - Track SerpApi web search credentials in runtime snapshots.
   v0.1.4 - 2025-12-07 - Track Serper web search credentials in runtime snapshots.
   v0.1.3 - 2025-12-07 - Track Tavily web search credentials in runtime snapshots.
   v0.1.2 - 2025-12-04 - Persist auto-open share preference across restarts.
@@ -103,6 +104,7 @@ class RuntimeSettingsService:
             "exa_api_key": settings.exa_api_key if settings else None,
             "tavily_api_key": settings.tavily_api_key if settings else None,
             "serper_api_key": settings.serper_api_key if settings else None,
+            "serpapi_api_key": settings.serpapi_api_key if settings else None,
             "auto_open_share_links": (
                 settings.auto_open_share_links if settings is not None else True
             ),
@@ -235,6 +237,7 @@ class RuntimeSettingsService:
             "exa_api_key",
             "tavily_api_key",
             "serper_api_key",
+            "serpapi_api_key",
             "auto_open_share_links",
         )
         for key in simple_keys:
@@ -366,6 +369,7 @@ class RuntimeSettingsService:
                 "litellm_api_key": runtime.get("litellm_api_key"),
                 "tavily_api_key": runtime.get("tavily_api_key"),
                 "serper_api_key": runtime.get("serper_api_key"),
+                "serpapi_api_key": runtime.get("serpapi_api_key"),
                 "embedding_backend": runtime.get("embedding_backend"),
                 "embedding_model": runtime.get("embedding_model"),
                 "chat_user_bubble_color": runtime.get("chat_user_bubble_color"),
@@ -394,6 +398,7 @@ class RuntimeSettingsService:
             settings_model.exa_api_key = updates.get("exa_api_key")
             settings_model.tavily_api_key = updates.get("tavily_api_key")
             settings_model.serper_api_key = updates.get("serper_api_key")
+            settings_model.serpapi_api_key = updates.get("serpapi_api_key")
             if "auto_open_share_links" in updates:
                 settings_model.auto_open_share_links = bool(updates.get("auto_open_share_links"))
             if "litellm_tts_stream" in updates:

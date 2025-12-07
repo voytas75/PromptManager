@@ -1,6 +1,7 @@
 """Tests for the web search provider/service scaffolding.
 
 Updates:
+  v0.1.5 - 2025-12-07 - Cover SerpApi provider success/error flows.
   v0.1.4 - 2025-12-07 - Cover Serper provider success/error flows.
   v0.1.3 - 2025-12-07 - Cover random provider fan-out behaviour.
   v0.1.2 - 2025-12-07 - Cover Tavily provider success/error flows.
@@ -17,6 +18,7 @@ from core.exceptions import WebSearchProviderError, WebSearchUnavailable
 from core.web_search import (
     ExaWebSearchProvider,
     RandomWebSearchProvider,
+    SerpApiWebSearchProvider,
     SerperWebSearchProvider,
     TavilyWebSearchProvider,
     WebSearchDocument,
@@ -174,6 +176,55 @@ async def test_serper_provider_raises_on_error() -> None:
         base_url="https://google.serper.dev",
     )
     provider = SerperWebSearchProvider(api_key="serper-test", client_factory=lambda: mock_client)
+
+    with pytest.raises(WebSearchProviderError):
+        await provider.search("latest news")
+    await mock_client.aclose()
+
+
+@pytest.mark.asyncio()
+async def test_serpapi_provider_parses_results() -> None:
+    """Ensure the SerpApi provider maps API payloads into canonical documents."""
+    mock_client = _build_mock_client(
+        httpx.Response(
+            200,
+            json={
+                "organic_results": [
+                    {
+                        "title": "SerpApi Result",
+                        "link": "https://example.com/serpapi",
+                        "snippet": "SerpApi snippet",
+                        "snippet_highlighted_words": ["SerpApi snippet"],
+                        "position": 1,
+                        "date": "2025-12-07",
+                        "source": "Example Source",
+                    }
+                ]
+            },
+        ),
+        base_url="https://serpapi.com",
+    )
+    provider = SerpApiWebSearchProvider(api_key="serpapi-test", client_factory=lambda: mock_client)
+    result = await provider.search("latest news", limit=3, gl="us")
+    await mock_client.aclose()
+
+    assert result.provider == "serpapi"
+    assert len(result.documents) == 1
+    doc = result.documents[0]
+    assert doc.summary == "SerpApi snippet"
+    assert doc.highlights == ["SerpApi snippet"]
+    assert doc.score == pytest.approx(1.0)
+    assert doc.author == "Example Source"
+
+
+@pytest.mark.asyncio()
+async def test_serpapi_provider_raises_on_error() -> None:
+    """Raise a provider error when SerpApi rejects the request."""
+    mock_client = _build_mock_client(
+        httpx.Response(503, json={"error": "upstream"}),
+        base_url="https://serpapi.com",
+    )
+    provider = SerpApiWebSearchProvider(api_key="serpapi-test", client_factory=lambda: mock_client)
 
     with pytest.raises(WebSearchProviderError):
         await provider.search("latest news")

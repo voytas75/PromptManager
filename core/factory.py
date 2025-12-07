@@ -1,6 +1,7 @@
 """Factories for constructing PromptManager instances from validated settings.
 
 Updates:
+  v0.8.1 - 2025-12-07 - Wire SerpApi provider into the web search factory.
   v0.8.0 - 2025-12-07 - Wire Serper provider into the web search factory.
   v0.7.9 - 2025-12-07 - Add random provider fan-out for the web search service.
   v0.7.8 - 2025-12-07 - Add Tavily provider wiring to the web search factory.
@@ -36,6 +37,7 @@ from .scenario_generation import LiteLLMScenarioGenerator
 from .web_search import (
     ExaWebSearchProvider,
     RandomWebSearchProvider,
+    SerpApiWebSearchProvider,
     SerperWebSearchProvider,
     TavilyWebSearchProvider,
     WebSearchService,
@@ -104,6 +106,7 @@ def _build_web_search_service(settings: PromptManagerSettings) -> WebSearchServi
     exa_provider = None
     tavily_provider = None
     serper_provider = None
+    serpapi_provider = None
     exa_key = getattr(settings, "exa_api_key", None)
     if exa_key:
         exa_provider = ExaWebSearchProvider(api_key=exa_key)
@@ -113,6 +116,9 @@ def _build_web_search_service(settings: PromptManagerSettings) -> WebSearchServi
     serper_key = getattr(settings, "serper_api_key", None)
     if serper_key:
         serper_provider = SerperWebSearchProvider(api_key=serper_key)
+    serpapi_key = getattr(settings, "serpapi_api_key", None)
+    if serpapi_key:
+        serpapi_provider = SerpApiWebSearchProvider(api_key=serpapi_key)
 
     if provider_slug == "exa":
         provider = exa_provider
@@ -120,10 +126,12 @@ def _build_web_search_service(settings: PromptManagerSettings) -> WebSearchServi
         provider = tavily_provider
     elif provider_slug == "serper":
         provider = serper_provider
+    elif provider_slug == "serpapi":
+        provider = serpapi_provider
     elif provider_slug == "random":
         available = [
             candidate
-            for candidate in (exa_provider, tavily_provider, serper_provider)
+            for candidate in (exa_provider, tavily_provider, serper_provider, serpapi_provider)
             if candidate
         ]
         if len(available) == 1:

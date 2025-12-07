@@ -1,6 +1,7 @@
 r"""Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.16.10 - 2025-12-07 - Include SerpApi in workspace web search tooltip messaging.
   v0.16.9 - 2025-12-07 - Describe Serper provider in workspace web search tooltips.
   v0.16.8 - 2025-12-07 - Sync \"Use web search\" tooltip with the configured provider.
   v0.16.7 - 2025-12-05 - Route prompt edit callbacks into chain dialogs and panels.
@@ -11,8 +12,6 @@ Updates:
   v0.16.2 - 2025-12-04 - Wire template preview bridge to handler so tab run works on load.
   v0.16.0 - 2025-12-02 - Delegate controller assembly, view callbacks, and handlers
     to helper modules for leaner MainWindow.
-  v0.15.82 - 2025-12-01 - Extract main window composition, workspace insight,
-    and action handlers for leaner MainWindow.
   v0.15.81-and-earlier - 2025-12-01 - Prior modularisation of layout, runtime settings, and sharing.
 """
 
@@ -516,6 +515,10 @@ class MainWindow(QMainWindow):
             self._runtime_settings.get("serper_api_key")
             or (getattr(self._settings, "serper_api_key", None) if self._settings else None)
         )
+        has_serpapi = bool(
+            self._runtime_settings.get("serpapi_api_key")
+            or (getattr(self._settings, "serpapi_api_key", None) if self._settings else None)
+        )
 
         if provider_slug == "exa":
             return "Include live web search context via Exa before executing prompts."
@@ -523,8 +526,15 @@ class MainWindow(QMainWindow):
             return "Include live web search context via Tavily before executing prompts."
         if provider_slug == "serper":
             return "Include live web search context via Serper before executing prompts."
+        if provider_slug == "serpapi":
+            return "Include live web search context via SerpApi before executing prompts."
         if provider_slug == "random":
-            candidate_pairs = (("Exa", has_exa), ("Tavily", has_tavily), ("Serper", has_serper))
+            candidate_pairs = (
+                ("Exa", has_exa),
+                ("Tavily", has_tavily),
+                ("Serper", has_serper),
+                ("SerpApi", has_serpapi),
+            )
             available_labels = [label for label, enabled in candidate_pairs if enabled]
             if not available_labels:
                 targets = "available providers"
@@ -537,8 +547,8 @@ class MainWindow(QMainWindow):
                 f"{targets} before executing prompts."
             )
         return (
-            "Include live web search context. Configure Exa, Tavily, or Serper under Settings "
-            "to enable provider-specific routing."
+            "Include live web search context. Configure Exa, Tavily, Serper, or SerpApi "
+            "under Settings to enable provider-specific routing."
         )
 
     def _initialize_notification_controller(self) -> None:

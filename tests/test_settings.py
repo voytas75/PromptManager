@@ -1,6 +1,7 @@
 """Tests for configuration loading and validation logic.
 
 Updates:
+  v0.2.2 - 2025-12-07 - Cover SerpApi provider secrets and env loading.
   v0.2.1 - 2025-12-07 - Cover Serper provider secrets and env loading.
   v0.2.0 - 2025-12-07 - Cover random web search provider selection.
   v0.1.9 - 2025-12-07 - Cover Tavily provider secrets and validation flow.
@@ -54,6 +55,8 @@ def _clear_litellm_env(monkeypatch: MonkeyPatch) -> None:
         "TAVILY_API_KEY",
         "PROMPT_MANAGER_SERPER_API_KEY",
         "SERPER_API_KEY",
+        "PROMPT_MANAGER_SERPAPI_API_KEY",
+        "SERPAPI_API_KEY",
         "PROMPT_MANAGER_AUTO_OPEN_SHARE_LINKS",
         "AUTO_OPEN_SHARE_LINKS",
         "PROMPT_MANAGER_SHARE_AUTO_OPEN_BROWSER",
@@ -225,6 +228,31 @@ def test_json_with_serper_api_key_is_ignored(
     assert "Ignoring secret key" in caplog.text
 
 
+def test_json_with_serpapi_api_key_is_ignored(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+    caplog: LogCaptureFixture,
+) -> None:
+    """Ensure SerpApi API keys present in JSON configs are ignored."""
+    _clear_litellm_env(monkeypatch)
+    config_payload = {
+        "web_search_provider": "serpapi",
+        "serpapi_api_key": "json-secret",
+    }
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    config_path = config_dir / "config.json"
+    config_path.write_text(json.dumps(config_payload), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    with caplog.at_level(logging.WARNING, logger="prompt_manager.settings"):
+        settings = load_settings()
+
+    assert settings.web_search_provider == "serpapi"
+    assert settings.serpapi_api_key is None
+    assert "Ignoring secret key" in caplog.text
+
+
 def test_litellm_settings_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     """Load LiteLLM configuration entirely from environment variables."""
     _clear_litellm_env(monkeypatch)
@@ -302,6 +330,22 @@ def test_serper_api_key_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> No
     assert settings.web_search_provider == "serper"
 
 
+def test_serpapi_api_key_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    """Load SerpApi API credentials from environment variables."""
+    _clear_litellm_env(monkeypatch)
+    tmp_config = tmp_path / "config.json"
+    tmp_config.write_text("{}", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(tmp_config))
+    monkeypatch.setenv("PROMPT_MANAGER_WEB_SEARCH_PROVIDER", "serpapi")
+    monkeypatch.setenv("PROMPT_MANAGER_SERPAPI_API_KEY", "serpapi-secret")
+
+    settings = load_settings()
+
+    assert settings.serpapi_api_key == "serpapi-secret"
+    assert settings.web_search_provider == "serpapi"
+
+
 def test_exa_api_key_from_dotenv(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     """Load Exa API credentials from a .env file when env vars are unset."""
 
@@ -362,6 +406,27 @@ def test_serper_api_key_from_dotenv_alias(monkeypatch: MonkeyPatch, tmp_path: Pa
 
     assert settings.serper_api_key == "serper-alias"
     assert settings.web_search_provider == "serper"
+
+
+def test_serpapi_api_key_from_dotenv_alias(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    """Support alias-only variables such as SERPAPI_API_KEY in .env files."""
+
+    _clear_litellm_env(monkeypatch)
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    config_path = config_dir / "config.json"
+    config_path.write_text("{}", encoding="utf-8")
+    env_file = tmp_path / ".env"
+    env_file.write_text("SERPAPI_API_KEY=serpapi-alias\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
+    monkeypatch.setenv("PROMPT_MANAGER_ENV_FILE", str(env_file))
+    monkeypatch.setenv("PROMPT_MANAGER_WEB_SEARCH_PROVIDER", "serpapi")
+
+    settings = load_settings()
+
+    assert settings.serpapi_api_key == "serpapi-alias"
+    assert settings.web_search_provider == "serpapi"
 
 
 def test_random_web_search_provider_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:

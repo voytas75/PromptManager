@@ -122,6 +122,24 @@ def test_persist_settings_to_config_omits_serper_api_key(tmp_path, monkeypatch):
     assert data["web_search_provider"] == "serper"
 
 
+def test_persist_settings_to_config_omits_serpapi_api_key(tmp_path, monkeypatch):
+    """Never persist SerpApi API credentials but keep provider selection."""
+    monkeypatch.chdir(tmp_path)
+
+    from config.persistence import persist_settings_to_config
+
+    persist_settings_to_config(
+        {
+            "serpapi_api_key": "serpapi-secret",
+            "web_search_provider": "serpapi",
+        }
+    )
+
+    data = json.loads(Path("config/config.json").read_text(encoding="utf-8"))
+    assert "serpapi_api_key" not in data
+    assert data["web_search_provider"] == "serpapi"
+
+
 def test_persist_settings_to_config_auto_open_flag(tmp_path, monkeypatch):
     """Write the share auto-open flag only when disabled."""
 
