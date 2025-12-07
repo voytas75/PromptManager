@@ -56,24 +56,31 @@ class RedisClientProtocol(Protocol):
 
     def ping(self) -> bool:
         """Return True if the Redis server responds."""
+        ...
 
     def dbsize(self) -> int:
         """Return the number of keys stored in Redis."""
+        ...
 
     def info(self) -> Mapping[str, Any]:
         """Return diagnostic information from Redis."""
+        ...
 
     def get(self, name: str) -> RedisValue | None:
         """Return a cached value when present."""
+        ...
 
     def setex(self, name: str, time: int, value: RedisValue) -> bool:
         """Store a value with the specified TTL."""
+        ...
 
     def delete(self, *names: str) -> int:
         """Remove one or more cache entries."""
+        ...
 
     def close(self) -> None:
         """Release client resources."""
+        ...
 
 
 class CollectionProtocol(Protocol):
@@ -81,18 +88,23 @@ class CollectionProtocol(Protocol):
 
     def count(self) -> int:
         """Return the number of stored embeddings."""
+        ...
 
     def delete(self, **kwargs: Any) -> Any:
         """Remove embeddings matching the supplied filters."""
+        ...
 
     def upsert(self, **kwargs: Any) -> Any:
         """Insert or update embeddings."""
+        ...
 
     def query(self, **kwargs: Any) -> Mapping[str, Any]:
         """Run a similarity query against the collection."""
+        ...
 
     def peek(self, **kwargs: Any) -> Any:
         """Inspect raw collection entries."""
+        ...
 
 
 class NullEmbeddingWorker:

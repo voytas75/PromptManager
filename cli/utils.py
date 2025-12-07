@@ -7,6 +7,7 @@ Updates:
 from __future__ import annotations
 
 import csv
+from os import PathLike
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -15,6 +16,8 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from logging import Logger
 else:  # pragma: no cover - runtime placeholders for type-only imports
     Mapping = Sequence = Logger = Any
+
+PathInput = str | PathLike[str] | Path
 
 
 def print_and_log(logger: Logger, level: int, message: str) -> None:
@@ -36,7 +39,7 @@ def mask_secret(value: str | None) -> str:
 
 
 def describe_path(
-    path_value: object,
+    path_value: PathInput | None,
     *,
     expect_directory: bool,
     allow_missing_file: bool = False,

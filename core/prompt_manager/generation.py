@@ -10,7 +10,7 @@ import logging
 import uuid
 from collections.abc import Mapping, MutableMapping, Sequence
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from models.category_model import PromptCategory, slugify_category
 
@@ -85,15 +85,20 @@ def _match_category_label(
 class GenerationMixin:
     """Prompt generation helpers shared across the manager and GUI flows."""
 
-    def generate_prompt_name(self: _PromptManager, context: str) -> str:
+    def _as_prompt_manager(self) -> _PromptManager:
+        """Return *self* with PromptManager-specific typing for helper access."""
+        return cast("_PromptManager", self)
+
+    def generate_prompt_name(self, context: str) -> str:
         """Return a prompt name using the configured LiteLLM generator."""
-        if self._name_generator is None:
+        manager = self._as_prompt_manager()
+        if manager._name_generator is None:
             raise NameGenerationError(
                 "LiteLLM name generator is not configured. Set PROMPT_MANAGER_LITELLM_MODEL."
             )
         task_id = f"name-gen:{uuid.uuid4()}"
         metadata = {"context_length": len(context or "")}
-        with self._notification_center.track_task(
+        with manager._notification_center.track_task(
             title="Prompt name generation",
             task_id=task_id,
             start_message="Generating prompt name via LiteLLM…",
@@ -103,34 +108,35 @@ class GenerationMixin:
             level=NotificationLevel.INFO,
         ):
             try:
-                suggestion = self._name_generator.generate(context)
+                suggestion = manager._name_generator.generate(context)
             except Exception as exc:  # pragma: no cover - backend determined
                 raise NameGenerationError(str(exc)) from exc
         return suggestion
 
     def generate_prompt_description(
-        self: _PromptManager,
+        self,
         context: str,
         *,
         allow_fallback: bool = True,
         prompt: Prompt | None = None,
     ) -> str:
         """Return a prompt description using LiteLLM with an optional deterministic fallback."""
+        manager = self._as_prompt_manager()
         text = (context or "").strip()
         if not text:
             raise DescriptionGenerationError(
                 "Prompt context is required to generate a description."
             )
-        if self._description_generator is None:
+        if manager._description_generator is None:
             if allow_fallback:
                 logger.debug("Description generator missing; using fallback summary")
-                return self._build_description_fallback(text, prompt=prompt)
+                return manager._build_description_fallback(text, prompt=prompt)
             raise DescriptionGenerationError(
                 "LiteLLM description generator is not configured. Set PROMPT_MANAGER_LITELLM_MODEL."
             )
         task_id = f"description-gen:{uuid.uuid4()}"
         metadata = {"context_length": len(text)}
-        with self._notification_center.track_task(
+        with manager._notification_center.track_task(
             title="Prompt description generation",
             task_id=task_id,
             start_message="Generating prompt description via LiteLLM…",
@@ -140,25 +146,26 @@ class GenerationMixin:
             level=NotificationLevel.INFO,
         ):
             try:
-                summary = self._description_generator.generate(text)
+                summary = manager._description_generator.generate(text)
             except Exception as exc:  # pragma: no cover - backend determined
                 if allow_fallback:
                     logger.warning(
                         "LiteLLM description generation failed; falling back",
                         exc_info=True,
                     )
-                    return self._build_description_fallback(text, prompt=prompt)
+                    return manager._build_description_fallback(text, prompt=prompt)
                 raise DescriptionGenerationError(str(exc)) from exc
         return summary
 
     def generate_prompt_scenarios(
-        self: _PromptManager,
+        self,
         context: str,
         *,
         max_scenarios: int = 3,
     ) -> list[str]:
         """Return usage scenarios for a prompt via the configured LiteLLM helper."""
-        if self._scenario_generator is None:
+        manager = self._as_prompt_manager()
+        if manager._scenario_generator is None:
             raise ScenarioGenerationError(
                 "LiteLLM scenario generator is not configured. Set PROMPT_MANAGER_LITELLM_MODEL."
             )
@@ -167,7 +174,7 @@ class GenerationMixin:
             "context_length": len(context or ""),
             "max_scenarios": max(0, int(max_scenarios)),
         }
-        with self._notification_center.track_task(
+        with manager._notification_center.track_task(
             title="Prompt scenario generation",
             task_id=task_id,
             start_message="Generating scenarios via LiteLLM…",
@@ -177,7 +184,7 @@ class GenerationMixin:
             level=NotificationLevel.INFO,
         ):
             try:
-                scenarios = self._scenario_generator.generate(
+                scenarios = manager._scenario_generator.generate(
                     context,
                     max_scenarios=max_scenarios,
                 )
@@ -186,19 +193,20 @@ class GenerationMixin:
         return scenarios
 
     def refresh_prompt_scenarios(
-        self: _PromptManager,
+        self,
         prompt_id: uuid.UUID,
         *,
         max_scenarios: int = 3,
     ) -> Prompt:
         """Regenerate and persist scenarios for the specified prompt."""
-        prompt = self.get_prompt(prompt_id)
+        manager = self._as_prompt_manager()
+        prompt = manager.get_prompt(prompt_id)
         context_source = prompt.context or prompt.description
         if not context_source:
             raise ScenarioGenerationError(
                 "Prompt is missing context or description; unable to generate scenarios."
             )
-        scenarios = self.generate_prompt_scenarios(context_source, max_scenarios=max_scenarios)
+        scenarios = manager.generate_prompt_scenarios(context_source, max_scenarios=max_scenarios)
         prompt.scenarios = list(scenarios)
         ext5_payload: MutableMapping[str, Any] | None
         if isinstance(prompt.ext5, MutableMapping):
@@ -218,42 +226,44 @@ class GenerationMixin:
         prompt.ext5 = ext5_payload
         prompt.last_modified = datetime.now(UTC)
         try:
-            return self.update_prompt(prompt)
+            return manager.update_prompt(prompt)
         except PromptManagerError as exc:
             raise PromptStorageError("Failed to persist refreshed scenarios") from exc
 
-    def generate_prompt_category(self: _PromptManager, context: str) -> str:
+    def generate_prompt_category(self, context: str) -> str:
         """Suggest a prompt category using LiteLLM with classifier-based fallback."""
+        manager = self._as_prompt_manager()
         text = (context or "").strip()
         if not text:
             return ""
-        categories = self.list_categories()
+        categories = manager.list_categories()
         if not categories:
             return ""
 
-        if self._category_generator is not None:
-            suggestion = self._run_category_generator(text, categories)
+        if manager._category_generator is not None:
+            suggestion = manager._run_category_generator(text, categories)
             if suggestion:
                 matched = _match_category_label(suggestion, categories)
                 if matched:
                     return matched
 
-        return self._fallback_category_from_context(text, categories)
+        return manager._fallback_category_from_context(text, categories)
 
     def _run_category_generator(
-        self: _PromptManager,
+        self,
         context: str,
         categories: Sequence[PromptCategory],
     ) -> str:
         """Return category suggestion from LiteLLM, logging failures for fallbacks."""
-        if self._category_generator is None:
+        manager = self._as_prompt_manager()
+        if manager._category_generator is None:
             return ""
         task_id = f"category-suggest:{uuid.uuid4()}"
         metadata = {
             "context_length": len(context or ""),
             "category_count": len(categories),
         }
-        with self._notification_center.track_task(
+        with manager._notification_center.track_task(
             title="Prompt category suggestion",
             task_id=task_id,
             start_message="Suggesting prompt category via LiteLLM…",
@@ -263,7 +273,7 @@ class GenerationMixin:
             level=NotificationLevel.INFO,
         ):
             try:
-                return self._category_generator.generate(context, categories=categories)
+                return manager._category_generator.generate(context, categories=categories)
             except CategorySuggestionError as exc:
                 logger.debug(
                     "LiteLLM category suggestion failed",
@@ -275,12 +285,13 @@ class GenerationMixin:
         return ""
 
     def _fallback_category_from_context(
-        self: _PromptManager,
+        self,
         context: str,
         categories: Sequence[PromptCategory],
     ) -> str:
         """Return a category suggestion using heuristics and classifier hints."""
-        classifier = getattr(self, "_intent_classifier", None)
+        manager = self._as_prompt_manager()
+        classifier = getattr(manager, "_intent_classifier", None)
         if classifier is not None:
             prediction = classifier.classify(context)
             if prediction.category_hints:
@@ -308,35 +319,38 @@ class GenerationMixin:
         return categories[0].label if categories else "General"
 
     def _update_category_insight(
-        self: _PromptManager,
+        self,
         prompt: Prompt,
         *,
         previous_prompt: Prompt | None,
     ) -> None:
         """Capture LiteLLM-backed category drift metadata on the prompt."""
-        if self._category_generator is None:
-            self._set_category_insight_metadata(prompt, None)
+        manager = self._as_prompt_manager()
+        if manager._category_generator is None:
+            manager._set_category_insight_metadata(prompt, None)
             return
 
-        context_text = self._category_context_text(prompt)
+        context_text = manager._category_context_text(prompt)
         if not context_text:
-            self._set_category_insight_metadata(prompt, None)
+            manager._set_category_insight_metadata(prompt, None)
             return
 
-        categories = self.list_categories()
+        categories = manager.list_categories()
         if not categories:
-            self._set_category_insight_metadata(prompt, None)
+            manager._set_category_insight_metadata(prompt, None)
             return
 
         try:
-            suggestion_raw = self._category_generator.generate(context_text, categories=categories)
+            suggestion_raw = manager._category_generator.generate(
+                context_text, categories=categories
+            )
         except CategorySuggestionError as exc:
             logger.debug(
                 "Category drift suggestion failed",
                 extra={"prompt_id": str(prompt.id), "error": str(exc)},
                 exc_info=True,
             )
-            self._set_category_insight_metadata(prompt, None)
+            manager._set_category_insight_metadata(prompt, None)
             return
         except Exception:  # pragma: no cover - defensive
             logger.warning(
@@ -344,16 +358,16 @@ class GenerationMixin:
                 extra={"prompt_id": str(prompt.id)},
                 exc_info=True,
             )
-            self._set_category_insight_metadata(prompt, None)
+            manager._set_category_insight_metadata(prompt, None)
             return
 
         suggestion_label = _match_category_label(suggestion_raw, categories) or suggestion_raw
         timestamp = datetime.now(UTC).isoformat()
         current_label = (prompt.category or "").strip()
         labels_match = bool(current_label) and current_label.lower() == suggestion_label.lower()
-        previous_insight = self._extract_category_insight(previous_prompt)
+        previous_insight = manager._extract_category_insight(previous_prompt)
         if labels_match:
-            adoption_payload = self._build_category_adoption_insight(
+            adoption_payload = manager._build_category_adoption_insight(
                 previous_prompt,
                 previous_insight,
                 suggestion_label,
@@ -362,9 +376,9 @@ class GenerationMixin:
                 timestamp,
             )
             if adoption_payload:
-                self._set_category_insight_metadata(prompt, adoption_payload)
+                manager._set_category_insight_metadata(prompt, adoption_payload)
             else:
-                self._set_category_insight_metadata(prompt, None)
+                manager._set_category_insight_metadata(prompt, None)
             return
 
         insight: dict[str, Any] = {
@@ -376,7 +390,7 @@ class GenerationMixin:
         }
         if previous_prompt is not None:
             insight["previous_category"] = previous_prompt.category
-        self._set_category_insight_metadata(prompt, insight)
+        manager._set_category_insight_metadata(prompt, insight)
 
     @staticmethod
     def _category_context_text(prompt: Prompt) -> str:
