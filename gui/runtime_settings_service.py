@@ -234,6 +234,7 @@ class RuntimeSettingsService:
             "web_search_provider",
             "exa_api_key",
             "tavily_api_key",
+            "serper_api_key",
             "auto_open_share_links",
         )
         for key in simple_keys:
@@ -364,6 +365,7 @@ class RuntimeSettingsService:
                 "litellm_stream": runtime.get("litellm_stream"),
                 "litellm_api_key": runtime.get("litellm_api_key"),
                 "tavily_api_key": runtime.get("tavily_api_key"),
+                "serper_api_key": runtime.get("serper_api_key"),
                 "embedding_backend": runtime.get("embedding_backend"),
                 "embedding_model": runtime.get("embedding_model"),
                 "chat_user_bubble_color": runtime.get("chat_user_bubble_color"),
@@ -391,6 +393,7 @@ class RuntimeSettingsService:
             settings_model.web_search_provider = updates.get("web_search_provider")
             settings_model.exa_api_key = updates.get("exa_api_key")
             settings_model.tavily_api_key = updates.get("tavily_api_key")
+            settings_model.serper_api_key = updates.get("serper_api_key")
             if "auto_open_share_links" in updates:
                 settings_model.auto_open_share_links = bool(updates.get("auto_open_share_links"))
             if "litellm_tts_stream" in updates:
