@@ -1,6 +1,7 @@
 """Coordinate prompt execution, streaming, and chat workspace logic.
 
 Updates:
+  v0.1.6 - 2025-12-07 - Enable chat continuation for workspace text runs.
   v0.1.5 - 2025-12-07 - Support promptless workspace text execution.
   v0.1.4 - 2025-12-07 - Wrap web context with shared markers and numbering.
   v0.1.3 - 2025-12-04 - Include all web snippets and summarize >5k words via fast LiteLLM.
@@ -171,6 +172,7 @@ class ExecutionController:
         self._last_prompt_name: str | None = None
         self._chat_conversation: list[dict[str, str]] = []
         self._chat_prompt_id: UUID | None = None
+        self._freeform_chat_active = False
 
         self._copy_result_button.setEnabled(False)
         self._copy_result_to_text_window_button.setEnabled(False)
@@ -414,7 +416,7 @@ class ExecutionController:
             prompt,
             outcome,
             enable_save=False,
-            enable_chat=False,
+            freeform_chat=True,
         )
         self._usage_logger.log_execute(
             prompt_name=prompt.name,
@@ -428,7 +430,15 @@ class ExecutionController:
 
     def continue_chat(self) -> None:
         """Send the workspace text as a follow-up within the active chat session."""
-        if not self._chat_conversation or self._chat_prompt_id is None:
+        if not self._chat_conversation:
+            self._status("Run a prompt to start a chat before continuing.", 4000)
+            return
+
+        if self._freeform_chat_active:
+            self._continue_freeform_chat()
+            return
+
+        if self._chat_prompt_id is None:
             self._status("Run a prompt to start a chat before continuing.", 4000)
             return
 
@@ -495,12 +505,95 @@ class ExecutionController:
             5000,
         )
 
+    def _continue_freeform_chat(self) -> None:
+        """Continue a chat session started from a workspace text-only run."""
+        follow_up = self._query_input.toPlainText().strip()
+        if not follow_up:
+            self._status("Type a follow-up message before continuing the chat.", 4000)
+            return
+
+        executor = getattr(self._manager, "executor", None)
+        if executor is None:
+            self._freeform_chat_active = False
+            self._continue_chat_button.setEnabled(False)
+            self._error("Prompt execution unavailable", "Configure LiteLLM before running text.")
+            self._status("Prompt execution unavailable.", 4000)
+            return
+
+        prompt = self._build_freeform_prompt()
+        payload = self._maybe_enrich_request(prompt, follow_up)
+        streaming_enabled = self._is_streaming_enabled()
+        callback = self._handle_stream_chunk if streaming_enabled else None
+        conversation_history = [dict(message) for message in self._chat_conversation]
+
+        if streaming_enabled:
+            self._begin_streaming_run(prompt)
+        try:
+            result = executor.execute(
+                prompt,
+                payload,
+                conversation=conversation_history,
+                stream=streaming_enabled,
+                on_stream=callback,
+            )
+        except ExecutionError as exc:
+            if streaming_enabled and self._streaming_in_progress:
+                self._end_streaming_run()
+            self._usage_logger.log_execute(
+                prompt_name=prompt.name,
+                success=False,
+                duration_ms=None,
+                error=str(exc),
+            )
+            self._error("Continue chat failed", str(exc))
+            return
+        except Exception as exc:  # noqa: BLE001 - defensive guard for executor failures
+            if streaming_enabled and self._streaming_in_progress:
+                self._end_streaming_run()
+            self._usage_logger.log_execute(
+                prompt_name=prompt.name,
+                success=False,
+                duration_ms=None,
+                error=str(exc),
+            )
+            self._error("Continue chat failed", str(exc))
+            return
+        finally:
+            if streaming_enabled and self._streaming_in_progress:
+                self._end_streaming_run()
+
+        conversation = list(conversation_history)
+        conversation.append({"role": "user", "content": payload})
+        if result.response_text:
+            conversation.append({"role": "assistant", "content": result.response_text})
+        outcome = PromptManager.ExecutionOutcome(
+            result=result,
+            history_entry=None,
+            conversation=conversation,
+        )
+        self._display_execution_result(
+            prompt,
+            outcome,
+            enable_save=False,
+            freeform_chat=True,
+        )
+        self._usage_logger.log_execute(
+            prompt_name=prompt.name,
+            success=True,
+            duration_ms=result.duration_ms,
+        )
+        self._status(
+            f"Continued workspace text chat in {result.duration_ms} ms.",
+            5000,
+        )
+
     def end_chat(self) -> None:
         """Terminate the active chat session while preserving the transcript."""
         if not self._chat_conversation:
             self._status("There is no active chat session to end.", 4000)
             return
         self._chat_prompt_id = None
+        self._freeform_chat_active = False
         self._continue_chat_button.setEnabled(False)
         self._end_chat_button.setEnabled(False)
         self._status("Chat session ended. Conversation preserved in history.", 5000)
@@ -510,6 +603,7 @@ class ExecutionController:
         self._stop_voice_playback()
         self._last_execution = None
         self._last_prompt_name = None
+        self._freeform_chat_active = False
         self._result_label.setText("No prompt executed yet")
         self._result_meta.clear()
         self._set_result_text_content("")
@@ -818,10 +912,19 @@ class ExecutionController:
         *,
         enable_save: bool = True,
         enable_chat: bool = True,
+        freeform_chat: bool = False,
     ) -> None:
         self._last_execution = outcome
         self._last_prompt_name = prompt.name
-        self._chat_prompt_id = prompt.id if enable_chat else None
+        if enable_chat and not freeform_chat:
+            self._chat_prompt_id = prompt.id
+            self._freeform_chat_active = False
+        elif enable_chat and freeform_chat:
+            self._chat_prompt_id = None
+            self._freeform_chat_active = True
+        else:
+            self._chat_prompt_id = None
+            self._freeform_chat_active = False
         self._chat_conversation = [dict(message) for message in outcome.conversation]
         self._result_label.setText(f"Last Result — {prompt.name}")
         meta_parts: list[str] = [f"Duration: {outcome.result.duration_ms} ms"]
@@ -849,6 +952,7 @@ class ExecutionController:
     def _reset_chat_session(self, *, clear_view: bool = True) -> None:
         self._chat_prompt_id = None
         self._chat_conversation = []
+        self._freeform_chat_active = False
         self._continue_chat_button.setEnabled(False)
         self._end_chat_button.setEnabled(False)
         if clear_view:
