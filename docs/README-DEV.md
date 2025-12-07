@@ -62,8 +62,9 @@ All settings are defined via `pydantic-settings` in `config/settings.py`. Provid
 | `PROMPT_MANAGER_LITELLM_STREAM` | Enable streaming responses (`true`/`false`) | `true` |
 | `PROMPT_MANAGER_LITELLM_TTS_MODEL` | LiteLLM text-to-speech model id used for voice playback | `openai/tts-1` |
 | `PROMPT_MANAGER_LITELLM_TTS_STREAM` | Stream LiteLLM TTS audio so playback starts mid-download (`true`/`false`) | `true` |
-| `PROMPT_MANAGER_WEB_SEARCH_PROVIDER` | Web search provider slug (`exa` or leave empty to disable) | `exa` |
+| `PROMPT_MANAGER_WEB_SEARCH_PROVIDER` | Web search provider slug (`exa`, `tavily`, or leave empty to disable) | `tavily` |
 | `PROMPT_MANAGER_EXA_API_KEY` / `EXA_API_KEY` | Exa web search API key (environment only) | `exa_***` |
+| `PROMPT_MANAGER_TAVILY_API_KEY` / `TAVILY_API_KEY` | Tavily web search API key (environment only) | `tvly-***` |
 | `PROMPT_MANAGER_AUTO_OPEN_SHARE_LINKS` | Auto-open shared URLs in the default browser (`true`/`false`) | `true` |
 | `PROMPT_MANAGER_EMBEDDING_BACKEND` | `litellm`, `sentence-transformers`, or `deterministic` | `sentence-transformers` |
 | `PROMPT_MANAGER_EMBEDDING_MODEL` | Embedding model identifier | `text-embedding-3-large` |
@@ -72,7 +73,7 @@ All settings are defined via `pydantic-settings` in `config/settings.py`. Provid
 
 Secrets must never be committed; rely on `.env` files ignored by git or host-level secret stores.
 
-See [`docs/web_search_plan.md`](web_search_plan.md) for the staged Exa integration plan if you are extending the provider surface.
+See [`docs/web_search_plan.md`](web_search_plan.md) for the staged web search integration plan (Exa + Tavily) if you are extending the provider surface.
 
 ## Detailed Getting Started
 
@@ -99,7 +100,7 @@ See [`docs/web_search_plan.md`](web_search_plan.md) for the staged Exa integrati
   - `deterministic`: offline hashing for smoke tests.
 - Search queries embed the entire user phrase and ask ChromaDB for nearest neighbours; results are already cosine-ranked and displayed as-is in the GUI.
 - The GUI shows similarity scores (`[0.91]`) when search is active; the sort dropdown is disabled to preserve ranking integrity.
-- When Exa is configured, the workspace and Chain tab expose a “Use web search” checkbox (checked by default). Leaving it on runs an Exa query (prompt metadata + user input) before execution and injects every available summary/highlight into the request body (source links included); if the aggregate context exceeds ~5,000 words, the fast LiteLLM model condenses it before prepending. Unchecking the box (or running `prompt-chain-run --no-web-search`) forces offline-only runs.
+- When a provider (Exa or Tavily) is configured, the workspace and Chain tab expose a “Use web search” checkbox (checked by default). Leaving it on runs a provider query (prompt metadata + user input) before execution and injects every available summary/highlight into the request body (source links included); if the aggregate context exceeds ~5,000 words, the fast LiteLLM model condenses it before prepending. Unchecking the box (or running `prompt-chain-run --no-web-search`) forces offline-only runs.
 
 ## Running the GUI
 

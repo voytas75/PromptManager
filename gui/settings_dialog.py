@@ -88,6 +88,7 @@ class SettingsDialog(QDialog):
         prompt_templates: dict[str, str] | None = None,
         web_search_provider: str | None = None,
         exa_api_key: str | None = None,
+        tavily_api_key: str | None = None,
         auto_open_share_links: bool | None = None,
     ) -> None:
         """Build the settings UI with existing runtime values pre-populated."""
@@ -115,8 +116,11 @@ class SettingsDialog(QDialog):
         self._litellm_tts_stream = True if litellm_tts_stream is None else bool(litellm_tts_stream)
         self._litellm_stream = bool(litellm_stream)
         provider_choice = (web_search_provider or "").strip().lower()
-        self._web_search_provider = provider_choice if provider_choice in {"exa"} else None
+        self._web_search_provider = (
+            provider_choice if provider_choice in {"exa", "tavily"} else None
+        )
         self._exa_api_key = exa_api_key or ""
+        self._tavily_api_key = tavily_api_key or ""
         original_actions = [
             dict(entry) for entry in (quick_actions or []) if isinstance(entry, dict)
         ]
@@ -155,6 +159,7 @@ class SettingsDialog(QDialog):
         self._prompt_template_initials: dict[str, str] = {}
         self._web_search_provider_combo: QComboBox | None = None
         self._exa_api_key_input: QLineEdit | None = None
+        self._tavily_api_key_input: QLineEdit | None = None
         default_share_toggle = (
             True if auto_open_share_links is None else bool(auto_open_share_links)
         )
@@ -328,8 +333,11 @@ class SettingsDialog(QDialog):
         provider_combo = QComboBox(integrations_tab)
         provider_combo.addItem("Disabled", userData=None)
         provider_combo.addItem("Exa", userData="exa")
+        provider_combo.addItem("Tavily", userData="tavily")
         if self._web_search_provider == "exa":
             provider_combo.setCurrentIndex(1)
+        elif self._web_search_provider == "tavily":
+            provider_combo.setCurrentIndex(2)
         else:
             provider_combo.setCurrentIndex(0)
         self._web_search_provider_combo = provider_combo
@@ -340,6 +348,12 @@ class SettingsDialog(QDialog):
         exa_api_key_input.setPlaceholderText("exa_********************************")
         self._exa_api_key_input = exa_api_key_input
         integrations_form.addRow("Exa API key", exa_api_key_input)
+
+        tavily_api_key_input = QLineEdit(self._tavily_api_key, integrations_tab)
+        tavily_api_key_input.setEchoMode(QLineEdit.Password)
+        tavily_api_key_input.setPlaceholderText("tvly-********************************")
+        self._tavily_api_key_input = tavily_api_key_input
+        integrations_form.addRow("Tavily API key", tavily_api_key_input)
 
         integrations_hint = QLabel(
             (
@@ -621,6 +635,9 @@ class SettingsDialog(QDialog):
         exa_api_key = (
             _clean(self._exa_api_key_input.text()) if self._exa_api_key_input else None
         )
+        tavily_api_key = (
+            _clean(self._tavily_api_key_input.text()) if self._tavily_api_key_input else None
+        )
 
         return {
             "litellm_model": _clean(self._model_input.text()),
@@ -643,6 +660,7 @@ class SettingsDialog(QDialog):
             "prompt_templates": self._prompt_templates_value,
             "web_search_provider": provider_choice,
             "exa_api_key": exa_api_key,
+            "tavily_api_key": tavily_api_key,
             "auto_open_share_links": (
                 bool(self._share_auto_open_checkbox.isChecked())
                 if self._share_auto_open_checkbox

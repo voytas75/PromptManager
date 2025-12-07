@@ -1,6 +1,7 @@
 """Factories for constructing PromptManager instances from validated settings.
 
 Updates:
+  v0.7.8 - 2025-12-07 - Add Tavily provider wiring to the web search factory.
   v0.7.7 - 2025-12-04 - Wire web search service creation into manager factory.
   v0.7.6 - 2025-11-30 - Remove docstring padding for Ruff compliance.
   v0.7.5 - 2025-11-29 - Move config imports behind type checks and wrap long strings.
@@ -9,10 +10,7 @@ Updates:
   v0.7.2 - 2025-11-26 - Wire LiteLLM streaming flag into executor construction.
   v0.7.1 - 2025-11-19 - Configure LiteLLM scenario generator for prompt metadata enrichment.
   v0.7.0 - 2025-11-15 - Wire prompt engineer construction into manager factory.
-  v0.6.1 - 2025-11-07 - Add configurable embedding backends via settings.
-  v0.6.0 - 2025-11-06 - Wire intent classifier for hybrid retrieval suggestions.
-  v0.5.0 - 2025-11-05 - Add LiteLLM name generator wiring.
-  v0.1.0 - 2025-11-03 - Added build_prompt_manager helper for GUI/bootstrap reuse.
+  v0.6.1-and-earlier - 2025-11-07 - Add configurable embedding backends and initial factory wiring.
 """
 
 from __future__ import annotations
@@ -35,7 +33,7 @@ from .prompt_engineering import PromptEngineer
 from .prompt_manager import NameGenerationError, PromptCacheError, PromptManager
 from .repository import PromptRepository
 from .scenario_generation import LiteLLMScenarioGenerator
-from .web_search import ExaWebSearchProvider, WebSearchService
+from .web_search import ExaWebSearchProvider, TavilyWebSearchProvider, WebSearchService
 
 try:  # pragma: no cover - redis optional dependency
     import redis
@@ -101,6 +99,10 @@ def _build_web_search_service(settings: PromptManagerSettings) -> WebSearchServi
         api_key = getattr(settings, "exa_api_key", None)
         if api_key:
             provider = ExaWebSearchProvider(api_key=api_key)
+    elif provider_slug == "tavily":
+        api_key = getattr(settings, "tavily_api_key", None)
+        if api_key:
+            provider = TavilyWebSearchProvider(api_key=api_key)
     return WebSearchService(provider)
 
 

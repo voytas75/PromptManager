@@ -1,6 +1,7 @@
 """Tests for configuration loading and validation logic.
 
 Updates:
+  v0.1.9 - 2025-12-07 - Cover Tavily provider secrets and validation flow.
   v0.1.8 - 2025-12-04 - Cover .env sourcing for Exa API secrets.
   v0.1.7 - 2025-11-30 - Add docstrings to tests for lint compliance.
   v0.1.6 - 2025-11-30 - Cover routing for category suggestion workflow.
@@ -49,6 +50,8 @@ def _clear_litellm_env(monkeypatch: MonkeyPatch) -> None:
         "PROMPT_MANAGER_WEB_SEARCH_PROVIDER",
         "PROMPT_MANAGER_EXA_API_KEY",
         "EXA_API_KEY",
+        "PROMPT_MANAGER_TAVILY_API_KEY",
+        "TAVILY_API_KEY",
         "PROMPT_MANAGER_AUTO_OPEN_SHARE_LINKS",
         "AUTO_OPEN_SHARE_LINKS",
         "PROMPT_MANAGER_SHARE_AUTO_OPEN_BROWSER",
@@ -170,6 +173,31 @@ def test_json_with_exa_api_key_is_ignored(
     assert "Ignoring secret key" in caplog.text
 
 
+def test_json_with_tavily_api_key_is_ignored(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+    caplog: LogCaptureFixture,
+) -> None:
+    """Ensure Tavily API keys present in JSON configs are ignored."""
+    _clear_litellm_env(monkeypatch)
+    config_payload = {
+        "web_search_provider": "tavily",
+        "tavily_api_key": "json-secret",
+    }
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    config_path = config_dir / "config.json"
+    config_path.write_text(json.dumps(config_payload), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    with caplog.at_level(logging.WARNING, logger="prompt_manager.settings"):
+        settings = load_settings()
+
+    assert settings.web_search_provider == "tavily"
+    assert settings.tavily_api_key is None
+    assert "Ignoring secret key" in caplog.text
+
+
 def test_litellm_settings_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     """Load LiteLLM configuration entirely from environment variables."""
     _clear_litellm_env(monkeypatch)
@@ -215,6 +243,22 @@ def test_exa_api_key_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     assert settings.web_search_provider == "exa"
 
 
+def test_tavily_api_key_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    """Load Tavily API credentials from environment variables."""
+    _clear_litellm_env(monkeypatch)
+    tmp_config = tmp_path / "config.json"
+    tmp_config.write_text("{}", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(tmp_config))
+    monkeypatch.setenv("PROMPT_MANAGER_WEB_SEARCH_PROVIDER", "tavily")
+    monkeypatch.setenv("PROMPT_MANAGER_TAVILY_API_KEY", "tvly-secret")
+
+    settings = load_settings()
+
+    assert settings.tavily_api_key == "tvly-secret"
+    assert settings.web_search_provider == "tavily"
+
+
 def test_exa_api_key_from_dotenv(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     """Load Exa API credentials from a .env file when env vars are unset."""
 
@@ -233,6 +277,27 @@ def test_exa_api_key_from_dotenv(monkeypatch: MonkeyPatch, tmp_path: Path) -> No
 
     assert settings.exa_api_key == "exa-dotenv"
     assert settings.web_search_provider == "exa"
+
+
+def test_tavily_api_key_from_dotenv_alias(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    """Support alias-only variables such as TAVILY_API_KEY in .env files."""
+
+    _clear_litellm_env(monkeypatch)
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    config_path = config_dir / "config.json"
+    config_path.write_text("{}", encoding="utf-8")
+    env_file = tmp_path / ".env"
+    env_file.write_text("TAVILY_API_KEY=tvly-alias\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
+    monkeypatch.setenv("PROMPT_MANAGER_ENV_FILE", str(env_file))
+    monkeypatch.setenv("PROMPT_MANAGER_WEB_SEARCH_PROVIDER", "tavily")
+
+    settings = load_settings()
+
+    assert settings.tavily_api_key == "tvly-alias"
+    assert settings.web_search_provider == "tavily"
 
 
 def test_exa_api_key_from_dotenv_alias(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:

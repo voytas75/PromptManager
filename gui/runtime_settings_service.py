@@ -1,6 +1,7 @@
 """Runtime settings helpers for Prompt Manager GUI.
 
 Updates:
+  v0.1.3 - 2025-12-07 - Track Tavily web search credentials in runtime snapshots.
   v0.1.2 - 2025-12-04 - Persist auto-open share preference across restarts.
   v0.1.1 - 2025-12-04 - Track web search provider/runtime secrets.
   v0.1.0 - 2025-12-01 - Extracted runtime settings snapshot + apply helpers.
@@ -99,6 +100,7 @@ class RuntimeSettingsService:
             ),
             "web_search_provider": settings.web_search_provider if settings else None,
             "exa_api_key": settings.exa_api_key if settings else None,
+            "tavily_api_key": settings.tavily_api_key if settings else None,
             "auto_open_share_links": (
                 settings.auto_open_share_links if settings is not None else True
             ),
@@ -230,6 +232,7 @@ class RuntimeSettingsService:
             "litellm_tts_stream",
             "web_search_provider",
             "exa_api_key",
+            "tavily_api_key",
             "auto_open_share_links",
         )
         for key in simple_keys:
@@ -359,6 +362,7 @@ class RuntimeSettingsService:
                 "litellm_drop_params": runtime.get("litellm_drop_params"),
                 "litellm_stream": runtime.get("litellm_stream"),
                 "litellm_api_key": runtime.get("litellm_api_key"),
+                "tavily_api_key": runtime.get("tavily_api_key"),
                 "embedding_backend": runtime.get("embedding_backend"),
                 "embedding_model": runtime.get("embedding_model"),
                 "chat_user_bubble_color": runtime.get("chat_user_bubble_color"),
@@ -385,6 +389,7 @@ class RuntimeSettingsService:
             settings_model.litellm_tts_model = updates.get("litellm_tts_model")
             settings_model.web_search_provider = updates.get("web_search_provider")
             settings_model.exa_api_key = updates.get("exa_api_key")
+            settings_model.tavily_api_key = updates.get("tavily_api_key")
             if "auto_open_share_links" in updates:
                 settings_model.auto_open_share_links = bool(
                     updates.get("auto_open_share_links")

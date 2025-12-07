@@ -228,13 +228,18 @@ class PromptManagerSettings(BaseSettings):
             "'fast' or 'inference'."
         ),
     )
-    web_search_provider: Literal["exa"] | None = Field(
+    web_search_provider: Literal["exa", "tavily"] | None = Field(
         default="exa",
         description="Configured web search provider slug (set empty to disable).",
     )
     exa_api_key: str | None = Field(
         default=None,
         description="API key used for Exa-powered web search features.",
+        repr=False,
+    )
+    tavily_api_key: str | None = Field(
+        default=None,
+        description="API key used for Tavily-powered web search features.",
         repr=False,
     )
     quick_actions: list[dict[str, object]] | None = Field(
@@ -347,6 +352,7 @@ class PromptManagerSettings(BaseSettings):
                 "prompt_templates": ["PROMPT_TEMPLATES", "prompt_templates"],
                 "web_search_provider": ["WEB_SEARCH_PROVIDER", "web_search_provider"],
                 "exa_api_key": ["EXA_API_KEY", "exa_api_key"],
+                "tavily_api_key": ["TAVILY_API_KEY", "tavily_api_key"],
                 "auto_open_share_links": [
                     "AUTO_OPEN_SHARE_LINKS",
                     "auto_open_share_links",
@@ -418,6 +424,7 @@ class PromptManagerSettings(BaseSettings):
         "embedding_model",
         "embedding_device",
         "exa_api_key",
+        "tavily_api_key",
         mode="before",
     )
     def _strip_strings(cls, value: str | None) -> str | None:
@@ -446,9 +453,9 @@ class PromptManagerSettings(BaseSettings):
         text = str(value).strip().lower()
         if text in {"none", "disabled", "off"}:
             return None
-        if text != "exa":
-            raise ValueError("web_search_provider must be set to 'exa' or left empty")
-        return "exa"
+        if text not in {"exa", "tavily"}:
+            raise ValueError("web_search_provider must be set to 'exa', 'tavily', or left empty")
+        return text
 
     @field_validator("theme_mode", mode="before")
     def _normalise_theme_mode(cls, value: str | None) -> str:
@@ -677,6 +684,7 @@ class PromptManagerSettings(BaseSettings):
                 "litellm_stream": ["LITELLM_STREAM", "litellm_stream"],
                 "web_search_provider": ["WEB_SEARCH_PROVIDER", "web_search_provider"],
                 "exa_api_key": ["EXA_API_KEY", "exa_api_key"],
+                "tavily_api_key": ["TAVILY_API_KEY", "tavily_api_key"],
                 "auto_open_share_links": [
                     "AUTO_OPEN_SHARE_LINKS",
                     "auto_open_share_links",
@@ -753,6 +761,8 @@ class PromptManagerSettings(BaseSettings):
                     "AZURE_OPENAI_API_KEY",
                     "exa_api_key",
                     "EXA_API_KEY",
+                    "tavily_api_key",
+                    "TAVILY_API_KEY",
                 }
                 removed_secrets = [
                     key

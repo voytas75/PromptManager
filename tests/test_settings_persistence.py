@@ -86,6 +86,24 @@ def test_persist_settings_to_config_omits_exa_api_key(tmp_path, monkeypatch):
     assert data["web_search_provider"] == "exa"
 
 
+def test_persist_settings_to_config_omits_tavily_api_key(tmp_path, monkeypatch):
+    """Never persist Tavily API credentials but keep provider selection."""
+    monkeypatch.chdir(tmp_path)
+
+    from config.persistence import persist_settings_to_config
+
+    persist_settings_to_config(
+        {
+            "tavily_api_key": "tvly-secret",
+            "web_search_provider": "tavily",
+        }
+    )
+
+    data = json.loads(Path("config/config.json").read_text(encoding="utf-8"))
+    assert "tavily_api_key" not in data
+    assert data["web_search_provider"] == "tavily"
+
+
 def test_persist_settings_to_config_auto_open_flag(tmp_path, monkeypatch):
     """Write the share auto-open flag only when disabled."""
 
