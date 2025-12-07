@@ -1,6 +1,7 @@
 """Settings workflows for the Prompt Manager main window.
 
 Updates:
+  v0.15.86 - 2025-12-07 - Pass Google Programmable Search credentials through the dialog.
   v0.15.85 - 2025-12-07 - Accept generic run buttons to support split actions.
   v0.15.84 - 2025-12-07 - Pass SerpApi credentials through the settings workflow dialog.
   v0.15.83 - 2025-12-07 - Refresh workspace tooltip when web search settings change.
@@ -98,6 +99,8 @@ class SettingsWorkflow:
             tavily_api_key=self._runtime_settings.get("tavily_api_key"),
             serper_api_key=self._runtime_settings.get("serper_api_key"),
             serpapi_api_key=self._runtime_settings.get("serpapi_api_key"),
+            google_api_key=self._runtime_settings.get("google_api_key"),
+            google_cse_id=self._runtime_settings.get("google_cse_id"),
             auto_open_share_links=self._runtime_settings.get("auto_open_share_links"),
         )
         if dialog.exec() != SettingsDialog.Accepted:

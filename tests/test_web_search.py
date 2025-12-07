@@ -1,6 +1,7 @@
 """Tests for the web search provider/service scaffolding.
 
 Updates:
+  v0.1.6 - 2025-12-07 - Cover Google provider success/error flows.
   v0.1.5 - 2025-12-07 - Cover SerpApi provider success/error flows.
   v0.1.4 - 2025-12-07 - Cover Serper provider success/error flows.
   v0.1.3 - 2025-12-07 - Cover random provider fan-out behaviour.
@@ -20,6 +21,7 @@ from core.web_search import (
     SEARCH_RESULTS_NOTE,
     SEARCH_RESULTS_START_MARKER,
     ExaWebSearchProvider,
+    GoogleWebSearchProvider,
     RandomWebSearchProvider,
     SerpApiWebSearchProvider,
     SerperWebSearchProvider,
@@ -260,6 +262,67 @@ async def test_serpapi_provider_raises_on_error() -> None:
         base_url="https://serpapi.com",
     )
     provider = SerpApiWebSearchProvider(api_key="serpapi-test", client_factory=lambda: mock_client)
+
+    with pytest.raises(WebSearchProviderError):
+        await provider.search("latest news")
+    await mock_client.aclose()
+
+
+@pytest.mark.asyncio()
+async def test_google_provider_parses_results() -> None:
+    """Ensure the Google provider maps API payloads into canonical documents."""
+    mock_client = _build_mock_client(
+        httpx.Response(
+            200,
+            json={
+                "items": [
+                    {
+                        "title": "Google Result",
+                        "link": "https://example.com/google",
+                        "snippet": "Snippet summary",
+                        "htmlSnippet": "Snippet <b>summary</b>",
+                        "displayLink": "example.com",
+                        "pagemap": {
+                            "metatags": [
+                                {"article:published_time": "2025-12-07T12:00:00Z"},
+                            ]
+                        },
+                    }
+                ]
+            },
+        ),
+        base_url="https://www.googleapis.com",
+    )
+    provider = GoogleWebSearchProvider(
+        api_key="google-secret",
+        cse_id="engine-id",
+        client_factory=lambda: mock_client,
+    )
+    result = await provider.search("latest news", limit=2)
+    await mock_client.aclose()
+
+    assert result.provider == "google"
+    assert len(result.documents) == 1
+    doc = result.documents[0]
+    assert doc.summary == "Snippet summary"
+    assert doc.highlights == ["Snippet summary"]
+    assert doc.author == "example.com"
+    assert doc.score == pytest.approx(1.0)
+    assert doc.published_at is not None
+
+
+@pytest.mark.asyncio()
+async def test_google_provider_raises_on_error() -> None:
+    """Raise a provider error when Google rejects the request."""
+    mock_client = _build_mock_client(
+        httpx.Response(400, json={"error": {"message": "invalid"}}),
+        base_url="https://www.googleapis.com",
+    )
+    provider = GoogleWebSearchProvider(
+        api_key="google-secret",
+        cse_id="engine-id",
+        client_factory=lambda: mock_client,
+    )
 
     with pytest.raises(WebSearchProviderError):
         await provider.search("latest news")

@@ -1,6 +1,7 @@
 """Tests for configuration loading and validation logic.
 
 Updates:
+  v0.2.3 - 2025-12-07 - Cover Google web search provider secrets and env loading.
   v0.2.2 - 2025-12-07 - Cover SerpApi provider secrets and env loading.
   v0.2.1 - 2025-12-07 - Cover Serper provider secrets and env loading.
   v0.2.0 - 2025-12-07 - Cover random web search provider selection.
@@ -57,6 +58,10 @@ def _clear_litellm_env(monkeypatch: MonkeyPatch) -> None:
         "SERPER_API_KEY",
         "PROMPT_MANAGER_SERPAPI_API_KEY",
         "SERPAPI_API_KEY",
+        "PROMPT_MANAGER_GOOGLE_API_KEY",
+        "GOOGLE_API_KEY",
+        "PROMPT_MANAGER_GOOGLE_CSE_ID",
+        "GOOGLE_CSE_ID",
         "PROMPT_MANAGER_AUTO_OPEN_SHARE_LINKS",
         "AUTO_OPEN_SHARE_LINKS",
         "PROMPT_MANAGER_SHARE_AUTO_OPEN_BROWSER",
@@ -250,6 +255,35 @@ def test_json_with_serpapi_api_key_is_ignored(
 
     assert settings.web_search_provider == "serpapi"
     assert settings.serpapi_api_key is None
+    assert settings.google_api_key is None
+    assert settings.google_cse_id is None
+
+
+def test_json_with_google_credentials_is_ignored(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+    caplog: LogCaptureFixture,
+) -> None:
+    """Ensure Google API key and CSE ID entries in JSON configs are ignored."""
+    _clear_litellm_env(monkeypatch)
+    config_payload = {
+        "web_search_provider": "google",
+        "google_api_key": "json-google",
+        "google_cse_id": "json-cse",
+    }
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    config_path = config_dir / "config.json"
+    config_path.write_text(json.dumps(config_payload), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    with caplog.at_level(logging.WARNING, logger="prompt_manager.settings"):
+        settings = load_settings()
+
+    assert settings.web_search_provider == "google"
+    assert settings.google_api_key is None
+    assert settings.google_cse_id is None
+    assert "Ignoring secret key" in caplog.text
     assert "Ignoring secret key" in caplog.text
 
 
@@ -346,6 +380,24 @@ def test_serpapi_api_key_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> N
     assert settings.web_search_provider == "serpapi"
 
 
+def test_google_credentials_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    """Load Google API key and CSE ID from environment variables."""
+    _clear_litellm_env(monkeypatch)
+    tmp_config = tmp_path / "config.json"
+    tmp_config.write_text("{}", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(tmp_config))
+    monkeypatch.setenv("PROMPT_MANAGER_WEB_SEARCH_PROVIDER", "google")
+    monkeypatch.setenv("PROMPT_MANAGER_GOOGLE_API_KEY", "google-secret")
+    monkeypatch.setenv("PROMPT_MANAGER_GOOGLE_CSE_ID", "engine-id")
+
+    settings = load_settings()
+
+    assert settings.web_search_provider == "google"
+    assert settings.google_api_key == "google-secret"
+    assert settings.google_cse_id == "engine-id"
+
+
 def test_exa_api_key_from_dotenv(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     """Load Exa API credentials from a .env file when env vars are unset."""
 
@@ -427,6 +479,35 @@ def test_serpapi_api_key_from_dotenv_alias(monkeypatch: MonkeyPatch, tmp_path: P
 
     assert settings.serpapi_api_key == "serpapi-alias"
     assert settings.web_search_provider == "serpapi"
+
+
+def test_google_credentials_from_dotenv_alias(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    """Load Google API key and CSE ID from dotenv aliases."""
+    _clear_litellm_env(monkeypatch)
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "\n".join(
+            [
+                "GOOGLE_API_KEY=google-alias",
+                "GOOGLE_CSE_ID=csedemo",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    tmp_config = tmp_path / "config.json"
+    tmp_config.write_text("{}", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_ENV_FILE", str(env_file))
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(tmp_config))
+    monkeypatch.setenv("PROMPT_MANAGER_WEB_SEARCH_PROVIDER", "google")
+
+    settings = load_settings()
+
+    assert settings.google_api_key == "google-alias"
+    assert settings.google_cse_id == "csedemo"
+    assert settings.web_search_provider == "google"
 
 
 def test_random_web_search_provider_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:

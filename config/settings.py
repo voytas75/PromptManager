@@ -1,6 +1,7 @@
 """Settings management utilities for Prompt Manager configuration.
 
 Updates:
+  v0.5.14 - 2025-12-07 - Add Google web search provider configuration and env parsing.
   v0.5.13 - 2025-12-07 - Add PrivateBin share provider configuration settings.
   v0.5.12 - 2025-12-07 - Add SerpApi web search provider configuration and env parsing.
   v0.5.11 - 2025-12-07 - Add Serper web search provider configuration and env parsing.
@@ -264,12 +265,12 @@ class PromptManagerSettings(BaseSettings):
             "'fast' or 'inference'."
         ),
     )
-    web_search_provider: Literal["exa", "tavily", "serper", "serpapi", "random"] | None = Field(
+    web_search_provider: Literal["exa", "tavily", "serper", "serpapi", "google", "random"] | None = Field(
         default="exa",
         description=(
             "Configured web search provider slug ('exa', 'tavily', 'serper', "
-            "'serpapi', 'random'; set empty to disable). The 'random' option rotates between "
-            "providers that have API keys configured before each search."
+            "'serpapi', 'google', 'random'; set empty to disable). The 'random' option rotates "
+            "between providers that have API keys configured before each search."
         ),
     )
     exa_api_key: str | None = Field(
@@ -290,6 +291,16 @@ class PromptManagerSettings(BaseSettings):
     serpapi_api_key: str | None = Field(
         default=None,
         description="API key used for SerpApi-powered web search features.",
+        repr=False,
+    )
+    google_api_key: str | None = Field(
+        default=None,
+        description="API key used for Google Programmable Search features.",
+        repr=False,
+    )
+    google_cse_id: str | None = Field(
+        default=None,
+        description="Custom Search Engine ID used for Google Programmable Search.",
         repr=False,
     )
     quick_actions: list[dict[str, object]] | None = Field(
@@ -429,6 +440,8 @@ class PromptManagerSettings(BaseSettings):
                 "tavily_api_key": ["TAVILY_API_KEY", "tavily_api_key"],
                 "serper_api_key": ["SERPER_API_KEY", "serper_api_key"],
                 "serpapi_api_key": ["SERPAPI_API_KEY", "serpapi_api_key"],
+                "google_api_key": ["GOOGLE_API_KEY", "google_api_key"],
+                "google_cse_id": ["GOOGLE_CSE_ID", "google_cse_id"],
                 "auto_open_share_links": [
                     "AUTO_OPEN_SHARE_LINKS",
                     "auto_open_share_links",
@@ -562,10 +575,10 @@ class PromptManagerSettings(BaseSettings):
         text = str(value).strip().lower()
         if text in {"none", "disabled", "off"}:
             return None
-        if text not in {"exa", "tavily", "serper", "serpapi", "random"}:
+        if text not in {"exa", "tavily", "serper", "serpapi", "google", "random"}:
             raise ValueError(
                 "web_search_provider must be set to 'exa', 'tavily', 'serper', "
-                "'serpapi', 'random', or left empty"
+                "'serpapi', 'google', 'random', or left empty"
             )
         return text
 
@@ -799,6 +812,8 @@ class PromptManagerSettings(BaseSettings):
                 "tavily_api_key": ["TAVILY_API_KEY", "tavily_api_key"],
                 "serper_api_key": ["SERPER_API_KEY", "serper_api_key"],
                 "serpapi_api_key": ["SERPAPI_API_KEY", "serpapi_api_key"],
+                "google_api_key": ["GOOGLE_API_KEY", "google_api_key"],
+                "google_cse_id": ["GOOGLE_CSE_ID", "google_cse_id"],
                 "auto_open_share_links": [
                     "AUTO_OPEN_SHARE_LINKS",
                     "auto_open_share_links",
@@ -896,6 +911,10 @@ class PromptManagerSettings(BaseSettings):
                     "SERPER_API_KEY",
                     "serpapi_api_key",
                     "SERPAPI_API_KEY",
+                    "google_api_key",
+                    "GOOGLE_API_KEY",
+                    "google_cse_id",
+                    "GOOGLE_CSE_ID",
                 }
                 removed_secrets = [
                     key

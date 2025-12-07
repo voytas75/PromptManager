@@ -1,6 +1,7 @@
 """Runtime settings helpers for Prompt Manager GUI.
 
 Updates:
+  v0.1.7 - 2025-12-07 - Track Google web search credentials in runtime snapshots.
   v0.1.6 - 2025-12-07 - Reconfigure web search providers when settings change.
   v0.1.5 - 2025-12-07 - Track SerpApi web search credentials in runtime snapshots.
   v0.1.4 - 2025-12-07 - Track Serper web search credentials in runtime snapshots.
@@ -110,6 +111,8 @@ class RuntimeSettingsService:
             "tavily_api_key": settings.tavily_api_key if settings else None,
             "serper_api_key": settings.serper_api_key if settings else None,
             "serpapi_api_key": settings.serpapi_api_key if settings else None,
+            "google_api_key": settings.google_api_key if settings else None,
+            "google_cse_id": settings.google_cse_id if settings else None,
             "auto_open_share_links": (
                 settings.auto_open_share_links if settings is not None else True
             ),
@@ -232,6 +235,8 @@ class RuntimeSettingsService:
             tavily_api_key=_clean(runtime.get("tavily_api_key")),
             serper_api_key=_clean(runtime.get("serper_api_key")),
             serpapi_api_key=_clean(runtime.get("serpapi_api_key")),
+            google_api_key=_clean(runtime.get("google_api_key")),
+            google_cse_id=_clean(runtime.get("google_cse_id")),
         )
         manager_service = getattr(self._manager, "web_search_service", None)
         if isinstance(manager_service, WebSearchService):
@@ -268,6 +273,8 @@ class RuntimeSettingsService:
             "tavily_api_key",
             "serper_api_key",
             "serpapi_api_key",
+            "google_api_key",
+            "google_cse_id",
             "auto_open_share_links",
         )
         for key in simple_keys:
@@ -415,6 +422,8 @@ class RuntimeSettingsService:
                 "tavily_api_key": runtime.get("tavily_api_key"),
                 "serper_api_key": runtime.get("serper_api_key"),
                 "serpapi_api_key": runtime.get("serpapi_api_key"),
+                "google_api_key": runtime.get("google_api_key"),
+                "google_cse_id": runtime.get("google_cse_id"),
                 "embedding_backend": runtime.get("embedding_backend"),
                 "embedding_model": runtime.get("embedding_model"),
                 "chat_user_bubble_color": runtime.get("chat_user_bubble_color"),
@@ -444,13 +453,15 @@ class RuntimeSettingsService:
             )
             settings_model.litellm_tts_model = cast("str | None", updates.get("litellm_tts_model"))
             settings_model.web_search_provider = cast(
-                "Literal['exa', 'tavily', 'serper', 'serpapi', 'random'] | None",
+                "Literal['exa', 'tavily', 'serper', 'serpapi', 'google', 'random'] | None",
                 updates.get("web_search_provider"),
             )
             settings_model.exa_api_key = cast("str | None", updates.get("exa_api_key"))
             settings_model.tavily_api_key = cast("str | None", updates.get("tavily_api_key"))
             settings_model.serper_api_key = cast("str | None", updates.get("serper_api_key"))
             settings_model.serpapi_api_key = cast("str | None", updates.get("serpapi_api_key"))
+            settings_model.google_api_key = cast("str | None", updates.get("google_api_key"))
+            settings_model.google_cse_id = cast("str | None", updates.get("google_cse_id"))
             if "auto_open_share_links" in updates:
                 settings_model.auto_open_share_links = bool(updates.get("auto_open_share_links"))
             if "litellm_tts_stream" in updates:

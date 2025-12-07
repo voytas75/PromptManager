@@ -1,6 +1,7 @@
 """Core service layer for Prompt Manager.
 
 Updates:
+  v0.11.4 - 2025-12-07 - Export Google web search provider alongside existing implementations.
   v0.11.3 - 2025-12-07 - Export Serper web search provider.
   v0.11.2 - 2025-12-07 - Export Tavily web search provider.
   v0.11.1 - 2025-12-04 - Keep prompt chain exports grouped to satisfy Ruff import sorting.
@@ -109,6 +110,7 @@ from .repository import PromptRepository, RepositoryError, RepositoryNotFoundErr
 from .scenario_generation import LiteLLMScenarioGenerator
 from .web_search import (
     ExaWebSearchProvider,
+    GoogleWebSearchProvider,
     SerperWebSearchProvider,
     TavilyWebSearchProvider,
     WebSearchService,
@@ -176,6 +178,7 @@ __all__ = [
     "LiteLLMScenarioGenerator",
     "WebSearchService",
     "ExaWebSearchProvider",
+    "GoogleWebSearchProvider",
     "SerperWebSearchProvider",
     "TavilyWebSearchProvider",
     "CodexExecutor",

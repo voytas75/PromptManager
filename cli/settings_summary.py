@@ -1,6 +1,7 @@
 """Printable summaries for Prompt Manager configuration.
 
 Updates:
+  v0.1.7 - 2025-12-07 - Surface Google web search credentials in CLI summaries.
   v0.1.6 - 2025-12-07 - Include PrivateBin share configuration in summaries.
   v0.1.5 - 2025-12-07 - Surface SerpApi provider credentials in CLI summaries.
   v0.1.4 - 2025-12-07 - Surface Serper provider credentials in CLI summaries.
@@ -46,6 +47,8 @@ def print_settings_summary(settings: PromptManagerSettings) -> None:
     tavily_api_key = getattr(settings, "tavily_api_key", None)
     serper_api_key = getattr(settings, "serper_api_key", None)
     serpapi_api_key = getattr(settings, "serpapi_api_key", None)
+    google_api_key = getattr(settings, "google_api_key", None)
+    google_cse_id = getattr(settings, "google_cse_id", None)
     auto_open_share_links = getattr(settings, "auto_open_share_links", True)
     privatebin_url = getattr(settings, "privatebin_url", DEFAULT_PRIVATEBIN_URL)
     privatebin_expiration = getattr(
@@ -121,10 +124,10 @@ def print_settings_summary(settings: PromptManagerSettings) -> None:
     provider_line = f"Provider: {web_search_provider or 'disabled'}"
     random_note = None
     if web_search_provider == "random":
-        provider_line = "Provider: random (rotates between configured providers each search)"
-        random_note = (
-            "Random selection uses whichever providers currently have API keys configured."
-        )
+            provider_line = "Provider: random (rotates between configured providers each search)"
+            random_note = (
+                "Random selection uses whichever providers currently have API keys configured."
+            )
 
     lines.extend(
         [
@@ -136,6 +139,8 @@ def print_settings_summary(settings: PromptManagerSettings) -> None:
             f"Tavily API key: {mask_secret(tavily_api_key)}",
             f"Serper API key: {mask_secret(serper_api_key)}",
             f"SerpApi API key: {mask_secret(serpapi_api_key)}",
+            f"Google API key: {mask_secret(google_api_key)}",
+            f"Google CSE ID: {mask_secret(google_cse_id)}",
         ]
     )
     if random_note:

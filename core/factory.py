@@ -1,6 +1,7 @@
 """Factories for constructing PromptManager instances from validated settings.
 
 Updates:
+  v0.8.3 - 2025-12-07 - Wire Google web search provider into the factory builder.
   v0.8.2 - 2025-12-07 - Expose reusable web search service builder.
   v0.8.1 - 2025-12-07 - Wire SerpApi provider into the web search factory.
   v0.8.0 - 2025-12-07 - Wire Serper provider into the web search factory.
@@ -99,6 +100,8 @@ def build_web_search_service(settings: PromptManagerSettings) -> WebSearchServic
         tavily_api_key=getattr(settings, "tavily_api_key", None),
         serper_api_key=getattr(settings, "serper_api_key", None),
         serpapi_api_key=getattr(settings, "serpapi_api_key", None),
+        google_api_key=getattr(settings, "google_api_key", None),
+        google_cse_id=getattr(settings, "google_cse_id", None),
     )
     return WebSearchService(provider)
 

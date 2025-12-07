@@ -1,6 +1,7 @@
 """Settings dialog for configuring Prompt Manager runtime options.
 
 Updates:
+  v0.2.18 - 2025-12-07 - Add Google Programmable Search fields to the Integrations tab.
   v0.2.17 - 2025-12-07 - Add SerpApi provider selector and API key entry.
   v0.2.16 - 2025-12-07 - Add Serper provider selector and API key entry.
   v0.2.15 - 2025-12-07 - Add random web search provider option and explanatory note.
@@ -90,6 +91,8 @@ class SettingsDialog(QDialog):
         tavily_api_key: str | None = None,
         serper_api_key: str | None = None,
         serpapi_api_key: str | None = None,
+        google_api_key: str | None = None,
+        google_cse_id: str | None = None,
         auto_open_share_links: bool | None = None,
     ) -> None:
         """Build the settings UI with existing runtime values pre-populated."""
@@ -119,13 +122,15 @@ class SettingsDialog(QDialog):
         provider_choice = (web_search_provider or "").strip().lower()
         self._web_search_provider = (
             provider_choice
-            if provider_choice in {"exa", "tavily", "serper", "serpapi", "random"}
+            if provider_choice in {"exa", "tavily", "serper", "serpapi", "google", "random"}
             else None
         )
         self._exa_api_key = exa_api_key or ""
         self._tavily_api_key = tavily_api_key or ""
         self._serper_api_key = serper_api_key or ""
         self._serpapi_api_key = serpapi_api_key or ""
+        self._google_api_key = google_api_key or ""
+        self._google_cse_id = google_cse_id or ""
         original_actions = [
             dict(entry) for entry in (quick_actions or []) if isinstance(entry, dict)
         ]
@@ -167,6 +172,8 @@ class SettingsDialog(QDialog):
         self._tavily_api_key_input: QLineEdit | None = None
         self._serper_api_key_input: QLineEdit | None = None
         self._serpapi_api_key_input: QLineEdit | None = None
+        self._google_api_key_input: QLineEdit | None = None
+        self._google_cse_id_input: QLineEdit | None = None
         default_share_toggle = (
             True if auto_open_share_links is None else bool(auto_open_share_links)
         )
@@ -344,6 +351,7 @@ class SettingsDialog(QDialog):
         provider_combo.addItem("Tavily", userData="tavily")
         provider_combo.addItem("Serper", userData="serper")
         provider_combo.addItem("SerpApi", userData="serpapi")
+        provider_combo.addItem("Google Programmable Search", userData="google")
         if self._web_search_provider == "random":
             provider_combo.setCurrentIndex(1)
         elif self._web_search_provider == "exa":
@@ -354,6 +362,8 @@ class SettingsDialog(QDialog):
             provider_combo.setCurrentIndex(4)
         elif self._web_search_provider == "serpapi":
             provider_combo.setCurrentIndex(5)
+        elif self._web_search_provider == "google":
+            provider_combo.setCurrentIndex(6)
         else:
             provider_combo.setCurrentIndex(0)
         self._web_search_provider_combo = provider_combo
@@ -392,6 +402,17 @@ class SettingsDialog(QDialog):
         serpapi_api_key_input.setPlaceholderText("serpapi-********************************")
         self._serpapi_api_key_input = serpapi_api_key_input
         integrations_form.addRow("SerpApi API key", serpapi_api_key_input)
+
+        google_api_key_input = QLineEdit(self._google_api_key, integrations_tab)
+        google_api_key_input.setEchoMode(QLineEdit.Password)
+        google_api_key_input.setPlaceholderText("AIza********************************")
+        self._google_api_key_input = google_api_key_input
+        integrations_form.addRow("Google API key", google_api_key_input)
+
+        google_cse_id_input = QLineEdit(self._google_cse_id, integrations_tab)
+        google_cse_id_input.setPlaceholderText("1234567890abcdef:ghijklmnop")
+        self._google_cse_id_input = google_cse_id_input
+        integrations_form.addRow("Google CSE ID", google_cse_id_input)
 
         integrations_hint = QLabel(
             (
@@ -680,6 +701,12 @@ class SettingsDialog(QDialog):
         serpapi_api_key = (
             _clean(self._serpapi_api_key_input.text()) if self._serpapi_api_key_input else None
         )
+        google_api_key = (
+            _clean(self._google_api_key_input.text()) if self._google_api_key_input else None
+        )
+        google_cse_id = (
+            _clean(self._google_cse_id_input.text()) if self._google_cse_id_input else None
+        )
 
         return {
             "litellm_model": _clean(self._model_input.text()),
@@ -705,6 +732,8 @@ class SettingsDialog(QDialog):
             "tavily_api_key": tavily_api_key,
             "serper_api_key": serper_api_key,
             "serpapi_api_key": serpapi_api_key,
+            "google_api_key": google_api_key,
+            "google_cse_id": google_cse_id,
             "auto_open_share_links": (
                 bool(self._share_auto_open_checkbox.isChecked())
                 if self._share_auto_open_checkbox

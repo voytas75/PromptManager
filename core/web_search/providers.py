@@ -1,6 +1,7 @@
 """Provider protocol definitions and concrete provider implementations.
 
 Updates:
+  v0.1.7 - 2025-12-07 - Add Google Programmable Search provider and HTML snippet parsing.
   v0.1.6 - 2025-12-07 - Add resolve_web_search_provider helper for runtime wiring.
   v0.1.5 - 2025-12-07 - Add SerpApi provider and organic result normalisation helper.
   v0.1.4 - 2025-12-07 - Add Serper provider and response normalisation helpers.
@@ -12,6 +13,8 @@ Updates:
 
 from __future__ import annotations
 
+import html
+import re
 import random
 from dataclasses import dataclass
 from datetime import datetime
@@ -26,6 +29,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
 
 MAX_RESULTS = 25
+GOOGLE_MAX_RESULTS = 10
+_HTML_TAG_PATTERN = re.compile(r"<[^>]+>")
 
 
 @runtime_checkable
@@ -193,6 +198,65 @@ def _normalise_serpapi_results(payload: Mapping[str, Any]) -> list[dict[str, Any
     return normalised
 
 
+def _normalise_google_results(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Normalise Google Programmable Search entries into the canonical schema."""
+    items = payload.get("items") or []
+    if not isinstance(items, list):
+        return []
+    normalised: list[dict[str, Any]] = []
+
+    def _clean_html(text: str | None) -> str | None:
+        if not text:
+            return None
+        stripped = _HTML_TAG_PATTERN.sub("", html.unescape(text))
+        collapsed = " ".join(stripped.split())
+        return collapsed or None
+
+    for index, entry in enumerate(items, start=1):
+        if not isinstance(entry, dict):
+            continue
+        title = str(entry.get("title") or "").strip()
+        url = str(entry.get("link") or "").strip()
+        if not title or not url:
+            continue
+        snippet = str(entry.get("snippet") or "").strip() or None
+        highlight_text = _clean_html(entry.get("htmlSnippet") or entry.get("html_snippet"))
+        highlights = [highlight_text] if highlight_text else []
+        pagemap = entry.get("pagemap") if isinstance(entry.get("pagemap"), dict) else {}
+        metatags = pagemap.get("metatags")
+        published_value: str | None = None
+        if isinstance(metatags, list):
+            for tag in metatags:
+                if not isinstance(tag, dict):
+                    continue
+                for key in (
+                    "article:published_time",
+                    "article:modified_time",
+                    "og:updated_time",
+                    "og:published_time",
+                    "pubdate",
+                ):
+                    candidate = tag.get(key)
+                    if isinstance(candidate, str) and candidate.strip():
+                        published_value = candidate
+                        break
+                if published_value:
+                    break
+        normalised.append(
+            {
+                "title": title,
+                "url": url,
+                "summary": snippet,
+                "highlights": highlights,
+                "author": entry.get("displayLink"),
+                "publishedDate": published_value,
+                "score": float(index),
+                "raw": entry,
+            }
+        )
+    return normalised
+
+
 @dataclass(slots=True)
 class ExaWebSearchProvider:
     """HTTPX-backed Exa web search provider."""
@@ -271,6 +335,109 @@ class ExaWebSearchProvider:
         except ValueError as exc:  # pragma: no cover - invalid provider payload
             raise WebSearchProviderError("Exa returned invalid JSON") from exc
         documents = _extract_documents(data, self.slug)
+        return WebSearchResult(
+            provider=self.slug,
+            query=cleaned_query,
+            documents=documents,
+            raw=data,
+        )
+
+
+@dataclass(slots=True)
+class GoogleWebSearchProvider:
+    """HTTPX-backed Google Programmable Search provider."""
+
+    api_key: str
+    cse_id: str
+    base_url: str = "https://www.googleapis.com"
+    endpoint: str = "/customsearch/v1"
+    timeout: float = 15.0
+    slug: str = "google"
+    display_name: str = "Google Programmable Search"
+    client_factory: Callable[[], httpx.AsyncClient] | None = None
+
+    def __post_init__(self) -> None:
+        """Ensure credentials are present and trimmed."""
+        if not self.api_key or not self.api_key.strip():
+            raise ValueError("Google API key is required")
+        if not self.cse_id or not self.cse_id.strip():
+            raise ValueError("Google Custom Search Engine ID is required")
+        self.api_key = self.api_key.strip()
+        self.cse_id = self.cse_id.strip()
+
+    async def search(
+        self,
+        query: str,
+        *,
+        limit: int = 5,
+        safe: str | None = None,
+        start_index: int | None = None,
+        lr: str | None = None,
+        cr: str | None = None,
+        gl: str | None = None,
+        cx: str | None = None,
+        **extra: Any,
+    ) -> WebSearchResult:
+        """Perform a search request against Google's Custom Search JSON API."""
+        cleaned_query = query.strip()
+        if not cleaned_query:
+            raise ValueError("query must be a non-empty string")
+        clamped_limit = max(1, min(limit, min(MAX_RESULTS, GOOGLE_MAX_RESULTS)))
+        params: dict[str, Any] = {
+            "key": self.api_key,
+            "cx": (cx or self.cse_id),
+            "q": cleaned_query,
+            "num": clamped_limit,
+        }
+
+        def _assign_text(key: str, value: str | None) -> None:
+            if value is None:
+                return
+            stripped = value.strip()
+            if stripped:
+                params[key] = stripped
+
+        _assign_text("safe", safe)
+        _assign_text("lr", lr)
+        _assign_text("cr", cr)
+        _assign_text("gl", gl)
+        if start_index is not None:
+            try:
+                params["start"] = max(1, int(start_index))
+            except (TypeError, ValueError) as exc:
+                raise ValueError("start_index must be an integer when provided") from exc
+
+        if extra:
+            for key, value in extra.items():
+                if value in (None, "", []):
+                    continue
+                params[str(key)] = value
+
+        manage_client = self.client_factory is None
+        if self.client_factory is None:
+            client = httpx.AsyncClient(
+                base_url=self.base_url,
+                timeout=self.timeout,
+            )
+        else:
+            client = self.client_factory()
+        try:
+            response = await client.get(self.endpoint, params=params)
+            response.raise_for_status()
+        except httpx.HTTPError as exc:  # pragma: no cover - exercised via tests
+            raise WebSearchProviderError("Google search request failed") from exc
+        finally:
+            if manage_client:
+                await client.aclose()
+
+        try:
+            data = response.json()
+        except ValueError as exc:  # pragma: no cover - invalid provider payload
+            raise WebSearchProviderError("Google returned invalid JSON") from exc
+        documents = _extract_documents(
+            {"results": _normalise_google_results(data)},
+            self.slug,
+        )
         return WebSearchResult(
             provider=self.slug,
             query=cleaned_query,
@@ -622,6 +789,8 @@ def resolve_web_search_provider(
     tavily_api_key: str | None = None,
     serper_api_key: str | None = None,
     serpapi_api_key: str | None = None,
+    google_api_key: str | None = None,
+    google_cse_id: str | None = None,
 ) -> WebSearchProvider | None:
     """Return a provider instance that matches *provider_slug* and available API keys."""
 
@@ -636,11 +805,18 @@ def resolve_web_search_provider(
     tavily_key = _clean(tavily_api_key)
     serper_key = _clean(serper_api_key)
     serpapi_key = _clean(serpapi_api_key)
+    google_key = _clean(google_api_key)
+    google_cse = _clean(google_cse_id)
 
     exa_provider = ExaWebSearchProvider(api_key=exa_key) if exa_key else None
     tavily_provider = TavilyWebSearchProvider(api_key=tavily_key) if tavily_key else None
     serper_provider = SerperWebSearchProvider(api_key=serper_key) if serper_key else None
     serpapi_provider = SerpApiWebSearchProvider(api_key=serpapi_key) if serpapi_key else None
+    google_provider = (
+        GoogleWebSearchProvider(api_key=google_key, cse_id=google_cse)
+        if google_key and google_cse
+        else None
+    )
 
     if slug == "exa":
         return exa_provider
@@ -650,10 +826,18 @@ def resolve_web_search_provider(
         return serper_provider
     if slug == "serpapi":
         return serpapi_provider
+    if slug == "google":
+        return google_provider
     if slug == "random":
         available = [
             candidate
-            for candidate in (exa_provider, tavily_provider, serper_provider, serpapi_provider)
+            for candidate in (
+                exa_provider,
+                tavily_provider,
+                serper_provider,
+                serpapi_provider,
+                google_provider,
+            )
             if candidate
         ]
         if len(available) == 1:
@@ -665,6 +849,7 @@ def resolve_web_search_provider(
 
 __all__ = [
     "ExaWebSearchProvider",
+    "GoogleWebSearchProvider",
     "RandomWebSearchProvider",
     "SerpApiWebSearchProvider",
     "SerperWebSearchProvider",

@@ -62,6 +62,8 @@ def _base_runtime_settings() -> dict[str, object | None]:
         "tavily_api_key": None,
         "serper_api_key": None,
         "serpapi_api_key": None,
+        "google_api_key": None,
+        "google_cse_id": None,
         "auto_open_share_links": True,
     }
 

@@ -1,6 +1,7 @@
 """Helpers for persisting runtime configuration without Qt dependencies.
 
 Updates:
+  v0.3.3 - 2025-12-07 - Guard Google Programmable Search credentials when persisting.
   v0.3.2 - 2025-12-07 - Guard SerpApi API keys alongside other secrets during persistence.
   v0.3.1 - 2025-12-07 - Guard Serper API keys alongside other secrets during persistence.
   v0.3.0 - 2025-12-07 - Guard Tavily API keys alongside other secrets during persistence.
@@ -128,6 +129,8 @@ def persist_settings_to_config(updates: dict[str, object | None]) -> None:
         "tavily_api_key",
         "serper_api_key",
         "serpapi_api_key",
+        "google_api_key",
+        "google_cse_id",
     }
     for key, value in updates.items():
         if key in secret_keys:

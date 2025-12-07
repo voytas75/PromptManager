@@ -1,6 +1,7 @@
 r"""Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.16.14 - 2025-12-07 - Describe Google Programmable Search in workspace tooltips.
   v0.16.13 - 2025-12-07 - Convert analytics log path to Path objects for typing.
   v0.16.12 - 2025-12-07 - Embed Workbench tab and expose activation hook.
   v0.16.11 - 2025-12-07 - Convert Run Prompt into a split button with text-only option.
@@ -528,6 +529,17 @@ class MainWindow(QMainWindow):
             self._runtime_settings.get("serpapi_api_key")
             or (getattr(self._settings, "serpapi_api_key", None) if self._settings else None)
         )
+        has_google = bool(
+            (
+                self._runtime_settings.get("google_api_key")
+                and self._runtime_settings.get("google_cse_id")
+            )
+            or (
+                self._settings
+                and getattr(self._settings, "google_api_key", None)
+                and getattr(self._settings, "google_cse_id", None)
+            )
+        )
 
         if provider_slug == "exa":
             return "Include live web search context via Exa before executing prompts."
@@ -537,12 +549,18 @@ class MainWindow(QMainWindow):
             return "Include live web search context via Serper before executing prompts."
         if provider_slug == "serpapi":
             return "Include live web search context via SerpApi before executing prompts."
+        if provider_slug == "google":
+            return (
+                "Include live web search context via Google Programmable Search before executing "
+                "prompts."
+            )
         if provider_slug == "random":
             candidate_pairs = (
                 ("Exa", has_exa),
                 ("Tavily", has_tavily),
                 ("Serper", has_serper),
                 ("SerpApi", has_serpapi),
+                ("Google", has_google),
             )
             available_labels = [label for label, enabled in candidate_pairs if enabled]
             if not available_labels:
@@ -556,7 +574,7 @@ class MainWindow(QMainWindow):
                 f"{targets} before executing prompts."
             )
         return (
-            "Include live web search context. Configure Exa, Tavily, Serper, or SerpApi "
+            "Include live web search context. Configure Exa, Tavily, Serper, SerpApi, or Google "
             "under Settings to enable provider-specific routing."
         )
 

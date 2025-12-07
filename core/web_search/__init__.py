@@ -1,6 +1,7 @@
 """Web search provider abstractions and service wiring.
 
 Updates:
+  v0.1.7 - 2025-12-07 - Export Google Programmable Search provider.
   v0.1.6 - 2025-12-07 - Export shared search context formatting helpers.
   v0.1.5 - 2025-12-07 - Re-export resolve_web_search_provider helper.
   v0.1.4 - 2025-12-07 - Export SerpApi provider alongside existing implementations.
@@ -21,6 +22,7 @@ from .context_formatting import (
 from .models import WebSearchDocument, WebSearchResult
 from .providers import (
     ExaWebSearchProvider,
+    GoogleWebSearchProvider,
     RandomWebSearchProvider,
     SerpApiWebSearchProvider,
     SerperWebSearchProvider,
@@ -35,6 +37,7 @@ __all__ = [
     "SEARCH_RESULTS_NOTE",
     "SEARCH_RESULTS_START_MARKER",
     "ExaWebSearchProvider",
+    "GoogleWebSearchProvider",
     "RandomWebSearchProvider",
     "SerpApiWebSearchProvider",
     "SerperWebSearchProvider",

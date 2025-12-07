@@ -8,6 +8,13 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 - Added Rentry as the third share provider: `core.sharing.RentryProvider` now handles CSRF/token negotiation against `https://rentry.co/api/new` (per the [official CLI README](https://github.com/radude/rentry/blob/master/README.md), retrieved 2025-12-07), surfaces edit-code management notes via the GUI share controller, registers alongside ShareText/PrivateBin during bootstrap, and includes unit tests + documentation updates so contributors know the new workflow.
 
+## [0.22.12] - 2025-12-07
+
+### Added
+
+- Added Google Programmable Search as the fifth web search provider: `PromptManagerSettings` now accepts `web_search_provider="google"` along with `PROMPT_MANAGER_GOOGLE_API_KEY` and `PROMPT_MANAGER_GOOGLE_CSE_ID`, the factory wires a `GoogleWebSearchProvider` that calls `https://www.googleapis.com/customsearch/v1` (per [developers.google.com/custom-search/v1/using_rest](https://developers.google.com/custom-search/v1/using_rest), retrieved 2025-12-07), GUI settings/tooltips and CLI summaries surface the new credentials, persistence guards keep both values out of `config.json`, and tests cover JSON/env loads plus provider success/error parsing.
+- Updated README, README-DEV, and `docs/web_search_plan.md` with the new env vars, provider lists, and API documentation, ensuring contributors know how to configure Google Programmable Search alongside Exa/Tavily/Serper/SerpApi and how Random fan-out incorporates whichever providers have secrets configured.
+
 ## [0.22.10] - 2025-12-07
 
 ### Added

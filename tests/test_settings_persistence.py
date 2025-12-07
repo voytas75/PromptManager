@@ -1,4 +1,9 @@
-"""Verify settings persistence helpers without requiring PySide runtime."""
+"""Verify settings persistence helpers without requiring PySide runtime.
+
+Updates:
+  v0.1.1 - 2025-12-07 - Ensure Google Programmable Search credentials are never persisted.
+  v0.1.0 - 2025-11-30 - Initial persistence coverage for runtime settings.
+"""
 
 from __future__ import annotations
 
@@ -138,6 +143,26 @@ def test_persist_settings_to_config_omits_serpapi_api_key(tmp_path, monkeypatch)
     data = json.loads(Path("config/config.json").read_text(encoding="utf-8"))
     assert "serpapi_api_key" not in data
     assert data["web_search_provider"] == "serpapi"
+
+
+def test_persist_settings_to_config_omits_google_credentials(tmp_path, monkeypatch):
+    """Never persist Google API key or CSE ID but keep provider selection."""
+    monkeypatch.chdir(tmp_path)
+
+    from config.persistence import persist_settings_to_config
+
+    persist_settings_to_config(
+        {
+            "google_api_key": "google-secret",
+            "google_cse_id": "search-id",
+            "web_search_provider": "google",
+        }
+    )
+
+    data = json.loads(Path("config/config.json").read_text(encoding="utf-8"))
+    assert "google_api_key" not in data
+    assert "google_cse_id" not in data
+    assert data["web_search_provider"] == "google"
 
 
 def test_persist_settings_to_config_auto_open_flag(tmp_path, monkeypatch):
