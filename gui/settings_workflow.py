@@ -94,6 +94,7 @@ class SettingsWorkflow:
             web_search_provider=self._runtime_settings.get("web_search_provider"),
             exa_api_key=self._runtime_settings.get("exa_api_key"),
             tavily_api_key=self._runtime_settings.get("tavily_api_key"),
+            serper_api_key=self._runtime_settings.get("serper_api_key"),
             auto_open_share_links=self._runtime_settings.get("auto_open_share_links"),
         )
         if dialog.exec() != SettingsDialog.Accepted:
