@@ -1,6 +1,7 @@
 """Runtime settings helpers for Prompt Manager GUI.
 
 Updates:
+  v0.1.6 - 2025-12-07 - Reconfigure web search providers when settings change.
   v0.1.5 - 2025-12-07 - Track SerpApi web search credentials in runtime snapshots.
   v0.1.4 - 2025-12-07 - Track Serper web search credentials in runtime snapshots.
   v0.1.3 - 2025-12-07 - Track Tavily web search credentials in runtime snapshots.
@@ -27,6 +28,7 @@ from config import (
     PromptManagerSettings,
     PromptTemplateOverrides,
 )
+from core.web_search import WebSearchService, resolve_web_search_provider
 
 from .appearance_controller import normalise_chat_palette, palette_differs_from_defaults
 from .settings_dialog import persist_settings_to_config
@@ -211,6 +213,31 @@ class RuntimeSettingsService:
         if not isinstance(runtime.get("litellm_tts_stream"), bool):
             runtime["litellm_tts_stream"] = True
         return runtime
+
+    def _refresh_web_search_provider(self, runtime: RuntimeSettings) -> None:
+        """Update the PromptManager web search provider based on runtime settings."""
+
+        def _clean(value: object | None) -> str | None:
+            if not isinstance(value, str):
+                return None
+            text = value.strip()
+            return text or None
+
+        provider = resolve_web_search_provider(
+            _clean(runtime.get("web_search_provider")),
+            exa_api_key=_clean(runtime.get("exa_api_key")),
+            tavily_api_key=_clean(runtime.get("tavily_api_key")),
+            serper_api_key=_clean(runtime.get("serper_api_key")),
+            serpapi_api_key=_clean(runtime.get("serpapi_api_key")),
+        )
+        manager_service = getattr(self._manager, "web_search_service", None)
+        if isinstance(manager_service, WebSearchService):
+            manager_service.configure(provider)
+            self._manager.web_search = manager_service
+            return
+        service = WebSearchService(provider)
+        self._manager.web_search_service = service
+        self._manager.web_search = service
 
     def apply_updates(
         self,
@@ -432,6 +459,7 @@ class RuntimeSettingsService:
             else:
                 settings_model.prompt_templates = PromptTemplateOverrides()
 
+        self._refresh_web_search_provider(runtime)
         self._manager.set_name_generator(
             runtime.get("litellm_model"),
             runtime.get("litellm_api_key"),

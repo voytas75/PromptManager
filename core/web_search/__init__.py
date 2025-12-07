@@ -1,6 +1,7 @@
 """Web search provider abstractions and service wiring.
 
 Updates:
+  v0.1.5 - 2025-12-07 - Re-export resolve_web_search_provider helper.
   v0.1.4 - 2025-12-07 - Export SerpApi provider alongside existing implementations.
   v0.1.3 - 2025-12-07 - Export Serper provider alongside existing implementations.
   v0.1.2 - 2025-12-07 - Export random provider wrapper alongside Exa/Tavily.
@@ -16,6 +17,7 @@ from .providers import (
     SerperWebSearchProvider,
     TavilyWebSearchProvider,
     WebSearchProvider,
+    resolve_web_search_provider,
 )
 from .service import WebSearchService
 
@@ -29,4 +31,5 @@ __all__ = [
     "WebSearchProvider",
     "WebSearchResult",
     "WebSearchService",
+    "resolve_web_search_provider",
 ]

@@ -1,6 +1,7 @@
 """Provider protocol definitions and concrete provider implementations.
 
 Updates:
+  v0.1.6 - 2025-12-07 - Add resolve_web_search_provider helper for runtime wiring.
   v0.1.5 - 2025-12-07 - Add SerpApi provider and organic result normalisation helper.
   v0.1.4 - 2025-12-07 - Add Serper provider and response normalisation helpers.
   v0.1.3 - 2025-12-07 - Add RandomWebSearchProvider to rotate between configured services.
@@ -614,11 +615,60 @@ class RandomWebSearchProvider:
         return await selected.search(query, limit=limit, **kwargs)
 
 
+def resolve_web_search_provider(
+    provider_slug: str | None,
+    *,
+    exa_api_key: str | None = None,
+    tavily_api_key: str | None = None,
+    serper_api_key: str | None = None,
+    serpapi_api_key: str | None = None,
+) -> WebSearchProvider | None:
+    """Return a provider instance that matches *provider_slug* and available API keys."""
+
+    def _clean(value: str | None) -> str | None:
+        if not value:
+            return None
+        stripped = value.strip()
+        return stripped or None
+
+    slug = (provider_slug or "").strip().lower() or None
+    exa_key = _clean(exa_api_key)
+    tavily_key = _clean(tavily_api_key)
+    serper_key = _clean(serper_api_key)
+    serpapi_key = _clean(serpapi_api_key)
+
+    exa_provider = ExaWebSearchProvider(api_key=exa_key) if exa_key else None
+    tavily_provider = TavilyWebSearchProvider(api_key=tavily_key) if tavily_key else None
+    serper_provider = SerperWebSearchProvider(api_key=serper_key) if serper_key else None
+    serpapi_provider = SerpApiWebSearchProvider(api_key=serpapi_key) if serpapi_key else None
+
+    if slug == "exa":
+        return exa_provider
+    if slug == "tavily":
+        return tavily_provider
+    if slug == "serper":
+        return serper_provider
+    if slug == "serpapi":
+        return serpapi_provider
+    if slug == "random":
+        available = [
+            candidate
+            for candidate in (exa_provider, tavily_provider, serper_provider, serpapi_provider)
+            if candidate
+        ]
+        if len(available) == 1:
+            return available[0]
+        if len(available) > 1:
+            return RandomWebSearchProvider(available)
+    return None
+
+
 __all__ = [
     "ExaWebSearchProvider",
     "RandomWebSearchProvider",
     "SerpApiWebSearchProvider",
     "SerperWebSearchProvider",
     "TavilyWebSearchProvider",
+    "resolve_web_search_provider",
     "WebSearchProvider",
 ]

@@ -1,6 +1,7 @@
 """Factories for constructing PromptManager instances from validated settings.
 
 Updates:
+  v0.8.2 - 2025-12-07 - Expose reusable web search service builder.
   v0.8.1 - 2025-12-07 - Wire SerpApi provider into the web search factory.
   v0.8.0 - 2025-12-07 - Wire Serper provider into the web search factory.
   v0.7.9 - 2025-12-07 - Add random provider fan-out for the web search service.
@@ -9,9 +10,7 @@ Updates:
   v0.7.6 - 2025-11-30 - Remove docstring padding for Ruff compliance.
   v0.7.5 - 2025-11-29 - Move config imports behind type checks and wrap long strings.
   v0.7.4 - 2025-11-24 - Wire LiteLLM category suggestion helper into manager construction.
-  v0.7.3 - 2025-11-05 - Support LiteLLM workflow routing across fast/inference models.
-  v0.7.2 - 2025-11-26 - Wire LiteLLM streaming flag into executor construction.
-  v0.7.1-and-earlier - 2025-11-19 - Configure LiteLLM scenario generator and earlier wiring.
+  v0.7.3-and-earlier - 2025-11-19 - Configure LiteLLM scenario generator and earlier wiring.
 """
 
 from __future__ import annotations
@@ -34,14 +33,7 @@ from .prompt_engineering import PromptEngineer
 from .prompt_manager import NameGenerationError, PromptCacheError, PromptManager
 from .repository import PromptRepository
 from .scenario_generation import LiteLLMScenarioGenerator
-from .web_search import (
-    ExaWebSearchProvider,
-    RandomWebSearchProvider,
-    SerpApiWebSearchProvider,
-    SerperWebSearchProvider,
-    TavilyWebSearchProvider,
-    WebSearchService,
-)
+from .web_search import WebSearchService, resolve_web_search_provider
 
 try:  # pragma: no cover - redis optional dependency
     import redis
@@ -99,45 +91,15 @@ def _resolve_embedding_components(
     return resolved_function, EmbeddingProvider(resolved_function)
 
 
-def _build_web_search_service(settings: PromptManagerSettings) -> WebSearchService:
+def build_web_search_service(settings: PromptManagerSettings) -> WebSearchService:
     """Return a WebSearchService configured from settings."""
-    provider_slug = getattr(settings, "web_search_provider", None)
-    provider = None
-    exa_provider = None
-    tavily_provider = None
-    serper_provider = None
-    serpapi_provider = None
-    exa_key = getattr(settings, "exa_api_key", None)
-    if exa_key:
-        exa_provider = ExaWebSearchProvider(api_key=exa_key)
-    tavily_key = getattr(settings, "tavily_api_key", None)
-    if tavily_key:
-        tavily_provider = TavilyWebSearchProvider(api_key=tavily_key)
-    serper_key = getattr(settings, "serper_api_key", None)
-    if serper_key:
-        serper_provider = SerperWebSearchProvider(api_key=serper_key)
-    serpapi_key = getattr(settings, "serpapi_api_key", None)
-    if serpapi_key:
-        serpapi_provider = SerpApiWebSearchProvider(api_key=serpapi_key)
-
-    if provider_slug == "exa":
-        provider = exa_provider
-    elif provider_slug == "tavily":
-        provider = tavily_provider
-    elif provider_slug == "serper":
-        provider = serper_provider
-    elif provider_slug == "serpapi":
-        provider = serpapi_provider
-    elif provider_slug == "random":
-        available = [
-            candidate
-            for candidate in (exa_provider, tavily_provider, serper_provider, serpapi_provider)
-            if candidate
-        ]
-        if len(available) == 1:
-            provider = available[0]
-        elif len(available) > 1:
-            provider = RandomWebSearchProvider(available)
+    provider = resolve_web_search_provider(
+        getattr(settings, "web_search_provider", None),
+        exa_api_key=getattr(settings, "exa_api_key", None),
+        tavily_api_key=getattr(settings, "tavily_api_key", None),
+        serper_api_key=getattr(settings, "serper_api_key", None),
+        serpapi_api_key=getattr(settings, "serpapi_api_key", None),
+    )
     return WebSearchService(provider)
 
 
@@ -273,7 +235,7 @@ def build_prompt_manager(
         reasoning_effort=settings.litellm_reasoning_effort,
         stream=settings.litellm_stream,
     )
-    web_search_service = _build_web_search_service(settings)
+    web_search_service = build_web_search_service(settings)
 
     manager_kwargs: dict[str, Any] = {
         "chroma_path": str(settings.chroma_path),
@@ -313,4 +275,4 @@ def build_prompt_manager(
     return manager
 
 
-__all__ = ["build_prompt_manager"]
+__all__ = ["build_prompt_manager", "build_web_search_service"]
