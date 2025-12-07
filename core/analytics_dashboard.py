@@ -1,7 +1,7 @@
 """High-level analytics aggregation helpers for dashboards and diagnostics.
 
 Updates:
-  v0.1.3 - 2025-12-05 - Treat window filtering as day-based so bucket boundaries match dashboard expectations.
+  v0.1.3 - 2025-12-05 - Align day buckets with dashboard filters.
   v0.1.2 - 2025-11-30 - Move typing-only imports into TYPE_CHECKING for lint compliance.
   v0.1.1 - 2025-11-30 - Fix function docstring spacing for lint compliance.
   v0.1.0 - 2025-11-28 - Introduce analytics snapshot builder for CLI and GUI surfaces.

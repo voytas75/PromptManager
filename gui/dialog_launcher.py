@@ -17,11 +17,11 @@ from .workbench import WorkbenchModeDialog, WorkbenchWindow
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from collections.abc import Callable
+    from uuid import UUID
 
     from PySide6.QtWidgets import QWidget
 
     from models.prompt_model import Prompt
-    from uuid import UUID
 else:  # pragma: no cover - runtime placeholders for type-only imports
     from typing import Any as _Any
 

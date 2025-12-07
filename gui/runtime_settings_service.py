@@ -182,9 +182,8 @@ class RuntimeSettingsService:
                 if isinstance(theme_value, str) and theme_value.strip():
                     runtime["theme_mode"] = theme_value.strip()
                 share_auto_open = data.get("auto_open_share_links")
-                if (
-                    runtime.get("auto_open_share_links") is None
-                    and isinstance(share_auto_open, bool)
+                if runtime.get("auto_open_share_links") is None and isinstance(
+                    share_auto_open, bool
                 ):
                     runtime["auto_open_share_links"] = share_auto_open
         raw_colour = runtime.get("chat_user_bubble_color")
@@ -391,9 +390,7 @@ class RuntimeSettingsService:
             settings_model.exa_api_key = updates.get("exa_api_key")
             settings_model.tavily_api_key = updates.get("tavily_api_key")
             if "auto_open_share_links" in updates:
-                settings_model.auto_open_share_links = bool(
-                    updates.get("auto_open_share_links")
-                )
+                settings_model.auto_open_share_links = bool(updates.get("auto_open_share_links"))
             if "litellm_tts_stream" in updates:
                 settings_model.litellm_tts_stream = bool(updates.get("litellm_tts_stream"))
             settings_model.litellm_workflow_models = cleaned_workflow_models

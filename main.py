@@ -41,6 +41,7 @@ def _setup_logging(config_path) -> None:
     """Compatibility wrapper for older test harnesses expecting main._setup_logging."""
     _runtime_setup_logging(config_path)
 
+
 from cli.commands import COMMAND_SPECS  # noqa: E402  (import moved for compatibility)
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers

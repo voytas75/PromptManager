@@ -653,6 +653,8 @@ def test_prompt_chain_manager_deletes_chain(
     assert manager.deleted_chain_ids
     dialog.close()
     dialog.deleteLater()
+
+
 def test_prompt_chain_dialog_stream_preview_renders(qt_app: QApplication) -> None:
     """Streaming preview should show incremental text in the result area."""
 

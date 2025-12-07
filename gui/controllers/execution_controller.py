@@ -505,12 +505,7 @@ class ExecutionController:
                 context_block = summary_text
                 summarized = True
         self._set_web_context_summary(len(context_lines), provider_label, summarized=summarized)
-        return (
-            f"{provider_label} findings:\n"
-            f"{context_block}\n\n"
-            "User request:\n"
-            f"{request_text}"
-        )
+        return f"{provider_label} findings:\n{context_block}\n\nUser request:\n{request_text}"
 
     def _build_web_search_query(self, prompt: Prompt, request_text: str) -> str:
         parts: list[str] = []

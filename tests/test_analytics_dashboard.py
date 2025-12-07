@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from core import (
@@ -146,15 +147,13 @@ def test_build_analytics_snapshot_aggregates_repository_data(tmp_path: Path) -> 
     manager = _StubAnalyticsManager(repo, execution_stats, embedding_report)
 
     usage_log = tmp_path / "intent_usage.jsonl"
-    usage_log.write_text(
-        "\n".join(
-            [
-                '{"event": "execute", "timestamp": "2025-11-28T10:00:00+00:00", "success": true}',
-                '{"event": "execute", "timestamp": "2025-11-28T11:00:00+00:00", "success": false}',
-            ]
-        ),
-        encoding="utf-8",
-    )
+    now = datetime.now(UTC).replace(microsecond=0)
+    earlier = now - timedelta(hours=1)
+    usage_events = [
+        json.dumps({"event": "execute", "timestamp": earlier.isoformat(), "success": True}),
+        json.dumps({"event": "execute", "timestamp": now.isoformat(), "success": False}),
+    ]
+    usage_log.write_text("\n".join(usage_events), encoding="utf-8")
 
     snapshot = build_analytics_snapshot(
         manager,

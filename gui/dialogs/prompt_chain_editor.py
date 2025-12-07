@@ -9,6 +9,7 @@ Updates:
 """
 
 from __future__ import annotations
+
 import uuid
 from dataclasses import replace
 from typing import TYPE_CHECKING
@@ -60,8 +61,7 @@ class PromptChainEditorDialog(QDialog):
         self._result_chain: PromptChain | None = None
         self._prompts: list[Prompt] = list(prompts or [])
         self._prompt_lookup: dict[str, Prompt] = {
-            str(prompt.id): prompt
-            for prompt in self._prompts
+            str(prompt.id): prompt for prompt in self._prompts
         }
         self.setWindowTitle("Edit Prompt Chain" if chain else "New Prompt Chain")
         self.resize(800, 640)
@@ -82,7 +82,10 @@ class PromptChainEditorDialog(QDialog):
         )
 
         info_label = QLabel(
-            "Chains no longer define variables or templates—each step receives the previous output.",
+            (
+                "Chains no longer define variables or templates—"
+                "each step receives the previous output."
+            ),
             self,
         )
         info_label.setWordWrap(True)
@@ -103,9 +106,7 @@ class PromptChainEditorDialog(QDialog):
         layout.addLayout(form)
 
         self._steps_table = QTableWidget(0, 3, self)
-        self._steps_table.setHorizontalHeaderLabels(
-            ["Order", "Prompt", "Failure handling"]
-        )
+        self._steps_table.setHorizontalHeaderLabels(["Order", "Prompt", "Failure handling"])
         self._steps_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self._steps_table.itemDoubleClicked.connect(self._handle_step_double_click)  # type: ignore[arg-type]
         layout.addWidget(self._steps_table, 1)
@@ -155,7 +156,7 @@ class PromptChainEditorDialog(QDialog):
         for row, step in enumerate(self._steps):
             self._steps_table.setItem(row, 0, QTableWidgetItem(str(step.order_index)))
             prompt = self._prompt_lookup.get(str(step.prompt_id))
-            prompt_label = (prompt.name if prompt and prompt.name else None)
+            prompt_label = prompt.name if prompt and prompt.name else None
             prompt_item = QTableWidgetItem(prompt_label or str(step.prompt_id))
             prompt_item.setData(Qt.ItemDataRole.UserRole, str(step.prompt_id))
             if prompt is not None:

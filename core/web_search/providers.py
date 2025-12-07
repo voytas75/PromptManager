@@ -38,6 +38,7 @@ class WebSearchProvider(Protocol):
         **kwargs: Any,
     ) -> WebSearchResult:
         """Return provider-specific web search results."""
+        ...
 
 
 def _parse_datetime(value: str | None) -> datetime | None:
@@ -129,6 +130,7 @@ class ExaWebSearchProvider:
         exclude_domains: list[str] | None = None,
         search_type: str | None = None,
         livecrawl: str | None = None,
+        **_: Any,
     ) -> WebSearchResult:
         """Perform a search request against Exa's REST API."""
         cleaned_query = query.strip()
@@ -224,6 +226,7 @@ class TavilyWebSearchProvider:
         exclude_domains: list[str] | None = None,
         country: str | None = None,
         auto_parameters: bool | None = None,
+        **_: Any,
     ) -> WebSearchResult:
         """Perform a search request against Tavily's REST API."""
         cleaned_query = query.strip()

@@ -295,9 +295,7 @@ class PromptChainManagerPanel(QWidget):
         steps_layout.addWidget(steps_label)
 
         self._steps_table = QTableWidget(0, 3, steps_container)
-        self._steps_table.setHorizontalHeaderLabels(
-            ["Order", "Prompt", "Failure handling"]
-        )
+        self._steps_table.setHorizontalHeaderLabels(["Order", "Prompt", "Failure handling"])
         self._steps_table.horizontalHeader().setStretchLastSection(True)
         self._steps_table.verticalHeader().setVisible(False)
         self._steps_table.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -316,7 +314,9 @@ class PromptChainManagerPanel(QWidget):
         run_layout.addWidget(run_header)
 
         self._chain_input_edit = QPlainTextEdit(run_container)
-        self._chain_input_edit.setPlaceholderText("Type the text you want to feed into the first step…")
+        self._chain_input_edit.setPlaceholderText(
+            "Type the text you want to feed into the first step…"
+        )
         self._chain_input_edit.textChanged.connect(self._handle_chain_input_changed)  # type: ignore[arg-type]
         run_layout.addWidget(self._chain_input_edit, 1)
 
@@ -678,9 +678,7 @@ class PromptChainManagerPanel(QWidget):
 
         previous_status = self._detail_status.text()
         use_web_search = (
-            bool(self._web_search_checkbox.isChecked())
-            if self._web_search_checkbox
-            else True
+            bool(self._web_search_checkbox.isChecked()) if self._web_search_checkbox else True
         )
         self._detail_status.setText(f"Running '{chain.name}'…")
         streaming_enabled = self._is_streaming_enabled()
@@ -721,6 +719,7 @@ class PromptChainManagerPanel(QWidget):
 
     def _display_run_result(self, result: PromptChainRunResult) -> None:
         """Render execution outputs and per-step summary for *result*."""
+
         def _indent_lines(text: str, prefix: str = "  ") -> list[str]:
             if not text.strip():
                 return [f"{prefix}(empty)"]
@@ -887,8 +886,8 @@ class PromptChainManagerPanel(QWidget):
     def _result_style_css(self) -> str:
         palette = self._result_view.palette()
         color_role_enum = getattr(QPalette, "ColorRole", None)
-        base_role = getattr(color_role_enum, "Base", getattr(QPalette, "Base"))
-        text_role = getattr(color_role_enum, "Text", getattr(QPalette, "Text"))
+        base_role = getattr(color_role_enum, "Base", QPalette.Base)
+        text_role = getattr(color_role_enum, "Text", QPalette.Text)
         base_color = palette.color(base_role)
         text_color = palette.color(text_role)
         chosen = self._pick_accessible_text_color(base_color, text_color)
@@ -927,7 +926,7 @@ class PromptChainManagerPanel(QWidget):
         """Return styled HTML for a single step entry."""
         step = step_run.step
         label = step.output_variable or str(step.prompt_id)
-        parts = ["<div class=\"chain-step\">"]
+        parts = ['<div class="chain-step">']
         parts.append(
             f"<div class='chain-step-title'>Step {step.order_index} – {html.escape(label)}</div>"
         )
@@ -940,9 +939,7 @@ class PromptChainManagerPanel(QWidget):
             parts.append(f"<div class='chain-step-error'>{html.escape(step_run.error)}</div>")
         elif step_run.status == "skipped":
             parts.append(
-                "<div class='chain-step-detail'>"
-                "Skipped because condition evaluated to false."
-                "</div>"
+                "<div class='chain-step-detail'>Skipped because condition evaluated to false.</div>"
             )
         if request_text and show_request_block:
             parts.append(

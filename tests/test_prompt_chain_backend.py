@@ -9,14 +9,16 @@ from __future__ import annotations
 
 import uuid
 from types import SimpleNamespace
-
-import pytest
+from typing import TYPE_CHECKING
 
 from core.execution import CodexExecutionResult
 from core.litellm_adapter import LiteLLMNotInstalledError
 from core.prompt_manager.chains import PromptChainMixin, PromptChainStepRun
 from core.prompt_manager.execution_history import ExecutionOutcome
 from models.prompt_chain_model import PromptChainStep
+
+if TYPE_CHECKING:
+    import pytest
 
 
 class _ChainSummaryHarness(PromptChainMixin):
@@ -35,7 +37,12 @@ class _ChainSummaryHarness(PromptChainMixin):
         )
 
 
-def _step_run(order_index: int, response_text: str, *, status: str = "success") -> PromptChainStepRun:
+def _step_run(
+    order_index: int,
+    response_text: str,
+    *,
+    status: str = "success",
+) -> PromptChainStepRun:
     step = PromptChainStep(
         id=uuid.uuid4(),
         chain_id=uuid.uuid4(),
@@ -53,7 +60,11 @@ def _step_run(order_index: int, response_text: str, *, status: str = "success") 
         raw_response={},
     )
     outcome = ExecutionOutcome(result=execution_result, history_entry=None, conversation=[])
-    return PromptChainStepRun(step=step, status=status, outcome=outcome if status == "success" else None)
+    return PromptChainStepRun(
+        step=step,
+        status=status,
+        outcome=outcome if status == "success" else None,
+    )
 
 
 def test_chain_summary_prefers_litellm_last_step(monkeypatch: pytest.MonkeyPatch) -> None:

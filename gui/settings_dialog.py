@@ -632,9 +632,7 @@ class SettingsDialog(QDialog):
         provider_choice = None
         if self._web_search_provider_combo is not None:
             provider_choice = self._web_search_provider_combo.currentData()
-        exa_api_key = (
-            _clean(self._exa_api_key_input.text()) if self._exa_api_key_input else None
-        )
+        exa_api_key = _clean(self._exa_api_key_input.text()) if self._exa_api_key_input else None
         tavily_api_key = (
             _clean(self._tavily_api_key_input.text()) if self._tavily_api_key_input else None
         )

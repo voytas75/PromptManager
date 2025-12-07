@@ -12,8 +12,7 @@ from __future__ import annotations
 import csv
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable
-from uuid import UUID
+from typing import TYPE_CHECKING
 
 from PySide6.QtCharts import (
     QBarCategoryAxis,
@@ -47,7 +46,8 @@ from core import AnalyticsSnapshot, PromptManager, build_analytics_snapshot, sna
 from .processing_indicator import ProcessingIndicator
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
+    from uuid import UUID
 
 
 class AnalyticsDashboardPanel(QWidget):

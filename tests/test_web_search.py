@@ -72,9 +72,7 @@ async def test_exa_provider_parses_results() -> None:
 @pytest.mark.asyncio()
 async def test_exa_provider_raises_on_error() -> None:
     """Raise a provider error when Exa rejects the request."""
-    mock_client = _build_mock_client(
-        httpx.Response(401, json={"message": "bad"})
-    )
+    mock_client = _build_mock_client(httpx.Response(401, json={"message": "bad"}))
     provider = ExaWebSearchProvider(api_key="test-key", client_factory=lambda: mock_client)
 
     with pytest.raises(WebSearchProviderError):

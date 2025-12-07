@@ -91,6 +91,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers only
 
         def increment_usage(self, prompt_id: uuid.UUID) -> None: ...
 
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -256,9 +257,7 @@ class PromptChainMixin:
                     continue
                 step_runs.append(PromptChainStepRun(step=step, status=status, outcome=outcome))
         summary_text = (
-            self._build_chain_summary(step_runs)
-            if chain.summarize_last_response
-            else None
+            self._build_chain_summary(step_runs) if chain.summarize_last_response else None
         )
         return PromptChainRunResult(
             chain=chain,
@@ -312,12 +311,7 @@ class PromptChainMixin:
             return request_text
         provider_label = (result.provider or "Web search").strip() or "Web search"
         context_block = "\n".join(lines)
-        return (
-            f"{provider_label} findings:\n"
-            f"{context_block}\n\n"
-            "User request:\n"
-            f"{request_text}"
-        )
+        return f"{provider_label} findings:\n{context_block}\n\nUser request:\n{request_text}"
 
     @staticmethod
     def _build_web_search_query(prompt: Prompt, request_text: str) -> str:
@@ -397,6 +391,7 @@ class PromptChainMixin:
             )
         conversation_history = _normalise_conversation(None)
         stream_enabled = executor.stream
+
         def _handle_stream(chunk: str) -> None:
             if stream_callback is None:
                 return
@@ -602,9 +597,7 @@ def _summarize_response_text(text: str, *, max_length: int = 360) -> str:
     if len(collapsed) <= max_length:
         return collapsed
     sentences = [
-        segment.strip()
-        for segment in _SENTENCE_BOUNDARY.split(collapsed)
-        if segment.strip()
+        segment.strip() for segment in _SENTENCE_BOUNDARY.split(collapsed) if segment.strip()
     ]
     summary_parts: list[str] = []
     for sentence in sentences:
