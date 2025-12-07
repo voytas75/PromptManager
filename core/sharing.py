@@ -1,6 +1,7 @@
 """Prompt sharing helpers for external paste services.
 
 Updates:
+  v0.1.4 - 2025-12-07 - Provide shared footer helper for prompts and results.
   v0.1.3 - 2025-12-05 - Sort imports for lint compliance.
   v0.1.2 - 2025-12-04 - Append footer metadata with app name, author link, and share date.
   v0.1.1 - 2025-11-30 - Document ShareText provider methods for lint compliance.
@@ -23,6 +24,22 @@ if TYPE_CHECKING:
 
 _APP_NAME = "PromptManager"
 _APP_AUTHOR_URL = "https://github.com/voytas75"
+
+
+def _current_share_date() -> str:
+    """Return the ISO-8601 date string used in footer metadata."""
+
+    return date.today().isoformat()
+
+
+def append_share_footer(payload: str) -> str:
+    """Append the standard share footer block to *payload* text."""
+
+    base_text = (payload or "").rstrip()
+    footer_line = f"{_APP_NAME} | Author: {_APP_AUTHOR_URL} | Shared: {_current_share_date()}"
+    if not base_text:
+        return f"---\n{footer_line}"
+    return f"{base_text}\n\n---\n{footer_line}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,12 +127,9 @@ def format_prompt_for_share(
         metadata = prompt.to_metadata()
         lines.append("## Metadata")
         lines.append(json.dumps(metadata, ensure_ascii=False, indent=2))
-    footer_date = date.today().isoformat()
-    lines.append("")
-    lines.append("---")
-    lines.append(f"{_APP_NAME} | Author: {_APP_AUTHOR_URL} | Shared: {footer_date}")
     payload = "\n".join(lines).strip()
-    return payload or "Prompt content unavailable."
+    payload = payload or "Prompt content unavailable."
+    return append_share_footer(payload)
 
 
 class ShareTextProvider:
@@ -178,6 +192,7 @@ class ShareTextProvider:
 
 
 __all__ = [
+    "append_share_footer",
     "ShareProvider",
     "ShareProviderInfo",
     "ShareResult",

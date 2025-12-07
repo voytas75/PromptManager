@@ -1,6 +1,7 @@
 """Coordinate prompt execution, streaming, and chat workspace logic.
 
 Updates:
+  v0.1.7 - 2025-12-07 - Append share footer to result payloads.
   v0.1.6 - 2025-12-07 - Enable chat continuation for workspace text runs.
   v0.1.5 - 2025-12-07 - Support promptless workspace text execution.
   v0.1.4 - 2025-12-07 - Wrap web context with shared markers and numbering.
@@ -44,6 +45,7 @@ from core.litellm_adapter import (
     get_completion,
     serialise_litellm_response,
 )
+from core.sharing import append_share_footer
 from core.web_search.context_formatting import (
     build_numbered_search_results,
     wrap_search_results_block,
@@ -243,10 +245,11 @@ class ExecutionController:
         if not payload:
             self._status("Run a prompt to produce output before sharing.", 4000)
             return
+        payload_with_footer = append_share_footer(payload)
         prompt_label = self._last_prompt_name or "Workspace Result"
         self._share_controller.share_payload(
             provider_name,
-            payload,
+            payload_with_footer,
             prompt=None,
             prompt_name=prompt_label,
             indicator_title="Sharing Result",
