@@ -10,7 +10,7 @@ Updates:
   v0.16.6 - 2025-12-05 - Normalize module docstring quoting and reorder imports for lint compliance.
   v0.16.5 - 2025-12-05 - Remove prompt chain toolbar shortcut; Chain tab remains embedded.
   v0.16.4 - 2025-12-05 - Embed prompt chain panel and add toolbar shortcut to focus Chain tab.
-  v0.16.3-and-earlier - 2025-12-04 - Track \"Use web search\" checkbox plus prior layout/runtime mods.
+  v0.16.3-and-earlier - 2025-12-04 - Track the web search checkbox plus earlier runtime mods.
 """
 
 from __future__ import annotations
@@ -95,9 +95,9 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from .template_preview import TemplatePreviewWidget
     from .template_preview_controller import TemplatePreviewController
     from .widgets import PromptDetailWidget, PromptFilterPanel, PromptToolbar
+    from .workbench import WorkbenchWindow
     from .workspace_actions_controller import WorkspaceActionsController
     from .workspace_view_controller import WorkspaceViewController
-    from .workbench import WorkbenchWindow
 else:  # pragma: no cover - runtime placeholders for type-only imports
     from typing import Any as _Any
 
