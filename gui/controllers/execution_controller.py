@@ -457,18 +457,18 @@ class ExecutionController:
         summarized: bool = False,
     ) -> None:
         safe_count = max(0, int(count))
-        self._last_web_context_sources = safe_count
         provider_name = (provider_label or "").strip()
         normalized_provider = provider_name.title() if provider_name else None
+        self._last_web_context_sources = safe_count
         self._last_web_context_provider = normalized_provider
 
-        if safe_count == 0:
+        if safe_count == 0 and normalized_provider is None:
             self._web_context_preface = ""
             return
 
         heading = f"{normalized_provider} context" if normalized_provider else "Web context"
         plural = "source" if safe_count == 1 else "sources"
-        summary_note = " (summarized)" if summarized else ""
+        summary_note = " (summarized)" if summarized and safe_count else ""
         self._web_context_preface = f"{heading} ({safe_count} {plural} added{summary_note}).\n\n"
 
     def _maybe_enrich_request(self, prompt: Prompt, request_text: str) -> str:
@@ -495,10 +495,12 @@ class ExecutionController:
             return request_text
         finally:
             self._clear_status()
+        provider_label = (result.provider or "").strip()
         context_lines, total_words = self._collect_web_context_lines(result.documents)
         if not context_lines:
+            self._set_web_context_summary(0, provider_label)
             return request_text
-        provider_label = result.provider.strip().title() if result.provider else "Web search"
+        display_label = provider_label.title() if provider_label else "Web search"
         context_block = "\n".join(context_lines)
         summarized = False
         if total_words > WEB_CONTEXT_SUMMARY_WORD_LIMIT:
@@ -510,8 +512,12 @@ class ExecutionController:
             if summary_text:
                 context_block = summary_text
                 summarized = True
-        self._set_web_context_summary(len(context_lines), provider_label, summarized=summarized)
-        return f"{provider_label} findings:\n{context_block}\n\nUser request:\n{request_text}"
+        self._set_web_context_summary(
+            len(context_lines),
+            display_label,
+            summarized=summarized,
+        )
+        return f"{display_label} findings:\n{context_block}\n\nUser request:\n{request_text}"
 
     def _build_web_search_query(self, prompt: Prompt, request_text: str) -> str:
         parts: list[str] = []
