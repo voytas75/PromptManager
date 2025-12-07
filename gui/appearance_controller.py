@@ -84,9 +84,8 @@ class AppearanceController:
         if app is None:
             return DEFAULT_THEME_MODE
 
-        theme = (
-            (mode or self._runtime_settings.get("theme_mode") or DEFAULT_THEME_MODE).strip().lower()
-        )
+        raw_theme = mode or self._runtime_settings.get("theme_mode") or DEFAULT_THEME_MODE
+        theme = str(raw_theme).strip().lower()
         if theme not in {"light", "dark"}:
             theme = DEFAULT_THEME_MODE
 

@@ -78,3 +78,10 @@ class Qt:
     CustomContextMenu: int
     ApplicationModal: int
     yellow: int
+    white: int
+    class AlignmentFlag:
+        AlignLeft: int
+        AlignRight: int
+        AlignTop: int
+        AlignBottom: int
+    ShortcutFocusReason: int
