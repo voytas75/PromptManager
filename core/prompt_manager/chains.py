@@ -1,6 +1,7 @@
 """Prompt chain orchestration helpers for Prompt Manager.
 
 Updates:
+  v0.2.1 - 2025-12-07 - Wrap web search context with shared formatting helpers.
   v0.2.0 - 2025-12-06 - Switch chains to plain-text inputs and linear step piping.
   v0.1.5 - 2025-12-06 - Honor prompt template overrides for chain summaries.
   v0.1.4 - 2025-12-06 - Summarize final chain output via LiteLLM when chains opt in.
@@ -39,6 +40,10 @@ from ..litellm_adapter import (
     serialise_litellm_response,
 )
 from ..repository import RepositoryError, RepositoryNotFoundError
+from ..web_search.context_formatting import (
+    build_numbered_search_results,
+    wrap_search_results_block,
+)
 from .execution_history import ExecutionOutcome, _normalise_conversation
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers only
@@ -310,8 +315,13 @@ class PromptChainMixin:
         if not lines:
             return request_text
         provider_label = (result.provider or "Web search").strip() or "Web search"
-        context_block = "\n".join(lines)
-        return f"{provider_label} findings:\n{context_block}\n\nUser request:\n{request_text}"
+        numbered_context = build_numbered_search_results(lines)
+        if not numbered_context:
+            return request_text
+        formatted_block = wrap_search_results_block(numbered_context)
+        if not formatted_block:
+            return request_text
+        return f"{provider_label} findings:\n{formatted_block}\n\nUser request:\n{request_text}"
 
     @staticmethod
     def _build_web_search_query(prompt: Prompt, request_text: str) -> str:
@@ -354,7 +364,7 @@ class PromptChainMixin:
                 continue
             title = str(getattr(document, "title", "") or "").strip()
             prefix = f"{title}: " if title else ""
-            lines.append(f"- {prefix}{snippet} (Source: {url})")
+            lines.append(f"{prefix}{snippet} (Source: {url})")
         return lines
 
     @staticmethod

@@ -1,6 +1,7 @@
 """Coordinate prompt execution, streaming, and chat workspace logic.
 
 Updates:
+  v0.1.4 - 2025-12-07 - Wrap web context with shared markers and numbering.
   v0.1.3 - 2025-12-04 - Include all web snippets and summarize >5k words via fast LiteLLM.
   v0.1.2 - 2025-12-04 - Surface web context source counts before each workspace result.
   v0.1.1 - 2025-12-04 - Add optional web search enrichment controlled by a UI toggle.
@@ -38,6 +39,10 @@ from core.litellm_adapter import (
     call_completion_with_fallback,
     get_completion,
     serialise_litellm_response,
+)
+from core.web_search.context_formatting import (
+    build_numbered_search_results,
+    wrap_search_results_block,
 )
 
 if TYPE_CHECKING:  # pragma: no cover - import for typing only
@@ -501,7 +506,11 @@ class ExecutionController:
             self._set_web_context_summary(0, provider_label)
             return request_text
         display_label = provider_label.title() if provider_label else "Web search"
-        context_block = "\n".join(context_lines)
+        numbered_context = build_numbered_search_results(context_lines)
+        if not numbered_context:
+            self._set_web_context_summary(0, provider_label)
+            return request_text
+        context_block = numbered_context
         summarized = False
         if total_words > WEB_CONTEXT_SUMMARY_WORD_LIMIT:
             self._status("Summarizing web context…", 0)
@@ -512,12 +521,16 @@ class ExecutionController:
             if summary_text:
                 context_block = summary_text
                 summarized = True
+        formatted_block = wrap_search_results_block(context_block)
+        if not formatted_block:
+            self._set_web_context_summary(0, provider_label)
+            return request_text
         self._set_web_context_summary(
             len(context_lines),
             display_label,
             summarized=summarized,
         )
-        return f"{display_label} findings:\n{context_block}\n\nUser request:\n{request_text}"
+        return f"{display_label} findings:\n{formatted_block}\n\nUser request:\n{request_text}"
 
     def _build_web_search_query(self, prompt: Prompt, request_text: str) -> str:
         parts: list[str] = []
@@ -559,7 +572,7 @@ class ExecutionController:
             total_words += len(snippet.split())
             title = str(getattr(doc, "title", "") or "").strip()
             title_prefix = f"{title}: " if title else ""
-            context_lines.append(f"- {title_prefix}{snippet} (Source: {url})")
+            context_lines.append(f"{title_prefix}{snippet} (Source: {url})")
         return context_lines, total_words
 
     @staticmethod

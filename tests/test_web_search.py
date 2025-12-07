@@ -18,12 +18,18 @@ from core.exceptions import WebSearchProviderError, WebSearchUnavailable
 from core.web_search import (
     ExaWebSearchProvider,
     RandomWebSearchProvider,
+    SEARCH_RESULTS_END_MARKER,
+    SEARCH_RESULTS_NOTE,
+    SEARCH_RESULTS_START_MARKER,
     SerpApiWebSearchProvider,
     SerperWebSearchProvider,
     TavilyWebSearchProvider,
     WebSearchDocument,
     WebSearchResult,
     WebSearchService,
+    build_numbered_search_results,
+    format_search_results_block,
+    wrap_search_results_block,
 )
 
 
@@ -180,6 +186,35 @@ async def test_serper_provider_raises_on_error() -> None:
     with pytest.raises(WebSearchProviderError):
         await provider.search("latest news")
     await mock_client.aclose()
+
+
+def test_build_numbered_search_results_numbers_entries() -> None:
+    """Ensure numbered formatting skips blanks and prefixes incremental identifiers."""
+    numbered = build_numbered_search_results(
+        [
+            "Example Article: Summary (Source: https://example.com/article)",
+            "",
+            "Second item (Source: https://example.com/second)",
+        ]
+    )
+    lines = numbered.splitlines()
+    assert lines[0].startswith("1. ")
+    assert lines[1].startswith("2. ")
+
+
+def test_wrap_search_results_block_wraps_with_markers() -> None:
+    """Ensure wrapped blocks contain the required markers and guidance note."""
+    block = wrap_search_results_block("1. Example Article (Source: https://example.com/article)")
+    assert block.startswith(f"{SEARCH_RESULTS_START_MARKER}\n{SEARCH_RESULTS_NOTE}")
+    assert block.endswith(SEARCH_RESULTS_END_MARKER)
+
+
+def test_format_search_results_block_combines_helpers() -> None:
+    """Ensure the combined formatter produces a fully wrapped block."""
+    block = format_search_results_block(["Example Article (Source: https://example.com/article)"])
+    assert SEARCH_RESULTS_START_MARKER in block
+    assert "1. Example Article" in block
+    assert block.endswith(SEARCH_RESULTS_END_MARKER)
 
 
 @pytest.mark.asyncio()
