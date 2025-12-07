@@ -1,6 +1,7 @@
 """Settings management utilities for Prompt Manager configuration.
 
 Updates:
+  v0.5.10 - 2025-12-07 - Allow random web search provider selection and validation.
   v0.5.9 - 2025-12-05 - Tighten dotenv helpers for lint compliance.
   v0.5.8 - 2025-12-04 - Add auto-open share link preference with GUI binding.
   v0.5.7 - 2025-12-04 - Load .env secrets so web search keys persist like LiteLLM keys.
@@ -10,7 +11,7 @@ Updates:
   v0.5.3 - 2025-11-30 - Fix validator docstring spacing for lint compliance.
   v0.5.2 - 2025-11-30 - Add category suggestion workflow to LiteLLM routing.
   v0.5.1 - 2025-11-23 - Added prompt template override settings.
-  v0.5.0 - 2025-11-22 - Added structure-only prompt refinement routing.
+  v0.5.0-and-earlier - 2025-11-22 - Added structure-only prompt refinement routing.
 """
 
 from __future__ import annotations
@@ -228,9 +229,13 @@ class PromptManagerSettings(BaseSettings):
             "'fast' or 'inference'."
         ),
     )
-    web_search_provider: Literal["exa", "tavily"] | None = Field(
+    web_search_provider: Literal["exa", "tavily", "random"] | None = Field(
         default="exa",
-        description="Configured web search provider slug (set empty to disable).",
+        description=(
+            "Configured web search provider slug ('exa', 'tavily', 'random'; set empty to "
+            "disable). The 'random' option rotates between providers that have API keys "
+            "configured before each search."
+        ),
     )
     exa_api_key: str | None = Field(
         default=None,
@@ -453,8 +458,10 @@ class PromptManagerSettings(BaseSettings):
         text = str(value).strip().lower()
         if text in {"none", "disabled", "off"}:
             return None
-        if text not in {"exa", "tavily"}:
-            raise ValueError("web_search_provider must be set to 'exa', 'tavily', or left empty")
+        if text not in {"exa", "tavily", "random"}:
+            raise ValueError(
+                "web_search_provider must be set to 'exa', 'tavily', 'random', or left empty"
+            )
         return text
 
     @field_validator("theme_mode", mode="before")

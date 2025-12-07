@@ -22,7 +22,7 @@
 ### Phase 1 – Configuration & Secrets
 
 - Extend `PromptManagerSettings` with:
-  - `web_search_provider` (`Literal["exa", "tavily"]`, default `exa` until telemetry indicates otherwise).
+- `web_search_provider` (`Literal["exa", "tavily", "random"]`, default `exa` until telemetry indicates otherwise). `random` rotates between providers that have API keys configured, falling back to the only available provider when necessary.
   - Secret fields for provider credentials (e.g., `exa_api_key`, `tavily_api_key`, stored only in memory and env vars such as `EXA_API_KEY` or `TAVILY_API_KEY`).
 - Update CLI summaries, runtime persistence, and docs (`README`, `README-DEV`, env matrices) so every provider shows up alongside LiteLLM.
 - Settings dialog: add an **Integrations → Web Search** tab hosting the provider selector plus per-provider API key password fields. Keys should stay in memory only (mirroring LiteLLM).

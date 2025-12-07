@@ -1,6 +1,7 @@
 """Settings dialog for configuring Prompt Manager runtime options.
 
 Updates:
+  v0.2.15 - 2025-12-07 - Add random web search provider option and explanatory note.
   v0.2.14 - 2025-12-05 - Break share preference assignments over multiple lines for linting.
   v0.2.13 - 2025-12-04 - Add auto-open share link preference toggle.
   v0.2.12 - 2025-12-04 - Add web search integrations tab and Exa API key field.
@@ -9,9 +10,7 @@ Updates:
   v0.2.9 - 2025-11-28 - Persist dialog geometry between sessions.
   v0.2.8 - 2025-11-23 - Surface editable LiteLLM prompt templates with reset controls.
   v0.2.7 - 2025-12-06 - Surface LiteLLM embedding model configuration.
-  v0.2.6 - 2025-11-05 - Add theme mode toggle to the appearance settings.
-  v0.2.5 - 2025-11-05 - Add chat appearance controls to settings dialog.
-  pre-v0.2.4 - 2025-11-04 - Initial dialog history covering releases v0.1.0–v0.2.3.
+  pre-v0.2.7 - 2025-11-05 - Theme mode/chat appearance controls and earlier history (v0.1.0–v0.2.6).
 """
 
 from __future__ import annotations
@@ -332,16 +331,29 @@ class SettingsDialog(QDialog):
 
         provider_combo = QComboBox(integrations_tab)
         provider_combo.addItem("Disabled", userData=None)
+        provider_combo.addItem("Random", userData="random")
         provider_combo.addItem("Exa", userData="exa")
         provider_combo.addItem("Tavily", userData="tavily")
-        if self._web_search_provider == "exa":
+        if self._web_search_provider == "random":
             provider_combo.setCurrentIndex(1)
-        elif self._web_search_provider == "tavily":
+        elif self._web_search_provider == "exa":
             provider_combo.setCurrentIndex(2)
+        elif self._web_search_provider == "tavily":
+            provider_combo.setCurrentIndex(3)
         else:
             provider_combo.setCurrentIndex(0)
         self._web_search_provider_combo = provider_combo
         integrations_form.addRow("Web search provider", provider_combo)
+
+        random_hint = QLabel(
+            (
+                "Random rotates between providers that have API keys configured for each "
+                "search. If only one provider has a key, that provider is used every time."
+            ),
+            integrations_tab,
+        )
+        random_hint.setWordWrap(True)
+        integrations_form.addRow(random_hint)
 
         exa_api_key_input = QLineEdit(self._exa_api_key, integrations_tab)
         exa_api_key_input.setEchoMode(QLineEdit.Password)

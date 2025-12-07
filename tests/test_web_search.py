@@ -1,6 +1,7 @@
 """Tests for the web search provider/service scaffolding.
 
 Updates:
+  v0.1.3 - 2025-12-07 - Cover random provider fan-out behaviour.
   v0.1.2 - 2025-12-07 - Cover Tavily provider success/error flows.
   v0.1.1 - 2025-12-05 - Reorder imports and wrap long lines for lint compliance.
   v0.1.0 - 2025-12-04 - Cover Exa provider and service scaffolding.
@@ -14,6 +15,7 @@ import pytest
 from core.exceptions import WebSearchProviderError, WebSearchUnavailable
 from core.web_search import (
     ExaWebSearchProvider,
+    RandomWebSearchProvider,
     TavilyWebSearchProvider,
     WebSearchDocument,
     WebSearchResult,
@@ -152,3 +154,37 @@ async def test_web_search_service_delegates_to_provider() -> None:
 
     assert result.provider == "dummy"
     assert result.query == "q"
+
+
+@pytest.mark.asyncio()
+async def test_random_provider_delegates_to_selected_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Random provider should funnel requests to the randomly selected provider."""
+
+    calls: list[tuple[str, str, int]] = []
+
+    class DummyProvider:
+        def __init__(self, slug: str) -> None:
+            self.slug = slug
+            self.display_name = slug
+
+        async def search(self, query: str, *, limit: int = 5, **_: object) -> WebSearchResult:  # type: ignore[override]
+            calls.append((self.slug, query, limit))
+            return WebSearchResult(provider=self.slug, query=query, documents=[])
+
+    providers = [DummyProvider("exa"), DummyProvider("tavily")]
+    random_provider = RandomWebSearchProvider(providers)
+    monkeypatch.setattr("core.web_search.providers.random.choice", lambda seq: seq[1])
+
+    result = await random_provider.search("topic", limit=3)
+
+    assert result.provider == "tavily"
+    assert calls == [("tavily", "topic", 3)]
+
+
+def test_random_provider_requires_candidates() -> None:
+    """Random provider cannot be constructed without downstream providers."""
+
+    with pytest.raises(WebSearchUnavailable):
+        RandomWebSearchProvider([])

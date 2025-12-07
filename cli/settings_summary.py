@@ -1,6 +1,7 @@
 """Printable summaries for Prompt Manager configuration.
 
 Updates:
+  v0.1.3 - 2025-12-07 - Explain random web search provider behaviour in summaries.
   v0.1.2 - 2025-12-07 - Surface Tavily provider credentials in CLI summaries.
   v0.1.1 - 2025-12-04 - Surface web search provider status in CLI summary.
   v0.1.0 - 2025-12-04 - Extract CLI settings summary rendering.
@@ -87,12 +88,32 @@ def print_settings_summary(settings: PromptManagerSettings) -> None:
             "-----------------------",
             f"Backend: {embedding_backend or DEFAULT_EMBEDDING_BACKEND}",
             f"Model: {resolved_model}",
+        ]
+    )
+
+    provider_line = f"Provider: {web_search_provider or 'disabled'}"
+    random_note = None
+    if web_search_provider == "random":
+        provider_line = "Provider: random (rotates between configured providers each search)"
+        random_note = (
+            "Random selection uses whichever providers currently have API keys configured."
+        )
+
+    lines.extend(
+        [
             "",
             "Web search",
             "-----------",
-            f"Provider: {web_search_provider or 'disabled'}",
+            provider_line,
             f"Exa API key: {mask_secret(exa_api_key)}",
             f"Tavily API key: {mask_secret(tavily_api_key)}",
+        ]
+    )
+    if random_note:
+        lines.append(random_note)
+
+    lines.extend(
+        [
             "",
             "Sharing",
             "--------",

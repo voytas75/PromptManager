@@ -1,6 +1,7 @@
 """Tests for configuration loading and validation logic.
 
 Updates:
+  v0.2.0 - 2025-12-07 - Cover random web search provider selection.
   v0.1.9 - 2025-12-07 - Cover Tavily provider secrets and validation flow.
   v0.1.8 - 2025-12-04 - Cover .env sourcing for Exa API secrets.
   v0.1.7 - 2025-11-30 - Add docstrings to tests for lint compliance.
@@ -10,7 +11,6 @@ Updates:
   v0.1.3 - 2025-11-15 - Warn and ignore LiteLLM API secrets supplied via JSON configuration.
   v0.1.2 - 2025-11-14 - Cover LiteLLM API key loading from JSON configuration.
   v0.1.1 - 2025-11-03 - Add precedence test using example template.
-  v0.1.0 - 2025-11-03 - Cover JSON/env precedence and validation errors.
 """
 
 from __future__ import annotations
@@ -298,6 +298,25 @@ def test_tavily_api_key_from_dotenv_alias(monkeypatch: MonkeyPatch, tmp_path: Pa
 
     assert settings.tavily_api_key == "tvly-alias"
     assert settings.web_search_provider == "tavily"
+
+
+def test_random_web_search_provider_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    """Allow selecting the random provider while loading both API keys."""
+
+    _clear_litellm_env(monkeypatch)
+    tmp_config = tmp_path / "config.json"
+    tmp_config.write_text("{}", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(tmp_config))
+    monkeypatch.setenv("PROMPT_MANAGER_WEB_SEARCH_PROVIDER", "random")
+    monkeypatch.setenv("PROMPT_MANAGER_EXA_API_KEY", "exa-secret")
+    monkeypatch.setenv("PROMPT_MANAGER_TAVILY_API_KEY", "tvly-secret")
+
+    settings = load_settings()
+
+    assert settings.web_search_provider == "random"
+    assert settings.exa_api_key == "exa-secret"
+    assert settings.tavily_api_key == "tvly-secret"
 
 
 def test_exa_api_key_from_dotenv_alias(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:

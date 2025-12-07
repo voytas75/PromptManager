@@ -1,6 +1,7 @@
 """Provider protocol definitions and concrete provider implementations.
 
 Updates:
+  v0.1.3 - 2025-12-07 - Add RandomWebSearchProvider to rotate between configured services.
   v0.1.2 - 2025-12-07 - Add Tavily provider and generalise document parsing.
   v0.1.1 - 2025-12-05 - Move typing-only imports behind TYPE_CHECKING and document __post_init__.
   v0.1.0 - 2025-12-04 - Introduce provider abstraction and Exa HTTP client.
@@ -8,17 +9,18 @@ Updates:
 
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 import httpx
 
-from ..exceptions import WebSearchProviderError
+from ..exceptions import WebSearchProviderError, WebSearchUnavailable
 from .models import WebSearchDocument, WebSearchResult
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping
+    from collections.abc import Callable, Mapping, Sequence
 
 MAX_RESULTS = 25
 
@@ -294,4 +296,32 @@ class TavilyWebSearchProvider:
         )
 
 
-__all__ = ["ExaWebSearchProvider", "TavilyWebSearchProvider", "WebSearchProvider"]
+@dataclass(slots=True)
+class RandomWebSearchProvider:
+    """Provider that randomly fans out requests across configured providers."""
+
+    providers: Sequence[WebSearchProvider]
+    slug: str = "random"
+    display_name: str = "Random Web Search"
+
+    def __post_init__(self) -> None:
+        """Ensure at least one downstream provider is configured."""
+        cleaned = tuple(provider for provider in self.providers if provider is not None)
+        if not cleaned:
+            raise WebSearchUnavailable(
+                "Random web search requires at least one configured provider"
+            )
+        self.providers = cleaned
+
+    async def search(self, query: str, *, limit: int = 5, **kwargs: Any) -> WebSearchResult:
+        """Delegate searches to a randomly selected downstream provider."""
+        selected = random.choice(self.providers)
+        return await selected.search(query, limit=limit, **kwargs)
+
+
+__all__ = [
+    "ExaWebSearchProvider",
+    "RandomWebSearchProvider",
+    "TavilyWebSearchProvider",
+    "WebSearchProvider",
+]

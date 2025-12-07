@@ -62,7 +62,7 @@ All settings are defined via `pydantic-settings` in `config/settings.py`. Provid
 | `PROMPT_MANAGER_LITELLM_STREAM` | Enable streaming responses (`true`/`false`) | `true` |
 | `PROMPT_MANAGER_LITELLM_TTS_MODEL` | LiteLLM text-to-speech model id used for voice playback | `openai/tts-1` |
 | `PROMPT_MANAGER_LITELLM_TTS_STREAM` | Stream LiteLLM TTS audio so playback starts mid-download (`true`/`false`) | `true` |
-| `PROMPT_MANAGER_WEB_SEARCH_PROVIDER` | Web search provider slug (`exa`, `tavily`, or leave empty to disable) | `tavily` |
+| `PROMPT_MANAGER_WEB_SEARCH_PROVIDER` | Web search provider slug (`exa`, `tavily`, `random`, or leave empty to disable) | `tavily` |
 | `PROMPT_MANAGER_EXA_API_KEY` / `EXA_API_KEY` | Exa web search API key (environment only) | `exa_***` |
 | `PROMPT_MANAGER_TAVILY_API_KEY` / `TAVILY_API_KEY` | Tavily web search API key (environment only) | `tvly-***` |
 | `PROMPT_MANAGER_AUTO_OPEN_SHARE_LINKS` | Auto-open shared URLs in the default browser (`true`/`false`) | `true` |
@@ -72,6 +72,8 @@ All settings are defined via `pydantic-settings` in `config/settings.py`. Provid
 | `PROMPT_MANAGER_CHROMA_TELEMETRY` | Opt-in flag for Chroma telemetry (`1` to enable) | `0` |
 
 Secrets must never be committed; rely on `.env` files ignored by git or host-level secret stores.
+
+Selecting `PROMPT_MANAGER_WEB_SEARCH_PROVIDER="random"` rotates calls between whichever providers currently have API keys configured; if only one provider has a key, Random behaves like that provider until another key is available.
 
 See [`docs/web_search_plan.md`](web_search_plan.md) for the staged web search integration plan (Exa + Tavily) if you are extending the provider surface.
 

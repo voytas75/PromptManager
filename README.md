@@ -36,7 +36,7 @@ export PROMPT_MANAGER_LITELLM_MODEL="gpt-4o-mini"
 export PROMPT_MANAGER_LITELLM_API_KEY="sk-***"
 export PROMPT_MANAGER_LITELLM_TTS_MODEL="openai/tts-1"
 # Optional: configure the web search provider (Integrations tab mirrors these values)
-export PROMPT_MANAGER_WEB_SEARCH_PROVIDER="tavily"  # or "exa"
+export PROMPT_MANAGER_WEB_SEARCH_PROVIDER="tavily"  # or "exa" / "random"
 export PROMPT_MANAGER_TAVILY_API_KEY="tvly-***"
 # export PROMPT_MANAGER_EXA_API_KEY="exa_***"  # when using Exa instead
 # Optional: disable streaming playback if your platform struggles with simultaneous read/write
@@ -62,6 +62,7 @@ PROMPT_MANAGER_TAVILY_API_KEY="tvly-***"
 EOF
 ```
 
+- Setting `PROMPT_MANAGER_WEB_SEARCH_PROVIDER="random"` rotates between the providers that have API keys configured before each run (falls back to the only available provider when just one key is set).
 - Copy `config/config.template.json` to `config/config.json` to persist non-secret defaults; environment variables always win.
 - Omit `PROMPT_MANAGER_LITELLM_API_KEY` to run without prompt execution; deterministic embeddings remain available for offline workflows.
 - Set `PROMPT_MANAGER_LITELLM_TTS_MODEL` when enabling the voice playback feature (defaults to disabled so no audio requests are issued).

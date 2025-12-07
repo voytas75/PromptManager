@@ -1,6 +1,7 @@
 """Factories for constructing PromptManager instances from validated settings.
 
 Updates:
+  v0.7.9 - 2025-12-07 - Add random provider fan-out for the web search service.
   v0.7.8 - 2025-12-07 - Add Tavily provider wiring to the web search factory.
   v0.7.7 - 2025-12-04 - Wire web search service creation into manager factory.
   v0.7.6 - 2025-11-30 - Remove docstring padding for Ruff compliance.
@@ -9,8 +10,8 @@ Updates:
   v0.7.3 - 2025-11-05 - Support LiteLLM workflow routing across fast/inference models.
   v0.7.2 - 2025-11-26 - Wire LiteLLM streaming flag into executor construction.
   v0.7.1 - 2025-11-19 - Configure LiteLLM scenario generator for prompt metadata enrichment.
-  v0.7.0 - 2025-11-15 - Wire prompt engineer construction into manager factory.
-  v0.6.1-and-earlier - 2025-11-07 - Add configurable embedding backends and initial factory wiring.
+  v0.7.0-and-earlier - 2025-11-15 - Wire prompt engineer construction with configurable
+  embedding backends and the initial factory wiring.
 """
 
 from __future__ import annotations
@@ -33,7 +34,12 @@ from .prompt_engineering import PromptEngineer
 from .prompt_manager import NameGenerationError, PromptCacheError, PromptManager
 from .repository import PromptRepository
 from .scenario_generation import LiteLLMScenarioGenerator
-from .web_search import ExaWebSearchProvider, TavilyWebSearchProvider, WebSearchService
+from .web_search import (
+    ExaWebSearchProvider,
+    RandomWebSearchProvider,
+    TavilyWebSearchProvider,
+    WebSearchService,
+)
 
 try:  # pragma: no cover - redis optional dependency
     import redis
@@ -95,14 +101,25 @@ def _build_web_search_service(settings: PromptManagerSettings) -> WebSearchServi
     """Return a WebSearchService configured from settings."""
     provider_slug = getattr(settings, "web_search_provider", None)
     provider = None
+    exa_provider = None
+    tavily_provider = None
+    exa_key = getattr(settings, "exa_api_key", None)
+    if exa_key:
+        exa_provider = ExaWebSearchProvider(api_key=exa_key)
+    tavily_key = getattr(settings, "tavily_api_key", None)
+    if tavily_key:
+        tavily_provider = TavilyWebSearchProvider(api_key=tavily_key)
+
     if provider_slug == "exa":
-        api_key = getattr(settings, "exa_api_key", None)
-        if api_key:
-            provider = ExaWebSearchProvider(api_key=api_key)
+        provider = exa_provider
     elif provider_slug == "tavily":
-        api_key = getattr(settings, "tavily_api_key", None)
-        if api_key:
-            provider = TavilyWebSearchProvider(api_key=api_key)
+        provider = tavily_provider
+    elif provider_slug == "random":
+        available = [candidate for candidate in (exa_provider, tavily_provider) if candidate]
+        if len(available) == 1:
+            provider = available[0]
+        elif len(available) > 1:
+            provider = RandomWebSearchProvider(available)
     return WebSearchService(provider)
 
 
