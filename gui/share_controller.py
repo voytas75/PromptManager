@@ -1,6 +1,7 @@
 """Centralised share-provider orchestration for prompt and result payloads.
 
 Updates:
+  v0.1.3 - 2025-12-07 - Surface provider management notes after sharing.
   v0.1.2 - 2025-12-05 - Reorder module imports for Ruff lint compliance.
   v0.1.1 - 2025-12-04 - Auto-open share URLs based on runtime preference.
   v0.1.0 - 2025-11-30 - Introduce ShareController to manage provider menus and execution.
@@ -127,6 +128,8 @@ class ShareController(QObject):
                 f"Delete this share later via: {result.delete_url}",
                 10000,
             )
+        if result.management_note:
+            self._status_callback(result.management_note, 12000)
         self._open_share_url(result.url)
         return True
 

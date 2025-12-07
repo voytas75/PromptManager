@@ -1,6 +1,7 @@
 """Prompt sharing helpers for external paste services.
 
 Updates:
+  v0.1.6 - 2025-12-07 - Add Rentry provider and management-note support.
   v0.1.5 - 2025-12-07 - Add PrivateBin provider for zero-knowledge sharing.
   v0.1.4 - 2025-12-07 - Provide shared footer helper for prompts and results.
   v0.1.3 - 2025-12-05 - Sort imports for lint compliance.
@@ -60,17 +61,16 @@ _DEFAULT_PRIVATEBIN_BASE = "https://privatebin.net/"
 _DEFAULT_PRIVATEBIN_EXPIRATION = "1week"
 _DEFAULT_PRIVATEBIN_FORMAT = "markdown"
 _DEFAULT_PRIVATEBIN_COMPRESSION = "zlib"
+_DEFAULT_RENTRY_BASE = "https://rentry.co"
 
 
 def _current_share_date() -> str:
     """Return the ISO-8601 date string used in footer metadata."""
-
     return date.today().isoformat()
 
 
 def append_share_footer(payload: str) -> str:
     """Append the standard share footer block to *payload* text."""
-
     base_text = (payload or "").rstrip()
     footer_line = f"{_APP_NAME} | Author: {_APP_AUTHOR_URL} | Shared: {_current_share_date()}"
     if not base_text:
@@ -120,6 +120,17 @@ def _normalise_privatebin_base_url(base_url: str) -> str:
     return urlunsplit((parts.scheme, parts.netloc, path, "", ""))
 
 
+def _normalise_rentry_base_url(base_url: str) -> str:
+    candidate = base_url.strip().rstrip("/")
+    if not candidate:
+        raise ValueError("Rentry base URL must not be empty.")
+    parts = urlsplit(candidate)
+    if not parts.scheme or not parts.netloc:
+        raise ValueError("Rentry base URL must include a scheme and hostname.")
+    path = parts.path.rstrip("/")
+    return urlunsplit((parts.scheme, parts.netloc, path, "", ""))
+
+
 @dataclass(frozen=True, slots=True)
 class ShareProviderInfo:
     """Metadata describing a share provider entry."""
@@ -137,6 +148,7 @@ class ShareResult:
     url: str
     payload_chars: int
     delete_url: str | None = None
+    management_note: str | None = None
 
 
 class ShareProvider(Protocol):
@@ -410,6 +422,104 @@ class PrivateBinProvider:
         )
 
 
+class RentryProvider:
+    """Share prompts via https://rentry.co markdown pastes."""
+
+    _USER_AGENT = "PromptManager/RentryShare"
+
+    def __init__(
+        self,
+        *,
+        base_url: str = _DEFAULT_RENTRY_BASE,
+        timeout: float = 15.0,
+        metadata: str | None = None,
+    ) -> None:
+        """Configure a Rentry client with optional metadata overrides."""
+        try:
+            normalised_base = _normalise_rentry_base_url(base_url)
+        except ValueError as exc:
+            raise ShareProviderError(str(exc)) from exc
+        self._base_url = normalised_base
+        self._timeout = timeout
+        self._metadata = metadata.strip() if metadata and metadata.strip() else None
+        referer = normalised_base if normalised_base.endswith("/") else f"{normalised_base}/"
+        self._headers = {
+            "User-Agent": self._USER_AGENT,
+            "Referer": referer,
+        }
+        self.info = ShareProviderInfo(
+            name="rentry",
+            label="Rentry",
+            description="Publish markdown-friendly prompts to rentry.co with edit codes.",
+        )
+
+    def share(self, payload: str, prompt: Prompt | None = None) -> ShareResult:
+        """Upload *payload* to Rentry and capture the edit code for later updates."""
+        stripped_payload = payload.strip()
+        if not stripped_payload:
+            raise ShareProviderError("Share payload is empty.")
+        try:
+            with httpx.Client(
+                headers=self._headers,
+                timeout=self._timeout,
+                follow_redirects=True,
+            ) as client:
+                csrf_token = self._fetch_csrf_token(client)
+                response = client.post(
+                    f"{self._base_url}/api/new",
+                    data=self._build_request_body(csrf_token, stripped_payload),
+                )
+                response.raise_for_status()
+        except httpx.HTTPError as exc:
+            raise ShareProviderError(f"Unable to reach Rentry: {exc}") from exc
+        try:
+            data = response.json()
+        except ValueError as exc:  # pragma: no cover - unexpected type
+            raise ShareProviderError("Rentry returned an invalid response.") from exc
+        status_text = str(data.get("status", "")).strip().lower()
+        if status_text not in {"200", "ok", "success"}:
+            message = str(data.get("content") or data.get("errors") or "Unknown error.").strip()
+            raise ShareProviderError(f"Rentry rejected the share: {message}")
+        share_url = str(data.get("url") or "").strip()
+        slug = str(data.get("url_short") or "").strip()
+        if not share_url and slug:
+            share_url = f"{self._base_url.rstrip('/')}/{slug}"
+        if not share_url:
+            raise ShareProviderError("Rentry response was missing a share URL.")
+        edit_code = str(data.get("edit_code") or "").strip()
+        management_note = None
+        if edit_code and slug:
+            management_note = (
+                f"Edit this entry via {self._base_url.rstrip('/')}/{slug}/edit "
+                f"using code: {edit_code}"
+            )
+        elif edit_code:
+            management_note = f"Store this Rentry edit code for updates: {edit_code}"
+        return ShareResult(
+            provider=self.info,
+            url=share_url,
+            payload_chars=len(stripped_payload),
+            management_note=management_note,
+        )
+
+    def _fetch_csrf_token(self, client: httpx.Client) -> str:
+        response = client.get(self._base_url)
+        response.raise_for_status()
+        token = client.cookies.get("csrftoken")
+        if not token:
+            raise ShareProviderError("Rentry did not provide a CSRF token.")
+        return token
+
+    def _build_request_body(self, token: str, payload: str) -> dict[str, str]:
+        body = {
+            "csrfmiddlewaretoken": token,
+            "text": payload,
+        }
+        if self._metadata:
+            body["metadata"] = self._metadata
+        return body
+
+
 __all__ = [
     "append_share_footer",
     "ShareProvider",
@@ -417,5 +527,6 @@ __all__ = [
     "ShareResult",
     "ShareTextProvider",
     "PrivateBinProvider",
+    "RentryProvider",
     "format_prompt_for_share",
 ]

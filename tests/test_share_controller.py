@@ -11,14 +11,22 @@ from gui.share_controller import ShareController
 
 
 class _DummyProvider:
-    def __init__(self) -> None:
-        self.info = ShareProviderInfo(
+    def __init__(
+        self,
+        *,
+        result: ShareResult | None = None,
+        info: ShareProviderInfo | None = None,
+    ) -> None:
+        self.info = info or ShareProviderInfo(
             name="dummy",
             label="DummyShare",
             description="Test provider",
         )
+        self._result = result
 
     def share(self, payload: str, prompt: Any | None = None) -> ShareResult:
+        if self._result is not None:
+            return self._result
         return ShareResult(
             provider=self.info,
             url="https://example.com/share",
@@ -100,6 +108,38 @@ def test_share_controller_respects_disabled_auto_open(monkeypatch: pytest.Monkey
     )
     controller.register_provider(_DummyProvider())
 
+
+def test_share_controller_surfaces_management_note(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Emit delete links and provider-specific notes through the status callback."""
+
+    monkeypatch.setattr("gui.share_controller.webbrowser.open", lambda *_, **__: True)
+    monkeypatch.setattr("PySide6.QtGui.QGuiApplication.clipboard", lambda: _DummyClipboard())
+
+    status_messages: list[str] = []
+
+    def _status(message: str, _: int) -> None:
+        status_messages.append(message)
+
+    controller = ShareController(
+        None,
+        toast_callback=lambda *_: None,
+        status_callback=_status,
+        error_callback=lambda *_: None,
+        usage_logger=_DummyUsageLogger(),
+        preference_supplier=lambda: False,
+    )
+    provider_info = ShareProviderInfo(name="dummy", label="DummyShare", description="Test")
+    provider = _DummyProvider(
+        result=ShareResult(
+            provider=provider_info,
+            url="https://example.com/share",
+            payload_chars=7,
+            delete_url="https://example.com/delete",
+            management_note="Edit via https://example.com/edit using code: secret",
+        ),
+        info=provider_info,
+    )
+    controller.register_provider(provider)
     controller.share_payload(
         "dummy",
         "payload",
@@ -107,3 +147,6 @@ def test_share_controller_respects_disabled_auto_open(monkeypatch: pytest.Monkey
         indicator_title="Share",
         error_title="Error",
     )
+
+    assert any("Delete this share later" in message for message in status_messages)
+    assert any("Edit via" in message for message in status_messages)

@@ -2,6 +2,12 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.22.11] - 2025-12-07
+
+### Added
+
+- Added Rentry as the third share provider: `core.sharing.RentryProvider` now handles CSRF/token negotiation against `https://rentry.co/api/new` (per the [official CLI README](https://github.com/radude/rentry/blob/master/README.md), retrieved 2025-12-07), surfaces edit-code management notes via the GUI share controller, registers alongside ShareText/PrivateBin during bootstrap, and includes unit tests + documentation updates so contributors know the new workflow.
+
 ## [0.22.10] - 2025-12-07
 
 ### Added

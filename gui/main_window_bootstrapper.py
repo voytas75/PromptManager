@@ -1,6 +1,7 @@
 """Helper utilities for bootstrapping the Prompt Manager main window.
 
 Updates:
+  v0.15.82 - 2025-12-07 - Register the Rentry share provider alongside ShareText and PrivateBin.
   v0.15.81 - 2025-12-01 - Extracted widget/controller bootstrap helpers from gui.main_window.
 """
 
@@ -13,7 +14,7 @@ from typing import TYPE_CHECKING, Protocol
 from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QLabel, QWidget
 
-from core.sharing import PrivateBinProvider, ShareTextProvider
+from core.sharing import PrivateBinProvider, RentryProvider, ShareTextProvider
 
 from .appearance_controller import AppearanceController
 from .layout_controller import LayoutController
@@ -142,6 +143,7 @@ class MainWindowBootstrapper:
             error_callback=self._error_callback,
         )
         share_workflow.register_provider(ShareTextProvider())
+        share_workflow.register_provider(RentryProvider())
         if self._settings is not None:
             privatebin_provider = PrivateBinProvider(
                 base_url=self._settings.privatebin_url,

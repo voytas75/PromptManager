@@ -137,7 +137,7 @@ Key UI capabilities:
 - Command palette (`Ctrl+K` / `Ctrl+Shift+P`) and shortcuts (`Ctrl+1`–`Ctrl+4`) jump directly into explain/fix/document/enhance workflows.
 - Category/tag/quality filters plus taxonomy manager keep catalogues organized.
 - Settings dialog controls LiteLLM routing, streaming, quick actions, embedding configuration, and now the Integrations tab for web search providers; API keys entered in the GUI stay in memory only.
-- Share panel (bordered row beneath the action buttons) lets users pick what to publish (body-only, body + description, or body + description + scenarios), toggle metadata inclusion, and then pick a provider (ShareText for quick plain-text pastes or PrivateBin for zero-knowledge AES-256-GCM uploads per the [PrivateBin API](https://github.com/PrivateBin/PrivateBin/wiki/API), retrieved 2025-12-07). Uploads happen on a worker thread, the resulting URL is copied to the clipboard automatically, and we surface the delete token returned by each provider.
+- Share panel (bordered row beneath the action buttons) lets users pick what to publish (body-only, body + description, or body + description + scenarios), toggle metadata inclusion, and then pick a provider: ShareText for quick plain-text pastes, Rentry for markdown pages with editable slugs/edit codes (per the [official CLI/API README](https://github.com/radude/rentry/blob/master/README.md), retrieved 2025-12-07), or PrivateBin for zero-knowledge AES-256-GCM uploads per the [PrivateBin API](https://github.com/PrivateBin/PrivateBin/wiki/API), retrieved 2025-12-07. Uploads happen on a worker thread, the resulting URL is copied to the clipboard automatically, and we surface the delete token or edit code returned by each provider.
 
 ### Template Preview & Validation
 
