@@ -406,11 +406,7 @@ def build_main_view(
 
     result_tab_layout.addWidget(main_splitter)
 
-    analytics_log_path = (
-        Path(usage_log_path)
-        if isinstance(usage_log_path, str)
-        else usage_log_path
-    )
+    analytics_log_path = Path(usage_log_path) if isinstance(usage_log_path, str) else usage_log_path
 
     history_panel = HistoryPanel(
         manager,

@@ -371,9 +371,7 @@ class MainWindow(QMainWindow):
         callbacks = build_main_view_callbacks(self)
         usage_log_value = getattr(self._usage_logger, "log_path", None)
         usage_log_path = (
-            Path(usage_log_value)
-            if isinstance(usage_log_value, str)
-            else usage_log_value
+            Path(usage_log_value) if isinstance(usage_log_value, str) else usage_log_value
         )
         components = build_main_view(
             parent=self,

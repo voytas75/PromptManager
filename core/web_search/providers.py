@@ -215,14 +215,18 @@ def _normalise_google_results(payload: Mapping[str, Any]) -> list[dict[str, Any]
     for index, entry in enumerate(items, start=1):
         if not isinstance(entry, dict):
             continue
-        title = str(entry.get("title") or "").strip()
-        url = str(entry.get("link") or "").strip()
+        entry_dict = entry
+        title = str(entry_dict.get("title") or "").strip()
+        url = str(entry_dict.get("link") or "").strip()
         if not title or not url:
             continue
-        snippet = str(entry.get("snippet") or "").strip() or None
-        highlight_text = _clean_html(entry.get("htmlSnippet") or entry.get("html_snippet"))
+        snippet = str(entry_dict.get("snippet") or "").strip() or None
+        highlight_text = _clean_html(
+            entry_dict.get("htmlSnippet") or entry_dict.get("html_snippet")
+        )
         highlights = [highlight_text] if highlight_text else []
-        pagemap = entry.get("pagemap") if isinstance(entry.get("pagemap"), dict) else {}
+        pagemap_value = entry_dict.get("pagemap")
+        pagemap = pagemap_value if isinstance(pagemap_value, dict) else {}
         metatags = pagemap.get("metatags")
         published_value: str | None = None
         if isinstance(metatags, list):
@@ -248,10 +252,10 @@ def _normalise_google_results(payload: Mapping[str, Any]) -> list[dict[str, Any]
                 "url": url,
                 "summary": snippet,
                 "highlights": highlights,
-                "author": entry.get("displayLink"),
+                "author": entry_dict.get("displayLink"),
                 "publishedDate": published_value,
                 "score": float(index),
-                "raw": entry,
+                "raw": entry_dict,
             }
         )
     return normalised

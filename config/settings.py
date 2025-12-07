@@ -265,7 +265,17 @@ class PromptManagerSettings(BaseSettings):
             "'fast' or 'inference'."
         ),
     )
-    web_search_provider: Literal["exa", "tavily", "serper", "serpapi", "google", "random"] | None = Field(
+    web_search_provider: (
+        Literal[
+            "exa",
+            "tavily",
+            "serper",
+            "serpapi",
+            "google",
+            "random",
+        ]
+        | None
+    ) = Field(
         default="exa",
         description=(
             "Configured web search provider slug ('exa', 'tavily', 'serper', "

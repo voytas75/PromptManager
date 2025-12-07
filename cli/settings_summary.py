@@ -124,10 +124,10 @@ def print_settings_summary(settings: PromptManagerSettings) -> None:
     provider_line = f"Provider: {web_search_provider or 'disabled'}"
     random_note = None
     if web_search_provider == "random":
-            provider_line = "Provider: random (rotates between configured providers each search)"
-            random_note = (
-                "Random selection uses whichever providers currently have API keys configured."
-            )
+        provider_line = "Provider: random (rotates between configured providers each search)"
+        random_note = (
+            "Random selection uses whichever providers currently have API keys configured."
+        )
 
     lines.extend(
         [
