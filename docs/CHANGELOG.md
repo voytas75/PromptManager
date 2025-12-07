@@ -2,6 +2,12 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.22.10] - 2025-12-07
+
+### Added
+
+- Added PrivateBin as the second share provider: `core.sharing.PrivateBinProvider` now encrypts prompt/result payloads with PBKDF2 + AES-256-GCM before uploading via the PrivateBin JSON-LD API ([docs](https://github.com/PrivateBin/PrivateBin/wiki/API), retrieved 2025-12-07); the GUI registers it alongside ShareText, CLI summaries and README/README-DEV document the new `PROMPT_MANAGER_PRIVATEBIN_*` settings, and unit tests cover payload construction plus error handling.
+
 ## [0.22.9] - 2025-12-07
 
 ### Added

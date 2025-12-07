@@ -10,3 +10,4 @@ PySide6==6.10.1
 httpx==0.27.2
 redis==7.1.0
 litellm==1.80.7
+cryptography==42.0.5

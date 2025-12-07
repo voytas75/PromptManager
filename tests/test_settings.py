@@ -501,6 +501,50 @@ def test_auto_open_share_links_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> 
     assert settings.auto_open_share_links is False
 
 
+def test_privatebin_settings_defaults(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    """Load the default PrivateBin configuration when overrides are absent."""
+
+    _clear_litellm_env(monkeypatch)
+    config_path = tmp_path / "config.json"
+    config_path.write_text("{}", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
+
+    settings = load_settings()
+
+    assert settings.privatebin_url == "https://privatebin.net/"
+    assert settings.privatebin_expiration == "1week"
+    assert settings.privatebin_format == "markdown"
+    assert settings.privatebin_compression == "zlib"
+    assert settings.privatebin_burn_after_reading is False
+    assert settings.privatebin_open_discussion is False
+
+
+def test_privatebin_settings_env_overrides(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    """Parse PrivateBin configuration overrides from environment variables."""
+
+    _clear_litellm_env(monkeypatch)
+    config_path = tmp_path / "config.json"
+    config_path.write_text("{}", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
+    monkeypatch.setenv("PROMPT_MANAGER_PRIVATEBIN_URL", "https://bin.example/pb")
+    monkeypatch.setenv("PROMPT_MANAGER_PRIVATEBIN_EXPIRATION", "10min")
+    monkeypatch.setenv("PROMPT_MANAGER_PRIVATEBIN_FORMAT", "plaintext")
+    monkeypatch.setenv("PROMPT_MANAGER_PRIVATEBIN_COMPRESSION", "none")
+    monkeypatch.setenv("PROMPT_MANAGER_PRIVATEBIN_BURN_AFTER_READING", "true")
+    monkeypatch.setenv("PROMPT_MANAGER_PRIVATEBIN_OPEN_DISCUSSION", "true")
+
+    settings = load_settings()
+
+    assert settings.privatebin_url == "https://bin.example/pb/"
+    assert settings.privatebin_expiration == "10min"
+    assert settings.privatebin_format == "plaintext"
+    assert settings.privatebin_compression == "none"
+    assert settings.privatebin_burn_after_reading is True
+    assert settings.privatebin_open_discussion is True
+
+
 def test_web_search_provider_from_json(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     """Load the web search provider from JSON configuration."""
     _clear_litellm_env(monkeypatch)

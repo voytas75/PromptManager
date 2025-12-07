@@ -1,6 +1,7 @@
 """Settings management utilities for Prompt Manager configuration.
 
 Updates:
+  v0.5.13 - 2025-12-07 - Add PrivateBin share provider configuration settings.
   v0.5.12 - 2025-12-07 - Add SerpApi web search provider configuration and env parsing.
   v0.5.11 - 2025-12-07 - Add Serper web search provider configuration and env parsing.
   v0.5.10 - 2025-12-07 - Allow random web search provider selection and validation.
@@ -25,6 +26,7 @@ from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Literal, cast
+from urllib.parse import urlsplit, urlunsplit
 
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 from pydantic_settings import (
@@ -54,6 +56,38 @@ DEFAULT_CHAT_USER_BUBBLE_COLOR = "#e6f0ff"
 DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR = "#f5f5f5"
 DEFAULT_EMBEDDING_BACKEND = "litellm"
 DEFAULT_EMBEDDING_MODEL = "text-embedding-3-large"
+DEFAULT_PRIVATEBIN_URL = "https://privatebin.net/"
+DEFAULT_PRIVATEBIN_EXPIRATION = "1week"
+DEFAULT_PRIVATEBIN_FORMAT = "markdown"
+DEFAULT_PRIVATEBIN_COMPRESSION = "zlib"
+PRIVATEBIN_EXPIRATION_CHOICES: tuple[str, ...] = (
+    "5min",
+    "10min",
+    "1hour",
+    "1day",
+    "1week",
+    "1month",
+    "1year",
+    "never",
+)
+PRIVATEBIN_FORMAT_CHOICES: tuple[str, ...] = (
+    "plaintext",
+    "syntaxhighlighting",
+    "markdown",
+)
+PRIVATEBIN_COMPRESSION_CHOICES: tuple[str, ...] = ("zlib", "none")
+PrivateBinExpiration = Literal[
+    "5min",
+    "10min",
+    "1hour",
+    "1day",
+    "1week",
+    "1month",
+    "1year",
+    "never",
+]
+PrivateBinFormat = Literal["plaintext", "syntaxhighlighting", "markdown"]
+PrivateBinCompression = Literal["zlib", "none"]
 
 
 class ChatColors(BaseSettings):
@@ -292,6 +326,30 @@ class PromptManagerSettings(BaseSettings):
         default=True,
         description="Open share URLs in the default browser after successful uploads.",
     )
+    privatebin_url: str = Field(
+        default=DEFAULT_PRIVATEBIN_URL,
+        description="Base URL of the PrivateBin instance used for sharing prompts.",
+    )
+    privatebin_expiration: PrivateBinExpiration = Field(
+        default=DEFAULT_PRIVATEBIN_EXPIRATION,
+        description="Expiration window applied to newly published PrivateBin pastes.",
+    )
+    privatebin_format: PrivateBinFormat = Field(
+        default=DEFAULT_PRIVATEBIN_FORMAT,
+        description="Formatter hint supplied to PrivateBin (plaintext, markdown, etc.).",
+    )
+    privatebin_compression: PrivateBinCompression = Field(
+        default=DEFAULT_PRIVATEBIN_COMPRESSION,
+        description="Compression strategy used before encrypting PrivateBin payloads.",
+    )
+    privatebin_burn_after_reading: bool = Field(
+        default=False,
+        description="Delete PrivateBin pastes immediately after they are opened once.",
+    )
+    privatebin_open_discussion: bool = Field(
+        default=False,
+        description="Allow discussions/comments on newly created PrivateBin pastes.",
+    )
     embedding_backend: str = Field(
         default=DEFAULT_EMBEDDING_BACKEND,
         description="Embedding backend to use (deterministic, LiteLLM, sentence-transformers).",
@@ -377,6 +435,21 @@ class PromptManagerSettings(BaseSettings):
                     "SHARE_AUTO_OPEN_BROWSER",
                     "share_auto_open_browser",
                 ],
+                "privatebin_url": ["PRIVATEBIN_URL", "privatebin_url"],
+                "privatebin_expiration": ["PRIVATEBIN_EXPIRATION", "privatebin_expiration"],
+                "privatebin_format": ["PRIVATEBIN_FORMAT", "privatebin_format"],
+                "privatebin_compression": [
+                    "PRIVATEBIN_COMPRESSION",
+                    "privatebin_compression",
+                ],
+                "privatebin_burn_after_reading": [
+                    "PRIVATEBIN_BURN_AFTER_READING",
+                    "privatebin_burn_after_reading",
+                ],
+                "privatebin_open_discussion": [
+                    "PRIVATEBIN_OPEN_DISCUSSION",
+                    "privatebin_open_discussion",
+                ],
             },
         },
     )
@@ -432,6 +505,22 @@ class PromptManagerSettings(BaseSettings):
                     cleaned.append({str(key): entry_mapping[key] for key in entry_mapping})
             return cleaned or None
         raise ValueError("categories must be provided as a list of objects")
+
+    @field_validator("privatebin_url", mode="before")
+    def _normalise_privatebin_url(cls, value: Any) -> str:
+        """Ensure the PrivateBin base URL includes a scheme, host, and trailing slash."""
+        if value in (None, ""):
+            raise ValueError("privatebin_url must not be empty")
+        url_text = str(value).strip()
+        if not url_text:
+            raise ValueError("privatebin_url must not be empty")
+        parts = urlsplit(url_text)
+        if not parts.scheme or not parts.netloc:
+            raise ValueError("privatebin_url must include a scheme and hostname")
+        path = parts.path or "/"
+        if not path.endswith("/"):
+            path = f"{path}/"
+        return urlunsplit((parts.scheme, parts.netloc, path, "", ""))
 
     @field_validator(
         "litellm_model",
@@ -716,6 +805,21 @@ class PromptManagerSettings(BaseSettings):
                     "SHARE_AUTO_OPEN_BROWSER",
                     "share_auto_open_browser",
                 ],
+                "privatebin_url": ["PRIVATEBIN_URL", "privatebin_url"],
+                "privatebin_expiration": ["PRIVATEBIN_EXPIRATION", "privatebin_expiration"],
+                "privatebin_format": ["PRIVATEBIN_FORMAT", "privatebin_format"],
+                "privatebin_compression": [
+                    "PRIVATEBIN_COMPRESSION",
+                    "privatebin_compression",
+                ],
+                "privatebin_burn_after_reading": [
+                    "PRIVATEBIN_BURN_AFTER_READING",
+                    "privatebin_burn_after_reading",
+                ],
+                "privatebin_open_discussion": [
+                    "PRIVATEBIN_OPEN_DISCUSSION",
+                    "privatebin_open_discussion",
+                ],
             }
             for field, keys in mapping.items():
                 for key in keys:
@@ -830,6 +934,12 @@ class PromptManagerSettings(BaseSettings):
                     "prompt_templates",
                     "web_search_provider",
                     "auto_open_share_links",
+                    "privatebin_url",
+                    "privatebin_expiration",
+                    "privatebin_format",
+                    "privatebin_compression",
+                    "privatebin_burn_after_reading",
+                    "privatebin_open_discussion",
                 ):
                     if key in data_dict:
                         mapped[key] = data_dict[key]

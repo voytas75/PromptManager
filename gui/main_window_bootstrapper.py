@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Protocol
 from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QLabel, QWidget
 
-from core.sharing import ShareTextProvider
+from core.sharing import PrivateBinProvider, ShareTextProvider
 
 from .appearance_controller import AppearanceController
 from .layout_controller import LayoutController
@@ -142,6 +142,18 @@ class MainWindowBootstrapper:
             error_callback=self._error_callback,
         )
         share_workflow.register_provider(ShareTextProvider())
+        if self._settings is not None:
+            privatebin_provider = PrivateBinProvider(
+                base_url=self._settings.privatebin_url,
+                expiration=self._settings.privatebin_expiration,
+                formatter=self._settings.privatebin_format,
+                compression=self._settings.privatebin_compression,
+                burn_after_reading=self._settings.privatebin_burn_after_reading,
+                open_discussion=self._settings.privatebin_open_discussion,
+            )
+        else:
+            privatebin_provider = PrivateBinProvider()
+        share_workflow.register_provider(privatebin_provider)
 
         settings_obj = QSettings("PromptManager", "MainWindow")
         layout_state = WindowStateManager(settings_obj)

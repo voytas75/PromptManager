@@ -1,6 +1,7 @@
 """Printable summaries for Prompt Manager configuration.
 
 Updates:
+  v0.1.6 - 2025-12-07 - Include PrivateBin share configuration in summaries.
   v0.1.5 - 2025-12-07 - Surface SerpApi provider credentials in CLI summaries.
   v0.1.4 - 2025-12-07 - Surface Serper provider credentials in CLI summaries.
   v0.1.3 - 2025-12-07 - Explain random web search provider behaviour in summaries.
@@ -14,6 +15,10 @@ from __future__ import annotations
 from config import (
     DEFAULT_EMBEDDING_BACKEND,
     DEFAULT_EMBEDDING_MODEL,
+    DEFAULT_PRIVATEBIN_COMPRESSION,
+    DEFAULT_PRIVATEBIN_EXPIRATION,
+    DEFAULT_PRIVATEBIN_FORMAT,
+    DEFAULT_PRIVATEBIN_URL,
     LITELLM_ROUTED_WORKFLOWS,
     PromptManagerSettings,
 )
@@ -42,6 +47,24 @@ def print_settings_summary(settings: PromptManagerSettings) -> None:
     serper_api_key = getattr(settings, "serper_api_key", None)
     serpapi_api_key = getattr(settings, "serpapi_api_key", None)
     auto_open_share_links = getattr(settings, "auto_open_share_links", True)
+    privatebin_url = getattr(settings, "privatebin_url", DEFAULT_PRIVATEBIN_URL)
+    privatebin_expiration = getattr(
+        settings,
+        "privatebin_expiration",
+        DEFAULT_PRIVATEBIN_EXPIRATION,
+    )
+    privatebin_format = getattr(
+        settings,
+        "privatebin_format",
+        DEFAULT_PRIVATEBIN_FORMAT,
+    )
+    privatebin_compression = getattr(
+        settings,
+        "privatebin_compression",
+        DEFAULT_PRIVATEBIN_COMPRESSION,
+    )
+    privatebin_burn_after = getattr(settings, "privatebin_burn_after_reading", False)
+    privatebin_discussion = getattr(settings, "privatebin_open_discussion", False)
 
     db_path_desc = describe_path(
         settings.db_path,
@@ -124,6 +147,11 @@ def print_settings_summary(settings: PromptManagerSettings) -> None:
             "Sharing",
             "--------",
             f"Auto-open share links: {'yes' if auto_open_share_links else 'no'}",
+            f"PrivateBin base URL: {privatebin_url}",
+            f"PrivateBin expiration: {privatebin_expiration}",
+            f"PrivateBin formatter: {privatebin_format}, compression: {privatebin_compression}",
+            f"PrivateBin burn-after-reading: {'yes' if privatebin_burn_after else 'no'}",
+            f"PrivateBin open discussion: {'yes' if privatebin_discussion else 'no'}",
         ]
     )
     print("\n".join(lines))

@@ -1,6 +1,7 @@
 """Prompt sharing helpers for external paste services.
 
 Updates:
+  v0.1.5 - 2025-12-07 - Add PrivateBin provider for zero-knowledge sharing.
   v0.1.4 - 2025-12-07 - Provide shared footer helper for prompts and results.
   v0.1.3 - 2025-12-05 - Sort imports for lint compliance.
   v0.1.2 - 2025-12-04 - Append footer metadata with app name, author link, and share date.
@@ -10,12 +11,21 @@ Updates:
 
 from __future__ import annotations
 
+import base64
 import json
+import secrets
 import urllib.error
 import urllib.request
+import zlib
 from dataclasses import dataclass
 from datetime import date
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Final, Protocol
+from urllib.parse import urlsplit, urlunsplit
+
+import httpx
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 from core.exceptions import ShareProviderError
 
@@ -24,6 +34,32 @@ if TYPE_CHECKING:
 
 _APP_NAME = "PromptManager"
 _APP_AUTHOR_URL = "https://github.com/voytas75"
+_BASE58_ALPHABET: Final[str] = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+_PRIVATEBIN_ITERATIONS: Final[int] = 150_000
+_PRIVATEBIN_KEY_BYTES: Final[int] = 32
+_PRIVATEBIN_SALT_BYTES: Final[int] = 8
+_PRIVATEBIN_IV_BYTES: Final[int] = 16
+_PRIVATEBIN_TAG_BITS: Final[int] = 128
+_PRIVATEBIN_ALLOWED_EXPIRATIONS: Final[set[str]] = {
+    "5min",
+    "10min",
+    "1hour",
+    "1day",
+    "1week",
+    "1month",
+    "1year",
+    "never",
+}
+_PRIVATEBIN_ALLOWED_FORMATS: Final[set[str]] = {
+    "plaintext",
+    "syntaxhighlighting",
+    "markdown",
+}
+_PRIVATEBIN_ALLOWED_COMPRESSION: Final[set[str]] = {"zlib", "none"}
+_DEFAULT_PRIVATEBIN_BASE = "https://privatebin.net/"
+_DEFAULT_PRIVATEBIN_EXPIRATION = "1week"
+_DEFAULT_PRIVATEBIN_FORMAT = "markdown"
+_DEFAULT_PRIVATEBIN_COMPRESSION = "zlib"
 
 
 def _current_share_date() -> str:
@@ -40,6 +76,48 @@ def append_share_footer(payload: str) -> str:
     if not base_text:
         return f"---\n{footer_line}"
     return f"{base_text}\n\n---\n{footer_line}"
+
+
+def _raw_deflate(data: bytes, compression: str) -> bytes:
+    if compression == "none":
+        return data
+    compressor = zlib.compressobj(wbits=-zlib.MAX_WBITS)
+    return compressor.compress(data) + compressor.flush()
+
+
+def _compact_json_bytes(data: object) -> bytes:
+    return json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+
+def _base58_encode(data: bytes) -> str:
+    if not data:
+        return _BASE58_ALPHABET[0]
+    num = int.from_bytes(data, "big")
+    encoded: list[str] = []
+    while num > 0:
+        num, remainder = divmod(num, 58)
+        encoded.append(_BASE58_ALPHABET[remainder])
+    encoded_str = "".join(reversed(encoded)) or _BASE58_ALPHABET[0]
+    leading_zeroes = 0
+    for byte in data:
+        if byte == 0:
+            leading_zeroes += 1
+        else:
+            break
+    return f"{_BASE58_ALPHABET[0] * leading_zeroes}{encoded_str}"
+
+
+def _normalise_privatebin_base_url(base_url: str) -> str:
+    candidate = base_url.strip()
+    if not candidate:
+        raise ValueError("PrivateBin base URL must not be empty.")
+    parts = urlsplit(candidate)
+    if not parts.scheme or not parts.netloc:
+        raise ValueError("PrivateBin base URL must include a scheme and hostname.")
+    path = parts.path or "/"
+    if not path.endswith("/"):
+        path = f"{path}/"
+    return urlunsplit((parts.scheme, parts.netloc, path, "", ""))
 
 
 @dataclass(frozen=True, slots=True)
@@ -191,11 +269,153 @@ class ShareTextProvider:
         )
 
 
+class PrivateBinProvider:
+    """Share prompts via a PrivateBin instance (https://privatebin.net/)."""
+
+    _USER_AGENT = "PromptManager/PrivateBinShare"
+
+    def __init__(
+        self,
+        *,
+        base_url: str = _DEFAULT_PRIVATEBIN_BASE,
+        expiration: str = _DEFAULT_PRIVATEBIN_EXPIRATION,
+        formatter: str = _DEFAULT_PRIVATEBIN_FORMAT,
+        compression: str = _DEFAULT_PRIVATEBIN_COMPRESSION,
+        burn_after_reading: bool = False,
+        open_discussion: bool = False,
+        confirm_before_open: bool = False,
+        timeout: float = 20.0,
+    ) -> None:
+        """Configure connection + encryption defaults for a PrivateBin instance."""
+        try:
+            normalised_base = _normalise_privatebin_base_url(base_url)
+        except ValueError as exc:
+            raise ShareProviderError(str(exc)) from exc
+        expiration_value = expiration.strip().lower()
+        if expiration_value not in _PRIVATEBIN_ALLOWED_EXPIRATIONS:
+            raise ShareProviderError(
+                f"Unsupported PrivateBin expiration '{expiration}'. Allowed: "
+                f"{', '.join(sorted(_PRIVATEBIN_ALLOWED_EXPIRATIONS))}."
+            )
+        formatter_value = formatter.strip().lower()
+        if formatter_value not in _PRIVATEBIN_ALLOWED_FORMATS:
+            raise ShareProviderError(
+                f"Unsupported PrivateBin formatter '{formatter}'. Allowed: "
+                f"{', '.join(sorted(_PRIVATEBIN_ALLOWED_FORMATS))}."
+            )
+        compression_value = compression.strip().lower()
+        if compression_value not in _PRIVATEBIN_ALLOWED_COMPRESSION:
+            raise ShareProviderError(
+                f"Unsupported PrivateBin compression '{compression}'. Allowed: "
+                f"{', '.join(sorted(_PRIVATEBIN_ALLOWED_COMPRESSION))}."
+            )
+        self._base_url = normalised_base
+        self._expiration = expiration_value
+        self._formatter = formatter_value
+        self._compression = compression_value
+        self._burn_after_reading = burn_after_reading
+        self._open_discussion = open_discussion
+        self._timeout = timeout
+        self._fragment_prefix = "-" if confirm_before_open else ""
+        self._headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "X-Requested-With": "JSONHttpRequest",
+            "User-Agent": self._USER_AGENT,
+        }
+        self.info = ShareProviderInfo(
+            name="privatebin",
+            label="PrivateBin",
+            description="Publish encrypted prompts via your configured PrivateBin instance.",
+        )
+
+    def share(self, payload: str, prompt: Prompt | None = None) -> ShareResult:
+        """Encrypt *payload* and upload it to the configured PrivateBin instance."""
+        plaintext_bytes = _compact_json_bytes({"paste": payload})
+        message_bytes = _raw_deflate(plaintext_bytes, self._compression)
+        secret_key = secrets.token_bytes(_PRIVATEBIN_KEY_BYTES)
+        salt = secrets.token_bytes(_PRIVATEBIN_SALT_BYTES)
+        iv = secrets.token_bytes(_PRIVATEBIN_IV_BYTES)
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=_PRIVATEBIN_KEY_BYTES,
+            salt=salt,
+            iterations=_PRIVATEBIN_ITERATIONS,
+        )
+        derived_key = kdf.derive(secret_key)
+        adata = [
+            [
+                base64.b64encode(iv).decode("utf-8"),
+                base64.b64encode(salt).decode("utf-8"),
+                _PRIVATEBIN_ITERATIONS,
+                _PRIVATEBIN_KEY_BYTES * 8,
+                _PRIVATEBIN_TAG_BITS,
+                "aes",
+                "gcm",
+                self._compression,
+            ],
+            self._formatter,
+            1 if self._open_discussion else 0,
+            1 if self._burn_after_reading else 0,
+        ]
+        aad_bytes = _compact_json_bytes(adata)
+        cipher = Cipher(
+            algorithms.AES(derived_key),
+            modes.GCM(iv, None, _PRIVATEBIN_TAG_BITS // 8),
+        )
+        encryptor = cipher.encryptor()
+        encryptor.authenticate_additional_data(aad_bytes)
+        ciphertext = encryptor.update(message_bytes) + encryptor.finalize()
+        payload_dict = {
+            "v": 2,
+            "adata": adata,
+            "ct": base64.b64encode(ciphertext + encryptor.tag).decode("utf-8"),
+            "meta": {"expire": self._expiration},
+        }
+        request_body = _compact_json_bytes(payload_dict)
+        try:
+            response = httpx.post(
+                self._base_url,
+                content=request_body,
+                headers=self._headers,
+                timeout=self._timeout,
+            )
+            response.raise_for_status()
+        except httpx.HTTPError as exc:
+            raise ShareProviderError(f"Unable to reach PrivateBin: {exc}") from exc
+        try:
+            data = response.json()
+        except ValueError as exc:
+            raise ShareProviderError("PrivateBin returned an invalid response.") from exc
+        status = int(data.get("status", 1))
+        if status != 0:
+            message = str(data.get("message") or "Unknown error.")
+            raise ShareProviderError(f"PrivateBin rejected the share: {message}")
+        paste_id = str(data.get("id", "")).strip()
+        if not paste_id:
+            raise ShareProviderError("PrivateBin response was missing a paste identifier.")
+        delete_token = str(data.get("deletetoken", "")).strip() or None
+        fragment = _base58_encode(secret_key)
+        if self._fragment_prefix:
+            fragment = f"{self._fragment_prefix}{fragment}"
+        share_url = f"{self._base_url}?{paste_id}#{fragment}"
+        delete_url = None
+        if delete_token:
+            delete_url = f"{self._base_url}?pasteid={paste_id}&deletetoken={delete_token}"
+        return ShareResult(
+            provider=self.info,
+            url=share_url,
+            payload_chars=len(payload),
+            delete_url=delete_url,
+        )
+
+
 __all__ = [
     "append_share_footer",
     "ShareProvider",
     "ShareProviderInfo",
     "ShareResult",
     "ShareTextProvider",
+    "PrivateBinProvider",
     "format_prompt_for_share",
 ]

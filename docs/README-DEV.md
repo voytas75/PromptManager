@@ -68,6 +68,12 @@ All settings are defined via `pydantic-settings` in `config/settings.py`. Provid
 | `PROMPT_MANAGER_SERPER_API_KEY` / `SERPER_API_KEY` | Serper.dev web search API key (environment only) | `serper-***` |
 | `PROMPT_MANAGER_SERPAPI_API_KEY` / `SERPAPI_API_KEY` | SerpApi web search API key (environment only) | `serpapi-***` |
 | `PROMPT_MANAGER_AUTO_OPEN_SHARE_LINKS` | Auto-open shared URLs in the default browser (`true`/`false`) | `true` |
+| `PROMPT_MANAGER_PRIVATEBIN_URL` | Base URL for the PrivateBin instance used for sharing (include trailing slash) | `https://privatebin.net/` |
+| `PROMPT_MANAGER_PRIVATEBIN_EXPIRATION` | PrivateBin expiration key (`5min`, `1day`, `1week`, `1month`, `1year`, `never`, etc.) | `1week` |
+| `PROMPT_MANAGER_PRIVATEBIN_FORMAT` | Formatter advertised to PrivateBin (`plaintext`, `markdown`, or `syntaxhighlighting`) | `markdown` |
+| `PROMPT_MANAGER_PRIVATEBIN_COMPRESSION` | Compression method before encryption (`zlib` or `none`) | `zlib` |
+| `PROMPT_MANAGER_PRIVATEBIN_BURN_AFTER_READING` | Delete PrivateBin pastes immediately after the first read (`true`/`false`) | `false` |
+| `PROMPT_MANAGER_PRIVATEBIN_OPEN_DISCUSSION` | Allow comments/discussion threads on new PrivateBin pastes (`true`/`false`) | `false` |
 | `PROMPT_MANAGER_EMBEDDING_BACKEND` | `litellm`, `sentence-transformers`, or `deterministic` | `sentence-transformers` |
 | `PROMPT_MANAGER_EMBEDDING_MODEL` | Embedding model identifier | `text-embedding-3-large` |
 | `PROMPT_MANAGER_EMBEDDING_DEVICE` | Device hint for local embeddings | `cuda` |
@@ -131,7 +137,7 @@ Key UI capabilities:
 - Command palette (`Ctrl+K` / `Ctrl+Shift+P`) and shortcuts (`Ctrl+1`–`Ctrl+4`) jump directly into explain/fix/document/enhance workflows.
 - Category/tag/quality filters plus taxonomy manager keep catalogues organized.
 - Settings dialog controls LiteLLM routing, streaming, quick actions, embedding configuration, and now the Integrations tab for web search providers; API keys entered in the GUI stay in memory only.
-- Share panel (bordered row beneath the action buttons) lets users pick what to publish (body-only, body + description, or body + description + scenarios), toggle metadata inclusion, and then pick a provider (ShareText today). Uploads happen on a worker thread, and the resulting URL is copied to the clipboard automatically.
+- Share panel (bordered row beneath the action buttons) lets users pick what to publish (body-only, body + description, or body + description + scenarios), toggle metadata inclusion, and then pick a provider (ShareText for quick plain-text pastes or PrivateBin for zero-knowledge AES-256-GCM uploads per the [PrivateBin API](https://github.com/PrivateBin/PrivateBin/wiki/API), retrieved 2025-12-07). Uploads happen on a worker thread, the resulting URL is copied to the clipboard automatically, and we surface the delete token returned by each provider.
 
 ### Template Preview & Validation
 
