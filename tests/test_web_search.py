@@ -1,6 +1,7 @@
 """Tests for the web search provider/service scaffolding.
 
 Updates:
+  v0.1.4 - 2025-12-07 - Cover Serper provider success/error flows.
   v0.1.3 - 2025-12-07 - Cover random provider fan-out behaviour.
   v0.1.2 - 2025-12-07 - Cover Tavily provider success/error flows.
   v0.1.1 - 2025-12-05 - Reorder imports and wrap long lines for lint compliance.
@@ -16,6 +17,7 @@ from core.exceptions import WebSearchProviderError, WebSearchUnavailable
 from core.web_search import (
     ExaWebSearchProvider,
     RandomWebSearchProvider,
+    SerperWebSearchProvider,
     TavilyWebSearchProvider,
     WebSearchDocument,
     WebSearchResult,
@@ -124,6 +126,54 @@ async def test_tavily_provider_raises_on_error() -> None:
         base_url="https://api.tavily.com",
     )
     provider = TavilyWebSearchProvider(api_key="tvly-test", client_factory=lambda: mock_client)
+
+    with pytest.raises(WebSearchProviderError):
+        await provider.search("latest news")
+    await mock_client.aclose()
+
+
+@pytest.mark.asyncio()
+async def test_serper_provider_parses_results() -> None:
+    """Ensure the Serper provider maps API payloads into canonical documents."""
+    mock_client = _build_mock_client(
+        httpx.Response(
+            200,
+            json={
+                "organic": [
+                    {
+                        "title": "Example Result",
+                        "link": "https://example.com/result",
+                        "snippet": "Snippet text",
+                        "date": "2025-12-07",
+                        "source": "Example Source",
+                        "snippetHighlighted": ["Snippet text"],
+                    }
+                ],
+                "relatedSearches": [],
+            },
+        ),
+        base_url="https://google.serper.dev",
+    )
+    provider = SerperWebSearchProvider(api_key="serper-test", client_factory=lambda: mock_client)
+    result = await provider.search("latest news", limit=5)
+    await mock_client.aclose()
+
+    assert result.provider == "serper"
+    assert len(result.documents) == 1
+    doc = result.documents[0]
+    assert doc.summary == "Snippet text"
+    assert doc.highlights == ["Snippet text"]
+    assert doc.author == "Example Source"
+
+
+@pytest.mark.asyncio()
+async def test_serper_provider_raises_on_error() -> None:
+    """Raise a provider error when Serper rejects the request."""
+    mock_client = _build_mock_client(
+        httpx.Response(429, json={"message": "error"}),
+        base_url="https://google.serper.dev",
+    )
+    provider = SerperWebSearchProvider(api_key="serper-test", client_factory=lambda: mock_client)
 
     with pytest.raises(WebSearchProviderError):
         await provider.search("latest news")

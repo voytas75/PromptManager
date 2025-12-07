@@ -1,6 +1,7 @@
 """Runtime settings helpers for Prompt Manager GUI.
 
 Updates:
+  v0.1.4 - 2025-12-07 - Track Serper web search credentials in runtime snapshots.
   v0.1.3 - 2025-12-07 - Track Tavily web search credentials in runtime snapshots.
   v0.1.2 - 2025-12-04 - Persist auto-open share preference across restarts.
   v0.1.1 - 2025-12-04 - Track web search provider/runtime secrets.
@@ -101,6 +102,7 @@ class RuntimeSettingsService:
             "web_search_provider": settings.web_search_provider if settings else None,
             "exa_api_key": settings.exa_api_key if settings else None,
             "tavily_api_key": settings.tavily_api_key if settings else None,
+            "serper_api_key": settings.serper_api_key if settings else None,
             "auto_open_share_links": (
                 settings.auto_open_share_links if settings is not None else True
             ),

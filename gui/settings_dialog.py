@@ -1,6 +1,7 @@
 """Settings dialog for configuring Prompt Manager runtime options.
 
 Updates:
+  v0.2.16 - 2025-12-07 - Add Serper provider selector and API key entry.
   v0.2.15 - 2025-12-07 - Add random web search provider option and explanatory note.
   v0.2.14 - 2025-12-05 - Break share preference assignments over multiple lines for linting.
   v0.2.13 - 2025-12-04 - Add auto-open share link preference toggle.
@@ -9,8 +10,7 @@ Updates:
   v0.2.10 - 2025-11-29 - Wrap quick action/parameter parsing for Ruff line length.
   v0.2.9 - 2025-11-28 - Persist dialog geometry between sessions.
   v0.2.8 - 2025-11-23 - Surface editable LiteLLM prompt templates with reset controls.
-  v0.2.7 - 2025-12-06 - Surface LiteLLM embedding model configuration.
-  pre-v0.2.7 - 2025-11-05 - Theme mode/chat appearance controls and earlier history (v0.1.0–v0.2.6).
+  v0.2.7-and-earlier - 2025-12-06 - LiteLLM embedding model configuration plus prior history.
 """
 
 from __future__ import annotations
@@ -88,6 +88,7 @@ class SettingsDialog(QDialog):
         web_search_provider: str | None = None,
         exa_api_key: str | None = None,
         tavily_api_key: str | None = None,
+        serper_api_key: str | None = None,
         auto_open_share_links: bool | None = None,
     ) -> None:
         """Build the settings UI with existing runtime values pre-populated."""
@@ -116,10 +117,11 @@ class SettingsDialog(QDialog):
         self._litellm_stream = bool(litellm_stream)
         provider_choice = (web_search_provider or "").strip().lower()
         self._web_search_provider = (
-            provider_choice if provider_choice in {"exa", "tavily"} else None
+            provider_choice if provider_choice in {"exa", "tavily", "serper", "random"} else None
         )
         self._exa_api_key = exa_api_key or ""
         self._tavily_api_key = tavily_api_key or ""
+        self._serper_api_key = serper_api_key or ""
         original_actions = [
             dict(entry) for entry in (quick_actions or []) if isinstance(entry, dict)
         ]
@@ -159,6 +161,7 @@ class SettingsDialog(QDialog):
         self._web_search_provider_combo: QComboBox | None = None
         self._exa_api_key_input: QLineEdit | None = None
         self._tavily_api_key_input: QLineEdit | None = None
+        self._serper_api_key_input: QLineEdit | None = None
         default_share_toggle = (
             True if auto_open_share_links is None else bool(auto_open_share_links)
         )
@@ -334,12 +337,15 @@ class SettingsDialog(QDialog):
         provider_combo.addItem("Random", userData="random")
         provider_combo.addItem("Exa", userData="exa")
         provider_combo.addItem("Tavily", userData="tavily")
+        provider_combo.addItem("Serper", userData="serper")
         if self._web_search_provider == "random":
             provider_combo.setCurrentIndex(1)
         elif self._web_search_provider == "exa":
             provider_combo.setCurrentIndex(2)
         elif self._web_search_provider == "tavily":
             provider_combo.setCurrentIndex(3)
+        elif self._web_search_provider == "serper":
+            provider_combo.setCurrentIndex(4)
         else:
             provider_combo.setCurrentIndex(0)
         self._web_search_provider_combo = provider_combo
@@ -366,6 +372,12 @@ class SettingsDialog(QDialog):
         tavily_api_key_input.setPlaceholderText("tvly-********************************")
         self._tavily_api_key_input = tavily_api_key_input
         integrations_form.addRow("Tavily API key", tavily_api_key_input)
+
+        serper_api_key_input = QLineEdit(self._serper_api_key, integrations_tab)
+        serper_api_key_input.setEchoMode(QLineEdit.Password)
+        serper_api_key_input.setPlaceholderText("serper-********************************")
+        self._serper_api_key_input = serper_api_key_input
+        integrations_form.addRow("Serper API key", serper_api_key_input)
 
         integrations_hint = QLabel(
             (
@@ -648,6 +660,9 @@ class SettingsDialog(QDialog):
         tavily_api_key = (
             _clean(self._tavily_api_key_input.text()) if self._tavily_api_key_input else None
         )
+        serper_api_key = (
+            _clean(self._serper_api_key_input.text()) if self._serper_api_key_input else None
+        )
 
         return {
             "litellm_model": _clean(self._model_input.text()),
@@ -671,6 +686,7 @@ class SettingsDialog(QDialog):
             "web_search_provider": provider_choice,
             "exa_api_key": exa_api_key,
             "tavily_api_key": tavily_api_key,
+            "serper_api_key": serper_api_key,
             "auto_open_share_links": (
                 bool(self._share_auto_open_checkbox.isChecked())
                 if self._share_auto_open_checkbox

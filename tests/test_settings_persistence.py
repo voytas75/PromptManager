@@ -104,6 +104,24 @@ def test_persist_settings_to_config_omits_tavily_api_key(tmp_path, monkeypatch):
     assert data["web_search_provider"] == "tavily"
 
 
+def test_persist_settings_to_config_omits_serper_api_key(tmp_path, monkeypatch):
+    """Never persist Serper API credentials but keep provider selection."""
+    monkeypatch.chdir(tmp_path)
+
+    from config.persistence import persist_settings_to_config
+
+    persist_settings_to_config(
+        {
+            "serper_api_key": "serper-secret",
+            "web_search_provider": "serper",
+        }
+    )
+
+    data = json.loads(Path("config/config.json").read_text(encoding="utf-8"))
+    assert "serper_api_key" not in data
+    assert data["web_search_provider"] == "serper"
+
+
 def test_persist_settings_to_config_auto_open_flag(tmp_path, monkeypatch):
     """Write the share auto-open flag only when disabled."""
 

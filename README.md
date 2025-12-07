@@ -36,9 +36,10 @@ export PROMPT_MANAGER_LITELLM_MODEL="gpt-4o-mini"
 export PROMPT_MANAGER_LITELLM_API_KEY="sk-***"
 export PROMPT_MANAGER_LITELLM_TTS_MODEL="openai/tts-1"
 # Optional: configure the web search provider (Integrations tab mirrors these values)
-export PROMPT_MANAGER_WEB_SEARCH_PROVIDER="tavily"  # or "exa" / "random"
+export PROMPT_MANAGER_WEB_SEARCH_PROVIDER="tavily"  # or "exa" / "serper" / "random"
 export PROMPT_MANAGER_TAVILY_API_KEY="tvly-***"
-# export PROMPT_MANAGER_EXA_API_KEY="exa_***"  # when using Exa instead
+# export PROMPT_MANAGER_EXA_API_KEY="exa_***"     # when using Exa instead
+# export PROMPT_MANAGER_SERPER_API_KEY="serper-***"  # when using Serper.dev instead
 # Optional: disable streaming playback if your platform struggles with simultaneous read/write
 # export PROMPT_MANAGER_LITELLM_TTS_STREAM="false"
 # Optional: keep share links in clipboard only
@@ -59,6 +60,7 @@ cat <<'EOF' > .env
 PROMPT_MANAGER_LITELLM_API_KEY="sk-***"
 PROMPT_MANAGER_TAVILY_API_KEY="tvly-***"
 # PROMPT_MANAGER_EXA_API_KEY="exa_***"
+# PROMPT_MANAGER_SERPER_API_KEY="serper-***"
 EOF
 ```
 
@@ -76,7 +78,7 @@ EOF
 - Prompt Parts registry with a dedicated GUI tab, CRUD, clipboard/export helpers, and reusable tone/formatting presets that can be attached to executions for consistent voice.
 - Prompt execution workspace with LiteLLM-backed runs, streaming output, chat-style transcripts, rating-based quality feedback, export/import utilities, and persisted execution history complete with context metadata (model, streaming flag, style hints).
 - Voice playback button in the workspace overlay streams LiteLLM text-to-speech audio as it downloads (enabled by default, toggle via `PROMPT_MANAGER_LITELLM_TTS_STREAM`).
-- Provider-agnostic web search integrations (now supporting Exa and Tavily) plus a workspace “Use web search” toggle (on by default) that injects every available snippet (summary + highlights) before each run—when those snippets exceed roughly 5,000 words, the fast LiteLLM model condenses them automatically so prompts still stay concise.
+- Provider-agnostic web search integrations (now supporting Exa, Tavily, and Serper) plus a workspace “Use web search” toggle (on by default) that injects every available snippet (summary + highlights) before each run—when those snippets exceed roughly 5,000 words, the fast LiteLLM model condenses them automatically so prompts still stay concise.
 - Dedicated Prompt Template editor dialog (toolbar button) that exposes every LiteLLM system prompt with inline validation and reset-to-default controls so teams can fine-tune guidance without editing config files.
 - Prompt chaining pipelines with CLI management (`prompt-chain-*` commands) plus a dedicated **Chain** tab in the GUI so teams can create/edit/delete chains, pick prompts from the catalog drop-down, and replay workflows with a single plain-text input that automatically flows from one step to the next—now with the same default-on “Use web search” enrichment (disable via the GUI toggle or `prompt-chain-run --no-web-search`) so each step can pull live context before executing.
 - Prompt sharing workflows baked into the prompt detail pane: choose whether to publish just the body, body + description, or body + description + scenarios, optionally include metadata, and the app uploads to ShareText and copies the share URL to your clipboard.
@@ -108,7 +110,7 @@ Every run logs to SQLite with request/response snippets, latency, token usage, s
 ## Developer
 
 See the full contributor guide in [`README-DEV.md`](docs/README-DEV.md) for development environment setup, environment variable matrix, testing/type-checking workflow, embedding and GUI deep dives, and maintenance procedures.
-The staged web search rollout plan (covering Exa and Tavily) lives in [`docs/web_search_plan.md`](docs/web_search_plan.md).
+The staged web search rollout plan (covering Exa, Tavily, and Serper) lives in [`docs/web_search_plan.md`](docs/web_search_plan.md).
 
 ## Changelog
 

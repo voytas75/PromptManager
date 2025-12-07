@@ -1,6 +1,7 @@
 """Printable summaries for Prompt Manager configuration.
 
 Updates:
+  v0.1.4 - 2025-12-07 - Surface Serper provider credentials in CLI summaries.
   v0.1.3 - 2025-12-07 - Explain random web search provider behaviour in summaries.
   v0.1.2 - 2025-12-07 - Surface Tavily provider credentials in CLI summaries.
   v0.1.1 - 2025-12-04 - Surface web search provider status in CLI summary.
@@ -37,6 +38,7 @@ def print_settings_summary(settings: PromptManagerSettings) -> None:
     web_search_provider = getattr(settings, "web_search_provider", None)
     exa_api_key = getattr(settings, "exa_api_key", None)
     tavily_api_key = getattr(settings, "tavily_api_key", None)
+    serper_api_key = getattr(settings, "serper_api_key", None)
     auto_open_share_links = getattr(settings, "auto_open_share_links", True)
 
     db_path_desc = describe_path(
@@ -107,6 +109,7 @@ def print_settings_summary(settings: PromptManagerSettings) -> None:
             provider_line,
             f"Exa API key: {mask_secret(exa_api_key)}",
             f"Tavily API key: {mask_secret(tavily_api_key)}",
+            f"Serper API key: {mask_secret(serper_api_key)}",
         ]
     )
     if random_note:

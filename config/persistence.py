@@ -1,6 +1,7 @@
 """Helpers for persisting runtime configuration without Qt dependencies.
 
 Updates:
+  v0.3.1 - 2025-12-07 - Guard Serper API keys alongside other secrets during persistence.
   v0.3.0 - 2025-12-07 - Guard Tavily API keys alongside other secrets during persistence.
   v0.2.9 - 2025-12-04 - Persist share auto-open preference when disabled.
   v0.2.8 - 2025-12-04 - Guard Exa API keys and persist web search provider selection.
@@ -9,8 +10,7 @@ Updates:
   v0.2.5 - 2025-12-06 - Persist embedding backend/model selections and drop defaults.
   v0.2.4 - 2025-12-03 - Normalise chat palette overrides and skip default colours.
   v0.2.3 - 2025-11-05 - Persist theme mode and chat appearance overrides.
-  v0.2.2 - 2025-11-05 - Persist chat appearance overrides.
-  v0.2.1 - 2025-11-05 - Persist LiteLLM workflow routing selections.
+  v0.2.2-and-earlier - 2025-11-05 - Early chat appearance and LiteLLM routing persistence.
 """
 
 from __future__ import annotations
@@ -121,7 +121,7 @@ def persist_settings_to_config(updates: dict[str, object | None]) -> None:
         except json.JSONDecodeError:
             config_data = {}
 
-    secret_keys = {"litellm_api_key", "exa_api_key", "tavily_api_key"}
+    secret_keys = {"litellm_api_key", "exa_api_key", "tavily_api_key", "serper_api_key"}
     for key, value in updates.items():
         if key in secret_keys:
             config_data.pop(key, None)

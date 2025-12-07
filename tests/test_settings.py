@@ -1,6 +1,7 @@
 """Tests for configuration loading and validation logic.
 
 Updates:
+  v0.2.1 - 2025-12-07 - Cover Serper provider secrets and env loading.
   v0.2.0 - 2025-12-07 - Cover random web search provider selection.
   v0.1.9 - 2025-12-07 - Cover Tavily provider secrets and validation flow.
   v0.1.8 - 2025-12-04 - Cover .env sourcing for Exa API secrets.
@@ -9,8 +10,7 @@ Updates:
   v0.1.5 - 2025-11-29 - Wrap embedding backend tests for Ruff line length.
   v0.1.4 - 2025-11-05 - Cover LiteLLM inference model configuration.
   v0.1.3 - 2025-11-15 - Warn and ignore LiteLLM API secrets supplied via JSON configuration.
-  v0.1.2 - 2025-11-14 - Cover LiteLLM API key loading from JSON configuration.
-  v0.1.1 - 2025-11-03 - Add precedence test using example template.
+  v0.1.2-and-earlier - 2025-11-14 - LiteLLM API precedence tests and earlier history.
 """
 
 from __future__ import annotations
@@ -52,6 +52,8 @@ def _clear_litellm_env(monkeypatch: MonkeyPatch) -> None:
         "EXA_API_KEY",
         "PROMPT_MANAGER_TAVILY_API_KEY",
         "TAVILY_API_KEY",
+        "PROMPT_MANAGER_SERPER_API_KEY",
+        "SERPER_API_KEY",
         "PROMPT_MANAGER_AUTO_OPEN_SHARE_LINKS",
         "AUTO_OPEN_SHARE_LINKS",
         "PROMPT_MANAGER_SHARE_AUTO_OPEN_BROWSER",
@@ -198,6 +200,31 @@ def test_json_with_tavily_api_key_is_ignored(
     assert "Ignoring secret key" in caplog.text
 
 
+def test_json_with_serper_api_key_is_ignored(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+    caplog: LogCaptureFixture,
+) -> None:
+    """Ensure Serper API keys present in JSON configs are ignored."""
+    _clear_litellm_env(monkeypatch)
+    config_payload = {
+        "web_search_provider": "serper",
+        "serper_api_key": "json-secret",
+    }
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    config_path = config_dir / "config.json"
+    config_path.write_text(json.dumps(config_payload), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    with caplog.at_level(logging.WARNING, logger="prompt_manager.settings"):
+        settings = load_settings()
+
+    assert settings.web_search_provider == "serper"
+    assert settings.serper_api_key is None
+    assert "Ignoring secret key" in caplog.text
+
+
 def test_litellm_settings_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     """Load LiteLLM configuration entirely from environment variables."""
     _clear_litellm_env(monkeypatch)
@@ -259,6 +286,22 @@ def test_tavily_api_key_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> No
     assert settings.web_search_provider == "tavily"
 
 
+def test_serper_api_key_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    """Load Serper API credentials from environment variables."""
+    _clear_litellm_env(monkeypatch)
+    tmp_config = tmp_path / "config.json"
+    tmp_config.write_text("{}", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(tmp_config))
+    monkeypatch.setenv("PROMPT_MANAGER_WEB_SEARCH_PROVIDER", "serper")
+    monkeypatch.setenv("PROMPT_MANAGER_SERPER_API_KEY", "serper-secret")
+
+    settings = load_settings()
+
+    assert settings.serper_api_key == "serper-secret"
+    assert settings.web_search_provider == "serper"
+
+
 def test_exa_api_key_from_dotenv(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     """Load Exa API credentials from a .env file when env vars are unset."""
 
@@ -298,6 +341,27 @@ def test_tavily_api_key_from_dotenv_alias(monkeypatch: MonkeyPatch, tmp_path: Pa
 
     assert settings.tavily_api_key == "tvly-alias"
     assert settings.web_search_provider == "tavily"
+
+
+def test_serper_api_key_from_dotenv_alias(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    """Support alias-only variables such as SERPER_API_KEY in .env files."""
+
+    _clear_litellm_env(monkeypatch)
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    config_path = config_dir / "config.json"
+    config_path.write_text("{}", encoding="utf-8")
+    env_file = tmp_path / ".env"
+    env_file.write_text("SERPER_API_KEY=serper-alias\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
+    monkeypatch.setenv("PROMPT_MANAGER_ENV_FILE", str(env_file))
+    monkeypatch.setenv("PROMPT_MANAGER_WEB_SEARCH_PROVIDER", "serper")
+
+    settings = load_settings()
+
+    assert settings.serper_api_key == "serper-alias"
+    assert settings.web_search_provider == "serper"
 
 
 def test_random_web_search_provider_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:

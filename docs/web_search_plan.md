@@ -5,12 +5,13 @@
 - **Exa Quickstart (2025-12-04)** — [docs.exa.ai/reference/quickstart](https://docs.exa.ai/reference/quickstart) shows that the official Python SDK (`exa-py`) exposes `search`, `search_and_contents`, and `answer` helpers once an `EXA_API_KEY` environment variable is provided. Exa also supports raw HTTP calls, but the SDK reduces request boilerplate and handles result pagination in one call.
 - **Exa Python Examples** (via `exa_py` README snippets surfaced through Exa-code search) demonstrate a consistent parameter surface (`type="auto"`, `include_domains`, `text_contents_options`, etc.) that maps cleanly onto PromptManager's structured search needs. Highlight support and similarity lookups arrive through the same client, so an abstraction that wraps Exa's client objects will cover most future workflows.
 - **Tavily Search API Reference (2025-12-07)** — [docs.tavily.com/documentation/api-reference/endpoint/search](https://docs.tavily.com/documentation/api-reference/endpoint/search) details the `/search` endpoint, including bearer authentication via `tvly-` keys, payload parameters (`query`, `max_results`, `topic`, `search_depth`, `include_domains`, `include_answer`, etc.), and JSON responses that return `answer`, `results[{title,url,content,score}]`, optional raw content, favicons, and timing metadata.
+- **Serper Search API (2025-12-07)** — Elastic’s [“Using AutoGen with Elasticsearch”](https://www.elastic.co/search-labs/blog/using-autogen-with-elasticsearch) tutorial and Rui Ramos’ [Serper quickstart](https://rramos.github.io/2024/06/13/serper/) both demonstrate POST requests to `https://google.serper.dev/search` with an `X-API-KEY` header plus JSON payload (`q`, `num`, optional `gl`/`hl`/`location`), returning an `organic` array with `title`, `link`, `snippet`, `date`, and `source` for each document.
 
 ## Objectives
 
-1. **Immediate:** Let operators enter Exa or Tavily API keys inside the PromptManager settings dialog so future workflows can dispatch authenticated web searches without touching env vars.
+1. **Immediate:** Let operators enter Exa, Tavily, or Serper API keys inside the PromptManager settings dialog so future workflows can dispatch authenticated web searches without touching env vars.
 2. **Near-term:** Introduce a provider-agnostic web search service that can:
-   - Register multiple providers (Exa + Tavily to start).
+   - Register multiple providers (Exa + Tavily + Serper to start).
    - Normalize search queries (`query`, `limit`, `filters`) and return a stable `WebSearchResult` payload for UI/automation layers.
    - Handle provider capability discovery (e.g., answer vs. similarity) without leaking implementation details to callers.
 3. **Future:** Wire prompt authoring/execution surfaces so they can:
@@ -22,8 +23,8 @@
 ### Phase 1 – Configuration & Secrets
 
 - Extend `PromptManagerSettings` with:
-- `web_search_provider` (`Literal["exa", "tavily", "random"]`, default `exa` until telemetry indicates otherwise). `random` rotates between providers that have API keys configured, falling back to the only available provider when necessary.
-  - Secret fields for provider credentials (e.g., `exa_api_key`, `tavily_api_key`, stored only in memory and env vars such as `EXA_API_KEY` or `TAVILY_API_KEY`).
+- `web_search_provider` (`Literal["exa", "tavily", "serper", "random"]`, default `exa` until telemetry indicates otherwise). `random` rotates between providers that have API keys configured, falling back to the only available provider when necessary.
+  - Secret fields for provider credentials (e.g., `exa_api_key`, `tavily_api_key`, `serper_api_key`, stored only in memory and env vars such as `EXA_API_KEY`, `TAVILY_API_KEY`, or `SERPER_API_KEY`).
 - Update CLI summaries, runtime persistence, and docs (`README`, `README-DEV`, env matrices) so every provider shows up alongside LiteLLM.
 - Settings dialog: add an **Integrations → Web Search** tab hosting the provider selector plus per-provider API key password fields. Keys should stay in memory only (mirroring LiteLLM).
 
@@ -31,7 +32,7 @@
 
 - Add `core/web_search` package with:
   - `WebSearchProvider` protocol + `WebSearchResult` / `WebSearchDocument` dataclasses.
-  - Provider implementations for Exa and Tavily using `httpx.AsyncClient`.
+  - Provider implementations for Exa, Tavily, and Serper using `httpx.AsyncClient`.
   - `WebSearchService` that resolves the configured provider, exposes async `search()` plus a sync wrapper for CLI/tests.
 - Wire `build_prompt_manager` to construct a `WebSearchService` (if an API key + provider is available) so PromptManager exposes `self.web_search`.
 

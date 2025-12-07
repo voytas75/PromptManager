@@ -2,6 +2,14 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.22.8] - 2025-12-07
+
+### Added
+
+- Added Serper.dev as the third web search provider: `PromptManagerSettings` now accepts `web_search_provider="serper"` along with a `PROMPT_MANAGER_SERPER_API_KEY`/`SERPER_API_KEY` secret, the factory wires a `SerperWebSearchProvider`, and random fan-out rotates between whichever of Exa/Tavily/Serper have credentials at runtime (tests cover HTTP success/error flows and configuration loading).
+- Extended the Settings dialog Integrations tab, runtime settings service, GUI tooltips, persistence guards, CLI summaries, and `.env` helpers so Serper keys can be managed in-memory alongside Exa/Tavily without ever touching disk.
+- Updated README, README-DEV, and `docs/web_search_plan.md` with the new provider, env var matrix, and API references (Elastic AutoGen tutorial + Rui Ramos Serper quickstart) so contributors know how to request `https://google.serper.dev/search` with `X-API-KEY` headers and parse the `organic` documents.
+
 ## [0.22.7] - 2025-12-07
 
 ### Added

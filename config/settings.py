@@ -1,6 +1,7 @@
 """Settings management utilities for Prompt Manager configuration.
 
 Updates:
+  v0.5.11 - 2025-12-07 - Add Serper web search provider configuration and env parsing.
   v0.5.10 - 2025-12-07 - Allow random web search provider selection and validation.
   v0.5.9 - 2025-12-05 - Tighten dotenv helpers for lint compliance.
   v0.5.8 - 2025-12-04 - Add auto-open share link preference with GUI binding.
@@ -9,9 +10,8 @@ Updates:
   v0.5.5 - 2025-12-03 - Add LiteLLM TTS streaming configuration toggle.
   v0.5.4 - 2025-12-03 - Add LiteLLM TTS model configuration for voice playback.
   v0.5.3 - 2025-11-30 - Fix validator docstring spacing for lint compliance.
-  v0.5.2 - 2025-11-30 - Add category suggestion workflow to LiteLLM routing.
-  v0.5.1 - 2025-11-23 - Added prompt template override settings.
-  v0.5.0-and-earlier - 2025-11-22 - Added structure-only prompt refinement routing.
+  v0.5.2-and-earlier - 2025-11-30 - Earlier LiteLLM routing, template override, and
+    structure-only refinement settings.
 """
 
 from __future__ import annotations
@@ -229,12 +229,12 @@ class PromptManagerSettings(BaseSettings):
             "'fast' or 'inference'."
         ),
     )
-    web_search_provider: Literal["exa", "tavily", "random"] | None = Field(
+    web_search_provider: Literal["exa", "tavily", "serper", "random"] | None = Field(
         default="exa",
         description=(
-            "Configured web search provider slug ('exa', 'tavily', 'random'; set empty to "
-            "disable). The 'random' option rotates between providers that have API keys "
-            "configured before each search."
+            "Configured web search provider slug ('exa', 'tavily', 'serper', 'random'; set "
+            "empty to disable). The 'random' option rotates between providers that have API "
+            "keys configured before each search."
         ),
     )
     exa_api_key: str | None = Field(
@@ -245,6 +245,11 @@ class PromptManagerSettings(BaseSettings):
     tavily_api_key: str | None = Field(
         default=None,
         description="API key used for Tavily-powered web search features.",
+        repr=False,
+    )
+    serper_api_key: str | None = Field(
+        default=None,
+        description="API key used for Serper-powered web search features.",
         repr=False,
     )
     quick_actions: list[dict[str, object]] | None = Field(
@@ -358,6 +363,7 @@ class PromptManagerSettings(BaseSettings):
                 "web_search_provider": ["WEB_SEARCH_PROVIDER", "web_search_provider"],
                 "exa_api_key": ["EXA_API_KEY", "exa_api_key"],
                 "tavily_api_key": ["TAVILY_API_KEY", "tavily_api_key"],
+                "serper_api_key": ["SERPER_API_KEY", "serper_api_key"],
                 "auto_open_share_links": [
                     "AUTO_OPEN_SHARE_LINKS",
                     "auto_open_share_links",
@@ -430,6 +436,7 @@ class PromptManagerSettings(BaseSettings):
         "embedding_device",
         "exa_api_key",
         "tavily_api_key",
+        "serper_api_key",
         mode="before",
     )
     def _strip_strings(cls, value: str | None) -> str | None:
@@ -458,9 +465,9 @@ class PromptManagerSettings(BaseSettings):
         text = str(value).strip().lower()
         if text in {"none", "disabled", "off"}:
             return None
-        if text not in {"exa", "tavily", "random"}:
+        if text not in {"exa", "tavily", "serper", "random"}:
             raise ValueError(
-                "web_search_provider must be set to 'exa', 'tavily', 'random', or left empty"
+                "web_search_provider must be set to 'exa', 'tavily', 'serper', 'random', or left empty"
             )
         return text
 
@@ -692,6 +699,7 @@ class PromptManagerSettings(BaseSettings):
                 "web_search_provider": ["WEB_SEARCH_PROVIDER", "web_search_provider"],
                 "exa_api_key": ["EXA_API_KEY", "exa_api_key"],
                 "tavily_api_key": ["TAVILY_API_KEY", "tavily_api_key"],
+                "serper_api_key": ["SERPER_API_KEY", "serper_api_key"],
                 "auto_open_share_links": [
                     "AUTO_OPEN_SHARE_LINKS",
                     "auto_open_share_links",
@@ -770,6 +778,8 @@ class PromptManagerSettings(BaseSettings):
                     "EXA_API_KEY",
                     "tavily_api_key",
                     "TAVILY_API_KEY",
+                    "serper_api_key",
+                    "SERPER_API_KEY",
                 }
                 removed_secrets = [
                     key

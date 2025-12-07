@@ -1,6 +1,7 @@
 """Factories for constructing PromptManager instances from validated settings.
 
 Updates:
+  v0.8.0 - 2025-12-07 - Wire Serper provider into the web search factory.
   v0.7.9 - 2025-12-07 - Add random provider fan-out for the web search service.
   v0.7.8 - 2025-12-07 - Add Tavily provider wiring to the web search factory.
   v0.7.7 - 2025-12-04 - Wire web search service creation into manager factory.
@@ -9,9 +10,7 @@ Updates:
   v0.7.4 - 2025-11-24 - Wire LiteLLM category suggestion helper into manager construction.
   v0.7.3 - 2025-11-05 - Support LiteLLM workflow routing across fast/inference models.
   v0.7.2 - 2025-11-26 - Wire LiteLLM streaming flag into executor construction.
-  v0.7.1 - 2025-11-19 - Configure LiteLLM scenario generator for prompt metadata enrichment.
-  v0.7.0-and-earlier - 2025-11-15 - Wire prompt engineer construction with configurable
-  embedding backends and the initial factory wiring.
+  v0.7.1-and-earlier - 2025-11-19 - Configure LiteLLM scenario generator and earlier wiring.
 """
 
 from __future__ import annotations
@@ -37,6 +36,7 @@ from .scenario_generation import LiteLLMScenarioGenerator
 from .web_search import (
     ExaWebSearchProvider,
     RandomWebSearchProvider,
+    SerperWebSearchProvider,
     TavilyWebSearchProvider,
     WebSearchService,
 )
@@ -103,19 +103,29 @@ def _build_web_search_service(settings: PromptManagerSettings) -> WebSearchServi
     provider = None
     exa_provider = None
     tavily_provider = None
+    serper_provider = None
     exa_key = getattr(settings, "exa_api_key", None)
     if exa_key:
         exa_provider = ExaWebSearchProvider(api_key=exa_key)
     tavily_key = getattr(settings, "tavily_api_key", None)
     if tavily_key:
         tavily_provider = TavilyWebSearchProvider(api_key=tavily_key)
+    serper_key = getattr(settings, "serper_api_key", None)
+    if serper_key:
+        serper_provider = SerperWebSearchProvider(api_key=serper_key)
 
     if provider_slug == "exa":
         provider = exa_provider
     elif provider_slug == "tavily":
         provider = tavily_provider
+    elif provider_slug == "serper":
+        provider = serper_provider
     elif provider_slug == "random":
-        available = [candidate for candidate in (exa_provider, tavily_provider) if candidate]
+        available = [
+            candidate
+            for candidate in (exa_provider, tavily_provider, serper_provider)
+            if candidate
+        ]
         if len(available) == 1:
             provider = available[0]
         elif len(available) > 1:

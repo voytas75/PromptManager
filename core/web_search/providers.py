@@ -1,6 +1,7 @@
 """Provider protocol definitions and concrete provider implementations.
 
 Updates:
+  v0.1.4 - 2025-12-07 - Add Serper provider and response normalisation helpers.
   v0.1.3 - 2025-12-07 - Add RandomWebSearchProvider to rotate between configured services.
   v0.1.2 - 2025-12-07 - Add Tavily provider and generalise document parsing.
   v0.1.1 - 2025-12-05 - Move typing-only imports behind TYPE_CHECKING and document __post_init__.
@@ -91,6 +92,7 @@ def _extract_documents(payload: Mapping[str, Any], provider_slug: str) -> list[W
             or None
         )
         published_value = entry.get("publishedDate") or entry.get("published_date")
+        raw_entry = entry.get("raw") if isinstance(entry.get("raw"), dict) else entry
         documents.append(
             WebSearchDocument(
                 title=title,
@@ -100,10 +102,43 @@ def _extract_documents(payload: Mapping[str, Any], provider_slug: str) -> list[W
                 author=str(entry.get("author") or "").strip() or None,
                 published_at=_parse_datetime(published_value),
                 score=score_value,
-                raw=entry,
+                raw=raw_entry,
             )
         )
     return documents
+
+
+def _normalise_serper_results(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Normalise Serper \"organic\" entries into the canonical result schema."""
+    organic_entries = payload.get("organic") or []
+    if not isinstance(organic_entries, list):
+        return []
+    normalised: list[dict[str, Any]] = []
+    for entry in organic_entries:
+        if not isinstance(entry, dict):
+            continue
+        title = str(entry.get("title") or "").strip()
+        url = str(entry.get("link") or "").strip()
+        if not title or not url:
+            continue
+        snippet = str(entry.get("snippet") or "").strip() or None
+        highlight_source = entry.get("snippetHighlighted") or entry.get("snippet_highlighted") or []
+        highlights: list[str] = []
+        if isinstance(highlight_source, list):
+            highlights = [str(item).strip() for item in highlight_source if str(item).strip()]
+        normalised.append(
+            {
+                "title": title,
+                "url": url,
+                "summary": snippet,
+                "highlights": highlights,
+                "score": entry.get("score"),
+                "publishedDate": entry.get("date"),
+                "author": entry.get("source"),
+                "raw": entry,
+            }
+        )
+    return normalised
 
 
 @dataclass(slots=True)
@@ -184,6 +219,96 @@ class ExaWebSearchProvider:
         except ValueError as exc:  # pragma: no cover - invalid provider payload
             raise WebSearchProviderError("Exa returned invalid JSON") from exc
         documents = _extract_documents(data, self.slug)
+        return WebSearchResult(
+            provider=self.slug,
+            query=cleaned_query,
+            documents=documents,
+            raw=data,
+        )
+
+
+@dataclass(slots=True)
+class SerperWebSearchProvider:
+    """HTTPX-backed Serper web search provider."""
+
+    api_key: str
+    base_url: str = "https://google.serper.dev"
+    timeout: float = 15.0
+    slug: str = "serper"
+    display_name: str = "Serper Web Search"
+    client_factory: Callable[[], httpx.AsyncClient] | None = None
+
+    def __post_init__(self) -> None:
+        """Validate provided API key and normalise spacing."""
+        if not self.api_key or not self.api_key.strip():
+            raise ValueError("Serper API key is required")
+        self.api_key = self.api_key.strip()
+
+    async def search(
+        self,
+        query: str,
+        *,
+        limit: int = 5,
+        gl: str | None = None,
+        hl: str | None = None,
+        location: str | None = None,
+        tbs: str | None = None,
+        search_type: str | None = None,
+        **_: Any,
+    ) -> WebSearchResult:
+        """Perform a search request against Serper's REST API."""
+        cleaned_query = query.strip()
+        if not cleaned_query:
+            raise ValueError("query must be a non-empty string")
+        clamped_limit = max(1, min(limit, MAX_RESULTS))
+        payload: dict[str, Any] = {
+            "q": cleaned_query,
+            "num": clamped_limit,
+        }
+
+        def _assign_text(key: str, value: str | None) -> None:
+            if value is None:
+                return
+            stripped = value.strip()
+            if stripped:
+                payload[key] = stripped
+
+        _assign_text("gl", gl)
+        _assign_text("hl", hl)
+        _assign_text("location", location)
+        _assign_text("tbs", tbs)
+
+        headers = {
+            "X-API-KEY": self.api_key,
+            "Content-Type": "application/json",
+        }
+        manage_client = self.client_factory is None
+        if self.client_factory is None:
+            client = httpx.AsyncClient(
+                base_url=self.base_url,
+                headers=headers,
+                timeout=self.timeout,
+            )
+        else:
+            client = self.client_factory()
+        endpoint = f"/{(search_type or 'search').strip().lstrip('/') or 'search'}"
+        try:
+            response = await client.post(endpoint, json=payload)
+            response.raise_for_status()
+        except httpx.HTTPError as exc:  # pragma: no cover - exercised via tests
+            raise WebSearchProviderError("Serper search request failed") from exc
+        finally:
+            if manage_client:
+                await client.aclose()
+
+        try:
+            data = response.json()
+        except ValueError as exc:  # pragma: no cover - invalid provider payload
+            raise WebSearchProviderError("Serper returned invalid JSON") from exc
+        documents = _extract_documents(
+            {"results": _normalise_serper_results(data)},
+            self.slug,
+        )
         return WebSearchResult(
             provider=self.slug,
             query=cleaned_query,
@@ -322,6 +447,7 @@ class RandomWebSearchProvider:
 __all__ = [
     "ExaWebSearchProvider",
     "RandomWebSearchProvider",
+    "SerperWebSearchProvider",
     "TavilyWebSearchProvider",
     "WebSearchProvider",
 ]
