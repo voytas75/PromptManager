@@ -457,12 +457,18 @@ class ExecutionController:
         summarized: bool = False,
     ) -> None:
         safe_count = max(0, int(count))
-        provider_name = (provider_label or "").strip()
-        heading = f"{provider_name.title()} context" if provider_name else "Web context"
-        plural = "source" if safe_count == 1 else "sources"
         self._last_web_context_sources = safe_count
-        self._last_web_context_provider = provider_name.title() if provider_name else None
-        summary_note = " (summarized)" if summarized and safe_count else ""
+        provider_name = (provider_label or "").strip()
+        normalized_provider = provider_name.title() if provider_name else None
+        self._last_web_context_provider = normalized_provider
+
+        if safe_count == 0:
+            self._web_context_preface = ""
+            return
+
+        heading = f"{normalized_provider} context" if normalized_provider else "Web context"
+        plural = "source" if safe_count == 1 else "sources"
+        summary_note = " (summarized)" if summarized else ""
         self._web_context_preface = f"{heading} ({safe_count} {plural} added{summary_note}).\n\n"
 
     def _maybe_enrich_request(self, prompt: Prompt, request_text: str) -> str:
