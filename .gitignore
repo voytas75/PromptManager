@@ -72,3 +72,4 @@ build/
 config/config.json
 .npm-cache/
 coverage.xml
+.codex/
