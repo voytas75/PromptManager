@@ -1,6 +1,7 @@
 r"""Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.16.8 - 2025-12-07 - Sync "Use web search" tooltip with the configured provider.
   v0.16.7 - 2025-12-05 - Route prompt edit callbacks into chain dialogs and panels.
   v0.16.6 - 2025-12-05 - Normalize module docstring quoting and reorder imports for lint compliance.
   v0.16.5 - 2025-12-05 - Remove prompt chain toolbar shortcut; Chain tab remains embedded.
@@ -401,6 +402,7 @@ class MainWindow(QMainWindow):
             execute_from_prompt_body=self._prompt_actions_bridge.execute_prompt_from_body,
         )
         bind_main_view(self, components=components, config=binder_config)
+        self._update_web_search_tooltip()
         self._workspace_history_controller = WorkspaceHistoryController(
             manager=self._manager,
             model=self._model,
@@ -425,6 +427,7 @@ class MainWindow(QMainWindow):
             run_button=self._run_button,
             template_preview_supplier=lambda: self._template_preview,
             toast_callback=self._show_toast,
+            web_search_tooltip_updater=self._update_web_search_tooltip,
         )
         self._dialog_launcher = DialogLauncher(
             parent=self,
@@ -490,6 +493,51 @@ class MainWindow(QMainWindow):
         self._share_result_button.setEnabled(False)
         self._continue_chat_button.setEnabled(False)
         self._end_chat_button.setEnabled(False)
+
+    def _update_web_search_tooltip(self) -> None:
+        """Refresh the workspace web search tooltip to reflect the provider setting."""
+        checkbox = getattr(self, "_web_search_checkbox", None)
+        if checkbox is None:
+            return
+        checkbox.setToolTip(self._build_web_search_tooltip_text())
+
+    def _build_web_search_tooltip_text(self) -> str:
+        """Return the tooltip text that describes the active web search provider."""
+        provider_value = self._runtime_settings.get("web_search_provider")
+        if provider_value is None and self._settings is not None:
+            provider_value = getattr(self._settings, "web_search_provider", None)
+        provider_slug = (str(provider_value or "").strip().lower() or None)
+
+        has_exa = bool(
+            self._runtime_settings.get("exa_api_key")
+            or (getattr(self._settings, "exa_api_key", None) if self._settings else None)
+        )
+        has_tavily = bool(
+            self._runtime_settings.get("tavily_api_key")
+            or (getattr(self._settings, "tavily_api_key", None) if self._settings else None)
+        )
+
+        if provider_slug == "exa":
+            return "Include live web search context via Exa before executing prompts."
+        if provider_slug == "tavily":
+            return "Include live web search context via Tavily before executing prompts."
+        if provider_slug == "random":
+            candidate_pairs = (("Exa", has_exa), ("Tavily", has_tavily))
+            available_labels = [label for label, enabled in candidate_pairs if enabled]
+            if not available_labels:
+                targets = "available providers"
+            elif len(available_labels) == 1:
+                targets = available_labels[0]
+            else:
+                targets = " and ".join(available_labels)
+            return (
+                "Include live web search context via the Random provider, rotating between "
+                f"{targets} before executing prompts."
+            )
+        return (
+            "Include live web search context. Configure Exa or Tavily under Settings to "
+            "enable provider-specific routing."
+        )
 
     def _initialize_notification_controller(self) -> None:
         """Wire the notification bridge and seed the indicator state."""

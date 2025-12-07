@@ -1,6 +1,7 @@
 """Settings workflows for the Prompt Manager main window.
 
 Updates:
+  v0.15.83 - 2025-12-07 - Refresh workspace tooltip when web search settings change.
   v0.15.82 - 2025-12-01 - Extract settings + template dialogs from gui.main_window.
 """
 
@@ -48,6 +49,7 @@ class SettingsWorkflow:
         run_button: QPushButton,
         template_preview_supplier: Callable[[], object | None],
         toast_callback: Callable[[str], None],
+        web_search_tooltip_updater: Callable[[], None],
     ) -> None:
         """Persist dependencies required for settings/template workflows."""
         self._parent = parent
@@ -63,6 +65,7 @@ class SettingsWorkflow:
         self._run_button = run_button
         self._template_preview_supplier = template_preview_supplier
         self._toast = toast_callback
+        self._web_search_tooltip_updater = web_search_tooltip_updater
 
     # ------------------------------------------------------------------
     # Public API
@@ -131,6 +134,8 @@ class SettingsWorkflow:
                 theme_mode=str(self._runtime_settings.get("theme_mode") or DEFAULT_THEME_MODE),
                 has_executor=self._manager.executor is not None,
             )
+        else:
+            self._web_search_tooltip_updater()
 
         controller = self._quick_action_supplier()
         if controller is not None:

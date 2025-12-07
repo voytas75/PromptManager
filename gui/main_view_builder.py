@@ -1,6 +1,7 @@
 r"""Composable builders for the Prompt Manager main window.
 
 Updates:
+  v0.2.7 - 2025-12-07 - Provide provider-agnostic default tooltip for web search toggle.
   v0.2.6 - 2025-12-05 - Pass prompt edit callbacks into analytics and chain panels.
   v0.2.5 - 2025-12-05 - Mark module docstring as raw for lint compliance.
   v0.2.4 - 2025-12-05 - Remove prompt template toolbar wiring.
@@ -234,9 +235,7 @@ def build_main_view(
 
     web_search_checkbox = QCheckBox("Use web search", parent)
     web_search_checkbox.setChecked(True)
-    web_search_checkbox.setToolTip(
-        "Include live web search context (Exa) before executing prompts."
-    )
+    web_search_checkbox.setToolTip("Include live web search context before executing prompts.")
     actions_layout.addWidget(web_search_checkbox)
 
     copy_result_button = QPushButton("Copy Result", parent)
