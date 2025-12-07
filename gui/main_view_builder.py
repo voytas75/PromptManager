@@ -1,6 +1,7 @@
 r"""Composable builders for the Prompt Manager main window.
 
 Updates:
+  v0.2.8 - 2025-12-07 - Convert Run Prompt button into split actions for prompt/text runs.
   v0.2.7 - 2025-12-07 - Provide provider-agnostic default tooltip for web search toggle.
   v0.2.6 - 2025-12-05 - Pass prompt edit callbacks into analytics and chain panels.
   v0.2.5 - 2025-12-05 - Mark module docstring as raw for lint compliance.
@@ -26,6 +27,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLayout,
     QListView,
+    QMenu,
     QPlainTextEdit,
     QPushButton,
     QSizePolicy,
@@ -76,6 +78,7 @@ class MainViewCallbacks:
     detect_intent_clicked: Callable[[], None]
     suggest_prompt_clicked: Callable[[], None]
     run_prompt_clicked: Callable[[], None]
+    run_text_only_clicked: Callable[[], None]
     clear_workspace_clicked: Callable[[], None]
     continue_chat_clicked: Callable[[], None]
     end_chat_clicked: Callable[[], None]
@@ -112,7 +115,7 @@ class MainViewComponents:
     quick_actions_button_default_tooltip: str
     detect_button: QPushButton
     suggest_button: QPushButton
-    run_button: QPushButton
+    run_button: QToolButton
     clear_button: QPushButton
     continue_chat_button: QPushButton
     end_chat_button: QPushButton
@@ -212,8 +215,16 @@ def build_main_view(
     suggest_button.clicked.connect(callbacks.suggest_prompt_clicked)  # type: ignore[arg-type]
     actions_layout.addWidget(suggest_button)
 
-    run_button = QPushButton("Run Prompt", parent)
+    run_button = QToolButton(parent)
+    run_button.setText("Run Prompt")
+    run_button.setPopupMode(QToolButton.MenuButtonPopup)
     run_button.clicked.connect(callbacks.run_prompt_clicked)  # type: ignore[arg-type]
+    run_menu = QMenu(run_button)
+    run_selected_action = run_menu.addAction("Run selected prompt")
+    run_selected_action.triggered.connect(callbacks.run_prompt_clicked)  # type: ignore[arg-type]
+    run_text_only_action = run_menu.addAction("Run provided text only")
+    run_text_only_action.triggered.connect(callbacks.run_text_only_clicked)  # type: ignore[arg-type]
+    run_button.setMenu(run_menu)
     actions_layout.addWidget(run_button)
 
     clear_button = QPushButton("Clear", parent)

@@ -1,6 +1,7 @@
 """Workspace-oriented operations extracted from the main window.
 
 Updates:
+  v0.1.1 - 2025-12-07 - Add text-only workspace execution support.
   v0.1.0 - 2025-12-01 - Introduced controller to manage execution, history, and chat actions.
 """
 
@@ -94,6 +95,18 @@ class WorkspaceActionsController:
             empty_text_message="Paste some text or code before executing a prompt.",
             keep_text_after=False,
         )
+
+    def run_text_only(self) -> None:
+        """Execute only the workspace text without referencing a saved prompt."""
+        request_text = self._query_input.toPlainText()
+        if not request_text.strip():
+            self._status_callback("Type or paste some text before running it.", 4000)
+            return
+        controller = self._execution_controller()
+        if controller is None:
+            self._error_callback("Workspace unavailable", "Execution controller is not ready.")
+            return
+        controller.execute_text_only(request_text)
 
     def save_result(self) -> None:
         """Persist the latest execution result with optional user notes."""

@@ -1,6 +1,7 @@
 """Handlers extracted from :mod:`gui.main_window` for clarity.
 
 Updates:
+  v0.15.85 - 2025-12-07 - Add workspace text-only execution handler.
   v0.15.84 - 2025-12-05 - Remove standalone prompt templates action after toolbar update.
   v0.15.83 - 2025-12-04 - Add prompt chain dialog launcher wiring.
   v0.15.82 - 2025-12-01 - Introduce prompt, workspace, and template handlers.
@@ -338,6 +339,10 @@ class WorkspaceInputHandler:
     def run_prompt(self) -> None:
         """Execute the selected prompt."""
         self._workspace_router.run_prompt()
+
+    def run_text_only(self) -> None:
+        """Execute only the workspace text without referencing a prompt."""
+        self._workspace_router.run_text_only()
 
     def clear_workspace(self) -> None:
         """Clear workspace inputs and outputs."""

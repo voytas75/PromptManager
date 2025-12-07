@@ -1,6 +1,7 @@
 """Settings workflows for the Prompt Manager main window.
 
 Updates:
+  v0.15.85 - 2025-12-07 - Accept generic run buttons to support split actions.
   v0.15.84 - 2025-12-07 - Pass SerpApi credentials through the settings workflow dialog.
   v0.15.83 - 2025-12-07 - Refresh workspace tooltip when web search settings change.
   v0.15.82 - 2025-12-01 - Extract settings + template dialogs from gui.main_window.
@@ -22,12 +23,12 @@ from .settings_dialog import SettingsDialog
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from collections.abc import Callable
 
-    from PySide6.QtWidgets import QPushButton, QWidget
+    from PySide6.QtWidgets import QAbstractButton, QWidget
 else:  # pragma: no cover - runtime placeholders for type-only imports
     from typing import Any as _Any
 
     Callable = _Any
-    QPushButton = _Any
+    QAbstractButton = _Any
     QWidget = _Any
 
 
@@ -47,7 +48,7 @@ class SettingsWorkflow:
         execution_controller_supplier: Callable[[], object | None],
         load_prompts: Callable[[str], None],
         current_search_text: Callable[[], str],
-        run_button: QPushButton,
+        run_button: QAbstractButton,
         template_preview_supplier: Callable[[], object | None],
         toast_callback: Callable[[str], None],
         web_search_tooltip_updater: Callable[[], None],

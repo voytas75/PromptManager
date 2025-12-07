@@ -1,6 +1,7 @@
 """Workspace command routing helpers for :class:`gui.main_window.MainWindow`.
 
 Updates:
+  v0.15.82 - 2025-12-07 - Route text-only workspace runs to the controller.
   v0.15.81 - 2025-12-01 - Extracted workspace signal handlers from gui.main_window.
 """
 
@@ -54,6 +55,12 @@ class WorkspaceCommandRouter:
         actions = self._supplier()
         if actions is not None:
             actions.run_prompt()
+
+    def run_text_only(self) -> None:
+        """Execute only the workspace text when the controller is ready."""
+        actions = self._supplier()
+        if actions is not None:
+            actions.run_text_only()
 
     def clear_workspace(self) -> None:
         """Clear workspace inputs and outputs."""

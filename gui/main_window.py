@@ -1,6 +1,7 @@
 r"""Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.16.11 - 2025-12-07 - Convert Run Prompt into a split button with text-only option.
   v0.16.10 - 2025-12-07 - Include SerpApi in workspace web search tooltip messaging.
   v0.16.9 - 2025-12-07 - Describe Serper provider in workspace web search tooltips.
   v0.16.8 - 2025-12-07 - Sync \"Use web search\" tooltip with the configured provider.
@@ -9,10 +10,7 @@ Updates:
   v0.16.5 - 2025-12-05 - Remove prompt chain toolbar shortcut; Chain tab remains embedded.
   v0.16.4 - 2025-12-05 - Embed prompt chain panel and add toolbar shortcut to focus Chain tab.
   v0.16.3 - 2025-12-04 - Track \"Use web search\" checkbox for execution controller.
-  v0.16.2 - 2025-12-04 - Wire template preview bridge to handler so tab run works on load.
-  v0.16.0 - 2025-12-02 - Delegate controller assembly, view callbacks, and handlers
-    to helper modules for leaner MainWindow.
-  v0.15.81-and-earlier - 2025-12-01 - Prior modularisation of layout, runtime settings, and sharing.
+  v0.16.2-and-earlier - 2025-12-04 - Delegated controller assembly plus earlier layout/runtime mods.
 """
 
 from __future__ import annotations
@@ -31,6 +29,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QTabWidget,
     QTextEdit,
+    QToolButton,
     QWidget,
 )
 
@@ -218,7 +217,7 @@ class MainWindow(QMainWindow):
         self._quick_actions_button_default_tooltip: str = ""
         self._detect_button: QPushButton = cast("QPushButton", None)
         self._suggest_button: QPushButton = cast("QPushButton", None)
-        self._run_button: QPushButton = cast("QPushButton", None)
+        self._run_button: QToolButton = cast("QToolButton", None)
         self._clear_button: QPushButton = cast("QPushButton", None)
         self._continue_chat_button: QPushButton = cast("QPushButton", None)
         self._end_chat_button: QPushButton = cast("QPushButton", None)

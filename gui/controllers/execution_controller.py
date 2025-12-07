@@ -1,6 +1,7 @@
 """Coordinate prompt execution, streaming, and chat workspace logic.
 
 Updates:
+  v0.1.5 - 2025-12-07 - Support promptless workspace text execution.
   v0.1.4 - 2025-12-07 - Wrap web context with shared markers and numbering.
   v0.1.3 - 2025-12-04 - Include all web snippets and summarize >5k words via fast LiteLLM.
   v0.1.2 - 2025-12-04 - Surface web context source counts before each workspace result.
@@ -12,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import uuid
 from collections.abc import Callable, Sequence
 from html import escape
 from typing import TYPE_CHECKING
@@ -33,6 +35,7 @@ from core import (
     PromptNotFoundError,
     WebSearchError,
 )
+from core.execution import ExecutionError
 from core.litellm_adapter import (
     LiteLLMNotInstalledError,
     apply_configured_drop_params,
@@ -58,9 +61,8 @@ if TYPE_CHECKING:  # pragma: no cover - import for typing only
         QTextEdit,
     )
 
-    from models.prompt_model import Prompt
-
 from gui.voice_playback_controller import VoicePlaybackError
+from models.prompt_model import Prompt
 
 if TYPE_CHECKING:  # pragma: no cover - import for typing only
     from gui.share_controller import ShareController
@@ -80,6 +82,13 @@ WEB_CONTEXT_SUMMARY_SYSTEM_PROMPT = (
     "into a concise, factual briefing for another model. Highlight consensus, note "
     "conflicts, and reference the provided source URLs inline when helpful. Respond "
     "in no more than 400 words."
+)
+
+FREEFORM_PROMPT_NAME = "Workspace Text Run"
+FREEFORM_PROMPT_CATEGORY = "Workspace"
+FREEFORM_SYSTEM_PROMPT = (
+    "You are a versatile AI assistant. Treat the user's next message as a standalone request "
+    "and respond with the clearest, most actionable answer possible."
 )
 
 logger = logging.getLogger(__name__)
@@ -342,6 +351,81 @@ class ExecutionController:
             5000,
         )
 
+    def execute_text_only(self, request_text: str) -> None:
+        """Execute workspace text without referencing the selected prompt."""
+        trimmed = (request_text or "").strip()
+        if not trimmed:
+            self._status("Type or paste some text before running it.", 4000)
+            return
+        executor = getattr(self._manager, "executor", None)
+        if executor is None:
+            self._error("Prompt execution unavailable", "Configure LiteLLM before running text.")
+            self._status("Prompt execution unavailable.", 4000)
+            return
+        prompt = self._build_freeform_prompt()
+        payload = self._maybe_enrich_request(prompt, trimmed)
+        streaming_enabled = self._is_streaming_enabled()
+        callback = self._handle_stream_chunk if streaming_enabled else None
+        if streaming_enabled:
+            self._begin_streaming_run(prompt)
+        try:
+            result = executor.execute(
+                prompt,
+                payload,
+                conversation=None,
+                stream=streaming_enabled,
+                on_stream=callback,
+            )
+        except ExecutionError as exc:
+            if streaming_enabled and self._streaming_in_progress:
+                self._end_streaming_run()
+            self._usage_logger.log_execute(
+                prompt_name=prompt.name,
+                success=False,
+                duration_ms=None,
+                error=str(exc),
+            )
+            self._error("Prompt execution failed", str(exc))
+            return
+        except Exception as exc:  # noqa: BLE001 - defensive guard for executor failures
+            if streaming_enabled and self._streaming_in_progress:
+                self._end_streaming_run()
+            self._usage_logger.log_execute(
+                prompt_name=prompt.name,
+                success=False,
+                duration_ms=None,
+                error=str(exc),
+            )
+            self._error("Prompt execution failed", str(exc))
+            return
+        finally:
+            if streaming_enabled and self._streaming_in_progress:
+                self._end_streaming_run()
+
+        conversation = [{"role": "user", "content": trimmed}]
+        if result.response_text:
+            conversation.append({"role": "assistant", "content": result.response_text})
+        outcome = PromptManager.ExecutionOutcome(
+            result=result,
+            history_entry=None,
+            conversation=conversation,
+        )
+        self._display_execution_result(
+            prompt,
+            outcome,
+            enable_save=False,
+            enable_chat=False,
+        )
+        self._usage_logger.log_execute(
+            prompt_name=prompt.name,
+            success=True,
+            duration_ms=result.duration_ms,
+        )
+        self._status(
+            f"Executed workspace text run in {result.duration_ms} ms.",
+            5000,
+        )
+
     def continue_chat(self) -> None:
         """Send the workspace text as a follow-up within the active chat session."""
         if not self._chat_conversation or self._chat_prompt_id is None:
@@ -475,6 +559,17 @@ class ExecutionController:
         plural = "source" if safe_count == 1 else "sources"
         summary_note = " (summarized)" if summarized and safe_count else ""
         self._web_context_preface = f"{heading} ({safe_count} {plural} added{summary_note}).\n\n"
+
+    def _build_freeform_prompt(self) -> Prompt:
+        return Prompt(
+            id=uuid.uuid4(),
+            name=FREEFORM_PROMPT_NAME,
+            description="Ad-hoc workspace text execution",
+            category=FREEFORM_PROMPT_CATEGORY,
+            context=FREEFORM_SYSTEM_PROMPT,
+            tags=["workspace"],
+            language="en",
+        )
 
     def _maybe_enrich_request(self, prompt: Prompt, request_text: str) -> str:
         self._set_web_context_summary(0, None)
@@ -720,10 +815,13 @@ class ExecutionController:
         self,
         prompt: Prompt,
         outcome: PromptManager.ExecutionOutcome,
+        *,
+        enable_save: bool = True,
+        enable_chat: bool = True,
     ) -> None:
         self._last_execution = outcome
         self._last_prompt_name = prompt.name
-        self._chat_prompt_id = prompt.id
+        self._chat_prompt_id = prompt.id if enable_chat else None
         self._chat_conversation = [dict(message) for message in outcome.conversation]
         self._result_label.setText(f"Last Result — {prompt.name}")
         meta_parts: list[str] = [f"Duration: {outcome.result.duration_ms} ms"]
@@ -739,10 +837,11 @@ class ExecutionController:
         has_response = bool(response_text)
         self._copy_result_button.setEnabled(has_response)
         self._copy_result_to_text_window_button.setEnabled(has_response)
-        self._save_button.setEnabled(True)
+        self._save_button.setEnabled(enable_save)
         self._share_result_button.setEnabled(self._can_share_result())
-        self._continue_chat_button.setEnabled(True)
-        self._end_chat_button.setEnabled(True)
+        can_continue = enable_chat and bool(outcome.conversation)
+        self._continue_chat_button.setEnabled(can_continue)
+        self._end_chat_button.setEnabled(can_continue)
         self._refresh_chat_history_view()
         self._query_input.clear()
         self._query_input.setFocus(Qt.ShortcutFocusReason)

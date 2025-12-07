@@ -1,6 +1,7 @@
 """Factories that build callback bundles for gui.main_window.
 
 Updates:
+  v0.16.5 - 2025-12-07 - Wire workspace text-only run callback.
   v0.16.4 - 2025-12-05 - Remove prompt template callback after toolbar removal.
   v0.16.3 - 2025-12-05 - Remove chains toolbar callback now that the Chain tab is built-in.
   v0.16.2 - 2025-12-05 - Route chains toolbar action to focus the Chain tab.
@@ -43,6 +44,7 @@ def build_main_view_callbacks(window: MainWindow) -> MainViewCallbacks:
         detect_intent_clicked=window._on_detect_intent_clicked,  # type: ignore[attr-defined]
         suggest_prompt_clicked=window._on_suggest_prompt_clicked,  # type: ignore[attr-defined]
         run_prompt_clicked=workspace_input.run_prompt,
+        run_text_only_clicked=workspace_input.run_text_only,
         clear_workspace_clicked=workspace_input.clear_workspace,
         continue_chat_clicked=workspace_input.continue_chat,
         end_chat_clicked=workspace_input.end_chat,
