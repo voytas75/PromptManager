@@ -1,6 +1,7 @@
 r"""Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.16.13 - 2025-12-07 - Convert analytics log path to Path objects for typing.
   v0.16.12 - 2025-12-07 - Embed Workbench tab and expose activation hook.
   v0.16.11 - 2025-12-07 - Convert Run Prompt into a split button with text-only option.
   v0.16.10 - 2025-12-07 - Include SerpApi in workspace web search tooltip messaging.
@@ -16,6 +17,7 @@ Updates:
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from PySide6.QtWidgets import (
@@ -366,7 +368,12 @@ class MainWindow(QMainWindow):
     def _build_ui(self) -> None:
         """Create the main layout with list/search/detail panes."""
         callbacks = build_main_view_callbacks(self)
-        usage_log_path = getattr(self._usage_logger, "log_path", None)
+        usage_log_value = getattr(self._usage_logger, "log_path", None)
+        usage_log_path = (
+            Path(usage_log_value)
+            if isinstance(usage_log_value, str)
+            else usage_log_value
+        )
         components = build_main_view(
             parent=self,
             model=self._model,

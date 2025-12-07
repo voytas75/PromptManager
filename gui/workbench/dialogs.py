@@ -1,13 +1,14 @@
 """Dialog helpers for starting and exporting Enhanced Prompt Workbench sessions.
 
 Updates:
+  v0.1.1 - 2025-12-07 - Introduce typed payload for export dialog results.
   v0.1.0 - 2025-12-04 - Extract mode picker, variable capture, and export dialogs.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -47,6 +48,16 @@ __all__ = [
     "WorkbenchMode",
     "WorkbenchModeDialog",
 ]
+
+
+class WorkbenchExportPayload(TypedDict):
+    """Structured payload returned when exporting a Workbench draft."""
+
+    name: str
+    category: str
+    language: str
+    tags: list[str]
+    author: str | None
 
 
 class WorkbenchMode:
@@ -227,18 +238,18 @@ class WorkbenchExportDialog(QDialog):
         self.setWindowTitle("Export Prompt")
         self._build_ui(session)
 
-    def prompt_kwargs(self) -> dict[str, str | list[str] | None] | None:
+    def prompt_kwargs(self) -> WorkbenchExportPayload | None:
         """Return keyword arguments for prompt creation when accepted."""
         if self.result() != QDialog.Accepted:
             return None
         tags = [tag.strip() for tag in self._tags_input.text().split(",") if tag.strip()]
-        return {
-            "name": self._name_input.text().strip(),
-            "category": self._category_input.text().strip() or "Workbench",
-            "language": self._language_input.text().strip() or "en",
-            "tags": tags,
-            "author": self._author_input.text().strip() or None,
-        }
+        return WorkbenchExportPayload(
+            name=self._name_input.text().strip(),
+            category=self._category_input.text().strip() or "Workbench",
+            language=self._language_input.text().strip() or "en",
+            tags=tags,
+            author=self._author_input.text().strip() or None,
+        )
 
     def _build_ui(self, session: WorkbenchSession) -> None:
         layout = QFormLayout(self)

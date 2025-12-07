@@ -1,6 +1,7 @@
 r"""Composable builders for the Prompt Manager main window.
 
 Updates:
+  v0.2.10 - 2025-12-07 - Accept Path inputs for analytics log path.
   v0.2.9 - 2025-12-07 - Embed the Workbench tab alongside Chain for inline sessions.
   v0.2.8 - 2025-12-07 - Convert Run Prompt button into split actions for prompt/text runs.
   v0.2.7 - 2025-12-07 - Provide provider-agnostic default tooltip for web search toggle.
@@ -16,6 +17,7 @@ Updates:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, QPoint, Qt
@@ -168,7 +170,7 @@ def build_main_view(
     status_callback: Callable[[str, int], None] | None,
     toast_callback: Callable[[str, int], None] | None,
     event_filter_target: QObject,
-    usage_log_path: str | None,
+    usage_log_path: Path | str | None,
     history_note_callback: Callable[[UUID, str], None] | None,
     history_export_callback: Callable[[int, str], None] | None,
 ) -> MainViewComponents:
@@ -404,6 +406,12 @@ def build_main_view(
 
     result_tab_layout.addWidget(main_splitter)
 
+    analytics_log_path = (
+        Path(usage_log_path)
+        if isinstance(usage_log_path, str)
+        else usage_log_path
+    )
+
     history_panel = HistoryPanel(
         manager,
         parent,
@@ -429,7 +437,7 @@ def build_main_view(
     analytics_panel = AnalyticsDashboardPanel(
         manager,
         parent,
-        usage_log_path=usage_log_path,
+        usage_log_path=analytics_log_path,
         prompt_edit_callback=callbacks.edit_prompt_by_id,
     )
 
