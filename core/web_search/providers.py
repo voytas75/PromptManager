@@ -14,8 +14,8 @@ Updates:
 from __future__ import annotations
 
 import html
-import re
 import random
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
