@@ -58,8 +58,8 @@ def create_qapplication(argv: Sequence[str] | None = None) -> QApplication:
         # Allow running in headless environments by defaulting to the offscreen plugin.
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
-    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+    QApplication.setAttribute(Qt.ApplicationAttribute.AA_EnableHighDpiScaling, True)
+    QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)
     app = QApplication(list(argv or []))
     fusion: Any | None = None
     if QStyleFactory is not None:  # pragma: no branch - branch depends on import success
@@ -67,12 +67,11 @@ def create_qapplication(argv: Sequence[str] | None = None) -> QApplication:
     if fusion is not None:
         app.setStyle(fusion)
     style_name = "<unknown>"
-    style_getter = getattr(app, "style", None)
-    if callable(style_getter):  # pragma: no branch - depends on Qt stubs
-        try:
-            style_name = style_getter().metaObject().className()
-        except AttributeError:  # pragma: no cover - stubbed Qt lacks metaObject
-            style_name = "<unavailable>"
+    try:
+        style_obj = app.style()
+        style_name = style_obj.metaObject().className()
+    except AttributeError:  # pragma: no cover - stubbed Qt lacks metaObject
+        style_name = "<unavailable>"
     logger.debug("GUI_STYLE active_style=%s", style_name)
     return app
 

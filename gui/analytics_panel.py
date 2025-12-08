@@ -83,8 +83,10 @@ class AnalyticsDashboardPanel(QWidget):
         self._status_label = QLabel("", self)
         self._embedding_summary = QLabel("", self)
         self._settings = QSettings("PromptManager", "AnalyticsPanel")
-        self._initial_window_days = self._settings.value("windowDays", 30, int)
-        self._initial_prompt_limit = self._settings.value("promptLimit", 5, int)
+        window_pref = self._settings.value("windowDays", 30, int)
+        prompt_pref = self._settings.value("promptLimit", 5, int)
+        self._initial_window_days: int = int(window_pref if window_pref is not None else 30)
+        self._initial_prompt_limit: int = int(prompt_pref if prompt_pref is not None else 5)
         self._prompt_edit_callback = prompt_edit_callback
         self._usage_row_prompt_ids: dict[int, UUID] = {}
         self._build_ui()
@@ -144,14 +146,14 @@ class AnalyticsDashboardPanel(QWidget):
         controls.addStretch(1)
         layout.addLayout(controls)
 
-        self._chart_view.setRenderHint(QPainter.Antialiasing)
+        self._chart_view.setRenderHint(QPainter.RenderHint.Antialiasing)
         layout.addWidget(self._chart_view, stretch=2)
 
         self._table.setColumnCount(0)
         self._table.setRowCount(0)
-        self._table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self._table.setSelectionMode(QAbstractItemView.SingleSelection)
-        self._table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self._table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table.cellActivated.connect(self._handle_table_cell_activated)  # type: ignore[arg-type]
         layout.addWidget(self._table, stretch=1)
 
@@ -255,8 +257,8 @@ class AnalyticsDashboardPanel(QWidget):
             axis_y = QValueAxis()
             axis_y.setRange(0, 100)
             axis_y.setTitleText("Success %")
-            chart.addAxis(axis_x, Qt.AlignBottom)
-            chart.addAxis(axis_y, Qt.AlignLeft)
+            chart.addAxis(axis_x, Qt.AlignmentFlag.AlignBottom)
+            chart.addAxis(axis_y, Qt.AlignmentFlag.AlignLeft)
             line_series.attachAxis(axis_x)
             line_series.attachAxis(axis_y)
             chart.setTitle("Intent workspace success rate")
@@ -282,8 +284,8 @@ class AnalyticsDashboardPanel(QWidget):
             axis_x.setTitleText("Index")
             axis_y = QValueAxis()
             axis_y.setRange(0, max(values) * 1.1 if values else 1)
-            chart.addAxis(axis_x, Qt.AlignBottom)
-            chart.addAxis(axis_y, Qt.AlignLeft)
+            chart.addAxis(axis_x, Qt.AlignmentFlag.AlignBottom)
+            chart.addAxis(axis_y, Qt.AlignmentFlag.AlignLeft)
             series.attachAxis(axis_x)
             series.attachAxis(axis_y)
         else:
@@ -297,8 +299,8 @@ class AnalyticsDashboardPanel(QWidget):
             axis_x.append(labels)
             axis_y = QValueAxis()
             axis_y.setRange(0, max(values) * 1.1 if values else 1)
-            chart.addAxis(axis_x, Qt.AlignBottom)
-            chart.addAxis(axis_y, Qt.AlignLeft)
+            chart.addAxis(axis_x, Qt.AlignmentFlag.AlignBottom)
+            chart.addAxis(axis_y, Qt.AlignmentFlag.AlignLeft)
             bar_series.attachAxis(axis_x)
             bar_series.attachAxis(axis_y)
 

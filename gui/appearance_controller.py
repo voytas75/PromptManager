@@ -91,22 +91,28 @@ class AppearanceController:
 
         if theme == "dark":
             palette = QPalette()
-            palette.setColor(QPalette.Window, QColor(31, 41, 51))
-            palette.setColor(QPalette.WindowText, Qt.white)
-            palette.setColor(QPalette.Base, QColor(24, 31, 41))
-            palette.setColor(QPalette.AlternateBase, QColor(37, 46, 59))
-            palette.setColor(QPalette.ToolTipBase, QColor(45, 55, 68))
-            palette.setColor(QPalette.ToolTipText, Qt.white)
-            palette.setColor(QPalette.Text, QColor(232, 235, 244))
-            palette.setColor(QPalette.Button, QColor(45, 55, 68))
-            palette.setColor(QPalette.ButtonText, Qt.white)
-            palette.setColor(QPalette.BrightText, QColor(255, 107, 107))
-            palette.setColor(QPalette.Link, QColor(140, 180, 255))
-            palette.setColor(QPalette.Highlight, QColor(99, 102, 241))
-            palette.setColor(QPalette.HighlightedText, Qt.white)
-            palette.setColor(QPalette.PlaceholderText, QColor(156, 163, 175))
-            palette.setColor(QPalette.Disabled, QPalette.Text, QColor(110, 115, 125))
-            palette.setColor(QPalette.Disabled, QPalette.ButtonText, QColor(110, 115, 125))
+            palette.setColor(QPalette.ColorRole.Window, QColor(31, 41, 51))
+            palette.setColor(QPalette.ColorRole.WindowText, QColor(Qt.GlobalColor.white))
+            palette.setColor(QPalette.ColorRole.Base, QColor(24, 31, 41))
+            palette.setColor(QPalette.ColorRole.AlternateBase, QColor(37, 46, 59))
+            palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(45, 55, 68))
+            palette.setColor(QPalette.ColorRole.ToolTipText, QColor(Qt.GlobalColor.white))
+            palette.setColor(QPalette.ColorRole.Text, QColor(232, 235, 244))
+            palette.setColor(QPalette.ColorRole.Button, QColor(45, 55, 68))
+            palette.setColor(QPalette.ColorRole.ButtonText, QColor(Qt.GlobalColor.white))
+            palette.setColor(QPalette.ColorRole.BrightText, QColor(255, 107, 107))
+            palette.setColor(QPalette.ColorRole.Link, QColor(140, 180, 255))
+            palette.setColor(QPalette.ColorRole.Highlight, QColor(99, 102, 241))
+            palette.setColor(QPalette.ColorRole.HighlightedText, QColor(Qt.GlobalColor.white))
+            palette.setColor(QPalette.ColorRole.PlaceholderText, QColor(156, 163, 175))
+            palette.setColor(
+                QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, QColor(110, 115, 125)
+            )
+            palette.setColor(
+                QPalette.ColorGroup.Disabled,
+                QPalette.ColorRole.ButtonText,
+                QColor(110, 115, 125),
+            )
             app.setPalette(palette)
             app.setStyleSheet(
                 "QToolTip { color: #f9fafc; background-color: #1f2933; border: 1px solid #3b4252; }"
