@@ -2,6 +2,12 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.22.13] - 2025-12-08
+
+### Fixed
+
+- Silenced LiteLLM's outstanding Pydantic ConfigDict deprecation spam (tracked in [BerriAI/litellm#9731](https://github.com/BerriAI/litellm/issues/9731)) and Python 3.13's new sqlite `ResourceWarning` for GC-closed connections during pytest + coverage runs by adding scoped `filterwarnings` entries so CI logs stay clean until upstream fixes land.
+
 ## [0.22.11] - 2025-12-07
 
 ### Added
