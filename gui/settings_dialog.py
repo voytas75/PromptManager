@@ -228,7 +228,7 @@ class SettingsDialog(QDialog):
 
         litellm_tab = QWidget(self)
         litellm_form = QFormLayout(litellm_tab)
-        litellm_form.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
+        litellm_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
 
         self._model_input = QLineEdit(self._litellm_model, litellm_tab)
         litellm_form.addRow("LiteLLM fast model", self._model_input)
@@ -342,7 +342,7 @@ class SettingsDialog(QDialog):
 
         integrations_tab = QWidget(self)
         integrations_form = QFormLayout(integrations_tab)
-        integrations_form.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
+        integrations_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
 
         provider_combo = QComboBox(integrations_tab)
         provider_combo.addItem("Disabled", userData=None)
@@ -428,7 +428,7 @@ class SettingsDialog(QDialog):
 
         appearance_tab = QWidget(self)
         appearance_form = QFormLayout(appearance_tab)
-        appearance_form.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
+        appearance_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
 
         theme_combo = QComboBox(appearance_tab)
         theme_combo.addItems(["Light", "Dark"])
@@ -456,7 +456,7 @@ class SettingsDialog(QDialog):
         # -------------------------------------------------------------
         colors_tab = QWidget(self)
         colors_form = QFormLayout(colors_tab)
-        colors_form.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
+        colors_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
 
         self._color_buttons: dict[str, QPushButton] = {}
 

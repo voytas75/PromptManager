@@ -115,7 +115,7 @@ class GuidedPromptWizard(QDialog):
                 {
                     "window": palette.color(QPalette.Window).name(),
                     "window_text": palette.color(QPalette.WindowText).name(),
-                    "base": palette.color(QPalette.Base).name(),
+                    "base": palette.color(QPalette.ColorRole.Base).name(),
                     "alternate": palette.color(QPalette.AlternateBase).name(),
                     "button": palette.color(QPalette.ColorRole.Button).name(),
                     "button_text": palette.color(QPalette.ColorRole.ButtonText).name(),

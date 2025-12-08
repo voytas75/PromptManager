@@ -65,7 +65,7 @@ class PromptToolbar(QWidget):
         self._new_button = QToolButton(self)
         self._new_button.setText("🆕 New")
         self._new_button.setToolTip("Create a prompt or open the Enhanced Prompt Workbench.")
-        self._new_button.setPopupMode(QToolButton.MenuButtonPopup)
+        self._new_button.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
         self._new_button.clicked.connect(self.add_requested)  # type: ignore[arg-type]
         layout.addWidget(self._new_button)
 
@@ -87,7 +87,7 @@ class PromptToolbar(QWidget):
         self._settings_button = QToolButton(self)
         self._settings_button.setText("Settings")
         self._settings_button.setToolTip("Open settings and administrative utilities.")
-        self._settings_button.setPopupMode(QToolButton.MenuButtonPopup)
+        self._settings_button.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
         self._settings_button.clicked.connect(self.settings_requested)  # type: ignore[arg-type]
         layout.addWidget(self._settings_button)
 

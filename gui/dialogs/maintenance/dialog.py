@@ -9,7 +9,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QEvent, QSettings, Qt, Signal
+from PySide6.QtCore import QSettings, Qt, Signal
+from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -73,7 +74,7 @@ class PromptMaintenanceDialog(
         if isinstance(width, int) and isinstance(height, int) and width > 0 and height > 0:
             self.resize(width, height)
 
-    def closeEvent(self, event: QEvent) -> None:  # type: ignore[override]
+    def closeEvent(self, event: QCloseEvent) -> None:
         """Persist the current window geometry when the dialog closes."""
         self._settings.setValue("width", self.width())
         self._settings.setValue("height", self.height())

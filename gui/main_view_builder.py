@@ -221,7 +221,7 @@ def build_main_view(
 
     run_button = QToolButton(parent)
     run_button.setText("Run Prompt")
-    run_button.setPopupMode(QToolButton.MenuButtonPopup)
+    run_button.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
     run_button.clicked.connect(callbacks.run_prompt_clicked)  # type: ignore[arg-type]
     run_menu = QMenu(run_button)
     run_selected_action = run_menu.addAction("Run selected prompt")
@@ -267,7 +267,7 @@ def build_main_view(
 
     speak_result_button = QToolButton(parent)
     speak_result_button.setToolTip("Read the latest result aloud.")
-    speak_result_button.setIcon(parent.style().standardIcon(QStyle.SP_MediaPlay))
+    speak_result_button.setIcon(parent.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
     speak_result_button.setCheckable(True)
     speak_result_button.setEnabled(False)
     speak_result_button.clicked.connect(callbacks.speak_result_clicked)  # type: ignore[arg-type]
@@ -331,7 +331,7 @@ def build_main_view(
     query_panel = QWidget(workspace_splitter)
     query_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     query_panel_layout = QVBoxLayout(query_panel)
-    query_panel_layout.setSizeConstraint(QLayout.SetMinimumSize)
+    query_panel_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
     query_panel_layout.setContentsMargins(0, 0, 0, 0)
     query_panel_layout.setSpacing(8)
     query_panel_layout.addWidget(query_input, 1)

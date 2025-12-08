@@ -98,7 +98,7 @@ class InfoDialog(QDialog):
         info = collect_system_info()
 
         form = QFormLayout()
-        form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
 
         author_label = QLabel('<a href="https://github.com/voytas75">voytas75</a>', self)
         author_label.setTextFormat(Qt.TextFormat.RichText)

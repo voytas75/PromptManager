@@ -89,7 +89,7 @@ class _PromptDialogAssistMixin:
                 self._context_input.toPlainText(),
             )
         except NameGenerationError as exc:
-            QMessageBox.warning(self, "Name generation failed", str(exc))
+            QMessageBox.warning(self._widget_parent(), "Name generation failed", str(exc))
             return
         if suggestion:
             self._name_input.setText(suggestion)
@@ -238,7 +238,7 @@ class _PromptDialogScenarioMixin(_PromptDialogAssistMixin):
                 context,
             )
         except ScenarioGenerationError as exc:
-            QMessageBox.warning(self, "Scenario generation failed", str(exc))
+            QMessageBox.warning(self._widget_parent(), "Scenario generation failed", str(exc))
             return
         if not scenarios:
             QMessageBox.information(
@@ -336,7 +336,7 @@ class _PromptDialogCategoryMixin(_PromptDialogAssistMixin):
                 or ""
             ).strip()
         except Exception as exc:  # noqa: BLE001 - surface generator failures to the user
-            QMessageBox.warning(self, "Category suggestion failed", str(exc))
+            QMessageBox.warning(self._widget_parent(), "Category suggestion failed", str(exc))
             return
         if suggestion:
             self._set_category_value(suggestion)
@@ -362,7 +362,7 @@ class _PromptDialogCategoryMixin(_PromptDialogAssistMixin):
                 or []
             )
         except Exception as exc:  # noqa: BLE001 - surface generator failures to the user
-            QMessageBox.warning(self, "Tag suggestion failed", str(exc))
+            QMessageBox.warning(self._widget_parent(), "Tag suggestion failed", str(exc))
             return
         tags = [tag.strip() for tag in suggestions if str(tag).strip()]
         if tags:
@@ -414,7 +414,7 @@ class _PromptDialogRefinementMixin(_PromptDialogAssistMixin):
     ) -> None:
         """Execute a refinement handler and surface the summary to the user."""
         if handler is None:
-            QMessageBox.information(self, unavailable_title, unavailable_message)
+            QMessageBox.information(self._widget_parent(), unavailable_title, unavailable_message)
             return
 
         prompt_text = self._context_input.toPlainText()
@@ -446,10 +446,10 @@ class _PromptDialogRefinementMixin(_PromptDialogAssistMixin):
                 tags=tags,
             )
         except PromptEngineeringError as exc:
-            QMessageBox.warning(self, "Prompt refinement failed", str(exc))
+            QMessageBox.warning(self._widget_parent(), "Prompt refinement failed", str(exc))
             return
         except PromptEngineeringUnavailable as exc:
-            QMessageBox.warning(self, "Prompt refinement unavailable", str(exc))
+            QMessageBox.warning(self._widget_parent(), "Prompt refinement unavailable", str(exc))
             return
         except Exception as exc:  # pragma: no cover - defensive
             QMessageBox.warning(

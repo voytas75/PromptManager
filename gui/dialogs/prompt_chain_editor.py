@@ -294,8 +294,8 @@ class PromptChainStepDialog(QDialog):
 
         self._prompt_combo = QComboBox(self)
         self._prompt_combo.setEditable(True)
-        self._prompt_combo.setInsertPolicy(QComboBox.NoInsert)
-        self._prompt_combo.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        self._prompt_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self._prompt_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         self._add_step_row(
             layout,
             "Prompt",

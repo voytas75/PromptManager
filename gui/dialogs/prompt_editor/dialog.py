@@ -123,7 +123,7 @@ class PromptDialog(
         main_layout = QVBoxLayout(self)
         form_layout = QFormLayout()
         form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-        form_layout.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
+        form_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
 
         self._name_input = QLineEdit(self)
         self._generate_name_button = QPushButton("Generate", self)
@@ -154,8 +154,8 @@ class PromptDialog(
 
         self._category_input = QComboBox(self)
         self._category_input.setEditable(True)
-        self._category_input.setInsertPolicy(QComboBox.NoInsert)
-        self._category_input.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        self._category_input.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self._category_input.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         self._category_input.setMinimumContentsLength(12)
         line_edit = self._category_input.lineEdit()
         if line_edit is not None:

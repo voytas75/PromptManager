@@ -37,8 +37,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from PySide6.QtCore import QByteArray, QSettings, Qt, QTimer
-from PySide6.QtGui import QPalette, QTextDocument  # type: ignore[attr-defined]
+from PySide6.QtGui import QPalette, QTextDocument
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QCheckBox,
     QDialog,
     QDialogButtonBox,
@@ -885,11 +886,8 @@ class PromptChainManagerPanel(QWidget):
 
     def _result_style_css(self) -> str:
         palette = self._result_view.palette()
-        color_role_enum = getattr(QPalette, "ColorRole", None)
-        base_role = getattr(color_role_enum, "Base", QPalette.Base)
-        text_role = getattr(color_role_enum, "Text", QPalette.Text)
-        base_color = palette.color(base_role)
-        text_color = palette.color(text_role)
+        base_color = palette.color(QPalette.ColorRole.Base)
+        text_color = palette.color(QPalette.ColorRole.Text)
         chosen = self._pick_accessible_text_color(base_color, text_color)
         return _RESULT_STYLE_TEMPLATE.replace("{text_color}", chosen)
 
