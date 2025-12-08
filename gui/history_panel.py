@@ -1,6 +1,7 @@
 """Execution history panel for Prompt Manager.
 
 Updates:
+  v0.3.2 - 2025-12-08 - Import QAbstractItemView for table selection controls.
   v0.3.1 - 2025-11-29 - Wrap header description to satisfy Ruff line length.
   v0.3.0 - 2025-11-12 - Display chat conversations alongside execution details.
   v0.2.0 - 2025-11-09 - Surface execution ratings in tables, details, and exports.
@@ -16,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QComboBox,
     QDialog,
     QFileDialog,
