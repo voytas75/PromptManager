@@ -1,6 +1,6 @@
 # PromptManager
 
-PromptManager is a desktop-first prompt operations hub that catalogues, searches, and executes AI prompts with a PySide6 GUI, SQLite persistence, optional Redis caching, and ChromaDB-backed semantic retrieval. It targets Python 3.12+ and ships with strict typing, automated testing, and reproducible configuration baked in.
+PromptManager is a desktop-first prompt operations hub that catalogues, searches, and executes AI prompts with a PySide6 GUI, SQLite persistence, optional Redis caching, and ChromaDB-backed semantic retrieval. It targets Python 3.13+ and ships with strict typing, automated testing, and reproducible configuration baked in.
 
 <p align="center">
   <img src="docs/images/main.png" alt="Prompt catalogue and workspace view" width="45%">
@@ -22,7 +22,7 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-- Python 3.12 or newer is required (3.13 when available).
+- Python 3.13 or newer is required (3.14 when available).
 - Dependencies are pinned in `requirements.txt`; no extras are needed for the base app.
 - The app can also be launched as a module after installation: `python -m main`.
 

@@ -12,7 +12,7 @@ PromptManager is a PySide6 desktop application for managing reusable AI prompts 
 
 ## Toolchain & Quality Gates
 
-- **Python**: 3.12+ (3.13 when stable) with `pyright` in strict mode; annotations are mandatory (no `type: ignore` in `core/`).
+- **Python**: 3.13+ (3.14 when stable) with `pyright` in strict mode; annotations are mandatory (no `type: ignore` in `core/`).
 - **Formatting/Linting**: `ruff --fix` plus `black --line-length 88`. Import ordering follows ruff/isort (builtin → stdlib → third-party → local).
 - **Testing**: `pytest -n auto --cov=core --cov-fail-under=90` with `pytest-asyncio`, `pytest-cov`, and `hypothesis` for parsing/generation code. Mock all external HTTP/DB calls (`respx`, `vcrpy`, `pytest-mock`).
 - **Automation**: `nox -s format lint typecheck test` runs the full CI-equivalent workflow. Add new sessions as needed but keep parity with AGENTS.md.
