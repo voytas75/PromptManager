@@ -1,4 +1,8 @@
-"""Tests for intent workspace usage logging utilities."""
+"""Tests for intent workspace usage logging utilities.
+
+Updates:
+  v0.1.1 - 2025-12-08 - Guard dynamic loader spec for Pyright strict mode.
+"""
 
 from __future__ import annotations
 
@@ -13,8 +17,9 @@ from core.intent_classifier import IntentLabel, IntentPrediction
 def _load_usage_logger():
     module_path = Path(__file__).resolve().parents[1] / "gui" / "usage_logger.py"
     spec = importlib.util.spec_from_file_location("usage_logger", module_path)
+    if spec is None or spec.loader is None:
+        raise AssertionError("Unable to load usage_logger module")
     module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(module)
     return module.IntentUsageLogger
 

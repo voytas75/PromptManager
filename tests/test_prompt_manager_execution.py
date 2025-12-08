@@ -1,9 +1,13 @@
-"""Tests for PromptManager prompt execution workflow."""
+"""Tests for PromptManager prompt execution workflow.
+
+Updates:
+  v0.1.1 - 2025-12-08 - Cast Chroma/embedding stubs and guard tracker usage.
+"""
 
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -20,6 +24,11 @@ from models.prompt_model import Prompt
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from chromadb.api import ClientAPI  # type: ignore[reportMissingTypeArgument]
+    from core.embedding import EmbeddingProvider
+else:  # pragma: no cover - runtime fallbacks when optional deps missing
+    ClientAPI = Any  # type: ignore[assignment]
+    EmbeddingProvider = Any  # type: ignore[assignment]
 
 
 class _StubEmbeddingProvider:
@@ -144,10 +153,10 @@ def _manager_with_dependencies(
         chroma_path=str(chroma_path),
         db_path=str(db_path),
         cache_ttl_seconds=60,
-        chroma_client=_StubChromaClient(),
+        chroma_client=cast(ClientAPI, _StubChromaClient()),
         embedding_function=None,
         repository=repository,
-        embedding_provider=_StubEmbeddingProvider(),
+        embedding_provider=cast(EmbeddingProvider, _StubEmbeddingProvider()),
         enable_background_sync=False,
         executor=executor,
         history_tracker=tracker,
@@ -192,6 +201,7 @@ def test_execute_prompt_logs_failure(tmp_path: Path) -> None:
     with pytest.raises(PromptExecutionError):
         manager.execute_prompt(prompt.id, "raise Exception")
 
+    assert tracker is not None
     history = tracker.list_for_prompt(prompt.id)
     assert history and history[0].status.value == "failed"
     assert history[0].metadata is not None

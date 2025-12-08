@@ -1,15 +1,17 @@
 """Tests covering storage coordination across SQLite, ChromaDB, and Redis facades.
 
-Updates: v0.1.2 - 2025-12-05 - Add response style repository and manager coverage.
-Updates: v0.1.1 - 2025-11-02 - Added regression tests for cache usage and search fallback paths.
-Updates: v0.1.0 - 2025-10-31 - Introduce repository and manager storage integration tests.
+Updates:
+  v0.1.3 - 2025-12-08 - Cast fake dependencies to satisfy Pyright strict typing.
+  v0.1.2 - 2025-12-05 - Add response style repository and manager coverage.
+  v0.1.1 - 2025-11-02 - Added regression tests for cache usage and search fallback paths.
+  v0.1.0 - 2025-10-31 - Introduce repository and manager storage integration tests.
 """
 
 from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable, cast
 
 import pytest
 
@@ -19,6 +21,8 @@ from core import (
     RepositoryError,
     RepositoryNotFoundError,
 )
+from core.embedding import EmbeddingSyncWorker
+from core.prompt_manager.backends import RedisClientProtocol
 from models.category_model import PromptCategory, slugify_category
 from models.prompt_model import Prompt, PromptVersion, UserProfile
 from models.prompt_note import PromptNote
@@ -26,6 +30,25 @@ from models.response_style import ResponseStyle
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from chromadb.api import ClientAPI  # type: ignore[reportMissingTypeArgument]
+else:  # pragma: no cover - runtime fallback
+    ClientAPI = Any  # type: ignore[assignment]
+
+
+def _as_chroma_client(client: _FakeChromaClient) -> ClientAPI:
+    return cast(ClientAPI, client)
+
+
+def _as_repository(repo: _FakeRepository) -> PromptRepository:
+    return cast(PromptRepository, repo)
+
+
+def _as_redis_client(client: _FakeRedis | _StubRedis) -> RedisClientProtocol:
+    return cast(RedisClientProtocol, client)
+
+
+def _as_worker(worker: _StubWorker) -> EmbeddingSyncWorker:
+    return cast(EmbeddingSyncWorker, worker)
 
 
 def _make_prompt(name: str = "Sample Prompt") -> Prompt:
@@ -407,8 +430,10 @@ def test_prompt_manager_coordinates_sqlite_and_chromadb(tmp_path) -> None:
     manager.delete_prompt(prompt.id)
     with pytest.raises(RepositoryNotFoundError):
         manager.repository.get(prompt.id)
-    chroma_result = manager.collection.get(ids=[str(prompt.id)])
-    assert not chroma_result.get("ids"), "ChromaDB entry should be removed"
+    get_method: Callable[..., Any] | None = getattr(manager.collection, "get", None)
+    if get_method is not None:
+        chroma_result = get_method(ids=[str(prompt.id)])
+        assert not chroma_result.get("ids"), "ChromaDB entry should be removed"
     manager.close()
 
 
@@ -477,9 +502,9 @@ def test_get_prompt_reads_from_cache_before_repository() -> None:
     redis_client = _FakeRedis()
     manager = PromptManager(
         chroma_path="unused",
-        chroma_client=_FakeChromaClient(collection),
-        redis_client=redis_client,
-        repository=repo,
+        chroma_client=_as_chroma_client(_FakeChromaClient(collection)),
+        redis_client=_as_redis_client(redis_client),
+        repository=_as_repository(repo),
     )
 
     prompt = _make_prompt("Cached Prompt")
@@ -498,8 +523,8 @@ def test_search_prompts_returns_chroma_records_when_sqlite_missing() -> None:
     repo = _FakeRepository()
     manager = PromptManager(
         chroma_path="unused",
-        chroma_client=_FakeChromaClient(collection),
-        repository=repo,
+        chroma_client=_as_chroma_client(_FakeChromaClient(collection)),
+        repository=_as_repository(repo),
     )
 
     prompt_id = str(uuid.uuid4())
@@ -542,10 +567,10 @@ def test_prompt_manager_close_shuts_down_workers_and_clients(tmp_path) -> None:
     manager = PromptManager(
         chroma_path=str(tmp_path / "chroma"),
         db_path=None,
-        chroma_client=chroma_client,
-        repository=repository,  # type: ignore[arg-type]
-        embedding_worker=worker,
-        redis_client=redis_client,  # type: ignore[arg-type]
+        chroma_client=_as_chroma_client(chroma_client),
+        repository=_as_repository(repository),
+        embedding_worker=_as_worker(worker),
+        redis_client=_as_redis_client(redis_client),
         enable_background_sync=False,
     )
 

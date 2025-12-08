@@ -1,21 +1,29 @@
 """Tests for PromptManager prompt refinement workflow.
 
-Updates: v0.1.1 - 2025-11-22 - Cover structure-only refinement calls.
-Updates: v0.1.0 - 2025-11-18 - Initial tests for prompt refinement workflow.
+Updates:
+  v0.1.2 - 2025-12-08 - Cast Chroma, embedding, and engineer stubs for Pyright.
+  v0.1.1 - 2025-11-22 - Cover structure-only refinement calls.
+  v0.1.0 - 2025-11-18 - Initial tests for prompt refinement workflow.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
 from core import PromptEngineeringUnavailable, PromptManager
-from core.prompt_engineering import PromptRefinement
+from core.prompt_engineering import PromptEngineer, PromptRefinement
 from core.repository import PromptRepository
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from chromadb.api import ClientAPI  # type: ignore[reportMissingTypeArgument]
+    from core.embedding import EmbeddingProvider
+else:  # pragma: no cover - runtime fallbacks when optional deps missing
+    Path = Any  # type: ignore[assignment]
+    ClientAPI = Any  # type: ignore[assignment]
+    EmbeddingProvider = Any  # type: ignore[assignment]
 
 
 class _StubEmbeddingProvider:
@@ -137,13 +145,13 @@ def _build_manager(
         chroma_path=str(chroma_path),
         db_path=str(db_path),
         cache_ttl_seconds=60,
-        chroma_client=_StubChromaClient(),
+        chroma_client=cast(ClientAPI, _StubChromaClient()),
         embedding_function=None,
         repository=repository,
-        embedding_provider=_StubEmbeddingProvider(),
+        embedding_provider=cast(EmbeddingProvider, _StubEmbeddingProvider()),
         enable_background_sync=False,
-        prompt_engineer=engineer,
-        structure_prompt_engineer=structure_engineer,
+        prompt_engineer=cast(PromptEngineer | None, engineer),
+        structure_prompt_engineer=cast(PromptEngineer | None, structure_engineer),
     )
 
 

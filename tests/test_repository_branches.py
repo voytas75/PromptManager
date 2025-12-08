@@ -69,7 +69,8 @@ def _make_prompt_note(text: str = "Remember to review logs") -> PromptNote:
 def test_json_helpers_cover_edge_cases() -> None:
     """Validate JSON helper fallbacks for malformed or null data."""
     assert _json_dumps(None) is None
-    assert _json_dumps(["a"]).startswith("[")
+    dumped = _json_dumps(["a"])
+    assert dumped is not None and dumped.startswith("[")
 
     assert _json_loads_list(None) == []
     assert _json_loads_list("null") == []
@@ -141,7 +142,8 @@ def test_repository_execution_roundtrip(tmp_path: Path) -> None:
 
     loaded = repo.get_execution(execution.id)
     assert loaded.response_text == execution.response_text
-    assert loaded.request_text.startswith("print")
+    assert loaded.request_text is not None and loaded.request_text.startswith("print")
+    assert loaded.metadata is not None
     assert loaded.metadata["usage"]["prompt_tokens"] == 10
     assert loaded.rating == pytest.approx(6.0)
 
@@ -554,10 +556,10 @@ def test_parse_optional_datetime_variants() -> None:
     """Support multiple datetime input shapes in helper parser."""
     naive = datetime(2024, 1, 1, 12, 0, 0)
     parsed_naive = _parse_optional_datetime(naive)
-    assert parsed_naive.tzinfo is not None
+    assert parsed_naive is not None and parsed_naive.tzinfo is not None
     iso_text = "2024-01-02T03:04:05"
     parsed_text = _parse_optional_datetime(iso_text)
-    assert parsed_text.tzinfo is not None
+    assert parsed_text is not None and parsed_text.tzinfo is not None
     assert _parse_optional_datetime("") is None
     assert _parse_optional_datetime("not-a-date") is None
 

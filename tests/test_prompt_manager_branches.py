@@ -1,7 +1,9 @@
 """Branch coverage tests for PromptManager edge cases.
 
-Updates: v0.1.1 - 2025-11-22 - Seed version history for legacy prompts without snapshots.
-Updates: v0.1.0 - 2025-10-30 - Add unit tests for error handling and caching paths.
+Updates:
+  v0.1.2 - 2025-12-08 - Import ChromaError and reuse the concrete stub for Pyright.
+  v0.1.1 - 2025-11-22 - Seed version history for legacy prompts without snapshots.
+  v0.1.0 - 2025-10-30 - Add unit tests for error handling and caching paths.
 """
 
 from __future__ import annotations
@@ -11,7 +13,7 @@ import types
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -19,6 +21,7 @@ from core.embedding import EmbeddingGenerationError
 from core.intent_classifier import IntentClassifier
 from core.name_generation import CategorySuggestionError, DescriptionGenerationError
 from core.prompt_manager import (
+    ChromaError,
     NameGenerationError,
     PromptCacheError,
     PromptManager,
@@ -28,12 +31,17 @@ from core.prompt_manager import (
     RepositoryError,
     RepositoryNotFoundError,
 )
+from core.prompt_manager.backends import RedisClientProtocol
+from core.repository import PromptRepository
 from models.category_model import PromptCategory, slugify_category
 from models.prompt_model import Prompt, PromptForkLink, PromptVersion, UserProfile
 
 if TYPE_CHECKING:
     import builtins
     from collections.abc import Sequence
+    from chromadb.api import ClientAPI  # type: ignore[reportMissingTypeArgument]
+else:  # pragma: no cover - runtime fallback when chromadb isn't available
+    ClientAPI = Any  # type: ignore[assignment]
 
 
 def _clone_prompt(prompt: Prompt) -> Prompt:
@@ -92,6 +100,34 @@ class _StubChromaClient:
     def get_or_create_collection(self, **_: Any) -> _StubCollection:
         self.get_or_create_calls += 1
         return self.collection
+
+
+def _as_chroma_client(client: _StubChromaClient) -> ClientAPI:
+    return cast(ClientAPI, client)
+
+
+class _TestChromaError(ChromaError):
+    """Concrete ChromaError for branch tests."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+
+    def name(self) -> str:  # type: ignore[override]
+        return "test"
+
+
+def _as_repository(repo: object) -> PromptRepository:
+    return cast(PromptRepository, repo)
+
+
+def _as_redis_client(client: object | None) -> RedisClientProtocol | None:
+    if client is None:
+        return None
+    return cast(RedisClientProtocol, client)
+
+
+def _pm(manager: PromptManager) -> Any:
+    return cast(Any, manager)
 
 
 class _RecordingRepository:
@@ -338,12 +374,14 @@ def _build_manager(
     repo = repository or _RecordingRepository()
     coll = collection or _StubCollection()
     client = _StubChromaClient(coll)
+    chroma_client = _as_chroma_client(client)
+    redis = _as_redis_client(redis_client)
     return PromptManager(
         chroma_path="/tmp/chroma",
         db_path="/tmp/db.sqlite",
-        repository=repo,
-        chroma_client=client,
-        redis_client=redis_client,
+        repository=_as_repository(repo),
+        chroma_client=chroma_client,
+        redis_client=redis,
         intent_classifier=IntentClassifier(),
         name_generator=name_generator,
         description_generator=description_generator,
@@ -365,11 +403,12 @@ def test_prompt_manager_wraps_repository_initialisation_errors(
 
     fake_collection = _StubCollection()
     monkeypatch.setattr("core.prompt_manager.PromptRepository", _ExplodingRepo)
+    chroma_client = _as_chroma_client(_StubChromaClient(fake_collection))
     with pytest.raises(PromptStorageError):
         PromptManager(
             chroma_path="/tmp/chroma",
             db_path="/tmp/db.sqlite",
-            chroma_client=_StubChromaClient(fake_collection),
+            chroma_client=chroma_client,
         )
 
 
@@ -469,7 +508,7 @@ def test_prompt_manager_falls_back_to_persistent_client(monkeypatch: pytest.Monk
     manager = PromptManager(
         chroma_path="/tmp/chroma",
         db_path="/tmp/db.sqlite",
-        repository=repository,
+        repository=_as_repository(repository),
     )
 
     assert persistent_client.calls == 1
@@ -477,20 +516,18 @@ def test_prompt_manager_falls_back_to_persistent_client(monkeypatch: pytest.Monk
 
 
 def test_create_prompt_rolls_back_when_chroma_add_fails() -> None:
-    from core.prompt_manager import ChromaError
-
     class _RepoWithDeleteError(_RecordingRepository):
         def delete(self, prompt_id: uuid.UUID) -> None:  # type: ignore[override]
             super().delete(prompt_id)
             raise RepositoryError("cleanup failed")
 
     repository = _RepoWithDeleteError()
-    collection = _StubCollection(upsert_exception=ChromaError("nope"))
-    chroma_client = _StubChromaClient(collection)
+    collection = _StubCollection(upsert_exception=_TestChromaError("nope"))
+    chroma_client = _as_chroma_client(_StubChromaClient(collection))
     manager = PromptManager(
         chroma_path="/tmp/chroma",
         db_path="/tmp/db.sqlite",
-        repository=repository,
+        repository=_as_repository(repository),
         chroma_client=chroma_client,
     )
 
@@ -504,7 +541,7 @@ def test_create_prompt_rolls_back_when_chroma_add_fails() -> None:
 def test_get_prompt_returns_cached_value() -> None:
     repository = _RecordingRepository()
     collection = _StubCollection()
-    chroma_client = _StubChromaClient(collection)
+    chroma_client = _as_chroma_client(_StubChromaClient(collection))
     prompt = _sample_prompt()
     payload = prompt.to_record()
     redis_client = _RedisStub(payload=json.dumps(payload))
@@ -512,9 +549,9 @@ def test_get_prompt_returns_cached_value() -> None:
     manager = PromptManager(
         chroma_path="/tmp/chroma",
         db_path="/tmp/db.sqlite",
-        repository=repository,
+        repository=_as_repository(repository),
         chroma_client=chroma_client,
-        redis_client=redis_client,
+        redis_client=_as_redis_client(redis_client),
     )
 
     result = manager.get_prompt(prompt.id)
@@ -525,15 +562,15 @@ def test_get_prompt_returns_cached_value() -> None:
 def test_get_cached_prompt_invalid_json_raises() -> None:
     repository = _RecordingRepository()
     collection = _StubCollection()
-    chroma_client = _StubChromaClient(collection)
+    chroma_client = _as_chroma_client(_StubChromaClient(collection))
     redis_client = _RedisStub(payload="not-json")
 
     manager = PromptManager(
         chroma_path="/tmp/chroma",
         db_path="/tmp/db.sqlite",
-        repository=repository,
+        repository=_as_repository(repository),
         chroma_client=chroma_client,
-        redis_client=redis_client,
+        redis_client=_as_redis_client(redis_client),
     )
 
     with pytest.raises(PromptCacheError):
@@ -545,7 +582,7 @@ def test_delete_prompt_logs_when_cache_evict_fails() -> None:
 
     repository = _RecordingRepository()
     collection = _StubCollection()
-    chroma_client = _StubChromaClient(collection)
+    chroma_client = _as_chroma_client(_StubChromaClient(collection))
     prompt = _sample_prompt()
     repository.add(prompt)
     failing_redis = _RedisStub(delete_exception=RedisError("boom"))
@@ -553,9 +590,9 @@ def test_delete_prompt_logs_when_cache_evict_fails() -> None:
     manager = PromptManager(
         chroma_path="/tmp/chroma",
         db_path="/tmp/db.sqlite",
-        repository=repository,
+        repository=_as_repository(repository),
         chroma_client=chroma_client,
-        redis_client=failing_redis,
+        redis_client=_as_redis_client(failing_redis),
     )
 
     manager.delete_prompt(prompt.id)
@@ -565,11 +602,11 @@ def test_delete_prompt_logs_when_cache_evict_fails() -> None:
 def test_search_prompts_handles_invalid_and_missing_entries() -> None:
     repository = _RecordingRepository()
     collection = _StubCollection()
-    chroma_client = _StubChromaClient(collection)
+    chroma_client = _as_chroma_client(_StubChromaClient(collection))
     manager = PromptManager(
         chroma_path="/tmp/chroma",
         db_path="/tmp/db.sqlite",
-        repository=repository,
+        repository=_as_repository(repository),
         chroma_client=chroma_client,
     )
 
@@ -599,11 +636,11 @@ def test_search_prompts_raises_when_repository_errors() -> None:
             "metadatas": [[{"name": "n", "description": "d", "category": "c"}]],
         }
     )
-    chroma_client = _StubChromaClient(collection)
+    chroma_client = _as_chroma_client(_StubChromaClient(collection))
     manager = PromptManager(
         chroma_path="/tmp/chroma",
         db_path="/tmp/db.sqlite",
-        repository=repository,
+        repository=_as_repository(repository),
         chroma_client=chroma_client,
     )
 
@@ -617,8 +654,8 @@ def test_search_prompts_requires_query_or_embedding() -> None:
     manager = PromptManager(
         chroma_path="/tmp/chroma",
         db_path="/tmp/db.sqlite",
-        repository=repository,
-        chroma_client=_StubChromaClient(collection),
+        repository=_as_repository(repository),
+        chroma_client=_as_chroma_client(_StubChromaClient(collection)),
     )
 
     with pytest.raises(ValueError):
@@ -626,19 +663,17 @@ def test_search_prompts_requires_query_or_embedding() -> None:
 
 
 def test_prompt_manager_collection_initialisation_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    from core.prompt_manager import ChromaError
-
     class _ExplodingClient:
         def get_or_create_collection(self, **_: Any) -> None:
-            raise ChromaError("boom")
+            raise _TestChromaError("boom")
 
     repository = _RecordingRepository()
     with pytest.raises(PromptStorageError):
         PromptManager(
             chroma_path="/tmp/chroma",
             db_path="/tmp/db.sqlite",
-            repository=repository,
-            chroma_client=_ExplodingClient(),
+            repository=_as_repository(repository),
+            chroma_client=cast(ClientAPI, _ExplodingClient()),
         )
 
 
@@ -802,12 +837,10 @@ def test_update_prompt_handles_repository_errors() -> None:
 
 
 def test_update_prompt_handles_chroma_and_cache_failures() -> None:
-    from core.prompt_manager import ChromaError
-
     prompt = _sample_prompt()
     repo = _RecordingRepository()
     repo.storage[prompt.id] = _clone_prompt(prompt)
-    collection = _StubCollection(upsert_exception=ChromaError("upsert"))
+    collection = _StubCollection(upsert_exception=_TestChromaError("upsert"))
     manager = _build_manager(repository=repo, collection=collection)
     with pytest.raises(PromptStorageError):
         manager.update_prompt(prompt)
@@ -982,21 +1015,17 @@ def test_delete_prompt_handles_repository_and_chroma_errors() -> None:
     with pytest.raises(PromptStorageError):
         manager_err.delete_prompt(uuid.uuid4())
 
-    from core.prompt_manager import ChromaError
-
     repo = _RecordingRepository()
     prompt = _sample_prompt()
     repo.add(prompt)
-    collection = _StubCollection(delete_exception=ChromaError("delete"))
+    collection = _StubCollection(delete_exception=_TestChromaError("delete"))
     manager_chroma = _build_manager(repository=repo, collection=collection)
     with pytest.raises(PromptStorageError):
         manager_chroma.delete_prompt(prompt.id)
 
 
 def test_search_prompts_raises_when_query_fails() -> None:
-    from core.prompt_manager import ChromaError
-
-    collection = _StubCollection(query_exception=ChromaError("query"))
+    collection = _StubCollection(query_exception=_TestChromaError("query"))
     manager = _build_manager(collection=collection)
     with pytest.raises(PromptStorageError):
         manager.search_prompts(query_text="hello")

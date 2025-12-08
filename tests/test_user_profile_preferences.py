@@ -8,11 +8,16 @@ Updates:
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from core.prompt_manager import PromptManager
 from core.repository import PromptRepository
 from models.prompt_model import Prompt, UserProfile
+
+if TYPE_CHECKING:
+    from chromadb.api import ClientAPI  # type: ignore[reportMissingTypeArgument]
+else:  # pragma: no cover - runtime fallback
+    ClientAPI = Any  # type: ignore[assignment]
 
 
 class _NoopCollection:
@@ -57,6 +62,10 @@ class _StubChromaClient:
         return self._collection
 
 
+def _as_chroma_client(client: _StubChromaClient) -> ClientAPI:
+    return cast(ClientAPI, client)
+
+
 def _make_prompt(name: str, category: str, tags: list[str]) -> Prompt:
     return Prompt(
         id=uuid.uuid4(),
@@ -98,7 +107,7 @@ def test_personalisation_biases_prompt_order(tmp_path) -> None:
     repo = PromptRepository(str(tmp_path / "prefs.db"))
     manager = PromptManager(
         chroma_path=str(tmp_path / "chroma"),
-        chroma_client=_StubChromaClient(_NoopCollection()),
+        chroma_client=_as_chroma_client(_StubChromaClient(_NoopCollection())),
         repository=repo,
         enable_background_sync=False,
     )
@@ -113,6 +122,7 @@ def test_personalisation_biases_prompt_order(tmp_path) -> None:
 
     reordered = manager._personalize_ranked_prompts([secondary_prompt, favourite_prompt])
     assert reordered[0].id == favourite_prompt.id
+    assert manager.user_profile is not None
     assert "Debug" in manager.user_profile.favorite_categories()
 
     manager.close()

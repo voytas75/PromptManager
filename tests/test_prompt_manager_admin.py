@@ -15,8 +15,8 @@ from chromadb.errors import ChromaError
 from core.embedding import EmbeddingGenerationError
 from core.exceptions import CategoryError, CategoryNotFoundError, CategoryStorageError
 from core.execution import CodexExecutionResult, ExecutionError
-from core.history_tracker import HistoryTrackerError
-from core.intent_classifier import IntentLabel, IntentPrediction
+from core.history_tracker import HistoryTracker, HistoryTrackerError
+from core.intent_classifier import IntentClassifier, IntentLabel, IntentPrediction
 from core.prompt_engineering import PromptEngineeringError, PromptRefinement
 from core.prompt_manager import (
     CategorySuggestionError,
@@ -40,6 +40,9 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
     import builtins
     from collections.abc import Mapping, Sequence
     from pathlib import Path
+    from chromadb.api import ClientAPI  # type: ignore[reportMissingTypeArgument]
+else:  # pragma: no cover - runtime fallback when chromadb isn't available
+    ClientAPI = Any  # type: ignore[assignment]
 
 
 def _clone_prompt(prompt: Prompt) -> Prompt:
@@ -201,12 +204,30 @@ class _DummyChromaClient:
         self.persist_calls += 1
 
 
-def _as_chroma_client(client: _DummyChromaClient) -> "ClientAPI":
-    return cast("ClientAPI", client)
+def _as_chroma_client(client: _DummyChromaClient) -> ClientAPI:
+    return cast(ClientAPI, client)
+
+
+class _TestChromaError(ChromaError):
+    """Concrete ChromaError implementation for tests."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+
+    def name(self) -> str:  # type: ignore[override]
+        return "test"
 
 
 def _pm(manager: PromptManager) -> Any:
     return cast(Any, manager)
+
+
+def _as_history_tracker(tracker: object) -> HistoryTracker:
+    return cast(HistoryTracker, tracker)
+
+
+def _as_intent_classifier(classifier: object) -> IntentClassifier:
+    return cast(IntentClassifier, classifier)
 
 
 class _HistoryTrackerStub:
@@ -332,6 +353,7 @@ def prompt_manager(
     client = _DummyChromaClient(collection)
     chroma_client = _as_chroma_client(client)
     chroma_client = _as_chroma_client(client)
+    chroma_client = _as_chroma_client(client)
     manager = PromptManager(
         chroma_path=str(chroma_dir),
         db_path=str(db_path),
@@ -416,20 +438,23 @@ def test_set_name_generator_configures_workflows(
     assert scenario_factory.instances[0].kwargs["model"] == "inference-model"
     assert engineer_factory.instances and len(engineer_factory.instances) == 2
     assert executor_factory.instances[0].kwargs["reasoning_effort"] == "medium"
-    assert manager._executor is executor_factory.instances[0]
-    assert manager._executor.drop_params == ["api_key"]
-    assert manager._executor.stream is True
-    manager._name_generator = object()
-    manager._litellm_drop_params = ("api_key",)
-    manager._litellm_reasoning_effort = "high"
-    manager._litellm_stream = True
+    executor_instance = manager._executor
+    assert executor_instance is executor_factory.instances[0]
+    assert executor_instance is not None
+    assert executor_instance.drop_params == ["api_key"]
+    assert executor_instance.stream is True
+    pm = _pm(manager)
+    pm._name_generator = object()
+    pm._litellm_drop_params = ("api_key",)
+    pm._litellm_reasoning_effort = "high"
+    pm._litellm_stream = True
 
     manager.set_name_generator(None, None, None, None)
 
-    assert manager._name_generator is None
-    assert manager._litellm_drop_params is None
-    assert manager._litellm_reasoning_effort is None
-    assert manager._litellm_stream is False
+    assert pm._name_generator is None
+    assert pm._litellm_drop_params is None
+    assert pm._litellm_reasoning_effort is None
+    assert pm._litellm_stream is False
 
 
 def test_get_redis_details_reports_stats(
@@ -455,7 +480,8 @@ def test_get_redis_details_reports_stats(
             "ssl": True,
         },
     )
-    manager._redis_client = redis_client
+    pm = _pm(manager)
+    pm._redis_client = redis_client
 
     details = manager.get_redis_details()
 
@@ -469,7 +495,8 @@ def test_get_redis_details_disabled_when_client_missing(
     prompt_manager: tuple[PromptManager, _DummyCollection, _DummyChromaClient, Path],
 ) -> None:
     manager, _, _, _ = prompt_manager
-    manager._redis_client = None  # type: ignore[assignment]
+    pm = _pm(manager)
+    pm._redis_client = None
     assert manager.get_redis_details() == {"enabled": False}
 
 
@@ -488,10 +515,11 @@ def test_get_redis_details_handles_redis_errors(
         raise RedisError("dbsize")
 
     failing_dbsize.dbsize = _fail_dbsize  # type: ignore[assignment]
-    manager._redis_client = failing_dbsize  # type: ignore[assignment]
+    pm = _pm(manager)
+    pm._redis_client = failing_dbsize
     details = manager.get_redis_details()
     assert "stats" not in details
-    manager._redis_client = redis_client  # type: ignore[assignment]
+    pm._redis_client = redis_client
     details = manager.get_redis_details()
     assert "info_error" in details["stats"]
 
@@ -505,7 +533,8 @@ def test_get_redis_details_handles_errors(
         info_error=RedisError("info failure"),
         dbsize_value=4,
     )
-    manager._redis_client = redis_client
+    pm = _pm(manager)
+    pm._redis_client = redis_client
 
     details = manager.get_redis_details()
     assert details["status"] == "error"
@@ -530,7 +559,7 @@ def test_get_chroma_details_handles_collection_error(
     prompt_manager: tuple[PromptManager, _DummyCollection, _DummyChromaClient, Path],
 ) -> None:
     manager, collection, _, _ = prompt_manager
-    collection.count_exception = ChromaError("count failed")
+    collection.count_exception = _TestChromaError("count failed")
 
     details = manager.get_chroma_details()
     assert details["status"] == "error"
@@ -676,7 +705,7 @@ def test_verify_vector_store_handles_chroma_errors(
     manager, _, _, chroma_dir = prompt_manager
     _ensure_chroma_database(chroma_dir)
     failing_collection = _DummyCollection()
-    failing_collection.count_exception = ChromaError("count fail")
+    failing_collection.count_exception = _TestChromaError("count fail")
     manager._collection = failing_collection  # type: ignore[assignment]
     with pytest.raises(PromptStorageError):
         manager.verify_vector_store()
@@ -700,10 +729,12 @@ def test_optimize_vector_store_handles_optimize_errors(
         def __exit__(self, exc_type, exc, tb) -> None:  # noqa: ANN001
             self._conn.close()
 
-        def execute(self, sql: str, *params: object) -> sqlite3.Cursor:
+        def execute(self, sql: str, parameters: object | None = None) -> sqlite3.Cursor:
             if "PRAGMA optimize" in sql:
                 raise sqlite3.OperationalError("optimize unsupported")
-            return self._conn.execute(sql, *params)
+            if parameters is None:
+                return self._conn.execute(sql)
+            return self._conn.execute(sql, cast(Any, parameters))
 
     def fake_connect(path: str, timeout: float = 60.0) -> _ConnectionWrapper:
         return _ConnectionWrapper(path, timeout)
@@ -771,7 +802,7 @@ def test_query_executions_handles_filters(
 ) -> None:
     manager, _, _, _ = prompt_manager
     tracker = _HistoryTrackerStub()
-    manager.set_history_tracker(tracker)
+    manager.set_history_tracker(_as_history_tracker(tracker))
 
     first = manager.query_executions(status="unknown", search="logs", limit=5)
     manager.query_executions(status=ExecutionStatus.SUCCESS)
@@ -802,7 +833,7 @@ def test_fallback_category_uses_classifier_hints(
         def classify(self, _: str) -> IntentPrediction:
             return prediction
 
-    manager.set_intent_classifier(_Classifier())
+    manager.set_intent_classifier(_as_intent_classifier(_Classifier()))
     assert (
         manager._fallback_category_from_context(
             "Investigate bug",
@@ -902,14 +933,16 @@ def test_generate_prompt_name_and_scenarios(
             self.calls.append((context, max_scenarios))
             return ["Scenario A"]
 
-    manager._name_generator = _NameGenerator()
-    manager._scenario_generator = _ScenarioGenerator()
+    pm = _pm(manager)
+    pm._name_generator = _NameGenerator()
+    pm._scenario_generator = _ScenarioGenerator()
 
     assert manager.generate_prompt_name("Discuss optimisations") == "Optimised prompt"
     assert manager.generate_prompt_scenarios("Discuss optimisations", max_scenarios=4) == [
         "Scenario A"
     ]
-    assert manager._scenario_generator.calls[0][1] == 4
+    scenario_generator = pm._scenario_generator
+    assert scenario_generator.calls[0][1] == 4
 
 
 def test_refresh_prompt_scenarios_updates_prompt(
@@ -928,7 +961,8 @@ def test_refresh_prompt_scenarios_updates_prompt(
             base = self.calls * 10
             return [f"Scenario {base + index}" for index in range(1, max_scenarios + 1)]
 
-    manager._scenario_generator = _ScenarioGenerator()
+    pm = _pm(manager)
+    pm._scenario_generator = _ScenarioGenerator()
 
     updated = manager.refresh_prompt_scenarios(prompt.id, max_scenarios=2)
     assert updated.scenarios == ["Scenario 11", "Scenario 12"]
@@ -1057,7 +1091,7 @@ def test_suggest_prompts_handles_empty_and_fallbacks(
                 tag_hints=["docs"],
             )
 
-    manager.set_intent_classifier(_Classifier())
+    manager.set_intent_classifier(_as_intent_classifier(_Classifier()))
     call_counter = {"count": 0}
 
     def fake_search(self: PromptManager, query_text: str, limit: int = 5) -> list[Prompt]:
@@ -1118,7 +1152,8 @@ def test_log_execution_success_and_failure_paths(
             )
 
     tracker = _Tracker()
-    manager._history_tracker = tracker  # type: ignore[assignment]
+    pm = _pm(manager)
+    pm._history_tracker = tracker
     result = CodexExecutionResult(
         prompt_id=prompt.id,
         request_text="hello",
@@ -1178,6 +1213,7 @@ def test_manager_initialises_litellm_defaults_from_helpers(tmp_path: Path) -> No
     repository = PromptRepository(str(db_path))
     collection = _DummyCollection()
     client = _DummyChromaClient(collection)
+    chroma_client = _as_chroma_client(client)
     generator = _GeneratorStub(stream=True, drop_params=("api_key",))
     executor = _ExecutorStub()
 
@@ -1187,10 +1223,10 @@ def test_manager_initialises_litellm_defaults_from_helpers(tmp_path: Path) -> No
         chroma_client=chroma_client,
         repository=repository,
         enable_background_sync=False,
-        name_generator=generator,
-        scenario_generator=generator,
-        prompt_engineer=generator,
-        executor=executor,  # type: ignore[arg-type]
+        name_generator=cast(Any, generator),
+        scenario_generator=cast(Any, generator),
+        prompt_engineer=cast(Any, generator),
+        executor=cast(Any, executor),
         workflow_models={
             "prompt_execution": "inference",
             "unknown": "fast",
@@ -1200,7 +1236,9 @@ def test_manager_initialises_litellm_defaults_from_helpers(tmp_path: Path) -> No
     assert manager._litellm_fast_model == "generator-fast"
     assert manager._litellm_workflow_models == {"prompt_execution": "inference"}
     assert manager._litellm_drop_params == ("api_key",)
-    assert manager._executor.drop_params == ["api_key"]
+    executor_instance = manager._executor
+    assert executor_instance is not None
+    assert executor_instance.drop_params == ["api_key"]
     assert manager._litellm_stream is True
 
 
@@ -1229,7 +1267,8 @@ def test_generate_prompt_name_and_description_error_paths(
         def generate(self, _: str) -> str:
             raise RuntimeError("fail")
 
-    manager._name_generator = _FailingGenerator()
+    pm = _pm(manager)
+    pm._name_generator = _FailingGenerator()
     with pytest.raises(NameGenerationError):
         manager.generate_prompt_name("Explain telemetry")
 
@@ -1239,7 +1278,8 @@ def test_generate_prompt_name_and_description_error_paths(
     summary = manager.generate_prompt_description("Describe behaviour", prompt=_make_prompt())
     assert "Overview" in summary
 
-    manager._description_generator = _FailingGenerator()
+    pm = _pm(manager)
+    pm._description_generator = _FailingGenerator()
     with pytest.raises(DescriptionGenerationError):
         manager.generate_prompt_description("Explain behaviour", allow_fallback=False)
 
@@ -1253,7 +1293,8 @@ def test_generate_prompt_scenarios_handles_generator_failures(
         def generate(self, *_: Any, **__: Any) -> list[str]:
             raise RuntimeError("fail")
 
-    manager._scenario_generator = _FailingScenarioGenerator()
+    pm = _pm(manager)
+    pm._scenario_generator = _FailingScenarioGenerator()
     with pytest.raises(ScenarioGenerationError):
         manager.generate_prompt_scenarios("Outline plan")
 
@@ -1353,8 +1394,9 @@ def test_execute_prompt_validation(
     manager, _, _, _ = prompt_manager
     prompt = _make_prompt("Execute prompt")
     repo = _InMemoryRepository([prompt])
-    manager._repository = repo  # type: ignore[assignment]
-    manager._executor = None  # type: ignore[assignment]
+    pm = _pm(manager)
+    pm._repository = repo
+    pm._executor = None
     with pytest.raises(PromptExecutionError):
         manager.execute_prompt(prompt.id, "   ")
     with pytest.raises(PromptExecutionUnavailable):
@@ -1367,7 +1409,8 @@ def test_execute_prompt_success_and_failure_logging(
     manager, _, _, _ = prompt_manager
     prompt = _make_prompt("Executable")
     repo = _InMemoryRepository([prompt])
-    manager._repository = repo  # type: ignore[assignment]
+    pm = _pm(manager)
+    pm._repository = repo
 
     class _Executor:
         def __init__(self) -> None:
@@ -1388,11 +1431,11 @@ def test_execute_prompt_success_and_failure_logging(
             )
 
     executor = _Executor()
-    manager._executor = executor  # type: ignore[assignment]
-    manager._history_tracker = None  # type: ignore[assignment]
-    manager._log_execution_success = lambda *args, **kwargs: None  # type: ignore[assignment]
-    manager._log_execution_failure = lambda *args, **kwargs: None  # type: ignore[assignment]
-    manager.increment_usage = lambda *_: None  # type: ignore[assignment]
+    pm._executor = executor
+    pm._history_tracker = None
+    pm._log_execution_success = lambda *args, **kwargs: None
+    pm._log_execution_failure = lambda *args, **kwargs: None
+    pm.increment_usage = lambda *_: None
     outcome = manager.execute_prompt(
         prompt.id,
         "Run task",
@@ -1468,7 +1511,8 @@ def test_run_category_generator_and_fallbacks(
         def generate(self, *_: Any, **__: Any) -> str:
             raise CategorySuggestionError("fail")
 
-    manager._category_generator = _FailingCategoryGenerator()
+    pm = _pm(manager)
+    pm._category_generator = _FailingCategoryGenerator()
     assert manager._run_category_generator("ctx", categories) == ""
 
     class _Classifier:
@@ -1480,7 +1524,7 @@ def test_run_category_generator_and_fallbacks(
                 tag_hints=[],
             )
 
-    manager.set_intent_classifier(_Classifier())
+    manager.set_intent_classifier(_as_intent_classifier(_Classifier()))
     assert manager._fallback_category_from_context("Docs", categories) == "Documentation"
 
     manager.set_intent_classifier(None)
@@ -1664,10 +1708,11 @@ def test_manager_close_releases_resources(
     worker = _Worker()
     redis_client = _RedisClient()
     chroma_client = _Chroma()
-    manager._embedding_worker = worker  # type: ignore[assignment]
-    manager._redis_client = redis_client  # type: ignore[assignment]
-    manager._chroma_client = chroma_client  # type: ignore[assignment]
-    manager._closed = False
+    pm = _pm(manager)
+    pm._embedding_worker = worker
+    pm._redis_client = redis_client
+    pm._chroma_client = chroma_client
+    pm._closed = False
 
     manager.close()
     assert worker.stopped
@@ -1702,10 +1747,11 @@ def test_manager_close_handles_component_exceptions(
         def close(self) -> None:
             raise RuntimeError("close failed")
 
-    manager._closed = False
-    manager._embedding_worker = _Worker()  # type: ignore[assignment]
-    manager._redis_client = _RedisClient()  # type: ignore[assignment]
-    manager._chroma_client = _Chroma()  # type: ignore[assignment]
+    pm = _pm(manager)
+    pm._closed = False
+    pm._embedding_worker = _Worker()
+    pm._redis_client = _RedisClient()
+    pm._chroma_client = _Chroma()
     manager.close()
 
 

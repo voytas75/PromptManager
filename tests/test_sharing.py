@@ -101,12 +101,15 @@ def test_privatebin_provider_uploads_payload(monkeypatch: MonkeyPatch) -> None:
     assert result.delete_url == "https://bin.example/secure/?pasteid=abc123&deletetoken=del-token"
     assert result.payload_chars == len("Payload body")
 
-    payload = json.loads(captured["body"].decode("utf-8"))
+    body = captured["body"]
+    assert isinstance(body, bytes)
+    payload = json.loads(body.decode("utf-8"))
     assert payload["meta"]["expire"] == "10min"
     assert payload["adata"][1] == "plaintext"
     assert payload["adata"][2] == 1
     assert payload["adata"][3] == 1
     headers = captured["headers"]
+    assert isinstance(headers, dict)
     assert headers["X-Requested-With"] == "JSONHttpRequest"
 
 
@@ -175,8 +178,10 @@ def test_rentry_provider_creates_entry(monkeypatch: MonkeyPatch) -> None:
     assert result.management_note is not None
     assert "edit-secret" in result.management_note
     assert captured["post_url"] == "https://rentry.co/api/new"
-    assert captured["post_data"]["csrfmiddlewaretoken"] == "token-123"
-    assert captured["post_data"]["metadata"] == "OPTION_DISABLE_VIEWS = true"
+    post_data = captured["post_data"]
+    assert isinstance(post_data, dict)
+    assert post_data["csrfmiddlewaretoken"] == "token-123"
+    assert post_data["metadata"] == "OPTION_DISABLE_VIEWS = true"
 
 
 def test_rentry_provider_requires_csrf(monkeypatch: MonkeyPatch) -> None:

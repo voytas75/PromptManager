@@ -1,6 +1,7 @@
 """Tests covering :mod:`gui.prompt_editor_flow` helpers.
 
 Updates:
+  v0.1.1 - 2025-12-08 - Cast QWidget parent and use DialogCode.Accepted for Pyright.
   v0.1.0 - 2025-12-02 - Ensure delete flow skips confirmation via keyword argument.
 """
 
@@ -18,9 +19,11 @@ from models.prompt_model import Prompt
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from core import PromptManager
     from gui.prompt_editor_flow import PromptDialogFactory
+    from PySide6.QtWidgets import QWidget
 else:  # pragma: no cover - runtime placeholders to avoid heavy imports
     PromptManager = object  # type: ignore[assignment]
     PromptDialogFactory = object  # type: ignore[assignment]
+    QWidget = object  # type: ignore[assignment]
 
 
 class _SignalStub:
@@ -35,7 +38,7 @@ class _DialogStub:
     applied: _SignalStub = _SignalStub()
 
     def exec(self) -> int:
-        return QDialog.Accepted
+        return QDialog.DialogCode.Accepted
 
 
 @dataclass
@@ -59,7 +62,7 @@ def test_edit_prompt_delete_requests_skip_confirmation_keyword() -> None:
     dialog_factory = cast("PromptDialogFactory", _DialogFactoryStub(dialog))
 
     flow = PromptEditorFlow(
-        parent=object(),
+        parent=cast(QWidget, object()),
         manager=cast("PromptManager", object()),
         dialog_factory=dialog_factory,
         load_prompts=lambda _: None,

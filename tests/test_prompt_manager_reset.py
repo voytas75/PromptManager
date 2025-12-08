@@ -1,17 +1,28 @@
-"""Tests covering PromptManager datastore reset workflows."""
+"""Tests covering PromptManager datastore reset workflows.
+
+Updates:
+  v0.1.1 - 2025-12-08 - Cast Chroma and embedding stubs for Pyright strict mode.
+"""
 
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
-from core.embedding import EmbeddingGenerationError
+from core.embedding import EmbeddingGenerationError, EmbeddingProvider
 from core.prompt_manager import PromptManager
 from core.repository import PromptRepository
 from models.prompt_model import Prompt, PromptExecution, UserProfile
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from chromadb.api import ClientAPI  # type: ignore[reportMissingTypeArgument]
+else:  # pragma: no cover - runtime fallback when optional deps missing
+    ClientAPI = Any  # type: ignore[assignment]
+
+
+def _as_chroma_client(client: _StubChromaClient | _StubChromaClientNoDelete) -> ClientAPI:
+    return cast(ClientAPI, client)
 
 
 def _make_prompt(name: str = "Diagnostics") -> Prompt:
@@ -122,7 +133,7 @@ def test_prompt_manager_reset_application_data(tmp_path: Path) -> None:
     manager = PromptManager(
         chroma_path=str(tmp_path / "chroma"),
         db_path=str(db_path),
-        chroma_client=client,
+        chroma_client=_as_chroma_client(client),
         repository=repo,
     )
     manager._logs_path = tmp_path / "logs"  # type: ignore[attr-defined]
@@ -152,7 +163,7 @@ def test_reset_vector_store_without_client_delete(tmp_path: Path) -> None:
     manager = PromptManager(
         chroma_path=str(tmp_path / "chroma"),
         db_path=str(db_path),
-        chroma_client=client,
+        chroma_client=_as_chroma_client(client),
         repository=repo,
     )
 
@@ -169,7 +180,7 @@ def test_clear_usage_logs_handles_missing_directory(tmp_path: Path) -> None:
     manager = PromptManager(
         chroma_path=str(tmp_path / "chroma"),
         db_path=str(db_path),
-        chroma_client=_StubChromaClient(_StubCollection()),
+        chroma_client=_as_chroma_client(_StubChromaClient(_StubCollection())),
         repository=repo,
     )
     custom_logs = tmp_path / "custom_logs"
@@ -193,7 +204,7 @@ def test_rebuild_embeddings_resets_store_and_regenerates_vectors(tmp_path: Path)
     manager = PromptManager(
         chroma_path=str(tmp_path / "chroma"),
         db_path=str(db_path),
-        chroma_client=client,
+        chroma_client=_as_chroma_client(client),
         repository=repo,
         enable_background_sync=False,
     )
@@ -224,9 +235,9 @@ def test_rebuild_embeddings_counts_generation_failures(tmp_path: Path) -> None:
     manager = PromptManager(
         chroma_path=str(tmp_path / "chroma"),
         db_path=str(db_path),
-        chroma_client=client,
+        chroma_client=_as_chroma_client(client),
         repository=repo,
-        embedding_provider=_FailingProvider(),  # type: ignore[arg-type]
+        embedding_provider=cast(EmbeddingProvider, _FailingProvider()),
         enable_background_sync=False,
     )
 

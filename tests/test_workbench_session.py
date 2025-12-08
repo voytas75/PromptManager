@@ -49,7 +49,7 @@ def test_build_prompt_uses_goal_as_description() -> None:
     assert prompt.description == "Generate FAQs"
     assert prompt.category == "Support"
     assert prompt.tags == ["faq"]
-    assert prompt.context.startswith("### System Role")
+    assert prompt.context is not None and prompt.context.startswith("### System Role")
 
 
 def test_suggest_refinement_target_flags_constraints() -> None:
