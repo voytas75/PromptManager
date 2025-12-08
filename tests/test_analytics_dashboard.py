@@ -1,11 +1,15 @@
-"""Unit tests for analytics snapshot helpers."""
+"""Unit tests for analytics snapshot helpers.
+
+Updates:
+  v0.2.0 - 2025-12-08 - Cast analytics manager stubs to PromptManager for Pyright.
+"""
 
 from __future__ import annotations
 
 import json
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from core import (
     AnalyticsSnapshot,
@@ -144,7 +148,7 @@ def test_build_analytics_snapshot_aggregates_repository_data(tmp_path: Path) -> 
         consistent_counts=True,
     )
 
-    manager = _StubAnalyticsManager(repo, execution_stats, embedding_report)
+    manager = cast(PromptManager, _StubAnalyticsManager(repo, execution_stats, embedding_report))
 
     usage_log = tmp_path / "intent_usage.jsonl"
     now = datetime.now(UTC).replace(microsecond=0)

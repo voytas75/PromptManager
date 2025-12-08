@@ -1,10 +1,16 @@
-"""Unit tests covering embedding provider and sync worker utilities."""
+"""Unit tests covering embedding provider and sync worker utilities.
+
+Updates:
+  v0.3.0 - 2025-12-08 - Align stub signatures/casts for strict Pyright checks.
+"""
 
 from __future__ import annotations
 
 import threading
 import time
 import uuid
+from collections.abc import Sequence
+from typing import Any, Mapping, cast
 
 import pytest
 
@@ -74,13 +80,14 @@ def test_embedding_sync_worker_eventually_persists_vector() -> None:
                 raise EmbeddingGenerationError("retry please")
             return [0.1, 0.2, float(len(text))]
 
-    provider = _FlakyProvider()
+    flaky_provider = _FlakyProvider()
+    provider = cast(EmbeddingProvider, flaky_provider)
 
     def _fetch_prompt(prompt_id: uuid.UUID) -> Prompt:
         assert prompt_id == prompt.id
         return prompt
 
-    def _persist_callback(prompt_obj: Prompt, vector: list[float]) -> None:
+    def _persist_callback(prompt_obj: Prompt, vector: Sequence[float]) -> None:
         persisted.append((prompt_obj.id, list(vector)))
         completion.set()
 
@@ -96,7 +103,7 @@ def test_embedding_sync_worker_eventually_persists_vector() -> None:
     assert completion.wait(timeout=2.0), "Background worker did not persist embedding"
     worker.stop()
 
-    assert provider.calls >= 2
+    assert flaky_provider.calls >= 2
     assert persisted and persisted[0][0] == prompt.id
 
 
@@ -105,7 +112,7 @@ def test_embedding_sync_worker_stops_after_max_attempts() -> None:
     calls = {"count": 0}
     completion = threading.Event()
 
-    def _failing_embed(_: str) -> list[float]:
+    def _failing_embed(_: Sequence[str]) -> list[list[float]]:
         calls["count"] += 1
         raise EmbeddingGenerationError("nope")
 
@@ -114,7 +121,7 @@ def test_embedding_sync_worker_stops_after_max_attempts() -> None:
             raise KeyError(prompt_id)
         return prompt
 
-    def _persist(_: Prompt, __: list[float]) -> None:
+    def _persist(_: Prompt, __: Sequence[float]) -> None:
         completion.set()
 
     worker = EmbeddingSyncWorker(
@@ -170,9 +177,10 @@ def test_litellm_embedding_function_uses_adapter(monkeypatch: pytest.MonkeyPatch
     assert isinstance(func, LiteLLMEmbeddingFunction)
     vectors = func(["sample text"])
     assert vectors == [[0.1, 0.2, 0.3]]
-    assert captured["request"]["api_key"] == "secret"
-    assert captured["request"]["api_base"] == "https://api.invalid"
-    assert captured["request"]["model"] == "text-embedding-3-small"
+    request = cast(Mapping[str, object], captured["request"])
+    assert request["api_key"] == "secret"
+    assert request["api_base"] == "https://api.invalid"
+    assert request["model"] == "text-embedding-3-small"
 
 
 def test_sentence_transformers_embedding_function_encodes(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -221,6 +229,7 @@ def test_litellm_embedding_function_accepts_object_response(
 
     monkeypatch.setattr("core.embedding.get_embedding", _fake_get_embedding)
     func = create_embedding_function("litellm", model="test", api_key=None, api_base=None)
+    assert func is not None
     assert func(["input"]) == [[0.4, 0.5]]
 
 
@@ -240,4 +249,5 @@ def test_litellm_embedding_function_uses_model_dump(monkeypatch: pytest.MonkeyPa
 
     monkeypatch.setattr("core.embedding.get_embedding", _fake_get_embedding)
     func = create_embedding_function("litellm", model="test", api_key=None, api_base=None)
+    assert func is not None
     assert func(["payload"]) == [[0.9, 1.1]]

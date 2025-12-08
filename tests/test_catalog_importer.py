@@ -1,16 +1,19 @@
 """Tests for catalogue import, diff, and export utilities.
 
-Updates: v0.2.0 - 2025-11-30 - Ensure GUI import helpers remain functional post-CLI removal.
+Updates:
+  v0.2.1 - 2025-12-08 - Cast stub managers to PromptManager for Pyright compliance.
+  v0.2.0 - 2025-11-30 - Ensure GUI import helpers remain functional post-CLI removal.
 """
 
 from __future__ import annotations
 
 import json
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
+from core import PromptManager
 from core.catalog_importer import (
     CatalogChangeType,
     CatalogImportResult,
@@ -60,6 +63,10 @@ class _StubManager:
         return self.repository.update(prompt)
 
 
+def _as_prompt_manager(manager: _StubManager) -> PromptManager:
+    return cast(PromptManager, manager)
+
+
 def test_load_prompt_catalog_without_path_returns_empty() -> None:
     prompts = load_prompt_catalog(None)
     assert prompts == []
@@ -83,7 +90,7 @@ def test_import_prompt_catalog_adds_and_updates(tmp_path: Path) -> None:
     ]
     catalog_path.write_text(json.dumps(catalog_payload), encoding="utf-8")
 
-    result = import_prompt_catalog(manager, catalog_path)
+    result = import_prompt_catalog(_as_prompt_manager(manager), catalog_path)
     assert isinstance(result, CatalogImportResult)
     assert result.added == 1
     assert result.updated == 0
@@ -101,7 +108,7 @@ def test_import_prompt_catalog_adds_and_updates(tmp_path: Path) -> None:
     updated_payload["tags"] = ["ci", "debugging", "logs"]
     catalog_path.write_text(json.dumps([updated_payload]), encoding="utf-8")
 
-    second_result = import_prompt_catalog(manager, catalog_path)
+    second_result = import_prompt_catalog(_as_prompt_manager(manager), catalog_path)
     assert second_result.added == 0
     assert second_result.updated == 1
     assert second_result.preview is not None
@@ -125,18 +132,18 @@ def test_diff_prompt_catalog_reports_expected_changes(tmp_path: Path) -> None:
     ]
     catalog_path.write_text(json.dumps(catalog_payload), encoding="utf-8")
 
-    diff = diff_prompt_catalog(manager, catalog_path)
+    diff = diff_prompt_catalog(_as_prompt_manager(manager), catalog_path)
     assert diff.added == 1
     assert diff.updated == 0
     assert diff.entries[0].change_type is CatalogChangeType.ADD
 
-    import_prompt_catalog(manager, catalog_path)
+    import_prompt_catalog(_as_prompt_manager(manager), catalog_path)
 
     updated_payload = dict(catalog_payload[0])
     updated_payload["description"] = "Emphasise separation of concerns."
     catalog_path.write_text(json.dumps([updated_payload]), encoding="utf-8")
 
-    updated_diff = diff_prompt_catalog(manager, catalog_path)
+    updated_diff = diff_prompt_catalog(_as_prompt_manager(manager), catalog_path)
     assert updated_diff.updated == 1
     assert updated_diff.entries[0].change_type is CatalogChangeType.UPDATE
     assert "separation of concerns" in updated_diff.entries[0].diff.lower()
@@ -154,7 +161,7 @@ def test_export_prompt_catalog_json(tmp_path: Path) -> None:
     manager.create_prompt(prompt)
 
     export_path = tmp_path / "catalog.json"
-    resolved = export_prompt_catalog(manager, export_path)
+    resolved = export_prompt_catalog(_as_prompt_manager(manager), export_path)
     assert resolved.exists()
 
     data = json.loads(resolved.read_text(encoding="utf-8"))
@@ -175,7 +182,7 @@ def test_export_prompt_catalog_yaml(tmp_path: Path) -> None:
     manager.create_prompt(prompt)
 
     export_path = tmp_path / "catalog.yaml"
-    resolved = export_prompt_catalog(manager, export_path, fmt="yaml")
+    resolved = export_prompt_catalog(_as_prompt_manager(manager), export_path, fmt="yaml")
     assert resolved.exists()
 
     with resolved.open(encoding="utf-8") as stream:
@@ -204,13 +211,16 @@ def test_export_prompt_catalog_respects_inactive_flag(tmp_path: Path) -> None:
     manager.create_prompt(active)
     manager.create_prompt(inactive)
 
-    default_export = export_prompt_catalog(manager, tmp_path / "default.json")
+    default_export = export_prompt_catalog(
+        _as_prompt_manager(manager),
+        tmp_path / "default.json",
+    )
     data = json.loads(default_export.read_text(encoding="utf-8"))
     names = [entry["name"] for entry in data["prompts"]]
     assert names == ["Active Prompt"]
 
     full_export = export_prompt_catalog(
-        manager,
+        _as_prompt_manager(manager),
         tmp_path / "full.json",
         include_inactive=True,
     )

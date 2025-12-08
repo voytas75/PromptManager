@@ -1,13 +1,20 @@
 """Chroma client initialisation tests.
 
-Updates: v0.1.0 - 2025-11-03 - Ensure Chroma anonymized telemetry is disabled by default.
+Updates:
+  v0.1.1 - 2025-12-08 - Cast recording client to ClientAPI for Pyright compliance.
+  v0.1.0 - 2025-11-03 - Ensure Chroma anonymized telemetry is disabled by default.
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from core.prompt_manager import PromptManager
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from chromadb.api import ClientAPI
+else:  # pragma: no cover - runtime fallback for typing
+    ClientAPI = Any
 
 
 class _RecordingClient:
@@ -46,12 +53,13 @@ def test_chroma_initializes_with_telemetry_disabled_by_default(tmp_path) -> None
     """
     # Use a fake chroma client to sidestep networking/telemetry and file IO.
     recording = _RecordingClient()
+    chroma_client = cast("ClientAPI", recording)
 
     # Build the manager; provide a db path so a real SQLite file can be created.
     _ = PromptManager(
         chroma_path=str(tmp_path / "chroma"),
         db_path=str(tmp_path / "prompt_manager.db"),
-        chroma_client=recording,
+        chroma_client=chroma_client,
     )
 
     assert recording.get_or_create_called is True

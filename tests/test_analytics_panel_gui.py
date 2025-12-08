@@ -1,6 +1,7 @@
 """GUI-focused tests for the analytics dashboard panel.
 
 Updates:
+  v0.1.1 - 2025-12-08 - Cast manager stubs and ensure QApplication fixtures satisfy Pyright.
   v0.1.0 - 2025-12-05 - Cover usage table prompt activation behaviour.
 """
 
@@ -8,13 +9,14 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
 pytest.importorskip("PySide6")
 from PySide6.QtWidgets import QApplication
 
+from core import PromptManager
 from core.analytics_dashboard import AnalyticsSnapshot, UsageFrequencyEntry
 from gui.analytics_panel import AnalyticsDashboardPanel
 
@@ -47,6 +49,10 @@ class _StubManager:
         return None
 
 
+def _as_prompt_manager(manager: _StubManager) -> PromptManager:
+    return cast(PromptManager, manager)
+
+
 @pytest.fixture(scope="module")
 def qt_app() -> QApplication:
     """Provide a shared Qt application instance for analytics panel tests."""
@@ -54,7 +60,7 @@ def qt_app() -> QApplication:
     app = QApplication.instance()
     if app is None:
         app = QApplication([])
-    return app
+    return cast(QApplication, app)
 
 
 def test_usage_prompt_activation_opens_editor(qt_app: QApplication) -> None:
@@ -62,7 +68,7 @@ def test_usage_prompt_activation_opens_editor(qt_app: QApplication) -> None:
 
     fired: list[UUID] = []
     panel = AnalyticsDashboardPanel(
-        _StubManager(),
+        _as_prompt_manager(_StubManager()),
         prompt_edit_callback=lambda prompt_id: fired.append(prompt_id),
     )
     prompt_id = uuid.uuid4()
