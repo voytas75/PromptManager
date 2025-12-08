@@ -1,6 +1,7 @@
 """Coordinate prompt execution, streaming, and chat workspace logic.
 
 Updates:
+  v0.1.9 - 2025-12-08 - Track per-execution token usage and refresh session/overall totals in the workspace.
   v0.1.8 - 2025-12-07 - Enable saving workspace text-only results with output.
   v0.1.7 - 2025-12-07 - Append share footer to result payloads.
   v0.1.6 - 2025-12-07 - Enable chat continuation for workspace text runs.
@@ -17,9 +18,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
 from html import escape
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QGuiApplication, QTextCursor
@@ -33,9 +35,11 @@ from config import (
 from core import (
     PromptExecutionError,
     PromptExecutionUnavailable,
+    PromptHistoryError,
     PromptManager,
     PromptManagerError,
     PromptNotFoundError,
+    TokenUsageTotals,
     WebSearchError,
 )
 from core.execution import ExecutionError
@@ -79,6 +83,20 @@ ErrorCallback = Callable[[str, str], None]
 ToastCallback = Callable[[str, int], None]
 
 
+@dataclass(slots=True)
+class SessionTokenUsage:
+    """Lightweight tracker for per-session token totals."""
+
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+
+    def add(self, prompt_tokens: int, completion_tokens: int, total_tokens: int) -> None:
+        self.prompt_tokens += prompt_tokens
+        self.completion_tokens += completion_tokens
+        self.total_tokens += total_tokens
+
+
 WEB_SEARCH_RESULT_LIMIT = 10
 WEB_CONTEXT_SUMMARY_WORD_LIMIT = 5000
 WEB_CONTEXT_SUMMARY_SYSTEM_PROMPT = (
@@ -111,6 +129,7 @@ class ExecutionController:
         query_input: QPlainTextEdit,
         result_label: QLabel,
         result_meta: QLabel,
+        token_usage_label: QLabel,
         result_tabs: QTabWidget,
         result_text: QTextEdit,
         chat_history_view: QTextEdit,
@@ -138,6 +157,7 @@ class ExecutionController:
         self._query_input = query_input
         self._result_label = result_label
         self._result_meta = result_meta
+        self._token_usage_label = token_usage_label
         self._result_tabs = result_tabs
         self._result_text = result_text
         self._chat_history_view = chat_history_view
@@ -176,6 +196,8 @@ class ExecutionController:
         self._chat_conversation: list[dict[str, str]] = []
         self._chat_prompt_id: UUID | None = None
         self._freeform_chat_active = False
+        self._session_usage = SessionTokenUsage()
+        self._overall_usage: TokenUsageTotals | None = None
 
         self._copy_result_button.setEnabled(False)
         self._copy_result_to_text_window_button.setEnabled(False)
@@ -195,6 +217,7 @@ class ExecutionController:
                 "Voice playback requires Qt multimedia support and a configured LiteLLM TTS model."
             )
             self._speak_result_button.setToolTip(tooltip)
+        self._initialise_token_usage_totals()
 
     @property
     def last_execution(self) -> PromptManager.ExecutionOutcome | None:
@@ -938,6 +961,9 @@ class ExecutionController:
         if history_entry is not None:
             executed_at = history_entry.executed_at.astimezone()
             meta_parts.append(f"Logged: {executed_at.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+        usage_summary = self._format_usage_summary(outcome.result.usage)
+        if usage_summary:
+            meta_parts.append(usage_summary)
         self._result_meta.setText(" | ".join(meta_parts))
         response_body = outcome.result.response_text or ""
         response_text = f"{self._web_context_preface}{response_body}".rstrip()
@@ -954,6 +980,7 @@ class ExecutionController:
         self._refresh_chat_history_view()
         self._query_input.clear()
         self._query_input.setFocus(Qt.FocusReason.ShortcutFocusReason)
+        self._record_session_usage(outcome.result.usage)
 
     def _reset_chat_session(self, *, clear_view: bool = True) -> None:
         self._chat_prompt_id = None
@@ -1017,6 +1044,84 @@ class ExecutionController:
             return
         formatted = self._format_chat_history_html(self._chat_conversation)
         self._chat_history_view.setHtml(formatted)
+
+    def _initialise_token_usage_totals(self) -> None:
+        if not self._token_usage_label:
+            return
+        try:
+            self._overall_usage = self._manager.get_token_usage_totals()
+        except (PromptHistoryError, PromptManagerError):
+            logger.debug("Overall token usage unavailable", exc_info=True)
+            self._overall_usage = None
+        self._session_usage = SessionTokenUsage()
+        self._refresh_token_usage_label()
+
+    def _record_session_usage(self, usage: Mapping[str, Any] | None) -> None:
+        if not self._token_usage_label:
+            return
+        prompt_tokens, completion_tokens, total_tokens = self._extract_usage_counts(usage)
+        if prompt_tokens == 0 and completion_tokens == 0 and total_tokens == 0:
+            return
+        self._session_usage.add(prompt_tokens, completion_tokens, total_tokens)
+        if self._overall_usage is not None:
+            self._overall_usage.prompt_tokens += prompt_tokens
+            self._overall_usage.completion_tokens += completion_tokens
+            self._overall_usage.total_tokens += total_tokens
+        self._refresh_token_usage_label()
+
+    def _refresh_token_usage_label(self) -> None:
+        if not self._token_usage_label:
+            return
+        parts = [
+            (
+                "Tokens (session): "
+                f"prompt={self._session_usage.prompt_tokens} "
+                f"completion={self._session_usage.completion_tokens} "
+                f"total={self._session_usage.total_tokens}"
+            )
+        ]
+        if self._overall_usage is not None:
+            parts.append(
+                "Tokens (overall): "
+                f"prompt={self._overall_usage.prompt_tokens} "
+                f"completion={self._overall_usage.completion_tokens} "
+                f"total={self._overall_usage.total_tokens}"
+            )
+        self._token_usage_label.setText(" | ".join(parts))
+
+    @staticmethod
+    def _extract_usage_counts(usage: Mapping[str, Any] | None) -> tuple[int, int, int]:
+        if not usage:
+            return (0, 0, 0)
+        return (
+            ExecutionController._coerce_usage_value(usage.get("prompt_tokens")),
+            ExecutionController._coerce_usage_value(usage.get("completion_tokens")),
+            ExecutionController._coerce_usage_value(usage.get("total_tokens")),
+        )
+
+    @staticmethod
+    def _coerce_usage_value(value: object | None) -> int:
+        if value in (None, ""):
+            return 0
+        try:
+            return int(value)  # type: ignore[call-arg]
+        except (TypeError, ValueError):
+            try:
+                return int(float(value))  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                return 0
+
+    @staticmethod
+    def _format_usage_summary(usage: Mapping[str, Any] | None) -> str:
+        prompt_tokens, completion_tokens, total_tokens = ExecutionController._extract_usage_counts(
+            usage
+        )
+        if prompt_tokens == 0 and completion_tokens == 0 and total_tokens == 0:
+            return ""
+        return (
+            "Tokens: "
+            f"prompt={prompt_tokens} completion={completion_tokens} total={total_tokens}"
+        )
 
     def _format_chat_history_html(self, conversation: Sequence[dict[str, str]]) -> str:
         blocks: list[str] = []

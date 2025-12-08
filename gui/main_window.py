@@ -1,6 +1,7 @@
 r"""Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.16.15 - 2025-12-08 - Store token usage label for execution controller wiring.
   v0.16.14 - 2025-12-07 - Describe Google Programmable Search in workspace tooltips.
   v0.16.13 - 2025-12-07 - Convert analytics log path to Path objects for typing.
   v0.16.12 - 2025-12-07 - Embed Workbench tab and expose activation hook.
@@ -239,6 +240,7 @@ class MainWindow(QMainWindow):
         self._main_container = cast("QFrame", None)
         self._result_label: QLabel = cast("QLabel", None)
         self._result_meta: QLabel = cast("QLabel", None)
+        self._token_usage_label: QLabel = cast("QLabel", None)
         self._result_tabs: QTabWidget = cast("QTabWidget", None)
         self._result_text: QTextEdit = cast("QTextEdit", None)
         self._result_overlay: ResultActionsOverlay = cast("ResultActionsOverlay", None)

@@ -1,6 +1,7 @@
 """Additional PromptRepository branch coverage tests.
 
 Updates:
+  v0.1.3 - 2025-12-08 - Cover token usage total helper for prompt executions.
   v0.1.2 - 2025-12-08 - Close ad-hoc sqlite connections with contextlib.closing during legacy setup.
   v0.1.1 - 2025-11-29 - Import Any for fake connections and wrap long test helpers.
   v0.1.0 - 2025-10-30 - Add error-path coverage for repository helpers.
@@ -155,6 +156,36 @@ def test_repository_execution_roundtrip(tmp_path: Path) -> None:
 
     recent = repo.list_executions(limit=1)
     assert recent[0].id == execution.id
+
+
+def test_repository_token_usage_totals(tmp_path: Path) -> None:
+    """Summarise token usage totals across execution history."""
+    repo = PromptRepository(str(tmp_path / "repo.db"))
+    prompt = _make_prompt()
+    repo.add(prompt)
+    execution = PromptExecution(
+        id=uuid.uuid4(),
+        prompt_id=prompt.id,
+        request_text="say hi",
+        response_text="hello",
+        status=ExecutionStatus.SUCCESS,
+        metadata={
+            "usage": {
+                "prompt_tokens": 7,
+                "completion_tokens": 13,
+                "total_tokens": 20,
+            }
+        },
+    )
+    repo.add_execution(execution)
+
+    totals = repo.get_token_usage_totals()
+    assert totals == {"prompt_tokens": 7, "completion_tokens": 13, "total_tokens": 20}
+
+    future_totals = repo.get_token_usage_totals(
+        since=datetime.now(UTC) + timedelta(days=1),
+    )
+    assert future_totals == {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 
 
 def test_repository_add_execution_duplicate_error(tmp_path: Path) -> None:

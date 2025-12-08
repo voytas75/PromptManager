@@ -1,6 +1,7 @@
 """Unit tests for analytics snapshot helpers.
 
 Updates:
+  v0.2.1 - 2025-12-08 - Cover token usage aggregates in analytics dataclasses.
   v0.2.0 - 2025-12-08 - Cast analytics manager stubs to PromptManager for Pyright.
 """
 
@@ -128,9 +129,15 @@ def test_build_analytics_snapshot_aggregates_repository_data(tmp_path: Path) -> 
                 average_rating=4.8,
                 rating_trend=0.1,
                 last_executed_at=datetime.now(UTC),
+                prompt_tokens=15,
+                completion_tokens=35,
+                total_tokens=50,
             )
         ],
         window_start=datetime.now(UTC),
+        prompt_tokens=15,
+        completion_tokens=35,
+        total_tokens=50,
     )
 
     embedding_report = PromptManager.EmbeddingDiagnostics(
@@ -167,6 +174,7 @@ def test_build_analytics_snapshot_aggregates_repository_data(tmp_path: Path) -> 
     )
 
     assert snapshot.execution is execution_stats
+    assert snapshot.execution and snapshot.execution.total_tokens == 50
     assert snapshot.embedding is embedding_report
     assert snapshot.model_costs and snapshot.model_costs[0].total_tokens == 50
     assert snapshot.benchmark_stats and snapshot.benchmark_stats[0].model == "gpt-benchmark"

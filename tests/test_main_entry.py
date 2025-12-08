@@ -1,6 +1,7 @@
 """Lightweight integration checks for main module.
 
 Updates:
+  v0.5.3 - 2025-12-08 - Include token usage aggregates in execution analytics helper.
   v0.5.2 - 2025-12-08 - Route monkeypatches through helper to satisfy Pyright.
   v0.5.1 - 2025-11-29 - Extend entrypoint guard stub for analytics helpers.
   v0.5.0 - 2025-11-28 - Cover analytics diagnostics CLI path and export flags.
@@ -25,7 +26,11 @@ import pytest
 
 import main
 from config.settings import DEFAULT_EMBEDDING_BACKEND, DEFAULT_EMBEDDING_MODEL
-from core.history_tracker import ExecutionAnalytics, PromptExecutionAnalytics
+from core.history_tracker import (
+    ExecutionAnalytics,
+    PromptExecutionAnalytics,
+    TokenUsageTotals,
+)
 from core.intent_classifier import IntentLabel, IntentPrediction
 from core.prompt_manager import PromptManagerError
 
@@ -83,6 +88,8 @@ class _DummyManager:
             consistent_counts=True,
         )
         self.diagnostics_sample_text: str | None = None
+        self.token_usage_totals_window = TokenUsageTotals(25, 50, 75)
+        self.token_usage_totals_all = TokenUsageTotals(125, 250, 375)
 
     def close(self) -> None:
         self.closed = True
@@ -115,6 +122,11 @@ class _DummyManager:
         self.diagnostics_sample_text = sample_text
         return self.embedding_diagnostics
 
+    def get_token_usage_totals(self, *, since: datetime | None = None) -> TokenUsageTotals:
+        if since is None:
+            return self.token_usage_totals_all
+        return self.token_usage_totals_window
+
 
 def _build_execution_analytics(total_runs: int = 5) -> ExecutionAnalytics:
     now = datetime.now(UTC)
@@ -127,6 +139,9 @@ def _build_execution_analytics(total_runs: int = 5) -> ExecutionAnalytics:
         average_rating=4.8,
         rating_trend=0.4,
         last_executed_at=now,
+        prompt_tokens=25,
+        completion_tokens=50,
+        total_tokens=75,
     )
     return ExecutionAnalytics(
         total_runs=total_runs,
@@ -135,6 +150,9 @@ def _build_execution_analytics(total_runs: int = 5) -> ExecutionAnalytics:
         average_rating=4.5,
         prompt_breakdown=[prompt_stats],
         window_start=now,
+        prompt_tokens=25,
+        completion_tokens=50,
+        total_tokens=75,
     )
 
 
@@ -693,6 +711,7 @@ def test_history_analytics_command_renders_summary(
     output = capsys.readouterr().out
     assert "Execution analytics" in output
     assert "Prompt Alpha" in output
+    assert "Tokens (window): prompt=25 completion=50 total=75" in output
     assert manager.closed is True
 
 

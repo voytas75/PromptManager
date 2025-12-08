@@ -1,6 +1,7 @@
 """GUI-focused tests for the analytics dashboard panel.
 
 Updates:
+  v0.1.2 - 2025-12-08 - Stub token usage totals for analytics summary expectations.
   v0.1.1 - 2025-12-08 - Cast manager stubs and ensure QApplication fixtures satisfy Pyright.
   v0.1.0 - 2025-12-05 - Cover usage table prompt activation behaviour.
 """
@@ -16,7 +17,7 @@ import pytest
 pytest.importorskip("PySide6")
 from PySide6.QtWidgets import QApplication
 
-from core import PromptManager
+from core import PromptManager, TokenUsageTotals
 from core.analytics_dashboard import AnalyticsSnapshot, UsageFrequencyEntry
 from gui.analytics_panel import AnalyticsDashboardPanel
 
@@ -41,12 +42,16 @@ class _StubRepository:
 class _StubManager:
     def __init__(self) -> None:
         self.repository = _StubRepository()
+        self.token_usage_totals = TokenUsageTotals(0, 0, 0)
 
     def get_execution_analytics(self, *_args, **_kwargs):
         return None
 
     def diagnose_embeddings(self):
         return None
+
+    def get_token_usage_totals(self, *_args, **_kwargs) -> TokenUsageTotals:
+        return self.token_usage_totals
 
 
 def _as_prompt_manager(manager: _StubManager) -> PromptManager:

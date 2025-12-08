@@ -1,6 +1,7 @@
 """Core service layer for Prompt Manager.
 
 Updates:
+  v0.11.5 - 2025-12-08 - Export token usage totals dataclass for analytics surfaces.
   v0.11.4 - 2025-12-07 - Export Google web search provider alongside existing implementations.
   v0.11.3 - 2025-12-07 - Export Serper web search provider.
   v0.11.2 - 2025-12-07 - Export Tavily web search provider.
@@ -58,6 +59,7 @@ from .history_tracker import (
     HistoryTracker,
     HistoryTrackerError,
     PromptExecutionAnalytics,
+    TokenUsageTotals,
 )
 from .intent_classifier import (
     IntentClassifier,
@@ -192,6 +194,7 @@ __all__ = [
     "HistoryTrackerError",
     "ExecutionAnalytics",
     "PromptExecutionAnalytics",
+    "TokenUsageTotals",
     "AnalyticsSnapshot",
     "UsageFrequencyEntry",
     "ModelCostEntry",

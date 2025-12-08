@@ -2,6 +2,14 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.22.14] - 2025-12-08
+
+### Added
+
+- Introduced comprehensive token usage tracking: repository analytics now aggregate prompt/completion/total tokens, the `HistoryPanel` renders a dedicated Tokens column plus CSV/export fields, and the workspace result header reports per-run metrics along with rolling session totals.
+- Added session + overall token summaries to the main workspace label and analytics dashboard, and exposed `PromptManager.get_token_usage_totals()` for CLI/GUI consumers so `python -m main history-analytics` can print window/overall token breakdowns alongside success rates.
+- Updated README/README-DEV/CLI docs to describe the new tracking surfaces, ensuring teams know where to inspect per-run costs and how the session label reflects spend without leaving the desktop app.
+
 ## [0.22.13] - 2025-12-08
 
 ### Fixed

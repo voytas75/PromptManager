@@ -1,6 +1,7 @@
 """Analytics dashboard panel wiring for the Prompt Manager GUI.
 
 Updates:
+  v0.1.4 - 2025-12-08 - Display window and overall token usage summaries above the dashboard.
   v0.1.3 - 2025-12-05 - Prevent duplicate edit launches by using a single activation signal.
   v0.1.2 - 2025-12-05 - Make usage table prompts clickable to open the editor.
   v0.1.1 - 2025-11-29 - Wrap analytics strings to satisfy Ruff line-length rules.
@@ -41,7 +42,14 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from core import AnalyticsSnapshot, PromptManager, build_analytics_snapshot, snapshot_dataset_rows
+from core import (
+    AnalyticsSnapshot,
+    PromptHistoryError,
+    PromptManager,
+    TokenUsageTotals,
+    build_analytics_snapshot,
+    snapshot_dataset_rows,
+)
 
 from .processing_indicator import ProcessingIndicator
 
@@ -82,6 +90,8 @@ class AnalyticsDashboardPanel(QWidget):
         self._table = QTableWidget(0, 0, self)
         self._status_label = QLabel("", self)
         self._embedding_summary = QLabel("", self)
+        self._token_summary = QLabel("", self)
+        self._overall_tokens: TokenUsageTotals | None = None
         self._settings = QSettings("PromptManager", "AnalyticsPanel")
         window_pref = cast(int, self._settings.value("windowDays", 30, int))
         prompt_pref = cast(int, self._settings.value("promptLimit", 5, int))
@@ -104,6 +114,10 @@ class AnalyticsDashboardPanel(QWidget):
         )
         header.setWordWrap(True)
         layout.addWidget(header)
+        self._token_summary.setWordWrap(True)
+        self._token_summary.setObjectName("tokenSummaryLabel")
+        self._token_summary.setText("Tokens (window): n/a | Tokens (overall): n/a")
+        layout.addWidget(self._token_summary)
 
         controls = QHBoxLayout()
         controls.setSpacing(8)
@@ -190,6 +204,10 @@ class AnalyticsDashboardPanel(QWidget):
             QMessageBox.critical(self, "Analytics", f"Unable to build analytics snapshot: {exc}")
             return
         self._snapshot = snapshot
+        try:
+            self._overall_tokens = self._manager.get_token_usage_totals()
+        except PromptHistoryError:
+            self._overall_tokens = None
         self._update_visuals()
         now_local = datetime.now(UTC).astimezone()
         self._status_label.setText(f"Refreshed at {now_local.strftime('%Y-%m-%d %H:%M:%S %Z')}")
@@ -208,6 +226,7 @@ class AnalyticsDashboardPanel(QWidget):
         self._update_chart()
         self._populate_table()
         self._update_embedding_summary()
+        self._update_token_summary()
 
     def _update_chart(self) -> None:
         chart = QChart()
@@ -443,6 +462,30 @@ class AnalyticsDashboardPanel(QWidget):
             f"{vector_summary}"
         )
         self._embedding_summary.setText(summary)
+
+    def _update_token_summary(self) -> None:
+        snapshot = self._snapshot
+        execution = snapshot.execution if snapshot else None
+        parts: list[str] = []
+        if execution is not None:
+            parts.append(
+                "Tokens (window): "
+                f"prompt={execution.prompt_tokens} "
+                f"completion={execution.completion_tokens} "
+                f"total={execution.total_tokens}"
+            )
+        else:
+            parts.append("Tokens (window): unavailable")
+        if self._overall_tokens is not None:
+            parts.append(
+                "Tokens (overall): "
+                f"prompt={self._overall_tokens.prompt_tokens} "
+                f"completion={self._overall_tokens.completion_tokens} "
+                f"total={self._overall_tokens.total_tokens}"
+            )
+        else:
+            parts.append("Tokens (overall): unavailable")
+        self._token_summary.setText(" | ".join(parts))
 
     def _export_csv(self) -> None:
         snapshot = self._snapshot

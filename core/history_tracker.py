@@ -1,6 +1,7 @@
 """Prompt execution history tracking utilities.
 
 Updates:
+  v0.3.5 - 2025-12-08 - Track token aggregates for summaries and expose usage totals helper.
   v0.3.4 - 2025-11-30 - Fix HistoryTracker docstring spacing to satisfy Ruff.
   v0.3.3 - 2025-11-29 - Move Mapping import into TYPE_CHECKING for Ruff TC003.
   v0.3.2 - 2025-11-29 - Reformat docstring to satisfy Ruff line length limits.
@@ -47,6 +48,9 @@ class PromptExecutionAnalytics:
     average_rating: float | None
     rating_trend: float | None
     last_executed_at: datetime | None
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
 
 
 @dataclass(slots=True)
@@ -59,6 +63,18 @@ class ExecutionAnalytics:
     average_rating: float | None
     prompt_breakdown: list[PromptExecutionAnalytics]
     window_start: datetime | None = None
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+
+
+@dataclass(slots=True)
+class TokenUsageTotals:
+    """Summed token usage metrics for a time window."""
+
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
 
 
 def _clip(text: str | None, max_length: int) -> str:
@@ -206,6 +222,9 @@ class HistoryTracker:
         average_duration = _coerce_float(summary_row.get("avg_duration_ms"))
         average_rating = _coerce_float(summary_row.get("avg_rating"))
         success_rate = success_runs / total_runs if total_runs else 0.0
+        prompt_tokens = _coerce_int(summary_row.get("prompt_tokens"))
+        completion_tokens = _coerce_int(summary_row.get("completion_tokens"))
+        total_tokens = _coerce_int(summary_row.get("total_tokens"))
 
         prompt_stats: list[PromptExecutionAnalytics] = []
         for row in prompt_rows:
@@ -222,6 +241,9 @@ class HistoryTracker:
             prompt_average_duration = _coerce_float(row.get("avg_duration_ms"))
             prompt_average_rating = _coerce_float(row.get("avg_rating"))
             last_executed = _parse_datetime(row.get("last_executed_at"))
+            prompt_prompt_tokens = _coerce_int(row.get("prompt_tokens"))
+            prompt_completion_tokens = _coerce_int(row.get("completion_tokens"))
+            prompt_total_tokens = _coerce_int(row.get("total_tokens"))
             rating_trend = self._compute_rating_trend(
                 prompt_id,
                 prompt_average_rating,
@@ -237,6 +259,9 @@ class HistoryTracker:
                     average_rating=prompt_average_rating,
                     rating_trend=rating_trend,
                     last_executed_at=last_executed,
+                    prompt_tokens=prompt_prompt_tokens,
+                    completion_tokens=prompt_completion_tokens,
+                    total_tokens=prompt_total_tokens,
                 )
             )
 
@@ -247,6 +272,9 @@ class HistoryTracker:
             average_rating=average_rating,
             prompt_breakdown=prompt_stats,
             window_start=since,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
         )
 
     def summarize_prompt(
@@ -290,6 +318,25 @@ class HistoryTracker:
             average_rating=average_rating,
             rating_trend=rating_trend,
             last_executed_at=last_executed,
+             prompt_tokens=_coerce_int(stats.get("prompt_tokens")),
+             completion_tokens=_coerce_int(stats.get("completion_tokens")),
+             total_tokens=_coerce_int(stats.get("total_tokens")),
+        )
+
+    def token_usage_totals(
+        self,
+        *,
+        since: datetime | None = None,
+    ) -> TokenUsageTotals:
+        """Return summed token usage for the provided time slice."""
+        try:
+            totals = self.repository.get_token_usage_totals(since=since)
+        except RepositoryError as exc:
+            raise HistoryTrackerError(f"Unable to compute token usage totals: {exc}") from exc
+        return TokenUsageTotals(
+            prompt_tokens=_coerce_int(totals.get("prompt_tokens")),
+            completion_tokens=_coerce_int(totals.get("completion_tokens")),
+            total_tokens=_coerce_int(totals.get("total_tokens")),
         )
 
     def _build_execution(
@@ -391,6 +438,19 @@ def _coerce_float(value: object | None) -> float | None:
         return None
 
 
+def _coerce_int(value: object | None) -> int:
+    if value in (None, ""):
+        return 0
+    try:
+        return int(cast("SupportsFloat | str | int | float", value))
+    except (TypeError, ValueError):
+        try:
+            numeric_value = float(cast("SupportsFloat | str | int | float", value))
+        except (TypeError, ValueError):
+            return 0
+        return int(numeric_value)
+
+
 def _parse_datetime(value: object | None) -> datetime | None:
     if value is None:
         return None
@@ -410,4 +470,5 @@ __all__ = [
     "HistoryTracker",
     "HistoryTrackerError",
     "PromptExecutionAnalytics",
+    "TokenUsageTotals",
 ]

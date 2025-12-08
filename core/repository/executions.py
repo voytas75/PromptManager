@@ -1,6 +1,7 @@
 """Prompt execution persistence, filtering, and analytics helpers.
 
 Updates:
+  v0.11.2 - 2025-12-08 - Include token aggregates in analytics queries and expose totals helper.
   v0.11.1 - 2025-12-07 - Move Path import under TYPE_CHECKING for lint compliance.
   v0.11.0 - 2025-12-04 - Extract execution CRUD and analytics into mixin.
 """
@@ -197,7 +198,11 @@ class ExecutionStoreMixin:
             "COUNT(*) AS total_runs, "
             "SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) AS success_runs, "
             "AVG(duration_ms) AS avg_duration_ms, "
-            "AVG(rating) AS avg_rating "
+            "AVG(rating) AS avg_rating, "
+            "SUM(COALESCE(json_extract(metadata, '$.usage.prompt_tokens'), 0)) AS prompt_tokens, "
+            "SUM(COALESCE(json_extract(metadata, '$.usage.completion_tokens'), 0)) "
+            "AS completion_tokens, "
+            "SUM(COALESCE(json_extract(metadata, '$.usage.total_tokens'), 0)) AS total_tokens "
             "FROM prompt_executions"
             f"{where_clause};"
         )
@@ -210,6 +215,10 @@ class ExecutionStoreMixin:
             "SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) AS success_runs, "
             "AVG(duration_ms) AS avg_duration_ms, "
             "AVG(rating) AS avg_rating, "
+            "SUM(COALESCE(json_extract(metadata, '$.usage.prompt_tokens'), 0)) AS prompt_tokens, "
+            "SUM(COALESCE(json_extract(metadata, '$.usage.completion_tokens'), 0)) "
+            "AS completion_tokens, "
+            "SUM(COALESCE(json_extract(metadata, '$.usage.total_tokens'), 0)) AS total_tokens, "
             "MAX(executed_at) AS last_executed_at "
             "FROM prompt_executions "
             "LEFT JOIN prompts p ON p.id = prompt_executions.prompt_id "
@@ -236,6 +245,41 @@ class ExecutionStoreMixin:
         summary = _row_to_dict(summary_row)
         aggregates = [_row_to_dict(row) for row in prompt_rows]
         return summary, aggregates
+
+    def get_token_usage_totals(
+        self,
+        *,
+        since: datetime | None = None,
+    ) -> dict[str, int]:
+        """Return summed token usage for the provided time slice."""
+        filters: list[str] = []
+        params: list[Any] = []
+        if since is not None:
+            filters.append("datetime(executed_at) >= ?")
+            params.append(since.isoformat())
+        where_clause = f" WHERE {' AND '.join(filters)}" if filters else ""
+        query = (
+            "SELECT "
+            "SUM(COALESCE(json_extract(metadata, '$.usage.prompt_tokens'), 0)) AS prompt_tokens, "
+            "SUM(COALESCE(json_extract(metadata, '$.usage.completion_tokens'), 0)) "
+            "AS completion_tokens, "
+            "SUM(COALESCE(json_extract(metadata, '$.usage.total_tokens'), 0)) AS total_tokens "
+            "FROM prompt_executions"
+            f"{where_clause};"
+        )
+
+        try:
+            with _connect(self._db_path) as conn:
+                row = conn.execute(query, params).fetchone()
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to compute token usage totals") from exc
+
+        if row is None:
+            return {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        return {
+            key: int(row[key] or 0)
+            for key in ("prompt_tokens", "completion_tokens", "total_tokens")
+        }
 
     def get_model_usage_breakdown(
         self,
@@ -342,6 +386,10 @@ class ExecutionStoreMixin:
             "SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) AS success_runs, "
             "AVG(duration_ms) AS avg_duration_ms, "
             "AVG(rating) AS avg_rating, "
+            "SUM(COALESCE(json_extract(metadata, '$.usage.prompt_tokens'), 0)) AS prompt_tokens, "
+            "SUM(COALESCE(json_extract(metadata, '$.usage.completion_tokens'), 0)) "
+            "AS completion_tokens, "
+            "SUM(COALESCE(json_extract(metadata, '$.usage.total_tokens'), 0)) AS total_tokens, "
             "MAX(executed_at) AS last_executed_at, "
             "MAX(p.name) AS prompt_name "
             "FROM prompt_executions "

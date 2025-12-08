@@ -1,6 +1,7 @@
 """Bind :mod:`gui.main_view_builder` components to the :class:`MainWindow`.
 
 Updates:
+  v0.15.84 - 2025-12-08 - Bind token usage label for workspace execution summaries.
   v0.15.83 - 2025-12-07 - Store Workbench panel reference for tab activation.
   v0.15.82 - 2025-12-04 - Bind web search checkbox for execution controller.
   v0.15.81 - 2025-12-01 - Moved widget wiring and controller construction out of gui.main_window.
@@ -121,6 +122,7 @@ def bind_main_view(
     window._list_view = components.list_view
     window._result_label = components.result_label
     window._result_meta = components.result_meta
+    window._token_usage_label = components.token_usage_label
     window._result_tabs = components.result_tabs
     window._result_text = components.result_text
     window._result_overlay = components.result_overlay

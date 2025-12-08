@@ -1,6 +1,7 @@
 r"""Composable builders for the Prompt Manager main window.
 
 Updates:
+  v0.2.11 - 2025-12-08 - Add token usage label beneath workspace result metadata.
   v0.2.10 - 2025-12-07 - Accept Path inputs for analytics log path.
   v0.2.9 - 2025-12-07 - Embed the Workbench tab alongside Chain for inline sessions.
   v0.2.8 - 2025-12-07 - Convert Run Prompt button into split actions for prompt/text runs.
@@ -10,7 +11,7 @@ Updates:
   v0.2.4 - 2025-12-05 - Remove prompt template toolbar wiring.
   v0.2.3 - 2025-12-05 - Drop prompt chain toolbar wiring; Chain tab is always visible.
   v0.2.2 - 2025-12-05 - Embed prompt chain manager panel as a Chain tab.
-  v0.2.1 - 2025-12-04 - Add \"Use web search\" toggle to the workspace actions row.
+  v0.2.1 - 2025-12-04 - Add "Use web search" toggle to the workspace actions row.
   v0.2.0-and-earlier - 2025-11-30 - Extract main window UI assembly into reusable builder helpers.
 """
 
@@ -139,6 +140,7 @@ class MainViewComponents:
     workspace_splitter: QSplitter
     result_label: QLabel
     result_meta: QLabel
+    token_usage_label: QLabel
     result_tabs: QTabWidget
     result_text: QTextEdit
     result_overlay: ResultActionsOverlay
@@ -348,6 +350,12 @@ def build_main_view(
     result_label.setObjectName("resultTitle")
     result_meta = QLabel("", parent)
     result_meta.setStyleSheet("color: #5b5b5b; font-style: italic;")
+    token_usage_label = QLabel(
+        "Tokens (session): prompt=0 completion=0 total=0 | Tokens (overall): prompt=0 completion=0 total=0",
+        parent,
+    )
+    token_usage_label.setObjectName("tokenUsageLabel")
+    token_usage_label.setStyleSheet("color: #5b5b5b; font-style: italic;")
 
     result_tabs = QTabWidget(parent)
     output_tab = QWidget(parent)
@@ -384,6 +392,7 @@ def build_main_view(
 
     output_layout.addWidget(result_label)
     output_layout.addWidget(result_meta)
+    output_layout.addWidget(token_usage_label)
     output_layout.addWidget(result_tabs, 1)
 
     render_actions_layout = QHBoxLayout()
@@ -555,6 +564,7 @@ def build_main_view(
         workspace_splitter=workspace_splitter,
         result_label=result_label,
         result_meta=result_meta,
+        token_usage_label=token_usage_label,
         result_tabs=result_tabs,
         result_text=result_text,
         result_overlay=result_overlay,

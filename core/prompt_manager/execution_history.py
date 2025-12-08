@@ -1,6 +1,7 @@
 """Execution workflow and history mixin for Prompt Manager.
 
 Updates:
+  v0.1.1 - 2025-12-08 - Expose token usage totals helper for GUI and CLI surfaces.
   v0.1.0 - 2025-12-03 - Extract execution and history APIs into dedicated mixin.
 """
 
@@ -9,6 +10,7 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
 
 from models.prompt_model import ExecutionStatus, Prompt, PromptExecution
@@ -24,6 +26,7 @@ from ..history_tracker import (
     ExecutionAnalytics,
     HistoryTrackerError,
     PromptExecutionAnalytics,
+    TokenUsageTotals,
 )
 from ..notifications import NotificationCenter, NotificationLevel
 
@@ -546,6 +549,20 @@ class ExecutionHistoryMixin:
                 prompt_limit=prompt_limit,
                 trend_window=trend_window,
             )
+        except HistoryTrackerError as exc:
+            raise PromptHistoryError(str(exc)) from exc
+
+    def get_token_usage_totals(
+        self,
+        *,
+        since: datetime | None = None,
+    ) -> TokenUsageTotals:
+        """Return summed token usage for the provided time slice."""
+        tracker = self._history_tracker
+        if tracker is None:
+            return TokenUsageTotals(prompt_tokens=0, completion_tokens=0, total_tokens=0)
+        try:
+            return tracker.token_usage_totals(since=since)
         except HistoryTrackerError as exc:
             raise PromptHistoryError(str(exc)) from exc
 

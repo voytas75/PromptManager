@@ -1,6 +1,7 @@
 """Execution history panel for Prompt Manager.
 
 Updates:
+  v0.3.4 - 2025-12-08 - Add per-execution token usage columns, exports, and summaries.
   v0.3.3 - 2025-12-08 - Guard note cell updates when the table item is missing.
   v0.3.2 - 2025-12-08 - Import QAbstractItemView for table selection controls.
   v0.3.1 - 2025-11-29 - Wrap header description to satisfy Ruff line length.
@@ -125,9 +126,18 @@ class HistoryPanel(QWidget):
         layout.addLayout(filter_layout)
 
         self._table = QTableWidget(self)
-        self._table.setColumnCount(7)
+        self._table.setColumnCount(8)
         self._table.setHorizontalHeaderLabels(
-            ["Prompt", "Status", "Rating", "Duration (ms)", "Executed At", "Error", "Note"]
+            [
+                "Prompt",
+                "Status",
+                "Rating",
+                "Duration (ms)",
+                "Tokens",
+                "Executed At",
+                "Error",
+                "Note",
+            ]
         )
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -194,19 +204,26 @@ class HistoryPanel(QWidget):
             name = self._resolve_prompt_name(entry.prompt_id)
             rows.append(_ExecutionRow(entry, name))
         self._rows = rows
-        self._populate_table()
+        prompt_sum, completion_sum, total_tokens = self._populate_table()
         total = len(rows)
         if total:
-            self._summary_label.setText(f"{total} executions shown (limit {self._limit}).")
+            summary = (
+                f"{total} executions shown (limit {self._limit}). "
+                f"Tokens: prompt={prompt_sum} completion={completion_sum} total={total_tokens}."
+            )
+            self._summary_label.setText(summary)
             self._table.selectRow(0)
         else:
             self._summary_label.setText("No executions match the current filters.")
             self._detail_view.clear()
             self._detail_label.setText("Select an execution to view details.")
 
-    def _populate_table(self) -> None:
+    def _populate_table(self) -> tuple[int, int, int]:
         self._table.setSortingEnabled(False)
         self._table.setRowCount(len(self._rows))
+        total_prompt_tokens = 0
+        total_completion_tokens = 0
+        total_tokens = 0
         for row_index, row in enumerate(self._rows):
             execution = row.execution
             executed_at_display = self._format_timestamp(execution.executed_at)
@@ -220,11 +237,22 @@ class HistoryPanel(QWidget):
                 if len(note_preview) > 80:
                     note_preview = note_preview[:77] + "..."
             rating_text = f"{execution.rating:.1f}" if execution.rating is not None else "-"
+            prompt_tokens, completion_tokens, usage_total = self._usage_from_metadata(
+                execution.metadata
+            )
+            total_prompt_tokens += prompt_tokens
+            total_completion_tokens += completion_tokens
+            total_tokens += usage_total
+            has_usage = bool(prompt_tokens or completion_tokens or usage_total)
+            token_text = (
+                f"{prompt_tokens}/{completion_tokens} ({usage_total})" if has_usage else "n/a"
+            )
             values = [
                 row.prompt_name,
                 execution.status.value.title(),
                 rating_text,
                 duration_text,
+                token_text,
                 executed_at_display,
                 error_preview[:120],
                 note_preview,
@@ -237,6 +265,7 @@ class HistoryPanel(QWidget):
                 self._table.setItem(row_index, col, item)
         self._table.resizeColumnsToContents()
         self._table.setSortingEnabled(True)
+        return total_prompt_tokens, total_completion_tokens, total_tokens
 
     def _on_selection_changed(self) -> None:
         indexes = self._table.selectionModel().selectedRows()
@@ -255,6 +284,14 @@ class HistoryPanel(QWidget):
         ]
         if execution.duration_ms is not None:
             detail_lines.append(f"Duration: {execution.duration_ms} ms")
+        prompt_tokens, completion_tokens, usage_total = self._usage_from_metadata(
+            execution.metadata
+        )
+        if prompt_tokens or completion_tokens or usage_total:
+            detail_lines.append(
+                "Tokens: "
+                f"prompt={prompt_tokens} completion={completion_tokens} total={usage_total}"
+            )
         if execution.rating is not None:
             detail_lines.append(f"Rating: {execution.rating:.1f}/10")
         note_text = ""
@@ -330,10 +367,10 @@ class HistoryPanel(QWidget):
             return
         self._rows[row_index] = _ExecutionRow(updated_execution, entry.prompt_name)
         note_preview = note if len(note) <= 80 else note[:77] + "..."
-        note_cell = self._table.item(row_index, 6)
+        note_cell = self._table.item(row_index, 7)
         if note_cell is None:
             note_cell = QTableWidgetItem(note_preview)
-            self._table.setItem(row_index, 6, note_cell)
+            self._table.setItem(row_index, 7, note_cell)
         else:
             note_cell.setText(note_preview)
         self._on_selection_changed()
@@ -361,6 +398,9 @@ class HistoryPanel(QWidget):
                         "status",
                         "rating",
                         "duration_ms",
+                        "prompt_tokens",
+                        "completion_tokens",
+                        "total_tokens",
                         "executed_at",
                         "error",
                         "note",
@@ -373,12 +413,18 @@ class HistoryPanel(QWidget):
                     note = ""
                     if execution.metadata:
                         note = str(execution.metadata.get("note") or "")
+                    prompt_tokens, completion_tokens, usage_total = self._usage_from_metadata(
+                        execution.metadata
+                    )
                     writer.writerow(
                         [
                             row.prompt_name,
                             execution.status.value,
                             execution.rating if execution.rating is not None else "",
                             execution.duration_ms if execution.duration_ms is not None else "",
+                            prompt_tokens,
+                            completion_tokens,
+                            usage_total,
                             execution.executed_at.isoformat(),
                             execution.error_message or "",
                             note,
@@ -422,3 +468,29 @@ class HistoryPanel(QWidget):
         if lines and lines[-1] == "":
             lines.pop()
         return lines
+
+    @staticmethod
+    def _usage_from_metadata(metadata: Any) -> tuple[int, int, int]:
+        """Extract prompt/completion/total tokens from metadata."""
+        if not isinstance(metadata, dict):
+            return (0, 0, 0)
+        usage = metadata.get("usage")
+        if not isinstance(usage, dict):
+            return (0, 0, 0)
+        return (
+            HistoryPanel._coerce_int(usage.get("prompt_tokens")),
+            HistoryPanel._coerce_int(usage.get("completion_tokens")),
+            HistoryPanel._coerce_int(usage.get("total_tokens")),
+        )
+
+    @staticmethod
+    def _coerce_int(value: Any) -> int:
+        if value in (None, ""):
+            return 0
+        try:
+            return int(value)  # type: ignore[call-arg]
+        except (TypeError, ValueError):
+            try:
+                return int(float(value))  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                return 0

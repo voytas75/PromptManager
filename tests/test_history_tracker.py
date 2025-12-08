@@ -1,4 +1,9 @@
-"""Unit tests for HistoryTracker execution logging."""
+"""Unit tests for HistoryTracker execution logging.
+
+Updates:
+  v0.1.1 - 2025-12-08 - Assert token usage aggregates and totals helper.
+  v0.1.0 - 2025-11-08 - Introduce HistoryTracker regression coverage.
+"""
 
 from __future__ import annotations
 
@@ -98,6 +103,7 @@ def test_history_tracker_summarize_returns_metrics(tmp_path) -> None:
         response_text="ok",
         duration_ms=100,
         rating=4.0,
+        metadata={"usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30}},
     )
     tracker.record_failure(
         prompt_id=prompt.id,
@@ -110,6 +116,7 @@ def test_history_tracker_summarize_returns_metrics(tmp_path) -> None:
         response_text="better",
         duration_ms=50,
         rating=5.0,
+        metadata={"usage": {"prompt_tokens": 5, "completion_tokens": 6, "total_tokens": 11}},
     )
 
     analytics = tracker.summarize(window_days=None, prompt_limit=3, trend_window=2)
@@ -122,6 +129,12 @@ def test_history_tracker_summarize_returns_metrics(tmp_path) -> None:
     assert pytest.approx(stats.success_rate, rel=1e-3) == 2 / 3
     assert stats.rating_trend is not None
     assert stats.average_duration_ms and stats.average_duration_ms >= 50
+    assert analytics.prompt_tokens == 15
+    assert analytics.completion_tokens == 26
+    assert analytics.total_tokens == 41
+    assert stats.prompt_tokens == 15
+    assert stats.completion_tokens == 26
+    assert stats.total_tokens == 41
 
 
 def test_history_tracker_summarize_handles_empty_history(tmp_path) -> None:
@@ -146,6 +159,7 @@ def test_history_tracker_summarize_prompt_returns_metrics(tmp_path) -> None:
         response_text="ok",
         duration_ms=80,
         rating=4.5,
+        metadata={"usage": {"prompt_tokens": 4, "completion_tokens": 5, "total_tokens": 9}},
     )
     tracker.record_failure(
         prompt_id=prompt.id,
@@ -161,6 +175,28 @@ def test_history_tracker_summarize_prompt_returns_metrics(tmp_path) -> None:
     assert stats.average_duration_ms == pytest.approx(80.0)
     assert stats.average_rating == pytest.approx(4.5)
     assert stats.rating_trend is not None
+    assert stats.prompt_tokens == 4
+    assert stats.completion_tokens == 5
+    assert stats.total_tokens == 9
 
     missing = tracker.summarize_prompt(uuid.uuid4(), window_days=None)
     assert missing is None
+
+
+def test_history_tracker_token_usage_totals(tmp_path) -> None:
+    repo = PromptRepository(str(tmp_path / "repo.db"))
+    prompt = _make_prompt()
+    repo.add(prompt)
+    tracker = HistoryTracker(repo)
+
+    tracker.record_success(
+        prompt_id=prompt.id,
+        request_text="demo",
+        response_text="ok",
+        metadata={"usage": {"prompt_tokens": 2, "completion_tokens": 3, "total_tokens": 5}},
+    )
+
+    totals = tracker.token_usage_totals()
+    assert totals.prompt_tokens == 2
+    assert totals.completion_tokens == 3
+    assert totals.total_tokens == 5

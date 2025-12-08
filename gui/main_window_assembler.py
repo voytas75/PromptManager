@@ -1,6 +1,7 @@
 """Helper builders for gui.main_window controller wiring.
 
 Updates:
+  v0.16.2 - 2025-12-08 - Wire token usage label into the execution controller.
   v0.16.1 - 2025-12-04 - Pass web search checkbox into execution controller.
   v0.16.0 - 2025-12-02 - Extract presenter, quick action, and execution controller setup.
 """
@@ -106,6 +107,7 @@ def assemble_execution_controller(window: MainWindow) -> ExecutionController:
         query_input=window._query_input,  # type: ignore[attr-defined]
         result_label=window._result_label,  # type: ignore[attr-defined]
         result_meta=window._result_meta,  # type: ignore[attr-defined]
+        token_usage_label=window._token_usage_label,  # type: ignore[attr-defined]
         result_tabs=window._result_tabs,  # type: ignore[attr-defined]
         result_text=window._result_text,  # type: ignore[attr-defined]
         chat_history_view=window._chat_history_view,  # type: ignore[attr-defined]

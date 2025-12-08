@@ -1,6 +1,7 @@
 """CLI command handlers for Prompt Manager.
 
 Updates:
+  v0.33.1 - 2025-12-08 - Surface token usage totals in history analytics output.
   v0.33.0 - 2025-12-06 - Switch prompt chain CLI to plain-text inputs.
   v0.32.2 - 2025-12-05 - Add prompt chain web search toggle wiring for CLI runs.
   v0.32.1 - 2025-12-05 - Sort imports for lint compliance.
@@ -26,6 +27,7 @@ from core import (
     PromptChainExecutionError,
     PromptHistoryError,
     PromptManagerError,
+    TokenUsageTotals,
     build_analytics_snapshot,
     export_prompt_catalog,
     snapshot_dataset_rows,
@@ -729,6 +731,25 @@ def run_history_analytics(
         if analytics.window_start is not None
         else "Full history"
     )
+
+    def _format_totals(label: str, totals: TokenUsageTotals | None) -> str:
+        if totals is None:
+            return f"{label}: unavailable"
+        return (
+            f"{label}: prompt={totals.prompt_tokens} "
+            f"completion={totals.completion_tokens} total={totals.total_tokens}"
+        )
+
+    window_totals: TokenUsageTotals | None
+    overall_totals: TokenUsageTotals | None
+    try:
+        window_totals = manager.get_token_usage_totals(since=analytics.window_start)
+        overall_totals = manager.get_token_usage_totals()
+    except PromptHistoryError:
+        logger.warning("Unable to compute token usage totals for CLI output", exc_info=True)
+        window_totals = None
+        overall_totals = None
+
     lines = [
         "Execution analytics",
         "-------------------",
@@ -739,6 +760,12 @@ def run_history_analytics(
         f"Average rating: {format_metric(analytics.average_rating)}",
         "",
     ]
+    if window_totals is not None:
+        lines.append(_format_totals("Tokens (window)", window_totals))
+    if overall_totals is not None:
+        lines.append(_format_totals("Tokens (overall)", overall_totals))
+    if window_totals is not None or overall_totals is not None:
+        lines.append("")
 
     if not analytics.prompt_breakdown:
         lines.append("No prompts have execution history within this window.")
@@ -757,7 +784,7 @@ def run_history_analytics(
                 f"{index}. {stats.name} — runs:{stats.total_runs} "
                 f"success:{stats.success_rate * 100:.1f}% "
                 f"avg_rating:{avg_rating} trend:{trend} latency:{latency} "
-                f"last:{last_run}"
+                f"last:{last_run} tokens:{stats.total_tokens}"
             )
 
     print("\n".join(lines))

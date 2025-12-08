@@ -83,6 +83,7 @@ EOF
 - Live Jinja2 template preview pane beside the workspace that renders prompts with JSON variables, ships custom filters (`truncate`, `slugify`, `json`), and validates payloads with optional JSON Schema or Pydantic feedback in real time.
 - Prompt Parts registry with a dedicated GUI tab, CRUD, clipboard/export helpers, and reusable tone/formatting presets that can be attached to executions for consistent voice.
 - Prompt execution workspace with LiteLLM-backed runs, streaming output, chat-style transcripts, rating-based quality feedback, export/import utilities, and persisted execution history complete with context metadata (model, streaming flag, style hints).
+- Token usage tracking that shows per-run prompt/completion/total tokens in the workspace and History tab, keeps running session totals (plus all-time totals) in the workspace header, and adds a dedicated token summary to the analytics dashboard and CLI outputs.
 - Voice playback button in the workspace overlay streams LiteLLM text-to-speech audio as it downloads (enabled by default, toggle via `PROMPT_MANAGER_LITELLM_TTS_STREAM`).
 - Provider-agnostic web search integrations (now supporting Exa, Tavily, Serper, SerpApi, and Google Programmable Search) plus a workspace “Use web search” toggle (on by default) that injects every available snippet (summary + highlights) before each run—when those snippets exceed roughly 5,000 words, the fast LiteLLM model condenses them automatically so prompts still stay concise.
 - Dedicated Prompt Template editor dialog (toolbar button) that exposes every LiteLLM system prompt with inline validation and reset-to-default controls so teams can fine-tune guidance without editing config files.
@@ -112,6 +113,7 @@ Prompt parts can be copied, exported to Markdown, or deleted from the tab. They 
 ### Execution History & Auditing
 
 Every run logs to SQLite with request/response snippets, latency, token usage, status, and structured context metadata (prompt info, model, streaming flag, prompt-part fingerprints). The GUI History tab and programmatic APIs (`list_recent_executions`, `list_executions_for_prompt`) surface the data for reviews, and the log payload is ready for downstream analytics or incident investigations.
+Per-entry token usage appears directly in the History table, detail view, and CSV exports so teams can reconcile prompt costs without leaving the app.
 
 ## Developer
 
