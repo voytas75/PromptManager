@@ -1,6 +1,7 @@
 """Utility helpers shared across Enhanced Prompt Workbench widgets.
 
 Updates:
+  v0.1.1 - 2025-12-08 - Cast application palette retrieval for Pyright.
   v0.1.0 - 2025-12-04 - Extract palette helpers, snippet presets, and token parsing.
 """
 
@@ -8,7 +9,7 @@ from __future__ import annotations
 
 import re
 import textwrap
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QGuiApplication
@@ -44,7 +45,7 @@ def inherit_palette(widget: QWidget) -> None:
     parent = widget.parent()
     palette = parent.palette() if isinstance(parent, QWidget) else None
     if palette is None:
-        app = QGuiApplication.instance()
+        app = cast("QGuiApplication | None", QGuiApplication.instance())
         palette = app.palette() if app is not None else None
     if palette is None:
         return

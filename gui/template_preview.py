@@ -1,6 +1,7 @@
 """Workspace template preview widget with live variable validation.
 
 Updates:
+  v0.2.3 - 2025-12-08 - Align Qt enums, wrapping modes, and schema helpers for Pyright.
   v0.2.2 - 2025-11-29 - Allow programmatic variable population and refresh hooks
     for external editors.
   v0.2.1 - 2025-11-29 - Wrap schema persistence logic to satisfy Ruff line length.
@@ -10,11 +11,7 @@ Updates:
   v0.1.7 - 2025-11-27 - Make the variables/schema editors and rendered preview vertically resizable.
   v0.1.6 - 2025-11-27 - Consolidate template status messaging into the footer label only.
   v0.1.5 - 2025-11-27 - Persist splitter sizes for the status and preview panes.
-  v0.1.4 - 2025-11-27 - Add contextual hints for template syntax errors.
-  v0.1.3 - 2025-11-27 - Keep raw templates visible while surfacing parse/render errors.
-  v0.1.2 - 2025-11-27 - Make rendered prompt view resizable with a splitter.
-  v0.1.1 - 2025-11-27 - Capture variables with multiline editors sized to four lines.
-  v0.1.0 - 2025-11-25 - Add dynamic Jinja2 preview with custom filters and schema validation.
+  v0.1.4-and-earlier - 2025-11-27 - Added template syntax hints, multi-line editors, and initial preview.
 """
 
 from __future__ import annotations
@@ -45,7 +42,7 @@ from core.templating import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Iterable, Mapping, Sequence
 
 
 class TemplatePreviewWidget(QWidget):
@@ -113,7 +110,7 @@ class TemplatePreviewWidget(QWidget):
 
         frame = QFrame(self)
         frame.setObjectName("templatePreviewFrame")
-        frame.setFrameShape(QFrame.StyledPanel)
+        frame.setFrameShape(QFrame.Shape.StyledPanel)
         frame_layout = QVBoxLayout(frame)
         frame_layout.setContentsMargins(8, 8, 8, 8)
         frame_layout.setSpacing(8)
@@ -242,7 +239,7 @@ class TemplatePreviewWidget(QWidget):
             label.setStyleSheet("font-weight: 500;")
             field = QPlainTextEdit(container)
             field.setPlaceholderText(f"Enter value for {name}…")
-            field.setLineWrapMode(QPlainTextEdit.WidgetWidth)
+            field.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
             metrics = field.fontMetrics()
             default_height = (metrics.lineSpacing() * 4) + 12
             field.setFixedHeight(default_height)
@@ -368,7 +365,7 @@ class TemplatePreviewWidget(QWidget):
             self._schema_panel.setVisible(self._schema_visible)
         self._update_preview()
 
-    def _top_level_fields(self, field_paths: Sequence[str]) -> set[str]:
+    def _top_level_fields(self, field_paths: Iterable[str]) -> set[str]:
         invalid: set[str] = set()
         for path in field_paths:
             if not path:

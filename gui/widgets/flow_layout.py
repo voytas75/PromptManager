@@ -1,6 +1,7 @@
 """Flow layout helper used by tabs with wrap-around action buttons.
 
 Updates:
+  v0.1.1 - 2025-12-08 - Align layout overrides with PySide6 typing requirements.
   v0.1.0 - 2025-11-30 - Extract FlowLayout from main window module.
 """
 
@@ -43,13 +44,13 @@ class FlowLayout(QLayout):
             return self._item_list[index]
         return None
 
-    def takeAt(self, index: int) -> QLayoutItem | None:
+    def takeAt(self, index: int) -> QLayoutItem:
         """Remove and return the item at *index*."""
         if 0 <= index < len(self._item_list):
             return self._item_list.pop(index)
-        return None
+        raise IndexError("FlowLayout index out of range")
 
-    def expandingDirections(self) -> Qt.Orientations:
+    def expandingDirections(self) -> Qt.Orientation:
         """FlowLayout never expands to fill space."""
         return Qt.Orientation(0)
 

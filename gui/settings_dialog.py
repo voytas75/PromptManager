@@ -1,6 +1,7 @@
 """Settings dialog for configuring Prompt Manager runtime options.
 
 Updates:
+  v0.2.19 - 2025-12-08 - Align Qt enums and type hints with PySide6 stubs for Pyright.
   v0.2.18 - 2025-12-07 - Add Google Programmable Search fields to the Integrations tab.
   v0.2.17 - 2025-12-07 - Add SerpApi provider selector and API key entry.
   v0.2.16 - 2025-12-07 - Add Serper provider selector and API key entry.
@@ -9,19 +10,17 @@ Updates:
   v0.2.13 - 2025-12-04 - Add auto-open share link preference toggle.
   v0.2.12 - 2025-12-04 - Add web search integrations tab and Exa API key field.
   v0.2.11 - 2025-12-03 - Add LiteLLM TTS model configuration field.
-  v0.2.10 - 2025-11-29 - Wrap quick action/parameter parsing for Ruff line length.
-  v0.2.9 - 2025-11-28 - Persist dialog geometry between sessions.
-  v0.2.7-and-earlier - 2025-12-06 - LiteLLM embedding + template override history.
+  v0.2.9-and-earlier - 2025-12-06 - LiteLLM embedding + template override history.
 """
 
 from __future__ import annotations
 
 import json
 from functools import partial
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
-from PySide6.QtCore import QEvent, QSettings, Qt
-from PySide6.QtGui import QColor, QGuiApplication, QPalette
+from PySide6.QtCore import QSettings, Qt
+from PySide6.QtGui import QCloseEvent, QColor, QGuiApplication, QPalette
 from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
@@ -194,7 +193,7 @@ class SettingsDialog(QDialog):
         if isinstance(width, int) and isinstance(height, int) and width > 0 and height > 0:
             self.resize(width, height)
 
-    def closeEvent(self, event: QEvent) -> None:  # type: ignore[override]
+    def closeEvent(self, event: QCloseEvent) -> None:  # pragma: no cover - Qt hook
         """Persist the dialog geometry before closing."""
         self._settings.setValue("width", self.width())
         self._settings.setValue("height", self.height())
@@ -202,7 +201,7 @@ class SettingsDialog(QDialog):
 
     def _build_ui(self) -> None:
         palette = self.palette()
-        window_color = palette.color(QPalette.Window)
+        window_color = palette.color(QPalette.ColorRole.Window)
         border_color = QColor(
             255 - window_color.red(),
             255 - window_color.green(),
@@ -241,7 +240,7 @@ class SettingsDialog(QDialog):
         litellm_form.addRow("LiteLLM embedding model", self._embedding_model_input)
 
         self._api_key_input = QLineEdit(self._litellm_api_key, litellm_tab)
-        self._api_key_input.setEchoMode(QLineEdit.Password)
+        self._api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
         litellm_form.addRow("LiteLLM API key", self._api_key_input)
 
         self._api_base_input = QLineEdit(self._litellm_api_base, litellm_tab)
@@ -380,31 +379,31 @@ class SettingsDialog(QDialog):
         integrations_form.addRow(random_hint)
 
         exa_api_key_input = QLineEdit(self._exa_api_key, integrations_tab)
-        exa_api_key_input.setEchoMode(QLineEdit.Password)
+        exa_api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
         exa_api_key_input.setPlaceholderText("exa_********************************")
         self._exa_api_key_input = exa_api_key_input
         integrations_form.addRow("Exa API key", exa_api_key_input)
 
         tavily_api_key_input = QLineEdit(self._tavily_api_key, integrations_tab)
-        tavily_api_key_input.setEchoMode(QLineEdit.Password)
+        tavily_api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
         tavily_api_key_input.setPlaceholderText("tvly-********************************")
         self._tavily_api_key_input = tavily_api_key_input
         integrations_form.addRow("Tavily API key", tavily_api_key_input)
 
         serper_api_key_input = QLineEdit(self._serper_api_key, integrations_tab)
-        serper_api_key_input.setEchoMode(QLineEdit.Password)
+        serper_api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
         serper_api_key_input.setPlaceholderText("serper-********************************")
         self._serper_api_key_input = serper_api_key_input
         integrations_form.addRow("Serper API key", serper_api_key_input)
 
         serpapi_api_key_input = QLineEdit(self._serpapi_api_key, integrations_tab)
-        serpapi_api_key_input.setEchoMode(QLineEdit.Password)
+        serpapi_api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
         serpapi_api_key_input.setPlaceholderText("serpapi-********************************")
         self._serpapi_api_key_input = serpapi_api_key_input
         integrations_form.addRow("SerpApi API key", serpapi_api_key_input)
 
         google_api_key_input = QLineEdit(self._google_api_key, integrations_tab)
-        google_api_key_input.setEchoMode(QLineEdit.Password)
+        google_api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
         google_api_key_input.setPlaceholderText("AIza********************************")
         self._google_api_key_input = google_api_key_input
         integrations_form.addRow("Google API key", google_api_key_input)
@@ -528,7 +527,7 @@ class SettingsDialog(QDialog):
         for key in PROMPT_TEMPLATE_KEYS:
             section = QFrame(scroll_container)
             section.setObjectName(f"promptTemplateSection_{key}")
-            section.setFrameShape(QFrame.StyledPanel)
+            section.setFrameShape(QFrame.Shape.StyledPanel)
             section_layout = QVBoxLayout(section)
             section_layout.setContentsMargins(12, 8, 12, 12)
 
@@ -590,7 +589,7 @@ class SettingsDialog(QDialog):
             return
         normalized = color.name().lower()
         border = QColor(normalized).darker(115).name()
-        r, g, b, _ = color.getRgb()
+        r, g, b, _ = cast("tuple[int, int, int, int]", color.getRgb())
         luminance = (0.299 * r) + (0.587 * g) + (0.114 * b)
         text_color = "#1f2933" if luminance >= 150 else "#f9fafc"
         self._chat_color_preview.setStyleSheet(

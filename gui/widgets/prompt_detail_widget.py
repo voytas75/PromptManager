@@ -1,6 +1,7 @@
 """Prompt detail panel shared between main and template tabs.
 
 Updates:
+  v0.1.2 - 2025-12-08 - Align palette usage with Qt ColorRole enums.
   v0.1.1 - 2025-12-08 - Reworked prompt detail layout with grouped actions.
   v0.1.0 - 2025-11-30 - Extract prompt detail widget for reuse/testing.
 """
@@ -404,7 +405,7 @@ class PromptDetailWidget(QWidget):
 
     def _label_color(self) -> str:
         """Return a label colour with ≥4.5 contrast for the current palette."""
-        background = self.palette().color(QPalette.Window)
+        background = self.palette().color(QPalette.ColorRole.Window)
         background_lum = self._relative_luminance(
             background.redF(), background.greenF(), background.blueF()
         )

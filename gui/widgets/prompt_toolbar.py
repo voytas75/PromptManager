@@ -1,6 +1,7 @@
 """Toolbar widget containing search and primary catalog actions.
 
 Updates:
+  v0.2.5 - 2025-12-08 - Use QStyle.StandardPixmap enums for icon lookup typing.
   v0.2.4 - 2025-12-05 - Move import/export/maintenance/notifications into the Settings menu.
   v0.2.3 - 2025-12-05 - Combine Add/New prompt actions into a single menu button.
   v0.2.2 - 2025-12-05 - Remove Prompt Templates toolbar button.
@@ -112,7 +113,9 @@ class PromptToolbar(QWidget):
         self._settings_button.setMenu(settings_menu)
 
         self._exit_button = QToolButton(self)
-        self._exit_button.setIcon(self.style().standardIcon(QStyle.SP_TitleBarCloseButton))
+        self._exit_button.setIcon(
+            self.style().standardIcon(QStyle.StandardPixmap.SP_TitleBarCloseButton)
+        )
         self._exit_button.setToolTip("Exit Prompt Manager")
         self._exit_button.setAccessibleName("Exit Prompt Manager")
         self._exit_button.setAutoRaise(True)

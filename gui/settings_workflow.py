@@ -1,6 +1,7 @@
 """Settings workflows for the Prompt Manager main window.
 
 Updates:
+  v0.15.87 - 2025-12-08 - Tighten dialog typings and casts for Pyright.
   v0.15.86 - 2025-12-07 - Pass Google Programmable Search credentials through the dialog.
   v0.15.85 - 2025-12-07 - Accept generic run buttons to support split actions.
   v0.15.84 - 2025-12-07 - Pass SerpApi credentials through the settings workflow dialog.
@@ -10,27 +11,22 @@ Updates:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Callable
+from typing import Mapping, Sequence, cast
 
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QAbstractButton, QDialog, QMessageBox, QWidget
 
 from config import DEFAULT_THEME_MODE, PromptManagerSettings
 from core import NameGenerationError, PromptManager
 
+from .appearance_controller import AppearanceController
+from .controllers.execution_controller import ExecutionController
 from .prompt_templates_dialog import PromptTemplateEditorDialog
+from .prompt_search_controller import LoadPromptsCallable
+from .quick_action_controller import QuickActionController
 from .runtime_settings_service import RuntimeSettingsResult, RuntimeSettingsService
 from .settings_dialog import SettingsDialog
-
-if TYPE_CHECKING:  # pragma: no cover - typing helpers
-    from collections.abc import Callable
-
-    from PySide6.QtWidgets import QAbstractButton, QWidget
-else:  # pragma: no cover - runtime placeholders for type-only imports
-    from typing import Any as _Any
-
-    Callable = _Any
-    QAbstractButton = _Any
-    QWidget = _Any
+from .template_preview import TemplatePreviewWidget
 
 
 class SettingsWorkflow:
@@ -43,14 +39,14 @@ class SettingsWorkflow:
         manager: PromptManager,
         runtime_settings_service: RuntimeSettingsService,
         runtime_settings: dict[str, object | None],
-        quick_action_supplier: Callable[[], object | None],
+        quick_action_supplier: Callable[[], QuickActionController | None],
         prompt_generation_refresher: Callable[[], None],
-        appearance_controller,
-        execution_controller_supplier: Callable[[], object | None],
-        load_prompts: Callable[[str], None],
+        appearance_controller: AppearanceController,
+        execution_controller_supplier: Callable[[], ExecutionController | None],
+        load_prompts: LoadPromptsCallable,
         current_search_text: Callable[[], str],
         run_button: QAbstractButton,
-        template_preview_supplier: Callable[[], object | None],
+        template_preview_supplier: Callable[[], TemplatePreviewWidget | None],
         toast_callback: Callable[[str], None],
         web_search_tooltip_updater: Callable[[], None],
     ) -> None:
@@ -75,35 +71,36 @@ class SettingsWorkflow:
     # ------------------------------------------------------------------
     def open_settings_dialog(self, settings: PromptManagerSettings | None = None) -> None:
         """Display the settings dialog and apply any accepted updates."""
+        data = self._runtime_settings
         dialog = SettingsDialog(
             self._parent,
-            litellm_model=self._runtime_settings.get("litellm_model"),
-            litellm_inference_model=self._runtime_settings.get("litellm_inference_model"),
-            litellm_api_key=self._runtime_settings.get("litellm_api_key"),
-            litellm_api_base=self._runtime_settings.get("litellm_api_base"),
-            litellm_api_version=self._runtime_settings.get("litellm_api_version"),
-            litellm_drop_params=self._runtime_settings.get("litellm_drop_params"),
-            litellm_reasoning_effort=self._runtime_settings.get("litellm_reasoning_effort"),
-            litellm_tts_model=self._runtime_settings.get("litellm_tts_model"),
-            litellm_tts_stream=self._runtime_settings.get("litellm_tts_stream"),
-            litellm_stream=self._runtime_settings.get("litellm_stream"),
-            litellm_workflow_models=self._runtime_settings.get("litellm_workflow_models"),
-            embedding_model=self._runtime_settings.get("embedding_model"),
-            quick_actions=self._runtime_settings.get("quick_actions"),
-            chat_user_bubble_color=self._runtime_settings.get("chat_user_bubble_color"),
-            theme_mode=self._runtime_settings.get("theme_mode"),
-            chat_colors=self._runtime_settings.get("chat_colors"),
-            prompt_templates=self._runtime_settings.get("prompt_templates"),
-            web_search_provider=self._runtime_settings.get("web_search_provider"),
-            exa_api_key=self._runtime_settings.get("exa_api_key"),
-            tavily_api_key=self._runtime_settings.get("tavily_api_key"),
-            serper_api_key=self._runtime_settings.get("serper_api_key"),
-            serpapi_api_key=self._runtime_settings.get("serpapi_api_key"),
-            google_api_key=self._runtime_settings.get("google_api_key"),
-            google_cse_id=self._runtime_settings.get("google_cse_id"),
-            auto_open_share_links=self._runtime_settings.get("auto_open_share_links"),
+            litellm_model=cast("str | None", data.get("litellm_model")),
+            litellm_inference_model=cast("str | None", data.get("litellm_inference_model")),
+            litellm_api_key=cast("str | None", data.get("litellm_api_key")),
+            litellm_api_base=cast("str | None", data.get("litellm_api_base")),
+            litellm_api_version=cast("str | None", data.get("litellm_api_version")),
+            litellm_drop_params=cast("Sequence[str] | None", data.get("litellm_drop_params")),
+            litellm_reasoning_effort=cast("str | None", data.get("litellm_reasoning_effort")),
+            litellm_tts_model=cast("str | None", data.get("litellm_tts_model")),
+            litellm_tts_stream=cast("bool | None", data.get("litellm_tts_stream")),
+            litellm_stream=cast("bool | None", data.get("litellm_stream")),
+            litellm_workflow_models=cast("Mapping[str, str] | None", data.get("litellm_workflow_models")),
+            embedding_model=cast("str | None", data.get("embedding_model")),
+            quick_actions=cast("list[dict[str, object]] | None", data.get("quick_actions")),
+            chat_user_bubble_color=cast("str | None", data.get("chat_user_bubble_color")),
+            theme_mode=cast("str | None", data.get("theme_mode")),
+            chat_colors=cast("dict[str, str] | None", data.get("chat_colors")),
+            prompt_templates=cast("dict[str, str] | None", data.get("prompt_templates")),
+            web_search_provider=cast("str | None", data.get("web_search_provider")),
+            exa_api_key=cast("str | None", data.get("exa_api_key")),
+            tavily_api_key=cast("str | None", data.get("tavily_api_key")),
+            serper_api_key=cast("str | None", data.get("serper_api_key")),
+            serpapi_api_key=cast("str | None", data.get("serpapi_api_key")),
+            google_api_key=cast("str | None", data.get("google_api_key")),
+            google_cse_id=cast("str | None", data.get("google_cse_id")),
+            auto_open_share_links=cast("bool | None", data.get("auto_open_share_links")),
         )
-        if dialog.exec() != SettingsDialog.Accepted:
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         updates = dialog.result_settings()
         self.apply_settings(updates)
@@ -112,9 +109,9 @@ class SettingsWorkflow:
         """Launch the prompt templates override dialog."""
         dialog = PromptTemplateEditorDialog(
             self._parent,
-            templates=self._runtime_settings.get("prompt_templates"),
+            templates=cast("Mapping[str, str] | None", self._runtime_settings.get("prompt_templates")),
         )
-        if dialog.exec() != PromptTemplateEditorDialog.Accepted:
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         overrides = dialog.result_templates()
         cleaned_overrides: dict[str, str] | None = overrides or None

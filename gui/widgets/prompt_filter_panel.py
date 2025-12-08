@@ -1,6 +1,7 @@
 """Filter panel widget for category, tag, quality, and sort controls.
 
 Updates:
+  v0.1.1 - 2025-12-08 - Adopt ButtonSymbols enum for quality spin box typing.
   v0.1.0 - 2025-11-30 - Extract reusable prompt filter panel widget.
 """
 
@@ -70,7 +71,7 @@ class PromptFilterPanel(QWidget):
         self._quality_spin.setRange(0.0, 10.0)
         self._quality_spin.setDecimals(1)
         self._quality_spin.setSingleStep(0.1)
-        self._quality_spin.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self._quality_spin.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         self._quality_spin.setAlignment(Qt.AlignmentFlag.AlignRight)
         self._quality_spin.setMinimumWidth(
             self._quality_spin.fontMetrics().horizontalAdvance("10.0") + 32
