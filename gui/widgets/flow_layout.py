@@ -1,11 +1,14 @@
 """Flow layout helper used by tabs with wrap-around action buttons.
 
 Updates:
+  v0.1.2 - 2025-12-08 - Cast contents margins to satisfy PySide6 typing quirks.
   v0.1.1 - 2025-12-08 - Align layout overrides with PySide6 typing requirements.
   v0.1.0 - 2025-11-30 - Extract FlowLayout from main window module.
 """
 
 from __future__ import annotations
+
+from typing import cast
 
 from PySide6.QtCore import QPoint, QRect, QSize, Qt
 from PySide6.QtWidgets import QLayout, QLayoutItem, QWidget, QWidgetItem
@@ -76,13 +79,13 @@ class FlowLayout(QLayout):
         size = QSize()
         for item in self._item_list:
             size = size.expandedTo(item.minimumSize())
-        left, top, right, bottom = self.getContentsMargins()
+        left, top, right, bottom = cast(tuple[int, int, int, int], self.getContentsMargins())
         size += QSize(left + right, top + bottom)
         return size
 
     def _do_layout(self, rect: QRect, *, test_only: bool) -> int:
         """Lay out items either virtually (when *test_only*) or for rendering."""
-        left, top, right, bottom = self.getContentsMargins()
+        left, top, right, bottom = cast(tuple[int, int, int, int], self.getContentsMargins())
         effective_rect = rect.adjusted(left, top, -right, -bottom)
         x = effective_rect.x()
         y = effective_rect.y()

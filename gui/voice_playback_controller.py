@@ -1,6 +1,7 @@
 """LiteLLM-powered voice playback for workspace results.
 
 Updates:
+  v0.1.1 - 2025-12-08 - Harden PySide6 typing guards and LiteLLM payload validation.
   v0.1.0 - 2025-12-03 - Introduce controller that streams LiteLLM TTS output to Qt audio.
 """
 
@@ -12,7 +13,16 @@ import threading
 from collections.abc import Mapping
 from pathlib import Path
 
+from typing import TYPE_CHECKING, Any, Callable, Iterable, TypedDict
+
 from PySide6.QtCore import QObject, QUrl, Signal
+
+if TYPE_CHECKING:  # pragma: no cover - typing helpers
+    from PySide6.QtMultimedia import QAudioOutput as QAudioOutputType
+    from PySide6.QtMultimedia import QMediaPlayer as QMediaPlayerType
+else:  # pragma: no cover - runtime placeholders when Qt multimedia is missing
+    QAudioOutputType = Any
+    QMediaPlayerType = Any
 
 _LITELLM_IMPORT_ERROR: str | None = None
 
@@ -48,6 +58,14 @@ class VoicePlaybackError(RuntimeError):
     """Raised when LiteLLM voice playback cannot proceed."""
 
 
+class _RuntimePayload(TypedDict):
+    model: str
+    voice: str
+    api_key: str
+    api_base: str | None
+    api_version: str | None
+
+
 class VoicePlaybackController(QObject):
     """Manage LiteLLM TTS downloads and Qt audio playback."""
 
@@ -61,15 +79,17 @@ class VoicePlaybackController(QObject):
         """Initialise the controller with optional QObject *parent*."""
         super().__init__(parent)
         self._supported = bool(_MULTIMEDIA_AVAILABLE and QMediaPlayer and QAudioOutput)
-        self._player: QMediaPlayer | None = None
-        self._audio_output: QAudioOutput | None = None
+        self._player: QMediaPlayerType | None = None
+        self._audio_output: QAudioOutputType | None = None
         if self._supported and QMediaPlayer is not None and QAudioOutput is not None:
-            self._player = QMediaPlayer(self)
-            self._audio_output = QAudioOutput(self)
-            self._player.setAudioOutput(self._audio_output)
-            self._player.playbackStateChanged.connect(  # type: ignore[arg-type]
+            player = QMediaPlayer(self)
+            audio_output = QAudioOutput(self)
+            player.setAudioOutput(audio_output)
+            player.playbackStateChanged.connect(  # type: ignore[arg-type]
                 self._handle_state_changed
             )
+            self._player = player
+            self._audio_output = audio_output
             self.playback_ready.connect(self._handle_playback_ready)
         self._worker: threading.Thread | None = None
         self._stop_event = threading.Event()
@@ -121,9 +141,9 @@ class VoicePlaybackController(QObject):
         self._is_preparing = True
         self.playback_preparing.emit()
         self._stop_event.clear()
-        runtime_payload = {
+        runtime_payload: _RuntimePayload = {
             "model": tts_model.strip(),
-            "voice": voice or DEFAULT_TTS_VOICE,
+            "voice": (voice or DEFAULT_TTS_VOICE).strip() or DEFAULT_TTS_VOICE,
             "api_key": api_key.strip(),
             "api_base": api_base.strip() if api_base else None,
             "api_version": api_version.strip() if api_version else None,
@@ -140,6 +160,7 @@ class VoicePlaybackController(QObject):
         self._stop_event.set()
         if (
             self._player is not None
+            and QMediaPlayer is not None
             and self._player.playbackState() != QMediaPlayer.PlaybackState.StoppedState
         ):
             self._player.stop()
@@ -150,7 +171,7 @@ class VoicePlaybackController(QObject):
     def _download_and_prepare(
         self,
         text: str,
-        runtime_payload: Mapping[str, str | None],
+        runtime_payload: _RuntimePayload,
         stream_audio: bool,
     ) -> None:
         if litellm is None:
@@ -163,10 +184,10 @@ class VoicePlaybackController(QObject):
 
         try:
             response = litellm.speech(  # type: ignore[attr-defined]
-                model=runtime_payload.get("model"),
-                voice=runtime_payload.get("voice"),
+                model=runtime_payload["model"],
+                voice=runtime_payload["voice"],
                 input=text,
-                api_key=runtime_payload.get("api_key"),
+                api_key=runtime_payload["api_key"],
                 api_base=runtime_payload.get("api_base"),
                 api_version=runtime_payload.get("api_version"),
             )
@@ -214,7 +235,7 @@ class VoicePlaybackController(QObject):
             self.playback_ready.emit(str(path))
 
     def _handle_playback_ready(self, path_str: str) -> None:
-        if self._player is None:
+        if self._player is None or QMediaPlayer is None:
             self.playback_failed.emit("Qt multimedia backend is unavailable on this system.")
             self._is_preparing = False
             return
@@ -224,29 +245,37 @@ class VoicePlaybackController(QObject):
         self._is_playing = True
         self.playback_started.emit()
 
-    def _handle_state_changed(self, state) -> None:  # pragma: no cover - Qt signal
+    def _handle_state_changed(self, state: object) -> None:  # pragma: no cover - Qt signal
+        if QMediaPlayer is None:
+            return
         if state == QMediaPlayer.PlaybackState.StoppedState and self._is_playing:
             self._finalise_stop()
             self.playback_finished.emit()
 
     def _write_response_to_file(
         self,
-        response: object,
+        response: Any,
         path: Path,
         stream_audio: bool,
     ) -> tuple[bool, bool]:
-        iterator_factory = getattr(response, "iter_bytes", None)
+        iterator_factory: Callable[[], Iterable[bytes]] | None = getattr(
+            response, "iter_bytes", None
+        )
         if not callable(iterator_factory):
             stream_to_file = getattr(response, "stream_to_file", None)
             if callable(stream_to_file):
                 stream_to_file(path)
             else:
                 content = getattr(response, "content", None)
-                if content is None and callable(getattr(response, "read", None)):
-                    content = response.read()
+                if content is None:
+                    reader = getattr(response, "read", None)
+                    if callable(reader):
+                        content = reader()
                 if content is None:
                     raise VoicePlaybackError("LiteLLM response did not expose audio content.")
-                path.write_bytes(content)
+                if not isinstance(content, (bytes, bytearray, memoryview)):
+                    raise VoicePlaybackError("LiteLLM response returned unexpected payload type.")
+                path.write_bytes(bytes(content))
             try:
                 size = path.stat().st_size
             except FileNotFoundError:

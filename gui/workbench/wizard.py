@@ -1,6 +1,7 @@
 """Guided wizard dialog for scaffolding Enhanced Prompt Workbench prompts.
 
 Updates:
+  v0.1.2 - 2025-12-08 - Use PySide6 enum classes to satisfy strict typing.
   v0.1.1 - 2025-12-04 - Apply Ruff formatting to satisfy formatter checks.
   v0.1.0 - 2025-12-04 - Extract guided wizard pages and dialog from workbench_window.
 """
@@ -113,10 +114,10 @@ class GuidedPromptWizard(QDialog):
             logger.debug(
                 "GUIDED_WIZARD palette=%s",
                 {
-                    "window": palette.color(QPalette.Window).name(),
-                    "window_text": palette.color(QPalette.WindowText).name(),
+                    "window": palette.color(QPalette.ColorRole.Window).name(),
+                    "window_text": palette.color(QPalette.ColorRole.WindowText).name(),
                     "base": palette.color(QPalette.ColorRole.Base).name(),
-                    "alternate": palette.color(QPalette.AlternateBase).name(),
+                    "alternate": palette.color(QPalette.ColorRole.AlternateBase).name(),
                     "button": palette.color(QPalette.ColorRole.Button).name(),
                     "button_text": palette.color(QPalette.ColorRole.ButtonText).name(),
                     "mid": palette.color(QPalette.ColorRole.Mid).name(),
@@ -198,7 +199,7 @@ class GuidedPromptWizard(QDialog):
         super().changeEvent(event)
         if self._palette_updating:
             return
-        if event.type() in {QEvent.Type.PaletteChange, QEvent.ApplicationPaletteChange}:
+        if event.type() in {QEvent.Type.PaletteChange, QEvent.Type.ApplicationPaletteChange}:
             palette = self._resolve_theme_palette(self.parentWidget())
             if palette is not None:
                 self._apply_palette(palette)
@@ -206,7 +207,7 @@ class GuidedPromptWizard(QDialog):
     def paintEvent(self, event: QPaintEvent) -> None:  # type: ignore[override]
         """Draw a solid background so palette colors are respected on Windows."""
         painter = QPainter(self)
-        painter.fillRect(self.rect(), self.palette().color(QPalette.Window))
+        painter.fillRect(self.rect(), self.palette().color(QPalette.ColorRole.Window))
         super().paintEvent(event)
 
     def _resolve_theme_palette(self, parent: QWidget | None) -> QPalette | None:

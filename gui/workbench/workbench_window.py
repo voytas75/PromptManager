@@ -1,6 +1,7 @@
 """Qt widgets for the Enhanced Prompt Workbench experience.
 
 Updates:
+  v0.1.24 - 2025-12-08 - Align PySide6 enums and text selection handling with Pyright.
   v0.1.23 - 2025-12-07 - Support embedded tab sessions and add begin_session helper.
   v0.1.22 - 2025-12-04 - Modularize dialogs, wizard, editor, and utilities into separate modules.
   v0.1.21 - 2025-11-30 - Skip busy indicator whenever LiteLLM streaming is enabled.
@@ -12,9 +13,7 @@ Updates:
     collapse the bottom panel.
   v0.1.15 - 2025-11-29 - Move output/history tabs below the editor and persist
     output splitter widths.
-  v0.1.14 - 2025-11-29 - Replace QWizard with custom-styled dialog to control Guided
-    mode appearance.
-Earlier versions: v0.1.0-v0.1.13 - Introduced the guided Workbench window plus
+Earlier versions: v0.1.0-v0.1.14 - Introduced the guided Workbench window plus
   iterative palette refinements.
 """
 
@@ -22,7 +21,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from PySide6.QtCore import QByteArray, QEventLoop, QSettings, Qt
 from PySide6.QtGui import QCloseEvent, QGuiApplication, QTextCharFormat, QTextCursor
@@ -439,7 +438,7 @@ class WorkbenchWindow(QMainWindow):
         thread.start()
         try:
             while not event.is_set():
-                QGuiApplication.processEvents(QEventLoop.AllEvents, 50)
+                QGuiApplication.processEvents(QEventLoop.ProcessEventsFlag.AllEvents, 50)
                 event.wait(0.01)
         finally:
             thread.join()
@@ -563,9 +562,13 @@ class WorkbenchWindow(QMainWindow):
         selection = QTextEdit.ExtraSelection()
         fmt = QTextCharFormat()
         fmt.setBackground(Qt.GlobalColor.yellow)
-        selection.cursor = cursor
-        selection.cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.KeepAnchor)
-        selection.format = fmt
+        selection_any = cast(Any, selection)
+        selection_any.cursor = cursor
+        selection_any.cursor.movePosition(
+            QTextCursor.MoveOperation.EndOfBlock,
+            QTextCursor.MoveMode.KeepAnchor,
+        )
+        selection_any.format = fmt
         self._editor.setExtraSelections([selection])
 
     def _run_brainstorm(self) -> None:
