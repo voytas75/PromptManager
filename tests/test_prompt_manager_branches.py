@@ -1,7 +1,7 @@
 """Branch coverage tests for PromptManager edge cases.
 
 Updates:
-  v0.1.2 - 2025-12-08 - Import ChromaError and reuse the concrete stub for Pyright.
+  v0.1.2 - 2025-12-08 - Import ChromaError, add override decorator, and reuse the concrete stub for Pyright.
   v0.1.1 - 2025-11-22 - Seed version history for legacy prompts without snapshots.
   v0.1.0 - 2025-10-30 - Add unit tests for error handling and caching paths.
 """
@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 
 import pytest
+from overrides import override
 
 from core.embedding import EmbeddingGenerationError
 from core.intent_classifier import IntentClassifier
@@ -112,7 +113,8 @@ class _TestChromaError(ChromaError):
     def __init__(self, message: str) -> None:
         super().__init__(message)
 
-    def name(self) -> str:  # type: ignore[override]
+    @override
+    def name(self) -> str:
         return "test"
 
 

@@ -1,4 +1,8 @@
-"""Administrative and diagnostic tests for PromptManager."""
+"""Administrative and diagnostic tests for PromptManager.
+
+Updates:
+  v0.1.2 - 2025-12-08 - Add override decorator for ChromaError stub to satisfy overrides.
+"""
 
 from __future__ import annotations
 
@@ -11,6 +15,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 from chromadb.errors import ChromaError
+from overrides import override
 
 from core.embedding import EmbeddingGenerationError
 from core.exceptions import CategoryError, CategoryNotFoundError, CategoryStorageError
@@ -214,7 +219,8 @@ class _TestChromaError(ChromaError):
     def __init__(self, message: str) -> None:
         super().__init__(message)
 
-    def name(self) -> str:  # type: ignore[override]
+    @override
+    def name(self) -> str:
         return "test"
 
 

@@ -1,6 +1,7 @@
 """Tests for GUI share controller helpers.
 
 Updates:
+  v0.1.2 - 2025-12-08 - Pass None parent via cast to preserve QObject behaviour.
   v0.1.1 - 2025-12-08 - Cast QWidget parent and usage logger stubs for Pyright.
 """
 
@@ -83,7 +84,7 @@ def test_share_controller_opens_browser(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setattr("PySide6.QtGui.QGuiApplication.clipboard", lambda: clipboard)
 
     controller = ShareController(
-        cast(QWidget, object()),
+        cast(QWidget, None),
         toast_callback=lambda *_: None,
         status_callback=lambda *_: None,
         error_callback=lambda *_: None,
@@ -110,7 +111,7 @@ def test_share_controller_respects_disabled_auto_open(monkeypatch: pytest.Monkey
     monkeypatch.setattr("PySide6.QtGui.QGuiApplication.clipboard", lambda: _DummyClipboard())
 
     controller = ShareController(
-        cast(QWidget, object()),
+        cast(QWidget, None),
         toast_callback=lambda *_: None,
         status_callback=lambda *_: None,
         error_callback=lambda *_: None,
@@ -132,7 +133,7 @@ def test_share_controller_surfaces_management_note(monkeypatch: pytest.MonkeyPat
         status_messages.append(message)
 
     controller = ShareController(
-        cast(QWidget, object()),
+        cast(QWidget, None),
         toast_callback=lambda *_: None,
         status_callback=_status,
         error_callback=lambda *_: None,

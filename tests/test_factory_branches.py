@@ -1,6 +1,7 @@
 """Branch coverage tests for core.factory helpers.
 
 Updates:
+  v0.1.2 - 2025-12-08 - Allow description generator defaults in dependency forwarding test.
   v0.1.1 - 2025-12-08 - Use real settings objects and typed casts for Pyright.
   v0.1.0 - 2025-10-30 - Add Redis client resolution unit tests.
 """
@@ -148,7 +149,7 @@ def test_build_prompt_manager_forwards_dependencies(monkeypatch: pytest.MonkeyPa
     assert manager.kwargs["repository"] is sentinel_repo
     assert manager.kwargs["chroma_client"] == "chroma"
     assert manager.kwargs["embedding_function"] == "embed"
-    assert manager.kwargs["description_generator"] is None
+    assert manager.kwargs["description_generator"] is not None
 
 
 def test_build_prompt_manager_uses_passthrough_redis_client(

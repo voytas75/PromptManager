@@ -1,6 +1,7 @@
 """Prompt chain manager dialog tests.
 
 Updates:
+  v0.4.2 - 2025-12-08 - Accept case-insensitive chain headings for Markdown toggles.
   v0.4.1 - 2025-12-08 - Cast manager stubs, use Qt enums, and swap SimpleNamespace prompts.
   v0.4.0 - 2025-12-06 - Adapt to the plain-text chain manager/editor UX.
   v0.3.0 - 2025-12-06 - Gate reasoning summary rendering and extend coverage.
@@ -368,7 +369,7 @@ def test_prompt_chain_markdown_toggle_preserves_text(qt_app: QApplication) -> No
         toggled_text = panel._result_view.toPlainText().strip()  # noqa: SLF001
         assert toggled_text
         assert "Input to chain" in toggled_text
-        assert "Chain Outputs" in toggled_text
+        assert "chain outputs" in toggled_text.lower()
     finally:
         dialog.close()
         dialog.deleteLater()

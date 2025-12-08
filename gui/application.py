@@ -1,6 +1,7 @@
 """Qt application helpers for Prompt Manager GUI.
 
 Updates:
+  v0.1.5 - 2025-12-08 - Guard ApplicationAttribute and style lookups for stubbed Qt modules.
   v0.1.4 - 2025-11-30 - Make Fusion style optional for stubbed Qt environments.
   v0.1.3 - 2025-11-29 - Apply Fusion style globally and log active GUI style for debugging.
   v0.1.2 - 2025-11-05 - Apply packaged application icon for desktop builds.
@@ -48,6 +49,17 @@ def _should_force_offscreen(env: MutableMapping[str, str]) -> bool:
     return not any(env.get(var) for var in _DISPLAY_ENV_VARS)
 
 
+def _set_application_attribute(attribute: str, enable: bool) -> None:
+    """Best-effort setter for Qt application attributes in stubbed environments."""
+    enum = getattr(Qt, "ApplicationAttribute", None)
+    if enum is None:
+        return
+    flag = getattr(enum, attribute, None)
+    if flag is None:
+        return
+    QApplication.setAttribute(flag, enable)
+
+
 def create_qapplication(argv: Sequence[str] | None = None) -> QApplication:
     """Return an existing QApplication or create a new one with sensible defaults."""
     existing = QApplication.instance()
@@ -58,8 +70,8 @@ def create_qapplication(argv: Sequence[str] | None = None) -> QApplication:
         # Allow running in headless environments by defaulting to the offscreen plugin.
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-    QApplication.setAttribute(Qt.ApplicationAttribute.AA_EnableHighDpiScaling, True)
-    QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)
+    _set_application_attribute("AA_EnableHighDpiScaling", True)
+    _set_application_attribute("AA_UseHighDpiPixmaps", True)
     app = QApplication(list(argv or []))
     fusion: Any | None = None
     if QStyleFactory is not None:  # pragma: no branch - branch depends on import success
@@ -67,12 +79,19 @@ def create_qapplication(argv: Sequence[str] | None = None) -> QApplication:
     if fusion is not None:
         app.setStyle(fusion)
     style_name = "<unknown>"
-    style_obj = app.style()
+    style_obj: Any | None = None
+    if hasattr(app, "style"):
+        try:
+            style_obj = app.style()
+        except Exception:  # pragma: no cover - stubbed Qt may lack style()
+            style_obj = None
     if style_obj is not None:
         try:
             style_name = style_obj.metaObject().className()
         except AttributeError:  # pragma: no cover - stubbed Qt lacks metaObject
             style_name = "<unavailable>"
+    else:
+        style_name = "<unavailable>"
     logger.debug("GUI_STYLE active_style=%s", style_name)
     return app
 
