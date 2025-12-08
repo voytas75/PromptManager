@@ -1,15 +1,16 @@
 """Helper mixins shared by the prompt editor dialog.
 
 Updates:
+  v0.1.1 - 2025-12-08 - Added QWidget-aware helpers and type hints for Pyright.
   v0.1.0 - 2025-12-04 - Extracted category, generation, and refinement helpers.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar, cast, runtime_checkable
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox, QWidget
 
 from core import (
     DescriptionGenerationError,
@@ -59,6 +60,15 @@ else:  # pragma: no cover - runtime fallbacks for postponed annotations
 _TaskResult = TypeVar("_TaskResult")
 
 
+@runtime_checkable
+class _CategoryAware(Protocol):
+    """Protocol describing mixins that expose category helpers."""
+
+    def _current_category_value(self) -> str:  # pragma: no cover - typing helper
+        """Return the canonical category value."""
+        ...
+
+
 class _PromptDialogAssistMixin:
     """Provide shared helper methods for prompt dialog subclasses."""
 
@@ -68,6 +78,18 @@ class _PromptDialogAssistMixin:
     _name_input: QLineEdit
     _description_input: QPlainTextEdit
 
+    def _widget_parent(self) -> QWidget:
+        """Return the QWidget instance to use as parent for dialogs."""
+        if isinstance(self, QWidget):
+            return self
+        parent = getattr(self, "parentWidget", None)
+        if callable(parent):
+            widget = parent()
+            if isinstance(widget, QWidget):
+                return widget
+        msg = "Prompt dialog mixins must be used with QWidget subclasses"
+        raise RuntimeError(msg)
+
     def _run_with_indicator(
         self,
         message: str,
@@ -76,7 +98,7 @@ class _PromptDialogAssistMixin:
         **kwargs: Any,
     ) -> _TaskResult:
         """Execute ``func`` within a background task while showing a busy UI."""
-        indicator = cast("Any", ProcessingIndicator(self, message))
+        indicator = cast("Any", ProcessingIndicator(self._widget_parent(), message))
         result = indicator.run(func, *args, **kwargs)
         return cast("_TaskResult", result)
 
@@ -226,7 +248,7 @@ class _PromptDialogScenarioMixin(_PromptDialogAssistMixin):
         context = self._context_input.toPlainText()
         if not context.strip():
             QMessageBox.information(
-                self,
+                self._widget_parent(),
                 "Prompt required",
                 "Provide a prompt body before generating scenarios.",
             )
@@ -242,7 +264,7 @@ class _PromptDialogScenarioMixin(_PromptDialogAssistMixin):
             return
         if not scenarios:
             QMessageBox.information(
-                self,
+                self._widget_parent(),
                 "No scenarios available",
                 "The assistant could not derive example scenarios for this prompt.",
             )
@@ -257,6 +279,7 @@ class _PromptDialogCategoryMixin(_PromptDialogAssistMixin):
     _category_generator: _CategoryGenerator | None
     _tags_generator: _TagsGenerator | None
     _category_input: QComboBox
+    _tags_input: QLineEdit
     _categories: list[PromptCategory]
 
     def _populate_category_options(self) -> None:
@@ -342,7 +365,7 @@ class _PromptDialogCategoryMixin(_PromptDialogAssistMixin):
             self._set_category_value(suggestion)
         else:
             QMessageBox.information(
-                self,
+                self._widget_parent(),
                 "No suggestion available",
                 "The assistant could not determine a suitable category.",
             )
@@ -369,7 +392,7 @@ class _PromptDialogCategoryMixin(_PromptDialogAssistMixin):
             self._tags_input.setText(", ".join(tags))
         else:
             QMessageBox.information(
-                self,
+                self._widget_parent(),
                 "No suggestion available",
                 "The assistant could not determine relevant tags.",
             )
@@ -420,7 +443,7 @@ class _PromptDialogRefinementMixin(_PromptDialogAssistMixin):
         prompt_text = self._context_input.toPlainText()
         if not prompt_text.strip():
             QMessageBox.information(
-                self,
+                self._widget_parent(),
                 "Prompt required",
                 "Enter prompt text before running refinement.",
             )
@@ -428,9 +451,7 @@ class _PromptDialogRefinementMixin(_PromptDialogAssistMixin):
 
         name = self._name_input.text().strip() or None
         description = self._description_input.toPlainText().strip() or None
-        category = (
-            self._current_category_value() if hasattr(self, "_current_category_value") else None
-        )
+        category = self._current_category_value() if isinstance(self, _CategoryAware) else None
         tags: list[str] = []
         if hasattr(self, "_tags_input"):
             tags = [tag.strip() for tag in self._tags_input.text().split(",") if tag.strip()]
@@ -453,7 +474,7 @@ class _PromptDialogRefinementMixin(_PromptDialogAssistMixin):
             return
         except Exception as exc:  # pragma: no cover - defensive
             QMessageBox.warning(
-                self,
+                self._widget_parent(),
                 "Prompt refinement failed",
                 f"Unexpected error: {exc}",
             )
@@ -461,7 +482,7 @@ class _PromptDialogRefinementMixin(_PromptDialogAssistMixin):
 
         self._context_input.setPlainText(result.improved_prompt)
         summary = self._format_refinement_summary(result)
-        result_dialog = PromptRefinedDialog(summary, self, title=result_title)
+        result_dialog = PromptRefinedDialog(summary, self._widget_parent(), title=result_title)
         result_dialog.exec()
 
     @staticmethod

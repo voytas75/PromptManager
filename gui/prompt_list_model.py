@@ -1,6 +1,7 @@
 """Qt list model that exposes prompt summaries for list views.
 
 Updates:
+  v0.1.1 - 2025-12-08 - Align Qt override signatures and guard similarity conversion.
   v0.1.0 - 2025-11-30 - Extract PromptListModel into its own module.
 """
 
@@ -8,7 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QAbstractListModel, QModelIndex, Qt
+from PySide6.QtCore import QAbstractListModel, QModelIndex, QPersistentModelIndex, Qt
 
 if TYPE_CHECKING:  # pragma: no cover - typing helper
     from collections.abc import Iterable, Sequence
@@ -24,13 +25,20 @@ class PromptListModel(QAbstractListModel):
         super().__init__(parent)
         self._prompts: list[Prompt] = list(prompts or [])
 
-    def rowCount(self, parent: QModelIndex | None = None) -> int:  # noqa: N802 - Qt API
+    def rowCount(
+        self,
+        parent: QModelIndex | QPersistentModelIndex = QModelIndex(),
+    ) -> int:  # noqa: N802 - Qt API
         """Return the number of prompts available for the view."""
-        if parent is not None and parent.isValid():
+        if parent.isValid():
             return 0
         return len(self._prompts)
 
-    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> str | None:  # noqa: N802
+    def data(
+        self,
+        index: QModelIndex | QPersistentModelIndex,
+        role: int = Qt.ItemDataRole.DisplayRole,
+    ) -> str | None:  # noqa: N802
         """Return the decorated prompt label for the requested index."""
         if not index.isValid() or index.row() >= len(self._prompts):
             return None
@@ -38,12 +46,10 @@ class PromptListModel(QAbstractListModel):
         if role in {Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole}:
             category = f" ({prompt.category})" if prompt.category else ""
             similarity_suffix = ""
-            if getattr(prompt, "similarity", None) is not None:
-                try:
-                    similarity = float(prompt.similarity)
-                    similarity_suffix = f" [{similarity:.4f}]"
-                except (TypeError, ValueError):
-                    similarity_suffix = ""
+            similarity_value = getattr(prompt, "similarity", None)
+            if isinstance(similarity_value, (int, float)):
+                similarity = float(similarity_value)
+                similarity_suffix = f" [{similarity:.4f}]"
             return f"{prompt.name}{category}{similarity_suffix}"
         return None
 

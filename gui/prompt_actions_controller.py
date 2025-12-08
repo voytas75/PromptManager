@@ -1,6 +1,7 @@
 """Prompt-specific actions separated from the main window.
 
 Updates:
+  v0.1.1 - 2025-12-08 - Fix dialog code comparison and toast callback usage for strict typing.
   v0.1.0 - 2025-12-01 - Extracted context menu, clipboard, and execute-as-context workflows.
 """
 
@@ -11,7 +12,7 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QGuiApplication, QTextCursor
-from PySide6.QtWidgets import QListView, QMenu, QMessageBox, QPlainTextEdit, QWidget
+from PySide6.QtWidgets import QDialog, QListView, QMenu, QMessageBox, QPlainTextEdit, QWidget
 
 from .execute_context_dialog import ExecuteContextDialog
 
@@ -191,7 +192,7 @@ class PromptActionsController:
             last_task=self._last_execute_context_task,
             history=tuple(self._execute_context_history),
         )
-        if dialog.exec() != ExecuteContextDialog.Accepted:
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         task_text = dialog.task_text()
         cleaned_task = task_text.strip()
@@ -231,7 +232,7 @@ class PromptActionsController:
             return
         clipboard = QGuiApplication.clipboard()
         clipboard.setText(payload)
-        self._toast_callback(f"Copied '{prompt.name}' to the clipboard.")
+        self._toast_callback(f"Copied '{prompt.name}' to the clipboard.", 2500)
         self._usage_logger.log_copy(prompt_name=prompt.name, prompt_has_body=bool(prompt.context))
 
     def show_prompt_description(self, prompt: Prompt) -> None:

@@ -1,6 +1,7 @@
 """Composable helpers for wiring the Prompt Manager main window.
 
 Updates:
+  v0.15.83 - 2025-12-08 - Align main-window type hints with bootstrapper refinements.
   v0.15.82 - 2025-12-01 - Introduced composition helpers for gui.main_window.
 """
 
@@ -10,14 +11,14 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from .main_window_bootstrapper import DetailWidgetCallbacks, MainWindowBootstrapper
-from .prompt_generation_service import PromptGenerationService
-from .prompt_search_controller import PromptSearchController
+from .prompt_generation_service import ExecuteContextHandler, PromptGenerationService
+from .prompt_search_controller import LoadPromptsCallable, PromptSearchController
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from collections.abc import Callable
     from uuid import UUID
 
-    from PySide6.QtWidgets import QWidget
+    from PySide6.QtWidgets import QMainWindow, QPushButton, QWidget
 
     from config import PromptManagerSettings
     from core import PromptManager
@@ -25,10 +26,13 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
 
     from .controllers.execution_controller import ExecutionController
     from .main_window_bootstrapper import BootstrapResult
+    from .prompt_editor_flow import _DeletePromptCallable
     from .prompt_list_presenter import PromptListPresenter
     from .widgets import PromptFilterPanel
 else:  # pragma: no cover - runtime placeholders for type-only imports
+    QMainWindow = object  # type: ignore[assignment]
     QWidget = object  # type: ignore[assignment]
+    QPushButton = object  # type: ignore[assignment]
     PromptManagerSettings = object  # type: ignore[assignment]
     BootstrapResult = object  # type: ignore[assignment]
     Prompt = object  # type: ignore[assignment]
@@ -43,7 +47,7 @@ class FilterPreferences:
 
     category_slug: str | None
     tag: str | None
-    min_quality: int | None
+    min_quality: float | None
     sort_value: str | None
 
 
@@ -51,11 +55,11 @@ class FilterPreferences:
 class PromptGenerationHooks:
     """Callables required to build prompt editor workflows."""
 
-    execute_prompt_as_context: Callable[[Prompt, QWidget | None, str | None], None]
-    load_prompts: Callable[[str], None]
+    execute_prompt_as_context: ExecuteContextHandler
+    load_prompts: LoadPromptsCallable
     current_search_text: Callable[[], str]
     select_prompt: Callable[[UUID], None]
-    delete_prompt: Callable[[Prompt], None]
+    delete_prompt: _DeletePromptCallable
     status_callback: Callable[[str, int], None]
     error_callback: Callable[[str, str], None]
     current_prompt_supplier: Callable[[], Prompt | None]
@@ -68,7 +72,7 @@ class PromptSearchHooks:
 
     presenter_supplier: Callable[[], PromptListPresenter | None]
     filter_panel_supplier: Callable[[], PromptFilterPanel | None]
-    load_prompts: Callable[[str], None]
+    load_prompts: LoadPromptsCallable
     current_search_text: Callable[[], str]
     select_prompt: Callable[[UUID], None]
 
@@ -85,7 +89,7 @@ class MainWindowComposition:
 
 def build_main_window_composition(
     *,
-    parent: QWidget,
+    parent: QMainWindow,
     manager: PromptManager,
     settings: PromptManagerSettings | None,
     detail_callbacks: DetailWidgetCallbacks,
@@ -94,7 +98,7 @@ def build_main_window_composition(
     error_callback: Callable[[str, str], None],
     prompt_generation_hooks: PromptGenerationHooks,
     prompt_search_hooks: PromptSearchHooks,
-    share_result_button_supplier: Callable[[], object | None],
+    share_result_button_supplier: Callable[[], QPushButton | None],
     execution_controller_supplier: Callable[[], ExecutionController | None],
 ) -> MainWindowComposition:
     """Create bootstrap collaborators and supporting controllers."""

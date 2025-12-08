@@ -1,6 +1,7 @@
 """Dialog for editing LiteLLM prompt template overrides.
 
 Updates:
+  v0.1.2 - 2025-12-08 - Use QFrame.Shape enums for Pyright compatibility.
   v0.1.1 - 2025-12-01 - Preserve trailing whitespace when saving template overrides.
   v0.1.0 - 2025-11-29 - Introduce dedicated prompt template editor dialog.
 """
@@ -76,7 +77,7 @@ class PromptTemplateEditorDialog(QDialog):
 
         for key in PROMPT_TEMPLATE_KEYS:
             section = QFrame(container)
-            section.setFrameShape(QFrame.StyledPanel)
+            section.setFrameShape(QFrame.Shape.StyledPanel)
             section_layout = QVBoxLayout(section)
             section_layout.setContentsMargins(12, 10, 12, 12)
 

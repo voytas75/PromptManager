@@ -1,6 +1,7 @@
 """Helpers that persist and restore user layout/preferences via QSettings.
 
 Updates:
+  v0.1.2 - 2025-12-08 - Sanitize quality filter parsing to satisfy strict typing.
   v0.1.1 - 2025-12-01 - Add WindowStateManager for geometry/splitter/history helpers.
   v0.1.0 - 2025-11-30 - Extract layout persistence helpers from main window.
 """
@@ -114,7 +115,7 @@ def _load_filter_preferences(
     quality: float | None = None
     if raw_quality not in {None, ""}:
         try:
-            quality = float(raw_quality)
+            quality = float(str(raw_quality))
         except (TypeError, ValueError):
             logger.warning("Invalid quality filter value '%s'; resetting to default.", raw_quality)
             quality = None

@@ -1,6 +1,7 @@
 """Transient processing overlays for long-running GUI tasks.
 
 Updates:
+  v0.1.3 - 2025-12-08 - Reference QEventLoop.ProcessEventsFlag enums for type safety.
   v0.1.2 - 2025-11-27 - Center the busy progress bar to avoid stretching across the dialog.
   v0.1.1 - 2025-11-27 - Run blocking tasks on a worker thread so the UI stays responsive.
   v0.1.0 - 2025-11-27 - Add reusable busy indicator for prompt workflows.
@@ -33,7 +34,7 @@ class ProcessingIndicator(AbstractContextManager["ProcessingIndicator"]):
     def __enter__(self) -> ProcessingIndicator:
         """Show the dialog and pump the event loop before returning self."""
         self._dialog.show()
-        QGuiApplication.processEvents(QEventLoop.AllEvents)
+        QGuiApplication.processEvents(QEventLoop.ProcessEventsFlag.AllEvents)
         return self
 
     def __exit__(
@@ -69,7 +70,7 @@ class ProcessingIndicator(AbstractContextManager["ProcessingIndicator"]):
         thread.start()
         try:
             while not event.is_set():
-                QGuiApplication.processEvents(QEventLoop.AllEvents, 50)
+                QGuiApplication.processEvents(QEventLoop.ProcessEventsFlag.AllEvents, 50)
                 event.wait(0.01)
         finally:
             thread.join()
@@ -82,7 +83,7 @@ class ProcessingIndicator(AbstractContextManager["ProcessingIndicator"]):
     def update_message(self, message: str) -> None:
         """Refresh the indicator text while the dialog is visible."""
         self._dialog.setLabelText(message)
-        QGuiApplication.processEvents(QEventLoop.AllEvents)
+        QGuiApplication.processEvents(QEventLoop.ProcessEventsFlag.AllEvents)
 
 
 class _ProcessingDialog(QDialog):

@@ -1,6 +1,7 @@
 """Execution history panel for Prompt Manager.
 
 Updates:
+  v0.3.3 - 2025-12-08 - Guard note cell updates when the table item is missing.
   v0.3.2 - 2025-12-08 - Import QAbstractItemView for table selection controls.
   v0.3.1 - 2025-11-29 - Wrap header description to satisfy Ruff line length.
   v0.3.0 - 2025-11-12 - Display chat conversations alongside execution details.
@@ -329,7 +330,12 @@ class HistoryPanel(QWidget):
             return
         self._rows[row_index] = _ExecutionRow(updated_execution, entry.prompt_name)
         note_preview = note if len(note) <= 80 else note[:77] + "..."
-        self._table.item(row_index, 6).setText(note_preview)
+        note_cell = self._table.item(row_index, 6)
+        if note_cell is None:
+            note_cell = QTableWidgetItem(note_preview)
+            self._table.setItem(row_index, 6, note_cell)
+        else:
+            note_cell.setText(note_preview)
         self._on_selection_changed()
         if self._note_callback:
             self._note_callback(entry.execution.id, note)

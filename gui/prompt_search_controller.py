@@ -1,13 +1,14 @@
 """Controller responsible for prompt filtering, sorting, and search workflows.
 
 Updates:
+  v0.15.82 - 2025-12-08 - Model load_prompts callbacks with keyword-aware Protocol.
   v0.15.81 - 2025-12-01 - Extracted search/filter orchestration from gui.main_window.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from .prompt_list_coordinator import PromptSortOrder
 
@@ -36,6 +37,11 @@ else:  # pragma: no cover - runtime placeholders for type-only imports
 logger = logging.getLogger(__name__)
 
 
+class LoadPromptsCallable(Protocol):
+    def __call__(self, search_text: str = "", *, use_indicator: bool = ...) -> None:
+        ...
+
+
 class PromptSearchController:
     """Coordinate search, filtering, and catalog-related workflows."""
 
@@ -47,7 +53,7 @@ class PromptSearchController:
         presenter_supplier: Callable[[], PromptListPresenter | None],
         filter_panel_supplier: Callable[[], PromptFilterPanel | None],
         layout_controller: LayoutController,
-        load_prompts: Callable[[str], None],
+        load_prompts: LoadPromptsCallable,
         current_search_text: Callable[[], str],
         select_prompt: Callable[[UUID], None],
     ) -> None:
@@ -153,4 +159,4 @@ class PromptSearchController:
         self._load_prompts(text, use_indicator=use_indicator)
 
 
-__all__ = ["PromptSearchController"]
+__all__ = ["PromptSearchController", "LoadPromptsCallable"]

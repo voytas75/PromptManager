@@ -1,6 +1,7 @@
 """Overlay manager that keeps result action buttons aligned with the output view.
 
 Updates:
+  v0.1.4 - 2025-12-08 - Guard QTextEdit access and use QEvent.Type enums for Pyright.
   v0.1.3 - 2025-12-01 - Prevent deleted QTextEdit references during shutdown.
   v0.1.2 - 2025-12-01 - Guard overlay event filter when QTextEdit is destroyed.
   v0.1.1 - 2025-11-30 - Ensure module is packaged and docstring formatting matches guidelines.
@@ -56,25 +57,29 @@ class ResultActionsOverlay(QObject):
             self._overlay.deleteLater()
             self._overlay = None
         text_edit = self._text_edit
-        if self._is_widget_alive(text_edit):
-            text_edit.viewport().removeEventFilter(self)
+        if isinstance(text_edit, QTextEdit) and self._is_widget_alive(text_edit):
+            viewport = text_edit.viewport()
+            if self._is_widget_alive(viewport):
+                viewport.removeEventFilter(self)
             text_edit.removeEventFilter(self)
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:
         """Keep the overlay anchored whenever the viewport updates."""
         text_edit = self._text_edit
-        if not self._is_widget_alive(text_edit):
+        if not isinstance(text_edit, QTextEdit) or not self._is_widget_alive(text_edit):
             return False
         viewport = text_edit.viewport()
         if not self._is_widget_alive(viewport):
             return False
         if obj is viewport or obj is text_edit:
-            if event.type() in {QEvent.Resize, QEvent.Show}:
+            if event.type() in {QEvent.Type.Resize, QEvent.Type.Show}:
                 self._position_overlay()
         return super().eventFilter(obj, event)
 
     def _position_overlay(self) -> None:
-        if not self._is_widget_alive(self._text_edit) or self._overlay is None:
+        if not isinstance(self._text_edit, QTextEdit) or not self._is_widget_alive(self._text_edit):
+            return
+        if self._overlay is None:
             return
         viewport = self._text_edit.viewport()
         overlay = self._overlay

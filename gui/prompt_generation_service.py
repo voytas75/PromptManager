@@ -1,19 +1,21 @@
 """Prompt creation and editing helpers extracted from :mod:`gui.main_window`.
 
 Updates:
+  v0.15.82 - 2025-12-08 - Model execute-context handler signature using a Protocol.
   v0.15.81 - 2025-12-01 - Provide reusable prompt generation + editor factory service.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from core import IntentLabel, PromptManager, PromptManagerError
 
 from .catalog_workflow_controller import CatalogWorkflowController
 from .language_tools import detect_language
-from .prompt_editor_flow import PromptDialogFactory, PromptEditorFlow
+from .prompt_editor_flow import PromptDialogFactory, PromptEditorFlow, _DeletePromptCallable
+from .prompt_search_controller import LoadPromptsCallable
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from collections.abc import Callable, Sequence
@@ -33,6 +35,19 @@ else:  # pragma: no cover - runtime placeholders for type-only names
     QWidget = object
 
 
+class ExecuteContextHandler(Protocol):
+    """Callable signature used for execute-as-context workflows."""
+
+    def __call__(
+        self,
+        prompt: Prompt,
+        *,
+        parent: QWidget | None = ...,
+        context_override: str | None = ...,
+    ) -> None:
+        ...
+
+
 @dataclass(slots=True)
 class PromptGenerationComponents:
     """Artifacts produced when building prompt editor workflows."""
@@ -49,19 +64,18 @@ class PromptGenerationService:
         self,
         *,
         manager: PromptManager,
-        execute_context_handler: Callable[[Prompt, QWidget | None, str | None], None],
-        load_prompts: Callable[[str], None],
+        load_prompts: LoadPromptsCallable,
         current_search_text: Callable[[], str],
         select_prompt: Callable[[UUID], None],
-        delete_prompt: Callable[[Prompt], None],
+        delete_prompt: _DeletePromptCallable,
         status_callback: Callable[[str, int], None],
         error_callback: Callable[[str, str], None],
         current_prompt_supplier: Callable[[], Prompt | None],
         open_version_history_dialog: Callable[[Prompt | None], None],
+        execute_context_handler: ExecuteContextHandler,
     ) -> None:
         """Store collaborators used for dialog factories and generators."""
         self._manager = manager
-        self._execute_context_handler = execute_context_handler
         self._load_prompts = load_prompts
         self._current_search_text = current_search_text
         self._select_prompt = select_prompt
@@ -70,6 +84,7 @@ class PromptGenerationService:
         self._error_callback = error_callback
         self._current_prompt_supplier = current_prompt_supplier
         self._open_version_history_dialog = open_version_history_dialog
+        self._execute_context_handler = execute_context_handler
 
     def rebuild_components(self, parent: QWidget) -> PromptGenerationComponents:
         """Create dialog factories, flows, and controllers for prompt editing."""

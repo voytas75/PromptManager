@@ -1,6 +1,7 @@
 """Qt helpers for surfacing core notification events in the GUI.
 
 Updates:
+  v0.2.2 - 2025-12-08 - Align dialog parent annotations with QWidget requirements.
   v0.2.1 - 2025-11-29 - Wrap notification dialog initializer for Ruff line length.
   v0.2.0 - 2025-11-28 - Add background task center with progress indicators and live feed.
   v0.1.1 - 2025-11-27 - Add toast confirmation for copying notification details.
@@ -60,7 +61,7 @@ class NotificationHistoryDialog(QDialog):
     def __init__(
         self,
         notifications: Sequence[Notification],
-        parent: QObject | None = None,
+        parent: QWidget | None = None,
     ) -> None:
         """Populate the dialog with historic notifications."""
         super().__init__(parent)

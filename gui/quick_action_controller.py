@@ -1,6 +1,7 @@
 """Quick action orchestration for the Prompt Manager workspace.
 
 Updates:
+  v0.1.1 - 2025-12-08 - Use QTextCursor.MoveOperation enums for cursor positioning.
   v0.1.0 - 2025-12-01 - Extract controller to manage palette, shortcuts, and execution.
 """
 
@@ -11,7 +12,7 @@ import uuid
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtGui import QKeySequence, QShortcut, QTextCursor
 from PySide6.QtWidgets import QDialog, QPlainTextEdit, QPushButton
 
 from core import PromptManager, RepositoryError
@@ -174,7 +175,7 @@ class QuickActionController:
         try:
             self._query_input.setPlainText(template)
             cursor = self._query_input.textCursor()
-            cursor.movePosition(cursor.End)
+            cursor.movePosition(QTextCursor.MoveOperation.End)
             self._query_input.setTextCursor(cursor)
         finally:
             self._suppress_workspace_signal = False

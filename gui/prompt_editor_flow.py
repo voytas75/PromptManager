@@ -1,6 +1,7 @@
 """Prompt dialog factory and editor flow helpers.
 
 Updates:
+  v0.1.2 - 2025-12-08 - Type prompt dialog references for Pyright compatibility.
   v0.1.1 - 2025-12-02 - Ensure delete flow bypasses confirmation via keyword arg.
   v0.1.0 - 2025-12-01 - Introduce shared dialog factory and CRUD flow coordinator.
 """
@@ -200,7 +201,7 @@ class PromptEditorFlow:
         self._select_prompt(forked.id)
         self._status_callback("Prompt fork created.", 4000)
 
-    def _handle_prompt_applied(self, prompt: Prompt, dialog: QDialog) -> None:
+    def _handle_prompt_applied(self, prompt: Prompt, dialog: PromptDialog) -> None:
         try:
             stored = ProcessingIndicator(dialog, "Saving prompt changes…").run(
                 self._manager.update_prompt,

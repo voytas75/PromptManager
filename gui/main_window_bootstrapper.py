@@ -1,6 +1,7 @@
 """Helper utilities for bootstrapping the Prompt Manager main window.
 
 Updates:
+  v0.15.83 - 2025-12-08 - Tighten supplier typings and adapt toast callbacks for ShareController.
   v0.15.82 - 2025-12-07 - Register the Rentry share provider alongside ShareText and PrivateBin.
   v0.15.81 - 2025-12-01 - Extracted widget/controller bootstrap helpers from gui.main_window.
 """
@@ -9,10 +10,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import partial
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QSettings
-from PySide6.QtWidgets import QLabel, QWidget
+from PySide6.QtWidgets import QLabel, QMainWindow, QPushButton, QWidget
 
 from core.sharing import PrivateBinProvider, RentryProvider, ShareTextProvider
 
@@ -33,6 +34,8 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from config import PromptManagerSettings
     from core import PromptManager
     from models.prompt_model import Prompt
+
+    from .controllers.execution_controller import ExecutionController
 else:  # pragma: no cover - runtime placeholders for type-only imports
     from typing import Any as _Any
 
@@ -40,11 +43,7 @@ else:  # pragma: no cover - runtime placeholders for type-only imports
     PromptManagerSettings = _Any
     PromptManager = _Any
     Prompt = _Any
-
-
-class _PromptSupplier(Protocol):
-    def __call__(self) -> object | None:
-        """Return the currently selected prompt or widget."""
+    ExecutionController = _Any
 
 
 @dataclass(slots=True)
@@ -83,15 +82,15 @@ class MainWindowBootstrapper:
     def __init__(
         self,
         *,
-        parent: QWidget,
+        parent: QMainWindow,
         manager: PromptManager,
         settings: PromptManagerSettings | None,
         detail_callbacks: DetailWidgetCallbacks,
         toast_callback: Callable[[str, int], None],
         status_callback: Callable[[str, int], None],
         error_callback: Callable[[str, str], None],
-        share_result_button_supplier: _PromptSupplier,
-        execution_controller_supplier: _PromptSupplier,
+        share_result_button_supplier: Callable[[], QPushButton | None],
+        execution_controller_supplier: Callable[[], ExecutionController | None],
     ) -> None:
         """Store dependencies required to construct bootstrap collaborators."""
         self._parent = parent
@@ -103,6 +102,7 @@ class MainWindowBootstrapper:
         self._error_callback = error_callback
         self._share_result_button_supplier = share_result_button_supplier
         self._execution_controller_supplier = execution_controller_supplier
+        self._share_toast_callback = lambda message: toast_callback(message, 4000)
 
     def bootstrap(self) -> BootstrapResult:
         """Instantiate widgets, controllers, and services shared across the GUI."""
@@ -126,7 +126,7 @@ class MainWindowBootstrapper:
 
         share_controller = ShareController(
             self._parent,
-            toast_callback=self._toast_callback,
+            toast_callback=self._share_toast_callback,
             status_callback=self._status_callback,
             error_callback=self._error_callback,
             usage_logger=usage_logger,
