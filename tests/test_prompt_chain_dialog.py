@@ -1,6 +1,7 @@
 """Prompt chain manager dialog tests.
 
 Updates:
+  v0.4.1 - 2025-12-08 - Cast manager stubs, use Qt enums, and swap SimpleNamespace prompts.
   v0.4.0 - 2025-12-06 - Adapt to the plain-text chain manager/editor UX.
   v0.3.0 - 2025-12-06 - Gate reasoning summary rendering and extend coverage.
   v0.2.9 - 2025-12-05 - Cover schema toggle visibility and chain list activation.
@@ -10,17 +11,14 @@ Updates:
   v0.2.5 - 2025-12-05 - Ensure step IO renders outside code fences for Markdown formatting.
   v0.2.4 - 2025-12-05 - Verify Markdown toggle preserves rendered text.
   v0.2.3 - 2025-12-05 - Cover streaming preview rendering and settings detection.
-  v0.2.2 - 2025-12-05 - Validate expanded chain result text sections.
-  v0.2.1 - 2025-12-05 - Adjust assertions for new description label.
-  v0.2.0 - 2025-12-04 - Cover GUI CRUD helpers via editor and manager dialog actions.
-  v0.1.0 - 2025-12-04 - Ensure dialog populates details and executes chains.
+  pre-v0.2.3 - 2025-12-04 - Earlier releases introduced CRUD helpers and execution flows.
 """
 
 from __future__ import annotations
 
 import uuid
-from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any
+from collections.abc import Callable, Iterator
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -28,15 +26,16 @@ pytest.importorskip("PySide6")
 from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QApplication, QDialog, QMessageBox, QTextEdit
 
-from core import PromptChainRunResult, PromptChainStepRun, PromptManagerError
+from core import PromptChainRunResult, PromptChainStepRun, PromptManager, PromptManagerError
 from core.execution import CodexExecutionResult
 from core.prompt_manager.execution_history import ExecutionOutcome
 from gui.dialogs.prompt_chain_editor import PromptChainEditorDialog
-from gui.dialogs.prompt_chains import PromptChainManagerDialog
+from gui.dialogs.prompt_chains import PromptChainManagerDialog, PromptChainManagerPanel
 from models.prompt_chain_model import PromptChain, PromptChainStep
+from models.prompt_model import Prompt
 
 if TYPE_CHECKING:  # pragma: no cover - typing helper
-    from collections.abc import Callable, Mapping
+    from collections.abc import Mapping
 
 
 @pytest.fixture(scope="module")
@@ -46,17 +45,35 @@ def qt_app() -> QApplication:
     app = QApplication.instance()
     if app is None:
         app = QApplication([])
-    return app
+    return cast(QApplication, app)
 
 
 @pytest.fixture(autouse=True)
-def reset_chain_panel_settings() -> None:
+def reset_chain_panel_settings() -> Iterator[None]:
     """Reset QSettings used by the chain panel between tests."""
 
     settings = QSettings("PromptManager", "PromptChainManagerPanel")
     settings.clear()
     yield
     settings.clear()
+
+
+class _ExecutorStub:
+    def __init__(self, stream_enabled: bool) -> None:
+        self.stream = stream_enabled
+
+
+def _make_prompt_record(prompt_id: uuid.UUID) -> Prompt:
+    return Prompt(
+        id=prompt_id,
+        name="Example Prompt",
+        description="Example prompt",
+        category="tests",
+    )
+
+
+def _as_prompt_manager(manager: "_ManagerStub") -> PromptManager:
+    return cast(PromptManager, manager)
 
 
 class _ManagerStub:
@@ -73,16 +90,16 @@ class _ManagerStub:
         self.saved_chain: PromptChain | None = None
         self.runs: list[dict[str, Any]] = []
         self.deleted_chain_ids: list[uuid.UUID] = []
-        self._executor = SimpleNamespace(stream=stream_enabled) if stream_enabled else None
+        self._executor = _ExecutorStub(stream_enabled) if stream_enabled else None
         self._litellm_stream = stream_enabled
         self._stream_chunks = stream_chunks
-        self.received_stream_callback: Callable[[PromptChainStep, str], None] | None = None
+        self.received_stream_callback: Callable[[PromptChainStep, str, bool], None] | None = None
         self._step_request_text = step_request_text
         self._step_response_text = step_response_text
         self._step_reasoning_text = step_reasoning_text
         self.last_use_web_search: bool | None = None
         prompt_id = self._chains[0].steps[0].prompt_id
-        self._prompt_record = SimpleNamespace(id=prompt_id, name="Example Prompt")
+        self._prompt_record = _make_prompt_record(prompt_id)
 
     @property
     def repository(self):  # pragma: no cover - only used by DialogLauncher in real app
@@ -174,6 +191,16 @@ class _ManagerStub:
         self._chains = [chain for chain in self._chains if chain.id != chain_id]
 
 
+def _build_dialog(
+    manager: _ManagerStub | None = None,
+    **kwargs: Any,
+) -> tuple[PromptChainManagerDialog, PromptChainManagerPanel, _ManagerStub]:
+    stub = manager or _ManagerStub()
+    dialog = PromptChainManagerDialog(_as_prompt_manager(stub), **kwargs)
+    panel: PromptChainManagerPanel = dialog._panel
+    return dialog, panel, stub
+
+
 def _make_chain() -> PromptChain:
     chain_id = uuid.uuid4()
     prompt_id = uuid.uuid4()
@@ -227,11 +254,11 @@ def test_prompt_chain_dialog_populates_details(qt_app: QApplication) -> None:
     """Dialog should load chains and render their metadata immediately."""
 
     manager = _ManagerStub()
-    dialog = PromptChainManagerDialog(manager)
+    dialog, panel, manager = _build_dialog(manager)
     try:
-        assert dialog._chain_list.count() == 1  # noqa: SLF001 - accessed for test visibility
-        assert dialog._detail_title.text() == "Demo Chain"
-        assert "Example" in dialog._description_label.text()
+        assert panel._chain_list.count() == 1  # noqa: SLF001
+        assert panel._detail_title.text() == "Demo Chain"
+        assert "Example" in panel._description_label.text()
     finally:
         dialog.close()
         dialog.deleteLater()
@@ -241,14 +268,14 @@ def test_prompt_chain_dialog_runs_chain(qt_app: QApplication) -> None:
     """Running a chain should send the plain-text input to the manager."""
 
     manager = _ManagerStub()
-    dialog = PromptChainManagerDialog(manager)
+    dialog, panel, manager = _build_dialog(manager)
     try:
-        dialog._chain_input_edit.setPlainText("Chain input text")  # noqa: SLF001
-        dialog._run_selected_chain()  # noqa: SLF001
+        panel._chain_input_edit.setPlainText("Chain input text")  # noqa: SLF001
+        panel._run_selected_chain()  # noqa: SLF001
         assert manager.runs
         assert manager.runs[0]["chain_input"].strip() == "Chain input text"
         assert manager.runs[0]["use_web_search"] is True
-        text = dialog._result_view.toPlainText()  # noqa: SLF001
+        text = panel._result_view.toPlainText()  # noqa: SLF001
         assert "Input to chain" in text
         assert "Chain outputs" in text
     finally:
@@ -260,11 +287,11 @@ def test_prompt_chain_dialog_renders_chain_summary(qt_app: QApplication) -> None
     """Execution results should include the final summary section when present."""
 
     manager = _ManagerStub()
-    dialog = PromptChainManagerDialog(manager)
+    dialog, panel, manager = _build_dialog(manager)
     try:
-        dialog._chain_input_edit.setPlainText("Summary input")  # noqa: SLF001
-        dialog._run_selected_chain()  # noqa: SLF001
-        text = dialog._result_view.toPlainText()  # noqa: SLF001
+        panel._chain_input_edit.setPlainText("Summary input")  # noqa: SLF001
+        panel._run_selected_chain()  # noqa: SLF001
+        text = panel._result_view.toPlainText()  # noqa: SLF001
         assert "Chain summary" in text
         assert "Demo summary" in text
     finally:
@@ -276,14 +303,16 @@ def test_prompt_chain_dialog_respects_web_search_toggle(qt_app: QApplication) ->
     """Web search checkbox should control manager invocation flag."""
 
     manager = _ManagerStub()
-    dialog = PromptChainManagerDialog(manager)
+    dialog, panel, manager = _build_dialog(manager)
     try:
-        dialog._chain_input_edit.setPlainText("Toggle input")  # noqa: SLF001
-        dialog._web_search_checkbox.setChecked(False)  # noqa: SLF001
-        dialog._run_selected_chain()  # noqa: SLF001
+        panel._chain_input_edit.setPlainText("Toggle input")  # noqa: SLF001
+        assert panel._web_search_checkbox is not None
+        checkbox = panel._web_search_checkbox
+        checkbox.setChecked(False)  # noqa: SLF001
+        panel._run_selected_chain()  # noqa: SLF001
         assert manager.last_use_web_search is False
-        dialog._web_search_checkbox.setChecked(True)  # noqa: SLF001
-        dialog._run_selected_chain()  # noqa: SLF001
+        checkbox.setChecked(True)  # noqa: SLF001
+        panel._run_selected_chain()  # noqa: SLF001
         assert manager.last_use_web_search is True
     finally:
         dialog.close()
@@ -294,9 +323,9 @@ def test_prompt_chain_dialog_displays_prompt_names(qt_app: QApplication) -> None
     """Steps table should render prompt names instead of UUIDs."""
 
     manager = _ManagerStub()
-    dialog = PromptChainManagerDialog(manager)
+    dialog, panel, manager = _build_dialog(manager)
     try:
-        item = dialog._steps_table.item(0, 1)  # noqa: SLF001
+        item = panel._steps_table.item(0, 1)  # noqa: SLF001
         assert item is not None
         assert item.text() == "Example Prompt"
         assert item.toolTip() == str(manager._prompt_record.id)
@@ -310,12 +339,12 @@ def test_prompt_chain_step_activation_opens_prompt_editor(qt_app: QApplication) 
 
     manager = _ManagerStub()
     invoked: list[uuid.UUID] = []
-    dialog = PromptChainManagerDialog(
+    dialog, panel, manager = _build_dialog(
         manager,
         prompt_edit_callback=lambda prompt_id: invoked.append(prompt_id),
     )
     try:
-        dialog._handle_step_table_activated(0, 0)  # noqa: SLF001
+        panel._handle_step_table_activated(0, 0)  # noqa: SLF001
         assert invoked == [manager._prompt_record.id]
     finally:
         dialog.close()
@@ -326,17 +355,17 @@ def test_prompt_chain_markdown_toggle_preserves_text(qt_app: QApplication) -> No
     """Disabling Markdown rendering must not clear previously rendered results."""
 
     manager = _ManagerStub()
-    dialog = PromptChainManagerDialog(manager)
+    dialog, panel, manager = _build_dialog(manager)
     try:
-        dialog._chain_input_edit.setPlainText("Markdown input")  # noqa: SLF001
-        dialog._run_selected_chain()  # noqa: SLF001 - exercising private helper for test
-        initial_plain = dialog._result_view.toPlainText().strip()  # noqa: SLF001
+        panel._chain_input_edit.setPlainText("Markdown input")  # noqa: SLF001
+        panel._run_selected_chain()  # noqa: SLF001
+        initial_plain = panel._result_view.toPlainText().strip()  # noqa: SLF001
         assert initial_plain
-        assert dialog._result_richtext.strip()  # noqa: SLF001
-        dialog._result_plaintext = ""  # noqa: SLF001 - simulate missing plain text snapshot
-        dialog._result_format_checkbox.setChecked(True)  # noqa: SLF001
-        dialog._result_format_checkbox.setChecked(False)  # noqa: SLF001
-        toggled_text = dialog._result_view.toPlainText().strip()  # noqa: SLF001
+        assert panel._result_richtext.strip()  # noqa: SLF001
+        panel._result_plaintext = ""  # noqa: SLF001
+        panel._result_format_checkbox.setChecked(True)  # noqa: SLF001
+        panel._result_format_checkbox.setChecked(False)  # noqa: SLF001
+        toggled_text = panel._result_view.toPlainText().strip()  # noqa: SLF001
         assert toggled_text
         assert "Input to chain" in toggled_text
         assert "Chain Outputs" in toggled_text
@@ -349,12 +378,15 @@ def test_prompt_chain_dialog_wrap_toggle_changes_line_mode(qt_app: QApplication)
     """Wrap checkbox should control the result view line wrap mode."""
 
     manager = _ManagerStub()
-    dialog = PromptChainManagerDialog(manager)
+    dialog, panel, manager = _build_dialog(manager)
     try:
-        assert dialog._wrap_checkbox.isChecked() is True  # noqa: SLF001
-        assert dialog._result_view.lineWrapMode() == QTextEdit.WidgetWidth  # noqa: SLF001
-        dialog._wrap_checkbox.setChecked(False)  # noqa: SLF001
-        assert dialog._result_view.lineWrapMode() == QTextEdit.NoWrap  # noqa: SLF001
+        assert panel._wrap_checkbox.isChecked() is True  # noqa: SLF001
+        assert (
+            panel._result_view.lineWrapMode()
+            == QTextEdit.LineWrapMode.WidgetWidth
+        )
+        panel._wrap_checkbox.setChecked(False)  # noqa: SLF001
+        assert panel._result_view.lineWrapMode() == QTextEdit.LineWrapMode.NoWrap
     finally:
         dialog.close()
         dialog.deleteLater()
@@ -364,11 +396,11 @@ def test_prompt_chain_markdown_omits_code_fences(qt_app: QApplication) -> None:
     """Markdown output should avoid code fences so wrapping works everywhere."""
 
     manager = _ManagerStub()
-    dialog = PromptChainManagerDialog(manager)
+    dialog, panel, manager = _build_dialog(manager)
     try:
-        dialog._chain_input_edit.setPlainText("Markdown fences")  # noqa: SLF001
-        dialog._run_selected_chain()  # noqa: SLF001
-        assert "```" not in dialog._result_richtext  # noqa: SLF001
+        panel._chain_input_edit.setPlainText("Markdown fences")  # noqa: SLF001
+        panel._run_selected_chain()  # noqa: SLF001
+        assert "```" not in panel._result_richtext  # noqa: SLF001
     finally:
         dialog.close()
         dialog.deleteLater()
@@ -378,11 +410,11 @@ def test_prompt_chain_results_use_colored_sections(qt_app: QApplication) -> None
     """Rich text output should include styled blocks for key sections."""
 
     manager = _ManagerStub()
-    dialog = PromptChainManagerDialog(manager)
+    dialog, panel, manager = _build_dialog(manager)
     try:
-        dialog._chain_input_edit.setPlainText("Colored sections")  # noqa: SLF001
-        dialog._run_selected_chain()  # noqa: SLF001
-        rich = dialog._result_richtext  # noqa: SLF001
+        panel._chain_input_edit.setPlainText("Colored sections")  # noqa: SLF001
+        panel._run_selected_chain()  # noqa: SLF001
+        rich = panel._result_richtext  # noqa: SLF001
         assert "chain-block--input" in rich
         assert "chain-block--summary" in rich
         assert "#66bb6a" in rich  # light green text
@@ -395,14 +427,14 @@ def test_prompt_chain_dialog_renders_reasoning_summary(qt_app: QApplication) -> 
     """Reasoning snippets should appear with dedicated styling when available."""
 
     manager = _ManagerStub(step_reasoning_text="Deliberate reasoning path.")
-    dialog = PromptChainManagerDialog(manager)
+    dialog, panel, manager = _build_dialog(manager)
     try:
-        dialog._chain_input_edit.setPlainText("Reasoning input")  # noqa: SLF001
-        dialog._run_selected_chain()  # noqa: SLF001
-        plain = dialog._result_view.toPlainText()  # noqa: SLF001
+        panel._chain_input_edit.setPlainText("Reasoning input")  # noqa: SLF001
+        panel._run_selected_chain()  # noqa: SLF001
+        plain = panel._result_view.toPlainText()  # noqa: SLF001
         assert "Reasoning summary" in plain
         assert "Deliberate reasoning path." in plain
-        assert "#1e88e5" in dialog._result_richtext  # noqa: SLF001
+        assert "#1e88e5" in panel._result_richtext  # noqa: SLF001
     finally:
         dialog.close()
         dialog.deleteLater()
@@ -415,11 +447,11 @@ def test_prompt_chain_dialog_omits_reasoning_when_summary_disabled(
 
     manager = _ManagerStub(step_reasoning_text="Should not appear.")
     manager._chains[0].summarize_last_response = False
-    dialog = PromptChainManagerDialog(manager)
+    dialog, panel, manager = _build_dialog(manager)
     try:
-        dialog._chain_input_edit.setPlainText("No reasoning")  # noqa: SLF001
-        dialog._run_selected_chain()  # noqa: SLF001
-        plain = dialog._result_view.toPlainText()  # noqa: SLF001
+        panel._chain_input_edit.setPlainText("No reasoning")  # noqa: SLF001
+        panel._run_selected_chain()  # noqa: SLF001
+        plain = panel._result_view.toPlainText()  # noqa: SLF001
         assert "Reasoning summary" not in plain
         assert "Chain summary" not in plain
     finally:
@@ -433,7 +465,7 @@ def test_prompt_chain_dialog_only_last_step_has_reasoning_summary(
     """Only the final successful step should surface the reasoning summary."""
 
     manager = _ManagerStub()
-    dialog = PromptChainManagerDialog(manager)
+    dialog, panel, manager = _build_dialog(manager)
     try:
         base_chain = _make_chain()
         step_one = base_chain.steps[0]
@@ -472,12 +504,12 @@ def test_prompt_chain_dialog_only_last_step_has_reasoning_summary(
             ],
             summary="Demo summary",
         )
-        dialog._display_run_result(result)  # noqa: SLF001
-        plain = dialog._result_plaintext  # noqa: SLF001
+        panel._display_run_result(result)  # noqa: SLF001
+        plain = panel._result_plaintext  # noqa: SLF001
         assert plain.count("Reasoning summary") == 1
         assert "Final reason" in plain
         assert "First reason" not in plain
-        rich = dialog._result_richtext  # noqa: SLF001
+        rich = panel._result_richtext  # noqa: SLF001
         assert "Final reason" in rich
         assert "First reason" not in rich
     finally:
@@ -492,14 +524,14 @@ def test_prompt_chain_step_markdown_renders_without_code_fences(qt_app: QApplica
         step_request_text="### Step input heading",
         step_response_text="### Step output\n\n- Item one",
     )
-    dialog = PromptChainManagerDialog(manager)
+    dialog, panel, manager = _build_dialog(manager)
     try:
-        dialog._chain_input_edit.setPlainText("Markdown step input")  # noqa: SLF001
-        dialog._run_selected_chain()  # noqa: SLF001
-        rich = dialog._result_richtext  # noqa: SLF001
+        panel._chain_input_edit.setPlainText("Markdown step input")  # noqa: SLF001
+        panel._run_selected_chain()  # noqa: SLF001
+        rich = panel._result_richtext  # noqa: SLF001
         assert "chain-block--outputs" in rich
         assert "```" not in rich
-        plain = dialog._result_plaintext  # noqa: SLF001
+        plain = panel._result_plaintext  # noqa: SLF001
         assert "Chain summary" in plain
         assert "### Step output" not in plain
     finally:
@@ -546,11 +578,12 @@ def test_prompt_chain_editor_respects_summary_flag(qt_app: QApplication) -> None
 def test_prompt_chain_editor_prompt_tooltip_and_double_click(
     qt_app: QApplication, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    prompt = SimpleNamespace(
+    prompt = Prompt(
         id=uuid.uuid4(),
         name="Demo Prompt",
+        description="Body text",
+        category="tests",
         context="Body text",
-        description="",
     )
     editor = PromptChainEditorDialog(None, manager=None, prompts=[prompt])
     step = PromptChainStep(
@@ -568,9 +601,10 @@ def test_prompt_chain_editor_prompt_tooltip_and_double_click(
     assert "Demo Prompt" in (item.toolTip() or "")
     captured: dict[str, str] = {}
 
-    def _capture(parent: object, title: str, text: str) -> None:  # noqa: ANN001
+    def _capture(parent: object, title: str, text: str) -> QMessageBox.StandardButton:  # noqa: ANN001
         captured["title"] = title
         captured["text"] = text
+        return QMessageBox.StandardButton.Ok
 
     monkeypatch.setattr("gui.dialogs.prompt_chain_editor.QMessageBox.information", _capture)
     editor._handle_step_double_click(item)  # noqa: SLF001
@@ -584,17 +618,19 @@ def test_prompt_chain_list_activation_opens_editor(
     """Double-clicking a chain should invoke the editor workflow."""
 
     manager = _ManagerStub()
-    dialog = PromptChainManagerDialog(manager)
+    dialog, panel, manager = _build_dialog(manager)
 
     class _EditorStub:
         def __init__(self, *_: object, **kwargs: object) -> None:
             called["chain"] = kwargs.get("chain")
 
         def exec(self) -> int:
-            return QDialog.Accepted
+            return int(QDialog.DialogCode.Accepted)
 
         def result_chain(self) -> PromptChain:
-            return called["chain"]  # type: ignore[return-value]
+            chain = called["chain"]
+            assert isinstance(chain, PromptChain)
+            return chain
 
     called: dict[str, object] = {}
     monkeypatch.setattr(
@@ -602,8 +638,8 @@ def test_prompt_chain_list_activation_opens_editor(
         _EditorStub,
     )
     try:
-        item = dialog._chain_list.item(0)  # noqa: SLF001
-        dialog._handle_chain_activation(item)  # noqa: SLF001
+        item = panel._chain_list.item(0)  # noqa: SLF001
+        panel._handle_chain_activation(item)  # noqa: SLF001
         assert called["chain"] is not None
     finally:
         dialog.close()
@@ -616,14 +652,14 @@ def test_prompt_chain_manager_creates_chain_via_editor(
     """Manager dialog should persist the chain returned by the editor."""
 
     manager = _ManagerStub()
-    dialog = PromptChainManagerDialog(manager)
+    dialog, panel, manager = _build_dialog(manager)
 
     class _EditorStub:
         def __init__(self, *_: object, **__: object) -> None:
             self._chain = _make_chain()
 
         def exec(self) -> int:
-            return QDialog.Accepted
+            return int(QDialog.DialogCode.Accepted)
 
         def result_chain(self) -> PromptChain:
             return self._chain
@@ -632,7 +668,7 @@ def test_prompt_chain_manager_creates_chain_via_editor(
         "gui.dialogs.prompt_chains.PromptChainEditorDialog",
         _EditorStub,
     )
-    dialog._create_chain()  # noqa: SLF001
+    panel._create_chain()  # noqa: SLF001
     assert manager.saved_chain is not None
     dialog.close()
     dialog.deleteLater()
@@ -644,12 +680,12 @@ def test_prompt_chain_manager_deletes_chain(
     """Delete action should invoke PromptManager.delete_prompt_chain."""
 
     manager = _ManagerStub()
-    dialog = PromptChainManagerDialog(manager)
+    dialog, panel, manager = _build_dialog(manager)
     monkeypatch.setattr(
         "gui.dialogs.prompt_chains.QMessageBox.question",
-        lambda *_, **__: QMessageBox.Yes,
+        lambda *_, **__: QMessageBox.StandardButton.Yes,
     )
-    dialog._delete_chain()  # noqa: SLF001
+    panel._delete_chain()  # noqa: SLF001
     assert manager.deleted_chain_ids
     dialog.close()
     dialog.deleteLater()
@@ -659,17 +695,17 @@ def test_prompt_chain_dialog_stream_preview_renders(qt_app: QApplication) -> Non
     """Streaming preview should show incremental text in the result area."""
 
     manager = _ManagerStub()
-    dialog = PromptChainManagerDialog(manager)
+    dialog, panel, manager = _build_dialog(manager)
     step = manager._chains[0].steps[0]  # noqa: SLF001
     try:
-        dialog._begin_stream_preview(manager._chains[0], "Streaming input")  # noqa: SLF001
-        dialog._register_stream_chunk(step, "partial response", False)  # noqa: SLF001
-        text = dialog._result_view.toPlainText()  # noqa: SLF001
+        panel._begin_stream_preview(manager._chains[0], "Streaming input")  # noqa: SLF001
+        panel._register_stream_chunk(step, "partial response", False)  # noqa: SLF001
+        text = panel._result_view.toPlainText()  # noqa: SLF001
         assert "Input to chain" in text
         assert "Streaming input" in text
         assert "partial response" in text
     finally:
-        dialog._end_stream_preview()  # noqa: SLF001
+        panel._end_stream_preview()  # noqa: SLF001
         dialog.close()
         dialog.deleteLater()
 
@@ -678,9 +714,9 @@ def test_prompt_chain_dialog_stream_detection_uses_executor(qt_app: QApplication
     """Streaming flag should be inferred from the manager executor."""
 
     manager = _ManagerStub(stream_enabled=True)
-    dialog = PromptChainManagerDialog(manager)
+    dialog, panel, manager = _build_dialog(manager)
     try:
-        assert dialog._is_streaming_enabled() is True  # noqa: SLF001
+        assert panel._is_streaming_enabled() is True  # noqa: SLF001
     finally:
         dialog.close()
         dialog.deleteLater()
