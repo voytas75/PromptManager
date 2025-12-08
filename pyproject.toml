@@ -87,6 +87,15 @@ docstring-code-format = false
 [tool.pytest.ini_options]
 # Keep only general options here, e.g.,
 # addopts = "-n auto --strict-markers" 
+# Silence LiteLLM's outstanding Pydantic ConfigDict deprecation warnings
+# until https://github.com/BerriAI/litellm/issues/9731 resolves upstream.
+filterwarnings = [
+    "ignore::pydantic.warnings.PydanticDeprecatedSince20:litellm.types.llms.anthropic",
+    "ignore::pydantic.warnings.PydanticDeprecatedSince20:litellm.types.rag",
+    # Python 3.13 emits ResourceWarning for sqlite connections left to GC; pytest-cov's
+    # coverage data store still relies on that behavior (see https://alexwlchan.net/til/2025/python3-13-sqlite-warnings/).
+    "ignore:unclosed database in <sqlite3.Connection object:ResourceWarning",
+]
 
 [tool.coverage.run]
 # This ensures coverage is measured for 'core' when pytest-cov runs
