@@ -1,6 +1,7 @@
 """Administrative and diagnostic tests for PromptManager.
 
 Updates:
+  v0.1.3 - 2025-12-08 - Close helper-created sqlite connections to avoid test ResourceWarnings.
   v0.1.2 - 2025-12-08 - Add override decorator for ChromaError stub to satisfy overrides.
 """
 
@@ -11,6 +12,7 @@ import sqlite3
 import types
 import uuid
 import zipfile
+from contextlib import closing
 from typing import TYPE_CHECKING, Any, cast
 
 import pytest
@@ -219,8 +221,9 @@ class _TestChromaError(ChromaError):
     def __init__(self, message: str) -> None:
         super().__init__(message)
 
+    @classmethod
     @override
-    def name(self) -> str:
+    def name(cls) -> str:
         return "test"
 
 
@@ -373,8 +376,9 @@ def _ensure_chroma_database(chroma_dir: Path) -> Path:
     """Create or return the Chroma SQLite path used for maintenance operations."""
     db_path = chroma_dir / "chroma.sqlite3"
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(db_path) as connection:
+    with closing(sqlite3.connect(db_path)) as connection:
         connection.execute("CREATE TABLE IF NOT EXISTS diagnostics (id INTEGER PRIMARY KEY)")
+        connection.commit()
     return db_path
 
 

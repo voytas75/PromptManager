@@ -1,6 +1,7 @@
 """Shared repository helpers, dataclasses, and error hierarchy.
 
 Updates:
+  v0.11.1 - 2025-12-08 - Wrap SQLite connections in a context manager that commits and closes.
   v0.11.0 - 2025-12-04 - Extract logger, helpers, and exceptions from monolith.
 """
 
@@ -10,9 +11,10 @@ import json
 import logging
 import sqlite3
 import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Iterator, cast
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -50,14 +52,22 @@ def ensure_directory(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
 
 
-def connect(db_path: Path) -> sqlite3.Connection:
-    """Return a configured SQLite connection."""
+@contextmanager
+def connect(db_path: Path) -> Iterator[sqlite3.Connection]:
+    """Yield a configured SQLite connection and ensure it closes cleanly."""
     conn = sqlite3.connect(str(db_path), detect_types=sqlite3.PARSE_DECLTYPES)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
     conn.execute("PRAGMA journal_mode = WAL;")
     conn.execute("PRAGMA synchronous = NORMAL;")
-    return conn
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def stringify_uuid(value: uuid.UUID | str) -> str:

@@ -1,6 +1,7 @@
 """Additional PromptRepository branch coverage tests.
 
 Updates:
+  v0.1.2 - 2025-12-08 - Close ad-hoc sqlite connections with contextlib.closing during legacy setup.
   v0.1.1 - 2025-11-29 - Import Any for fake connections and wrap long test helpers.
   v0.1.0 - 2025-10-30 - Add error-path coverage for repository helpers.
 """
@@ -9,6 +10,7 @@ from __future__ import annotations
 
 import sqlite3
 import uuid
+from contextlib import closing
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
@@ -352,7 +354,7 @@ def test_get_prompts_for_ids_preserves_order(tmp_path: Path) -> None:
 def test_repository_backfills_category_slugs(tmp_path: Path) -> None:
     """Backfill missing category slugs for legacy records."""
     db_path = tmp_path / "legacy.db"
-    with sqlite3.connect(db_path) as conn:
+    with closing(sqlite3.connect(db_path)) as conn:
         conn.execute(
             """
             CREATE TABLE prompts (
@@ -427,8 +429,9 @@ def test_repository_backfills_category_slugs(tmp_path: Path) -> None:
                 None,
             ),
         )
+        conn.commit()
     PromptRepository(str(db_path))
-    with sqlite3.connect(db_path) as conn:
+    with closing(sqlite3.connect(db_path)) as conn:
         columns = {row[1] for row in conn.execute("PRAGMA table_info(prompts);").fetchall()}
         assert "category_slug" in columns
         slug = conn.execute("SELECT category_slug FROM prompts;").fetchone()[0]

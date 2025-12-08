@@ -1,6 +1,7 @@
 """Maintenance mixin providing operational utilities for Prompt Manager.
 
 Updates:
+  v0.1.2 - 2025-12-08 - Close SQLite handles via explicit context manager to prevent leaks.
   v0.1.1 - 2025-12-07 - Gate CollectionProtocol import behind TYPE_CHECKING.
   v0.1.0 - 2025-12-02 - Extract maintenance helpers from core.prompt_manager.__init__.
 """
@@ -14,11 +15,13 @@ import shutil
 import sqlite3
 import sys
 import zipfile
+from contextlib import contextmanager
 from dataclasses import asdict
 from datetime import UTC, datetime
 from importlib import metadata as importlib_metadata
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from sqlite3 import Connection as SQLiteConnection
+from typing import TYPE_CHECKING, Any, Iterator, cast
 
 from chromadb.errors import ChromaError
 
@@ -40,6 +43,26 @@ else:
     CollectionProtocol = Any
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def _sqlite_connection(path: Path, *, timeout: float = 60.0) -> Iterator[SQLiteConnection]:
+    """Yield a SQLite connection that commits changes and closes reliably."""
+    conn = sqlite3.connect(str(path), timeout=timeout)
+    try:
+        yield conn
+        commit = getattr(conn, "commit", None)
+        if callable(commit):
+            commit()
+    except Exception:
+        rollback = getattr(conn, "rollback", None)
+        if callable(rollback):
+            rollback()
+        raise
+    finally:
+        close = getattr(conn, "close", None)
+        if callable(close):
+            close()
 
 __all__ = ["MaintenanceMixin"]
 
@@ -267,7 +290,7 @@ class MaintenanceMixin:
             raise PromptStorageError(f"Chroma persistence database missing at {db_path}.")
         manager._persist_chroma_client()
         try:
-            with sqlite3.connect(str(db_path), timeout=60.0) as connection:
+            with _sqlite_connection(db_path) as connection:
                 connection.execute("PRAGMA wal_checkpoint(TRUNCATE);")
                 connection.execute("VACUUM;")
         except sqlite3.Error as exc:
@@ -282,7 +305,7 @@ class MaintenanceMixin:
             raise PromptStorageError(f"Chroma persistence database missing at {db_path}.")
         manager._persist_chroma_client()
         try:
-            with sqlite3.connect(str(db_path), timeout=60.0) as connection:
+            with _sqlite_connection(db_path) as connection:
                 connection.execute("ANALYZE;")
                 try:
                     connection.execute("PRAGMA optimize;")
@@ -323,7 +346,7 @@ class MaintenanceMixin:
         diagnostics: list[str] = []
         manager._persist_chroma_client()
         try:
-            with sqlite3.connect(str(db_path), timeout=60.0) as connection:
+            with _sqlite_connection(db_path) as connection:
                 integrity_rows = connection.execute("PRAGMA integrity_check;").fetchall()
                 integrity_failures = [
                     str(row[0]) for row in integrity_rows if str(row[0]).lower() != "ok"
@@ -354,7 +377,7 @@ class MaintenanceMixin:
         manager = self._as_prompt_manager()
         db_path = manager._resolve_repository_path()
         try:
-            with sqlite3.connect(str(db_path), timeout=60.0) as connection:
+            with _sqlite_connection(db_path) as connection:
                 connection.execute("PRAGMA wal_checkpoint(TRUNCATE);")
                 connection.execute("VACUUM;")
         except sqlite3.Error as exc:
@@ -366,7 +389,7 @@ class MaintenanceMixin:
         manager = self._as_prompt_manager()
         db_path = manager._resolve_repository_path()
         try:
-            with sqlite3.connect(str(db_path), timeout=60.0) as connection:
+            with _sqlite_connection(db_path) as connection:
                 connection.execute("ANALYZE;")
                 try:
                     connection.execute("PRAGMA optimize;")
@@ -385,7 +408,7 @@ class MaintenanceMixin:
         db_path = manager._resolve_repository_path()
         diagnostics: list[str] = []
         try:
-            with sqlite3.connect(str(db_path), timeout=60.0) as connection:
+            with _sqlite_connection(db_path) as connection:
                 integrity_rows = connection.execute("PRAGMA integrity_check;").fetchall()
                 integrity_failures = [
                     str(row[0]) for row in integrity_rows if str(row[0]).lower() != "ok"

@@ -113,8 +113,9 @@ class _TestChromaError(ChromaError):
     def __init__(self, message: str) -> None:
         super().__init__(message)
 
+    @classmethod
     @override
-    def name(self) -> str:
+    def name(cls) -> str:
         return "test"
 
 
