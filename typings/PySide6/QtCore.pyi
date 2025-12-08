@@ -84,4 +84,5 @@ class Qt:
         AlignRight: int
         AlignTop: int
         AlignBottom: int
+
     ShortcutFocusReason: int
