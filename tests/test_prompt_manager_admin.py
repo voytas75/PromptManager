@@ -7,7 +7,7 @@ import sqlite3
 import types
 import uuid
 import zipfile
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 from chromadb.errors import ChromaError
@@ -201,6 +201,14 @@ class _DummyChromaClient:
         self.persist_calls += 1
 
 
+def _as_chroma_client(client: _DummyChromaClient) -> "ClientAPI":
+    return cast("ClientAPI", client)
+
+
+def _pm(manager: PromptManager) -> Any:
+    return cast(Any, manager)
+
+
 class _HistoryTrackerStub:
     """Record execution queries issued by PromptManager."""
 
@@ -322,10 +330,12 @@ def prompt_manager(
     db_path = tmp_path / "prompt_manager.db"
     collection = _DummyCollection()
     client = _DummyChromaClient(collection)
+    chroma_client = _as_chroma_client(client)
+    chroma_client = _as_chroma_client(client)
     manager = PromptManager(
         chroma_path=str(chroma_dir),
         db_path=str(db_path),
-        chroma_client=client,
+        chroma_client=chroma_client,
         enable_background_sync=False,
     )
     return manager, collection, client, chroma_dir
@@ -1174,7 +1184,7 @@ def test_manager_initialises_litellm_defaults_from_helpers(tmp_path: Path) -> No
     manager = PromptManager(
         chroma_path=str(chroma_dir),
         db_path=str(db_path),
-        chroma_client=client,
+        chroma_client=chroma_client,
         repository=repository,
         enable_background_sync=False,
         name_generator=generator,
@@ -1560,10 +1570,11 @@ def test_apply_rating_handles_fetch_and_update_failures(
 
 
 def test_clear_usage_logs_creates_and_resets(tmp_path: Path) -> None:
+    client = _DummyChromaClient(_DummyCollection())
     manager = PromptManager(
         chroma_path=str(tmp_path / "chroma"),
         db_path=str(tmp_path / "repo.db"),
-        chroma_client=_DummyChromaClient(_DummyCollection()),
+        chroma_client=_as_chroma_client(client),
         enable_background_sync=False,
     )
     logs_path = tmp_path / "logs"
