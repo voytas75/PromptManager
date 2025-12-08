@@ -133,7 +133,7 @@ class WorkspaceActionsController:
             button_text="Save",
             enable_rating=True,
         )
-        if dialog.exec() != QDialog.Accepted:
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         note = dialog.note
         rating_value = dialog.rating

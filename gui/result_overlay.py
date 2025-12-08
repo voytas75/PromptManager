@@ -40,7 +40,7 @@ class ResultActionsOverlay(QObject):
         overlay_parent = self._text_edit
         overlay = QWidget(overlay_parent)
         overlay.setObjectName("resultActionsOverlay")
-        overlay.setAttribute(Qt.WA_StyledBackground, True)
+        overlay.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         layout = QHBoxLayout(overlay)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)

@@ -92,7 +92,7 @@ class CollapsibleTextSection(QWidget):
         """Create a collapsed text editor labelled by *title*."""
         super().__init__(parent)
         self._title = title
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
         self._layout.setSpacing(4)
@@ -101,8 +101,8 @@ class CollapsibleTextSection(QWidget):
         self._toggle.setText(title)
         self._toggle.setCheckable(True)
         self._toggle.setChecked(False)
-        self._toggle.setArrowType(Qt.RightArrow)
-        self._toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self._toggle.setArrowType(Qt.ArrowType.RightArrow)
+        self._toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self._toggle.clicked.connect(self._on_toggle_clicked)  # type: ignore[arg-type]
         self._layout.addWidget(self._toggle)
         self._apply_toggle_style()
@@ -118,7 +118,7 @@ class CollapsibleTextSection(QWidget):
 
     def event(self, event: QEvent) -> bool:  # noqa: D401 - Qt override, documentation inherited
         """Refresh toggle styling when palettes or styles change."""
-        if event.type() in {QEvent.PaletteChange, QEvent.StyleChange}:
+        if event.type() in {QEvent.Type.PaletteChange, QEvent.Type.StyleChange}:
             self._apply_toggle_style()
         return super().event(event)
 
@@ -155,7 +155,7 @@ class CollapsibleTextSection(QWidget):
 
     def eventFilter(self, obj, event):  # type: ignore[override]
         """Collapse the editor when focus leaves and the field is empty."""
-        if obj is self._editor and event.type() == QEvent.FocusOut:
+        if obj is self._editor and event.type() == QEvent.Type.FocusOut:
             if not self._editor.toPlainText().strip():
                 self._set_expanded(False, focus=False)
         return super().eventFilter(obj, event)
@@ -163,11 +163,11 @@ class CollapsibleTextSection(QWidget):
     def _apply_toggle_style(self) -> None:
         """Align the toggle button background with the active theme palette."""
         palette = self._toggle.palette()
-        button_color = palette.color(QPalette.Button).name()
-        text_color = palette.color(QPalette.ButtonText).name()
-        border_color = palette.color(QPalette.Mid).name()
-        checked_color = palette.color(QPalette.Highlight).name()
-        checked_text = palette.color(QPalette.HighlightedText).name()
+        button_color = palette.color(QPalette.ColorRole.Button).name()
+        text_color = palette.color(QPalette.ColorRole.ButtonText).name()
+        border_color = palette.color(QPalette.ColorRole.Mid).name()
+        checked_color = palette.color(QPalette.ColorRole.Highlight).name()
+        checked_text = palette.color(QPalette.ColorRole.HighlightedText).name()
         self._toggle.setStyleSheet(
             "QToolButton {"
             f"background-color: {button_color};"
@@ -189,14 +189,14 @@ class CollapsibleTextSection(QWidget):
         self._toggle.blockSignals(True)
         self._toggle.setChecked(expanded)
         self._toggle.blockSignals(False)
-        self._toggle.setArrowType(Qt.DownArrow if expanded else Qt.RightArrow)
+        self._toggle.setArrowType(Qt.ArrowType.DownArrow if expanded else Qt.ArrowType.RightArrow)
         self._editor.setVisible(expanded)
         if expanded:
             self._editor.setFixedHeight(self._expanded_height)
         else:
             self._editor.setFixedHeight(self._collapsed_height)
         if expanded and focus:
-            self._editor.setFocus(Qt.OtherFocusReason)
+            self._editor.setFocus(Qt.FocusReason.OtherFocusReason)
 
     def _on_toggle_clicked(self, checked: bool) -> None:
         self._set_expanded(checked, focus=checked)

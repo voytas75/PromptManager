@@ -116,7 +116,7 @@ class PromptToolbar(QWidget):
         self._exit_button.setToolTip("Exit Prompt Manager")
         self._exit_button.setAccessibleName("Exit Prompt Manager")
         self._exit_button.setAutoRaise(True)
-        self._exit_button.setCursor(Qt.PointingHandCursor)
+        self._exit_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self._exit_button.clicked.connect(self.exit_requested)  # type: ignore[arg-type]
         layout.addWidget(self._exit_button)
 
@@ -145,7 +145,7 @@ class PromptToolbar(QWidget):
 
     def focus_search(self) -> None:
         """Place keyboard focus in the search field."""
-        self._search_input.setFocus(Qt.ShortcutFocusReason)
+        self._search_input.setFocus(Qt.FocusReason.ShortcutFocusReason)
 
     def _emit_search_request(self) -> None:
         self.search_requested.emit(self.search_text())

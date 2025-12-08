@@ -105,7 +105,7 @@ class PromptTemplateEditorDialog(QDialog):
             actions = QHBoxLayout()
             reset_btn = QPushButton("Reset to default", section)
             reset_btn.clicked.connect(partial(self._reset_template, key))  # type: ignore[arg-type]
-            actions.addWidget(reset_btn, alignment=Qt.AlignLeft)
+            actions.addWidget(reset_btn, alignment=Qt.AlignmentFlag.AlignLeft)
             actions.addStretch(1)
             section_layout.addLayout(actions)
 
@@ -113,10 +113,10 @@ class PromptTemplateEditorDialog(QDialog):
 
         reset_all = QPushButton("Reset all to defaults", container)
         reset_all.clicked.connect(self._reset_all)  # type: ignore[arg-type]
-        container_layout.addWidget(reset_all, alignment=Qt.AlignLeft)
+        container_layout.addWidget(reset_all, alignment=Qt.AlignmentFlag.AlignLeft)
         container_layout.addStretch(1)
 
-        self._buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        self._buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self)
         self._buttons.accepted.connect(self._on_accept)  # type: ignore[arg-type]
         self._buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(self._buttons)
@@ -165,7 +165,7 @@ class PromptTemplateEditorDialog(QDialog):
 
     def _validate_inputs(self) -> None:
         valid = all(editor.toPlainText().strip() for editor in self._editors.values())
-        self._buttons.button(QDialogButtonBox.Ok).setEnabled(valid)
+        self._buttons.button(QDialogButtonBox.StandardButton.Ok).setEnabled(valid)
 
     def _on_accept(self) -> None:
         if not all(editor.toPlainText().strip() for editor in self._editors.values()):

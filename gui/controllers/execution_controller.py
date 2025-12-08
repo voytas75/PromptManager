@@ -159,7 +159,7 @@ class ExecutionController:
         self._voice_supported = bool(voice_controller and voice_controller.is_supported)
         self._speak_result_button_play_icon = speak_result_button.icon()
         button_style = speak_result_button.style()
-        self._speak_result_button_stop_icon = button_style.standardIcon(QStyle.SP_MediaStop)
+        self._speak_result_button_stop_icon = button_style.standardIcon(QStyle.StandardPixmap.SP_MediaStop)
         self._speak_result_button.setCheckable(True)
         self._web_search_warning_shown = False
         self._last_web_context_sources = 0
@@ -280,9 +280,9 @@ class ExecutionController:
             return
         self._query_input.setPlainText(response)
         cursor = self._query_input.textCursor()
-        cursor.movePosition(QTextCursor.End)
+        cursor.movePosition(QTextCursor.MoveOperation.End)
         self._query_input.setTextCursor(cursor)
-        self._query_input.setFocus(Qt.ShortcutFocusReason)
+        self._query_input.setFocus(Qt.FocusReason.ShortcutFocusReason)
         self._toast("Prompt result copied to the text window.", 2500)
 
     def execute_prompt_with_text(
@@ -343,9 +343,9 @@ class ExecutionController:
         if keep_text_after:
             self._query_input.setPlainText(request_text)
             cursor = self._query_input.textCursor()
-            cursor.movePosition(QTextCursor.End)
+            cursor.movePosition(QTextCursor.MoveOperation.End)
             self._query_input.setTextCursor(cursor)
-            self._query_input.setFocus(Qt.ShortcutFocusReason)
+            self._query_input.setFocus(Qt.FocusReason.ShortcutFocusReason)
 
         self._usage_logger.log_execute(
             prompt_name=prompt.name,
@@ -953,7 +953,7 @@ class ExecutionController:
         self._end_chat_button.setEnabled(can_continue)
         self._refresh_chat_history_view()
         self._query_input.clear()
-        self._query_input.setFocus(Qt.ShortcutFocusReason)
+        self._query_input.setFocus(Qt.FocusReason.ShortcutFocusReason)
 
     def _reset_chat_session(self, *, clear_view: bool = True) -> None:
         self._chat_prompt_id = None
@@ -974,11 +974,11 @@ class ExecutionController:
         if self._is_markdown_render_enabled():
             self._result_text.setMarkdown(self._raw_result_text)
             cursor = self._result_text.textCursor()
-            cursor.movePosition(QTextCursor.End)
+            cursor.movePosition(QTextCursor.MoveOperation.End)
             self._result_text.setTextCursor(cursor)
             return
         cursor = self._result_text.textCursor()
-        cursor.movePosition(QTextCursor.End)
+        cursor.movePosition(QTextCursor.MoveOperation.End)
         cursor.insertText(chunk)
         self._result_text.setTextCursor(cursor)
 
@@ -991,7 +991,7 @@ class ExecutionController:
         else:
             self._result_text.setPlainText(content)
         cursor = self._result_text.textCursor()
-        cursor.movePosition(QTextCursor.End)
+        cursor.movePosition(QTextCursor.MoveOperation.End)
         self._result_text.setTextCursor(cursor)
 
     def _set_result_text_content(self, text: str) -> None:

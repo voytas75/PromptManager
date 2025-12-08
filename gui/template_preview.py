@@ -183,7 +183,7 @@ class TemplatePreviewWidget(QWidget):
         self._schema_panel.setVisible(False)
         editors_layout.addWidget(self._schema_panel, stretch=1)
 
-        self._content_splitter = QSplitter(Qt.Vertical, frame)
+        self._content_splitter = QSplitter(Qt.Orientation.Vertical, frame)
         self._content_splitter.setChildrenCollapsible(False)
         self._content_splitter.addWidget(editors_container)
 

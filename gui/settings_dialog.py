@@ -515,7 +515,7 @@ class SettingsDialog(QDialog):
         scroll_area.setWidget(scroll_container)
         scroll_container_layout = QVBoxLayout(scroll_container)
         scroll_container_layout.setContentsMargins(0, 0, 0, 0)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         intro_label = QLabel(
             "Override the system prompts sent to LiteLLM for each supported workflow. "
@@ -551,7 +551,7 @@ class SettingsDialog(QDialog):
             actions_row = QHBoxLayout()
             reset_btn = QPushButton("Reset to default", section)
             reset_btn.clicked.connect(partial(self._reset_prompt_template, key))  # type: ignore[arg-type]
-            actions_row.addWidget(reset_btn, alignment=Qt.AlignLeft)
+            actions_row.addWidget(reset_btn, alignment=Qt.AlignmentFlag.AlignLeft)
             actions_row.addStretch(1)
             section_layout.addLayout(actions_row)
 
@@ -559,12 +559,12 @@ class SettingsDialog(QDialog):
 
         reset_all_btn = QPushButton("Reset all to defaults", scroll_container)
         reset_all_btn.clicked.connect(self._reset_all_prompt_templates)  # type: ignore[arg-type]
-        scroll_container_layout.addWidget(reset_all_btn, alignment=Qt.AlignLeft)
+        scroll_container_layout.addWidget(reset_all_btn, alignment=Qt.AlignmentFlag.AlignLeft)
         scroll_container_layout.addStretch(1)
 
         tab_widget.addTab(prompts_tab, "Prompt Templates")
 
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self)
         button_box.accepted.connect(self.accept)  # type: ignore[arg-type]
         button_box.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(button_box)
@@ -600,7 +600,7 @@ class SettingsDialog(QDialog):
         self._chat_color_preview.setText("You: Example message")
 
     def accept(self) -> None:
-        """Validate inputs, capture state, and close with ``QDialog.Accepted``."""
+        """Validate inputs, capture state, and close with ``QDialog.DialogCode.Accepted``."""
         text = self._quick_actions_input.toPlainText().strip()
         if text:
             try:

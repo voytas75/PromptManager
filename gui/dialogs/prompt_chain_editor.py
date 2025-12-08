@@ -107,7 +107,7 @@ class PromptChainEditorDialog(QDialog):
 
         self._steps_table = QTableWidget(0, 3, self)
         self._steps_table.setHorizontalHeaderLabels(["Order", "Prompt", "Failure handling"])
-        self._steps_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self._steps_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self._steps_table.itemDoubleClicked.connect(self._handle_step_double_click)  # type: ignore[arg-type]
         layout.addWidget(self._steps_table, 1)
 
@@ -126,7 +126,7 @@ class PromptChainEditorDialog(QDialog):
         step_actions.addStretch(1)
         layout.addLayout(step_actions)
 
-        self._buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel, self)
+        self._buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel, self)
         self._buttons.accepted.connect(self._handle_accept)  # type: ignore[arg-type]
         self._buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(self._buttons)
@@ -172,7 +172,7 @@ class PromptChainEditorDialog(QDialog):
             prompts=self._prompts,
         )
         dialog.set_order_index(len(self._steps) + 1)
-        if dialog.exec() != QDialog.Accepted:
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         step = dialog.result_step()
         if step is None:
@@ -190,7 +190,7 @@ class PromptChainEditorDialog(QDialog):
             step=self._steps[row],
             prompts=self._prompts,
         )
-        if dialog.exec() != QDialog.Accepted:
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         step = dialog.result_step()
         if step is None:
@@ -312,7 +312,7 @@ class PromptChainStepDialog(QDialog):
             "If unchecked the chain continues even when this step errors.",
         )
 
-        buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel, self)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel, self)
         buttons.accepted.connect(self._handle_accept)  # type: ignore[arg-type]
         buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(buttons)
@@ -377,7 +377,7 @@ class PromptChainStepDialog(QDialog):
         self.accept()
 
     def _resolve_prompt_uuid_text(self) -> str | None:
-        data = self._prompt_combo.currentData(Qt.UserRole)
+        data = self._prompt_combo.currentData(Qt.ItemDataRole.UserRole)
         if data:
             return str(data)
         text = self._prompt_combo.currentText().strip()

@@ -84,7 +84,7 @@ class PromptMaintenanceDialog(
 
         scroll_area = QScrollArea(self)
         scroll_area.setWidgetResizable(True)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         outer_layout.addWidget(scroll_area, stretch=1)
 
         scroll_contents = QWidget(self)
@@ -109,6 +109,6 @@ class PromptMaintenanceDialog(
         reset_tab = self._build_reset_tab(self)
         self._tab_widget.addTab(reset_tab, "Data Reset")
 
-        self._buttons = QDialogButtonBox(QDialogButtonBox.Close, self)
+        self._buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close, self)
         self._buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         outer_layout.addWidget(self._buttons)

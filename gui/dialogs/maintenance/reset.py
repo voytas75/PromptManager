@@ -104,10 +104,10 @@ class ResetMaintenanceMixin:
             self,
             "Confirm Data Reset",
             f"{prompt}\n\nThis action cannot be undone. Continue?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         )
-        return result == QMessageBox.Yes
+        return result == QMessageBox.StandardButton.Yes
 
     def _on_snapshot_clicked(self) -> None:
         default_name = datetime.now(UTC).strftime("prompt-manager-snapshot-%Y%m%d-%H%M%S.zip")
@@ -123,7 +123,7 @@ class ResetMaintenanceMixin:
         destination = Path(file_path)
 
         self._append_reset_log("Creating maintenance snapshot…")
-        QApplication.setOverrideCursor(Qt.WaitCursor)
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
             archive_path = self._manager.create_data_snapshot(destination)
         except PromptManagerError as exc:

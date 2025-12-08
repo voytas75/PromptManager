@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from PySide6.QtCore import Qt
 
@@ -50,9 +50,9 @@ def _should_force_offscreen(env: MutableMapping[str, str]) -> bool:
 
 def create_qapplication(argv: Sequence[str] | None = None) -> QApplication:
     """Return an existing QApplication or create a new one with sensible defaults."""
-    app = QApplication.instance()
-    if app is not None:
-        return app  # Reuse existing instance when running inside tests/tools
+    existing = QApplication.instance()
+    if existing is not None:
+        return cast(QApplication, existing)  # Reuse existing instance when running inside tests/tools
 
     if _should_force_offscreen(os.environ):
         # Allow running in headless environments by defaulting to the offscreen plugin.
@@ -67,11 +67,12 @@ def create_qapplication(argv: Sequence[str] | None = None) -> QApplication:
     if fusion is not None:
         app.setStyle(fusion)
     style_name = "<unknown>"
-    try:
-        style_obj = app.style()
-        style_name = style_obj.metaObject().className()
-    except AttributeError:  # pragma: no cover - stubbed Qt lacks metaObject
-        style_name = "<unavailable>"
+    style_obj = app.style()
+    if style_obj is not None:
+        try:
+            style_name = style_obj.metaObject().className()
+        except AttributeError:  # pragma: no cover - stubbed Qt lacks metaObject
+            style_name = "<unavailable>"
     logger.debug("GUI_STYLE active_style=%s", style_name)
     return app
 

@@ -74,11 +74,11 @@ class NotificationHistoryDialog(QDialog):
         for notification in reversed(list(notifications)):
             text = _format_notification(notification)
             item = QListWidgetItem(text)
-            item.setData(Qt.UserRole, notification)
+            item.setData(Qt.ItemDataRole.UserRole, notification)
             self._list.addItem(item)
 
-        button_box = QDialogButtonBox(QDialogButtonBox.Close)
-        copy_button = button_box.addButton("Copy Details", QDialogButtonBox.ActionRole)
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        copy_button = button_box.addButton("Copy Details", QDialogButtonBox.ButtonRole.ActionRole)
         copy_button.clicked.connect(self._copy_selected)  # type: ignore[arg-type]
         button_box.rejected.connect(self.reject)
         layout.addWidget(button_box)
@@ -87,7 +87,7 @@ class NotificationHistoryDialog(QDialog):
         selected = self._list.currentItem()
         if selected is None:
             return
-        notification: Notification = selected.data(Qt.UserRole)
+        notification: Notification = selected.data(Qt.ItemDataRole.UserRole)
         clipboard: QClipboard = QGuiApplication.clipboard()
         clipboard.setText(_format_notification(notification, include_metadata=True))
         show_toast(self, "Notification details copied to clipboard.")
@@ -108,7 +108,7 @@ class BackgroundTaskItemWidget(QWidget):
         self._title = QLabel(notification.title, self)
         self._title.setStyleSheet("font-weight: 600;")
         self._status = QLabel("", self)
-        self._status.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self._status.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         header.addWidget(self._title)
         header.addWidget(self._status)
         layout.addLayout(header)
@@ -172,12 +172,12 @@ class BackgroundTaskCenterDialog(QDialog):
         layout.addWidget(active_label)
 
         self._active_placeholder = QLabel("No active tasks", self)
-        self._active_placeholder.setAlignment(Qt.AlignCenter)
+        self._active_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._active_placeholder.setStyleSheet("color: #6b7280;")
         layout.addWidget(self._active_placeholder)
 
         self._active_list = QListWidget(self)
-        self._active_list.setSelectionMode(QAbstractItemView.NoSelection)
+        self._active_list.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self._active_list.setSpacing(6)
         layout.addWidget(self._active_list)
 
@@ -186,10 +186,10 @@ class BackgroundTaskCenterDialog(QDialog):
         layout.addWidget(history_label)
 
         self._history_list = QListWidget(self)
-        self._history_list.setSelectionMode(QAbstractItemView.NoSelection)
+        self._history_list.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         layout.addWidget(self._history_list)
 
-        button_box = QDialogButtonBox(QDialogButtonBox.Close)
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         button_box.rejected.connect(self.reject)
         layout.addWidget(button_box)
 

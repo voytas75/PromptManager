@@ -126,9 +126,9 @@ class HistoryPanel(QWidget):
         self._table.setHorizontalHeaderLabels(
             ["Prompt", "Status", "Rating", "Duration (ms)", "Executed At", "Error", "Note"]
         )
-        self._table.setSelectionBehavior(QTableWidget.SelectRows)
-        self._table.setSelectionMode(QTableWidget.SingleSelection)
-        self._table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self._table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._table.setSortingEnabled(True)
         self._table.itemSelectionChanged.connect(self._on_selection_changed)  # type: ignore[arg-type]
         layout.addWidget(self._table, stretch=1)
@@ -229,8 +229,8 @@ class HistoryPanel(QWidget):
             for col, value in enumerate(values):
                 item = QTableWidgetItem(value)
                 if col == 1:
-                    item.setData(Qt.UserRole, execution.status.value)
-                item.setFlags(item.flags() ^ Qt.ItemIsEditable)
+                    item.setData(Qt.ItemDataRole.UserRole, execution.status.value)
+                item.setFlags(item.flags() ^ Qt.ItemFlag.ItemIsEditable)
                 self._table.setItem(row_index, col, item)
         self._table.resizeColumnsToContents()
         self._table.setSortingEnabled(True)
@@ -317,7 +317,7 @@ class HistoryPanel(QWidget):
             button_text="Update",
             enable_rating=False,
         )
-        if dialog.exec() != QDialog.Accepted:
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         note = dialog.note
         try:

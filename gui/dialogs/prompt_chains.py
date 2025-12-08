@@ -198,7 +198,7 @@ class PromptChainManagerPanel(QWidget):
         intro.setWordWrap(True)
         layout.addWidget(intro)
 
-        self._outer_splitter = QSplitter(Qt.Horizontal, self)
+        self._outer_splitter = QSplitter(Qt.Orientation.Horizontal, self)
         self._outer_splitter.setObjectName("promptChainOuterSplitter")
         layout.addWidget(self._outer_splitter, 1)
 
@@ -207,7 +207,7 @@ class PromptChainManagerPanel(QWidget):
         management_layout.setContentsMargins(0, 0, 0, 0)
         management_layout.setSpacing(0)
 
-        self._management_splitter = QSplitter(Qt.Horizontal, management_container)
+        self._management_splitter = QSplitter(Qt.Orientation.Horizontal, management_container)
         self._management_splitter.setObjectName("promptChainSplitter")
         management_layout.addWidget(self._management_splitter, 1)
 
@@ -254,7 +254,7 @@ class PromptChainManagerPanel(QWidget):
         detail_layout.setContentsMargins(8, 8, 8, 8)
         detail_layout.setSpacing(10)
 
-        self._detail_splitter = QSplitter(Qt.Vertical, detail_container)
+        self._detail_splitter = QSplitter(Qt.Orientation.Vertical, detail_container)
         self._detail_splitter.setObjectName("promptChainDetailSplitter")
         detail_layout.addWidget(self._detail_splitter, 1)
 
@@ -274,7 +274,7 @@ class PromptChainManagerPanel(QWidget):
         self._description_label = QLabel("(No description provided.)", info_container)
         self._description_label.setWordWrap(True)
         self._description_label.setObjectName("promptChainDescription")
-        self._description_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self._description_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         info_layout.addWidget(self._description_label)
 
         guidance = QLabel(
@@ -298,9 +298,9 @@ class PromptChainManagerPanel(QWidget):
         self._steps_table.setHorizontalHeaderLabels(["Order", "Prompt", "Failure handling"])
         self._steps_table.horizontalHeader().setStretchLastSection(True)
         self._steps_table.verticalHeader().setVisible(False)
-        self._steps_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self._steps_table.setSelectionBehavior(QTableWidget.SelectRows)
-        self._steps_table.setSelectionMode(QTableWidget.SingleSelection)
+        self._steps_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self._steps_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self._steps_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self._steps_table.cellActivated.connect(self._handle_step_table_activated)  # type: ignore[arg-type]
         steps_layout.addWidget(self._steps_table, 1)
 
@@ -436,14 +436,14 @@ class PromptChainManagerPanel(QWidget):
             for chain in self._chains:
                 status = "Active" if chain.is_active else "Inactive"
                 item = QListWidgetItem(f"{chain.name} ({status})", self._chain_list)
-                item.setData(Qt.UserRole, str(chain.id))
+                item.setData(Qt.ItemDataRole.UserRole, str(chain.id))
             if self._chains:
                 target_id = preferred_id or str(self._chains[0].id)
                 for row in range(self._chain_list.count()):
                     item = self._chain_list.item(row)
                     if item is None:
                         continue
-                    if item.data(Qt.UserRole) == target_id:
+                    if item.data(Qt.ItemDataRole.UserRole) == target_id:
                         self._chain_list.setCurrentRow(row)
                         selected_chain = self._chains[row]
                         self._selected_chain_id = str(selected_chain.id)
@@ -477,7 +477,7 @@ class PromptChainManagerPanel(QWidget):
             self._selected_chain_id = None
             self._render_chain_details(None)
             return
-        chain_id = item.data(Qt.UserRole)
+        chain_id = item.data(Qt.ItemDataRole.UserRole)
         self._selected_chain_id = chain_id
         chain = next((entry for entry in self._chains if str(entry.id) == chain_id), None)
         self._render_chain_details(chain)
@@ -579,7 +579,7 @@ class PromptChainManagerPanel(QWidget):
             manager=self._manager,
             prompts=self._available_prompts(),
         )
-        if editor.exec() != QDialog.Accepted:
+        if editor.exec() != QDialog.DialogCode.Accepted:
             return
         chain = editor.result_chain()
         if chain is None:
@@ -597,7 +597,7 @@ class PromptChainManagerPanel(QWidget):
             prompts=self._available_prompts(),
             chain=chain,
         )
-        if editor.exec() != QDialog.Accepted:
+        if editor.exec() != QDialog.DialogCode.Accepted:
             return
         updated = editor.result_chain()
         if updated is None:
@@ -622,10 +622,10 @@ class PromptChainManagerPanel(QWidget):
             self,
             "Delete prompt chain",
             f"Delete '{chain.name}' and all of its steps?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         )
-        if confirmation != QMessageBox.Yes:
+        if confirmation != QMessageBox.StandardButton.Yes:
             return
         try:
             self._manager.delete_prompt_chain(chain.id)
@@ -658,7 +658,7 @@ class PromptChainManagerPanel(QWidget):
             item = self._chain_list.item(row)
             if item is None:
                 continue
-            if item.data(Qt.UserRole) == chain_id_text:
+            if item.data(Qt.ItemDataRole.UserRole) == chain_id_text:
                 self._chain_list.setCurrentRow(row)
                 return
 
@@ -1331,7 +1331,7 @@ class PromptChainManagerDialog(QDialog):
             prompt_edit_callback=prompt_edit_callback,
         )
         layout.addWidget(self._panel)
-        buttons = QDialogButtonBox(QDialogButtonBox.Close, self)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close, self)
         buttons.accepted.connect(self.accept)  # type: ignore[arg-type]
         buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(buttons)

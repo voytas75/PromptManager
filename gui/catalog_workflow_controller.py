@@ -73,10 +73,10 @@ class CatalogWorkflowController:
                 self._parent,
                 "Import directory?",
                 "No file selected. Do you want to import all JSON files from a directory instead?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
             )
-            if use_directory != QMessageBox.Yes:
+            if use_directory != QMessageBox.StandardButton.Yes:
                 return
             directory = QFileDialog.getExistingDirectory(
                 self._parent,
@@ -96,7 +96,7 @@ class CatalogWorkflowController:
             return
 
         dialog = CatalogPreviewDialog(preview, self._parent)
-        if dialog.exec() != QDialog.Accepted or not dialog.apply_requested:
+        if dialog.exec() != QDialog.DialogCode.Accepted or not dialog.apply_requested:
             return
 
         try:

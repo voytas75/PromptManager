@@ -151,9 +151,9 @@ class PromptActionsController:
             return
         self._query_input.setPlainText(raw_payload)
         cursor = self._query_input.textCursor()
-        cursor.movePosition(QTextCursor.End)
+        cursor.movePosition(QTextCursor.MoveOperation.End)
         self._query_input.setTextCursor(cursor)
-        self._query_input.setFocus(Qt.ShortcutFocusReason)
+        self._query_input.setFocus(Qt.FocusReason.ShortcutFocusReason)
         controller = self._execution_controller_supplier()
         if controller is None:
             self._error_callback("Workspace unavailable", "Execution controller is not ready.")

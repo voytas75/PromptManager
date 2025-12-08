@@ -54,10 +54,10 @@ class WorkspaceViewController:
         """Populate the workspace editor with *text* and optionally focus the field."""
         self._query_input.setPlainText(text)
         cursor = self._query_input.textCursor()
-        cursor.movePosition(QTextCursor.End)
+        cursor.movePosition(QTextCursor.MoveOperation.End)
         self._query_input.setTextCursor(cursor)
         if focus:
-            self._query_input.setFocus(Qt.ShortcutFocusReason)
+            self._query_input.setFocus(Qt.FocusReason.ShortcutFocusReason)
 
     def clear(self) -> None:
         """Clear the workspace editor, output tab, and chat transcript."""

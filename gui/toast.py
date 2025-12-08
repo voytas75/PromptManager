@@ -22,7 +22,7 @@ def show_toast(parent: QWidget | None, message: str, duration_ms: int = 2500) ->
         "border-radius: 8px;"
         "font-weight: 500;"
     )
-    toast.setAttribute(Qt.WA_TransparentForMouseEvents)
+    toast.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
     toast.adjustSize()
     parent_rect = parent.rect()
     x_pos = max((parent_rect.width() - toast.width()) // 2, 0)

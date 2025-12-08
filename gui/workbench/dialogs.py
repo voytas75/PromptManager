@@ -132,11 +132,11 @@ class WorkbenchModeDialog(QDialog):
         self._template_list.setEnabled(False)
         for prompt in self._prompts:
             item = QListWidgetItem(prompt.name)
-            item.setData(Qt.UserRole, prompt)
+            item.setData(Qt.ItemDataRole.UserRole, prompt)
             self._template_list.addItem(item)
         layout.addWidget(self._template_list)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self)
         buttons.accepted.connect(self._on_accept)  # type: ignore[arg-type]
         buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(buttons)
@@ -172,7 +172,7 @@ class WorkbenchModeDialog(QDialog):
     def _on_accept(self) -> None:
         if self._selection.mode == WorkbenchMode.TEMPLATE:
             item = self._template_list.currentItem()
-            prompt = item.data(Qt.UserRole) if item else None
+            prompt = item.data(Qt.ItemDataRole.UserRole) if item else None
             if prompt is None:
                 QMessageBox.warning(self, "Select template", "Choose a template first.")
                 return
@@ -196,7 +196,7 @@ class VariableCaptureDialog(QDialog):
 
     def result_variable(self) -> WorkbenchVariable | None:
         """Return a WorkbenchVariable when the dialog is accepted."""
-        if self.result() != QDialog.Accepted:
+        if self.result() != QDialog.DialogCode.Accepted:
             return None
         name = self._name_input.text().strip()
         if not name:
@@ -222,7 +222,7 @@ class VariableCaptureDialog(QDialog):
         self._sample_input.setPlaceholderText("Sample value used for preview")
         self._sample_input.setFixedHeight(80)
         layout.addRow("Sample value", self._sample_input)
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self)
         buttons.accepted.connect(self.accept)  # type: ignore[arg-type]
         buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(buttons)
@@ -240,7 +240,7 @@ class WorkbenchExportDialog(QDialog):
 
     def prompt_kwargs(self) -> WorkbenchExportPayload | None:
         """Return keyword arguments for prompt creation when accepted."""
-        if self.result() != QDialog.Accepted:
+        if self.result() != QDialog.DialogCode.Accepted:
             return None
         tags = [tag.strip() for tag in self._tags_input.text().split(",") if tag.strip()]
         return WorkbenchExportPayload(
@@ -268,7 +268,7 @@ class WorkbenchExportDialog(QDialog):
         layout.addRow("Tags", self._tags_input)
         self._author_input = QLineEdit(self)
         layout.addRow("Author", self._author_input)
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self)
         buttons.accepted.connect(self.accept)  # type: ignore[arg-type]
         buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addRow(buttons)

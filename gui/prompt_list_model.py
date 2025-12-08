@@ -30,12 +30,12 @@ class PromptListModel(QAbstractListModel):
             return 0
         return len(self._prompts)
 
-    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> str | None:  # noqa: N802
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> str | None:  # noqa: N802
         """Return the decorated prompt label for the requested index."""
         if not index.isValid() or index.row() >= len(self._prompts):
             return None
         prompt = self._prompts[index.row()]
-        if role in {Qt.DisplayRole, Qt.EditRole}:
+        if role in {Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole}:
             category = f" ({prompt.category})" if prompt.category else ""
             similarity_suffix = ""
             if getattr(prompt, "similarity", None) is not None:

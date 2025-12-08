@@ -109,7 +109,7 @@ class WorkbenchWindow(QMainWindow):
     def _build_ui(self) -> None:
         self.setWindowTitle("Enhanced Prompt Workbench")
         if self.isWindow():
-            self.setWindowModality(Qt.ApplicationModal)
+            self.setWindowModality(Qt.WindowModality.ApplicationModal)
             self.resize(1280, 860)
 
         toolbar = QToolBar("Workbench Controls", self)
@@ -148,7 +148,7 @@ class WorkbenchWindow(QMainWindow):
         self._summary_label.setStyleSheet("font-weight: 500;")
         container_layout.addWidget(self._summary_label)
 
-        self._main_splitter = QSplitter(Qt.Horizontal, container)
+        self._main_splitter = QSplitter(Qt.Orientation.Horizontal, container)
         self._main_splitter.setChildrenCollapsible(False)
         container_layout.addWidget(self._main_splitter, 1)
 
@@ -168,7 +168,7 @@ class WorkbenchWindow(QMainWindow):
         middle_layout = QVBoxLayout(middle_panel)
         middle_layout.setContentsMargins(8, 8, 8, 8)
         middle_layout.setSpacing(8)
-        self._middle_splitter = QSplitter(Qt.Vertical, middle_panel)
+        self._middle_splitter = QSplitter(Qt.Orientation.Vertical, middle_panel)
         self._middle_splitter.setChildrenCollapsible(False)
         middle_layout.addWidget(self._middle_splitter, 1)
 
@@ -330,7 +330,7 @@ class WorkbenchWindow(QMainWindow):
     def _launch_wizard(self, *, initial: bool = False) -> None:
         wizard = GuidedPromptWizard(self._session, self)
         wizard.updated.connect(self._handle_wizard_update)
-        if wizard.exec() == QDialog.Accepted and not initial:
+        if wizard.exec() == QDialog.DialogCode.Accepted and not initial:
             show_toast(self, "Wizard applied to prompt.")
 
     def _handle_wizard_update(self, payload: Mapping[str, Any]) -> None:
@@ -350,7 +350,7 @@ class WorkbenchWindow(QMainWindow):
 
     def _open_variable_editor(self, name: str) -> None:
         dialog = VariableCaptureDialog(name, self)
-        if dialog.exec() != QDialog.Accepted:
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         variable = dialog.result_variable()
         if variable is None:
@@ -370,7 +370,7 @@ class WorkbenchWindow(QMainWindow):
         else:
             candidate = variable_at_cursor(cursor)
         dialog = VariableCaptureDialog(candidate, self)
-        if dialog.exec() != QDialog.Accepted:
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         variable = dialog.result_variable()
         if variable is None:
@@ -416,7 +416,7 @@ class WorkbenchWindow(QMainWindow):
             return
         self._streaming_buffer.append(chunk)
         cursor = self._output_view.textCursor()
-        cursor.movePosition(QTextCursor.End)
+        cursor.movePosition(QTextCursor.MoveOperation.End)
         cursor.insertText(chunk)
         self._output_view.setTextCursor(cursor)
         self._output_view.ensureCursorVisible()
@@ -562,9 +562,9 @@ class WorkbenchWindow(QMainWindow):
             return
         selection = QTextEdit.ExtraSelection()
         fmt = QTextCharFormat()
-        fmt.setBackground(Qt.yellow)
+        fmt.setBackground(Qt.GlobalColor.yellow)
         selection.cursor = cursor
-        selection.cursor.movePosition(QTextCursor.EndOfBlock, QTextCursor.KeepAnchor)
+        selection.cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.KeepAnchor)
         selection.format = fmt
         self._editor.setExtraSelections([selection])
 
@@ -646,7 +646,7 @@ class WorkbenchWindow(QMainWindow):
 
     def _export_prompt(self) -> None:
         dialog = WorkbenchExportDialog(self._session, self)
-        if dialog.exec() != QDialog.Accepted:
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         kwargs = dialog.prompt_kwargs()
         if kwargs is None:

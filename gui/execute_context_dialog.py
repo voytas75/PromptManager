@@ -69,7 +69,7 @@ class ExecuteContextDialog(QDialog):
         if last_task:
             self._description_input.setPlainText(last_task)
             cursor = self._description_input.textCursor()
-            cursor.movePosition(QTextCursor.End)
+            cursor.movePosition(QTextCursor.MoveOperation.End)
             self._description_input.setTextCursor(cursor)
         layout.addWidget(self._description_input)
 
@@ -80,7 +80,7 @@ class ExecuteContextDialog(QDialog):
 
             history_list = QListWidget(self)
             history_list.setObjectName("executeContextHistoryList")
-            history_list.setSelectionMode(QAbstractItemView.SingleSelection)
+            history_list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
             history_list.setAlternatingRowColors(True)
             history_list.setMinimumHeight(140)
             for entry in self._history:
@@ -92,8 +92,8 @@ class ExecuteContextDialog(QDialog):
             layout.addWidget(history_list)
             self._history_list = history_list
 
-        buttons = QDialogButtonBox(QDialogButtonBox.Cancel | QDialogButtonBox.Ok, self)
-        buttons.button(QDialogButtonBox.Ok).setText("Execute")
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel | QDialogButtonBox.StandardButton.Ok, self)
+        buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Execute")
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
@@ -111,6 +111,6 @@ class ExecuteContextDialog(QDialog):
         """Set the description field to *text* and focus the editor."""
         self._description_input.setPlainText(text)
         cursor = self._description_input.textCursor()
-        cursor.movePosition(QTextCursor.End)
+        cursor.movePosition(QTextCursor.MoveOperation.End)
         self._description_input.setTextCursor(cursor)
-        self._description_input.setFocus(Qt.TabFocusReason)
+        self._description_input.setFocus(Qt.FocusReason.TabFocusReason)

@@ -119,8 +119,8 @@ class SaveResultDialog(QDialog):
             self._rating_input = None
 
         buttons = QDialogButtonBox(self)
-        self._save_button = buttons.addButton(button_text, QDialogButtonBox.AcceptRole)
-        buttons.addButton(QDialogButtonBox.Cancel)
+        self._save_button = buttons.addButton(button_text, QDialogButtonBox.ButtonRole.AcceptRole)
+        buttons.addButton(QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self._on_accept)  # type: ignore[arg-type]
         buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(buttons)
@@ -241,7 +241,7 @@ class ResponseStyleDialog(QDialog):
         self._examples_input.setFixedHeight(80)
         layout.addWidget(self._examples_input)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self)
         buttons.accepted.connect(self._on_accept)  # type: ignore[arg-type]
         buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(buttons)

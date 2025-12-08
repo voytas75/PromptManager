@@ -114,7 +114,7 @@ class PromptEditorFlow:
     def create_prompt(self) -> None:
         """Open a creation dialog and persist the resulting prompt."""
         dialog = self._dialog_factory.build(self._parent)
-        if dialog.exec() != QDialog.Accepted:
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         prompt = dialog.result_prompt
         if prompt is None:
@@ -133,7 +133,7 @@ class PromptEditorFlow:
         dialog.applied.connect(  # type: ignore[arg-type]
             lambda updated_prompt: self._handle_prompt_applied(updated_prompt, dialog)
         )
-        if dialog.exec() != QDialog.Accepted:
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         if dialog.delete_requested:
             self._delete_prompt(prompt, skip_confirmation=True)
@@ -163,7 +163,7 @@ class PromptEditorFlow:
         """Duplicate *prompt* via a pre-filled creation dialog."""
         dialog = self._dialog_factory.build(self._parent)
         dialog.prefill_from_prompt(prompt)
-        if dialog.exec() != QDialog.Accepted:
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         duplicate = dialog.result_prompt
         if duplicate is None:
@@ -190,7 +190,7 @@ class PromptEditorFlow:
         dialog.applied.connect(  # type: ignore[arg-type]
             lambda updated_prompt: self._handle_prompt_applied(updated_prompt, dialog)
         )
-        if dialog.exec() == QDialog.Accepted and dialog.result_prompt is not None:
+        if dialog.exec() == QDialog.DialogCode.Accepted and dialog.result_prompt is not None:
             try:
                 forked = self._manager.update_prompt(dialog.result_prompt)
             except PromptManagerError as exc:

@@ -71,7 +71,7 @@ class PromptFilterPanel(QWidget):
         self._quality_spin.setDecimals(1)
         self._quality_spin.setSingleStep(0.1)
         self._quality_spin.setButtonSymbols(QAbstractSpinBox.NoButtons)
-        self._quality_spin.setAlignment(Qt.AlignRight)
+        self._quality_spin.setAlignment(Qt.AlignmentFlag.AlignRight)
         self._quality_spin.setMinimumWidth(
             self._quality_spin.fontMetrics().horizontalAdvance("10.0") + 32
         )

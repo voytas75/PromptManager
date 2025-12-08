@@ -105,7 +105,7 @@ class CategoryEditorDialog(QDialog):
 
         layout.addLayout(form)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self)
         buttons.accepted.connect(self._on_accept)  # type: ignore[arg-type]
         buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(buttons)
@@ -198,8 +198,8 @@ class CategoryManagerDialog(QDialog):
             ["Label", "Slug", "Description", "Parent", "Min quality", "Status"]
         )
         self._table.horizontalHeader().setStretchLastSection(True)
-        self._table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self._table.setSelectionMode(QAbstractItemView.SingleSelection)
+        self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self._table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self._table.itemSelectionChanged.connect(self._update_button_states)  # type: ignore[arg-type]
         layout.addWidget(self._table, stretch=1)
 
@@ -223,7 +223,7 @@ class CategoryManagerDialog(QDialog):
         button_row.addWidget(self._refresh_button)
         layout.addLayout(button_row)
 
-        close_buttons = QDialogButtonBox(QDialogButtonBox.Close, self)
+        close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close, self)
         close_buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(close_buttons)
 

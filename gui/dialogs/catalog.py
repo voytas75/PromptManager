@@ -62,7 +62,7 @@ class CatalogPreviewDialog(QDialog):
         diff_view.setPlainText(self._format_diff(self._diff))
         layout.addWidget(diff_view, stretch=1)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, parent=self)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, parent=self)
         buttons.accepted.connect(self._on_accept)  # type: ignore[arg-type]
         buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(buttons)

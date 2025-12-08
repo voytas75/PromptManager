@@ -89,10 +89,10 @@ class _ProcessingDialog(QDialog):
     """Compact dialog that centers an indeterminate progress bar."""
 
     def __init__(self, parent: QWidget, *, title: str, message: str) -> None:
-        super().__init__(parent, Qt.Dialog | Qt.CustomizeWindowHint | Qt.WindowTitleHint)
+        super().__init__(parent, Qt.WindowType.Dialog | Qt.WindowType.CustomizeWindowHint | Qt.WindowType.WindowTitleHint)
         self.setWindowTitle(title)
         self.setModal(True)
-        self.setWindowModality(Qt.ApplicationModal)
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self.setMinimumWidth(320)
 
         layout = QVBoxLayout(self)
@@ -100,14 +100,14 @@ class _ProcessingDialog(QDialog):
         layout.setSpacing(12)
 
         self._label = QLabel(message, self)
-        self._label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(self._label, alignment=Qt.AlignCenter)
+        self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self._label, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self._progress = QProgressBar(self)
         self._progress.setRange(0, 0)
         self._progress.setFixedWidth(220)
-        self._progress.setAlignment(Qt.AlignCenter)
-        layout.addWidget(self._progress, alignment=Qt.AlignCenter)
+        self._progress.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self._progress, alignment=Qt.AlignmentFlag.AlignCenter)
 
     def setLabelText(self, text: str) -> None:
         """Update the message displayed above the progress bar."""

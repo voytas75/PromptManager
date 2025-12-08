@@ -12,7 +12,7 @@ from __future__ import annotations
 import csv
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from PySide6.QtCharts import (
     QBarCategoryAxis,
@@ -83,10 +83,10 @@ class AnalyticsDashboardPanel(QWidget):
         self._status_label = QLabel("", self)
         self._embedding_summary = QLabel("", self)
         self._settings = QSettings("PromptManager", "AnalyticsPanel")
-        window_pref = self._settings.value("windowDays", 30, int)
-        prompt_pref = self._settings.value("promptLimit", 5, int)
-        self._initial_window_days: int = int(window_pref if window_pref is not None else 30)
-        self._initial_prompt_limit: int = int(prompt_pref if prompt_pref is not None else 5)
+        window_pref = cast(int, self._settings.value("windowDays", 30, int))
+        prompt_pref = cast(int, self._settings.value("promptLimit", 5, int))
+        self._initial_window_days = int(window_pref)
+        self._initial_prompt_limit = int(prompt_pref)
         self._prompt_edit_callback = prompt_edit_callback
         self._usage_row_prompt_ids: dict[int, UUID] = {}
         self._build_ui()

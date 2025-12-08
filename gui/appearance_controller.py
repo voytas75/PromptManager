@@ -7,7 +7,7 @@ Updates:
 from __future__ import annotations
 
 from collections import abc
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QGuiApplication, QPalette
@@ -83,6 +83,7 @@ class AppearanceController:
         app = QGuiApplication.instance()
         if app is None:
             return DEFAULT_THEME_MODE
+        gui_app = cast(QGuiApplication, app)
 
         raw_theme = mode or self._runtime_settings.get("theme_mode") or DEFAULT_THEME_MODE
         theme = str(raw_theme).strip().lower()
@@ -113,17 +114,17 @@ class AppearanceController:
                 QPalette.ColorRole.ButtonText,
                 QColor(110, 115, 125),
             )
-            app.setPalette(palette)
-            app.setStyleSheet(
+            gui_app.setPalette(palette)
+            gui_app.setStyleSheet(
                 "QToolTip { color: #f9fafc; background-color: #1f2933; border: 1px solid #3b4252; }"
             )
         else:
-            palette = app.style().standardPalette()
-            app.setPalette(palette)
-            app.setStyleSheet("")
+            palette = gui_app.style().standardPalette()
+            gui_app.setPalette(palette)
+            gui_app.setStyleSheet("")
             theme = "light"
 
-        self._window.setPalette(app.palette())
+        self._window.setPalette(gui_app.palette())
         self._runtime_settings["theme_mode"] = theme
         self.refresh_theme_styles()
         return theme

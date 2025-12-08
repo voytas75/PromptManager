@@ -60,7 +60,7 @@ class MarkdownPreviewDialog(QDialog):
             viewer.setMarkdown("*No content available.*")
         layout.addWidget(viewer, stretch=1)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.Close, parent=self)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close, parent=self)
         buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         buttons.accepted.connect(self.accept)  # type: ignore[arg-type]
         layout.addWidget(buttons)
@@ -87,12 +87,12 @@ class InfoDialog(QDialog):
             pixmap = icon.pixmap(96, 96)
             if not pixmap.isNull():
                 icon_label = QLabel(self)
-                icon_label.setAlignment(Qt.AlignHCenter)
+                icon_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
                 icon_label.setPixmap(pixmap)
                 layout.addWidget(icon_label)
 
         title_label = QLabel("<b>Prompt Manager</b>", self)
-        title_label.setTextFormat(Qt.RichText)
+        title_label.setTextFormat(Qt.TextFormat.RichText)
         layout.addWidget(title_label)
 
         info = collect_system_info()
@@ -101,31 +101,31 @@ class InfoDialog(QDialog):
         form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
         author_label = QLabel('<a href="https://github.com/voytas75">voytas75</a>', self)
-        author_label.setTextFormat(Qt.RichText)
-        author_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        author_label.setTextFormat(Qt.TextFormat.RichText)
+        author_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
         author_label.setOpenExternalLinks(True)
         form.addRow("Author:", author_label)
 
         tagline_label = QLabel(self._TAGLINE, self)
         tagline_label.setWordWrap(True)
-        tagline_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        tagline_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         form.addRow("Tagline:", tagline_label)
 
         app_version = self._resolve_app_version()
         version_label = QLabel(app_version, self)
-        version_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        version_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         form.addRow("Version:", version_label)
 
         cpu_label = QLabel(info.cpu, self)
-        cpu_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        cpu_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         form.addRow("CPU:", cpu_label)
 
         platform_label = QLabel(f"{info.platform_family} ({info.os_label})", self)
-        platform_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        platform_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         form.addRow("Platform:", platform_label)
 
         architecture_label = QLabel(info.architecture, self)
-        architecture_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        architecture_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         form.addRow("Architecture:", architecture_label)
 
         license_label = QLabel(
@@ -133,21 +133,21 @@ class InfoDialog(QDialog):
             "MIT License</a>",
             self,
         )
-        license_label.setTextFormat(Qt.RichText)
-        license_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        license_label.setTextFormat(Qt.TextFormat.RichText)
+        license_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
         license_label.setOpenExternalLinks(True)
         form.addRow("License:", license_label)
 
         icon_source_label = QLabel('<a href="https://icons8.com/">Icons8</a>', self)
-        icon_source_label.setTextFormat(Qt.RichText)
-        icon_source_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        icon_source_label.setTextFormat(Qt.TextFormat.RichText)
+        icon_source_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
         icon_source_label.setOpenExternalLinks(True)
         form.addRow("Icon source:", icon_source_label)
 
         layout.addLayout(form)
 
         buttons = QDialogButtonBox(parent=self)
-        close_button = buttons.addButton("Close", QDialogButtonBox.AcceptRole)
+        close_button = buttons.addButton("Close", QDialogButtonBox.ButtonRole.AcceptRole)
         close_button.clicked.connect(self.accept)  # type: ignore[arg-type]
         layout.addWidget(buttons)
 

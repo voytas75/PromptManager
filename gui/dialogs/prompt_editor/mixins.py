@@ -291,7 +291,7 @@ class _PromptDialogCategoryMixin(_PromptDialogAssistMixin):
             self._category_input.setEditText("")
             self._category_input.setCurrentIndex(-1)
             return
-        index = self._category_input.findText(resolved, Qt.MatchFixedString)
+        index = self._category_input.findText(resolved, Qt.MatchFlag.MatchFixedString)
         if index >= 0:
             self._category_input.setCurrentIndex(index)
             return

@@ -110,7 +110,7 @@ class NotesPanel(QWidget):
         for note in self._notes:
             title = note.note.splitlines()[0] if note.note else "Untitled note"
             item = QListWidgetItem(title.strip() or "Untitled note", self._list)
-            item.setData(Qt.UserRole, str(note.id))
+            item.setData(Qt.ItemDataRole.UserRole, str(note.id))
         self._note_view.clear()
         self._edit_button.setEnabled(False)
         self._delete_button.setEnabled(False)
@@ -123,7 +123,7 @@ class NotesPanel(QWidget):
         item = self._list.currentItem()
         if item is None:
             return None
-        raw_id = item.data(Qt.UserRole)
+        raw_id = item.data(Qt.ItemDataRole.UserRole)
         try:
             note_id = uuid.UUID(str(raw_id))
         except (TypeError, ValueError):
@@ -146,7 +146,7 @@ class NotesPanel(QWidget):
 
     def _on_add_clicked(self) -> None:
         dialog = PromptNoteDialog(self)
-        if dialog.exec() != QDialog.Accepted:
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         result = dialog.result_note
         if result is None:
@@ -165,7 +165,7 @@ class NotesPanel(QWidget):
             QMessageBox.information(self, "Edit note", "Select a note first.")
             return
         dialog = PromptNoteDialog(self, note=note)
-        if dialog.exec() != QDialog.Accepted:
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         result = dialog.result_note
         if result is None:
@@ -187,10 +187,10 @@ class NotesPanel(QWidget):
             self,
             "Delete note",
             "Delete the selected note?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         )
-        if confirmation != QMessageBox.Yes:
+        if confirmation != QMessageBox.StandardButton.Yes:
             return
         try:
             self._manager.delete_prompt_note(note.id)

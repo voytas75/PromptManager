@@ -276,7 +276,7 @@ def build_main_view(
     intent_hint.setObjectName("intentHintLabel")
     intent_hint.setStyleSheet("color: #5b5b5b; font-style: italic;")
     intent_hint.setWordWrap(True)
-    intent_hint.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+    intent_hint.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
     intent_hint.setVisible(False)
 
     filter_panel = PromptFilterPanel(
@@ -291,7 +291,7 @@ def build_main_view(
     query_input = QPlainTextEdit(parent)
     query_input.setPlaceholderText("Paste code or text to analyse and suggest prompts…")
     query_input.setMinimumHeight(120)
-    query_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+    query_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     query_input.textChanged.connect(callbacks.query_text_changed)
 
     tab_widget = QTabWidget(parent)
@@ -301,16 +301,16 @@ def build_main_view(
     result_tab_layout = QVBoxLayout(result_tab)
     result_tab_layout.setContentsMargins(0, 0, 0, 0)
 
-    main_splitter = QSplitter(Qt.Horizontal, result_tab)
+    main_splitter = QSplitter(Qt.Orientation.Horizontal, result_tab)
 
-    list_splitter = QSplitter(Qt.Vertical, main_splitter)
+    list_splitter = QSplitter(Qt.Orientation.Vertical, main_splitter)
 
     list_view = QListView(list_splitter)
     list_view.setModel(model)
-    list_view.setSelectionMode(QAbstractItemView.SingleSelection)
+    list_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
     list_view.selectionModel().selectionChanged.connect(callbacks.selection_changed)
     list_view.doubleClicked.connect(callbacks.prompt_double_clicked)  # type: ignore[arg-type]
-    list_view.setContextMenuPolicy(Qt.CustomContextMenu)
+    list_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
     list_view.customContextMenuRequested.connect(callbacks.prompt_context_menu)
     list_splitter.addWidget(list_view)
 
@@ -324,12 +324,12 @@ def build_main_view(
     workspace_layout.setContentsMargins(0, 0, 0, 0)
     workspace_layout.setSpacing(0)
 
-    workspace_splitter = QSplitter(Qt.Vertical, workspace_panel)
+    workspace_splitter = QSplitter(Qt.Orientation.Vertical, workspace_panel)
     workspace_splitter.setChildrenCollapsible(False)
     workspace_layout.addWidget(workspace_splitter, 1)
 
     query_panel = QWidget(workspace_splitter)
-    query_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+    query_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     query_panel_layout = QVBoxLayout(query_panel)
     query_panel_layout.setSizeConstraint(QLayout.SetMinimumSize)
     query_panel_layout.setContentsMargins(0, 0, 0, 0)
@@ -447,7 +447,7 @@ def build_main_view(
     preview_layout = QVBoxLayout(preview_tab)
     preview_layout.setContentsMargins(12, 12, 12, 12)
     preview_layout.setSpacing(8)
-    template_preview_splitter = QSplitter(Qt.Horizontal, preview_tab)
+    template_preview_splitter = QSplitter(Qt.Orientation.Horizontal, preview_tab)
     template_preview_splitter.setChildrenCollapsible(False)
 
     preview_list_panel = QWidget(template_preview_splitter)
@@ -464,11 +464,11 @@ def build_main_view(
     preview_hint.setWordWrap(True)
     preview_hint.setStyleSheet("color: #4b5563;")
     preview_list_layout.addWidget(preview_hint)
-    template_preview_list_splitter = QSplitter(Qt.Vertical, preview_list_panel)
+    template_preview_list_splitter = QSplitter(Qt.Orientation.Vertical, preview_list_panel)
     template_preview_list_splitter.setChildrenCollapsible(False)
     template_list_view = QListView(template_preview_list_splitter)
     template_list_view.setModel(model)
-    template_list_view.setSelectionMode(QAbstractItemView.SingleSelection)
+    template_list_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
     template_list_view.setSelectionModel(list_view.selectionModel())
     template_list_view.doubleClicked.connect(callbacks.prompt_double_clicked)  # type: ignore[arg-type]
     template_preview_list_splitter.addWidget(template_list_view)

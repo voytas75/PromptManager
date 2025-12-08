@@ -113,7 +113,7 @@ class ResponseStylesPanel(QWidget):
         for style in self._styles:
             label = style.name or "Untitled"
             item = QListWidgetItem(label, self._list)
-            item.setData(Qt.UserRole, str(style.id))
+            item.setData(Qt.ItemDataRole.UserRole, str(style.id))
         self._detail_view.clear()
         self._edit_button.setEnabled(False)
         self._delete_button.setEnabled(False)
@@ -126,7 +126,7 @@ class ResponseStylesPanel(QWidget):
         item = self._list.currentItem()
         if item is None:
             return None
-        raw_id = item.data(Qt.UserRole)
+        raw_id = item.data(Qt.ItemDataRole.UserRole)
         try:
             style_id = uuid.UUID(str(raw_id))
         except (TypeError, ValueError):
@@ -177,7 +177,7 @@ class ResponseStylesPanel(QWidget):
 
     def _on_new_clicked(self) -> None:
         dialog = ResponseStyleDialog(self)
-        if dialog.exec() != QDialog.Accepted:
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         result = dialog.result_style
         if result is None:
@@ -196,7 +196,7 @@ class ResponseStylesPanel(QWidget):
             QMessageBox.information(self, "Edit prompt part", "Select a prompt part first.")
             return
         dialog = ResponseStyleDialog(self, style=style)
-        if dialog.exec() != QDialog.Accepted:
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         result = dialog.result_style
         if result is None:
@@ -218,10 +218,10 @@ class ResponseStylesPanel(QWidget):
             self,
             "Delete prompt part",
             f"Delete prompt part '{style.name}'?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         )
-        if confirmation != QMessageBox.Yes:
+        if confirmation != QMessageBox.StandardButton.Yes:
             return
         try:
             self._manager.delete_response_style(style.id)

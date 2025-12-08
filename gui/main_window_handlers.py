@@ -189,10 +189,10 @@ class PromptActionsHandler:
                 self._parent,
                 "Delete prompt",
                 f"Are you sure you want to delete '{prompt.name}'?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
             )
-            if confirmation != QMessageBox.Yes:
+            if confirmation != QMessageBox.StandardButton.Yes:
                 return
         try:
             self._manager.delete_prompt(prompt.id)

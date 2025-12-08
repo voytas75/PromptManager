@@ -103,7 +103,7 @@ class GuidedPromptWizard(QDialog):
         """Build the wizard pages and sync palette styling."""
         super().__init__(parent)
         self._palette_updating = False
-        self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self._session = session
         self.setWindowTitle("Guided Prompt Wizard")
         self.setModal(True)
@@ -117,12 +117,12 @@ class GuidedPromptWizard(QDialog):
                     "window_text": palette.color(QPalette.WindowText).name(),
                     "base": palette.color(QPalette.Base).name(),
                     "alternate": palette.color(QPalette.AlternateBase).name(),
-                    "button": palette.color(QPalette.Button).name(),
-                    "button_text": palette.color(QPalette.ButtonText).name(),
-                    "mid": palette.color(QPalette.Mid).name(),
-                    "midlight": palette.color(QPalette.Midlight).name(),
-                    "highlight": palette.color(QPalette.Highlight).name(),
-                    "highlighted_text": palette.color(QPalette.HighlightedText).name(),
+                    "button": palette.color(QPalette.ColorRole.Button).name(),
+                    "button_text": palette.color(QPalette.ColorRole.ButtonText).name(),
+                    "mid": palette.color(QPalette.ColorRole.Mid).name(),
+                    "midlight": palette.color(QPalette.ColorRole.Midlight).name(),
+                    "highlight": palette.color(QPalette.ColorRole.Highlight).name(),
+                    "highlighted_text": palette.color(QPalette.ColorRole.HighlightedText).name(),
                 },
             )
         self._goal_page = _GoalWizardPage(session)
@@ -198,7 +198,7 @@ class GuidedPromptWizard(QDialog):
         super().changeEvent(event)
         if self._palette_updating:
             return
-        if event.type() in {QEvent.PaletteChange, QEvent.ApplicationPaletteChange}:
+        if event.type() in {QEvent.Type.PaletteChange, QEvent.ApplicationPaletteChange}:
             palette = self._resolve_theme_palette(self.parentWidget())
             if palette is not None:
                 self._apply_palette(palette)

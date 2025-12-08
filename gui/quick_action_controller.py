@@ -82,7 +82,7 @@ class QuickActionController:
     def show_command_palette(self) -> None:
         """Display the quick action palette dialog."""
         dialog = CommandPaletteDialog(self._quick_actions, self._parent)
-        if dialog.exec() != QDialog.Accepted:
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         action = dialog.selected_action
         if action is not None:
@@ -113,7 +113,7 @@ class QuickActionController:
         )
         self._detail_widget.display_prompt(selected_prompt)
         self._apply_quick_action_template(action)
-        self._query_input.setFocus(Qt.ShortcutFocusReason)
+        self._query_input.setFocus(Qt.FocusReason.ShortcutFocusReason)
         self._set_active_quick_action(action)
         self._status_callback(f"Quick action applied: {action.title}", 4000)
 

@@ -120,16 +120,16 @@ class CommandPaletteDialog(QDialog):
         self._list_widget.itemActivated.connect(self._on_item_activated)  # type: ignore[arg-type]
         layout.addWidget(self._list_widget, 1)
 
-        button_box = QDialogButtonBox(QDialogButtonBox.Cancel, Qt.Horizontal, self)
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel, Qt.Orientation.Horizontal, self)
         button_box.rejected.connect(self.reject)
 
         help_button = QPushButton("Help", self)
         help_button.clicked.connect(self._show_help)  # type: ignore[arg-type]
-        button_box.addButton(help_button, QDialogButtonBox.ActionRole)
+        button_box.addButton(help_button, QDialogButtonBox.ButtonRole.ActionRole)
         layout.addWidget(button_box)
 
         self._populate_list(self._actions)
-        self._search_input.setFocus(Qt.ShortcutFocusReason)
+        self._search_input.setFocus(Qt.FocusReason.ShortcutFocusReason)
 
     @property
     def selected_action(self) -> QuickAction | None:
@@ -146,7 +146,7 @@ class CommandPaletteDialog(QDialog):
                 title = f"{title} ({action.shortcut})"
             item = QListWidgetItem(title, self._list_widget)
             item.setToolTip(action.description)
-            item.setData(Qt.UserRole, action.identifier)
+            item.setData(Qt.ItemDataRole.UserRole, action.identifier)
         if self._list_widget.count() > 0:
             self._list_widget.setCurrentRow(0)
 
@@ -167,7 +167,7 @@ class CommandPaletteDialog(QDialog):
 
     def _on_item_activated(self, item: QListWidgetItem) -> None:
         """Accept the dialog when an action item is activated."""
-        identifier = item.data(Qt.UserRole)
+        identifier = item.data(Qt.ItemDataRole.UserRole)
         for action in self._filtered_actions:
             if action.identifier == identifier:
                 self._selected = action
@@ -187,7 +187,7 @@ class CommandPaletteDialog(QDialog):
         label = QLabel(help_text, help_dialog)
         label.setWordWrap(True)
         layout.addWidget(label)
-        button_box = QDialogButtonBox(QDialogButtonBox.Close, parent=help_dialog)
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close, parent=help_dialog)
         button_box.rejected.connect(help_dialog.reject)
         button_box.accepted.connect(help_dialog.accept)
         layout.addWidget(button_box)

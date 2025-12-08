@@ -122,7 +122,7 @@ class PromptDialog(
         """Construct the dialog layout and wire interactions."""
         main_layout = QVBoxLayout(self)
         form_layout = QFormLayout()
-        form_layout.setLabelAlignment(Qt.AlignLeft | Qt.AlignTop)
+        form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         form_layout.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
 
         self._name_input = QLineEdit(self)
@@ -146,7 +146,7 @@ class PromptDialog(
         version_container_layout.addWidget(self._version_label)
         self._version_history_button = QPushButton("Version History", self)
         self._version_history_button.setObjectName("promptDialogHistoryButton")
-        self._version_history_button.setCursor(Qt.PointingHandCursor)
+        self._version_history_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self._version_history_button.clicked.connect(self._on_version_history_clicked)  # type: ignore[arg-type]
         version_container_layout.addWidget(self._version_history_button)
         version_container_layout.addStretch(1)
@@ -167,11 +167,11 @@ class PromptDialog(
         self._context_input.setPlaceholderText("Paste the full prompt text here…")
         self._context_input.setMinimumHeight(320)
         context_policy = self._context_input.sizePolicy()
-        context_policy.setVerticalPolicy(QSizePolicy.Expanding)
+        context_policy.setVerticalPolicy(QSizePolicy.Policy.Expanding)
         self._context_input.setSizePolicy(context_policy)
         self._description_input = QPlainTextEdit(self)
         self._description_input.setFixedHeight(60)
-        self._description_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self._description_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self._example_input = CollapsibleTextSection("Example Input", self)
         self._example_input.setPlaceholderText("Optional example input…")
         self._example_output = CollapsibleTextSection("Example Output", self)
@@ -180,7 +180,7 @@ class PromptDialog(
         self._language_input.setPlaceholderText("en")
         self._author_input.setPlaceholderText("Optional author name…")
         self._author_input.setMaximumWidth(260)
-        self._author_input.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        self._author_input.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         self._tags_input.setPlaceholderText("tag-a, tag-b")
 
         metadata_container = QWidget(self)
@@ -280,7 +280,7 @@ class PromptDialog(
         self._scenarios_input.setPlaceholderText("One scenario per line…")
         self._scenarios_input.setFixedHeight(90)
         scenarios_container = QWidget(self)
-        scenarios_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        scenarios_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         scenarios_layout = QVBoxLayout(scenarios_container)
         scenarios_layout.setContentsMargins(0, 0, 0, 0)
         scenarios_layout.setSpacing(4)
@@ -294,11 +294,11 @@ class PromptDialog(
             self._generate_scenarios_button.setToolTip(
                 "Generate heuristic scenarios from the prompt body. Configure LiteLLM for AI help."
             )
-        scenarios_layout.addWidget(self._generate_scenarios_button, alignment=Qt.AlignRight)
+        scenarios_layout.addWidget(self._generate_scenarios_button, alignment=Qt.AlignmentFlag.AlignRight)
         form_layout.addRow("Scenarios", scenarios_container)
 
         examples_container = QWidget(self)
-        examples_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        examples_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         examples_layout = QHBoxLayout(examples_container)
         examples_layout.setContentsMargins(0, 0, 0, 0)
         examples_layout.setSpacing(12)
@@ -308,17 +308,17 @@ class PromptDialog(
 
         main_layout.addLayout(form_layout)
 
-        self._buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, parent=self)
+        self._buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, parent=self)
         self._buttons.accepted.connect(self._on_accept)  # type: ignore[arg-type]
         self._buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         if self._source_prompt is not None:
-            apply_button = self._buttons.addButton("Apply", QDialogButtonBox.ApplyRole)
+            apply_button = self._buttons.addButton("Apply", QDialogButtonBox.ButtonRole.ApplyRole)
             apply_button.setToolTip("Save changes without closing the dialog.")
             apply_button.clicked.connect(self._on_apply_clicked)  # type: ignore[arg-type]
             self._apply_button = apply_button
             delete_button = self._buttons.addButton(
                 "Delete",
-                QDialogButtonBox.DestructiveRole,
+                QDialogButtonBox.ButtonRole.DestructiveRole,
             )
             delete_button.setToolTip("Delete this prompt from the catalogue.")
             delete_button.clicked.connect(self._on_delete_clicked)  # type: ignore[arg-type]
@@ -374,10 +374,10 @@ class PromptDialog(
             self,
             "Delete prompt",
             f"Are you sure you want to delete '{name}'?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         )
-        if confirmation != QMessageBox.Yes:
+        if confirmation != QMessageBox.StandardButton.Yes:
             return
         self._delete_requested = True
         self._result_prompt = None

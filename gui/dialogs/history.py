@@ -89,13 +89,13 @@ class PromptVersionHistoryDialog(QDialog):
         self._table = QTableWidget(self)
         self._table.setColumnCount(3)
         self._table.setHorizontalHeaderLabels(["Version", "Created", "Message"])
-        self._table.setSelectionBehavior(QTableWidget.SelectRows)
-        self._table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self._table.setSelectionMode(QTableWidget.SingleSelection)
+        self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self._table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         header_view = self._table.horizontalHeader()
-        header_view.setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        header_view.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        header_view.setSectionResizeMode(2, QHeaderView.Stretch)
+        header_view.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        header_view.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        header_view.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         self._table.itemSelectionChanged.connect(self._on_selection_changed)  # type: ignore[arg-type]
         layout.addWidget(self._table, stretch=1)
 
@@ -279,7 +279,7 @@ class PromptVersionHistoryDialog(QDialog):
             "Restore Version",
             "This will replace the current prompt contents with the selected snapshot. Continue?",
         )
-        if confirm != QMessageBox.Yes:
+        if confirm != QMessageBox.StandardButton.Yes:
             return
         try:
             restored = self._manager.restore_prompt_version(version.id)

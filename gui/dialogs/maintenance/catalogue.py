@@ -76,7 +76,7 @@ class CatalogueMaintenanceMixin:
         for row_index, (key, label_text) in enumerate(stat_rows):
             label_widget = QLabel(label_text, stats_group)
             value_widget = QLabel("—", stats_group)
-            value_widget.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            value_widget.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             stats_layout.addWidget(label_widget, row_index, 0)
             stats_layout.addWidget(value_widget, row_index, 1)
             self._stats_labels[key] = value_widget
@@ -92,7 +92,7 @@ class CatalogueMaintenanceMixin:
             0,
             1,
             2,
-            alignment=Qt.AlignRight,
+            alignment=Qt.AlignmentFlag.AlignRight,
         )
 
         helper_label = QLabel(
@@ -110,8 +110,8 @@ class CatalogueMaintenanceMixin:
         health_layout.setSpacing(8)
 
         self._category_table = QTableWidget(0, 5, health_group)
-        self._category_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self._category_table.setSelectionMode(QTableWidget.NoSelection)
+        self._category_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self._category_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self._category_table.setHorizontalHeaderLabels(
             [
                 "Category",
@@ -127,7 +127,7 @@ class CatalogueMaintenanceMixin:
 
         self._category_refresh_button = QPushButton("Refresh Category Health", health_group)
         self._category_refresh_button.clicked.connect(self._refresh_category_health)  # type: ignore[arg-type]
-        health_layout.addWidget(self._category_refresh_button, alignment=Qt.AlignRight)
+        health_layout.addWidget(self._category_refresh_button, alignment=Qt.AlignmentFlag.AlignRight)
 
         metadata_layout.addWidget(health_group)
 
