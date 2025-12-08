@@ -65,7 +65,9 @@ def test_codex_executor_collects_streaming_chunks(monkeypatch) -> None:
     assert result.response_text == "Hello world"
     assert dict(result.usage) == {"prompt_tokens": 4, "completion_tokens": 6}
     assert result.raw_response.get("streamed") is True
-    assert result.raw_response.get("choices")[0]["message"]["content"] == "Hello world"
+    choices = result.raw_response.get("choices")
+    assert isinstance(choices, list)
+    assert choices[0]["message"]["content"] == "Hello world"
 
 
 def test_codex_executor_stream_requires_iterable(monkeypatch) -> None:

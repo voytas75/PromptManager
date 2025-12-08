@@ -38,7 +38,9 @@ def test_helper_functions_cover_edge_cases() -> None:
     assert _serialize_metadata(None) is None
     assert _serialize_metadata("text") == "text"
     complex_meta = {"score": 1}
-    assert json.loads(_serialize_metadata(complex_meta)) == complex_meta
+    serialized_meta = _serialize_metadata(complex_meta)
+    assert serialized_meta is not None
+    assert json.loads(serialized_meta) == complex_meta
 
     assert _deserialize_metadata(None) is None
     assert _deserialize_metadata("null") is None

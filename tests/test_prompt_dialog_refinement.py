@@ -1,10 +1,14 @@
 """Prompt dialog refinement controls tests.
 
-Updates: v0.1.1 - 2025-11-27 - Cover scenario metadata stripping helper.
-Updates: v0.1.0 - 2025-11-22 - Verify structure-only refinement button wiring.
+Updates:
+  v0.1.2 - 2025-12-08 - Cast Qt fixtures for Pyright and normalize docstring history.
+  v0.1.1 - 2025-11-27 - Cover scenario metadata stripping helper.
+  v0.1.0 - 2025-11-22 - Verify structure-only refinement button wiring.
 """
 
 from __future__ import annotations
+
+from typing import cast
 
 import pytest
 
@@ -21,7 +25,7 @@ def qt_app() -> QApplication:
     app = QApplication.instance()
     if app is None:
         app = QApplication([])
-    return app
+    return cast(QApplication, app)
 
 
 def _refinement_stub(*_: object, **__: object) -> PromptRefinement:
