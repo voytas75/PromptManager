@@ -1,19 +1,34 @@
 """Branch coverage tests for core.factory helpers.
 
-Updates: v0.1.0 - 2025-10-30 - Add Redis client resolution unit tests.
+Updates:
+  v0.1.1 - 2025-12-08 - Use real settings objects and typed casts for Pyright.
+  v0.1.0 - 2025-10-30 - Add Redis client resolution unit tests.
 """
 
 from __future__ import annotations
 
-from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 
-from config.settings import DEFAULT_EMBEDDING_BACKEND, DEFAULT_EMBEDDING_MODEL
+from config.settings import (
+    DEFAULT_EMBEDDING_BACKEND,
+    DEFAULT_EMBEDDING_MODEL,
+    PromptManagerSettings,
+)
 from core.factory import PromptCacheError, _resolve_redis_client, build_prompt_manager
+from core.repository import PromptRepository
+
+ClientAPI = Any  # type: ignore[assignment]
+Redis = Any  # type: ignore[assignment]
 
 
-def _make_settings(**overrides: object) -> SimpleNamespace:
+class _RedisStub:
+    def __init__(self, label: str = "redis") -> None:
+        self.label = label
+
+
+def _make_settings(**overrides: object) -> PromptManagerSettings:
     defaults = {
         "chroma_path": "/tmp/chroma",
         "db_path": "/tmp/db.sqlite",
@@ -30,11 +45,23 @@ def _make_settings(**overrides: object) -> SimpleNamespace:
         "embedding_device": None,
     }
     defaults.update(overrides)
-    return SimpleNamespace(**defaults)
+    return PromptManagerSettings(**defaults)
+
+
+def _as_redis(value: object) -> Redis:
+    return cast(Redis, value)
+
+
+def _as_repository(value: object) -> PromptRepository:
+    return cast(PromptRepository, value)
+
+
+def _as_client(value: object) -> ClientAPI:
+    return cast(ClientAPI, value)
 
 
 def test_resolve_redis_client_returns_existing_instance() -> None:
-    existing = object()
+    existing = _as_redis(_RedisStub())
     assert _resolve_redis_client("redis://localhost", existing) is existing
 
 
@@ -48,19 +75,20 @@ def test_resolve_redis_client_invokes_from_url(monkeypatch: pytest.MonkeyPatch) 
     calls: list[str] = []
 
     class _RedisModule:
-        def from_url(self, url: str) -> str:
+        def from_url(self, url: str) -> Redis:
             calls.append(url)
-            return f"client:{url}"
+            return _as_redis(_RedisStub(url))
 
     monkeypatch.setattr("core.factory.redis", _RedisModule())
 
     result = _resolve_redis_client("redis://cache", None)
-    assert result == "client:redis://cache"
+    assert isinstance(result, _RedisStub)
+    assert result.label == "redis://cache"
     assert calls == ["redis://cache"]
 
 
 def test_build_prompt_manager_forwards_dependencies(monkeypatch: pytest.MonkeyPatch) -> None:
-    sentinel_redis = object()
+    sentinel_redis = _as_redis(_RedisStub("sentinel"))
     sentinel_repo = object()
 
     class _PromptManager:
@@ -110,9 +138,9 @@ def test_build_prompt_manager_forwards_dependencies(monkeypatch: pytest.MonkeyPa
     settings = _make_settings()
     manager = build_prompt_manager(
         settings,
-        chroma_client="chroma",
+        chroma_client=_as_client("chroma"),
         embedding_function="embed",
-        repository=sentinel_repo,
+        repository=_as_repository(sentinel_repo),
     )
 
     assert isinstance(manager, _PromptManager)
@@ -133,7 +161,7 @@ def test_build_prompt_manager_uses_passthrough_redis_client(
     monkeypatch.setattr("core.factory.PromptManager", lambda **_: "manager")
 
     settings = _make_settings(redis_dsn=None)
-    sentinel = object()
+    sentinel = _as_redis(_RedisStub("passthrough"))
     result = build_prompt_manager(settings, redis_client=sentinel)
     assert result == "manager"
 
