@@ -1,6 +1,7 @@
 """Tests for settings/persistence helpers.
 
 Updates:
+  v0.3.2 - 2025-12-08 - Cast fake settings objects to QSettings for Pyright compliance.
   v0.3.1 - 2025-11-30 - Point helpers to layout_state module exports.
   v0.3.0 - 2025-11-26 - Cover filter preference helpers for category/tag/sort persistence.
   v0.2.0 - 2025-11-26 - Cover history load/store helpers and trimming logic.
@@ -10,6 +11,16 @@ Updates:
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING, Any, cast
+
+import pytest
+
+pytest.importorskip("PySide6")
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from PySide6.QtCore import QSettings
+else:  # pragma: no cover - fallback type for runtime
+    QSettings = object
 
 from gui.layout_state import (
     _EXECUTE_CONTEXT_HISTORY_KEY,
@@ -44,19 +55,23 @@ class _FakeSettings:
         self.synced = True
 
 
+def _as_qsettings(settings: _FakeSettings) -> QSettings:
+    return cast(QSettings, settings)
+
+
 def test_load_last_execute_context_task_returns_trimmed_value() -> None:
     """Trim whitespace when loading the last recorded execute-context task."""
     settings = _FakeSettings()
     settings.values[_EXECUTE_CONTEXT_TASK_KEY] = "  Summarise logs  "
 
-    assert _load_last_execute_context_task(settings) == "Summarise logs"
+    assert _load_last_execute_context_task(_as_qsettings(settings)) == "Summarise logs"
 
 
 def test_store_last_execute_context_task_persists_text_and_syncs() -> None:
     """Persist last task text and sync the settings store."""
     settings = _FakeSettings()
 
-    _store_last_execute_context_task(settings, "Investigate timeouts")
+    _store_last_execute_context_task(_as_qsettings(settings), "Investigate timeouts")
 
     assert settings.values[_EXECUTE_CONTEXT_TASK_KEY] == "Investigate timeouts"
     assert settings.synced is True
@@ -69,7 +84,7 @@ def test_load_execute_context_history_preserves_whitespace() -> None:
         ["  Summarise logs  ", "Summarise logs", "Investigate outages", " "]
     )
 
-    entries = _load_execute_context_history(settings, limit=3)
+    entries = _load_execute_context_history(_as_qsettings(settings), limit=3)
 
     assert entries == ["  Summarise logs  ", "Summarise logs", "Investigate outages"]
 
@@ -79,7 +94,7 @@ def test_load_execute_context_history_handles_invalid_payload() -> None:
     settings = _FakeSettings()
     settings.values[_EXECUTE_CONTEXT_HISTORY_KEY] = "{"  # invalid JSON
 
-    assert _load_execute_context_history(settings) == []
+    assert _load_execute_context_history(_as_qsettings(settings)) == []
 
 
 def test_store_execute_context_history_preserves_whitespace_and_limits() -> None:
@@ -87,10 +102,12 @@ def test_store_execute_context_history_preserves_whitespace_and_limits() -> None
     settings = _FakeSettings()
 
     _store_execute_context_history(
-        settings, ["  Summarise logs  ", "Investigate outages", "Summarise logs", ""]
+        _as_qsettings(settings),
+        ["  Summarise logs  ", "Investigate outages", "Summarise logs", ""],
     )
 
-    stored = json.loads(settings.values[_EXECUTE_CONTEXT_HISTORY_KEY])
+    stored_raw = settings.values[_EXECUTE_CONTEXT_HISTORY_KEY]
+    stored = json.loads(str(stored_raw))
     assert stored == ["  Summarise logs  ", "Investigate outages", "Summarise logs"]
     assert settings.synced is True
 
@@ -103,7 +120,7 @@ def test_load_filter_preferences_returns_trimmed_state() -> None:
     settings.values[_FILTER_QUALITY_KEY] = "4.5"
     settings.values[_FILTER_SORT_KEY] = "usage_desc"
 
-    category, tag, quality, sort_value = _load_filter_preferences(settings)
+    category, tag, quality, sort_value = _load_filter_preferences(_as_qsettings(settings))
 
     assert category == "incident_response"
     assert tag == "outages"
@@ -116,7 +133,7 @@ def test_load_filter_preferences_handles_invalid_quality() -> None:
     settings = _FakeSettings()
     settings.values[_FILTER_QUALITY_KEY] = "fast"
 
-    _, _, quality, sort_value = _load_filter_preferences(settings)
+    _, _, quality, sort_value = _load_filter_preferences(_as_qsettings(settings))
 
     assert quality is None
     assert sort_value is None
@@ -127,7 +144,7 @@ def test_store_filter_preferences_persists_values_and_syncs() -> None:
     settings = _FakeSettings()
 
     _store_filter_preferences(
-        settings,
+        _as_qsettings(settings),
         category_slug="incident_response",
         tag="outages",
         min_quality=3.2,
@@ -143,7 +160,7 @@ def test_store_sort_preference_persists_value() -> None:
     """Persist the sort order using the enum value representation."""
     settings = _FakeSettings()
 
-    _store_sort_preference(settings, PromptSortOrder.USAGE_DESC)
+    _store_sort_preference(_as_qsettings(settings), PromptSortOrder.USAGE_DESC)
 
     assert settings.values[_FILTER_SORT_KEY] == PromptSortOrder.USAGE_DESC.value
     assert settings.synced is True
