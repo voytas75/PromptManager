@@ -355,7 +355,7 @@ def build_main_view(
         parent,
     )
     token_usage_label.setObjectName("tokenUsageLabel")
-    token_usage_label.setStyleSheet("color: #5b5b5b; font-style: italic;")
+    token_usage_label.setStyleSheet("color: #2d2d2d; font-weight: 600;")
 
     result_tabs = QTabWidget(parent)
     output_tab = QWidget(parent)
