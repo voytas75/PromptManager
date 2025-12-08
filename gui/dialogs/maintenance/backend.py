@@ -7,7 +7,7 @@ Updates:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -19,13 +19,16 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from core import PromptManagerError, RepositoryError
+from core import PromptManager, PromptManagerError, RepositoryError
+
+if TYPE_CHECKING:  # pragma: no cover - typing helpers
+    from PySide6.QtWidgets import QWidget as _QWidget
 
 
 class BackendMaintenanceMixin:
     """Provide backend inspection and maintenance utilities."""
 
-    _manager: Any
+    _manager: PromptManager
     _redis_status_label: QLabel
     _redis_connection_label: QLabel
     _redis_stats_view: QPlainTextEdit
@@ -227,16 +230,20 @@ class BackendMaintenanceMixin:
         ):
             button.setEnabled(False)
 
+    def _parent_widget(self) -> "_QWidget":
+        return cast("_QWidget", self)
+
     def _on_chroma_compact_clicked(self) -> None:
         self._set_chroma_actions_busy(True)
+        parent = self._parent_widget()
         try:
             self._manager.compact_vector_store()
         except PromptManagerError as exc:
-            QMessageBox.critical(self, "Compaction failed", str(exc))
+            QMessageBox.critical(parent, "Compaction failed", str(exc))
             return
         else:
             QMessageBox.information(
-                self,
+                parent,
                 "Chroma store compacted",
                 "The persistent Chroma store has been vacuumed and reclaimed space.",
             )
@@ -245,14 +252,15 @@ class BackendMaintenanceMixin:
 
     def _on_chroma_optimize_clicked(self) -> None:
         self._set_chroma_actions_busy(True)
+        parent = self._parent_widget()
         try:
             self._manager.optimize_vector_store()
         except PromptManagerError as exc:
-            QMessageBox.critical(self, "Optimization failed", str(exc))
+            QMessageBox.critical(parent, "Optimization failed", str(exc))
             return
         else:
             QMessageBox.information(
-                self,
+                parent,
                 "Chroma store optimized",
                 "Chroma query statistics have been refreshed for better performance.",
             )
@@ -261,14 +269,15 @@ class BackendMaintenanceMixin:
 
     def _on_chroma_verify_clicked(self) -> None:
         self._set_chroma_actions_busy(True)
+        parent = self._parent_widget()
         try:
             summary = self._manager.verify_vector_store()
         except PromptManagerError as exc:
-            QMessageBox.critical(self, "Verification failed", str(exc))
+            QMessageBox.critical(parent, "Verification failed", str(exc))
             return
         else:
             message = summary or "Chroma store integrity verified successfully."
-            QMessageBox.information(self, "Chroma store verified", message)
+            QMessageBox.information(parent, "Chroma store verified", message)
         finally:
             self._refresh_chroma_info()
 
@@ -285,14 +294,15 @@ class BackendMaintenanceMixin:
 
     def _on_sqlite_compact_clicked(self) -> None:
         self._set_storage_actions_busy(True)
+        parent = self._parent_widget()
         try:
             self._manager.compact_repository()
         except PromptManagerError as exc:
-            QMessageBox.critical(self, "Compaction failed", str(exc))
+            QMessageBox.critical(parent, "Compaction failed", str(exc))
             return
         else:
             QMessageBox.information(
-                self,
+                parent,
                 "Prompt database compacted",
                 "The SQLite repository has been vacuumed and reclaimed space.",
             )
@@ -301,14 +311,15 @@ class BackendMaintenanceMixin:
 
     def _on_sqlite_optimize_clicked(self) -> None:
         self._set_storage_actions_busy(True)
+        parent = self._parent_widget()
         try:
             self._manager.optimize_repository()
         except PromptManagerError as exc:
-            QMessageBox.critical(self, "Optimization failed", str(exc))
+            QMessageBox.critical(parent, "Optimization failed", str(exc))
             return
         else:
             QMessageBox.information(
-                self,
+                parent,
                 "Prompt database optimized",
                 "SQLite statistics have been refreshed for prompt lookups.",
             )
@@ -317,14 +328,15 @@ class BackendMaintenanceMixin:
 
     def _on_sqlite_verify_clicked(self) -> None:
         self._set_storage_actions_busy(True)
+        parent = self._parent_widget()
         try:
             summary = self._manager.verify_repository()
         except PromptManagerError as exc:
-            QMessageBox.critical(self, "Verification failed", str(exc))
+            QMessageBox.critical(parent, "Verification failed", str(exc))
             return
         else:
             message = summary or "SQLite repository integrity verified successfully."
-            QMessageBox.information(self, "Prompt database verified", message)
+            QMessageBox.information(parent, "Prompt database verified", message)
         finally:
             self._refresh_storage_info()
 

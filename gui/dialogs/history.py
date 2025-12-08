@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QDialog,
     QHBoxLayout,
     QHeaderView,

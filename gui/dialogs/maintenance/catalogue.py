@@ -8,10 +8,11 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable, Sequence, cast
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -25,29 +26,31 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from core import PromptManagerError, RepositoryError
+from core import PromptManager, PromptManagerError, RepositoryError
 
 from ..base import logger
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
-    from collections.abc import Callable, Sequence
-
+    from PySide6.QtWidgets import QWidget as _QWidget
     from models.prompt_model import Prompt
 
 
 class CatalogueMaintenanceMixin:
     """Provide catalogue overview and metadata generation helpers."""
 
-    _manager: Any
+    _manager: PromptManager
     _stats_labels: dict[str, QLabel]
     _log_view: QPlainTextEdit
     _category_table: QTableWidget
     _category_refresh_button: QPushButton
     _categories_button: QPushButton
     _tags_button: QPushButton
-    _manager: object
     _category_generator: Callable[[str], str] | None
     _tags_generator: Callable[[str], Sequence[str]] | None
+    maintenance_applied: Any
+
+    def _parent_widget(self) -> "_QWidget":
+        return cast("_QWidget", self)
 
     def _build_metadata_tab(self, parent: QWidget) -> QWidget:
         metadata_tab = QWidget(parent)
@@ -208,10 +211,11 @@ class CatalogueMaintenanceMixin:
         )
 
     def _refresh_category_health(self) -> None:
+        parent = self._parent_widget()
         try:
             health_entries = self._manager.get_category_health()
         except PromptManagerError as exc:
-            QMessageBox.warning(self, "Category health", str(exc))
+            QMessageBox.warning(parent, "Category health", str(exc))
             self._category_table.setRowCount(0)
             return
 

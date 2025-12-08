@@ -9,7 +9,9 @@ Updates:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, cast
+
+from PySide6.QtWidgets import QDialog, QMainWindow, QWidget
 
 from core import PromptManager, RepositoryError
 
@@ -17,17 +19,12 @@ from .dialogs import InfoDialog, PromptChainManagerDialog, PromptVersionHistoryD
 from .workbench import WorkbenchModeDialog
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
-    from collections.abc import Callable
     from uuid import UUID
-
-    from PySide6.QtWidgets import QWidget
 
     from models.prompt_model import Prompt
 else:  # pragma: no cover - runtime placeholders for type-only imports
     from typing import Any as _Any
 
-    Callable = _Any
-    QWidget = _Any
     Prompt = _Any
 
 
@@ -69,7 +66,7 @@ class DialogLauncher:
         except RepositoryError:
             templates = []
         dialog = WorkbenchModeDialog(templates, self._parent)
-        if dialog.exec() != WorkbenchModeDialog.Accepted:
+        if dialog.exec() != int(QDialog.DialogCode.Accepted):
             return
         selection = dialog.result_selection()
         activator = getattr(self._parent, "activate_workbench_tab", None)
@@ -81,11 +78,12 @@ class DialogLauncher:
         target = prompt or self._current_prompt_supplier()
         if target is None:
             return
+        window = cast(QMainWindow, self._parent)
         dialog = PromptVersionHistoryDialog(
             self._manager,
             target,
             self._parent,
-            status_callback=lambda message, duration=3000: self._parent.statusBar().showMessage(
+            status_callback=lambda message, duration=3000: window.statusBar().showMessage(
                 message, duration
             ),
         )
@@ -93,7 +91,7 @@ class DialogLauncher:
         if dialog.last_restored_prompt is not None:
             self._load_prompts(self._current_search_text())
             self._select_prompt(dialog.last_restored_prompt)
-            self._parent.statusBar().showMessage("Prompt restored to selected version.", 4000)
+            window.statusBar().showMessage("Prompt restored to selected version.", 4000)
 
     def open_prompt_chains_dialog(self) -> None:
         """Launch the prompt chain management dialog."""

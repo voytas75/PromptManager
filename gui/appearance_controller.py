@@ -10,7 +10,8 @@ from collections import abc
 from typing import TYPE_CHECKING, cast
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QGuiApplication, QPalette
+from PySide6.QtGui import QColor, QPalette
+from PySide6.QtWidgets import QApplication
 
 from config import (
     DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR,
@@ -80,10 +81,10 @@ class AppearanceController:
 
     def apply_theme(self, mode: str | None = None) -> str:
         """Apply the provided or configured theme and return the active mode."""
-        app = QGuiApplication.instance()
+        app = QApplication.instance()
         if app is None:
             return DEFAULT_THEME_MODE
-        gui_app = cast(QGuiApplication, app)
+        gui_app = cast(QApplication, app)
 
         raw_theme = mode or self._runtime_settings.get("theme_mode") or DEFAULT_THEME_MODE
         theme = str(raw_theme).strip().lower()
@@ -135,9 +136,9 @@ class AppearanceController:
         if container is None:
             return
 
-        app = QGuiApplication.instance()
-        palette = app.palette() if app is not None else container.palette()
-        window_color = palette.color(QPalette.Window)
+        app = QApplication.instance()
+        palette = QApplication.palette() if app is not None else container.palette()
+        window_color = palette.color(QPalette.ColorRole.Window)
         border_color = QColor(
             255 - window_color.red(),
             255 - window_color.green(),
