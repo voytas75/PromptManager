@@ -1,6 +1,7 @@
 """Prompt detail panel shared between main and template tabs.
 
 Updates:
+  v0.1.9 - 2025-12-09 - Collapse metadata spacing by hiding header/text when not in use.
   v0.1.8 - 2025-12-09 - Swap metadata table for a toggleable text view with close control.
   v0.1.7 - 2025-12-09 - Import QToolButton to restore GUI startup.
   v0.1.6 - 2025-12-09 - Show only the requested metadata and add close toggle.
@@ -154,13 +155,15 @@ class PromptDetailWidget(QWidget):
         metadata_buttons.addStretch(1)
         metadata_layout.addLayout(metadata_buttons)
 
-        metadata_header = QHBoxLayout()
+        self._metadata_header = QWidget(metadata_group)
+        self._metadata_header.setVisible(False)
+        metadata_header = QHBoxLayout(self._metadata_header)
         metadata_header.setContentsMargins(0, 0, 0, 0)
         metadata_header.setSpacing(4)
-        self._metadata_label = QLabel("", metadata_group)
+        self._metadata_label = QLabel("", self._metadata_header)
         metadata_header.addWidget(self._metadata_label)
         metadata_header.addStretch(1)
-        self._metadata_close_button = QToolButton(metadata_group)
+        self._metadata_close_button = QToolButton(self._metadata_header)
         self._metadata_close_button.setText("x")
         self._metadata_close_button.setObjectName("hideMetadataButton")
         self._metadata_close_button.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -169,7 +172,7 @@ class PromptDetailWidget(QWidget):
         self._metadata_close_button.setToolTip("Hide metadata")
         self._metadata_close_button.clicked.connect(self._clear_metadata_view)  # type: ignore[arg-type]
         metadata_header.addWidget(self._metadata_close_button)
-        metadata_layout.addLayout(metadata_header)
+        metadata_layout.addWidget(self._metadata_header)
         self._metadata_view = QPlainTextEdit(metadata_group)
         self._metadata_view.setObjectName("promptMetadata")
         self._metadata_view.setReadOnly(True)
@@ -517,6 +520,7 @@ class PromptDetailWidget(QWidget):
         self._metadata_view.setEnabled(True)
         self._metadata_label.setText(f"Metadata ({label})")
         self._metadata_close_button.setVisible(True)
+        self._metadata_header.setVisible(True)
         self._metadata_visible_label = label
 
     def _clear_metadata_view(self) -> None:
@@ -526,6 +530,7 @@ class PromptDetailWidget(QWidget):
         self._metadata_view.setEnabled(False)
         self._metadata_close_button.setVisible(False)
         self._metadata_label.clear()
+        self._metadata_header.setVisible(False)
         self._metadata_visible_label = None
 
     def update_lineage_summary(self, text: str | None) -> None:
