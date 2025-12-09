@@ -1,6 +1,7 @@
 """Coordinate prompt execution, streaming, and chat workspace logic.
 
 Updates:
+  v0.1.10 - 2025-12-09 - Block executions when LLM is offline and show configuration guidance.
   v0.1.9 - 2025-12-08 - Track per-execution token usage and refresh session/overall totals in the workspace.
   v0.1.8 - 2025-12-07 - Enable saving workspace text-only results with output.
   v0.1.7 - 2025-12-07 - Append share footer to result payloads.
@@ -10,7 +11,6 @@ Updates:
   v0.1.3 - 2025-12-04 - Include all web snippets and summarize >5k words via fast LiteLLM.
   v0.1.2 - 2025-12-04 - Surface web context source counts before each workspace result.
   v0.1.1 - 2025-12-04 - Add optional web search enrichment controlled by a UI toggle.
-  v0.1.0 - 2025-11-30 - Extract execution and chat orchestration from main window.
 """
 
 from __future__ import annotations
@@ -322,6 +322,11 @@ class ExecutionController:
         if not trimmed:
             self._status(empty_text_message, 4000)
             return
+        if not getattr(self._manager, "llm_available", True):
+            message = self._manager.llm_status_message("Prompt execution")
+            self._error("Prompt execution unavailable", message)
+            self._status("Prompt execution unavailable.", 4000)
+            return
 
         payload = self._maybe_enrich_request(prompt, trimmed)
         streaming_enabled = self._is_streaming_enabled()
@@ -356,7 +361,12 @@ class ExecutionController:
                 duration_ms=None,
                 error=str(exc),
             )
-            self._error("Prompt execution failed", str(exc))
+            self._error(
+                "Prompt execution failed",
+                self._manager.llm_status_message("Prompt execution")
+                if not getattr(self._manager, "llm_available", True)
+                else str(exc),
+            )
             return
         finally:
             if streaming_enabled and self._streaming_in_progress:
