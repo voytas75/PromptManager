@@ -1,6 +1,7 @@
 """Prompt detail panel shared between main and template tabs.
 
 Updates:
+  v0.1.8 - 2025-12-09 - Swap metadata table for a toggleable text view with close control.
   v0.1.7 - 2025-12-09 - Import QToolButton to restore GUI startup.
   v0.1.6 - 2025-12-09 - Show only the requested metadata and add close toggle.
   v0.1.5 - 2025-12-09 - Toggle metadata table off on repeat clicks and ensure full payload shows.
@@ -20,18 +21,15 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import (
-    QAbstractItemView,
     QCheckBox,
     QComboBox,
     QGroupBox,
-    QHeaderView,
     QHBoxLayout,
     QLabel,
+    QPlainTextEdit,
     QPushButton,
     QScrollArea,
     QToolButton,
-    QTableWidget,
-    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -156,21 +154,6 @@ class PromptDetailWidget(QWidget):
         metadata_buttons.addStretch(1)
         metadata_layout.addLayout(metadata_buttons)
 
-        self._metadata_table = QTableWidget(0, 2, metadata_group)
-        self._metadata_table.setObjectName("promptMetadataTable")
-        self._metadata_table.setHorizontalHeaderLabels(["Type", "Metadata"])
-        header = self._metadata_table.horizontalHeader()
-        header.setStretchLastSection(True)
-        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        self._metadata_table.verticalHeader().setVisible(False)
-        self._metadata_table.setWordWrap(True)
-        self._metadata_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self._metadata_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self._metadata_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self._metadata_table.setMinimumHeight(180)
-        self._metadata_table.setVisible(False)
-        self._metadata_table.setEnabled(False)
-        self._metadata_visible_label: str | None = None
         metadata_header = QHBoxLayout()
         metadata_header.setContentsMargins(0, 0, 0, 0)
         metadata_header.setSpacing(4)
@@ -184,10 +167,16 @@ class PromptDetailWidget(QWidget):
         self._metadata_close_button.setAutoRaise(True)
         self._metadata_close_button.setVisible(False)
         self._metadata_close_button.setToolTip("Hide metadata")
-        self._metadata_close_button.clicked.connect(self._clear_metadata_table)  # type: ignore[arg-type]
+        self._metadata_close_button.clicked.connect(self._clear_metadata_view)  # type: ignore[arg-type]
         metadata_header.addWidget(self._metadata_close_button)
         metadata_layout.addLayout(metadata_header)
-        metadata_layout.addWidget(self._metadata_table)
+        self._metadata_view = QPlainTextEdit(metadata_group)
+        self._metadata_view.setObjectName("promptMetadata")
+        self._metadata_view.setReadOnly(True)
+        self._metadata_view.setMinimumHeight(180)
+        self._metadata_view.setVisible(False)
+        self._metadata_visible_label: str | None = None
+        metadata_layout.addWidget(self._metadata_view)
         content_layout.addWidget(metadata_group)
 
         self._full_metadata_text = ""
@@ -340,7 +329,7 @@ class PromptDetailWidget(QWidget):
             indent=2,
         )
         self._current_prompt = prompt
-        self._clear_metadata_table()
+        self._clear_metadata_view()
         self._basic_metadata_button.setEnabled(True)
         self._all_metadata_button.setEnabled(True)
         self._edit_button.setEnabled(True)
@@ -477,7 +466,7 @@ class PromptDetailWidget(QWidget):
         self._examples.clear()
         self._basic_metadata_button.setEnabled(False)
         self._all_metadata_button.setEnabled(False)
-        self._clear_metadata_table()
+        self._clear_metadata_view()
         self._full_metadata_text = ""
         self._basic_metadata_text = ""
         self._current_prompt = None
@@ -520,33 +509,21 @@ class PromptDetailWidget(QWidget):
         """Render a single metadata payload and toggle off when repeated."""
         if not payload:
             return
-        if self._metadata_table.isVisible() and self._metadata_visible_label == label:
-            self._clear_metadata_table()
+        if self._metadata_view.isVisible() and self._metadata_visible_label == label:
+            self._clear_metadata_view()
             return
-        self._metadata_table.clearContents()
-        self._metadata_table.setRowCount(1)
-        type_item = QTableWidgetItem(label)
-        type_item.setFlags(type_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-        payload_item = QTableWidgetItem(payload)
-        payload_item.setFlags(payload_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-        payload_item.setTextAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-        self._metadata_table.setItem(0, 0, type_item)
-        self._metadata_table.setItem(0, 1, payload_item)
-        self._metadata_table.resizeRowsToContents()
-        self._metadata_table.setVisible(True)
-        self._metadata_table.setEnabled(True)
-        self._metadata_table.selectRow(0)
+        self._metadata_view.setPlainText(payload)
+        self._metadata_view.setVisible(True)
+        self._metadata_view.setEnabled(True)
         self._metadata_label.setText(f"Metadata ({label})")
         self._metadata_close_button.setVisible(True)
         self._metadata_visible_label = label
 
-    def _clear_metadata_table(self) -> None:
-        """Hide and clear metadata table contents."""
-        self._metadata_table.clearContents()
-        self._metadata_table.setRowCount(0)
-        self._metadata_table.setVisible(False)
-        self._metadata_table.setEnabled(False)
-        self._metadata_table.clearSelection()
+    def _clear_metadata_view(self) -> None:
+        """Hide and clear metadata view contents."""
+        self._metadata_view.clear()
+        self._metadata_view.setVisible(False)
+        self._metadata_view.setEnabled(False)
         self._metadata_close_button.setVisible(False)
         self._metadata_label.clear()
         self._metadata_visible_label = None
