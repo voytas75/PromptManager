@@ -1,6 +1,7 @@
 """Runtime lifecycle helpers for Prompt Manager.
 
 Updates:
+  v0.1.3 - 2025-12-09 - Track Redis cache availability for settings display.
   v0.1.2 - 2025-12-09 - Expand offline guidance to include Settings, env, and config hints.
   v0.1.1 - 2025-12-09 - Track LLM availability and emit offline notifications.
   v0.1.0 - 2025-12-03 - Extract backend and lifecycle utilities into dedicated mixin.
@@ -58,6 +59,7 @@ class PromptRuntimeMixin:
     _notification_center: NotificationCenter
     _logs_path: Path
     _redis_client: RedisClientProtocol | None
+    _redis_unavailable_reason: str | None
     _embedding_worker: Any
     _closed: bool
     _history_tracker: HistoryTracker | None
@@ -95,6 +97,10 @@ class PromptRuntimeMixin:
             )
             logger.warning("LLM features disabled: %s", message)
 
+    def set_redis_status(self, available: bool, *, reason: str | None = None) -> None:
+        """Update Redis cache availability state."""
+        self._redis_unavailable_reason = None if available else (reason or "Redis cache disabled.")
+
     @property
     def llm_available(self) -> bool:
         """Return True when LiteLLM-backed features are configured."""
@@ -114,6 +120,11 @@ class PromptRuntimeMixin:
             "Configure LiteLLM credentials and model in Settings or via PROMPT_MANAGER_* env/.env/config.json, "
             "or continue in offline mode (LLM-backed features disabled)."
         )
+
+    @property
+    def redis_unavailable_reason(self) -> str | None:
+        """Return the reason Redis caching is unavailable, if any."""
+        return self._redis_unavailable_reason
 
     def _apply_category_metadata(self, prompt: Prompt) -> Prompt:
         """Ensure prompt categories map to registry entries."""

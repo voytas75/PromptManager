@@ -1,14 +1,14 @@
 """Factories for constructing PromptManager instances from validated settings.
 
 Updates:
+  v0.8.8 - 2025-12-09 - Handle Redis cache availability gracefully and surface status in settings.
   v0.8.7 - 2025-12-09 - Handle missing LiteLLM embedding credentials and clarify offline guidance.
   v0.8.6 - 2025-12-09 - Treat missing API base/version as offline for Azure LiteLLM models.
   v0.8.5 - 2025-12-09 - Skip LiteLLM components when the LiteLLM API key is missing.
   v0.8.4 - 2025-12-09 - Surface offline mode when LiteLLM credentials are missing.
   v0.8.3 - 2025-12-07 - Wire Google web search provider into the factory builder.
   v0.8.2 - 2025-12-07 - Expose reusable web search service builder.
-  v0.8.1 - 2025-12-07 - Wire SerpApi provider into the web search factory.
-  v0.8.0 - 2025-12-07 - Wire Serper provider into the web search factory.
+  v0.8.1-0.8.0 - 2025-12-07 - Wire SerpApi and Serper providers into the web search factory.
   v0.7.9-0.7.6 - 2025-12-07 - Add random provider fan-out, Tavily wiring, and web search creation updates.
   v0.7.5-and-earlier - 2025-11-24 - Configure LiteLLM category/scenario wiring with spacing and import fixes.
 """
@@ -31,7 +31,7 @@ from .name_generation import (
 )
 from .notifications import NotificationCenter, notification_center as default_notification_center
 from .prompt_engineering import PromptEngineer
-from .prompt_manager import NameGenerationError, PromptCacheError, PromptManager
+from .prompt_manager import NameGenerationError, PromptManager
 from .repository import PromptRepository
 from .scenario_generation import LiteLLMScenarioGenerator
 from .web_search import WebSearchService, resolve_web_search_provider
@@ -71,15 +71,27 @@ def _format_missing_requirements(values: Sequence[str]) -> str:
 def _resolve_redis_client(
     redis_dsn: str | None,
     redis_client: Redis | None,
-) -> Redis | None:
+) -> tuple[Redis | None, str | None]:
     """Create a Redis client when a DSN is provided but no client supplied."""
     if redis_client is not None or not redis_dsn:
-        return redis_client
+        return redis_client, None
     redis_module = cast("Any", redis)
     if redis_module is None:
-        raise PromptCacheError("Redis DSN provided but redis package is not installed")
+        reason = (
+            "Redis caching disabled: redis package is not installed. "
+            "Install redis or remove PROMPT_MANAGER_REDIS_DSN to silence this notice."
+        )
+        return None, reason
     from_url = cast("Callable[[str], Redis]", redis_module.from_url)
-    return from_url(redis_dsn)
+    try:
+        client = from_url(redis_dsn)
+    except Exception as exc:  # noqa: BLE001 - external dependency failure
+        reason = (
+            "Redis caching disabled: unable to configure the client. "
+            f"DSN={redis_dsn!s}; error={exc}"
+        )
+        return None, reason
+    return client, None
 
 
 def _resolve_embedding_components(
@@ -202,7 +214,7 @@ def build_prompt_manager(
     prompt_engineer: PromptEngineer | None = None,
 ) -> PromptManager:
     """Return a PromptManager configured from validated settings."""
-    resolved_redis = _resolve_redis_client(settings.redis_dsn, redis_client)
+    resolved_redis, redis_reason = _resolve_redis_client(settings.redis_dsn, redis_client)
     resolved_embedding_function, resolved_embedding_provider = _resolve_embedding_components(
         settings,
         embedding_function,
@@ -362,6 +374,10 @@ def build_prompt_manager(
     manager_kwargs["history_tracker"] = history_tracker
 
     manager = PromptManager(**manager_kwargs)
+    if hasattr(manager, "set_redis_status"):
+        manager.set_redis_status(resolved_redis is not None, reason=redis_reason)
+    if redis_reason:
+        factory_logger.info(redis_reason)
     llm_ready, llm_reason = _determine_llm_status(settings)
     if not llm_ready and llm_reason:
         factory_logger.warning(llm_reason)

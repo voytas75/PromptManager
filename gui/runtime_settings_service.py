@@ -1,6 +1,7 @@
 """Runtime settings helpers for Prompt Manager GUI.
 
 Updates:
+  v0.1.8 - 2025-12-09 - Surface Redis cache availability in settings snapshots.
   v0.1.7 - 2025-12-07 - Track Google web search credentials in runtime snapshots.
   v0.1.6 - 2025-12-07 - Reconfigure web search providers when settings change.
   v0.1.5 - 2025-12-07 - Track SerpApi web search credentials in runtime snapshots.
@@ -116,7 +117,22 @@ class RuntimeSettingsService:
             "auto_open_share_links": (
                 settings.auto_open_share_links if settings is not None else True
             ),
+            "redis_status": None,
         }
+
+        if settings is not None:
+            redis_reason = getattr(self._manager, "redis_unavailable_reason", None)
+            redis_client_present = getattr(self._manager, "_redis_client", None) is not None
+            if settings.redis_dsn:
+                if redis_client_present:
+                    runtime["redis_status"] = f"Redis caching enabled via {settings.redis_dsn}"
+                else:
+                    runtime["redis_status"] = (
+                        redis_reason
+                        or "Redis caching disabled: unable to connect to configured DSN."
+                    )
+            else:
+                runtime["redis_status"] = "Redis caching disabled (no DSN configured)."
 
         config_path = Path("config/config.json")
         if config_path.exists():

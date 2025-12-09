@@ -1,13 +1,13 @@
 """Settings dialog for configuring Prompt Manager runtime options.
 
 Updates:
+  v0.2.20 - 2025-12-09 - Display Redis cache availability in the settings banner.
   v0.2.19 - 2025-12-08 - Align Qt enums and type hints with PySide6 stubs for Pyright.
   v0.2.18 - 2025-12-07 - Add Google Programmable Search fields to the Integrations tab.
   v0.2.17 - 2025-12-07 - Add SerpApi provider selector and API key entry.
   v0.2.16 - 2025-12-07 - Add Serper provider selector and API key entry.
   v0.2.15 - 2025-12-07 - Add random web search provider option and explanatory note.
-  v0.2.14 - 2025-12-05 - Break share preference assignments over multiple lines for linting.
-  v0.2.13 - 2025-12-04 - Add auto-open share link preference toggle.
+  v0.2.14-0.2.13 - 2025-12-05 - Auto-open share link preference and share layout tweaks.
   v0.2.12 - 2025-12-04 - Add web search integrations tab and Exa API key field.
   v0.2.11 - 2025-12-03 - Add LiteLLM TTS model configuration field.
   v0.2.9-and-earlier - 2025-12-06 - LiteLLM embedding + template override history.
@@ -93,6 +93,7 @@ class SettingsDialog(QDialog):
         google_api_key: str | None = None,
         google_cse_id: str | None = None,
         auto_open_share_links: bool | None = None,
+        redis_status: str | None = None,
     ) -> None:
         """Build the settings UI with existing runtime values pre-populated."""
         super().__init__(parent)
@@ -130,6 +131,7 @@ class SettingsDialog(QDialog):
         self._serpapi_api_key = serpapi_api_key or ""
         self._google_api_key = google_api_key or ""
         self._google_cse_id = google_cse_id or ""
+        self._redis_status = (redis_status or "").strip()
         original_actions = [
             dict(entry) for entry in (quick_actions or []) if isinstance(entry, dict)
         ]
@@ -220,6 +222,18 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(container)
         layout.setContentsMargins(12, 12, 12, 12)
         outer_layout.addWidget(container)
+
+        if self._redis_status:
+            redis_banner = QLabel(self._redis_status, container)
+            redis_banner.setWordWrap(True)
+            redis_banner.setObjectName("redisStatusBanner")
+            banner_color = "#fff7e6" if "disabled" in self._redis_status.lower() else "#e6f4ff"
+            border_color = "#f0ad4e" if "disabled" in self._redis_status.lower() else "#7aa7c7"
+            redis_banner.setStyleSheet(
+                f"background-color: {banner_color}; border: 1px solid {border_color}; "
+                "border-radius: 6px; padding: 8px; margin-bottom: 8px;"
+            )
+            layout.addWidget(redis_banner)
 
         tab_widget = QTabWidget(self)
         tab_widget.setObjectName("settingsTabs")

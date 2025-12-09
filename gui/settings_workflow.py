@@ -101,6 +101,7 @@ class SettingsWorkflow:
             google_api_key=cast("str | None", data.get("google_api_key")),
             google_cse_id=cast("str | None", data.get("google_cse_id")),
             auto_open_share_links=cast("bool | None", data.get("auto_open_share_links")),
+            redis_status=cast("str | None", data.get("redis_status")),
         )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return

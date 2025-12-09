@@ -1,6 +1,7 @@
 """Backend bootstrap mixin for Prompt Manager.
 
 Updates:
+  v0.1.1 - 2025-12-09 - Initialise Redis availability state.
   v0.1.0 - 2025-12-03 - Extract repository and backend wiring helpers from package init.
 """
 
@@ -43,6 +44,7 @@ class BackendBootstrapMixin:
     _closed: bool
     _cache_ttl_seconds: int
     _redis_client: RedisClientProtocol | None
+    _redis_unavailable_reason: str | None
     _repository: PromptRepository
     _category_registry: CategoryRegistry
     _collection: CollectionProtocol | None
@@ -78,6 +80,7 @@ class BackendBootstrapMixin:
         self._closed = False
         self._cache_ttl_seconds = cache_ttl_seconds
         self._redis_client = redis_client
+        self._redis_unavailable_reason = None
 
         resolved_db_path = Path(db_path).expanduser() if db_path is not None else None
         resolved_chroma_path = Path(chroma_path).expanduser()
