@@ -1,6 +1,7 @@
 """LiteLLM workflow configuration helpers for Prompt Manager.
 
 Updates:
+  v0.1.1 - 2025-12-09 - Require LiteLLM API key before wiring executors and update LLM status.
   v0.1.0 - 2025-12-03 - Extract runtime LiteLLM configuration API from PromptManager.
 """
 
@@ -83,6 +84,7 @@ class LiteLLMWorkflowMixin:
         """Configure LiteLLM-backed workflows at runtime."""
         self._litellm_fast_model = self._normalise_model_identifier(model)
         self._litellm_inference_model = self._normalise_model_identifier(inference_model)
+        cleaned_api_key = api_key.strip() if isinstance(api_key, str) else None
         routing: dict[str, str] = {}
         if workflow_models:
             for key, value in workflow_models.items():
@@ -117,10 +119,24 @@ class LiteLLMWorkflowMixin:
         self._scenario_generator = None
         self._category_generator = None
         self._executor = None
-
         if not (self._litellm_fast_model or self._litellm_inference_model):
             self._litellm_reasoning_effort = None
             self._litellm_stream = False
+            self.set_llm_status(
+                False,
+                reason="LiteLLM model is not configured; provide a fast or inference model.",
+            )
+            return
+        if not cleaned_api_key:
+            self._litellm_reasoning_effort = None
+            self._litellm_stream = False
+            self.set_llm_status(
+                False,
+                reason=(
+                    "LiteLLM API key is missing; set PROMPT_MANAGER_LITELLM_API_KEY "
+                    "to enable execution."
+                ),
+            )
             return
 
         drop_params_payload = list(self._litellm_drop_params) if self._litellm_drop_params else None
@@ -138,7 +154,7 @@ class LiteLLMWorkflowMixin:
             factory = _resolve_factory(factory_name)
             return factory(
                 model=selected_model,
-                api_key=api_key,
+                api_key=cleaned_api_key,
                 api_base=api_base,
                 api_version=api_version,
                 drop_params=drop_params_payload,
@@ -199,3 +215,16 @@ class LiteLLMWorkflowMixin:
             self._litellm_fast_model or self._litellm_inference_model
         ):
             logger.debug("LiteLLM powered features enabled for intent classifier")
+
+        llm_ready = any(
+            candidate is not None
+            for candidate in (
+                self._name_generator,
+                self._description_generator,
+                self._prompt_engineer,
+                self._scenario_generator,
+                self._category_generator,
+                self._executor,
+            )
+        )
+        self.set_llm_status(llm_ready, reason=None)

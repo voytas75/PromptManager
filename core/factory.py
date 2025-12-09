@@ -1,18 +1,16 @@
 """Factories for constructing PromptManager instances from validated settings.
 
 Updates:
+  v0.8.5 - 2025-12-09 - Skip LiteLLM components when the LiteLLM API key is missing.
   v0.8.4 - 2025-12-09 - Surface offline mode when LiteLLM credentials are missing.
   v0.8.3 - 2025-12-07 - Wire Google web search provider into the factory builder.
   v0.8.2 - 2025-12-07 - Expose reusable web search service builder.
   v0.8.1 - 2025-12-07 - Wire SerpApi provider into the web search factory.
   v0.8.0 - 2025-12-07 - Wire Serper provider into the web search factory.
-  v0.7.9 - 2025-12-07 - Add random provider fan-out for the web search service.
-  v0.7.8 - 2025-12-07 - Add Tavily provider wiring to the web search factory.
-  v0.7.7 - 2025-12-04 - Wire web search service creation into manager factory.
-  v0.7.6 - 2025-11-30 - Remove docstring padding for Ruff compliance.
+  v0.7.9-0.7.8 - 2025-12-07 - Add random provider fan-out and Tavily wiring to web search.
+  v0.7.7-0.7.6 - 2025-12-04 - Wire web search creation into the factory and align Ruff spacing.
   v0.7.5 - 2025-11-29 - Move config imports behind type checks and wrap long strings.
-  v0.7.4 - 2025-11-24 - Wire LiteLLM category suggestion helper into manager construction.
-  v0.7.3-and-earlier - 2025-11-19 - Configure LiteLLM scenario generator and earlier wiring.
+  v0.7.4-and-earlier - 2025-11-24 - Configure LiteLLM category/scenario wiring and related helpers.
 """
 
 from __future__ import annotations
@@ -199,14 +197,16 @@ def build_prompt_manager(
             return inference_model or fast_model
         return fast_model or inference_model
 
+    api_key = (settings.litellm_api_key or "").strip() or None
+
     def _construct(factory: Callable[..., Any], workflow: str, **extra: Any) -> Any | None:
         model_name = _select_model(workflow)
-        if not model_name:
+        if not model_name or not api_key:
             return None
         try:
             return factory(
                 model=model_name,
-                api_key=settings.litellm_api_key,
+                api_key=api_key,
                 api_base=settings.litellm_api_base,
                 api_version=settings.litellm_api_version,
                 drop_params=settings.litellm_drop_params,
