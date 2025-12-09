@@ -1,6 +1,7 @@
 """Embedding provider and background synchronisation helpers for Prompt Manager.
 
 Updates:
+  v0.7.6 - 2025-12-09 - Guard LiteLLM embedding availability and fall back gracefully.
   v0.7.5 - 2025-12-09 - Expose LiteLLM embedding function name for Chroma telemetry.
   v0.7.4 - 2025-11-30 - Document embedding helpers and fix docstring spacing for lint compliance.
   v0.7.3 - 2025-11-29 - Guard Prompt import for typing and wrap logging/reporting lines.
@@ -37,6 +38,8 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from models.prompt_model import Prompt
 
 EmbeddingFunction = Callable[[Sequence[str]], Sequence[Sequence[float]]]
+
+logger = logging.getLogger("prompt_manager.embedding")
 
 
 class EmbeddingProviderError(Exception):
@@ -243,6 +246,11 @@ def create_embedding_function(
     if backend_normalised in {"", "deterministic", "default"}:
         return None
     if backend_normalised in {"litellm", "openai"}:
+        if not _litellm_embedding_available():
+            logger.warning(
+                "LiteLLM embedding backend unavailable; using deterministic embeddings instead."
+            )
+            return None
         return LiteLLMEmbeddingFunction(
             model=model or "",
             api_key=api_key,
@@ -252,6 +260,16 @@ def create_embedding_function(
     if backend_normalised in {"sentence-transformers", "sentence_transformers", "st"}:
         return SentenceTransformersEmbeddingFunction(model or "", device=device)
     raise ValueError(f"Unsupported embedding backend: {backend}")
+
+
+def _litellm_embedding_available() -> bool:
+    """Return True when litellm.embedding can be imported and is callable."""
+    try:
+        embedding_fn, _ = get_embedding()
+    except Exception as exc:  # noqa: BLE001 - external dependency availability
+        logger.debug("LiteLLM embedding unavailable: %s", exc)
+        return False
+    return callable(embedding_fn)
 
 
 class EmbeddingProvider:

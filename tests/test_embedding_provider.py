@@ -1,6 +1,7 @@
 """Unit tests covering embedding provider and sync worker utilities.
 
 Updates:
+  v0.3.2 - 2025-12-09 - Guard LiteLLM embedding availability and expose name for Chroma.
   v0.3.1 - 2025-12-09 - Ensure LiteLLM embedding function exposes name for Chroma.
   v0.3.0 - 2025-12-08 - Align stub signatures/casts for strict Pyright checks.
 """
@@ -153,6 +154,26 @@ def test_create_embedding_function_returns_none_for_default() -> None:
 def test_create_embedding_function_rejects_unknown_backend() -> None:
     with pytest.raises(ValueError):
         create_embedding_function("unknown-backend", model=None, api_key=None, api_base=None)
+
+
+def test_create_embedding_function_falls_back_when_litellm_missing(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level("WARNING")
+
+    def _raise():
+        raise RuntimeError("missing embedding")
+
+    monkeypatch.setattr("core.embedding.get_embedding", lambda: (_raise(), RuntimeError))
+    result = create_embedding_function(
+        "litellm",
+        model="text-embedding-3-large",
+        api_key=None,
+        api_base=None,
+    )
+
+    assert result is None
+    assert "LiteLLM embedding backend unavailable" in caplog.text
 
 
 def test_litellm_embedding_function_exposes_name(monkeypatch: pytest.MonkeyPatch) -> None:

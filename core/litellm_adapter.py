@@ -50,6 +50,12 @@ def _ensure_loaded() -> None:
     if completion is None:
         raise RuntimeError("litellm completion API is unavailable in the installed version.")
     embedding = getattr(litellm, "embedding", None)
+    if embedding is not None and not callable(embedding):
+        logger.warning(
+            "litellm.embedding is not callable (got %s); treating embedding API as unavailable.",
+            type(embedding).__name__,
+        )
+        embedding = None
 
     try:
         exceptions_module = importlib.import_module("litellm.exceptions")
