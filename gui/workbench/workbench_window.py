@@ -122,15 +122,18 @@ class WorkbenchWindow(QMainWindow):
         validate_action = toolbar.addAction("✅ Validate", self._validate_template)
         validate_action.setToolTip("Re-run template preview validation and report status.")
         run_action = toolbar.addAction("▶️ Run Once", self._trigger_run)
+        llm_available = getattr(self._manager, "llm_available", False)
         run_action.setToolTip(
-            "Render the prompt with sample data and execute it via CodexExecutor."
+            self._manager.llm_status_message("Prompt execution")
+            if not llm_available
+            else "Render the prompt with sample data and execute it via CodexExecutor."
         )
         export_action = toolbar.addAction("💾 Export", self._export_prompt)
         export_action.setToolTip("Persist this prompt into the repository.")
         executor_ready = self._executor is not None
         self._brainstorm_action.setEnabled(executor_ready)
         self._peek_action.setEnabled(executor_ready)
-        run_action.setEnabled(executor_ready)
+        run_action.setEnabled(executor_ready or not llm_available)
 
         container = QWidget(self)
         container_layout = QVBoxLayout(container)
@@ -217,7 +220,8 @@ class WorkbenchWindow(QMainWindow):
         right_layout.setContentsMargins(8, 8, 8, 8)
         right_layout.setSpacing(8)
         self._preview = TemplatePreviewWidget(right_panel)
-        run_enabled = bool(self._executor is not None or not getattr(self._manager, "llm_available", False))
+        llm_available = getattr(self._manager, "llm_available", False)
+        run_enabled = bool(self._executor is not None or not llm_available)
         self._preview.set_run_enabled(run_enabled)
         self._preview.run_requested.connect(self._handle_preview_run)  # type: ignore[arg-type]
         right_layout.addWidget(self._preview, 1)
@@ -384,6 +388,11 @@ class WorkbenchWindow(QMainWindow):
         self._status.showMessage("Template validation refreshed.", 4000)
 
     def _trigger_run(self) -> None:
+        if not getattr(self._manager, "llm_available", True):
+            message = self._manager.llm_status_message("Prompt execution")
+            QMessageBox.information(self, "Prompt execution unavailable", message)
+            self._status.showMessage("Prompt execution unavailable.", 5000)
+            return
         if not self._preview.request_run():
             self._status.showMessage("Preview not ready for execution.", 5000)
 
@@ -446,8 +455,10 @@ class WorkbenchWindow(QMainWindow):
         return result["value"]
 
     def _handle_preview_run(self, rendered_text: str, variables: Mapping[str, str]) -> None:
-        if self._executor is None:
-            self._status.showMessage("CodexExecutor is not configured.", 6000)
+        if not getattr(self._manager, "llm_available", True) or self._executor is None:
+            message = self._manager.llm_status_message("Prompt execution")
+            QMessageBox.information(self, "Prompt execution unavailable", message)
+            self._status.showMessage("Prompt execution unavailable.", 6000)
             return
         raw_request = self._test_input.toPlainText().strip()
         fallback_message = None
