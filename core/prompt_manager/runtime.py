@@ -1,12 +1,14 @@
 """Runtime lifecycle helpers for Prompt Manager.
 
 Updates:
+  v0.1.1 - 2025-12-09 - Track LLM availability and emit offline notifications.
   v0.1.0 - 2025-12-03 - Extract backend and lifecycle utilities into dedicated mixin.
 """
 
 from __future__ import annotations
 
 import logging
+import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Self
 
@@ -15,6 +17,11 @@ from ..exceptions import (
     CategoryStorageError,
     PromptManagerError,
     PromptStorageError,
+)
+from ..notifications import (
+    Notification,
+    NotificationLevel,
+    NotificationStatus,
 )
 from ..repository import RepositoryError
 from .backends import CollectionProtocol, RedisClientProtocol, build_chroma_client
@@ -54,6 +61,57 @@ class PromptRuntimeMixin:
     _closed: bool
     _history_tracker: HistoryTracker | None
     _executor: CodexExecutor | None
+    _llm_available: bool
+    _llm_unavailable_reason: str | None
+
+    def _initialise_llm_status(self, *, available: bool, reason: str | None = None) -> None:
+        """Store the current LLM availability state."""
+        self._llm_available = available
+        self._llm_unavailable_reason = (
+            None if available else (reason or "LLM configuration is missing.")
+        )
+
+    def set_llm_status(
+        self,
+        available: bool,
+        *,
+        reason: str | None = None,
+        notify: bool = False,
+    ) -> None:
+        """Update LLM availability and optionally notify listeners."""
+        self._initialise_llm_status(available=available, reason=reason)
+        if notify and not available:
+            message = self._llm_unavailable_reason or "LiteLLM configuration is missing."
+            self._notification_center.publish(
+                Notification(
+                    id=uuid.uuid4(),
+                    title="Running without LiteLLM",
+                    message=message,
+                    level=NotificationLevel.WARNING,
+                    status=NotificationStatus.STARTED,
+                    metadata={"mode": "offline", "capability": "llm"},
+                )
+            )
+            logger.warning("LLM features disabled: %s", message)
+
+    @property
+    def llm_available(self) -> bool:
+        """Return True when LiteLLM-backed features are configured."""
+        return self._llm_available
+
+    @property
+    def llm_unavailable_reason(self) -> str | None:
+        """Return the reason LLM features are disabled, if any."""
+        return self._llm_unavailable_reason
+
+    def llm_status_message(self, capability: str) -> str:
+        """Return a user-facing message describing LLM availability."""
+        reason = self._llm_unavailable_reason or "LiteLLM model and API key are missing."
+        capability_text = capability.rstrip(".")
+        return (
+            f"{capability_text} is unavailable because {reason} "
+            "Configure LiteLLM credentials and model or continue in offline mode (LLM-backed features disabled)."
+        )
 
     def _apply_category_metadata(self, prompt: Prompt) -> Prompt:
         """Ensure prompt categories map to registry entries."""

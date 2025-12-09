@@ -1,6 +1,7 @@
 """Execution workflow and history mixin for Prompt Manager.
 
 Updates:
+  v0.1.2 - 2025-12-09 - Surface offline-friendly errors when execution is unavailable.
   v0.1.1 - 2025-12-08 - Expose token usage totals helper for GUI and CLI surfaces.
   v0.1.0 - 2025-12-03 - Extract execution and history APIs into dedicated mixin.
 """
@@ -160,9 +161,13 @@ class ExecutionHistoryMixin:
         if not request_text.strip():
             raise PromptExecutionError("Prompt execution requires non-empty input text.")
         if self._executor is None:
-            raise PromptExecutionUnavailable(
-                "Prompt execution is not configured. Provide LiteLLM credentials and model."
+            runtime = cast("Any", self)
+            message = (
+                runtime.llm_status_message("Prompt execution")
+                if hasattr(runtime, "llm_status_message")
+                else "Prompt execution is not configured. Provide LiteLLM credentials and model."
             )
+            raise PromptExecutionUnavailable(message)
 
         conversation_history = _normalise_conversation(conversation)
         deps = cast("_PromptAccessor", self)

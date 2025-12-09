@@ -1,6 +1,7 @@
 """Prompt Manager package façade and orchestration layer.
 
 Updates:
+  v0.14.21 - 2025-12-09 - Track LLM availability state during manager initialisation.
   v0.14.20 - 2025-12-04 - Wire optional web search service into the manager.
   v0.14.19 - 2025-12-04 - Group prompt chain exception imports for Ruff sorting.
   v0.14.18 - 2025-12-04 - Remove stale transitional NOTE block.
@@ -318,6 +319,16 @@ class PromptManager(
         self._initialise_user_state(
             history_tracker=history_tracker,
             user_profile=user_profile,
+        )
+        self._initialise_llm_status(
+            available=bool(
+                self._executor
+                or self._name_generator
+                or self._description_generator
+                or self._scenario_generator
+                or self._prompt_engineer
+            ),
+            reason=None,
         )
         self.web_search_service = web_search_service or WebSearchService()
         self.web_search = self.web_search_service

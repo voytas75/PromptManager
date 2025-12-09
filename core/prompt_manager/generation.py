@@ -1,6 +1,7 @@
 """LiteLLM generation and category insight helpers for Prompt Manager.
 
 Updates:
+  v0.1.1 - 2025-12-09 - Provide offline-friendly errors when LiteLLM is missing.
   v0.1.0 - 2025-12-02 - Extract prompt generation and category insight APIs into mixin.
 """
 
@@ -10,7 +11,7 @@ import logging
 import uuid
 from collections.abc import Mapping, MutableMapping, Sequence
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from models.category_model import PromptCategory, slugify_category
 
@@ -36,6 +37,8 @@ else:  # pragma: no cover - runtime fallback for typing name
 logger = logging.getLogger(__name__)
 
 __all__ = ["GenerationMixin"]
+
+_PromptManagerErrorT = TypeVar("_PromptManagerErrorT", bound=PromptManagerError)
 
 
 _CATEGORY_DEFAULT_MAP: dict[IntentLabel, str] = {
@@ -89,12 +92,23 @@ class GenerationMixin:
         """Return *self* with PromptManager-specific typing for helper access."""
         return cast("_PromptManager", self)
 
+    def _raise_llm_unavailable(
+        self,
+        error_type: type[_PromptManagerErrorT],
+        capability: str,
+    ) -> None:
+        """Raise a capability-specific error with the manager's offline message."""
+        manager = self._as_prompt_manager()
+        message = manager.llm_status_message(capability)
+        raise error_type(message)
+
     def generate_prompt_name(self, context: str) -> str:
         """Return a prompt name using the configured LiteLLM generator."""
         manager = self._as_prompt_manager()
         if manager._name_generator is None:
-            raise NameGenerationError(
-                "LiteLLM name generator is not configured. Set PROMPT_MANAGER_LITELLM_MODEL."
+            self._raise_llm_unavailable(
+                NameGenerationError,
+                "Prompt name generation",
             )
         task_id = f"name-gen:{uuid.uuid4()}"
         metadata = {"context_length": len(context or "")}
@@ -131,8 +145,9 @@ class GenerationMixin:
             if allow_fallback:
                 logger.debug("Description generator missing; using fallback summary")
                 return manager._build_description_fallback(text, prompt=prompt)
-            raise DescriptionGenerationError(
-                "LiteLLM description generator is not configured. Set PROMPT_MANAGER_LITELLM_MODEL."
+            self._raise_llm_unavailable(
+                DescriptionGenerationError,
+                "Prompt description generation",
             )
         task_id = f"description-gen:{uuid.uuid4()}"
         metadata = {"context_length": len(text)}
@@ -166,8 +181,9 @@ class GenerationMixin:
         """Return usage scenarios for a prompt via the configured LiteLLM helper."""
         manager = self._as_prompt_manager()
         if manager._scenario_generator is None:
-            raise ScenarioGenerationError(
-                "LiteLLM scenario generator is not configured. Set PROMPT_MANAGER_LITELLM_MODEL."
+            self._raise_llm_unavailable(
+                ScenarioGenerationError,
+                "Prompt scenario generation",
             )
         task_id = f"scenario-gen:{uuid.uuid4()}"
         metadata = {

@@ -1,6 +1,7 @@
 """Prompt chain orchestration helpers for Prompt Manager.
 
 Updates:
+  v0.2.2 - 2025-12-09 - Surface offline-friendly messaging when execution is disabled.
   v0.2.1 - 2025-12-07 - Wrap web search context with shared formatting helpers.
   v0.2.0 - 2025-12-06 - Switch chains to plain-text inputs and linear step piping.
   v0.1.5 - 2025-12-06 - Honor prompt template overrides for chain summaries.
@@ -396,9 +397,12 @@ class PromptChainMixin:
         host = cast("_PromptChainHost", self)
         executor = getattr(self, "_executor", None)
         if executor is None:
-            raise PromptChainExecutionError(
-                "Prompt execution is not configured for this manager instance."
+            message = (
+                host.llm_status_message("Prompt execution")
+                if hasattr(host, "llm_status_message")
+                else "Prompt execution is not configured for this manager instance."
             )
+            raise PromptChainExecutionError(message)
         conversation_history = _normalise_conversation(None)
         stream_enabled = executor.stream
 

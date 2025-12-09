@@ -1,6 +1,7 @@
 """Factories for constructing PromptManager instances from validated settings.
 
 Updates:
+  v0.8.4 - 2025-12-09 - Surface offline mode when LiteLLM credentials are missing.
   v0.8.3 - 2025-12-07 - Wire Google web search provider into the factory builder.
   v0.8.2 - 2025-12-07 - Expose reusable web search service builder.
   v0.8.1 - 2025-12-07 - Wire SerpApi provider into the web search factory.
@@ -16,6 +17,7 @@ Updates:
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any, cast
 
@@ -52,6 +54,8 @@ else:  # pragma: no cover - typing only
     PromptManagerSettings = Any
     PromptTemplateOverrides = Any
     Redis = Any
+
+factory_logger = logging.getLogger("prompt_manager.factory")
 
 
 def _resolve_redis_client(
@@ -90,6 +94,29 @@ def _resolve_embedding_components(
     if embedding_provider is not None:
         return resolved_function, embedding_provider
     return resolved_function, EmbeddingProvider(resolved_function)
+
+
+def _determine_llm_status(settings: PromptManagerSettings) -> tuple[bool, str | None]:
+    """Return LiteLLM readiness plus a human-readable offline reason."""
+    model_configured = bool(
+        getattr(settings, "litellm_model", None)
+        or getattr(settings, "litellm_inference_model", None)
+    )
+    api_key_configured = bool(getattr(settings, "litellm_api_key", None))
+    if model_configured and api_key_configured:
+        return True, None
+    missing_parts: list[str] = []
+    if not model_configured:
+        missing_parts.append("model")
+    if not api_key_configured:
+        missing_parts.append("API key")
+    missing_text = " and ".join(missing_parts) if missing_parts else "credentials"
+    reason = (
+        f"LiteLLM {missing_text} missing; running in offline mode. "
+        "Configure PROMPT_MANAGER_LITELLM_MODEL and PROMPT_MANAGER_LITELLM_API_KEY to enable "
+        "prompt generation and execution."
+    )
+    return False, reason
 
 
 def build_web_search_service(settings: PromptManagerSettings) -> WebSearchService:
@@ -275,6 +302,10 @@ def build_prompt_manager(
     manager_kwargs["history_tracker"] = history_tracker
 
     manager = PromptManager(**manager_kwargs)
+    llm_ready, llm_reason = _determine_llm_status(settings)
+    if not llm_ready and llm_reason:
+        factory_logger.warning(llm_reason)
+    manager.set_llm_status(llm_ready, reason=llm_reason, notify=not llm_ready)
     return manager
 
 

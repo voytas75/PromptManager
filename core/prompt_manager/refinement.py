@@ -1,6 +1,7 @@
 """Prompt refinement helpers shared across Prompt Manager components.
 
 Updates:
+  v0.1.1 - 2025-12-09 - Provide offline-friendly messaging when LiteLLM is missing.
   v0.1.0 - 2025-12-03 - Extract prompt refinement helpers from PromptManager.
 """
 
@@ -58,10 +59,9 @@ class PromptRefinementMixin:
             raise PromptEngineeringError("Prompt refinement requires non-empty prompt text.")
         engineer = self.prompt_structure_engineer or self.prompt_engineer
         if engineer is None:
-            raise PromptEngineeringUnavailable(
-                "Prompt engineering is not configured. Set PROMPT_MANAGER_LITELLM_MODEL "
-                "to enable refinement."
-            )
+            manager = self._as_prompt_manager()
+            message = manager.llm_status_message("Prompt engineering")
+            raise PromptEngineeringUnavailable(message)
         task_id = f"prompt-refine:{uuid.uuid4()}"
         metadata = {
             "prompt_length": len(prompt_text or ""),
@@ -106,10 +106,9 @@ class PromptRefinementMixin:
             raise PromptEngineeringError("Prompt refinement requires non-empty prompt text.")
         engineer = self.prompt_structure_engineer or self.prompt_engineer
         if engineer is None:
-            raise PromptEngineeringUnavailable(
-                "Prompt engineering is not configured. Set PROMPT_MANAGER_LITELLM_MODEL "
-                "to enable refinement."
-            )
+            manager = self._as_prompt_manager()
+            message = manager.llm_status_message("Prompt engineering")
+            raise PromptEngineeringUnavailable(message)
         task_id = f"prompt-structure-refine:{uuid.uuid4()}"
         metadata = {
             "prompt_length": len(prompt_text or ""),
