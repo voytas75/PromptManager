@@ -1,6 +1,7 @@
 """Backend maintenance helpers for Redis, ChromaDB, and SQLite tabs.
 
 Updates:
+  v0.1.1 - 2025-12-09 - Show Redis cache availability banner with clear contrast styling.
   v0.1.0 - 2025-12-04 - Extract backend tab builders and maintenance routines.
 """
 
@@ -31,6 +32,7 @@ class BackendMaintenanceMixin:
     _manager: PromptManager
     _redis_status_label: QLabel
     _redis_connection_label: QLabel
+    _redis_banner_label: QLabel
     _redis_stats_view: QPlainTextEdit
     _redis_refresh_button: QPushButton
     _chroma_status_label: QLabel
@@ -55,6 +57,11 @@ class BackendMaintenanceMixin:
         redis_description = QLabel("Inspect the Redis cache used for prompt caching.", redis_tab)
         redis_description.setWordWrap(True)
         redis_layout.addWidget(redis_description)
+
+        self._redis_banner_label = QLabel("", redis_tab)
+        self._redis_banner_label.setWordWrap(True)
+        self._redis_banner_label.setVisible(False)
+        redis_layout.addWidget(self._redis_banner_label)
 
         status_container = QWidget(redis_tab)
         status_layout = QHBoxLayout(status_container)
@@ -343,14 +350,42 @@ class BackendMaintenanceMixin:
     def _refresh_redis_info(self) -> None:
         details = self._manager.get_redis_details()
         enabled = details.get("enabled", False)
+        reason = details.get("reason")
+        error_text = details.get("error")
+
+        def _set_banner(text: str, *, intent: str) -> None:
+            self._redis_banner_label.setText(text)
+            self._redis_banner_label.setVisible(True)
+            if intent == "error":
+                bg = "#fdecea"
+                border = "#f5c2c7"
+                color = "#7a1c1c"
+            elif intent == "warn":
+                bg = "#fff4e5"
+                border = "#f0ad4e"
+                color = "#8a4b0f"
+            else:
+                bg = "#e8f5e9"
+                border = "#2e7d32"
+                color = "#1b5e20"
+            self._redis_banner_label.setStyleSheet(
+                f"background-color: {bg}; border: 1px solid {border}; "
+                f"border-radius: 6px; padding: 8px; color: {color};"
+            )
+
         if not enabled:
             self._redis_status_label.setText("Redis caching is disabled.")
             self._redis_connection_label.setText("")
             self._redis_stats_view.setPlainText("")
             self._redis_refresh_button.setEnabled(False)
+            if reason:
+                _set_banner(reason, intent="warn")
+            else:
+                self._redis_banner_label.setVisible(False)
             return
 
         self._redis_refresh_button.setEnabled(True)
+        self._redis_banner_label.setVisible(False)
 
         status = details.get("status", "unknown").capitalize()
         if details.get("error"):
@@ -374,6 +409,10 @@ class BackendMaintenanceMixin:
             self._redis_connection_label.setText("")
         else:
             self._redis_connection_label.setText("Connection: " + ", ".join(connection_parts))
+        if details.get("status") == "error" and error_text:
+            _set_banner(f"Redis connection error: {error_text}", intent="error")
+        elif status.lower() == "online":
+            _set_banner("Redis caching enabled and reachable.", intent="success")
 
         stats = details.get("stats", {})
         lines: list[str] = []

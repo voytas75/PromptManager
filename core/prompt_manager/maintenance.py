@@ -82,7 +82,12 @@ def _coerce_int(value: Any) -> int | None:
 
 
 class MaintenanceMixin:
-    """Operational helpers for repository, cache, and vector-store maintenance."""
+"""Operational helpers for repository, cache, and vector-store maintenance.
+
+Updates:
+  v0.1.1 - 2025-12-09 - Include Redis unavailability reasons in maintenance details.
+  v0.1.0 - 2025-12-03 - Initial maintenance helpers.
+"""
 
     _redis_client: Any | None
     _collection: CollectionProtocol | None
@@ -103,6 +108,10 @@ class MaintenanceMixin:
         details: dict[str, Any] = {"enabled": manager._redis_client is not None}
         client = manager._redis_client
         if client is None:
+            reason = getattr(manager, "redis_unavailable_reason", None)
+            if reason:
+                details["reason"] = reason
+                details["status"] = "disabled"
             return details
 
         try:
