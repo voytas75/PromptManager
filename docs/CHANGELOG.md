@@ -2,6 +2,13 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.22.15] - 2025-12-09
+
+### Fixed
+
+- LiteLLM offline and embedding checks now surface specific `PROMPT_MANAGER_*` environment variables in warnings, fall back to deterministic embeddings when credentials are missing, and keep the GUI/CLI in a safe offline state.
+- Redis cache availability no longer raises during bootstrap; the Settings dialog and maintenance Redis tab display high-contrast banners indicating disabled or error states, with refresh controls gated when the cache is unavailable.
+
 ## [0.22.14] - 2025-12-08
 
 ### Added
