@@ -11,7 +11,7 @@ import logging
 import uuid
 from collections.abc import Mapping, MutableMapping, Sequence
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, NoReturn, TypeVar, cast
 
 from models.category_model import PromptCategory, slugify_category
 
@@ -96,7 +96,7 @@ class GenerationMixin:
         self,
         error_type: type[_PromptManagerErrorT],
         capability: str,
-    ) -> None:
+    ) -> NoReturn:
         """Raise a capability-specific error with the manager's offline message."""
         manager = self._as_prompt_manager()
         message = manager.llm_status_message(capability)

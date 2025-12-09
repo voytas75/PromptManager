@@ -90,6 +90,7 @@ class LiteLLMEmbeddingFunction:
         self._api_base = api_base
         self._timeout_seconds = timeout_seconds
 
+    @property
     def name(self) -> str:
         """Identifier surfaced to Chroma for telemetry/diagnostics."""
         return f"litellm:{self._model}"

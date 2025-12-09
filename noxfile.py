@@ -20,10 +20,41 @@ environment (no isolated venv) so ensure required tools are installed locally.
 
 from __future__ import annotations
 
-import nox
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import nox  # type: ignore[reportMissingImports]
+
+    type Session = "nox.Session"
+else:  # pragma: no cover - runtime fallback when nox is unavailable
+    try:
+        import nox as _nox
+
+        nox = _nox
+        Session = _nox.Session
+    except ImportError:
+
+        class _NoxStubSession:
+            def run(self, *args, **kwargs) -> None:
+                raise RuntimeError("nox is not installed; install the dev extras to run nox.")
+
+            def error(self, message: str) -> None:
+                raise RuntimeError(message)
+
+        class _NoxStub:
+            Session = _NoxStubSession
+
+            def session(self, *args, **kwargs):  # type: ignore[override]
+                def decorator(func):
+                    return func
+
+                return decorator
+
+        nox = _NoxStub()
+        Session = _NoxStubSession
 
 
-def _ensure_tool(session: nox.Session, command: str, *version_args: str) -> None:
+def _ensure_tool(session: Session, command: str, *version_args: str) -> None:
     """Verify that an external tool is available before executing commands."""
     args = (command, *(version_args or ("--version",)))
     try:

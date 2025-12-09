@@ -315,7 +315,12 @@ class PromptChainManagerPanel(QWidget):
         actions_row = QHBoxLayout()
         self._run_button = QPushButton("Run Chain", run_container)
         if not getattr(self._manager, "llm_available", False):
-            self._run_button.setToolTip(self._manager.llm_status_message("Prompt execution"))
+            status_message = getattr(
+                self._manager,
+                "llm_status_message",
+                lambda capability: f"{capability} is unavailable; configure LiteLLM to enable it.",
+            )
+            self._run_button.setToolTip(status_message("Prompt execution"))
         else:
             self._run_button.setToolTip("Execute the selected chain with the provided input.")
         self._run_button.clicked.connect(self._run_selected_chain)  # type: ignore[arg-type]
@@ -671,11 +676,13 @@ class PromptChainManagerPanel(QWidget):
         if not chain_input_text.strip():
             QMessageBox.warning(self, "Chain input", "Enter text to feed into the first step.")
             return
-        if (
-            not getattr(self._manager, "llm_available", True)
-            or getattr(self._manager, "executor", None) is None
-        ):
-            message = self._manager.llm_status_message("Prompt execution")
+        if not getattr(self._manager, "llm_available", True):
+            status_message = getattr(
+                self._manager,
+                "llm_status_message",
+                lambda capability: f"{capability} is unavailable; configure LiteLLM to enable it.",
+            )
+            message = status_message("Prompt execution")
             QMessageBox.information(self, "Prompt execution unavailable", message)
             return
 

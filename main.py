@@ -21,11 +21,27 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+try:
+    from config import PromptManagerSettings, SettingsError, load_settings
+except (ImportError, AttributeError):  # pragma: no cover - fallback for test stubs
+    import config as _config
+
+    PromptManagerSettings = getattr(_config, "PromptManagerSettings", object)
+    SettingsError = getattr(_config, "SettingsError", Exception)
+    load_settings = _config.load_settings
+else:
+    import config as _config
+
+if TYPE_CHECKING:
+    from config import PromptManagerSettings as PromptManagerSettingsType
+else:
+    from typing import Any as _Any
+
+    PromptManagerSettingsType = _Any
 from cli.gui_launcher import run_default_mode
 from cli.parser import parse_args
 from cli.runtime import setup_logging as _runtime_setup_logging
 from cli.settings_summary import print_settings_summary
-from config import PromptManagerSettings, SettingsError, load_settings
 from core import (
     build_analytics_snapshot as _core_build_analytics_snapshot,
     build_prompt_manager,
@@ -54,7 +70,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
 
 
 def _initialise_manager(
-    settings: PromptManagerSettings,
+    settings: PromptManagerSettingsType,
     logger: logging.Logger,
 ) -> PromptManager | None:
     try:
@@ -108,6 +124,7 @@ def _prompt_create_default_config(logger: logging.Logger) -> bool:
         "Created configuration at %s. Update it with your LiteLLM credentials and preferences.",
         DEFAULT_CONFIG_PATH,
     )
+    print(f"Created configuration at {DEFAULT_CONFIG_PATH}")
     return True
 
 

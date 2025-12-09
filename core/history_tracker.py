@@ -441,14 +441,16 @@ def _coerce_float(value: object | None) -> float | None:
 def _coerce_int(value: object | None) -> int:
     if value in (None, ""):
         return 0
-    try:
-        return int(cast("SupportsFloat | str | int | float", value))
-    except (TypeError, ValueError):
+    if isinstance(value, (int, float, str)):
         try:
-            numeric_value = float(cast("SupportsFloat | str | int | float", value))
+            return int(value)
         except (TypeError, ValueError):
-            return 0
-        return int(numeric_value)
+            pass
+    try:
+        numeric_value = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0
+    return int(numeric_value)
 
 
 def _parse_datetime(value: object | None) -> datetime | None:

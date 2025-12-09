@@ -26,26 +26,9 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers only
     from .appearance_controller import AppearanceController
     from .controllers.execution_controller import ExecutionController
     from .prompt_search_controller import LoadPromptsCallable
-    from .prompt_templates_dialog import PromptTemplateEditorDialog
     from .quick_action_controller import QuickActionController
-    from .runtime_settings_service import RuntimeSettingsResult, RuntimeSettingsService
-    from .settings_dialog import SettingsDialog
+    from .runtime_settings_service import RuntimeSettingsService
     from .template_preview import TemplatePreviewWidget
-else:  # pragma: no cover - runtime placeholders for type-only imports
-    from typing import Any as _Any
-
-    AppearanceController = _Any
-    Callable = _Any
-    ExecutionController = _Any
-    LoadPromptsCallable = _Any
-    Mapping = _Any
-    PromptTemplateEditorDialog = _Any
-    QuickActionController = _Any
-    RuntimeSettingsResult = _Any
-    RuntimeSettingsService = _Any
-    Sequence = _Any
-    SettingsDialog = _Any
-    TemplatePreviewWidget = _Any
 
 
 class SettingsWorkflow:
@@ -90,6 +73,8 @@ class SettingsWorkflow:
     # ------------------------------------------------------------------
     def open_settings_dialog(self, settings: PromptManagerSettings | None = None) -> None:
         """Display the settings dialog and apply any accepted updates."""
+        from .settings_dialog import SettingsDialog
+
         data = self._runtime_settings
         dialog = SettingsDialog(
             self._parent,
@@ -129,6 +114,8 @@ class SettingsWorkflow:
 
     def open_prompt_templates_dialog(self) -> None:
         """Launch the prompt templates override dialog."""
+        from .prompt_templates_dialog import PromptTemplateEditorDialog
+
         dialog = PromptTemplateEditorDialog(
             self._parent,
             templates=cast(
@@ -149,6 +136,8 @@ class SettingsWorkflow:
 
     def apply_settings(self, updates: dict[str, object | None]) -> None:
         """Propagate runtime setting updates throughout the application."""
+        from .runtime_settings_service import RuntimeSettingsResult
+
         if not updates:
             return
         try:

@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable, Mapping, Sequence  # noqa: TCH003
 from importlib import import_module
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from config import LITELLM_ROUTED_WORKFLOWS
 from prompt_templates import DEFAULT_PROMPT_TEMPLATES, PROMPT_TEMPLATE_KEYS
@@ -40,6 +40,19 @@ def _resolve_factory(name: str) -> Callable[..., Any]:
 
 class LiteLLMWorkflowMixin:
     """Mixin that encapsulates LiteLLM-backed workflow configuration."""
+
+    def set_llm_status(
+        self,
+        available: bool,
+        *,
+        reason: str | None = None,
+        notify: bool = False,
+    ) -> None:
+        """Delegate LLM status updates to the runtime mixin."""
+        from .runtime import PromptRuntimeMixin
+
+        runtime_self = cast("PromptRuntimeMixin", self)
+        PromptRuntimeMixin.set_llm_status(runtime_self, available, reason=reason, notify=notify)
 
     @staticmethod
     def _normalise_model_identifier(value: str | None) -> str | None:

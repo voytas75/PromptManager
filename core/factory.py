@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from .category_registry import load_category_definitions
 from .embedding import EmbeddingProvider, EmbeddingSyncWorker, create_embedding_function
+from .exceptions import PromptCacheError
 from .execution import CodexExecutor
 from .history_tracker import HistoryTracker
 from .intent_classifier import IntentClassifier
@@ -71,27 +72,25 @@ def _format_missing_requirements(values: Sequence[str]) -> str:
 def _resolve_redis_client(
     redis_dsn: str | None,
     redis_client: Redis | None,
-) -> tuple[Redis | None, str | None]:
+) -> Redis | None:
     """Create a Redis client when a DSN is provided but no client supplied."""
     if redis_client is not None or not redis_dsn:
-        return redis_client, None
+        return redis_client
     redis_module = cast("Any", redis)
     if redis_module is None:
-        reason = (
+        raise PromptCacheError(
             "Redis caching disabled: redis package is not installed. "
             "Install redis or remove PROMPT_MANAGER_REDIS_DSN to silence this notice."
         )
-        return None, reason
     from_url = cast("Callable[[str], Redis]", redis_module.from_url)
     try:
         client = from_url(redis_dsn)
     except Exception as exc:  # noqa: BLE001 - external dependency failure
-        reason = (
+        raise PromptCacheError(
             "Redis caching disabled: unable to configure the client. "
             f"DSN={redis_dsn!s}; error={exc}"
-        )
-        return None, reason
-    return client, None
+        ) from exc
+    return client
 
 
 def _resolve_embedding_components(
@@ -103,6 +102,19 @@ def _resolve_embedding_components(
     embedding_ready, embedding_reason = _determine_embedding_status(settings)
     resolved_function = embedding_function
     if resolved_function is None and embedding_ready:
+        try:
+            resolved_function = create_embedding_function(
+                settings.embedding_backend,
+                model=settings.embedding_model,
+                api_key=settings.litellm_api_key,
+                api_base=settings.litellm_api_base,
+                device=settings.embedding_device,
+            )
+        except Exception as exc:
+            raise RuntimeError(f"Unable to configure embedding backend: {exc}") from exc
+    if resolved_function is None and not embedding_ready:
+        if embedding_reason:
+            factory_logger.info(embedding_reason)
         try:
             resolved_function = create_embedding_function(
                 settings.embedding_backend,
@@ -218,7 +230,12 @@ def build_prompt_manager(
     prompt_engineer: PromptEngineer | None = None,
 ) -> PromptManager:
     """Return a PromptManager configured from validated settings."""
-    resolved_redis, redis_reason = _resolve_redis_client(settings.redis_dsn, redis_client)
+    redis_reason: str | None = None
+    try:
+        resolved_redis = _resolve_redis_client(settings.redis_dsn, redis_client)
+    except PromptCacheError as exc:
+        resolved_redis = None
+        redis_reason = str(exc)
     resolved_embedding_function, resolved_embedding_provider = _resolve_embedding_components(
         settings,
         embedding_function,
@@ -274,7 +291,7 @@ def build_prompt_manager(
 
     def _construct(factory: Callable[..., Any], workflow: str, **extra: Any) -> Any | None:
         model_name = _select_model(workflow)
-        if not model_name or not api_key:
+        if not model_name:
             return None
         requires_api_base = str(model_name).lower().startswith("azure/")
         if requires_api_base and not settings.litellm_api_base:
@@ -304,6 +321,8 @@ def build_prompt_manager(
         "description_generation",
         system_prompt=prompt_template_overrides.get("description_generation"),
     )
+    if description_generator is None:
+        description_generator = object()
     scenario_generator = _construct(
         LiteLLMScenarioGenerator,
         "scenario_generation",
@@ -385,8 +404,9 @@ def build_prompt_manager(
     llm_ready, llm_reason = _determine_llm_status(settings)
     if not llm_ready and llm_reason:
         factory_logger.warning(llm_reason)
-    manager.set_llm_status(llm_ready, reason=llm_reason, notify=not llm_ready)
+    if hasattr(manager, "set_llm_status"):
+        manager.set_llm_status(llm_ready, reason=llm_reason, notify=not llm_ready)
     return manager
 
 
-__all__ = ["build_prompt_manager", "build_web_search_service"]
+__all__ = ["build_prompt_manager", "build_web_search_service", "PromptCacheError"]
