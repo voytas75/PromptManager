@@ -1,6 +1,7 @@
 """Prompt detail panel shared between main and template tabs.
 
 Updates:
+  v0.1.4 - 2025-12-09 - Keep metadata hidden until toggled, showing both sets together inline.
   v0.1.3 - 2025-12-09 - Display basic and full metadata together in an inline table.
   v0.1.2 - 2025-12-08 - Align palette usage with Qt ColorRole enums.
   v0.1.1 - 2025-12-08 - Reworked prompt detail layout with grouped actions.
@@ -318,7 +319,7 @@ class PromptDetailWidget(QWidget):
             indent=2,
         )
         self._current_prompt = prompt
-        self._populate_metadata_table()
+        self._clear_metadata_table()
         self._basic_metadata_button.setEnabled(True)
         self._all_metadata_button.setEnabled(True)
         self._edit_button.setEnabled(True)
@@ -329,7 +330,6 @@ class PromptDetailWidget(QWidget):
         self._share_button.setEnabled(True)
         self._share_payload_combo.setEnabled(True)
         self._share_metadata_checkbox.setEnabled(True)
-        self._metadata_table.setEnabled(True)
 
     def _format_context_preview(self, context: str | None) -> str:
         """Return a truncated, single-line context preview for the prompt summary."""
