@@ -110,6 +110,7 @@ See [`docs/web_search_plan.md`](web_search_plan.md) for the staged web search in
   - `litellm`: delegates to provider embeddings (default `text-embedding-3-large`).
   - `sentence-transformers`: runs locally; set `PROMPT_MANAGER_EMBEDDING_DEVICE` for GPU.
   - `deterministic`: offline hashing for smoke tests.
+- If LiteLLM embeddings are selected without `PROMPT_MANAGER_LITELLM_API_KEY` (and `PROMPT_MANAGER_LITELLM_API_BASE` + `PROMPT_MANAGER_LITELLM_API_VERSION` for Azure models), the app logs a guidance message and falls back to deterministic embeddings until credentials are provided.
 - Search queries embed the entire user phrase and ask ChromaDB for nearest neighbours; results are already cosine-ranked and displayed as-is in the GUI.
 - The GUI shows similarity scores (`[0.91]`) when search is active; the sort dropdown is disabled to preserve ranking integrity.
 - When a provider (Exa, Tavily, Serper, SerpApi, or Google Programmable Search) is configured, the workspace and Chain tab expose a “Use web search” checkbox (checked by default). Leaving it on runs a provider query (prompt metadata + user input) before execution and injects every available summary/highlight into the request body (source links included); if the aggregate context exceeds ~5,000 words, the fast LiteLLM model condenses it before prepending. Unchecking the box (or running `prompt-chain-run --no-web-search`) forces offline-only runs.
