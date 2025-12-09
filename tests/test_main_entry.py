@@ -1,6 +1,7 @@
 """Lightweight integration checks for main module.
 
 Updates:
+  v0.5.4 - 2025-12-09 - Offer to create config/config.json during first-run tests.
   v0.5.3 - 2025-12-08 - Include token usage aggregates in execution analytics helper.
   v0.5.2 - 2025-12-08 - Route monkeypatches through helper to satisfy Pyright.
   v0.5.1 - 2025-11-29 - Extend entrypoint guard stub for analytics helpers.
@@ -25,6 +26,7 @@ from typing import Any, cast
 import pytest
 
 import main
+from config import SettingsError
 from config.settings import DEFAULT_EMBEDDING_BACKEND, DEFAULT_EMBEDDING_MODEL
 from core.history_tracker import (
     ExecutionAnalytics,
@@ -259,6 +261,39 @@ def test_main_returns_error_when_settings_fail(
 
     assert exit_code == 2
     assert "Failed to load settings" in capsys.readouterr().out
+
+
+def test_main_offers_config_creation_on_missing_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "--print-settings"])
+    monkeypatch.chdir(tmp_path)
+    template_path = tmp_path / "config" / "config.template.json"
+    template_path.parent.mkdir(parents=True)
+    payload = {"litellm_model": "template-model"}
+    template_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    config_path = template_path.parent / "config.json"
+    attempts = {"count": 0}
+
+    def _load() -> _DummySettings:
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            raise SettingsError(f"Configuration file not found: {config_path}")
+        return _DummySettings()
+
+    _patch_main(monkeypatch, "load_settings", _load)
+    monkeypatch.setattr(main.sys, "stdin", SimpleNamespace(isatty=lambda: True))
+    monkeypatch.setattr("builtins.input", lambda _: "y")
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    assert attempts["count"] == 2
+    assert config_path.exists()
+    assert json.loads(config_path.read_text(encoding="utf-8")) == payload
+    output = capsys.readouterr().out
+    assert "Created configuration at" in output
 
 
 def test_main_returns_error_when_manager_init_fails(
