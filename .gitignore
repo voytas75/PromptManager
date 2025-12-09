@@ -5,6 +5,7 @@ __pycache__/
 *.pkl
 venv/
 .venv/
+.venv313/
 output*.txt
 output*.ps1
 output*.py
@@ -33,7 +34,6 @@ local_cache/
 config.py
 knowledge/
 .env
-.venv/
 .cursorrules
 .cache
 .vscode/
