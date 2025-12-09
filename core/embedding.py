@@ -1,6 +1,7 @@
 """Embedding provider and background synchronisation helpers for Prompt Manager.
 
 Updates:
+  v0.7.7 - 2025-12-09 - Expose embedding function names as callables for Chroma.
   v0.7.6 - 2025-12-09 - Guard LiteLLM embedding availability and fall back gracefully.
   v0.7.5 - 2025-12-09 - Expose LiteLLM embedding function name for Chroma telemetry.
   v0.7.4 - 2025-11-30 - Document embedding helpers and fix docstring spacing for lint compliance.
@@ -89,7 +90,6 @@ class LiteLLMEmbeddingFunction:
         self._api_base = api_base
         self._timeout_seconds = timeout_seconds
 
-    @property
     def name(self) -> str:
         """Identifier surfaced to Chroma for telemetry/diagnostics."""
         return f"litellm:{self._model}"
@@ -213,6 +213,10 @@ class SentenceTransformersEmbeddingFunction:
         sentence_transformer = cast("Any", SentenceTransformer)
         model: Any = sentence_transformer(self._model_name, device=self._device)
         return model
+
+    def name(self) -> str:
+        """Identifier surfaced to Chroma for telemetry/diagnostics."""
+        return f"sentence-transformers:{self._model_name}"
 
     def __call__(self, input: Sequence[str]) -> list[list[float]]:
         """Return embeddings for the supplied text batch using the loaded model."""
