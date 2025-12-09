@@ -1,6 +1,7 @@
 """Qt widgets for the Enhanced Prompt Workbench experience.
 
 Updates:
+  v0.1.26 - 2025-12-09 - Keep template runs clickable but block with offline guidance when LLM is missing.
   v0.1.25 - 2025-12-09 - Disable template runs when LiteLLM is offline.
   v0.1.24 - 2025-12-08 - Align PySide6 enums and text selection handling with Pyright.
   v0.1.23 - 2025-12-07 - Support embedded tab sessions and add begin_session helper.
@@ -9,13 +10,7 @@ Updates:
   v0.1.20 - 2025-11-30 - Respect LiteLLM streaming flag when running prompts.
   v0.1.19 - 2025-11-29 - Fix toast calls to pass the parent widget first.
   v0.1.18 - 2025-11-29 - Persist Workbench window geometry between sessions.
-  v0.1.17 - 2025-11-29 - Stack the prompt editor above Run Output/History in the center column.
-  v0.1.16 - 2025-11-29 - Relocate output/history tabs into the center column and
-    collapse the bottom panel.
-  v0.1.15 - 2025-11-29 - Move output/history tabs below the editor and persist
-    output splitter widths.
-Earlier versions: v0.1.0-v0.1.14 - Introduced the guided Workbench window plus
-  iterative palette refinements.
+  v0.1.17-and-earlier - 2025-11-29 - Earlier layout, splitter, and palette refinements.
 """
 
 from __future__ import annotations
@@ -222,7 +217,8 @@ class WorkbenchWindow(QMainWindow):
         right_layout.setContentsMargins(8, 8, 8, 8)
         right_layout.setSpacing(8)
         self._preview = TemplatePreviewWidget(right_panel)
-        self._preview.set_run_enabled(self._executor is not None and getattr(self._manager, "llm_available", False))
+        run_enabled = bool(self._executor is not None or not getattr(self._manager, "llm_available", False))
+        self._preview.set_run_enabled(run_enabled)
         self._preview.run_requested.connect(self._handle_preview_run)  # type: ignore[arg-type]
         right_layout.addWidget(self._preview, 1)
         right_layout.addWidget(QLabel("Test input", right_panel))

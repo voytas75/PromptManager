@@ -1,6 +1,7 @@
 """Settings workflows for the Prompt Manager main window.
 
 Updates:
+  v0.15.89 - 2025-12-09 - Keep run controls enabled but surface offline guidance.
   v0.15.88 - 2025-12-09 - Disable run controls when LLM is offline.
   v0.15.87 - 2025-12-08 - Tighten dialog typings and casts for Pyright.
   v0.15.86 - 2025-12-07 - Pass Google Programmable Search credentials through the dialog.
@@ -154,11 +155,16 @@ class SettingsWorkflow:
             execution_controller.refresh_chat_history_view()
 
         self._load_prompts(self._current_search_text())
-        has_llm_executor = bool(result.has_executor and getattr(self._manager, "llm_available", False))
-        self._run_button.setEnabled(has_llm_executor)
+        llm_available = getattr(self._manager, "llm_available", False)
+        run_enabled = bool(result.has_executor or not llm_available)
+        if not llm_available:
+            self._run_button.setToolTip(self._manager.llm_status_message("Prompt execution"))
+        else:
+            self._run_button.setToolTip("Run the selected prompt or the text you provide.")
+        self._run_button.setEnabled(run_enabled)
         template_preview = self._template_preview_supplier()
         if template_preview is not None:
-            template_preview.set_run_enabled(has_llm_executor)
+            template_preview.set_run_enabled(run_enabled)
 
 
 __all__ = ["SettingsWorkflow"]

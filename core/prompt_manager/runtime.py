@@ -1,6 +1,7 @@
 """Runtime lifecycle helpers for Prompt Manager.
 
 Updates:
+  v0.1.2 - 2025-12-09 - Expand offline guidance to include Settings, env, and config hints.
   v0.1.1 - 2025-12-09 - Track LLM availability and emit offline notifications.
   v0.1.0 - 2025-12-03 - Extract backend and lifecycle utilities into dedicated mixin.
 """
@@ -110,7 +111,8 @@ class PromptRuntimeMixin:
         capability_text = capability.rstrip(".")
         return (
             f"{capability_text} is unavailable because {reason} "
-            "Configure LiteLLM credentials and model or continue in offline mode (LLM-backed features disabled)."
+            "Configure LiteLLM credentials and model in Settings or via PROMPT_MANAGER_* env/.env/config.json, "
+            "or continue in offline mode (LLM-backed features disabled)."
         )
 
     def _apply_category_metadata(self, prompt: Prompt) -> Prompt:

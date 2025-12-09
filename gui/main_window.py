@@ -1,7 +1,7 @@
 r"""Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
-  v0.16.16 - 2025-12-09 - Disable Run Prompt when LLM credentials are missing.
+  v0.16.17 - 2025-12-09 - Keep Run Prompt enabled but surface LLM configuration guidance when offline.
   v0.16.15 - 2025-12-08 - Store token usage label for execution controller wiring.
   v0.16.14 - 2025-12-07 - Describe Google Programmable Search in workspace tooltips.
   v0.16.13 - 2025-12-07 - Convert analytics log path to Path objects for typing.
@@ -10,11 +10,7 @@ Updates:
   v0.16.10 - 2025-12-07 - Include SerpApi in workspace web search tooltip messaging.
   v0.16.9 - 2025-12-07 - Describe Serper provider in workspace web search tooltips.
   v0.16.8 - 2025-12-07 - Sync \"Use web search\" tooltip with the configured provider.
-  v0.16.7 - 2025-12-05 - Route prompt edit callbacks into chain dialogs and panels.
-  v0.16.6 - 2025-12-05 - Normalize module docstring quoting and reorder imports for lint compliance.
-  v0.16.5 - 2025-12-05 - Remove prompt chain toolbar shortcut; Chain tab remains embedded.
-  v0.16.4 - 2025-12-05 - Embed prompt chain panel and add toolbar shortcut to focus Chain tab.
-  v0.16.3-and-earlier - 2025-12-04 - Track the web search checkbox plus earlier runtime mods.
+  v0.16.7-and-earlier - 2025-12-05 - Earlier chain routing, layout, and tooltip refinements.
 """
 
 from __future__ import annotations
@@ -489,10 +485,18 @@ class MainWindow(QMainWindow):
         self._workspace_insight_controller.initialise_language()
         self.setCentralWidget(self._main_container)
 
-        has_executor = bool(self._manager.executor) and getattr(self._manager, "llm_available", False)
-        self._run_button.setEnabled(has_executor)
+        llm_available = getattr(self._manager, "llm_available", False)
+        has_executor = bool(self._manager.executor)
+        run_enabled = has_executor or not llm_available
+        tooltip_text = (
+            self._manager.llm_status_message("Prompt execution")
+            if not llm_available
+            else "Run the selected prompt or the text you provide."
+        )
+        self._run_button.setEnabled(run_enabled)
+        self._run_button.setToolTip(tooltip_text)
         if self._template_preview is not None:
-            self._template_preview.set_run_enabled(has_executor)
+            self._template_preview.set_run_enabled(run_enabled)
         self._copy_result_button.setEnabled(False)
         self._copy_result_to_text_window_button.setEnabled(False)
         self._save_button.setEnabled(False)
