@@ -1,6 +1,7 @@
 """Prompt chain management surfaces for the GUI.
 
 Updates:
+  v0.6.1 - 2025-12-09 - Show LLM configuration guidance before running chains when offline.
   v0.6.0 - 2025-12-06 - Redesign chain manager for plain-text inputs and linear chaining.
   v0.5.18 - 2025-12-06 - Improve default contrast and satisfy lint/type checks for toggles.
   v0.5.17 - 2025-12-06 - Ignore reasoning payload tokens that look like opaque IDs.
@@ -10,19 +11,7 @@ Updates:
   v0.5.13 - 2025-12-05 - Add default-on web search toggle for chain executions.
   v0.5.12 - 2025-12-05 - Color-code results sections and surface reasoning summaries.
   v0.5.11 - 2025-12-05 - Ensure wrapped results by removing code fences from chain IO sections.
-  v0.5.10 - 2025-12-05 - Add line wrap toggle for execution results pane (on by default).
-  v0.5.9 - 2025-12-05 - Display chain summary preference and render condensed outputs.
-  v0.5.8 - 2025-12-05 - Render step inputs/outputs without code fences for Markdown previews.
-  v0.5.7 - 2025-12-05 - Preserve chain results when toggling Markdown formatting.
-  v0.5.6 - 2025-12-05 - Add auto-scroll toggle for streaming/results pane.
-  v0.5.5 - 2025-12-05 - Enable LiteLLM streaming preview without blocking busy indicator.
-  v0.5.4 - 2025-12-05 - Expand execution results with labeled inputs/outputs per step.
-  v0.5.3 - 2025-12-05 - Split detail column vertically, persist variables, swap description editor.
-  v0.5.2 - 2025-12-05 - Persist chain splitters immediately so tabbed windows remember widths.
-  v0.5.1 - 2025-12-05 - Add Markdown toggle for execution results with rich-text rendering.
-  v0.5.0 - 2025-12-05 - Split execution results into dedicated column with persisted splitter state.
-  v0.4.1-v0.1.0 - 2025-12-04 - Earlier releases introduced the dialog and editor flows,
-    including CRUD/import helpers.
+  v0.5.10-v0.1.0 - 2025-12-05 - Earlier chain layout, streaming, and Markdown refinements.
 """
 
 from __future__ import annotations
@@ -323,6 +312,10 @@ class PromptChainManagerPanel(QWidget):
 
         actions_row = QHBoxLayout()
         self._run_button = QPushButton("Run Chain", run_container)
+        if not getattr(self._manager, "llm_available", False):
+            self._run_button.setToolTip(self._manager.llm_status_message("Prompt execution"))
+        else:
+            self._run_button.setToolTip("Execute the selected chain with the provided input.")
         self._run_button.clicked.connect(self._run_selected_chain)  # type: ignore[arg-type]
         actions_row.addWidget(self._run_button)
         self._clear_input_button = QPushButton("Clear Input", run_container)
@@ -675,6 +668,12 @@ class PromptChainManagerPanel(QWidget):
         chain_input_text = self._chain_input_edit.toPlainText()
         if not chain_input_text.strip():
             QMessageBox.warning(self, "Chain input", "Enter text to feed into the first step.")
+            return
+        if not getattr(self._manager, "llm_available", True) or getattr(
+            self._manager, "executor", None
+        ) is None:
+            message = self._manager.llm_status_message("Prompt execution")
+            QMessageBox.information(self, "Prompt execution unavailable", message)
             return
 
         previous_status = self._detail_status.text()
