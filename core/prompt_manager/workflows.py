@@ -1,6 +1,7 @@
 """LiteLLM workflow configuration helpers for Prompt Manager.
 
 Updates:
+  v0.1.2 - 2025-12-09 - Require API base/version for Azure models before wiring executors.
   v0.1.1 - 2025-12-09 - Require LiteLLM API key before wiring executors and update LLM status.
   v0.1.0 - 2025-12-03 - Extract runtime LiteLLM configuration API from PromptManager.
 """
@@ -47,6 +48,14 @@ class LiteLLMWorkflowMixin:
             return None
         text = str(value).strip()
         return text or None
+
+    @staticmethod
+    def _model_requires_api_base(model: str | None) -> bool:
+        """Return True when the model is an Azure-style identifier needing api_base/api_version."""
+        if not model:
+            return False
+        lowered = model.lower()
+        return lowered.startswith("azure/") or lowered.startswith("azure-")
 
     @staticmethod
     def _normalise_prompt_templates(
@@ -138,6 +147,21 @@ class LiteLLMWorkflowMixin:
                 ),
             )
             return
+        requires_api_base = any(
+            self._model_requires_api_base(model_id)
+            for model_id in (self._litellm_fast_model, self._litellm_inference_model)
+        )
+        if requires_api_base and not api_base:
+            self._litellm_reasoning_effort = None
+            self._litellm_stream = False
+            self.set_llm_status(
+                False,
+                reason=(
+                    "LiteLLM API base is missing; set PROMPT_MANAGER_LITELLM_API_BASE "
+                    "when using Azure models."
+                ),
+            )
+            return
 
         drop_params_payload = list(self._litellm_drop_params) if self._litellm_drop_params else None
 
@@ -150,6 +174,8 @@ class LiteLLMWorkflowMixin:
         def _construct(factory_name: str, workflow: str, **extra: Any) -> Any | None:
             selected_model = _select_model(workflow)
             if not selected_model:
+                return None
+            if self._model_requires_api_base(selected_model) and not api_base:
                 return None
             factory = _resolve_factory(factory_name)
             return factory(

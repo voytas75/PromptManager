@@ -1,6 +1,7 @@
 """Factories for constructing PromptManager instances from validated settings.
 
 Updates:
+  v0.8.6 - 2025-12-09 - Treat missing API base/version as offline for Azure LiteLLM models.
   v0.8.5 - 2025-12-09 - Skip LiteLLM components when the LiteLLM API key is missing.
   v0.8.4 - 2025-12-09 - Surface offline mode when LiteLLM credentials are missing.
   v0.8.3 - 2025-12-07 - Wire Google web search provider into the factory builder.
@@ -96,18 +97,26 @@ def _resolve_embedding_components(
 
 def _determine_llm_status(settings: PromptManagerSettings) -> tuple[bool, str | None]:
     """Return LiteLLM readiness plus a human-readable offline reason."""
-    model_configured = bool(
-        getattr(settings, "litellm_model", None)
-        or getattr(settings, "litellm_inference_model", None)
-    )
+    fast_model = getattr(settings, "litellm_model", None)
+    inference_model = getattr(settings, "litellm_inference_model", None)
+    model_configured = bool(fast_model or inference_model)
     api_key_configured = bool(getattr(settings, "litellm_api_key", None))
-    if model_configured and api_key_configured:
+    api_base_configured = bool(getattr(settings, "litellm_api_base", None))
+    api_version_configured = bool(getattr(settings, "litellm_api_version", None))
+    azure_model_configured = any(
+        str(model).lower().startswith("azure/") for model in (fast_model, inference_model) if model
+    )
+    if model_configured and api_key_configured and (not azure_model_configured or api_base_configured):
         return True, None
     missing_parts: list[str] = []
     if not model_configured:
         missing_parts.append("model")
     if not api_key_configured:
         missing_parts.append("API key")
+    if azure_model_configured and not api_base_configured:
+        missing_parts.append("API base")
+    if azure_model_configured and not api_version_configured:
+        missing_parts.append("API version")
     missing_text = " and ".join(missing_parts) if missing_parts else "credentials"
     reason = (
         f"LiteLLM {missing_text} missing; running in offline mode. "
@@ -202,6 +211,9 @@ def build_prompt_manager(
     def _construct(factory: Callable[..., Any], workflow: str, **extra: Any) -> Any | None:
         model_name = _select_model(workflow)
         if not model_name or not api_key:
+            return None
+        requires_api_base = str(model_name).lower().startswith("azure/")
+        if requires_api_base and not settings.litellm_api_base:
             return None
         try:
             return factory(
