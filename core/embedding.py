@@ -1,6 +1,7 @@
 """Embedding provider and background synchronisation helpers for Prompt Manager.
 
 Updates:
+  v0.7.5 - 2025-12-09 - Expose LiteLLM embedding function name for Chroma telemetry.
   v0.7.4 - 2025-11-30 - Document embedding helpers and fix docstring spacing for lint compliance.
   v0.7.3 - 2025-11-29 - Guard Prompt import for typing and wrap logging/reporting lines.
   v0.7.2 - 2025-12-06 - Align embedding function signatures with updated Chroma client expectations.
@@ -84,6 +85,11 @@ class LiteLLMEmbeddingFunction:
         self._api_key = api_key
         self._api_base = api_base
         self._timeout_seconds = timeout_seconds
+
+    @property
+    def name(self) -> str:
+        """Identifier surfaced to Chroma for telemetry/diagnostics."""
+        return f"litellm:{self._model}"
 
     def __call__(self, input: Sequence[str]) -> list[list[float]]:
         """Return embedding vectors by invoking the configured LiteLLM backend."""
