@@ -1,6 +1,7 @@
 """Maintenance mixin providing operational utilities for Prompt Manager.
 
 Updates:
+  v0.1.3 - 2025-12-09 - Surface Redis unavailability reasons in maintenance details.
   v0.1.2 - 2025-12-08 - Close SQLite handles via explicit context manager to prevent leaks.
   v0.1.1 - 2025-12-07 - Gate CollectionProtocol import behind TYPE_CHECKING.
   v0.1.0 - 2025-12-02 - Extract maintenance helpers from core.prompt_manager.__init__.
@@ -82,13 +83,14 @@ def _coerce_int(value: Any) -> int | None:
 
 
 class MaintenanceMixin:
-"""Operational helpers for repository, cache, and vector-store maintenance.
+    """Operational helpers for repository, cache, and vector-store maintenance.
 
-Updates:
-  v0.1.1 - 2025-12-09 - Include Redis unavailability reasons in maintenance details.
-  v0.1.0 - 2025-12-03 - Initial maintenance helpers.
-"""
-
+    Updates:
+      v0.1.3 - 2025-12-09 - Surface Redis unavailability reasons in maintenance details.
+      v0.1.2 - 2025-12-08 - Close SQLite handles via explicit context manager to prevent leaks.
+      v0.1.1 - 2025-12-07 - Gate CollectionProtocol import behind TYPE_CHECKING.
+      v0.1.0 - 2025-12-02 - Extract maintenance helpers from core.prompt_manager.__init__.
+    """
     _redis_client: Any | None
     _collection: CollectionProtocol | None
     _collection_name: str
