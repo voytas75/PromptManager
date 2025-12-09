@@ -1,6 +1,7 @@
 """Prompt detail panel shared between main and template tabs.
 
 Updates:
+  v0.1.7 - 2025-12-09 - Import QToolButton to restore GUI startup.
   v0.1.6 - 2025-12-09 - Show only the requested metadata and add close toggle.
   v0.1.5 - 2025-12-09 - Toggle metadata table off on repeat clicks and ensure full payload shows.
   v0.1.4 - 2025-12-09 - Keep metadata hidden until toggled, showing both sets together inline.
@@ -28,6 +29,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QPushButton,
     QScrollArea,
+    QToolButton,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
