@@ -1,6 +1,7 @@
 """Prompt detail panel shared between main and template tabs.
 
 Updates:
+  v0.1.6 - 2025-12-09 - Show only the requested metadata and add close toggle.
   v0.1.5 - 2025-12-09 - Toggle metadata table off on repeat clicks and ensure full payload shows.
   v0.1.4 - 2025-12-09 - Keep metadata hidden until toggled, showing both sets together inline.
   v0.1.3 - 2025-12-09 - Display basic and full metadata together in an inline table.
@@ -167,6 +168,23 @@ class PromptDetailWidget(QWidget):
         self._metadata_table.setMinimumHeight(180)
         self._metadata_table.setVisible(False)
         self._metadata_table.setEnabled(False)
+        self._metadata_visible_label: str | None = None
+        metadata_header = QHBoxLayout()
+        metadata_header.setContentsMargins(0, 0, 0, 0)
+        metadata_header.setSpacing(4)
+        self._metadata_label = QLabel("", metadata_group)
+        metadata_header.addWidget(self._metadata_label)
+        metadata_header.addStretch(1)
+        self._metadata_close_button = QToolButton(metadata_group)
+        self._metadata_close_button.setText("x")
+        self._metadata_close_button.setObjectName("hideMetadataButton")
+        self._metadata_close_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._metadata_close_button.setAutoRaise(True)
+        self._metadata_close_button.setVisible(False)
+        self._metadata_close_button.setToolTip("Hide metadata")
+        self._metadata_close_button.clicked.connect(self._clear_metadata_table)  # type: ignore[arg-type]
+        metadata_header.addWidget(self._metadata_close_button)
+        metadata_layout.addLayout(metadata_header)
         metadata_layout.addWidget(self._metadata_table)
         content_layout.addWidget(metadata_group)
 
@@ -489,63 +507,36 @@ class PromptDetailWidget(QWidget):
         return self._share_metadata_checkbox.isChecked()
 
     def _show_basic_metadata(self) -> None:
-        """Highlight the basic prompt metadata subset."""
-        self._select_metadata_row("Basic")
+        """Show only the basic prompt metadata subset."""
+        self._render_metadata("Basic", self._basic_metadata_text)
 
     def _show_all_metadata(self) -> None:
-        """Highlight the full prompt metadata payload."""
-        self._select_metadata_row("All")
+        """Show only the full prompt metadata payload."""
+        self._render_metadata("All", self._full_metadata_text)
 
-    def _populate_metadata_table(self) -> None:
-        """Render both metadata payloads inside the inline table."""
-        self._metadata_table.clearContents()
-        self._metadata_table.setRowCount(0)
-        if not (self._basic_metadata_text and self._full_metadata_text):
-            self._metadata_table.setVisible(False)
-            self._metadata_table.setEnabled(False)
+    def _render_metadata(self, label: str, payload: str) -> None:
+        """Render a single metadata payload and toggle off when repeated."""
+        if not payload:
             return
-        rows = [("Basic", self._basic_metadata_text), ("All", self._full_metadata_text)]
-        self._metadata_table.setRowCount(len(rows))
-        for row_index, (label, payload) in enumerate(rows):
-            type_item = QTableWidgetItem(label)
-            type_item.setFlags(type_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            payload_item = QTableWidgetItem(payload)
-            payload_item.setFlags(payload_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            payload_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft
-            )
-            self._metadata_table.setItem(row_index, 0, type_item)
-            self._metadata_table.setItem(row_index, 1, payload_item)
+        if self._metadata_table.isVisible() and self._metadata_visible_label == label:
+            self._clear_metadata_table()
+            return
+        self._metadata_table.clearContents()
+        self._metadata_table.setRowCount(1)
+        type_item = QTableWidgetItem(label)
+        type_item.setFlags(type_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        payload_item = QTableWidgetItem(payload)
+        payload_item.setFlags(payload_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        payload_item.setTextAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        self._metadata_table.setItem(0, 0, type_item)
+        self._metadata_table.setItem(0, 1, payload_item)
         self._metadata_table.resizeRowsToContents()
         self._metadata_table.setVisible(True)
         self._metadata_table.setEnabled(True)
         self._metadata_table.selectRow(0)
-
-    def _select_metadata_row(self, label: str) -> None:
-        """Select the requested metadata row in the inline table."""
-        if self._metadata_table.isVisible():
-            current_row = self._metadata_table.currentRow()
-            if current_row >= 0:
-                current_item = self._metadata_table.item(current_row, 0)
-                if current_item and current_item.text().lower() == label.lower():
-                    self._clear_metadata_table()
-                    return
-        if not self._metadata_table.isVisible():
-            self._populate_metadata_table()
-        if self._metadata_table.rowCount() == 0:
-            return
-        for row in range(self._metadata_table.rowCount()):
-            type_item = self._metadata_table.item(row, 0)
-            if type_item is None:
-                continue
-            if type_item.text().lower() == label.lower():
-                self._metadata_table.selectRow(row)
-                self._metadata_table.scrollToItem(
-                    type_item, QAbstractItemView.ScrollHint.PositionAtTop
-                )
-                self._metadata_table.setVisible(True)
-                self._metadata_table.setEnabled(True)
-                return
+        self._metadata_label.setText(f"Metadata ({label})")
+        self._metadata_close_button.setVisible(True)
+        self._metadata_visible_label = label
 
     def _clear_metadata_table(self) -> None:
         """Hide and clear metadata table contents."""
@@ -554,6 +545,9 @@ class PromptDetailWidget(QWidget):
         self._metadata_table.setVisible(False)
         self._metadata_table.setEnabled(False)
         self._metadata_table.clearSelection()
+        self._metadata_close_button.setVisible(False)
+        self._metadata_label.clear()
+        self._metadata_visible_label = None
 
     def update_lineage_summary(self, text: str | None) -> None:
         """Display lineage/version info beneath the description."""
