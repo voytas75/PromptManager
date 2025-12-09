@@ -1,6 +1,7 @@
 """Settings workflows for the Prompt Manager main window.
 
 Updates:
+  v0.15.88 - 2025-12-09 - Disable run controls when LLM is offline.
   v0.15.87 - 2025-12-08 - Tighten dialog typings and casts for Pyright.
   v0.15.86 - 2025-12-07 - Pass Google Programmable Search credentials through the dialog.
   v0.15.85 - 2025-12-07 - Accept generic run buttons to support split actions.
@@ -153,10 +154,11 @@ class SettingsWorkflow:
             execution_controller.refresh_chat_history_view()
 
         self._load_prompts(self._current_search_text())
-        self._run_button.setEnabled(result.has_executor)
+        has_llm_executor = bool(result.has_executor and getattr(self._manager, "llm_available", False))
+        self._run_button.setEnabled(has_llm_executor)
         template_preview = self._template_preview_supplier()
         if template_preview is not None:
-            template_preview.set_run_enabled(result.has_executor)
+            template_preview.set_run_enabled(has_llm_executor)
 
 
 __all__ = ["SettingsWorkflow"]

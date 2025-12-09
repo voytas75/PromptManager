@@ -396,6 +396,11 @@ class ExecutionController:
         if not trimmed:
             self._status("Type or paste some text before running it.", 4000)
             return
+        if not getattr(self._manager, "llm_available", True):
+            message = self._manager.llm_status_message("Prompt execution")
+            self._error("Prompt execution unavailable", message)
+            self._status("Prompt execution unavailable.", 4000)
+            return
         executor = getattr(self._manager, "executor", None)
         if executor is None:
             self._error("Prompt execution unavailable", "Configure LiteLLM before running text.")
@@ -478,6 +483,11 @@ class ExecutionController:
 
         if self._chat_prompt_id is None:
             self._status("Run a prompt to start a chat before continuing.", 4000)
+            return
+        if not getattr(self._manager, "llm_available", True):
+            message = self._manager.llm_status_message("Prompt execution")
+            self._error("Prompt execution unavailable", message)
+            self._status("Prompt execution unavailable.", 4000)
             return
 
         follow_up = self._query_input.toPlainText().strip()

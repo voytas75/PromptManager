@@ -1,6 +1,7 @@
 r"""Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.16.16 - 2025-12-09 - Disable Run Prompt when LLM credentials are missing.
   v0.16.15 - 2025-12-08 - Store token usage label for execution controller wiring.
   v0.16.14 - 2025-12-07 - Describe Google Programmable Search in workspace tooltips.
   v0.16.13 - 2025-12-07 - Convert analytics log path to Path objects for typing.
@@ -488,7 +489,7 @@ class MainWindow(QMainWindow):
         self._workspace_insight_controller.initialise_language()
         self.setCentralWidget(self._main_container)
 
-        has_executor = self._manager.executor is not None
+        has_executor = bool(self._manager.executor) and getattr(self._manager, "llm_available", False)
         self._run_button.setEnabled(has_executor)
         if self._template_preview is not None:
             self._template_preview.set_run_enabled(has_executor)
