@@ -1,6 +1,7 @@
 """Prompt detail panel shared between main and template tabs.
 
 Updates:
+  v0.1.5 - 2025-12-09 - Toggle metadata table off on repeat clicks and ensure full payload shows.
   v0.1.4 - 2025-12-09 - Keep metadata hidden until toggled, showing both sets together inline.
   v0.1.3 - 2025-12-09 - Display basic and full metadata together in an inline table.
   v0.1.2 - 2025-12-08 - Align palette usage with Qt ColorRole enums.
@@ -522,6 +523,13 @@ class PromptDetailWidget(QWidget):
 
     def _select_metadata_row(self, label: str) -> None:
         """Select the requested metadata row in the inline table."""
+        if self._metadata_table.isVisible():
+            current_row = self._metadata_table.currentRow()
+            if current_row >= 0:
+                current_item = self._metadata_table.item(current_row, 0)
+                if current_item and current_item.text().lower() == label.lower():
+                    self._clear_metadata_table()
+                    return
         if not self._metadata_table.isVisible():
             self._populate_metadata_table()
         if self._metadata_table.rowCount() == 0:
@@ -535,6 +543,8 @@ class PromptDetailWidget(QWidget):
                 self._metadata_table.scrollToItem(
                     type_item, QAbstractItemView.ScrollHint.PositionAtTop
                 )
+                self._metadata_table.setVisible(True)
+                self._metadata_table.setEnabled(True)
                 return
 
     def _clear_metadata_table(self) -> None:
@@ -543,6 +553,7 @@ class PromptDetailWidget(QWidget):
         self._metadata_table.setRowCount(0)
         self._metadata_table.setVisible(False)
         self._metadata_table.setEnabled(False)
+        self._metadata_table.clearSelection()
 
     def update_lineage_summary(self, text: str | None) -> None:
         """Display lineage/version info beneath the description."""
