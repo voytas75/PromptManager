@@ -1,6 +1,7 @@
 """Factories for constructing PromptManager instances from validated settings.
 
 Updates:
+  v0.8.7 - 2025-12-09 - Handle missing LiteLLM embedding credentials and clarify offline guidance.
   v0.8.6 - 2025-12-09 - Treat missing API base/version as offline for Azure LiteLLM models.
   v0.8.5 - 2025-12-09 - Skip LiteLLM components when the LiteLLM API key is missing.
   v0.8.4 - 2025-12-09 - Surface offline mode when LiteLLM credentials are missing.
@@ -8,16 +9,14 @@ Updates:
   v0.8.2 - 2025-12-07 - Expose reusable web search service builder.
   v0.8.1 - 2025-12-07 - Wire SerpApi provider into the web search factory.
   v0.8.0 - 2025-12-07 - Wire Serper provider into the web search factory.
-  v0.7.9-0.7.8 - 2025-12-07 - Add random provider fan-out and Tavily wiring to web search.
-  v0.7.7-0.7.6 - 2025-12-04 - Wire web search creation into the factory and align Ruff spacing.
-  v0.7.5 - 2025-11-29 - Move config imports behind type checks and wrap long strings.
-  v0.7.4-and-earlier - 2025-11-24 - Configure LiteLLM category/scenario wiring and related helpers.
+  v0.7.9-0.7.6 - 2025-12-07 - Add random provider fan-out, Tavily wiring, and web search creation updates.
+  v0.7.5-and-earlier - 2025-11-24 - Configure LiteLLM category/scenario wiring with spacing and import fixes.
 """
 
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 from .category_registry import load_category_definitions
@@ -57,6 +56,18 @@ else:  # pragma: no cover - typing only
 factory_logger = logging.getLogger("prompt_manager.factory")
 
 
+def _format_missing_requirements(values: Sequence[str]) -> str:
+    """Return a human-friendly list of missing configuration values."""
+    entries = [value for value in values if value]
+    if not entries:
+        return ""
+    if len(entries) == 1:
+        return entries[0]
+    if len(entries) == 2:
+        return " and ".join(entries)
+    return ", ".join(entries[:-1]) + f", and {entries[-1]}"
+
+
 def _resolve_redis_client(
     redis_dsn: str | None,
     redis_client: Redis | None,
@@ -77,8 +88,9 @@ def _resolve_embedding_components(
     embedding_provider: EmbeddingProvider | None,
 ) -> tuple[Any | None, EmbeddingProvider]:
     """Return embedding function/provider pair respecting overrides and settings."""
+    embedding_ready, embedding_reason = _determine_embedding_status(settings)
     resolved_function = embedding_function
-    if resolved_function is None:
+    if resolved_function is None and embedding_ready:
         try:
             resolved_function = create_embedding_function(
                 settings.embedding_backend,
@@ -91,8 +103,12 @@ def _resolve_embedding_components(
             raise RuntimeError(f"Unable to configure embedding backend: {exc}") from exc
 
     if embedding_provider is not None:
-        return resolved_function, embedding_provider
-    return resolved_function, EmbeddingProvider(resolved_function)
+        provider = embedding_provider
+    else:
+        provider = EmbeddingProvider(resolved_function)
+    if embedding_reason:
+        factory_logger.info(embedding_reason)
+    return resolved_function, provider
 
 
 def _determine_llm_status(settings: PromptManagerSettings) -> tuple[bool, str | None]:
@@ -106,24 +122,56 @@ def _determine_llm_status(settings: PromptManagerSettings) -> tuple[bool, str | 
     azure_model_configured = any(
         str(model).lower().startswith("azure/") for model in (fast_model, inference_model) if model
     )
-    if model_configured and api_key_configured and (not azure_model_configured or api_base_configured):
+    if model_configured and api_key_configured and (
+        not azure_model_configured or (api_base_configured and api_version_configured)
+    ):
         return True, None
     missing_parts: list[str] = []
     if not model_configured:
-        missing_parts.append("model")
+        missing_parts.append("PROMPT_MANAGER_LITELLM_MODEL or PROMPT_MANAGER_LITELLM_INFERENCE_MODEL")
     if not api_key_configured:
-        missing_parts.append("API key")
+        missing_parts.append("PROMPT_MANAGER_LITELLM_API_KEY")
     if azure_model_configured and not api_base_configured:
-        missing_parts.append("API base")
+        missing_parts.append("PROMPT_MANAGER_LITELLM_API_BASE")
     if azure_model_configured and not api_version_configured:
-        missing_parts.append("API version")
-    missing_text = " and ".join(missing_parts) if missing_parts else "credentials"
+        missing_parts.append("PROMPT_MANAGER_LITELLM_API_VERSION")
+    missing_text = _format_missing_requirements(missing_parts)
     reason = (
-        f"LiteLLM {missing_text} missing; running in offline mode. "
-        "Configure PROMPT_MANAGER_LITELLM_MODEL and PROMPT_MANAGER_LITELLM_API_KEY to enable "
-        "prompt generation and execution."
+        f"LiteLLM configuration incomplete ({missing_text}). LLM-backed features are offline; "
+        "configure these values in Settings or via PROMPT_MANAGER_* env/.env to enable prompt "
+        "generation and execution."
     )
     return False, reason
+
+
+def _determine_embedding_status(settings: PromptManagerSettings) -> tuple[bool, str | None]:
+    """Return embedding readiness plus optional offline reason."""
+    backend = (getattr(settings, "embedding_backend", "") or "deterministic").strip().lower()
+    model = getattr(settings, "embedding_model", None)
+    api_key = getattr(settings, "litellm_api_key", None)
+    api_base = getattr(settings, "litellm_api_base", None)
+    api_version = getattr(settings, "litellm_api_version", None)
+    azure_model = str(model or "").lower().startswith("azure/")
+    if backend in {"litellm", "openai"}:
+        missing_parts: list[str] = []
+        if not model:
+            missing_parts.append("PROMPT_MANAGER_EMBEDDING_MODEL")
+        if not api_key:
+            missing_parts.append("PROMPT_MANAGER_LITELLM_API_KEY")
+        if azure_model and not api_base:
+            missing_parts.append("PROMPT_MANAGER_LITELLM_API_BASE")
+        if azure_model and not api_version:
+            missing_parts.append("PROMPT_MANAGER_LITELLM_API_VERSION")
+        if missing_parts:
+            missing_text = _format_missing_requirements(missing_parts)
+            reason = (
+                "Embeddings offline: "
+                f"{missing_text} not configured. Semantic search falls back to deterministic "
+                "vectors until LiteLLM credentials are set in Settings or via PROMPT_MANAGER_* "
+                "env/.env."
+            )
+            return False, reason
+    return True, None
 
 
 def build_web_search_service(settings: PromptManagerSettings) -> WebSearchService:
