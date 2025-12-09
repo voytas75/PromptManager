@@ -25,7 +25,7 @@ def qt_app() -> QApplication:
     app = QApplication.instance()
     if app is None:
         app = QApplication([])
-    return cast(QApplication, app)
+    return cast("QApplication", app)
 
 
 def _refinement_stub(*_: object, **__: object) -> PromptRefinement:

@@ -21,8 +21,7 @@ from dataclasses import asdict
 from datetime import UTC, datetime
 from importlib import metadata as importlib_metadata
 from pathlib import Path
-from sqlite3 import Connection as SQLiteConnection
-from typing import TYPE_CHECKING, Any, Iterator, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from chromadb.errors import ChromaError
 
@@ -35,7 +34,8 @@ from ..repository import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers only
-    from collections.abc import Mapping
+    from collections.abc import Iterator, Mapping
+    from sqlite3 import Connection as SQLiteConnection
 
     from . import PromptManager as _PromptManager
     from .backends import CollectionProtocol
@@ -65,6 +65,7 @@ def _sqlite_connection(path: Path, *, timeout: float = 60.0) -> Iterator[SQLiteC
         if callable(close):
             close()
 
+
 __all__ = ["MaintenanceMixin"]
 
 _parent_module = sys.modules.get("core.prompt_manager")
@@ -91,6 +92,7 @@ class MaintenanceMixin:
       v0.1.1 - 2025-12-07 - Gate CollectionProtocol import behind TYPE_CHECKING.
       v0.1.0 - 2025-12-02 - Extract maintenance helpers from core.prompt_manager.__init__.
     """
+
     _redis_client: Any | None
     _collection: CollectionProtocol | None
     _collection_name: str

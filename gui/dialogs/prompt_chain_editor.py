@@ -126,7 +126,9 @@ class PromptChainEditorDialog(QDialog):
         step_actions.addStretch(1)
         layout.addLayout(step_actions)
 
-        self._buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel, self)
+        self._buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel, self
+        )
         self._buttons.accepted.connect(self._handle_accept)  # type: ignore[arg-type]
         self._buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(self._buttons)
@@ -312,7 +314,9 @@ class PromptChainStepDialog(QDialog):
             "If unchecked the chain continues even when this step errors.",
         )
 
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel, self)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel, self
+        )
         buttons.accepted.connect(self._handle_accept)  # type: ignore[arg-type]
         buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(buttons)

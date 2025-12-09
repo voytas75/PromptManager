@@ -51,7 +51,9 @@ class PromptRefinedDialog(QDialog):
         self._body.setMinimumHeight(200)
         layout.addWidget(self._body)
 
-        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok, Qt.Orientation.Horizontal, self)
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok, Qt.Orientation.Horizontal, self
+        )
         button_box.accepted.connect(self.accept)  # type: ignore[arg-type]
         layout.addWidget(button_box)
 

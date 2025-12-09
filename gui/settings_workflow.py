@@ -13,22 +13,39 @@ Updates:
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Mapping, Sequence, cast
+from typing import TYPE_CHECKING, cast
 
 from PySide6.QtWidgets import QAbstractButton, QDialog, QMessageBox, QWidget
 
 from config import DEFAULT_THEME_MODE, PromptManagerSettings
 from core import NameGenerationError, PromptManager
 
-from .appearance_controller import AppearanceController
-from .controllers.execution_controller import ExecutionController
-from .prompt_templates_dialog import PromptTemplateEditorDialog
-from .prompt_search_controller import LoadPromptsCallable
-from .quick_action_controller import QuickActionController
-from .runtime_settings_service import RuntimeSettingsResult, RuntimeSettingsService
-from .settings_dialog import SettingsDialog
-from .template_preview import TemplatePreviewWidget
+if TYPE_CHECKING:  # pragma: no cover - typing helpers only
+    from collections.abc import Callable, Mapping, Sequence
+
+    from .appearance_controller import AppearanceController
+    from .controllers.execution_controller import ExecutionController
+    from .prompt_search_controller import LoadPromptsCallable
+    from .prompt_templates_dialog import PromptTemplateEditorDialog
+    from .quick_action_controller import QuickActionController
+    from .runtime_settings_service import RuntimeSettingsResult, RuntimeSettingsService
+    from .settings_dialog import SettingsDialog
+    from .template_preview import TemplatePreviewWidget
+else:  # pragma: no cover - runtime placeholders for type-only imports
+    from typing import Any as _Any
+
+    AppearanceController = _Any
+    Callable = _Any
+    ExecutionController = _Any
+    LoadPromptsCallable = _Any
+    Mapping = _Any
+    PromptTemplateEditorDialog = _Any
+    QuickActionController = _Any
+    RuntimeSettingsResult = _Any
+    RuntimeSettingsService = _Any
+    Sequence = _Any
+    SettingsDialog = _Any
+    TemplatePreviewWidget = _Any
 
 
 class SettingsWorkflow:
@@ -86,7 +103,9 @@ class SettingsWorkflow:
             litellm_tts_model=cast("str | None", data.get("litellm_tts_model")),
             litellm_tts_stream=cast("bool | None", data.get("litellm_tts_stream")),
             litellm_stream=cast("bool | None", data.get("litellm_stream")),
-            litellm_workflow_models=cast("Mapping[str, str] | None", data.get("litellm_workflow_models")),
+            litellm_workflow_models=cast(
+                "Mapping[str, str] | None", data.get("litellm_workflow_models")
+            ),
             embedding_model=cast("str | None", data.get("embedding_model")),
             quick_actions=cast("list[dict[str, object]] | None", data.get("quick_actions")),
             chat_user_bubble_color=cast("str | None", data.get("chat_user_bubble_color")),
@@ -112,7 +131,9 @@ class SettingsWorkflow:
         """Launch the prompt templates override dialog."""
         dialog = PromptTemplateEditorDialog(
             self._parent,
-            templates=cast("Mapping[str, str] | None", self._runtime_settings.get("prompt_templates")),
+            templates=cast(
+                "Mapping[str, str] | None", self._runtime_settings.get("prompt_templates")
+            ),
         )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return

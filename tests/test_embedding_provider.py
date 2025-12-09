@@ -11,8 +11,7 @@ from __future__ import annotations
 import threading
 import time
 import uuid
-from collections.abc import Sequence
-from typing import Any, Mapping, cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -25,6 +24,14 @@ from core.embedding import (
     create_embedding_function,
 )
 from models.prompt_model import Prompt
+
+if TYPE_CHECKING:  # pragma: no cover - typing helpers
+    from collections.abc import Mapping, Sequence
+else:  # pragma: no cover - runtime placeholders
+    from typing import Any as _Any
+
+    Mapping = _Any
+    Sequence = _Any
 
 
 def _make_prompt(name: str = "Embedding Test") -> Prompt:
@@ -83,7 +90,7 @@ def test_embedding_sync_worker_eventually_persists_vector() -> None:
             return [0.1, 0.2, float(len(text))]
 
     flaky_provider = _FlakyProvider()
-    provider = cast(EmbeddingProvider, flaky_provider)
+    provider = cast("EmbeddingProvider", flaky_provider)
 
     def _fetch_prompt(prompt_id: uuid.UUID) -> Prompt:
         assert prompt_id == prompt.id
@@ -220,7 +227,7 @@ def test_litellm_embedding_function_uses_adapter(monkeypatch: pytest.MonkeyPatch
     assert isinstance(func, LiteLLMEmbeddingFunction)
     vectors = func(["sample text"])
     assert vectors == [[0.1, 0.2, 0.3]]
-    request = cast(Mapping[str, object], captured["request"])
+    request = cast("Mapping[str, object]", captured["request"])
     assert request["api_key"] == "secret"
     assert request["api_base"] == "https://api.invalid"
     assert request["model"] == "text-embedding-3-small"

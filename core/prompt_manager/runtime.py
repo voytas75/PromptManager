@@ -115,11 +115,11 @@ class PromptRuntimeMixin:
         """Return a user-facing message describing LLM availability."""
         reason = self._llm_unavailable_reason or "LiteLLM model and API key are missing."
         capability_text = capability.rstrip(".")
-        return (
-            f"{capability_text} is unavailable because {reason} "
-            "Configure LiteLLM credentials and model in Settings or via PROMPT_MANAGER_* env/.env/config.json, "
-            "or continue in offline mode (LLM-backed features disabled)."
+        guidance = (
+            "Configure LiteLLM credentials via Settings or PROMPT_MANAGER_* env/.env/config.json. "
+            "Alternatively continue offline (LLM-backed features disabled)."
         )
+        return f"{capability_text} is unavailable because {reason} {guidance}"
 
     @property
     def redis_unavailable_reason(self) -> str | None:

@@ -120,7 +120,9 @@ class CommandPaletteDialog(QDialog):
         self._list_widget.itemActivated.connect(self._on_item_activated)  # type: ignore[arg-type]
         layout.addWidget(self._list_widget, 1)
 
-        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel, Qt.Orientation.Horizontal, self)
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Cancel, Qt.Orientation.Horizontal, self
+        )
         button_box.rejected.connect(self.reject)
 
         help_button = QPushButton("Help", self)

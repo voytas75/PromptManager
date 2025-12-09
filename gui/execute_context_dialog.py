@@ -92,7 +92,9 @@ class ExecuteContextDialog(QDialog):
             layout.addWidget(history_list)
             self._history_list = history_list
 
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel | QDialogButtonBox.StandardButton.Ok, self)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Cancel | QDialogButtonBox.StandardButton.Ok, self
+        )
         buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Execute")
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)

@@ -1,7 +1,7 @@
 r"""Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
-  v0.16.17 - 2025-12-09 - Keep Run Prompt enabled but surface LLM configuration guidance when offline.
+  v0.16.17 - 2025-12-09 - Keep Run Prompt enabled but show LLM configuration guidance when offline.
   v0.16.15 - 2025-12-08 - Store token usage label for execution controller wiring.
   v0.16.14 - 2025-12-07 - Describe Google Programmable Search in workspace tooltips.
   v0.16.13 - 2025-12-07 - Convert analytics log path to Path objects for typing.

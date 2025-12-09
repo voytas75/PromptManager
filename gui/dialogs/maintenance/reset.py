@@ -43,10 +43,10 @@ class ResetMaintenanceMixin:
     _manager: PromptManager
     _reset_log_view: QPlainTextEdit
 
-    def _parent_widget(self) -> "_QWidget":
+    def _parent_widget(self) -> _QWidget:
         return cast("_QWidget", self)
 
-    def _maintenance_host(self) -> "_ResetHost":
+    def _maintenance_host(self) -> _ResetHost:
         return cast("_ResetHost", self)
 
     def _build_reset_tab(self, parent: QWidget) -> QWidget:
@@ -119,7 +119,6 @@ class ResetMaintenanceMixin:
 
     def _confirm_destructive_action(self, prompt: str) -> bool:
         parent = self._parent_widget()
-        host = self._maintenance_host()
         result = QMessageBox.question(
             parent,
             "Confirm Data Reset",

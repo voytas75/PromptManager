@@ -24,7 +24,9 @@ from models.prompt_model import Prompt
 
 if TYPE_CHECKING:
     from pathlib import Path
+
     from chromadb.api import ClientAPI  # type: ignore[reportMissingTypeArgument]
+
     from core.embedding import EmbeddingProvider
 else:  # pragma: no cover - runtime fallbacks when optional deps missing
     ClientAPI = Any  # type: ignore[assignment]
@@ -153,10 +155,10 @@ def _manager_with_dependencies(
         chroma_path=str(chroma_path),
         db_path=str(db_path),
         cache_ttl_seconds=60,
-        chroma_client=cast(ClientAPI, _StubChromaClient()),
+        chroma_client=cast("ClientAPI", _StubChromaClient()),
         embedding_function=None,
         repository=repository,
-        embedding_provider=cast(EmbeddingProvider, _StubEmbeddingProvider()),
+        embedding_provider=cast("EmbeddingProvider", _StubEmbeddingProvider()),
         enable_background_sync=False,
         executor=executor,
         history_tracker=tracker,

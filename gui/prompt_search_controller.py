@@ -38,8 +38,10 @@ logger = logging.getLogger(__name__)
 
 
 class LoadPromptsCallable(Protocol):
+    """Protocol defining the signature for loading prompts into the catalog."""
+
     def __call__(self, search_text: str = "", *, use_indicator: bool = ...) -> None:
-        ...
+        """Load prompts matching *search_text* and optionally show a busy indicator."""
 
 
 class PromptSearchController:

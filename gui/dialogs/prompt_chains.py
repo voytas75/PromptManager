@@ -264,7 +264,9 @@ class PromptChainManagerPanel(QWidget):
         self._description_label = QLabel("(No description provided.)", info_container)
         self._description_label.setWordWrap(True)
         self._description_label.setObjectName("promptChainDescription")
-        self._description_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self._description_label.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
         info_layout.addWidget(self._description_label)
 
         guidance = QLabel(
@@ -669,9 +671,10 @@ class PromptChainManagerPanel(QWidget):
         if not chain_input_text.strip():
             QMessageBox.warning(self, "Chain input", "Enter text to feed into the first step.")
             return
-        if not getattr(self._manager, "llm_available", True) or getattr(
-            self._manager, "executor", None
-        ) is None:
+        if (
+            not getattr(self._manager, "llm_available", True)
+            or getattr(self._manager, "executor", None) is None
+        ):
             message = self._manager.llm_status_message("Prompt execution")
             QMessageBox.information(self, "Prompt execution unavailable", message)
             return

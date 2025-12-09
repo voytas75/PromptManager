@@ -351,7 +351,8 @@ def build_main_view(
     result_meta = QLabel("", parent)
     result_meta.setStyleSheet("color: #5b5b5b; font-style: italic;")
     token_usage_label = QLabel(
-        "Tokens (session): prompt=0 completion=0 total=0 | Tokens (overall): prompt=0 completion=0 total=0",
+        "Tokens (session): prompt=0 completion=0 total=0 | "
+        "Tokens (overall): prompt=0 completion=0 total=0",
         parent,
     )
     token_usage_label.setObjectName("tokenUsageLabel")

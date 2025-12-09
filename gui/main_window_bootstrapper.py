@@ -13,7 +13,7 @@ from functools import partial
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QSettings
-from PySide6.QtWidgets import QLabel, QMainWindow, QPushButton, QWidget
+from PySide6.QtWidgets import QLabel, QMainWindow, QPushButton
 
 from core.sharing import PrivateBinProvider, RentryProvider, ShareTextProvider
 

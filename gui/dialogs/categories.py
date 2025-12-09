@@ -6,10 +6,9 @@ Updates:
 
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
 from PySide6.QtCore import QSettings
-from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QDialog,
@@ -28,6 +27,9 @@ from PySide6.QtWidgets import (
 
 from core import CategoryNotFoundError, CategoryStorageError, PromptManager
 from models.category_model import PromptCategory, slugify_category
+
+if TYPE_CHECKING:  # pragma: no cover - typing helpers only
+    from PySide6.QtGui import QCloseEvent
 
 
 class CategoryPayload(TypedDict):
@@ -106,7 +108,9 @@ class CategoryEditorDialog(QDialog):
 
         layout.addLayout(form)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self
+        )
         buttons.accepted.connect(self._on_accept)  # type: ignore[arg-type]
         buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(buttons)

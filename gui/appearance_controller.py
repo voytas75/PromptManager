@@ -84,7 +84,7 @@ class AppearanceController:
         app = QApplication.instance()
         if app is None:
             return DEFAULT_THEME_MODE
-        gui_app = cast(QApplication, app)
+        gui_app = cast("QApplication", app)
 
         raw_theme = mode or self._runtime_settings.get("theme_mode") or DEFAULT_THEME_MODE
         theme = str(raw_theme).strip().lower()

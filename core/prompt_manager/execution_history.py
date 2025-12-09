@@ -11,7 +11,6 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
 
 from models.prompt_model import ExecutionStatus, Prompt, PromptExecution
@@ -33,6 +32,7 @@ from ..notifications import NotificationCenter, NotificationLevel
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
+    from datetime import datetime
     from typing import Protocol
 
     from ..history_tracker import HistoryTracker
@@ -46,6 +46,7 @@ if TYPE_CHECKING:
 
 else:  # pragma: no cover - typing fallback
     HistoryTracker = Any
+    datetime = Any
 
 logger = logging.getLogger(__name__)
 

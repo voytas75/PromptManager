@@ -93,8 +93,8 @@ class AnalyticsDashboardPanel(QWidget):
         self._token_summary = QLabel("", self)
         self._overall_tokens: TokenUsageTotals | None = None
         self._settings = QSettings("PromptManager", "AnalyticsPanel")
-        window_pref = cast(int, self._settings.value("windowDays", 30, int))
-        prompt_pref = cast(int, self._settings.value("promptLimit", 5, int))
+        window_pref = cast("int", self._settings.value("windowDays", 30, int))
+        prompt_pref = cast("int", self._settings.value("promptLimit", 5, int))
         self._initial_window_days = int(window_pref)
         self._initial_prompt_limit = int(prompt_pref)
         self._prompt_edit_callback = prompt_edit_callback

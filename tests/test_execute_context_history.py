@@ -11,7 +11,7 @@ Updates:
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -56,7 +56,7 @@ class _FakeSettings:
 
 
 def _as_qsettings(settings: _FakeSettings) -> QSettings:
-    return cast(QSettings, settings)
+    return cast("QSettings", settings)
 
 
 def test_load_last_execute_context_task_returns_trimmed_value() -> None:

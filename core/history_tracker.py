@@ -318,9 +318,9 @@ class HistoryTracker:
             average_rating=average_rating,
             rating_trend=rating_trend,
             last_executed_at=last_executed,
-             prompt_tokens=_coerce_int(stats.get("prompt_tokens")),
-             completion_tokens=_coerce_int(stats.get("completion_tokens")),
-             total_tokens=_coerce_int(stats.get("total_tokens")),
+            prompt_tokens=_coerce_int(stats.get("prompt_tokens")),
+            completion_tokens=_coerce_int(stats.get("completion_tokens")),
+            total_tokens=_coerce_int(stats.get("total_tokens")),
         )
 
     def token_usage_totals(

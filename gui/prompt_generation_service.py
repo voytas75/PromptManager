@@ -15,7 +15,6 @@ from core import IntentLabel, PromptManager, PromptManagerError
 from .catalog_workflow_controller import CatalogWorkflowController
 from .language_tools import detect_language
 from .prompt_editor_flow import PromptDialogFactory, PromptEditorFlow, _DeletePromptCallable
-from .prompt_search_controller import LoadPromptsCallable
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from collections.abc import Callable, Sequence
@@ -25,6 +24,8 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
 
     from core.prompt_engineering import PromptRefinement
     from models.prompt_model import Prompt
+
+    from .prompt_search_controller import LoadPromptsCallable
 else:  # pragma: no cover - runtime placeholders for type-only names
     from typing import Any as _Any
 
@@ -44,8 +45,7 @@ class ExecuteContextHandler(Protocol):
         *,
         parent: QWidget | None = ...,
         context_override: str | None = ...,
-    ) -> None:
-        ...
+    ) -> None: ...
 
 
 @dataclass(slots=True)

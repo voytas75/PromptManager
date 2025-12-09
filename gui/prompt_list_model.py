@@ -27,10 +27,11 @@ class PromptListModel(QAbstractListModel):
 
     def rowCount(
         self,
-        parent: QModelIndex | QPersistentModelIndex = QModelIndex(),
+        parent: QModelIndex | QPersistentModelIndex | None = None,
     ) -> int:  # noqa: N802 - Qt API
         """Return the number of prompts available for the view."""
-        if parent.isValid():
+        parent_index = parent or QModelIndex()
+        if parent_index.isValid():
             return 0
         return len(self._prompts)
 

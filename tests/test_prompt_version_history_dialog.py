@@ -9,16 +9,22 @@ Updates:
 from __future__ import annotations
 
 import uuid
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
 pytest.importorskip("PySide6")
 from PySide6.QtWidgets import QApplication
 
-from core import PromptManager
 from gui.dialogs import PromptVersionHistoryDialog
 from models.prompt_model import Prompt
+
+if TYPE_CHECKING:  # pragma: no cover - typing helpers
+    from core import PromptManager
+else:  # pragma: no cover - runtime placeholders
+    from typing import Any as _Any
+
+    PromptManager = _Any
 
 
 @pytest.fixture(scope="module")
@@ -27,7 +33,7 @@ def qt_app() -> QApplication:
     app = QApplication.instance()
     if app is None:
         app = QApplication([])
-    return cast(QApplication, app)
+    return cast("QApplication", app)
 
 
 class _ManagerStub:
@@ -45,7 +51,7 @@ def _prompt_stub() -> Prompt:
 
 
 def _as_prompt_manager(manager: _ManagerStub) -> PromptManager:
-    return cast(PromptManager, manager)
+    return cast("PromptManager", manager)
 
 
 def test_version_history_dialog_defaults_to_body_tab(qt_app: QApplication) -> None:

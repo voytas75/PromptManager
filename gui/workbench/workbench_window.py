@@ -1,7 +1,7 @@
 """Qt widgets for the Enhanced Prompt Workbench experience.
 
 Updates:
-  v0.1.26 - 2025-12-09 - Keep template runs clickable but block with offline guidance when LLM is missing.
+  v0.1.26 - 2025-12-09 - Keep template runs clickable; show offline guidance when LLM is missing.
   v0.1.25 - 2025-12-09 - Disable template runs when LiteLLM is offline.
   v0.1.24 - 2025-12-08 - Align PySide6 enums and text selection handling with Pyright.
   v0.1.23 - 2025-12-07 - Support embedded tab sessions and add begin_session helper.
@@ -570,7 +570,7 @@ class WorkbenchWindow(QMainWindow):
         selection = QTextEdit.ExtraSelection()
         fmt = QTextCharFormat()
         fmt.setBackground(Qt.GlobalColor.yellow)
-        selection_any = cast(Any, selection)
+        selection_any = cast("Any", selection)
         selection_any.cursor = cursor
         selection_any.cursor.movePosition(
             QTextCursor.MoveOperation.EndOfBlock,

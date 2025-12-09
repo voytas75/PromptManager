@@ -1,8 +1,8 @@
 """Coordinate prompt execution, streaming, and chat workspace logic.
 
 Updates:
-  v0.1.10 - 2025-12-09 - Block executions when LLM is offline and show configuration guidance.
-  v0.1.9 - 2025-12-08 - Track per-execution token usage and refresh session/overall totals in the workspace.
+  v0.1.10 - 2025-12-09 - Block executions when LLM is offline; show configuration guidance.
+  v0.1.9 - 2025-12-08 - Track per-execution token usage and refresh session totals.
   v0.1.8 - 2025-12-07 - Enable saving workspace text-only results with output.
   v0.1.7 - 2025-12-07 - Append share footer to result payloads.
   v0.1.6 - 2025-12-07 - Enable chat continuation for workspace text runs.
@@ -92,6 +92,7 @@ class SessionTokenUsage:
     total_tokens: int = 0
 
     def add(self, prompt_tokens: int, completion_tokens: int, total_tokens: int) -> None:
+        """Accumulate new token counts into the running session totals."""
         self.prompt_tokens += prompt_tokens
         self.completion_tokens += completion_tokens
         self.total_tokens += total_tokens
@@ -179,7 +180,9 @@ class ExecutionController:
         self._voice_supported = bool(voice_controller and voice_controller.is_supported)
         self._speak_result_button_play_icon = speak_result_button.icon()
         button_style = speak_result_button.style()
-        self._speak_result_button_stop_icon = button_style.standardIcon(QStyle.StandardPixmap.SP_MediaStop)
+        self._speak_result_button_stop_icon = button_style.standardIcon(
+            QStyle.StandardPixmap.SP_MediaStop
+        )
         self._speak_result_button.setCheckable(True)
         self._web_search_warning_shown = False
         self._last_web_context_sources = 0
@@ -1138,10 +1141,7 @@ class ExecutionController:
         )
         if prompt_tokens == 0 and completion_tokens == 0 and total_tokens == 0:
             return ""
-        return (
-            "Tokens: "
-            f"prompt={prompt_tokens} completion={completion_tokens} total={total_tokens}"
-        )
+        return f"Tokens: prompt={prompt_tokens} completion={completion_tokens} total={total_tokens}"
 
     def _format_chat_history_html(self, conversation: Sequence[dict[str, str]]) -> str:
         blocks: list[str] = []

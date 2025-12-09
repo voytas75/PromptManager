@@ -18,7 +18,9 @@ from core.repository import PromptRepository
 
 if TYPE_CHECKING:
     from pathlib import Path
+
     from chromadb.api import ClientAPI  # type: ignore[reportMissingTypeArgument]
+
     from core.embedding import EmbeddingProvider
 else:  # pragma: no cover - runtime fallbacks when optional deps missing
     Path = Any  # type: ignore[assignment]
@@ -145,13 +147,13 @@ def _build_manager(
         chroma_path=str(chroma_path),
         db_path=str(db_path),
         cache_ttl_seconds=60,
-        chroma_client=cast(ClientAPI, _StubChromaClient()),
+        chroma_client=cast("ClientAPI", _StubChromaClient()),
         embedding_function=None,
         repository=repository,
-        embedding_provider=cast(EmbeddingProvider, _StubEmbeddingProvider()),
+        embedding_provider=cast("EmbeddingProvider", _StubEmbeddingProvider()),
         enable_background_sync=False,
-        prompt_engineer=cast(PromptEngineer | None, engineer),
-        structure_prompt_engineer=cast(PromptEngineer | None, structure_engineer),
+        prompt_engineer=cast("PromptEngineer | None", engineer),
+        structure_prompt_engineer=cast("PromptEngineer | None", structure_engineer),
     )
 
 

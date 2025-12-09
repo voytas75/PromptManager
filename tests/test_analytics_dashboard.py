@@ -155,7 +155,7 @@ def test_build_analytics_snapshot_aggregates_repository_data(tmp_path: Path) -> 
         consistent_counts=True,
     )
 
-    manager = cast(PromptManager, _StubAnalyticsManager(repo, execution_stats, embedding_report))
+    manager = cast("PromptManager", _StubAnalyticsManager(repo, execution_stats, embedding_report))
 
     usage_log = tmp_path / "intent_usage.jsonl"
     now = datetime.now(UTC).replace(microsecond=0)

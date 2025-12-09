@@ -16,6 +16,7 @@ from gui.share_controller import ShareController
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers only
     from PySide6.QtWidgets import QWidget
+
     from gui.usage_logger import IntentUsageLogger
 else:  # pragma: no cover - runtime fallbacks for optional deps
     QWidget = object  # type: ignore[assignment]
@@ -84,11 +85,11 @@ def test_share_controller_opens_browser(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setattr("PySide6.QtGui.QGuiApplication.clipboard", lambda: clipboard)
 
     controller = ShareController(
-        cast(QWidget, None),
+        cast("QWidget", None),
         toast_callback=lambda *_: None,
         status_callback=lambda *_: None,
         error_callback=lambda *_: None,
-        usage_logger=cast(IntentUsageLogger, _DummyUsageLogger()),
+        usage_logger=cast("IntentUsageLogger", _DummyUsageLogger()),
         preference_supplier=lambda: True,
     )
     controller.register_provider(_DummyProvider())
@@ -111,11 +112,11 @@ def test_share_controller_respects_disabled_auto_open(monkeypatch: pytest.Monkey
     monkeypatch.setattr("PySide6.QtGui.QGuiApplication.clipboard", lambda: _DummyClipboard())
 
     controller = ShareController(
-        cast(QWidget, None),
+        cast("QWidget", None),
         toast_callback=lambda *_: None,
         status_callback=lambda *_: None,
         error_callback=lambda *_: None,
-        usage_logger=cast(IntentUsageLogger, _DummyUsageLogger()),
+        usage_logger=cast("IntentUsageLogger", _DummyUsageLogger()),
         preference_supplier=lambda: False,
     )
     controller.register_provider(_DummyProvider())
@@ -133,11 +134,11 @@ def test_share_controller_surfaces_management_note(monkeypatch: pytest.MonkeyPat
         status_messages.append(message)
 
     controller = ShareController(
-        cast(QWidget, None),
+        cast("QWidget", None),
         toast_callback=lambda *_: None,
         status_callback=_status,
         error_callback=lambda *_: None,
-        usage_logger=cast(IntentUsageLogger, _DummyUsageLogger()),
+        usage_logger=cast("IntentUsageLogger", _DummyUsageLogger()),
         preference_supplier=lambda: False,
     )
     provider_info = ShareProviderInfo(name="dummy", label="DummyShare", description="Test")

@@ -10,16 +10,17 @@ from __future__ import annotations
 import os
 import tempfile
 import threading
-from collections.abc import Mapping
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
-
-from typing import TYPE_CHECKING, Any, Callable, Iterable, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from PySide6.QtCore import QObject, QUrl, Signal
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
-    from PySide6.QtMultimedia import QAudioOutput as QAudioOutputType
-    from PySide6.QtMultimedia import QMediaPlayer as QMediaPlayerType
+    from PySide6.QtMultimedia import (
+        QAudioOutput as QAudioOutputType,
+        QMediaPlayer as QMediaPlayerType,
+    )
 else:  # pragma: no cover - runtime placeholders when Qt multimedia is missing
     QAudioOutputType = Any
     QMediaPlayerType = Any

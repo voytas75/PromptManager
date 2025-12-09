@@ -16,13 +16,14 @@ from models.prompt_model import Prompt, PromptExecution, UserProfile
 
 if TYPE_CHECKING:
     from pathlib import Path
+
     from chromadb.api import ClientAPI  # type: ignore[reportMissingTypeArgument]
 else:  # pragma: no cover - runtime fallback when optional deps missing
     ClientAPI = Any  # type: ignore[assignment]
 
 
 def _as_chroma_client(client: _StubChromaClient | _StubChromaClientNoDelete) -> ClientAPI:
-    return cast(ClientAPI, client)
+    return cast("ClientAPI", client)
 
 
 def _make_prompt(name: str = "Diagnostics") -> Prompt:
@@ -237,7 +238,7 @@ def test_rebuild_embeddings_counts_generation_failures(tmp_path: Path) -> None:
         db_path=str(db_path),
         chroma_client=_as_chroma_client(client),
         repository=repo,
-        embedding_provider=cast(EmbeddingProvider, _FailingProvider()),
+        embedding_provider=cast("EmbeddingProvider", _FailingProvider()),
         enable_background_sync=False,
     )
 

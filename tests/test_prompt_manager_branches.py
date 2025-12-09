@@ -1,7 +1,7 @@
 """Branch coverage tests for PromptManager edge cases.
 
 Updates:
-  v0.1.2 - 2025-12-08 - Import ChromaError, add override decorator, and reuse the concrete stub for Pyright.
+  v0.1.2 - 2025-12-08 - Import ChromaError, add override decorator, reuse concrete stub for Pyright.
   v0.1.1 - 2025-11-22 - Seed version history for legacy prompts without snapshots.
   v0.1.0 - 2025-10-30 - Add unit tests for error handling and caching paths.
 """
@@ -32,17 +32,21 @@ from core.prompt_manager import (
     RepositoryError,
     RepositoryNotFoundError,
 )
-from core.prompt_manager.backends import RedisClientProtocol
-from core.repository import PromptRepository
 from models.category_model import PromptCategory, slugify_category
 from models.prompt_model import Prompt, PromptForkLink, PromptVersion, UserProfile
 
 if TYPE_CHECKING:
     import builtins
     from collections.abc import Sequence
+
     from chromadb.api import ClientAPI  # type: ignore[reportMissingTypeArgument]
+
+    from core.prompt_manager.backends import RedisClientProtocol
+    from core.repository import PromptRepository
 else:  # pragma: no cover - runtime fallback when chromadb isn't available
     ClientAPI = Any  # type: ignore[assignment]
+    RedisClientProtocol = Any
+    PromptRepository = Any
 
 
 def _clone_prompt(prompt: Prompt) -> Prompt:
@@ -104,7 +108,7 @@ class _StubChromaClient:
 
 
 def _as_chroma_client(client: _StubChromaClient) -> ClientAPI:
-    return cast(ClientAPI, client)
+    return cast("ClientAPI", client)
 
 
 class _TestChromaError(ChromaError):
@@ -120,17 +124,17 @@ class _TestChromaError(ChromaError):
 
 
 def _as_repository(repo: object) -> PromptRepository:
-    return cast(PromptRepository, repo)
+    return cast("PromptRepository", repo)
 
 
 def _as_redis_client(client: object | None) -> RedisClientProtocol | None:
     if client is None:
         return None
-    return cast(RedisClientProtocol, client)
+    return cast("RedisClientProtocol", client)
 
 
 def _pm(manager: PromptManager) -> Any:
-    return cast(Any, manager)
+    return cast("Any", manager)
 
 
 class _RecordingRepository:
@@ -676,7 +680,7 @@ def test_prompt_manager_collection_initialisation_error(monkeypatch: pytest.Monk
             chroma_path="/tmp/chroma",
             db_path="/tmp/db.sqlite",
             repository=_as_repository(repository),
-            chroma_client=cast(ClientAPI, _ExplodingClient()),
+            chroma_client=cast("ClientAPI", _ExplodingClient()),
         )
 
 

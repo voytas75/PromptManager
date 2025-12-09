@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Callable, Sequence, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -31,7 +31,10 @@ from core import PromptManager, PromptManagerError, RepositoryError
 from ..base import logger
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
+    from collections.abc import Callable, Sequence
+
     from PySide6.QtWidgets import QWidget as _QWidget
+
     from models.prompt_model import Prompt
 
 
@@ -49,7 +52,7 @@ class CatalogueMaintenanceMixin:
     _tags_generator: Callable[[str], Sequence[str]] | None
     maintenance_applied: Any
 
-    def _parent_widget(self) -> "_QWidget":
+    def _parent_widget(self) -> _QWidget:
         return cast("_QWidget", self)
 
     def _build_metadata_tab(self, parent: QWidget) -> QWidget:
@@ -130,7 +133,9 @@ class CatalogueMaintenanceMixin:
 
         self._category_refresh_button = QPushButton("Refresh Category Health", health_group)
         self._category_refresh_button.clicked.connect(self._refresh_category_health)  # type: ignore[arg-type]
-        health_layout.addWidget(self._category_refresh_button, alignment=Qt.AlignmentFlag.AlignRight)
+        health_layout.addWidget(
+            self._category_refresh_button, alignment=Qt.AlignmentFlag.AlignRight
+        )
 
         metadata_layout.addWidget(health_group)
 

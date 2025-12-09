@@ -577,7 +577,9 @@ class SettingsDialog(QDialog):
 
         tab_widget.addTab(prompts_tab, "Prompt Templates")
 
-        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self)
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self
+        )
         button_box.accepted.connect(self.accept)  # type: ignore[arg-type]
         button_box.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(button_box)

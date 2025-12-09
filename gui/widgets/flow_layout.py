@@ -79,13 +79,13 @@ class FlowLayout(QLayout):
         size = QSize()
         for item in self._item_list:
             size = size.expandedTo(item.minimumSize())
-        left, top, right, bottom = cast(tuple[int, int, int, int], self.getContentsMargins())
+        left, top, right, bottom = cast("tuple[int, int, int, int]", self.getContentsMargins())
         size += QSize(left + right, top + bottom)
         return size
 
     def _do_layout(self, rect: QRect, *, test_only: bool) -> int:
         """Lay out items either virtually (when *test_only*) or for rendering."""
-        left, top, right, bottom = cast(tuple[int, int, int, int], self.getContentsMargins())
+        left, top, right, bottom = cast("tuple[int, int, int, int]", self.getContentsMargins())
         effective_rect = rect.adjusted(left, top, -right, -bottom)
         x = effective_rect.x()
         y = effective_rect.y()

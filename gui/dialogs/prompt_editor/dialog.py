@@ -171,7 +171,9 @@ class PromptDialog(
         self._context_input.setSizePolicy(context_policy)
         self._description_input = QPlainTextEdit(self)
         self._description_input.setFixedHeight(60)
-        self._description_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self._description_input.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
         self._example_input = CollapsibleTextSection("Example Input", self)
         self._example_input.setPlaceholderText("Optional example input…")
         self._example_output = CollapsibleTextSection("Example Output", self)
@@ -294,7 +296,9 @@ class PromptDialog(
             self._generate_scenarios_button.setToolTip(
                 "Generate heuristic scenarios from the prompt body. Configure LiteLLM for AI help."
             )
-        scenarios_layout.addWidget(self._generate_scenarios_button, alignment=Qt.AlignmentFlag.AlignRight)
+        scenarios_layout.addWidget(
+            self._generate_scenarios_button, alignment=Qt.AlignmentFlag.AlignRight
+        )
         form_layout.addRow("Scenarios", scenarios_container)
 
         examples_container = QWidget(self)
@@ -308,7 +312,9 @@ class PromptDialog(
 
         main_layout.addLayout(form_layout)
 
-        self._buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, parent=self)
+        self._buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, parent=self
+        )
         self._buttons.accepted.connect(self._on_accept)  # type: ignore[arg-type]
         self._buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         if self._source_prompt is not None:

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Callable, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -21,34 +21,39 @@ from core import (
     RepositoryError,
     RepositoryNotFoundError,
 )
-from core.embedding import EmbeddingSyncWorker
-from core.prompt_manager.backends import RedisClientProtocol
 from models.category_model import PromptCategory, slugify_category
 from models.prompt_model import Prompt, PromptVersion, UserProfile
 from models.prompt_note import PromptNote
 from models.response_style import ResponseStyle
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
+
     from chromadb.api import ClientAPI  # type: ignore[reportMissingTypeArgument]
+
+    from core.embedding import EmbeddingSyncWorker
+    from core.prompt_manager.backends import RedisClientProtocol
 else:  # pragma: no cover - runtime fallback
     ClientAPI = Any  # type: ignore[assignment]
+    Callable = Any
+    EmbeddingSyncWorker = Any
+    RedisClientProtocol = Any
 
 
 def _as_chroma_client(client: _FakeChromaClient) -> ClientAPI:
-    return cast(ClientAPI, client)
+    return cast("ClientAPI", client)
 
 
 def _as_repository(repo: _FakeRepository) -> PromptRepository:
-    return cast(PromptRepository, repo)
+    return cast("PromptRepository", repo)
 
 
 def _as_redis_client(client: _FakeRedis | _StubRedis) -> RedisClientProtocol:
-    return cast(RedisClientProtocol, client)
+    return cast("RedisClientProtocol", client)
 
 
 def _as_worker(worker: _StubWorker) -> EmbeddingSyncWorker:
-    return cast(EmbeddingSyncWorker, worker)
+    return cast("EmbeddingSyncWorker", worker)
 
 
 def _make_prompt(name: str = "Sample Prompt") -> Prompt:

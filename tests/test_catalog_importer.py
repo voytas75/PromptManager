@@ -28,6 +28,12 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     import builtins
     from pathlib import Path
 
+    from core import PromptManager
+else:  # pragma: no cover - runtime placeholders for type-only imports
+    from typing import Any as _Any
+
+    PromptManager = _Any
+
 
 class _StubRepository:
     def __init__(self) -> None:
@@ -64,7 +70,7 @@ class _StubManager:
 
 
 def _as_prompt_manager(manager: _StubManager) -> PromptManager:
-    return cast(PromptManager, manager)
+    return cast("PromptManager", manager)
 
 
 def test_load_prompt_catalog_without_path_returns_empty() -> None:

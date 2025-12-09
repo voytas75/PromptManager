@@ -11,7 +11,7 @@ Updates:
   v0.1.7 - 2025-11-27 - Make the variables/schema editors and rendered preview vertically resizable.
   v0.1.6 - 2025-11-27 - Consolidate template status messaging into the footer label only.
   v0.1.5 - 2025-11-27 - Persist splitter sizes for the status and preview panes.
-  v0.1.4-and-earlier - 2025-11-27 - Added template syntax hints, multi-line editors, and initial preview.
+  v0.1.4-and-earlier - 2025-11-27 - Add template syntax hints, multi-line editors, initial preview.
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ from core.templating import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Mapping, Sequence
+    from collections.abc import Iterable, Mapping
 
 
 class TemplatePreviewWidget(QWidget):

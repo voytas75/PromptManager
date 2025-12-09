@@ -9,8 +9,8 @@ Updates:
   v0.8.3 - 2025-12-07 - Wire Google web search provider into the factory builder.
   v0.8.2 - 2025-12-07 - Expose reusable web search service builder.
   v0.8.1-0.8.0 - 2025-12-07 - Wire SerpApi and Serper providers into the web search factory.
-  v0.7.9-0.7.6 - 2025-12-07 - Add random provider fan-out, Tavily wiring, and web search creation updates.
-  v0.7.5-and-earlier - 2025-11-24 - Configure LiteLLM category/scenario wiring with spacing and import fixes.
+  v0.7.9-0.7.6 - 2025-12-07 - Add random provider fan-out and Tavily web search updates.
+  v0.7.5-and-earlier - 2025-11-24 - Configure LiteLLM category/scenario wiring and spacing fixes.
 """
 
 from __future__ import annotations
@@ -134,13 +134,17 @@ def _determine_llm_status(settings: PromptManagerSettings) -> tuple[bool, str | 
     azure_model_configured = any(
         str(model).lower().startswith("azure/") for model in (fast_model, inference_model) if model
     )
-    if model_configured and api_key_configured and (
-        not azure_model_configured or (api_base_configured and api_version_configured)
+    if (
+        model_configured
+        and api_key_configured
+        and (not azure_model_configured or (api_base_configured and api_version_configured))
     ):
         return True, None
     missing_parts: list[str] = []
     if not model_configured:
-        missing_parts.append("PROMPT_MANAGER_LITELLM_MODEL or PROMPT_MANAGER_LITELLM_INFERENCE_MODEL")
+        missing_parts.append(
+            "PROMPT_MANAGER_LITELLM_MODEL or PROMPT_MANAGER_LITELLM_INFERENCE_MODEL"
+        )
     if not api_key_configured:
         missing_parts.append("PROMPT_MANAGER_LITELLM_API_KEY")
     if azure_model_configured and not api_base_configured:

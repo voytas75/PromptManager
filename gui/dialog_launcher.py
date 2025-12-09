@@ -9,7 +9,7 @@ Updates:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, cast
+from typing import TYPE_CHECKING, cast
 
 from PySide6.QtWidgets import QDialog, QMainWindow, QWidget
 
@@ -19,6 +19,7 @@ from .dialogs import InfoDialog, PromptChainManagerDialog, PromptVersionHistoryD
 from .workbench import WorkbenchModeDialog
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
+    from collections.abc import Callable
     from uuid import UUID
 
     from models.prompt_model import Prompt
@@ -78,7 +79,7 @@ class DialogLauncher:
         target = prompt or self._current_prompt_supplier()
         if target is None:
             return
-        window = cast(QMainWindow, self._parent)
+        window = cast("QMainWindow", self._parent)
         dialog = PromptVersionHistoryDialog(
             self._manager,
             target,

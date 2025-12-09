@@ -47,6 +47,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
     import builtins
     from collections.abc import Mapping, Sequence
     from pathlib import Path
+
     from chromadb.api import ClientAPI  # type: ignore[reportMissingTypeArgument]
 else:  # pragma: no cover - runtime fallback when chromadb isn't available
     ClientAPI = Any  # type: ignore[assignment]
@@ -212,7 +213,7 @@ class _DummyChromaClient:
 
 
 def _as_chroma_client(client: _DummyChromaClient) -> ClientAPI:
-    return cast(ClientAPI, client)
+    return cast("ClientAPI", client)
 
 
 class _TestChromaError(ChromaError):
@@ -228,15 +229,15 @@ class _TestChromaError(ChromaError):
 
 
 def _pm(manager: PromptManager) -> Any:
-    return cast(Any, manager)
+    return cast("Any", manager)
 
 
 def _as_history_tracker(tracker: object) -> HistoryTracker:
-    return cast(HistoryTracker, tracker)
+    return cast("HistoryTracker", tracker)
 
 
 def _as_intent_classifier(classifier: object) -> IntentClassifier:
-    return cast(IntentClassifier, classifier)
+    return cast("IntentClassifier", classifier)
 
 
 class _HistoryTrackerStub:
@@ -744,7 +745,7 @@ def test_optimize_vector_store_handles_optimize_errors(
                 raise sqlite3.OperationalError("optimize unsupported")
             if parameters is None:
                 return self._conn.execute(sql)
-            return self._conn.execute(sql, cast(Any, parameters))
+            return self._conn.execute(sql, cast("Any", parameters))
 
     def fake_connect(path: str, timeout: float = 60.0) -> _ConnectionWrapper:
         return _ConnectionWrapper(path, timeout)
@@ -1233,10 +1234,10 @@ def test_manager_initialises_litellm_defaults_from_helpers(tmp_path: Path) -> No
         chroma_client=chroma_client,
         repository=repository,
         enable_background_sync=False,
-        name_generator=cast(Any, generator),
-        scenario_generator=cast(Any, generator),
-        prompt_engineer=cast(Any, generator),
-        executor=cast(Any, executor),
+        name_generator=cast("Any", generator),
+        scenario_generator=cast("Any", generator),
+        prompt_engineer=cast("Any", generator),
+        executor=cast("Any", executor),
         workflow_models={
             "prompt_execution": "inference",
             "unknown": "fast",

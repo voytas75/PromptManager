@@ -289,8 +289,7 @@ class HistoryPanel(QWidget):
         )
         if prompt_tokens or completion_tokens or usage_total:
             detail_lines.append(
-                "Tokens: "
-                f"prompt={prompt_tokens} completion={completion_tokens} total={usage_total}"
+                f"Tokens: prompt={prompt_tokens} completion={completion_tokens} total={usage_total}"
             )
         if execution.rating is not None:
             detail_lines.append(f"Rating: {execution.rating:.1f}/10")

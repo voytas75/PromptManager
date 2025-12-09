@@ -17,9 +17,10 @@ from gui.prompt_editor_flow import PromptEditorFlow
 from models.prompt_model import Prompt
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
+    from PySide6.QtWidgets import QWidget
+
     from core import PromptManager
     from gui.prompt_editor_flow import PromptDialogFactory
-    from PySide6.QtWidgets import QWidget
 else:  # pragma: no cover - runtime placeholders to avoid heavy imports
     PromptManager = object  # type: ignore[assignment]
     PromptDialogFactory = object  # type: ignore[assignment]
@@ -62,7 +63,7 @@ def test_edit_prompt_delete_requests_skip_confirmation_keyword() -> None:
     dialog_factory = cast("PromptDialogFactory", _DialogFactoryStub(dialog))
 
     flow = PromptEditorFlow(
-        parent=cast(QWidget, object()),
+        parent=cast("QWidget", object()),
         manager=cast("PromptManager", object()),
         dialog_factory=dialog_factory,
         load_prompts=lambda _: None,

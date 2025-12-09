@@ -10,7 +10,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QSettings, Qt, Signal
-from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -26,6 +25,8 @@ from .reset import ResetMaintenanceMixin
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from collections.abc import Callable, Sequence
+
+    from PySide6.QtGui import QCloseEvent
 
     from core.prompt_manager import PromptManager
 else:  # pragma: no cover - runtime placeholders for type-only imports

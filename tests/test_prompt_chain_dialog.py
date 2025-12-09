@@ -18,7 +18,6 @@ Updates:
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable, Iterator
 from typing import TYPE_CHECKING, Any, cast
 
 import pytest
@@ -36,7 +35,13 @@ from models.prompt_chain_model import PromptChain, PromptChainStep
 from models.prompt_model import Prompt
 
 if TYPE_CHECKING:  # pragma: no cover - typing helper
-    from collections.abc import Mapping
+    from collections.abc import Callable, Iterator, Mapping
+else:  # pragma: no cover - runtime placeholders
+    from typing import Any as _Any
+
+    Callable = _Any
+    Iterator = _Any
+    Mapping = _Any
 
 
 @pytest.fixture(scope="module")
@@ -46,7 +51,7 @@ def qt_app() -> QApplication:
     app = QApplication.instance()
     if app is None:
         app = QApplication([])
-    return cast(QApplication, app)
+    return cast("QApplication", app)
 
 
 @pytest.fixture(autouse=True)
@@ -73,8 +78,8 @@ def _make_prompt_record(prompt_id: uuid.UUID) -> Prompt:
     )
 
 
-def _as_prompt_manager(manager: "_ManagerStub") -> PromptManager:
-    return cast(PromptManager, manager)
+def _as_prompt_manager(manager: _ManagerStub) -> PromptManager:
+    return cast("PromptManager", manager)
 
 
 class _ManagerStub:
@@ -382,10 +387,7 @@ def test_prompt_chain_dialog_wrap_toggle_changes_line_mode(qt_app: QApplication)
     dialog, panel, manager = _build_dialog(manager)
     try:
         assert panel._wrap_checkbox.isChecked() is True  # noqa: SLF001
-        assert (
-            panel._result_view.lineWrapMode()
-            == QTextEdit.LineWrapMode.WidgetWidth
-        )
+        assert panel._result_view.lineWrapMode() == QTextEdit.LineWrapMode.WidgetWidth
         panel._wrap_checkbox.setChecked(False)  # noqa: SLF001
         assert panel._result_view.lineWrapMode() == QTextEdit.LineWrapMode.NoWrap
     finally:

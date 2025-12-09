@@ -117,7 +117,9 @@ class PromptTemplateEditorDialog(QDialog):
         container_layout.addWidget(reset_all, alignment=Qt.AlignmentFlag.AlignLeft)
         container_layout.addStretch(1)
 
-        self._buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self)
+        self._buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self
+        )
         self._buttons.accepted.connect(self._on_accept)  # type: ignore[arg-type]
         self._buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(self._buttons)

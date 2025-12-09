@@ -63,7 +63,7 @@ class _StubChromaClient:
 
 
 def _as_chroma_client(client: _StubChromaClient) -> ClientAPI:
-    return cast(ClientAPI, client)
+    return cast("ClientAPI", client)
 
 
 def _make_prompt(name: str, category: str, tags: list[str]) -> Prompt:

@@ -38,11 +38,11 @@ from core.prompt_manager import PromptManagerError
 
 
 def _patch_main(monkeypatch: pytest.MonkeyPatch, name: str, value: object) -> None:
-    monkeypatch.setattr(cast(Any, main), name, value)
+    monkeypatch.setattr(cast("Any", main), name, value)
 
 
 def _mock_module(name: str) -> Any:
-    return cast(Any, types.ModuleType(name))
+    return cast("Any", types.ModuleType(name))
 
 
 class _DummySettings(SimpleNamespace):

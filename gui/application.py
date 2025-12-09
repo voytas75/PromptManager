@@ -64,7 +64,9 @@ def create_qapplication(argv: Sequence[str] | None = None) -> QApplication:
     """Return an existing QApplication or create a new one with sensible defaults."""
     existing = QApplication.instance()
     if existing is not None:
-        return cast(QApplication, existing)  # Reuse existing instance when running inside tests/tools
+        return cast(
+            "QApplication", existing
+        )  # Reuse existing instance when running inside tests/tools
 
     if _should_force_offscreen(os.environ):
         # Allow running in headless environments by defaulting to the offscreen plugin.

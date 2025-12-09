@@ -136,7 +136,9 @@ class WorkbenchModeDialog(QDialog):
             self._template_list.addItem(item)
         layout.addWidget(self._template_list)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self
+        )
         buttons.accepted.connect(self._on_accept)  # type: ignore[arg-type]
         buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(buttons)
@@ -222,7 +224,9 @@ class VariableCaptureDialog(QDialog):
         self._sample_input.setPlaceholderText("Sample value used for preview")
         self._sample_input.setFixedHeight(80)
         layout.addRow("Sample value", self._sample_input)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self
+        )
         buttons.accepted.connect(self.accept)  # type: ignore[arg-type]
         buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(buttons)
@@ -268,7 +272,9 @@ class WorkbenchExportDialog(QDialog):
         layout.addRow("Tags", self._tags_input)
         self._author_input = QLineEdit(self)
         layout.addRow("Author", self._author_input)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self
+        )
         buttons.accepted.connect(self.accept)  # type: ignore[arg-type]
         buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addRow(buttons)

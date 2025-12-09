@@ -8,7 +8,7 @@ Updates:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -237,7 +237,7 @@ class BackendMaintenanceMixin:
         ):
             button.setEnabled(False)
 
-    def _parent_widget(self) -> "_QWidget":
+    def _parent_widget(self) -> _QWidget:
         return cast("_QWidget", self)
 
     def _on_chroma_compact_clicked(self) -> None:

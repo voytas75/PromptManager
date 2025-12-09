@@ -55,7 +55,7 @@ class _StubManager:
 
 
 def _as_prompt_manager(manager: _StubManager) -> PromptManager:
-    return cast(PromptManager, manager)
+    return cast("PromptManager", manager)
 
 
 @pytest.fixture(scope="module")
@@ -65,7 +65,7 @@ def qt_app() -> QApplication:
     app = QApplication.instance()
     if app is None:
         app = QApplication([])
-    return cast(QApplication, app)
+    return cast("QApplication", app)
 
 
 def test_usage_prompt_activation_opens_editor(qt_app: QApplication) -> None:

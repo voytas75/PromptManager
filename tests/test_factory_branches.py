@@ -8,7 +8,7 @@ Updates:
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -18,7 +18,11 @@ from config.settings import (
     PromptManagerSettings,
 )
 from core.factory import PromptCacheError, _resolve_redis_client, build_prompt_manager
-from core.repository import PromptRepository
+
+if TYPE_CHECKING:  # pragma: no cover - typing helpers
+    from core.repository import PromptRepository
+else:  # pragma: no cover - runtime placeholders
+    PromptRepository = Any
 
 ClientAPI = Any  # type: ignore[assignment]
 Redis = Any  # type: ignore[assignment]
@@ -50,15 +54,15 @@ def _make_settings(**overrides: object) -> PromptManagerSettings:
 
 
 def _as_redis(value: object) -> Redis:
-    return cast(Redis, value)
+    return cast("Redis", value)
 
 
 def _as_repository(value: object) -> PromptRepository:
-    return cast(PromptRepository, value)
+    return cast("PromptRepository", value)
 
 
 def _as_client(value: object) -> ClientAPI:
-    return cast(ClientAPI, value)
+    return cast("ClientAPI", value)
 
 
 def test_resolve_redis_client_returns_existing_instance() -> None:

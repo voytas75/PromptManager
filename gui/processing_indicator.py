@@ -90,7 +90,12 @@ class _ProcessingDialog(QDialog):
     """Compact dialog that centers an indeterminate progress bar."""
 
     def __init__(self, parent: QWidget, *, title: str, message: str) -> None:
-        super().__init__(parent, Qt.WindowType.Dialog | Qt.WindowType.CustomizeWindowHint | Qt.WindowType.WindowTitleHint)
+        super().__init__(
+            parent,
+            Qt.WindowType.Dialog
+            | Qt.WindowType.CustomizeWindowHint
+            | Qt.WindowType.WindowTitleHint,
+        )
         self.setWindowTitle(title)
         self.setModal(True)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
