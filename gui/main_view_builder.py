@@ -1,6 +1,7 @@
 r"""Composable builders for the Prompt Manager main window.
 
 Updates:
+  v0.2.12 - 2025-12-10 - Increase result metadata and token usage contrast for Windows.
   v0.2.11 - 2025-12-08 - Add token usage label beneath workspace result metadata.
   v0.2.10 - 2025-12-07 - Accept Path inputs for analytics log path.
   v0.2.9 - 2025-12-07 - Embed the Workbench tab alongside Chain for inline sessions.
@@ -9,10 +10,7 @@ Updates:
   v0.2.6 - 2025-12-05 - Pass prompt edit callbacks into analytics and chain panels.
   v0.2.5 - 2025-12-05 - Mark module docstring as raw for lint compliance.
   v0.2.4 - 2025-12-05 - Remove prompt template toolbar wiring.
-  v0.2.3 - 2025-12-05 - Drop prompt chain toolbar wiring; Chain tab is always visible.
-  v0.2.2 - 2025-12-05 - Embed prompt chain manager panel as a Chain tab.
-  v0.2.1 - 2025-12-04 - Add "Use web search" toggle to the workspace actions row.
-  v0.2.0-and-earlier - 2025-11-30 - Extract main window UI assembly into reusable builder helpers.
+  v0.2.0-and-earlier - 2025-11-30 - Extract main window UI assembly into reusable builder helpers and early chain/template wiring.
 """
 
 from __future__ import annotations
@@ -349,14 +347,14 @@ def build_main_view(
     result_label = QLabel("No prompt executed yet", parent)
     result_label.setObjectName("resultTitle")
     result_meta = QLabel("", parent)
-    result_meta.setStyleSheet("color: #5b5b5b; font-style: italic;")
+    result_meta.setStyleSheet("color: #ffffff; font-style: italic;")
     token_usage_label = QLabel(
         "Tokens (session): prompt=0 completion=0 total=0 | "
         "Tokens (overall): prompt=0 completion=0 total=0",
         parent,
     )
     token_usage_label.setObjectName("tokenUsageLabel")
-    token_usage_label.setStyleSheet("color: #2d2d2d; font-weight: 600;")
+    token_usage_label.setStyleSheet("color: #ffffff; font-weight: 600;")
 
     result_tabs = QTabWidget(parent)
     output_tab = QWidget(parent)
