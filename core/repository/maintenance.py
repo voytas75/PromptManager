@@ -1,6 +1,7 @@
 """Schema bootstrap and maintenance helpers for the repository.
 
 Updates:
+  v0.11.2 - 2025-12-10 - Add execution session identifier column and index.
   v0.11.1 - 2025-12-07 - Restrict Path import to type checking contexts.
   v0.11.0 - 2025-12-04 - Extract schema management and reset helpers.
 """
@@ -179,6 +180,7 @@ class RepositoryMaintenanceMixin:
                 executed_at TEXT NOT NULL,
                 input_hash TEXT NOT NULL,
                 rating REAL,
+                session_id TEXT,
                 metadata TEXT,
                 FOREIGN KEY(prompt_id) REFERENCES prompts(id) ON DELETE CASCADE
             );
@@ -255,6 +257,12 @@ class RepositoryMaintenanceMixin:
         }
         if "rating" not in execution_columns:
             conn.execute("ALTER TABLE prompt_executions ADD COLUMN rating REAL;")
+        if "session_id" not in execution_columns:
+            conn.execute("ALTER TABLE prompt_executions ADD COLUMN session_id TEXT;")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_prompt_executions_session_id "
+            "ON prompt_executions(session_id);"
+        )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS user_profile (

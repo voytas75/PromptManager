@@ -1,6 +1,7 @@
 """Prompt execution history tracking utilities.
 
 Updates:
+  v0.3.6 - 2025-12-10 - Add session identifier support and per-session token totals helper.
   v0.3.5 - 2025-12-08 - Track token aggregates for summaries and expose usage totals helper.
   v0.3.4 - 2025-11-30 - Fix HistoryTracker docstring spacing to satisfy Ruff.
   v0.3.3 - 2025-11-29 - Move Mapping import into TYPE_CHECKING for Ruff TC003.
@@ -105,6 +106,7 @@ class HistoryTracker:
         metadata: Mapping[str, object] | None = None,
         rating: float | None = None,
         context_metadata: Mapping[str, object] | None = None,
+        session_id: uuid.UUID | None = None,
     ) -> PromptExecution:
         """Persist a successful execution."""
         metadata_payload: dict[str, object] = dict(metadata) if metadata else {}
@@ -118,6 +120,7 @@ class HistoryTracker:
             duration_ms=duration_ms,
             metadata=metadata_payload or None,
             rating=rating,
+            session_id=session_id,
         )
         return self._store(execution)
 
@@ -130,6 +133,7 @@ class HistoryTracker:
         duration_ms: int | None = None,
         metadata: Mapping[str, object] | None = None,
         context_metadata: Mapping[str, object] | None = None,
+        session_id: uuid.UUID | None = None,
     ) -> PromptExecution:
         """Persist a failed execution attempt, including optional context metadata."""
         metadata_payload: dict[str, object] = dict(metadata) if metadata else {}
@@ -144,6 +148,7 @@ class HistoryTracker:
             duration_ms=duration_ms,
             metadata=metadata_payload or None,
             rating=None,
+            session_id=session_id,
         )
         return self._store(execution)
 
@@ -339,6 +344,25 @@ class HistoryTracker:
             total_tokens=_coerce_int(totals.get("total_tokens")),
         )
 
+    def token_usage_for_session(
+        self,
+        session_id: uuid.UUID,
+        *,
+        since: datetime | None = None,
+    ) -> TokenUsageTotals:
+        """Return summed token usage for the provided session."""
+        try:
+            totals = self.repository.get_token_usage_for_session(session_id, since=since)
+        except RepositoryError as exc:
+            raise HistoryTrackerError(
+                f"Unable to compute token usage totals for session {session_id}: {exc}"
+            ) from exc
+        return TokenUsageTotals(
+            prompt_tokens=_coerce_int(totals.get("prompt_tokens")),
+            completion_tokens=_coerce_int(totals.get("completion_tokens")),
+            total_tokens=_coerce_int(totals.get("total_tokens")),
+        )
+
     def _build_execution(
         self,
         *,
@@ -351,6 +375,7 @@ class HistoryTracker:
         error_message: str | None = None,
         executed_at: datetime | None = None,
         rating: float | None = None,
+        session_id: uuid.UUID | None = None,
     ) -> PromptExecution:
         """Create a PromptExecution dataclass instance with sanitised payloads."""
         execution_metadata = dict(metadata) if metadata else None
@@ -365,6 +390,7 @@ class HistoryTracker:
             executed_at=executed_at or datetime.now(UTC),
             metadata=execution_metadata,
             rating=rating,
+            session_id=session_id,
         )
 
     def _store(self, execution: PromptExecution) -> PromptExecution:

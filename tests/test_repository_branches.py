@@ -1,6 +1,7 @@
 """Additional PromptRepository branch coverage tests.
 
 Updates:
+  v0.1.4 - 2025-12-10 - Cover per-session token usage aggregation helper.
   v0.1.3 - 2025-12-08 - Cover token usage total helper for prompt executions.
   v0.1.2 - 2025-12-08 - Close ad-hoc sqlite connections with contextlib.closing during legacy setup.
   v0.1.1 - 2025-11-29 - Import Any for fake connections and wrap long test helpers.
@@ -186,6 +187,40 @@ def test_repository_token_usage_totals(tmp_path: Path) -> None:
         since=datetime.now(UTC) + timedelta(days=1),
     )
     assert future_totals == {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+
+
+def test_repository_token_usage_for_session(tmp_path: Path) -> None:
+    """Summarise token usage per session identifier."""
+    repo = PromptRepository(str(tmp_path / "repo.db"))
+    prompt = _make_prompt()
+    repo.add(prompt)
+    session_id = uuid.uuid4()
+    other_session = uuid.uuid4()
+    first = PromptExecution(
+        id=uuid.uuid4(),
+        prompt_id=prompt.id,
+        request_text="say hi",
+        response_text="hello",
+        status=ExecutionStatus.SUCCESS,
+        session_id=session_id,
+        metadata={"usage": {"prompt_tokens": 2, "completion_tokens": 3, "total_tokens": 5}},
+    )
+    second = PromptExecution(
+        id=uuid.uuid4(),
+        prompt_id=prompt.id,
+        request_text="bye",
+        response_text="bye",
+        status=ExecutionStatus.SUCCESS,
+        session_id=other_session,
+        metadata={"usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}},
+    )
+    repo.add_execution(first)
+    repo.add_execution(second)
+
+    totals = repo.get_token_usage_for_session(session_id)
+    assert totals == {"prompt_tokens": 2, "completion_tokens": 3, "total_tokens": 5}
+    other_totals = repo.get_token_usage_for_session(other_session)
+    assert other_totals == {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}
 
 
 def test_repository_add_execution_duplicate_error(tmp_path: Path) -> None:

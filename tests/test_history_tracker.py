@@ -1,6 +1,7 @@
 """Unit tests for HistoryTracker execution logging.
 
 Updates:
+  v0.1.2 - 2025-12-10 - Cover per-session token usage helper.
   v0.1.1 - 2025-12-08 - Assert token usage aggregates and totals helper.
   v0.1.0 - 2025-11-08 - Introduce HistoryTracker regression coverage.
 """
@@ -200,3 +201,31 @@ def test_history_tracker_token_usage_totals(tmp_path) -> None:
     assert totals.prompt_tokens == 2
     assert totals.completion_tokens == 3
     assert totals.total_tokens == 5
+
+
+def test_history_tracker_token_usage_for_session(tmp_path) -> None:
+    repo = PromptRepository(str(tmp_path / "repo.db"))
+    prompt = _make_prompt()
+    repo.add(prompt)
+    tracker = HistoryTracker(repo)
+    session_id = uuid.uuid4()
+
+    tracker.record_success(
+        prompt_id=prompt.id,
+        request_text="demo",
+        response_text="ok",
+        metadata={"usage": {"prompt_tokens": 3, "completion_tokens": 4, "total_tokens": 7}},
+        session_id=session_id,
+    )
+    tracker.record_success(
+        prompt_id=prompt.id,
+        request_text="demo",
+        response_text="ok",
+        metadata={"usage": {"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3}},
+        session_id=session_id,
+    )
+
+    totals = tracker.token_usage_for_session(session_id)
+    assert totals.prompt_tokens == 4
+    assert totals.completion_tokens == 6
+    assert totals.total_tokens == 10

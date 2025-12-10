@@ -1,6 +1,7 @@
 """Prompt execution persistence, filtering, and analytics helpers.
 
 Updates:
+  v0.11.3 - 2025-12-10 - Add session identifier support and session token aggregates.
   v0.11.2 - 2025-12-08 - Include token aggregates in analytics queries and expose totals helper.
   v0.11.1 - 2025-12-07 - Move Path import under TYPE_CHECKING for lint compliance.
   v0.11.0 - 2025-12-04 - Extract execution CRUD and analytics into mixin.
@@ -43,6 +44,7 @@ class ExecutionStoreMixin:
         "executed_at",
         "input_hash",
         "rating",
+        "session_id",
         "metadata",
     )
 
@@ -281,6 +283,37 @@ class ExecutionStoreMixin:
             for key in ("prompt_tokens", "completion_tokens", "total_tokens")
         }
 
+    def get_token_usage_for_session(
+        self,
+        session_id: uuid.UUID,
+        *,
+        since: datetime | None = None,
+    ) -> dict[str, int]:
+        """Return summed token usage for a specific session identifier."""
+        params: list[Any] = [_stringify_uuid(session_id)]
+        query = (
+            "SELECT "
+            "SUM(COALESCE(json_extract(metadata, '$.usage.prompt_tokens'), 0)) AS prompt_tokens, "
+            "SUM(COALESCE(json_extract(metadata, '$.usage.completion_tokens'), 0)) "
+            "AS completion_tokens, "
+            "SUM(COALESCE(json_extract(metadata, '$.usage.total_tokens'), 0)) AS total_tokens "
+            "FROM prompt_executions WHERE session_id = ?"
+        )
+        if since is not None:
+            query += " AND datetime(executed_at) >= ?"
+            params.append(since.isoformat())
+        try:
+            with _connect(self._db_path) as conn:
+                row = conn.execute(query, params).fetchone()
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to compute session token usage") from exc
+        if row is None:
+            return {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        return {
+            key: int(row[key] or 0)
+            for key in ("prompt_tokens", "completion_tokens", "total_tokens")
+        }
+
     def get_model_usage_breakdown(
         self,
         *,
@@ -455,6 +488,7 @@ class ExecutionStoreMixin:
             "executed_at": row["executed_at"],
             "input_hash": row["input_hash"],
             "rating": row["rating"],
+            "session_id": row["session_id"],
             "metadata": row["metadata"],
         }
         return PromptExecution.from_record(payload)

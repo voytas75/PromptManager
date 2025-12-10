@@ -1,5 +1,6 @@
 """Prompt data model definitions.
 
+Updates: v0.9.1 - 2025-12-10 - Add session identifier to executions for token rollups.
 Updates: v0.8.0 - 2025-11-22 - Persist prompt category slugs for taxonomy management.
 Updates: v0.7.1 - 2025-11-22 - Normalize prompt version labels to integer strings.
 Updates: v0.7.0 - 2025-11-22 - Add prompt versioning and fork lineage dataclasses.
@@ -9,7 +10,6 @@ Updates: v0.4.0 - 2025-11-11 - Add single-user profile dataclass with preference
 Updates: v0.3.0 - 2025-11-09 - Add rating aggregates and execution rating support.
 Updates: v0.2.0 - 2025-11-08 - Add prompt execution records for history logging.
 Updates: v0.1.1 - 2025-11-01 - Filtered null metadata fields for Chroma compatibility.
-Updates: v0.1.0 - 2025-10-30 - Initial Prompt schema with serialization helpers.
 """
 
 from __future__ import annotations
@@ -391,6 +391,7 @@ class PromptExecution:
     executed_at: datetime = field(default_factory=_utc_now)
     input_hash: str = ""
     rating: float | None = None
+    session_id: uuid.UUID | None = None
     metadata: MutableMapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
@@ -411,6 +412,7 @@ class PromptExecution:
             "executed_at": self.executed_at.isoformat(),
             "input_hash": self.input_hash,
             "rating": self.rating,
+            "session_id": str(self.session_id) if self.session_id is not None else None,
             "metadata": self.metadata,
         }
 
@@ -435,6 +437,9 @@ class PromptExecution:
             executed_at=_ensure_datetime(data.get("executed_at")),
             input_hash=str(data.get("input_hash") or ""),
             rating=(float(data["rating"]) if data.get("rating") not in (None, "") else None),
+            session_id=_ensure_uuid(data["session_id"])
+            if data.get("session_id") not in (None, "")
+            else None,
             metadata=_deserialize_metadata(data.get("metadata")),
         )
 
