@@ -1,6 +1,7 @@
 """LiteLLM-backed prompt execution helpers.
 
 Updates:
+  v0.4.3 - 2025-12-10 - Normalise LiteLLM usage payloads so token counts persist across platforms.
   v0.4.2 - 2025-11-30 - Fix docstring spacing for Ruff and improve helper comments.
   v0.4.1 - 2025-11-29 - Guard Prompt/UUID imports and wrap payload handling lines.
   v0.4.0 - 2025-11-26 - Add streaming support for LiteLLM prompt execution.
@@ -23,6 +24,7 @@ from .litellm_adapter import (
     apply_configured_drop_params,
     call_completion_with_fallback,
     get_completion,
+    serialise_litellm_response,
 )
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -201,8 +203,11 @@ class CodexExecutor:
             if isinstance(usage_value, Mapping):
                 usage_mapping = cast("Mapping[str, Any]", usage_value)
                 usage = {str(key): value for key, value in usage_mapping.items()}
+                payload_dict["usage"] = usage
             else:
-                usage = {}
+                usage = _normalise_usage(usage_value)
+                if usage:
+                    payload_dict["usage"] = usage
             raw_payload = payload_dict
 
         if stream_enabled:
@@ -353,11 +358,30 @@ def _extract_stream_text(payload: Any) -> str:
 
 def _extract_stream_usage(payload: Any) -> dict[str, Any]:
     """Return usage metadata from a streaming payload if present."""
-    empty: dict[str, Any] = {}
     if not isinstance(payload, Mapping):
-        return empty
+        return {}
     usage_value = cast("Mapping[str, Any]", payload).get("usage")
+    return _normalise_usage(usage_value)
+
+
+def _normalise_usage(usage_value: object | None) -> dict[str, Any]:
+    """Return a dictionary view of LiteLLM usage payloads."""
+    if usage_value is None:
+        return {}
     if isinstance(usage_value, Mapping):
         usage_mapping = cast("Mapping[str, Any]", usage_value)
         return {str(key): value for key, value in usage_mapping.items()}
-    return empty
+    serialised = serialise_litellm_response(usage_value)
+    if serialised and isinstance(serialised, Mapping):
+        serialised_mapping = cast("Mapping[str, Any]", serialised)
+        return {str(key): value for key, value in serialised_mapping.items()}
+    prompt_tokens = getattr(usage_value, "prompt_tokens", None)
+    completion_tokens = getattr(usage_value, "completion_tokens", None)
+    total_tokens = getattr(usage_value, "total_tokens", None)
+    if prompt_tokens is None and completion_tokens is None and total_tokens is None:
+        return {}
+    return {
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens": total_tokens,
+    }

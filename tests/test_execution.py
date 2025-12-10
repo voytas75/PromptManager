@@ -165,6 +165,49 @@ def test_supports_reasoning_marks_reasoning_models() -> None:
     assert _supports_reasoning("gpt-3.5") is False
 
 
+def test_codex_executor_normalises_usage_objects(monkeypatch: pytest.MonkeyPatch) -> None:
+    prompt = _make_prompt()
+    executor = CodexExecutor(model="gpt-test")
+
+    class _Usage:
+        def __init__(self) -> None:
+            self.prompt_tokens = 7
+            self.completion_tokens = 9
+            self.total_tokens = 16
+
+        def model_dump(self) -> dict[str, int]:
+            return {
+                "prompt_tokens": self.prompt_tokens,
+                "completion_tokens": self.completion_tokens,
+                "total_tokens": self.total_tokens,
+            }
+
+    usage = _Usage()
+
+    def fake_get_completion() -> tuple[Callable[..., Any], type[Exception]]:
+        return (lambda **_: None), RuntimeError
+
+    def fake_call_completion(
+        request: Mapping[str, Any],
+        completion: Callable[..., Any],  # noqa: ARG001
+        lite_llm_exception: type[Exception],  # noqa: ARG001
+        *,
+        drop_candidates: Sequence[str],  # noqa: ARG001
+        pre_dropped: Sequence[str],  # noqa: ARG001
+    ) -> Mapping[str, Any]:
+        assert request["messages"][-1]["content"] == "Count tokens"
+        return {"choices": [{"message": {"content": "Hello!"}}], "usage": usage}
+
+    monkeypatch.setattr("core.execution.get_completion", fake_get_completion)
+    monkeypatch.setattr("core.execution.call_completion_with_fallback", fake_call_completion)
+
+    result = executor.execute(prompt, "Count tokens")
+
+    expected_usage = {"prompt_tokens": 7, "completion_tokens": 9, "total_tokens": 16}
+    assert result.usage == expected_usage
+    assert result.raw_response.get("usage") == expected_usage
+
+
 def test_extract_completion_text_handles_multiple_shapes() -> None:
     message_payload = {"choices": [{"message": {"content": "From message"}}]}
     delta_payload = {"choices": [{"delta": {"content": "From delta"}}]}
