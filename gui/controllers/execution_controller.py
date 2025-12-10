@@ -21,7 +21,7 @@ import uuid
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from html import escape
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QGuiApplication, QTextCursor
@@ -984,7 +984,12 @@ class ExecutionController:
         if history_entry is not None:
             executed_at = history_entry.executed_at.astimezone()
             meta_parts.append(f"Logged: {executed_at.strftime('%Y-%m-%d %H:%M:%S %Z')}")
-        usage_summary = self._format_usage_summary(outcome.result.usage)
+        usage_source: Mapping[str, Any] | None = outcome.result.usage
+        if usage_source is None and history_entry is not None:
+            metadata = history_entry.metadata
+            if isinstance(metadata, Mapping):
+                usage_source = cast("Mapping[str, Any] | None", metadata.get("usage"))
+        usage_summary = self._format_usage_summary(usage_source)
         if usage_summary:
             meta_parts.append(usage_summary)
         self._result_meta.setText(" | ".join(meta_parts))
@@ -1003,7 +1008,11 @@ class ExecutionController:
         self._refresh_chat_history_view()
         self._query_input.clear()
         self._query_input.setFocus(Qt.FocusReason.ShortcutFocusReason)
-        self._record_session_usage(outcome.result.usage)
+        self._record_session_usage(usage_source)
+        try:
+            self._overall_usage = self._manager.get_token_usage_totals()
+        except (PromptHistoryError, PromptManagerError):
+            logger.debug("Unable to refresh overall token usage", exc_info=True)
 
     def _reset_chat_session(self, *, clear_view: bool = True) -> None:
         self._chat_prompt_id = None
