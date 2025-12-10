@@ -1,6 +1,7 @@
 """Tests for configuration loading and validation logic.
 
 Updates:
+  v0.2.4 - 2025-12-10 - Cover LiteLLM logging toggle env parsing.
   v0.2.3 - 2025-12-07 - Cover Google web search provider secrets and env loading.
   v0.2.2 - 2025-12-07 - Cover SerpApi provider secrets and env loading.
   v0.2.1 - 2025-12-07 - Cover Serper provider secrets and env loading.
@@ -9,10 +10,7 @@ Updates:
   v0.1.8 - 2025-12-04 - Cover .env sourcing for Exa API secrets.
   v0.1.7 - 2025-11-30 - Add docstrings to tests for lint compliance.
   v0.1.6 - 2025-11-30 - Cover routing for category suggestion workflow.
-  v0.1.5 - 2025-11-29 - Wrap embedding backend tests for Ruff line length.
-  v0.1.4 - 2025-11-05 - Cover LiteLLM inference model configuration.
-  v0.1.3 - 2025-11-15 - Warn and ignore LiteLLM API secrets supplied via JSON configuration.
-  v0.1.2-and-earlier - 2025-11-14 - LiteLLM API precedence tests and earlier history.
+  v0.1.5-and-earlier - 2025-11-29 - Embedding backend and LiteLLM secret precedence tests.
 """
 
 from __future__ import annotations
@@ -38,6 +36,9 @@ def _clear_litellm_env(monkeypatch: MonkeyPatch) -> None:
         "PROMPT_MANAGER_LITELLM_WORKFLOW_MODELS",
         "PROMPT_MANAGER_LITELLM_TTS_MODEL",
         "PROMPT_MANAGER_LITELLM_TTS_STREAM",
+        "PROMPT_MANAGER_LITELLM_LOGGING_ENABLED",
+        "PROMPT_MANAGER_LITELLM_LOGGING",
+        "PROMPT_MANAGER_LITELLM_LOGS",
         "AZURE_OPENAI_API_KEY",
         "AZURE_OPENAI_ENDPOINT",
         "AZURE_OPENAI_API_VERSION",
@@ -49,6 +50,8 @@ def _clear_litellm_env(monkeypatch: MonkeyPatch) -> None:
         "LITELLM_WORKFLOW_MODELS",
         "LITELLM_TTS_MODEL",
         "LITELLM_TTS_STREAM",
+        "LITELLM_LOGGING",
+        "LITELLM_LOGS",
         "PROMPT_MANAGER_WEB_SEARCH_PROVIDER",
         "PROMPT_MANAGER_EXA_API_KEY",
         "EXA_API_KEY",
@@ -817,6 +820,18 @@ def test_litellm_stream_flag_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) 
     settings = load_settings()
 
     assert settings.litellm_stream is True
+
+
+def test_litellm_logging_flag_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    """Read the LiteLLM logging toggle from environment variables."""
+    tmp_config = tmp_path / "config.json"
+    tmp_config.write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(tmp_config))
+    monkeypatch.setenv("PROMPT_MANAGER_LITELLM_LOGGING", "true")
+
+    settings = load_settings()
+
+    assert settings.litellm_logging_enabled is True
 
 
 def test_embedding_backend_defaults_to_litellm(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:

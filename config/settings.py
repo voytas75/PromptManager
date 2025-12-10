@@ -1,6 +1,7 @@
 """Settings management utilities for Prompt Manager configuration.
 
 Updates:
+  v0.5.15 - 2025-12-10 - Add LiteLLM logging toggle and env binding.
   v0.5.14 - 2025-12-07 - Add Google web search provider configuration and env parsing.
   v0.5.13 - 2025-12-07 - Add PrivateBin share provider configuration settings.
   v0.5.12 - 2025-12-07 - Add SerpApi web search provider configuration and env parsing.
@@ -9,12 +10,7 @@ Updates:
   v0.5.9 - 2025-12-05 - Tighten dotenv helpers for lint compliance.
   v0.5.8 - 2025-12-04 - Add auto-open share link preference with GUI binding.
   v0.5.7 - 2025-12-04 - Load .env secrets so web search keys persist like LiteLLM keys.
-  v0.5.6 - 2025-12-04 - Add Exa web search provider configuration.
-  v0.5.5 - 2025-12-03 - Add LiteLLM TTS streaming configuration toggle.
-  v0.5.4 - 2025-12-03 - Add LiteLLM TTS model configuration for voice playback.
-  v0.5.3 - 2025-11-30 - Fix validator docstring spacing for lint compliance.
-  v0.5.2-and-earlier - 2025-11-30 - Earlier LiteLLM routing, template override, and
-    structure-only refinement settings.
+  v0.5.6-and-earlier - 2025-12-03 - Exa/voice prompt settings and earlier LiteLLM routing tweaks.
 """
 
 from __future__ import annotations
@@ -258,6 +254,10 @@ class PromptManagerSettings(BaseSettings):
         default=False,
         description="Enable streaming responses when executing prompts via LiteLLM.",
     )
+    litellm_logging_enabled: bool = Field(
+        default=False,
+        description="Enable LiteLLM library logging (disabled by default to reduce noise).",
+    )
     litellm_workflow_models: dict[str, Literal["fast", "inference"]] | None = Field(
         default=None,
         description=(
@@ -435,6 +435,15 @@ class PromptManagerSettings(BaseSettings):
                     "litellm_tts_stream",
                 ],
                 "litellm_stream": ["LITELLM_STREAM", "litellm_stream"],
+                "litellm_logging_enabled": [
+                    "LITELLM_LOGGING",
+                    "litellm_logging",
+                    "LITELLM_LOGS",
+                    "litellm_logs",
+                    "PROMPT_MANAGER_LITELLM_LOGGING",
+                    "PROMPT_MANAGER_LITELLM_LOGS",
+                    "PROMPT_MANAGER_LITELLM_LOGGING_ENABLED",
+                ],
                 "litellm_workflow_models": ["LITELLM_WORKFLOW_MODELS", "litellm_workflow_models"],
                 "embedding_backend": ["EMBEDDING_BACKEND", "embedding_backend"],
                 "embedding_model": ["EMBEDDING_MODEL", "embedding_model"],
@@ -817,6 +826,12 @@ class PromptManagerSettings(BaseSettings):
                     "litellm_tts_stream",
                 ],
                 "litellm_stream": ["LITELLM_STREAM", "litellm_stream"],
+                "litellm_logging_enabled": [
+                    "LITELLM_LOGGING",
+                    "litellm_logging",
+                    "LITELLM_LOGS",
+                    "litellm_logs",
+                ],
                 "web_search_provider": ["WEB_SEARCH_PROVIDER", "web_search_provider"],
                 "exa_api_key": ["EXA_API_KEY", "exa_api_key"],
                 "tavily_api_key": ["TAVILY_API_KEY", "tavily_api_key"],
@@ -951,6 +966,7 @@ class PromptManagerSettings(BaseSettings):
                     "litellm_reasoning_effort",
                     "litellm_tts_stream",
                     "litellm_stream",
+                    "litellm_logging_enabled",
                     "litellm_workflow_models",
                     "litellm_tts_model",
                     "embedding_backend",

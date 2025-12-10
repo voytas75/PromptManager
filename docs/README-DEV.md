@@ -60,6 +60,7 @@ All settings are defined via `pydantic-settings` in `config/settings.py`. Provid
 | `PROMPT_MANAGER_LITELLM_DROP_PARAMS` | Comma/JSON list of parameters stripped before sending | `max_tokens,temperature` |
 | `PROMPT_MANAGER_LITELLM_REASONING_EFFORT` | `minimal`, `medium`, or `high` for OpenAI reasoning models | `medium` |
 | `PROMPT_MANAGER_LITELLM_STREAM` | Enable streaming responses (`true`/`false`) | `true` |
+| `PROMPT_MANAGER_LITELLM_LOGGING` | Allow LiteLLM library logs to surface (`true`/`false`) | `false` |
 | `PROMPT_MANAGER_LITELLM_TTS_MODEL` | LiteLLM text-to-speech model id used for voice playback | `openai/tts-1` |
 | `PROMPT_MANAGER_LITELLM_TTS_STREAM` | Stream LiteLLM TTS audio so playback starts mid-download (`true`/`false`) | `true` |
 | `PROMPT_MANAGER_WEB_SEARCH_PROVIDER` | Web search provider slug (`exa`, `tavily`, `serper`, `serpapi`, `google`, `random`, or leave empty to disable) | `tavily` |

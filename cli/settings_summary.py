@@ -1,6 +1,7 @@
 """Printable summaries for Prompt Manager configuration.
 
 Updates:
+  v0.1.8 - 2025-12-10 - Surface LiteLLM logging toggle in summaries.
   v0.1.7 - 2025-12-07 - Surface Google web search credentials in CLI summaries.
   v0.1.6 - 2025-12-07 - Include PrivateBin share configuration in summaries.
   v0.1.5 - 2025-12-07 - Surface SerpApi provider credentials in CLI summaries.
@@ -39,6 +40,7 @@ def print_settings_summary(settings: PromptManagerSettings) -> None:
     litellm_tts_model = getattr(settings, "litellm_tts_model", None)
     litellm_tts_stream = getattr(settings, "litellm_tts_stream", True)
     litellm_stream = getattr(settings, "litellm_stream", False)
+    litellm_logging_enabled = getattr(settings, "litellm_logging_enabled", False)
     litellm_workflow_models = getattr(settings, "litellm_workflow_models", None) or {}
     embedding_backend = getattr(settings, "embedding_backend", None)
     embedding_model = getattr(settings, "embedding_model", None)
@@ -102,6 +104,7 @@ def print_settings_summary(settings: PromptManagerSettings) -> None:
         f"LiteLLM API version: {litellm_api_version or 'not set'}",
         f"Reasoning effort: {litellm_reasoning_effort or 'not set'}",
         f"Streaming enabled: {'yes' if litellm_stream else 'no'}",
+        f"LiteLLM logging: {'enabled' if litellm_logging_enabled else 'disabled'}",
         "",
         "LiteLLM routing",
         "----------------",

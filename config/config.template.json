@@ -7,6 +7,7 @@
   "litellm_inference_model": null,
   "litellm_api_version": "2025-04-01-preview",
   "litellm_stream": false,
+  "litellm_logging_enabled": false,
   "litellm_drop_params": ["max_tokens", "max_output_tokens", "temperature", "timeout"],
   "litellm_reasoning_effort": null,
   "litellm_tts_model": null,

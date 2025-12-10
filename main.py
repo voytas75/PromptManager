@@ -1,6 +1,7 @@
 """Application entry point for Prompt Manager.
 
 Updates:
+  v0.9.3 - 2025-12-10 - Apply LiteLLM logging toggle from settings.
   v0.9.2 - 2025-12-09 - Offer to create config/config.json from template when missing.
   v0.9.1 - 2025-12-05 - Remove duplicate COMMAND_SPECS import flagged by Ruff.
   v0.9.0 - 2025-12-04 - Modularise CLI parsing, commands, and GUI launcher helpers.
@@ -10,7 +11,6 @@ Updates:
   v0.8.0 - 2025-02-14 - Add embedding diagnostics CLI command.
   v0.7.9 - 2025-11-28 - Add benchmark and scenario refresh CLI commands.
   v0.7.8 - 2025-12-07 - Add CLI command to rebuild embeddings from scratch.
-  v0.7.7 - 2025-11-05 - Surface LiteLLM workflow routing details in CLI summaries.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ else:
     PromptManagerSettingsType = _Any
 from cli.gui_launcher import run_default_mode
 from cli.parser import parse_args
-from cli.runtime import setup_logging as _runtime_setup_logging
+from cli.runtime import configure_litellm_logging, setup_logging as _runtime_setup_logging
 from cli.settings_summary import print_settings_summary
 from core import (
     build_analytics_snapshot as _core_build_analytics_snapshot,
@@ -151,6 +151,7 @@ def main() -> int:
             logger.error("Failed to load settings: %s", exc)
             return 2
 
+    configure_litellm_logging(bool(getattr(settings, "litellm_logging_enabled", False)))
     if args.print_settings:
         print_settings_summary(settings)
         return 0

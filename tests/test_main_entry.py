@@ -1,6 +1,7 @@
 """Lightweight integration checks for main module.
 
 Updates:
+  v0.5.5 - 2025-12-10 - Cover LiteLLM logging toggle helper.
   v0.5.4 - 2025-12-09 - Offer to create config/config.json during first-run tests.
   v0.5.3 - 2025-12-08 - Include token usage aggregates in execution analytics helper.
   v0.5.2 - 2025-12-08 - Route monkeypatches through helper to satisfy Pyright.
@@ -564,6 +565,33 @@ def test_setup_logging_basic_config_fallback(
         logging.getLogger("prompt_manager.testing").info("hello from fallback")
 
     assert "hello from fallback" in caplog.text
+
+
+def test_configure_litellm_logging_toggles_loggers() -> None:
+    """Toggle LiteLLM loggers on and off."""
+    from cli.runtime import configure_litellm_logging
+
+    targets = [
+        logging.getLogger("litellm"),
+        logging.getLogger("litellm.proxy"),
+        logging.getLogger("litellm.proxy.proxy_server"),
+    ]
+    original_states = [(logger.disabled, logger.level, logger.propagate) for logger in targets]
+    try:
+        configure_litellm_logging(False)
+        for logger in targets:
+            assert logger.disabled is True
+            assert logger.level == logging.CRITICAL
+
+        configure_litellm_logging(True)
+        for logger in targets:
+            assert logger.disabled is False
+            assert logger.level == logging.NOTSET
+    finally:
+        for logger, (disabled, level, propagate) in zip(targets, original_states):
+            logger.disabled = disabled
+            logger.setLevel(level)
+            logger.propagate = propagate
 
 
 def test_main_entrypoint_guard_executes(

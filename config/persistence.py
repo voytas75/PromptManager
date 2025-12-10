@@ -1,6 +1,7 @@
 """Helpers for persisting runtime configuration without Qt dependencies.
 
 Updates:
+  v0.3.4 - 2025-12-10 - Persist LiteLLM logging flag while keeping secrets filtered.
   v0.3.3 - 2025-12-07 - Guard Google Programmable Search credentials when persisting.
   v0.3.2 - 2025-12-07 - Guard SerpApi API keys alongside other secrets during persistence.
   v0.3.1 - 2025-12-07 - Guard Serper API keys alongside other secrets during persistence.
@@ -9,10 +10,7 @@ Updates:
   v0.2.8 - 2025-12-04 - Guard Exa API keys and persist web search provider selection.
   v0.2.7 - 2025-12-03 - Persist LiteLLM TTS streaming flag.
   v0.2.6 - 2025-12-03 - Persist LiteLLM TTS model selection for voice playback.
-  v0.2.5 - 2025-12-06 - Persist embedding backend/model selections and drop defaults.
-  v0.2.4 - 2025-12-03 - Normalise chat palette overrides and skip default colours.
-  v0.2.3 - 2025-11-05 - Persist theme mode and chat appearance overrides.
-  v0.2.2-and-earlier - 2025-11-05 - Early chat appearance and LiteLLM routing persistence.
+  v0.2.5-and-earlier - 2025-12-03 - Embedding/appearance persistence and earlier helpers.
 """
 
 from __future__ import annotations
@@ -136,6 +134,8 @@ def persist_settings_to_config(updates: dict[str, object | None]) -> None:
         if key in secret_keys:
             config_data.pop(key, None)
             continue
+        if key == "litellm_logging_enabled":
+            value = True if bool(value) else None
         if key == "litellm_drop_params":
             value = _normalise_drop_params(value)
         if key == "theme_mode":

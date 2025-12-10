@@ -1,6 +1,7 @@
 """Verify settings persistence helpers without requiring PySide runtime.
 
 Updates:
+  v0.1.2 - 2025-12-10 - Persist LiteLLM logging toggle when enabled.
   v0.1.1 - 2025-12-07 - Ensure Google Programmable Search credentials are never persisted.
   v0.1.0 - 2025-11-30 - Initial persistence coverage for runtime settings.
 """
@@ -34,6 +35,22 @@ def test_persist_settings_to_config(tmp_path, monkeypatch):
     assert data["litellm_drop_params"] == ["max_tokens", "temperature"]
     assert data["litellm_tts_model"] == "openai/tts-1"
     assert data["litellm_tts_stream"] is False
+
+
+def test_persist_settings_to_config_handles_litellm_logging(tmp_path, monkeypatch):
+    """Write LiteLLM logging flag when enabling logs."""
+    monkeypatch.chdir(tmp_path)
+
+    from config.persistence import persist_settings_to_config
+
+    persist_settings_to_config({"litellm_logging_enabled": True})
+    config_path = Path("config/config.json")
+    data = json.loads(config_path.read_text(encoding="utf-8"))
+    assert data["litellm_logging_enabled"] is True
+
+    persist_settings_to_config({"litellm_logging_enabled": False})
+    data = json.loads(config_path.read_text(encoding="utf-8"))
+    assert "litellm_logging_enabled" not in data
 
 
 def test_persist_settings_to_config_persists_chat_palette_override(tmp_path, monkeypatch):
