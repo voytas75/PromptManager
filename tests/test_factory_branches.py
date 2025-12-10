@@ -1,6 +1,7 @@
 """Branch coverage tests for core.factory helpers.
 
 Updates:
+  v0.1.3 - 2025-12-10 - Cover LiteLLM offline guidance and embedding readiness paths.
   v0.1.2 - 2025-12-08 - Allow description generator defaults in dependency forwarding test.
   v0.1.1 - 2025-12-08 - Use real settings objects and typed casts for Pyright.
   v0.1.0 - 2025-10-30 - Add Redis client resolution unit tests.
@@ -17,7 +18,13 @@ from config.settings import (
     DEFAULT_EMBEDDING_MODEL,
     PromptManagerSettings,
 )
-from core.factory import PromptCacheError, _resolve_redis_client, build_prompt_manager
+from core.factory import (
+    PromptCacheError,
+    _determine_embedding_status,
+    _determine_llm_status,
+    _resolve_redis_client,
+    build_prompt_manager,
+)
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from core.repository import PromptRepository
@@ -183,3 +190,63 @@ def test_build_prompt_manager_bubbles_embedding_errors(monkeypatch: pytest.Monke
     with pytest.raises(RuntimeError) as excinfo:
         build_prompt_manager(settings)
     assert "Unable to configure embedding backend" in str(excinfo.value)
+
+
+def test_determine_llm_status_requires_models_and_keys() -> None:
+    settings = _make_settings(
+        litellm_model=None,
+        litellm_inference_model=None,
+        litellm_api_key=None,
+    )
+
+    ready, reason = _determine_llm_status(settings)
+
+    assert ready is False
+    assert reason is not None
+    assert "PROMPT_MANAGER_LITELLM_MODEL" in reason
+    assert "PROMPT_MANAGER_LITELLM_API_KEY" in reason
+
+
+def test_determine_llm_status_requires_azure_base_and_version() -> None:
+    settings = _make_settings(
+        litellm_model="azure/gpt-4o-mini",
+        litellm_api_key="test-key",
+        litellm_api_base=None,
+        litellm_api_version=None,
+    )
+
+    ready, reason = _determine_llm_status(settings)
+
+    assert ready is False
+    assert reason is not None
+    assert "PROMPT_MANAGER_LITELLM_API_BASE" in reason
+    assert "PROMPT_MANAGER_LITELLM_API_VERSION" in reason
+
+
+def test_determine_embedding_status_marks_azure_missing_base() -> None:
+    settings = _make_settings(
+        embedding_backend="litellm",
+        embedding_model="azure/text-embedding-3-small",
+        litellm_api_key="test-key",
+        litellm_api_base=None,
+        litellm_api_version=None,
+    )
+
+    ready, reason = _determine_embedding_status(settings)
+
+    assert ready is False
+    assert reason is not None
+    assert "PROMPT_MANAGER_LITELLM_API_BASE" in reason
+    assert "PROMPT_MANAGER_LITELLM_API_VERSION" in reason
+
+
+def test_determine_embedding_status_accepts_deterministic_backend() -> None:
+    settings = _make_settings(
+        embedding_backend="deterministic",
+        embedding_model="hash",
+    )
+
+    ready, reason = _determine_embedding_status(settings)
+
+    assert ready is True
+    assert reason is None

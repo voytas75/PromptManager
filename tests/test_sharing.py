@@ -1,6 +1,7 @@
 """Tests for prompt sharing helpers.
 
 Updates:
+  v0.1.2 - 2025-12-10 - Cover prompt formatting helper and PrivateBin URL validation.
   v0.1.1 - 2025-12-07 - Cover PrivateBin provider payload construction and error handling.
   v0.1.0 - 2025-12-07 - Cover shared footer helper for prompts and results.
 """
@@ -14,7 +15,13 @@ import pytest
 from pytest import MonkeyPatch
 
 from core.exceptions import ShareProviderError
-from core.sharing import PrivateBinProvider, RentryProvider, append_share_footer
+from core.sharing import (
+    PrivateBinProvider,
+    RentryProvider,
+    _normalise_privatebin_base_url,
+    append_share_footer,
+    format_prompt_for_share,
+)
 
 
 class _DummyHttpxResponse:
@@ -211,3 +218,51 @@ def test_rentry_provider_requires_csrf(monkeypatch: MonkeyPatch) -> None:
         provider.share("text", prompt=None)
 
     assert "CSRF" in str(excinfo.value)
+
+
+def test_format_prompt_for_share_includes_sections(monkeypatch: MonkeyPatch) -> None:
+    """Ensure prompt payload includes all sections and the footer."""
+
+    import uuid
+
+    from models.prompt_model import Prompt
+
+    monkeypatch.setattr("core.sharing._current_share_date", lambda: "2025-12-31")
+
+    prompt = Prompt(
+        id=uuid.uuid4(),
+        name="Shareable Prompt",
+        description="Describe the behaviour",
+        category="demo",
+        tags=["tag-b", "tag-a"],
+        language="pl",
+        context="Do the thing",
+        example_input="input sample",
+        example_output="output sample",
+        scenarios=[" first ", "second"],
+    )
+
+    payload = format_prompt_for_share(prompt)
+
+    assert payload.startswith("# Shareable Prompt\n")
+    assert "Category: demo" in payload
+    assert "Language: pl" in payload
+    assert "tag-a, tag-b" in payload  # tags sorted and trimmed
+    assert "## Description" in payload and "Describe the behaviour" in payload
+    assert "## Prompt Body" in payload and "Do the thing" in payload
+    assert "## Examples" in payload and "input sample" in payload
+    assert "output sample" in payload
+    assert "## Scenarios" in payload and "- first" in payload and "- second" in payload
+    assert payload.rstrip().endswith(
+        "---\nPromptManager | Author: https://github.com/voytas75 | Shared: 2025-12-31"
+    )
+
+
+def test_normalise_privatebin_base_url_adds_trailing_slash() -> None:
+    """Normalise base URLs and reject missing schemes."""
+
+    normalised = _normalise_privatebin_base_url("https://pb.local/nested")
+    assert normalised == "https://pb.local/nested/"
+
+    with pytest.raises(ValueError):
+        _normalise_privatebin_base_url("pb.local")

@@ -1,28 +1,37 @@
 """Unit tests for backend and LiteLLM wiring mixins.
 
 Updates:
+  v0.1.1 - 2025-12-10 - Cover user state and prompt note support mixins.
   v0.1.0 - 2025-12-03 - Cover backend bootstrap and LiteLLM helper mixins.
 """
 
 from __future__ import annotations
 
+import uuid
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 
+import pytest
+
 from core.embedding import EmbeddingSyncWorker
+from core.exceptions import PromptNoteNotFoundError, PromptNoteStorageError
 from core.intent_classifier import IntentClassifier
 from core.notifications import NotificationCenter
 from core.prompt_manager.backends import NullEmbeddingWorker
 from core.prompt_manager.bootstrap import BackendBootstrapMixin
 from core.prompt_manager.litellm_helpers import LiteLLMWiringMixin
+from core.prompt_manager.prompt_notes import PromptNoteSupport
+from core.prompt_manager.state import UserStateMixin
 from core.prompt_manager.workflows import LiteLLMWorkflowMixin
+from core.repository import PromptRepository, RepositoryError, RepositoryNotFoundError
+from models.prompt_model import UserProfile
+from models.prompt_note import PromptNote
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    import pytest
-
     from core.execution import CodexExecutor
+    from core.history_tracker import HistoryTracker
     from core.name_generation import LiteLLMNameGenerator
 
 
@@ -263,3 +272,162 @@ def test_litellm_mixin_uses_supplied_intent_classifier() -> None:
     assert harness.litellm_fast_model == "fast"
     assert harness.litellm_workflow_models == {}
     assert executor.reasoning_effort == "medium"
+
+
+class _StateHarness(UserStateMixin):
+    def __init__(self, repository: object) -> None:
+        self._repository = cast("PromptRepository", repository)
+        self._history_tracker: HistoryTracker | None = None
+        self._user_profile: UserProfile | None = None
+
+
+class _UserRepoStub:
+    def __init__(self, profile: UserProfile | None = None, raise_error: bool = False) -> None:
+        self.profile = profile
+        self.raise_error = raise_error
+        self.calls = 0
+
+    def get_user_profile(self) -> UserProfile | None:
+        self.calls += 1
+        if self.raise_error:
+            raise RepositoryError("boom")
+        return self.profile
+
+
+def test_user_state_mixin_prefers_explicit_profile() -> None:
+    repo = _UserRepoStub(profile=UserProfile(id=uuid.uuid4(), username="repo"))
+    harness = _StateHarness(repo)
+
+    tracker = cast("HistoryTracker", object())
+    profile = UserProfile(id=uuid.uuid4(), username="explicit")
+
+    harness._initialise_user_state(history_tracker=tracker, user_profile=profile)
+
+    assert harness._history_tracker is tracker
+    assert harness._user_profile == profile
+    assert repo.calls == 0
+
+
+def test_user_state_mixin_loads_repository_profile_and_handles_errors() -> None:
+    repo = _UserRepoStub(profile=UserProfile(id=uuid.uuid4(), username="repo"))
+    harness = _StateHarness(repo)
+
+    harness._initialise_user_state(history_tracker=None, user_profile=None)
+
+    assert harness._user_profile == repo.profile
+    assert repo.calls == 1
+
+    failing_repo = _UserRepoStub(raise_error=True)
+    failing_harness = _StateHarness(failing_repo)
+    failing_harness._initialise_user_state(history_tracker=None, user_profile=None)
+
+    assert failing_harness._user_profile is None
+    assert failing_repo.calls == 1
+
+
+class _PromptNoteRepoStub:
+    def __init__(self) -> None:
+        self.notes: dict[uuid.UUID, PromptNote] = {}
+        self.fail_mode: str | None = None
+
+    def list_prompt_notes(self) -> list[PromptNote]:
+        if self.fail_mode == "list":
+            raise RepositoryError("list failed")
+        return list(self.notes.values())
+
+    def get_prompt_note(self, note_id: uuid.UUID) -> PromptNote:
+        if self.fail_mode == "get-error":
+            raise RepositoryError("get failed")
+        try:
+            return self.notes[note_id]
+        except KeyError as exc:
+            raise RepositoryNotFoundError("missing") from exc
+
+    def add_prompt_note(self, note: PromptNote) -> PromptNote:
+        if self.fail_mode == "add":
+            raise RepositoryError("add failed")
+        self.notes[note.id] = note
+        return note
+
+    def update_prompt_note(self, note: PromptNote) -> PromptNote:
+        if self.fail_mode == "update-error":
+            raise RepositoryError("update failed")
+        if self.fail_mode == "update-missing":
+            raise RepositoryNotFoundError("missing")
+        if note.id not in self.notes:
+            raise RepositoryNotFoundError("missing")
+        self.notes[note.id] = note
+        return note
+
+    def delete_prompt_note(self, note_id: uuid.UUID) -> None:
+        if self.fail_mode == "delete-error":
+            raise RepositoryError("delete failed")
+        if note_id not in self.notes:
+            raise RepositoryNotFoundError("missing")
+        self.notes.pop(note_id, None)
+
+
+class _PromptNoteHarness(PromptNoteSupport):
+    def __init__(self, repository: _PromptNoteRepoStub) -> None:
+        self._repository = cast("PromptRepository", repository)
+
+
+def test_prompt_note_support_crud_and_touching() -> None:
+    repo = _PromptNoteRepoStub()
+    harness = _PromptNoteHarness(repo)
+
+    note = PromptNote(id=uuid.uuid4(), note="hello")
+    before = note.last_modified
+
+    created = harness.create_prompt_note(note)
+    assert created is note
+    assert created.last_modified >= before
+    assert harness.list_prompt_notes() == [note]
+
+    updated_note = PromptNote(id=note.id, note="updated")
+    updated = harness.update_prompt_note(updated_note)
+    assert updated.last_modified >= updated_note.created_at
+    assert repo.notes[note.id].note == "updated"
+
+    fetched = harness.get_prompt_note(note.id)
+    assert fetched.note == "updated"
+
+    harness.delete_prompt_note(note.id)
+    assert repo.notes == {}
+
+
+def test_prompt_note_support_translates_repository_errors() -> None:
+    repo = _PromptNoteRepoStub()
+    harness = _PromptNoteHarness(repo)
+    missing_id = uuid.uuid4()
+
+    repo.fail_mode = "list"
+    with pytest.raises(PromptNoteStorageError):
+        harness.list_prompt_notes()
+    repo.fail_mode = "get-error"
+    with pytest.raises(PromptNoteStorageError):
+        harness.get_prompt_note(missing_id)
+    repo.fail_mode = None
+    with pytest.raises(PromptNoteNotFoundError):
+        harness.get_prompt_note(missing_id)
+
+    repo.fail_mode = "add"
+    with pytest.raises(PromptNoteStorageError):
+        harness.create_prompt_note(PromptNote(id=missing_id, note="boom"))
+
+    repo.fail_mode = "update-missing"
+    with pytest.raises(PromptNoteNotFoundError):
+        harness.update_prompt_note(PromptNote(id=missing_id, note="missing"))
+    repo.fail_mode = "update-error"
+    existing = PromptNote(id=missing_id, note="existing")
+    repo.notes[missing_id] = existing
+    with pytest.raises(PromptNoteStorageError):
+        harness.update_prompt_note(existing)
+
+    repo.fail_mode = "delete-error"
+    with pytest.raises(PromptNoteStorageError):
+        harness.delete_prompt_note(missing_id)
+    repo.fail_mode = None
+    repo.notes.clear()
+    with pytest.raises(PromptNoteNotFoundError):
+        harness.delete_prompt_note(missing_id)
