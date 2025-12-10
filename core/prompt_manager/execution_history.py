@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
@@ -31,7 +32,6 @@ from ..history_tracker import (
 from ..notifications import NotificationCenter, NotificationLevel
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping, Sequence
     from datetime import datetime
     from typing import Protocol
 
@@ -591,6 +591,20 @@ class ExecutionHistoryMixin:
             usage_metadata = dict(result.usage)
         except Exception:  # pragma: no cover - defensive
             usage_metadata = {}
+        if not usage_metadata:
+            raw_usage = result.raw_response.get("usage")
+            if isinstance(raw_usage, Mapping):
+                usage_metadata = {str(key): value for key, value in raw_usage.items()}
+        if "total_tokens" not in usage_metadata:
+            prompt_tokens = usage_metadata.get("prompt_tokens")
+            completion_tokens = usage_metadata.get("completion_tokens")
+            if prompt_tokens is not None or completion_tokens is not None:
+                try:
+                    prompt_value = int(prompt_tokens or 0)
+                    completion_value = int(completion_tokens or 0)
+                    usage_metadata["total_tokens"] = prompt_value + completion_value
+                except (TypeError, ValueError):
+                    usage_metadata.setdefault("total_tokens", 0)
         metadata: dict[str, Any] = {"usage": usage_metadata}
         if conversation:
             metadata["conversation"] = list(conversation)
