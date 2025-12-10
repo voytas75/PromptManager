@@ -403,8 +403,12 @@ def _estimate_usage(
         import litellm
     except Exception:  # pragma: no cover - optional dependency
         return {}
+    litellm_module = cast("Any", litellm)
+    token_counter = getattr(litellm_module, "token_counter", None)
+    if not callable(token_counter):
+        return {}
     try:
-        usage = litellm.token_counter(
+        usage = token_counter(
             model=model,
             messages=list(messages),
             text=response_text,

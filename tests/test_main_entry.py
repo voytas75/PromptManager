@@ -588,7 +588,7 @@ def test_configure_litellm_logging_toggles_loggers() -> None:
             assert logger.disabled is False
             assert logger.level == logging.NOTSET
     finally:
-        for logger, (disabled, level, propagate) in zip(targets, original_states):
+        for logger, (disabled, level, propagate) in zip(targets, original_states, strict=False):
             logger.disabled = disabled
             logger.setLevel(level)
             logger.propagate = propagate

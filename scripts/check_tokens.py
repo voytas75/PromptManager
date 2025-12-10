@@ -9,8 +9,8 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Mapping, Sequence
 
 
 def _estimate_usage(model: str, messages: Sequence[Mapping[str, str]], text: str) -> dict[str, int]:
@@ -28,7 +28,9 @@ def _estimate_usage(model: str, messages: Sequence[Mapping[str, str]], text: str
     prompt_value = _coerce_int(usage.get("prompt_tokens"))
     completion_value = _coerce_int(usage.get("completion_tokens"))
     total_value = usage.get("total_tokens")
-    total_tokens = _coerce_int(total_value) if total_value is not None else prompt_value + completion_value
+    total_tokens = (
+        _coerce_int(total_value) if total_value is not None else prompt_value + completion_value
+    )
     return {
         "prompt_tokens": prompt_value,
         "completion_tokens": completion_value,
@@ -95,11 +97,7 @@ def main() -> None:
         except json.JSONDecodeError:
             metadata = {}
         usage = metadata.get("usage") or {}
-        model = (
-            metadata.get("context", {})
-            .get("execution", {})
-            .get("model", "unknown-model")
-        )
+        model = metadata.get("context", {}).get("execution", {}).get("model", "unknown-model")
         conversation = metadata.get("conversation") or []
         if not conversation:
             conversation = [{"role": "user", "content": row["request_text"] or ""}]
