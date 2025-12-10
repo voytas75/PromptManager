@@ -31,6 +31,7 @@ def configure_litellm_logging(enabled: bool) -> None:
     """Enable or disable upstream LiteLLM library logs."""
     litellm_loggers = (
         logging.getLogger("litellm"),
+        logging.getLogger("LiteLLM"),
         logging.getLogger("litellm.proxy"),
         logging.getLogger("litellm.proxy.proxy_server"),
     )
@@ -42,3 +43,4 @@ def configure_litellm_logging(enabled: bool) -> None:
         else:
             litellm_logger.disabled = True
             litellm_logger.setLevel(logging.CRITICAL)
+            litellm_logger.propagate = False

@@ -573,6 +573,7 @@ def test_configure_litellm_logging_toggles_loggers() -> None:
 
     targets = [
         logging.getLogger("litellm"),
+        logging.getLogger("LiteLLM"),
         logging.getLogger("litellm.proxy"),
         logging.getLogger("litellm.proxy.proxy_server"),
     ]

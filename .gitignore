@@ -61,6 +61,7 @@ examples/
 AGENTS*.md
 PromptManagerBlueprint.txt
 .coverage
+.coveragerc
 .mypy_cache/
 .nox/
 .ruff_cache/
