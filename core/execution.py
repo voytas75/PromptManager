@@ -1,6 +1,7 @@
 """LiteLLM-backed prompt execution helpers.
 
 Updates:
+  v0.4.4 - 2025-12-10 - Estimate token usage when providers omit usage metadata (Azure streaming).
   v0.4.3 - 2025-12-10 - Normalise LiteLLM usage payloads so token counts persist across platforms.
   v0.4.2 - 2025-11-30 - Fix docstring spacing for Ruff and improve helper comments.
   v0.4.1 - 2025-11-29 - Guard Prompt/UUID imports and wrap payload handling lines.
@@ -213,6 +214,11 @@ class CodexExecutor:
         if stream_enabled:
             response_text = response_text.strip()
 
+        if not usage:
+            usage = _estimate_usage(self.model, payload_messages, response_text)
+            if usage:
+                raw_payload["usage"] = usage
+
         result = CodexExecutionResult(
             prompt_id=prompt.id,
             request_text=request_text,
@@ -384,4 +390,51 @@ def _normalise_usage(usage_value: object | None) -> dict[str, Any]:
         "prompt_tokens": prompt_tokens,
         "completion_tokens": completion_tokens,
         "total_tokens": total_tokens,
+    }
+
+
+def _estimate_usage(
+    model: str,
+    messages: Sequence[Mapping[str, str]],
+    response_text: str,
+) -> dict[str, int]:
+    """Estimate token usage when providers omit usage metadata."""
+    try:
+        import litellm
+    except Exception:  # pragma: no cover - optional dependency
+        return {}
+    try:
+        usage = litellm.token_counter(
+            model=model,
+            messages=list(messages),
+            text=response_text,
+        )
+    except Exception:  # pragma: no cover - defensive
+        return {}
+    if not isinstance(usage, Mapping):
+        return {}
+    prompt_tokens = usage.get("prompt_tokens")
+    completion_tokens = usage.get("completion_tokens")
+    total_tokens = usage.get("total_tokens")
+    if prompt_tokens is None and completion_tokens is None and total_tokens is None:
+        return {}
+    try:
+        prompt_value = int(prompt_tokens or 0)
+    except (TypeError, ValueError):
+        prompt_value = 0
+    try:
+        completion_value = int(completion_tokens or 0)
+    except (TypeError, ValueError):
+        completion_value = 0
+    if total_tokens is None:
+        total_value = prompt_value + completion_value
+    else:
+        try:
+            total_value = int(total_tokens)
+        except (TypeError, ValueError):
+            total_value = prompt_value + completion_value
+    return {
+        "prompt_tokens": prompt_value,
+        "completion_tokens": completion_value,
+        "total_tokens": total_value,
     }

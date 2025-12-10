@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 import uuid
 from typing import TYPE_CHECKING, Any
 
@@ -206,6 +207,44 @@ def test_codex_executor_normalises_usage_objects(monkeypatch: pytest.MonkeyPatch
     expected_usage = {"prompt_tokens": 7, "completion_tokens": 9, "total_tokens": 16}
     assert result.usage == expected_usage
     assert result.raw_response.get("usage") == expected_usage
+
+
+def test_codex_executor_estimates_usage_when_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    prompt = _make_prompt()
+    executor = CodexExecutor(model="gpt-test")
+
+    def fake_get_completion() -> tuple[Callable[..., Any], type[Exception]]:
+        return (lambda **_: {"choices": [{"message": {"content": "Hi"}}]}), RuntimeError
+
+    def fake_call_completion(
+        request: Mapping[str, Any],
+        completion: Callable[..., Any],
+        lite_llm_exception: type[Exception],  # noqa: ARG001
+        *,
+        drop_candidates: Sequence[str],  # noqa: ARG001
+        pre_dropped: Sequence[str],  # noqa: ARG001
+    ) -> Mapping[str, Any]:
+        return completion()
+
+    class _TokenCounter:
+        def __call__(self, *, model: str, messages: Sequence[Mapping[str, str]], text: str) -> dict:
+            assert model == "gpt-test"
+            assert messages[-1]["content"] == "Estimate please"
+            assert text == "Hi"
+            return {"prompt_tokens": 4, "completion_tokens": 6}
+
+    monkeypatch.setattr("core.execution.get_completion", fake_get_completion)
+    monkeypatch.setattr("core.execution.call_completion_with_fallback", fake_call_completion)
+    monkeypatch.setitem(
+        sys.modules,
+        "litellm",
+        type("litellm", (), {"token_counter": _TokenCounter()}),
+    )
+
+    result = executor.execute(prompt, "Estimate please")
+
+    assert result.usage == {"prompt_tokens": 4, "completion_tokens": 6, "total_tokens": 10}
+    assert result.raw_response["usage"] == result.usage
 
 
 def test_extract_completion_text_handles_multiple_shapes() -> None:
