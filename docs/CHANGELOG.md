@@ -2,6 +2,12 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.22.16] - 2025-12-10
+
+### Removed
+
+- Deleted unused `typings/` and `unused/` directories and removed the associated `stubPath`/`extraPaths` configuration from Pyright now that no custom stubs are shipped.
+
 ## [0.22.15] - 2025-12-09
 
 ### Fixed

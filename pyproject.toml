@@ -1,6 +1,6 @@
 [project]
 name = "prompt-manager"
-version = "0.22.15"
+version = "0.22.16"
 description = "Desktop application for cataloguing, searching, and launching AI prompts."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -110,7 +110,6 @@ include = ["main.py", "core", "config", "gui", "models", "tests"]
 exclude = ["data"]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
-stubPath = "typings"
 reportMissingImports = "warning"
 reportMissingTypeStubs = "warning"
 useLibraryCodeForTypes = true
