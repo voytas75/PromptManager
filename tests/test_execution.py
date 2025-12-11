@@ -64,7 +64,11 @@ def test_codex_executor_collects_streaming_chunks(monkeypatch) -> None:
 
     assert chunks == ["Hello", " world"]
     assert result.response_text == "Hello world"
-    assert dict(result.usage) == {"prompt_tokens": 4, "completion_tokens": 6}
+    assert dict(result.usage) == {
+        "prompt_tokens": 4,
+        "completion_tokens": 6,
+        "total_tokens": 10,
+    }
     assert result.raw_response.get("streamed") is True
     choices = result.raw_response.get("choices")
     assert isinstance(choices, list)
@@ -132,7 +136,11 @@ def test_codex_executor_non_stream_request_builds_payload(monkeypatch: pytest.Mo
     )
 
     assert result.response_text == "Execution succeeded"
-    assert result.usage == {"prompt_tokens": 10, "completion_tokens": 20}
+    assert result.usage == {
+        "prompt_tokens": 10,
+        "completion_tokens": 20,
+        "total_tokens": 30,
+    }
     assert captured_request["model"] == "gpt-4.1"
     assert captured_request["messages"][0]["content"] == prompt.context
     assert captured_request["messages"][-1]["content"] == "Run quality checks"
@@ -242,6 +250,56 @@ def test_codex_executor_estimates_usage_when_missing(monkeypatch: pytest.MonkeyP
     )
 
     result = executor.execute(prompt, "Estimate please")
+
+    assert result.usage == {"prompt_tokens": 4, "completion_tokens": 6, "total_tokens": 10}
+    assert result.raw_response["usage"] == result.usage
+
+
+def test_codex_executor_estimates_usage_when_values_are_null(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prompt = _make_prompt()
+    executor = CodexExecutor(model="gpt-test")
+
+    def fake_get_completion() -> tuple[Callable[..., Any], type[Exception]]:
+        return (
+            lambda **_: {
+                "choices": [{"message": {"content": "Hi"}}],
+                "usage": {
+                    "prompt_tokens": None,
+                    "completion_tokens": None,
+                    "total_tokens": None,
+                },
+            },
+            RuntimeError,
+        )
+
+    def fake_call_completion(
+        request: Mapping[str, Any],
+        completion: Callable[..., Any],
+        lite_llm_exception: type[Exception],  # noqa: ARG001
+        *,
+        drop_candidates: Sequence[str],  # noqa: ARG001
+        pre_dropped: Sequence[str],  # noqa: ARG001
+    ) -> Mapping[str, Any]:
+        return completion()
+
+    class _TokenCounter:
+        def __call__(self, *, model: str, messages: Sequence[Mapping[str, str]], text: str) -> dict:
+            assert model == "gpt-test"
+            assert messages[-1]["content"] == "Estimate with null usage"
+            assert text == "Hi"
+            return {"prompt_tokens": 4, "completion_tokens": 6}
+
+    monkeypatch.setattr("core.execution.get_completion", fake_get_completion)
+    monkeypatch.setattr("core.execution.call_completion_with_fallback", fake_call_completion)
+    monkeypatch.setitem(
+        sys.modules,
+        "litellm",
+        type("litellm", (), {"token_counter": _TokenCounter()}),
+    )
+
+    result = executor.execute(prompt, "Estimate with null usage")
 
     assert result.usage == {"prompt_tokens": 4, "completion_tokens": 6, "total_tokens": 10}
     assert result.raw_response["usage"] == result.usage

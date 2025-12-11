@@ -1,6 +1,7 @@
 """LiteLLM-backed prompt execution helpers.
 
 Updates:
+  v0.4.5 - 2025-12-11 - Fall back to estimated token usage when providers return null usage.
   v0.4.4 - 2025-12-10 - Estimate token usage when providers omit usage metadata (Azure streaming).
   v0.4.3 - 2025-12-10 - Normalise LiteLLM usage payloads so token counts persist across platforms.
   v0.4.2 - 2025-11-30 - Fix docstring spacing for Ruff and improve helper comments.
@@ -10,7 +11,6 @@ Updates:
   v0.3.0 - 2025-11-02 - Support reasoning config and max-output-token flags for newer OpenAI models.
   v0.2.1 - 2025-11-14 - Surface missing LiteLLM dependency as ExecutionError.
   v0.2.0 - 2025-11-12 - Support multi-turn conversation payloads for LiteLLM execution.
-  v0.1.0 - 2025-11-08 - Introduce CodexExecutor for running prompts via LiteLLM.
 """
 
 from __future__ import annotations
@@ -214,10 +214,19 @@ class CodexExecutor:
         if stream_enabled:
             response_text = response_text.strip()
 
-        if not usage:
-            usage = _estimate_usage(self.model, payload_messages, response_text)
-            if usage:
-                raw_payload["usage"] = usage
+        usage_tokens = _coerce_usage_tokens(usage)
+        if not usage_tokens and isinstance(raw_payload.get("usage"), Mapping):
+            usage_tokens = _coerce_usage_tokens(cast("Mapping[str, Any]", raw_payload["usage"]))
+        if not usage_tokens:
+            usage_tokens = _estimate_usage(self.model, payload_messages, response_text)
+
+        merged_usage: dict[str, Any] = {}
+        if isinstance(raw_payload.get("usage"), Mapping):
+            merged_usage.update(dict(cast("Mapping[str, Any]", raw_payload["usage"])))
+        merged_usage.update(usage_tokens)
+        usage = merged_usage
+        if merged_usage:
+            raw_payload["usage"] = merged_usage
 
         result = CodexExecutionResult(
             prompt_id=prompt.id,
@@ -391,6 +400,41 @@ def _normalise_usage(usage_value: object | None) -> dict[str, Any]:
         "completion_tokens": completion_tokens,
         "total_tokens": total_tokens,
     }
+
+
+def _coerce_usage_tokens(usage: Mapping[str, Any] | None) -> dict[str, int]:
+    """Return standardised token counts from a LiteLLM usage payload."""
+    if not usage:
+        return {}
+
+    def _first_int(keys: Sequence[str]) -> int | None:
+        for key in keys:
+            value = usage.get(key)
+            if value in (None, ""):
+                continue
+            try:
+                return int(value)  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                try:
+                    return int(float(value))  # type: ignore[arg-type]
+                except (TypeError, ValueError):
+                    continue
+        return None
+
+    prompt_tokens = _first_int(("prompt_tokens", "input_tokens", "tokens_prompt"))
+    completion_tokens = _first_int(("completion_tokens", "output_tokens", "tokens_completion"))
+    total_tokens = _first_int(("total_tokens", "tokens_total"))
+    if total_tokens is None and (prompt_tokens is not None or completion_tokens is not None):
+        total_tokens = (prompt_tokens or 0) + (completion_tokens or 0)
+
+    tokens: dict[str, int] = {}
+    if prompt_tokens is not None:
+        tokens["prompt_tokens"] = prompt_tokens
+    if completion_tokens is not None:
+        tokens["completion_tokens"] = completion_tokens
+    if total_tokens is not None:
+        tokens["total_tokens"] = total_tokens
+    return tokens
 
 
 def _estimate_usage(
