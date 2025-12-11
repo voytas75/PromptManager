@@ -1,6 +1,7 @@
 """Settings management utilities for Prompt Manager configuration.
 
 Updates:
+  v0.5.18 - 2025-12-12 - Normalise litellm_reasoning_effort aliases and tolerate blank font fields.
   v0.5.17 - 2025-12-11 - Add prompt/chat font colour preferences with validation and env bindings.
   v0.5.16 - 2025-12-11 - Add prompt/chat font preferences with validation and env bindings.
   v0.5.15 - 2025-12-10 - Add LiteLLM logging toggle and env binding.
@@ -794,6 +795,8 @@ class PromptManagerSettings(BaseSettings):
         if value in (None, ""):
             return None
         effort = str(value).strip().lower()
+        alias_map = {"xhigh": "high", "extreme": "high"}
+        effort = alias_map.get(effort, effort)
         if effort not in {"minimal", "medium", "high"}:
             raise ValueError("litellm_reasoning_effort must be one of: minimal, medium, high")
         return effort
