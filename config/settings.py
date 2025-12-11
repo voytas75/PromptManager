@@ -557,11 +557,29 @@ class PromptManagerSettings(BaseSettings):
             raise ValueError("font family cannot be empty")
         return cleaned
 
+    @field_validator("prompt_output_font_size", "chat_font_size", mode="before")
+    def _coerce_font_size(cls, value: object, info: FieldValidationInfo) -> object:
+        """Allow empty strings to fall back to defaults before validation."""
+        if value in ("", None):
+            if info.field_name == "prompt_output_font_size":
+                return DEFAULT_PROMPT_OUTPUT_FONT_SIZE
+            return DEFAULT_CHAT_FONT_SIZE
+        return value
+
     @field_validator("prompt_output_font_size", "chat_font_size")
     def _validate_font_size(cls, value: int) -> int:
         """Ensure font sizes fall within a sensible range."""
         if value < 6 or value > 72:
             raise ValueError("font sizes must be between 6 and 72 points")
+        return value
+
+    @field_validator("prompt_output_font_color", "chat_font_color", mode="before")
+    def _coerce_font_color(cls, value: object, info: FieldValidationInfo) -> object:
+        """Allow empty strings to fall back to defaults before validation."""
+        if value in ("", None):
+            if info.field_name == "prompt_output_font_color":
+                return DEFAULT_PROMPT_OUTPUT_FONT_COLOR
+            return DEFAULT_CHAT_FONT_COLOR
         return value
 
     @field_validator("prompt_output_font_color", "chat_font_color")
