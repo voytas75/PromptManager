@@ -437,6 +437,16 @@ def _coerce_usage_tokens(usage: Mapping[str, Any] | None) -> dict[str, int]:
     return tokens
 
 
+def _approximate_token_count(text: str) -> int:
+    """Best-effort token approximation for when LiteLLM counters are unavailable."""
+    if not text:
+        return 0
+    words = text.replace("\n", " ").split()
+    if not words:
+        return 0
+    return len(words)
+
+
 def _estimate_usage(
     model: str,
     messages: Sequence[Mapping[str, str]],
@@ -450,7 +460,13 @@ def _estimate_usage(
     litellm_module = cast("Any", litellm)
     token_counter = getattr(litellm_module, "token_counter", None)
     if not callable(token_counter):
-        return {}
+        prompt_words = _approximate_token_count(" ".join(msg.get("content", "") for msg in messages))
+        completion_words = _approximate_token_count(response_text)
+        return {
+            "prompt_tokens": prompt_words,
+            "completion_tokens": completion_words,
+            "total_tokens": prompt_words + completion_words,
+        }
     try:
         usage = token_counter(
             model=model,
@@ -458,7 +474,13 @@ def _estimate_usage(
             text=response_text,
         )
     except Exception:  # pragma: no cover - defensive
-        return {}
+        prompt_words = _approximate_token_count(" ".join(msg.get("content", "") for msg in messages))
+        completion_words = _approximate_token_count(response_text)
+        return {
+            "prompt_tokens": prompt_words,
+            "completion_tokens": completion_words,
+            "total_tokens": prompt_words + completion_words,
+        }
     if not isinstance(usage, Mapping):
         return {}
     prompt_tokens = usage.get("prompt_tokens")

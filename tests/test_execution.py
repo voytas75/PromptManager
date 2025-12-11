@@ -305,6 +305,35 @@ def test_codex_executor_estimates_usage_when_values_are_null(
     assert result.raw_response["usage"] == result.usage
 
 
+def test_codex_executor_estimates_usage_when_token_counter_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prompt = _make_prompt()
+    executor = CodexExecutor(model="gpt-test")
+
+    def fake_get_completion() -> tuple[Callable[..., Any], type[Exception]]:
+        return (lambda **_: {"choices": [{"message": {"content": "Hi there"}}]}), RuntimeError
+
+    def fake_call_completion(
+        request: Mapping[str, Any],
+        completion: Callable[..., Any],
+        lite_llm_exception: type[Exception],  # noqa: ARG001
+        *,
+        drop_candidates: Sequence[str],  # noqa: ARG001
+        pre_dropped: Sequence[str],  # noqa: ARG001
+    ) -> Mapping[str, Any]:
+        return completion()
+
+    monkeypatch.setattr("core.execution.get_completion", fake_get_completion)
+    monkeypatch.setattr("core.execution.call_completion_with_fallback", fake_call_completion)
+    monkeypatch.setitem(sys.modules, "litellm", type("litellm", (), {})())
+
+    result = executor.execute(prompt, "Estimate without counter")
+
+    assert result.usage == {"prompt_tokens": 6, "completion_tokens": 2, "total_tokens": 8}
+    assert result.raw_response["usage"] == result.usage
+
+
 def test_extract_completion_text_handles_multiple_shapes() -> None:
     message_payload = {"choices": [{"message": {"content": "From message"}}]}
     delta_payload = {"choices": [{"delta": {"content": "From delta"}}]}
