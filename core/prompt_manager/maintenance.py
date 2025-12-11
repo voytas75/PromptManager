@@ -1,6 +1,7 @@
 """Maintenance mixin providing operational utilities for Prompt Manager.
 
 Updates:
+  v0.1.4 - 2025-12-11 - Add helpers to clear token usage aggregates without deleting history.
   v0.1.3 - 2025-12-09 - Surface Redis unavailability reasons in maintenance details.
   v0.1.2 - 2025-12-08 - Close SQLite handles via explicit context manager to prevent leaks.
   v0.1.1 - 2025-12-07 - Gate CollectionProtocol import behind TYPE_CHECKING.
@@ -512,6 +513,14 @@ class MaintenanceMixin:
         manager.reset_vector_store()
         if clear_logs:
             manager.clear_usage_logs()
+
+    def reset_token_usage_totals(self) -> None:
+        """Clear stored token usage aggregates while preserving execution records."""
+        manager = self._as_prompt_manager()
+        try:
+            manager._repository.clear_token_usage()
+        except RepositoryError as exc:
+            raise PromptManagerError(f"Unable to clear token usage aggregates: {exc}") from exc
 
     def get_prompt_catalogue_stats(self) -> PromptCatalogueStats:
         """Return aggregate prompt statistics for maintenance workflows."""

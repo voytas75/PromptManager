@@ -1,6 +1,7 @@
 """Coordinate prompt execution, streaming, and chat workspace logic.
 
 Updates:
+  v0.1.11 - 2025-12-11 - Allow maintenance workflows to reset session/overall token counters.
   v0.1.10 - 2025-12-09 - Block executions when LLM is offline; show configuration guidance.
   v0.1.9 - 2025-12-08 - Track per-execution token usage and refresh session totals.
   v0.1.8 - 2025-12-07 - Enable saving workspace text-only results with output.
@@ -1076,6 +1077,18 @@ class ExecutionController:
             return
         formatted = self._format_chat_history_html(self._chat_conversation)
         self._chat_history_view.setHtml(formatted)
+
+    def reset_token_counters(self) -> None:
+        """Zero in-memory session usage and refresh overall totals."""
+        if not self._token_usage_label:
+            return
+        self._session_usage = SessionTokenUsage()
+        try:
+            self._overall_usage = self._manager.get_token_usage_totals()
+        except (PromptHistoryError, PromptManagerError):
+            logger.debug("Unable to refresh overall token usage after reset", exc_info=True)
+            self._overall_usage = None
+        self._refresh_token_usage_label()
 
     def _initialise_token_usage_totals(self) -> None:
         if not self._token_usage_label:

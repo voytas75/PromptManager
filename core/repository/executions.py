@@ -1,6 +1,7 @@
 """Prompt execution persistence, filtering, and analytics helpers.
 
 Updates:
+  v0.11.4 - 2025-12-11 - Add helper to clear stored token usage aggregates.
   v0.11.3 - 2025-12-10 - Add session identifier support and session token aggregates.
   v0.11.2 - 2025-12-08 - Include token aggregates in analytics queries and expose totals helper.
   v0.11.1 - 2025-12-07 - Move Path import under TYPE_CHECKING for lint compliance.
@@ -313,6 +314,23 @@ class ExecutionStoreMixin:
             key: int(row[key] or 0)
             for key in ("prompt_tokens", "completion_tokens", "total_tokens")
         }
+
+    def clear_token_usage(self) -> None:
+        """Zero stored token usage aggregates across all executions."""
+        query = (
+            "UPDATE prompt_executions SET metadata = json_set("
+            "COALESCE(metadata, '{}'), "
+            "'$.usage.prompt_tokens', 0, "
+            "'$.usage.completion_tokens', 0, "
+            "'$.usage.total_tokens', 0"
+            ");"
+        )
+        try:
+            with _connect(self._db_path) as conn:
+                conn.execute(query)
+                conn.commit()
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to clear token usage aggregates") from exc
 
     def get_model_usage_breakdown(
         self,

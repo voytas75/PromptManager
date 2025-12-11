@@ -1,6 +1,7 @@
 r"""Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.16.18 - 2025-12-11 - Expose token counter reset hook for maintenance dialog.
   v0.16.17 - 2025-12-09 - Keep Run Prompt enabled but show LLM configuration guidance when offline.
   v0.16.15 - 2025-12-08 - Store token usage label for execution controller wiring.
   v0.16.14 - 2025-12-07 - Describe Google Programmable Search in workspace tooltips.
@@ -688,6 +689,12 @@ class MainWindow(QMainWindow):
         """Refresh result and chat panes when the markdown toggle changes."""
         if self._execution_controller is not None:
             self._execution_controller.refresh_rendering()
+
+    def reset_session_token_counters(self) -> None:
+        """Reset session and overall token counters in the workspace panel."""
+        if self._execution_controller is None:
+            return
+        self._execution_controller.reset_token_counters()
 
     def _current_prompt(self) -> Prompt | None:
         """Return the prompt currently selected in the list."""

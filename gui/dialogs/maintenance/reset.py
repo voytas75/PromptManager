@@ -1,6 +1,7 @@
 """Data reset helpers for the maintenance dialog.
 
 Updates:
+  v0.1.1 - 2025-12-11 - Add token counter reset actions for session and overall usage.
   v0.1.0 - 2025-12-04 - Extract snapshot and reset workflows into a mixin.
 """
 
@@ -16,6 +17,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QLabel,
     QMessageBox,
+    QHBoxLayout,
     QPlainTextEdit,
     QPushButton,
     QVBoxLayout,
@@ -77,6 +79,43 @@ class ResetMaintenanceMixin:
         reset_buttons_layout = QVBoxLayout(reset_buttons_container)
         reset_buttons_layout.setContentsMargins(0, 0, 0, 0)
         reset_buttons_layout.setSpacing(8)
+
+        token_header = QLabel("<b>Token usage</b>", reset_buttons_container)
+        token_header.setWordWrap(True)
+        reset_buttons_layout.addWidget(token_header)
+
+        token_description = QLabel(
+            (
+                "Reset session counters for the current workspace or clear stored token totals "
+                "from execution history. Clearing totals preserves prompt history but zeroes "
+                "usage aggregates."
+            ),
+            reset_buttons_container,
+        )
+        token_description.setWordWrap(True)
+        reset_buttons_layout.addWidget(token_description)
+
+        token_buttons = QWidget(reset_buttons_container)
+        token_buttons_layout = QHBoxLayout(token_buttons)
+        token_buttons_layout.setContentsMargins(0, 0, 0, 0)
+        token_buttons_layout.setSpacing(8)
+
+        reset_session_tokens_button = QPushButton("Reset Session Counters", token_buttons)
+        reset_session_tokens_button.setToolTip(
+            "Zero the in-memory session token counters used in the workspace panel."
+        )
+        reset_session_tokens_button.clicked.connect(self._on_reset_session_tokens_clicked)  # type: ignore[arg-type]
+        token_buttons_layout.addWidget(reset_session_tokens_button)
+
+        reset_overall_tokens_button = QPushButton("Reset Overall Totals", token_buttons)
+        reset_overall_tokens_button.setToolTip(
+            "Clear token usage aggregates stored in execution history while keeping records."
+        )
+        reset_overall_tokens_button.clicked.connect(self._on_reset_overall_tokens_clicked)  # type: ignore[arg-type]
+        token_buttons_layout.addWidget(reset_overall_tokens_button)
+
+        token_buttons_layout.addStretch(1)
+        reset_buttons_layout.addWidget(token_buttons)
 
         snapshot_button = QPushButton("Create Backup Snapshot", reset_buttons_container)
         snapshot_button.setToolTip(
@@ -203,6 +242,47 @@ class ResetMaintenanceMixin:
         )
         host._refresh_chroma_info()
         host.maintenance_applied.emit("Embedding store cleared.")
+
+    def _on_reset_session_tokens_clicked(self) -> None:
+        parent = self._parent_widget()
+        reset_hook = getattr(parent, "reset_session_token_counters", None)
+        if callable(reset_hook):
+            reset_hook()
+            self._append_reset_log("Session token counters reset.")
+            QMessageBox.information(
+                parent,
+                "Session counters reset",
+                "Workspace session token counters have been reset to zero.",
+            )
+            host = self._maintenance_host()
+            host.maintenance_applied.emit("Session token counters reset.")
+        else:
+            QMessageBox.information(
+                parent,
+                "Session reset unavailable",
+                "Session counters reset requires the workspace window. Please reopen the app.",
+            )
+
+    def _on_reset_overall_tokens_clicked(self) -> None:
+        parent = self._parent_widget()
+        host = self._maintenance_host()
+        if not self._confirm_destructive_action(
+            "Clear stored token usage totals from execution history while preserving records?",
+        ):
+            return
+        try:
+            self._manager.reset_token_usage_totals()
+        except PromptManagerError as exc:
+            QMessageBox.critical(parent, "Reset failed", str(exc))
+            self._append_reset_log(f"Token usage reset failed: {exc}")
+            return
+        self._append_reset_log("Token usage aggregates cleared.")
+        QMessageBox.information(
+            parent,
+            "Token totals cleared",
+            "Token usage aggregates have been reset. Execution history remains intact.",
+        )
+        host.maintenance_applied.emit("Token usage totals cleared.")
 
     def _on_reset_application_clicked(self) -> None:
         parent = self._parent_widget()
