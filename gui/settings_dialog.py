@@ -1,6 +1,7 @@
 """Settings dialog for configuring Prompt Manager runtime options.
 
 Updates:
+  v0.2.21 - 2025-12-11 - Add prompt/chat font configuration controls to Appearance tab.
   v0.2.20 - 2025-12-09 - Display Redis cache availability in the settings banner.
   v0.2.19 - 2025-12-08 - Align Qt enums and type hints with PySide6 stubs for Pyright.
   v0.2.18 - 2025-12-07 - Add Google Programmable Search fields to the Integrations tab.
@@ -10,7 +11,6 @@ Updates:
   v0.2.14-0.2.13 - 2025-12-05 - Auto-open share link preference and share layout tweaks.
   v0.2.12 - 2025-12-04 - Add web search integrations tab and Exa API key field.
   v0.2.11 - 2025-12-03 - Add LiteLLM TTS model configuration field.
-  v0.2.9-and-earlier - 2025-12-06 - LiteLLM embedding + template override history.
 """
 
 from __future__ import annotations
@@ -39,6 +39,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QRadioButton,
     QScrollArea,
+    QSpinBox,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -47,8 +48,12 @@ from PySide6.QtWidgets import (
 from config import LITELLM_ROUTED_WORKFLOWS
 from config.persistence import persist_settings_to_config
 from config.settings import (
+    DEFAULT_CHAT_FONT_FAMILY,
+    DEFAULT_CHAT_FONT_SIZE,
     DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR,
     DEFAULT_CHAT_USER_BUBBLE_COLOR,
+    DEFAULT_PROMPT_OUTPUT_FONT_FAMILY,
+    DEFAULT_PROMPT_OUTPUT_FONT_SIZE,
 )
 from prompt_templates import (
     DEFAULT_PROMPT_TEMPLATES,
@@ -83,6 +88,10 @@ class SettingsDialog(QDialog):
         quick_actions: list[dict[str, object]] | None = None,
         chat_user_bubble_color: str | None = None,
         theme_mode: str | None = None,
+        prompt_output_font_family: str | None = None,
+        prompt_output_font_size: int | None = None,
+        chat_font_family: str | None = None,
+        chat_font_size: int | None = None,
         chat_colors: dict[str, str] | None = None,
         prompt_templates: dict[str, str] | None = None,
         web_search_provider: str | None = None,
@@ -164,7 +173,27 @@ class SettingsDialog(QDialog):
         self._chat_color_preview: QLabel | None = None
         self._chat_colors_value: dict[str, str] | None = None
         self._theme_mode = "dark" if (theme_mode or "").strip().lower() == "dark" else "light"
+        output_family_candidate = (
+            prompt_output_font_family or DEFAULT_PROMPT_OUTPUT_FONT_FAMILY
+        ).strip()
+        self._prompt_output_font_family = (
+            output_family_candidate or DEFAULT_PROMPT_OUTPUT_FONT_FAMILY
+        )
+        self._prompt_output_font_size = (
+            prompt_output_font_size
+            if prompt_output_font_size is not None
+            else DEFAULT_PROMPT_OUTPUT_FONT_SIZE
+        )
+        chat_family_candidate = (chat_font_family or DEFAULT_CHAT_FONT_FAMILY).strip()
+        self._chat_font_family = chat_family_candidate or DEFAULT_CHAT_FONT_FAMILY
+        self._chat_font_size = (
+            chat_font_size if chat_font_size is not None else DEFAULT_CHAT_FONT_SIZE
+        )
         self._theme_combo: QComboBox | None = None
+        self._prompt_output_font_family_input: QLineEdit | None = None
+        self._prompt_output_font_size_input: QSpinBox | None = None
+        self._chat_font_family_input: QLineEdit | None = None
+        self._chat_font_size_input: QSpinBox | None = None
         self._prompt_template_inputs: dict[str, QPlainTextEdit] = {}
         self._prompt_templates_value: dict[str, str] | None = None
         self._prompt_template_initials: dict[str, str] = {}
@@ -450,6 +479,28 @@ class SettingsDialog(QDialog):
         self._theme_combo = theme_combo
         appearance_form.addRow("Theme", theme_combo)
 
+        prompt_font_family_input = QLineEdit(self._prompt_output_font_family, appearance_tab)
+        prompt_font_family_input.setPlaceholderText(DEFAULT_PROMPT_OUTPUT_FONT_FAMILY)
+        self._prompt_output_font_family_input = prompt_font_family_input
+        appearance_form.addRow("Prompt output font", prompt_font_family_input)
+
+        prompt_font_size_input = QSpinBox(appearance_tab)
+        prompt_font_size_input.setRange(6, 72)
+        prompt_font_size_input.setValue(self._prompt_output_font_size)
+        self._prompt_output_font_size_input = prompt_font_size_input
+        appearance_form.addRow("Prompt output size", prompt_font_size_input)
+
+        chat_font_family_input = QLineEdit(self._chat_font_family, appearance_tab)
+        chat_font_family_input.setPlaceholderText(DEFAULT_CHAT_FONT_FAMILY)
+        self._chat_font_family_input = chat_font_family_input
+        appearance_form.addRow("Chat font", chat_font_family_input)
+
+        chat_font_size_input = QSpinBox(appearance_tab)
+        chat_font_size_input.setRange(6, 72)
+        chat_font_size_input.setValue(self._chat_font_size)
+        self._chat_font_size_input = chat_font_size_input
+        appearance_form.addRow("Chat font size", chat_font_size_input)
+
         chat_color_input = QLineEdit(self._chat_user_bubble_color, appearance_tab)
         chat_color_input.setPlaceholderText(self._default_chat_color)
         chat_color_input.textChanged.connect(self._update_chat_color_preview)  # type: ignore[arg-type]
@@ -695,6 +746,23 @@ class SettingsDialog(QDialog):
         if drop_text:
             drop_params = [item.strip() for item in drop_text.split(",") if item.strip()]
 
+        prompt_output_font_family = (
+            _clean(self._prompt_output_font_family_input.text())
+            if self._prompt_output_font_family_input
+            else None
+        )
+        chat_font_family = (
+            _clean(self._chat_font_family_input.text()) if self._chat_font_family_input else None
+        )
+        prompt_output_font_size = (
+            self._prompt_output_font_size_input.value()
+            if self._prompt_output_font_size_input
+            else None
+        )
+        chat_font_size = (
+            self._chat_font_size_input.value() if self._chat_font_size_input else None
+        )
+
         workflow_models: dict[str, str] = {}
         for key, group in self._workflow_groups.items():
             button = group.checkedButton()
@@ -741,6 +809,10 @@ class SettingsDialog(QDialog):
             "chat_user_bubble_color": self._chat_user_bubble_color,
             "chat_colors": self._chat_colors_value,
             "theme_mode": self._theme_mode,
+            "prompt_output_font_family": prompt_output_font_family,
+            "prompt_output_font_size": prompt_output_font_size,
+            "chat_font_family": chat_font_family,
+            "chat_font_size": chat_font_size,
             "prompt_templates": self._prompt_templates_value,
             "web_search_provider": provider_choice,
             "exa_api_key": exa_api_key,

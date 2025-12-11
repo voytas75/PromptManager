@@ -1,6 +1,7 @@
 """Coordinate prompt execution, streaming, and chat workspace logic.
 
 Updates:
+  v0.1.12 - 2025-12-11 - Apply configurable fonts to workspace output and chat transcript.
   v0.1.11 - 2025-12-11 - Allow maintenance workflows to reset session/overall token counters.
   v0.1.10 - 2025-12-09 - Block executions when LLM is offline; show configuration guidance.
   v0.1.9 - 2025-12-08 - Track per-execution token usage and refresh session totals.
@@ -10,8 +11,6 @@ Updates:
   v0.1.5 - 2025-12-07 - Support promptless workspace text execution.
   v0.1.4 - 2025-12-07 - Wrap web context with shared markers and numbering.
   v0.1.3 - 2025-12-04 - Include all web snippets and summarize >5k words via fast LiteLLM.
-  v0.1.2 - 2025-12-04 - Surface web context source counts before each workspace result.
-  v0.1.1 - 2025-12-04 - Add optional web search enrichment controlled by a UI toggle.
 """
 
 from __future__ import annotations
@@ -25,12 +24,16 @@ from html import escape
 from typing import TYPE_CHECKING, Any, cast
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QGuiApplication, QTextCursor
+from PySide6.QtGui import QColor, QFont, QGuiApplication, QTextCursor
 from PySide6.QtWidgets import QAbstractButton, QStyle
 
 from config import (
     DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR,
     DEFAULT_CHAT_USER_BUBBLE_COLOR,
+    DEFAULT_CHAT_FONT_FAMILY,
+    DEFAULT_CHAT_FONT_SIZE,
+    DEFAULT_PROMPT_OUTPUT_FONT_FAMILY,
+    DEFAULT_PROMPT_OUTPUT_FONT_SIZE,
     PromptManagerSettings,
 )
 from core import (
@@ -221,6 +224,7 @@ class ExecutionController:
                 "Voice playback requires Qt multimedia support and a configured LiteLLM TTS model."
             )
             self._speak_result_button.setToolTip(tooltip)
+        self._apply_font_preferences()
         self._initialise_token_usage_totals()
 
     @property
@@ -252,6 +256,12 @@ class ExecutionController:
 
     def refresh_rendering(self) -> None:
         """Re-render output and chat views based on the markdown toggle."""
+        self._refresh_result_text_display()
+        self._refresh_chat_history_view()
+
+    def refresh_font_preferences(self) -> None:
+        """Reapply configured fonts to chat and output panes."""
+        self._apply_font_preferences()
         self._refresh_result_text_display()
         self._refresh_chat_history_view()
 
@@ -1224,6 +1234,59 @@ class ExecutionController:
             blocks.append(block)
         separator = "\n\n---\n\n"
         return separator.join(blocks)
+
+    def _preferred_font_family(self, runtime_key: str, default: str) -> str:
+        value = self._runtime_settings.get(runtime_key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        if self._settings is not None:
+            settings_value = getattr(self._settings, runtime_key, None)
+            if isinstance(settings_value, str) and settings_value.strip():
+                return settings_value.strip()
+        return default
+
+    def _preferred_font_size(self, runtime_key: str, default: int) -> int:
+        value = self._runtime_settings.get(runtime_key)
+        candidate = None
+        if isinstance(value, bool):
+            candidate = None
+        elif isinstance(value, (int, float)):
+            candidate = int(value)
+        elif isinstance(value, str) and value.strip().isdigit():
+            candidate = int(value.strip())
+        if candidate is None and self._settings is not None:
+            settings_value = getattr(self._settings, runtime_key, None)
+            if isinstance(settings_value, (int, float)):
+                candidate = int(settings_value)
+            elif isinstance(settings_value, str) and settings_value.strip().isdigit():
+                candidate = int(settings_value.strip())
+        if candidate is None or candidate < 6 or candidate > 72:
+            return default
+        return candidate
+
+    def _apply_font_preferences(self) -> None:
+        if self._result_text is not None:
+            output_font = QFont(self._result_text.font())
+            output_font.setFamily(
+                self._preferred_font_family(
+                    "prompt_output_font_family", DEFAULT_PROMPT_OUTPUT_FONT_FAMILY
+                )
+            )
+            output_font.setPointSize(
+                self._preferred_font_size(
+                    "prompt_output_font_size", DEFAULT_PROMPT_OUTPUT_FONT_SIZE
+                )
+            )
+            self._result_text.setFont(output_font)
+        if self._chat_history_view is not None:
+            chat_font = QFont(self._chat_history_view.font())
+            chat_font.setFamily(
+                self._preferred_font_family("chat_font_family", DEFAULT_CHAT_FONT_FAMILY)
+            )
+            chat_font.setPointSize(
+                self._preferred_font_size("chat_font_size", DEFAULT_CHAT_FONT_SIZE)
+            )
+            self._chat_history_view.setFont(chat_font)
 
     def _chat_user_colour(self) -> str:
         fallback = DEFAULT_CHAT_USER_BUBBLE_COLOR

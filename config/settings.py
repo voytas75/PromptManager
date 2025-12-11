@@ -1,6 +1,7 @@
 """Settings management utilities for Prompt Manager configuration.
 
 Updates:
+  v0.5.16 - 2025-12-11 - Add prompt/chat font preferences with validation and env bindings.
   v0.5.15 - 2025-12-10 - Add LiteLLM logging toggle and env binding.
   v0.5.14 - 2025-12-07 - Add Google web search provider configuration and env parsing.
   v0.5.13 - 2025-12-07 - Add PrivateBin share provider configuration settings.
@@ -10,7 +11,6 @@ Updates:
   v0.5.9 - 2025-12-05 - Tighten dotenv helpers for lint compliance.
   v0.5.8 - 2025-12-04 - Add auto-open share link preference with GUI binding.
   v0.5.7 - 2025-12-04 - Load .env secrets so web search keys persist like LiteLLM keys.
-  v0.5.6-and-earlier - 2025-12-03 - Exa/voice prompt settings and earlier LiteLLM routing tweaks.
 """
 
 from __future__ import annotations
@@ -53,6 +53,10 @@ DEFAULT_CHAT_USER_BUBBLE_COLOR = "#e6f0ff"
 DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR = "#f5f5f5"
 DEFAULT_EMBEDDING_BACKEND = "litellm"
 DEFAULT_EMBEDDING_MODEL = "text-embedding-3-large"
+DEFAULT_PROMPT_OUTPUT_FONT_FAMILY = "JetBrains Mono"
+DEFAULT_PROMPT_OUTPUT_FONT_SIZE = 13
+DEFAULT_CHAT_FONT_FAMILY = "Segoe UI"
+DEFAULT_CHAT_FONT_SIZE = 12
 DEFAULT_PRIVATEBIN_URL = "https://privatebin.net/"
 DEFAULT_PRIVATEBIN_EXPIRATION = "1week"
 DEFAULT_PRIVATEBIN_FORMAT = "markdown"
@@ -332,6 +336,22 @@ class PromptManagerSettings(BaseSettings):
         default=DEFAULT_THEME_MODE,
         description="Preferred UI theme mode (light or dark).",
     )
+    prompt_output_font_family: str = Field(
+        default=DEFAULT_PROMPT_OUTPUT_FONT_FAMILY,
+        description="Font family applied to workspace prompt output text.",
+    )
+    prompt_output_font_size: int = Field(
+        default=DEFAULT_PROMPT_OUTPUT_FONT_SIZE,
+        description="Font size (points) for workspace prompt output text.",
+    )
+    chat_font_family: str = Field(
+        default=DEFAULT_CHAT_FONT_FAMILY,
+        description="Font family applied to chat history messages in the workspace.",
+    )
+    chat_font_size: int = Field(
+        default=DEFAULT_CHAT_FONT_SIZE,
+        description="Font size (points) for chat history messages.",
+    )
     chat_user_bubble_color: str = Field(
         default=DEFAULT_CHAT_USER_BUBBLE_COLOR,
         description=(
@@ -452,6 +472,16 @@ class PromptManagerSettings(BaseSettings):
                 "categories_path": ["CATEGORIES_PATH", "categories_path"],
                 "categories": ["CATEGORIES", "categories"],
                 "theme_mode": ["THEME_MODE", "theme_mode"],
+                "prompt_output_font_family": [
+                    "PROMPT_OUTPUT_FONT_FAMILY",
+                    "prompt_output_font_family",
+                ],
+                "prompt_output_font_size": [
+                    "PROMPT_OUTPUT_FONT_SIZE",
+                    "prompt_output_font_size",
+                ],
+                "chat_font_family": ["CHAT_FONT_FAMILY", "chat_font_family"],
+                "chat_font_size": ["CHAT_FONT_SIZE", "chat_font_size"],
                 "chat_user_bubble_color": ["CHAT_USER_BUBBLE_COLOR", "chat_user_bubble_color"],
                 "prompt_templates": ["PROMPT_TEMPLATES", "prompt_templates"],
                 "web_search_provider": ["WEB_SEARCH_PROVIDER", "web_search_provider"],
@@ -499,6 +529,24 @@ class PromptManagerSettings(BaseSettings):
         """Ensure the cache TTL is a positive integer."""
         if value <= 0:
             raise ValueError("cache_ttl_seconds must be greater than zero")
+        return value
+
+    @field_validator(
+        "prompt_output_font_family",
+        "chat_font_family",
+    )
+    def _validate_font_family(cls, value: str) -> str:
+        """Validate that font family names are non-empty."""
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("font family cannot be empty")
+        return cleaned
+
+    @field_validator("prompt_output_font_size", "chat_font_size")
+    def _validate_font_size(cls, value: int) -> int:
+        """Ensure font sizes fall within a sensible range."""
+        if value < 6 or value > 72:
+            raise ValueError("font sizes must be between 6 and 72 points")
         return value
 
     @field_validator("redis_dsn", mode="before")
@@ -973,6 +1021,10 @@ class PromptManagerSettings(BaseSettings):
                     "embedding_model",
                     "embedding_device",
                     "quick_actions",
+                    "prompt_output_font_family",
+                    "prompt_output_font_size",
+                    "chat_font_family",
+                    "chat_font_size",
                     "chat_user_bubble_color",
                     "chat_colors",
                     "theme_mode",

@@ -1,6 +1,7 @@
 """Settings workflows for the Prompt Manager main window.
 
 Updates:
+  v0.15.90 - 2025-12-11 - Reapply workspace font preferences when settings change.
   v0.15.89 - 2025-12-09 - Keep run controls enabled but surface offline guidance.
   v0.15.88 - 2025-12-09 - Disable run controls when LLM is offline.
   v0.15.87 - 2025-12-08 - Tighten dialog typings and casts for Pyright.
@@ -95,6 +96,12 @@ class SettingsWorkflow:
             quick_actions=cast("list[dict[str, object]] | None", data.get("quick_actions")),
             chat_user_bubble_color=cast("str | None", data.get("chat_user_bubble_color")),
             theme_mode=cast("str | None", data.get("theme_mode")),
+            prompt_output_font_family=cast(
+                "str | None", data.get("prompt_output_font_family")
+            ),
+            prompt_output_font_size=cast("int | None", data.get("prompt_output_font_size")),
+            chat_font_family=cast("str | None", data.get("chat_font_family")),
+            chat_font_size=cast("int | None", data.get("chat_font_size")),
             chat_colors=cast("dict[str, str] | None", data.get("chat_colors")),
             prompt_templates=cast("dict[str, str] | None", data.get("prompt_templates")),
             web_search_provider=cast("str | None", data.get("web_search_provider")),
@@ -163,7 +170,7 @@ class SettingsWorkflow:
 
         execution_controller = self._execution_controller_supplier()
         if execution_controller is not None:
-            execution_controller.refresh_chat_history_view()
+            execution_controller.refresh_font_preferences()
 
         self._load_prompts(self._current_search_text())
         llm_available = getattr(self._manager, "llm_available", False)

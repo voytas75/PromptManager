@@ -1,6 +1,7 @@
 """Helpers for persisting runtime configuration without Qt dependencies.
 
 Updates:
+  v0.3.5 - 2025-12-11 - Persist workspace prompt/chat font preferences when customised.
   v0.3.4 - 2025-12-10 - Persist LiteLLM logging flag while keeping secrets filtered.
   v0.3.3 - 2025-12-07 - Guard Google Programmable Search credentials when persisting.
   v0.3.2 - 2025-12-07 - Guard SerpApi API keys alongside other secrets during persistence.
@@ -10,7 +11,6 @@ Updates:
   v0.2.8 - 2025-12-04 - Guard Exa API keys and persist web search provider selection.
   v0.2.7 - 2025-12-03 - Persist LiteLLM TTS streaming flag.
   v0.2.6 - 2025-12-03 - Persist LiteLLM TTS model selection for voice playback.
-  v0.2.5-and-earlier - 2025-12-03 - Embedding/appearance persistence and earlier helpers.
 """
 
 from __future__ import annotations
@@ -22,10 +22,14 @@ from pathlib import Path
 from typing import Any, cast
 
 from config.settings import (
+    DEFAULT_CHAT_FONT_FAMILY,
+    DEFAULT_CHAT_FONT_SIZE,
     DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR,
     DEFAULT_CHAT_USER_BUBBLE_COLOR,
     DEFAULT_EMBEDDING_BACKEND,
     DEFAULT_EMBEDDING_MODEL,
+    DEFAULT_PROMPT_OUTPUT_FONT_FAMILY,
+    DEFAULT_PROMPT_OUTPUT_FONT_SIZE,
 )
 from prompt_templates import (
     DEFAULT_PROMPT_TEMPLATES,
@@ -86,6 +90,31 @@ def _is_default_chat_palette(palette: Mapping[str, str] | None) -> bool:
     return True
 
 
+def _normalise_font_family(value: object | None) -> str | None:
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    return text or None
+
+
+def _normalise_font_size(value: object | None) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        candidate = int(value)
+    elif isinstance(value, str):
+        stripped = value.strip()
+        try:
+            candidate = int(stripped)
+        except ValueError:
+            return None
+    else:
+        return None
+    if candidate < 6 or candidate > 72:
+        return None
+    return candidate
+
+
 def _normalise_prompt_templates(value: object | None) -> dict[str, str] | None:
     if value is None or not isinstance(value, Mapping):
         return None
@@ -134,6 +163,18 @@ def persist_settings_to_config(updates: dict[str, object | None]) -> None:
         if key in secret_keys:
             config_data.pop(key, None)
             continue
+        if key == "prompt_output_font_family":
+            family = _normalise_font_family(value)
+            value = None if family in (None, DEFAULT_PROMPT_OUTPUT_FONT_FAMILY) else family
+        if key == "chat_font_family":
+            family = _normalise_font_family(value)
+            value = None if family in (None, DEFAULT_CHAT_FONT_FAMILY) else family
+        if key == "prompt_output_font_size":
+            size = _normalise_font_size(value)
+            value = None if size in (None, DEFAULT_PROMPT_OUTPUT_FONT_SIZE) else size
+        if key == "chat_font_size":
+            size = _normalise_font_size(value)
+            value = None if size in (None, DEFAULT_CHAT_FONT_SIZE) else size
         if key == "litellm_logging_enabled":
             value = True if bool(value) else None
         if key == "litellm_drop_params":

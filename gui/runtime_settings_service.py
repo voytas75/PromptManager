@@ -1,6 +1,7 @@
 """Runtime settings helpers for Prompt Manager GUI.
 
 Updates:
+  v0.1.9 - 2025-12-11 - Track prompt/chat font preferences in runtime snapshots.
   v0.1.8 - 2025-12-09 - Surface Redis cache availability in settings snapshots.
   v0.1.7 - 2025-12-07 - Track Google web search credentials in runtime snapshots.
   v0.1.6 - 2025-12-07 - Reconfigure web search providers when settings change.
@@ -22,9 +23,13 @@ from typing import TYPE_CHECKING, Literal, cast
 from PySide6.QtGui import QColor
 
 from config import (
+    DEFAULT_CHAT_FONT_FAMILY,
+    DEFAULT_CHAT_FONT_SIZE,
     DEFAULT_CHAT_USER_BUBBLE_COLOR,
     DEFAULT_EMBEDDING_BACKEND,
     DEFAULT_EMBEDDING_MODEL,
+    DEFAULT_PROMPT_OUTPUT_FONT_FAMILY,
+    DEFAULT_PROMPT_OUTPUT_FONT_SIZE,
     DEFAULT_THEME_MODE,
     ChatColors,
     PromptManagerSettings,
@@ -94,6 +99,16 @@ class RuntimeSettingsService:
                 settings.chat_user_bubble_color if settings else DEFAULT_CHAT_USER_BUBBLE_COLOR
             ),
             "theme_mode": settings.theme_mode if settings else DEFAULT_THEME_MODE,
+            "prompt_output_font_family": (
+                settings.prompt_output_font_family
+                if settings
+                else DEFAULT_PROMPT_OUTPUT_FONT_FAMILY
+            ),
+            "prompt_output_font_size": (
+                settings.prompt_output_font_size if settings else DEFAULT_PROMPT_OUTPUT_FONT_SIZE
+            ),
+            "chat_font_family": settings.chat_font_family if settings else DEFAULT_CHAT_FONT_FAMILY,
+            "chat_font_size": settings.chat_font_size if settings else DEFAULT_CHAT_FONT_SIZE,
             "chat_colors": (
                 {
                     "user": settings.chat_colors.user,
@@ -152,6 +167,8 @@ class RuntimeSettingsService:
                     "litellm_tts_stream",
                     "embedding_backend",
                     "embedding_model",
+                    "prompt_output_font_family",
+                    "chat_font_family",
                     "web_search_provider",
                 ):
                     if runtime.get(key) is None and isinstance(data.get(key), str):
@@ -206,6 +223,18 @@ class RuntimeSettingsService:
                 )
                 if palette:
                     runtime["chat_colors"] = palette
+                if runtime.get("prompt_output_font_size") is None:
+                    prompt_font_size = data.get("prompt_output_font_size")
+                    if isinstance(prompt_font_size, int):
+                        runtime["prompt_output_font_size"] = prompt_font_size
+                    elif isinstance(prompt_font_size, str) and prompt_font_size.strip().isdigit():
+                        runtime["prompt_output_font_size"] = int(prompt_font_size.strip())
+                if runtime.get("chat_font_size") is None:
+                    chat_font_size = data.get("chat_font_size")
+                    if isinstance(chat_font_size, int):
+                        runtime["chat_font_size"] = chat_font_size
+                    elif isinstance(chat_font_size, str) and chat_font_size.strip().isdigit():
+                        runtime["chat_font_size"] = int(chat_font_size.strip())
                 theme_value = data.get("theme_mode")
                 if isinstance(theme_value, str) and theme_value.strip():
                     runtime["theme_mode"] = theme_value.strip()
@@ -336,6 +365,59 @@ class RuntimeSettingsService:
             stream_flag = bool(updates.get("litellm_stream"))
             runtime["litellm_stream"] = stream_flag
 
+        def _clean_font_family(value: object | None, default: str) -> str:
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+            return default
+
+        def _clean_font_size(value: object | None, default: int) -> int:
+            if isinstance(value, bool):
+                return default
+            if isinstance(value, (int, float)):
+                candidate = int(value)
+            elif isinstance(value, str):
+                stripped = value.strip()
+                try:
+                    candidate = int(stripped)
+                except ValueError:
+                    return default
+            else:
+                return default
+            if candidate < 6 or candidate > 72:
+                return default
+            return candidate
+
+        prompt_output_font_family = _clean_font_family(
+            runtime.get("prompt_output_font_family"), DEFAULT_PROMPT_OUTPUT_FONT_FAMILY
+        )
+        chat_font_family = _clean_font_family(
+            runtime.get("chat_font_family"), DEFAULT_CHAT_FONT_FAMILY
+        )
+        prompt_output_font_size = _clean_font_size(
+            runtime.get("prompt_output_font_size"), DEFAULT_PROMPT_OUTPUT_FONT_SIZE
+        )
+        chat_font_size = _clean_font_size(runtime.get("chat_font_size"), DEFAULT_CHAT_FONT_SIZE)
+        if "prompt_output_font_family" in updates:
+            prompt_output_font_family = _clean_font_family(
+                updates.get("prompt_output_font_family"), DEFAULT_PROMPT_OUTPUT_FONT_FAMILY
+            )
+        if "chat_font_family" in updates:
+            chat_font_family = _clean_font_family(
+                updates.get("chat_font_family"), DEFAULT_CHAT_FONT_FAMILY
+            )
+        if "prompt_output_font_size" in updates:
+            prompt_output_font_size = _clean_font_size(
+                updates.get("prompt_output_font_size"), DEFAULT_PROMPT_OUTPUT_FONT_SIZE
+            )
+        if "chat_font_size" in updates:
+            chat_font_size = _clean_font_size(
+                updates.get("chat_font_size"), DEFAULT_CHAT_FONT_SIZE
+            )
+        runtime["prompt_output_font_family"] = prompt_output_font_family
+        runtime["chat_font_family"] = chat_font_family
+        runtime["prompt_output_font_size"] = prompt_output_font_size
+        runtime["chat_font_size"] = chat_font_size
+
         def _normalise_workflows(value: object | None) -> WorkflowRouting | None:
             if not isinstance(value, dict):
                 return None
@@ -442,6 +524,10 @@ class RuntimeSettingsService:
                 "google_cse_id": runtime.get("google_cse_id"),
                 "embedding_backend": runtime.get("embedding_backend"),
                 "embedding_model": runtime.get("embedding_model"),
+                "prompt_output_font_family": runtime.get("prompt_output_font_family"),
+                "prompt_output_font_size": runtime.get("prompt_output_font_size"),
+                "chat_font_family": runtime.get("chat_font_family"),
+                "chat_font_size": runtime.get("chat_font_size"),
                 "chat_user_bubble_color": runtime.get("chat_user_bubble_color"),
                 "chat_colors": (
                     palette_for_diff if palette_differs_from_defaults(palette_for_diff) else None
@@ -488,6 +574,10 @@ class RuntimeSettingsService:
             settings_model.litellm_stream = stream_flag
             settings_model.embedding_backend = embedding_backend_value
             settings_model.embedding_model = cast("str | None", runtime.get("embedding_model"))
+            settings_model.prompt_output_font_family = prompt_output_font_family
+            settings_model.prompt_output_font_size = prompt_output_font_size
+            settings_model.chat_font_family = chat_font_family
+            settings_model.chat_font_size = chat_font_size
             settings_model.chat_user_bubble_color = chat_colour
             settings_model.theme_mode = cast("Literal['light', 'dark']", theme_choice)
             if cleaned_palette:
