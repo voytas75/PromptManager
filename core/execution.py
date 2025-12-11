@@ -460,7 +460,9 @@ def _estimate_usage(
     litellm_module = cast("Any", litellm)
     token_counter = getattr(litellm_module, "token_counter", None)
     if not callable(token_counter):
-        prompt_words = _approximate_token_count(" ".join(msg.get("content", "") for msg in messages))
+        prompt_words = _approximate_token_count(
+            " ".join(msg.get("content", "") for msg in messages)
+        )
         completion_words = _approximate_token_count(response_text)
         return {
             "prompt_tokens": prompt_words,
@@ -474,7 +476,9 @@ def _estimate_usage(
             text=response_text,
         )
     except Exception:  # pragma: no cover - defensive
-        prompt_words = _approximate_token_count(" ".join(msg.get("content", "") for msg in messages))
+        prompt_words = _approximate_token_count(
+            " ".join(msg.get("content", "") for msg in messages)
+        )
         completion_words = _approximate_token_count(response_text)
         return {
             "prompt_tokens": prompt_words,

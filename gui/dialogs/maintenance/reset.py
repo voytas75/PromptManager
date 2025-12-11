@@ -15,9 +15,9 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
+    QHBoxLayout,
     QLabel,
     QMessageBox,
-    QHBoxLayout,
     QPlainTextEdit,
     QPushButton,
     QVBoxLayout,

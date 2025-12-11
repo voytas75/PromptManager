@@ -10,7 +10,7 @@ Updates:
   v0.2.6 - 2025-12-05 - Pass prompt edit callbacks into analytics and chain panels.
   v0.2.5 - 2025-12-05 - Mark module docstring as raw for lint compliance.
   v0.2.4 - 2025-12-05 - Remove prompt template toolbar wiring.
-  v0.2.0-and-earlier - 2025-11-30 - Extract main window UI assembly into reusable builder helpers and early chain/template wiring.
+  v0.2.0-and-earlier - 2025-11-30 - Extract main window UI assembly into reusable builder helpers.
 """
 
 from __future__ import annotations
