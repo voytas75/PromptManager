@@ -30,8 +30,10 @@ from PySide6.QtWidgets import QAbstractButton, QStyle
 from config import (
     DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR,
     DEFAULT_CHAT_USER_BUBBLE_COLOR,
+    DEFAULT_CHAT_FONT_COLOR,
     DEFAULT_CHAT_FONT_FAMILY,
     DEFAULT_CHAT_FONT_SIZE,
+    DEFAULT_PROMPT_OUTPUT_FONT_COLOR,
     DEFAULT_PROMPT_OUTPUT_FONT_FAMILY,
     DEFAULT_PROMPT_OUTPUT_FONT_SIZE,
     PromptManagerSettings,
@@ -1264,6 +1266,17 @@ class ExecutionController:
             return default
         return candidate
 
+    def _preferred_font_color(self, runtime_key: str, default: str) -> str:
+        value = self._runtime_settings.get(runtime_key)
+        candidate = None
+        if isinstance(value, str) and QColor(value.strip()).isValid():
+            candidate = QColor(value.strip()).name().lower()
+        if candidate is None and self._settings is not None:
+            settings_value = getattr(self._settings, runtime_key, None)
+            if isinstance(settings_value, str) and QColor(settings_value.strip()).isValid():
+                candidate = QColor(settings_value.strip()).name().lower()
+        return candidate or default
+
     def _apply_font_preferences(self) -> None:
         if self._result_text is not None:
             output_font = QFont(self._result_text.font())
@@ -1278,6 +1291,10 @@ class ExecutionController:
                 )
             )
             self._result_text.setFont(output_font)
+            output_color = self._preferred_font_color(
+                "prompt_output_font_color", DEFAULT_PROMPT_OUTPUT_FONT_COLOR
+            )
+            self._result_text.setStyleSheet(f"color: {output_color};")
         if self._chat_history_view is not None:
             chat_font = QFont(self._chat_history_view.font())
             chat_font.setFamily(
@@ -1287,6 +1304,8 @@ class ExecutionController:
                 self._preferred_font_size("chat_font_size", DEFAULT_CHAT_FONT_SIZE)
             )
             self._chat_history_view.setFont(chat_font)
+            chat_color = self._preferred_font_color("chat_font_color", DEFAULT_CHAT_FONT_COLOR)
+            self._chat_history_view.setStyleSheet(f"color: {chat_color};")
 
     def _chat_user_colour(self) -> str:
         fallback = DEFAULT_CHAT_USER_BUBBLE_COLOR

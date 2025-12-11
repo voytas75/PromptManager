@@ -1,6 +1,7 @@
 """Settings management utilities for Prompt Manager configuration.
 
 Updates:
+  v0.5.17 - 2025-12-11 - Add prompt/chat font colour preferences with validation and env bindings.
   v0.5.16 - 2025-12-11 - Add prompt/chat font preferences with validation and env bindings.
   v0.5.15 - 2025-12-10 - Add LiteLLM logging toggle and env binding.
   v0.5.14 - 2025-12-07 - Add Google web search provider configuration and env parsing.
@@ -10,7 +11,6 @@ Updates:
   v0.5.10 - 2025-12-07 - Allow random web search provider selection and validation.
   v0.5.9 - 2025-12-05 - Tighten dotenv helpers for lint compliance.
   v0.5.8 - 2025-12-04 - Add auto-open share link preference with GUI binding.
-  v0.5.7 - 2025-12-04 - Load .env secrets so web search keys persist like LiteLLM keys.
 """
 
 from __future__ import annotations
@@ -57,6 +57,8 @@ DEFAULT_PROMPT_OUTPUT_FONT_FAMILY = "JetBrains Mono"
 DEFAULT_PROMPT_OUTPUT_FONT_SIZE = 13
 DEFAULT_CHAT_FONT_FAMILY = "Segoe UI"
 DEFAULT_CHAT_FONT_SIZE = 12
+DEFAULT_PROMPT_OUTPUT_FONT_COLOR = "#b5cfed"
+DEFAULT_CHAT_FONT_COLOR = "#b5cfed"
 DEFAULT_PRIVATEBIN_URL = "https://privatebin.net/"
 DEFAULT_PRIVATEBIN_EXPIRATION = "1week"
 DEFAULT_PRIVATEBIN_FORMAT = "markdown"
@@ -344,6 +346,10 @@ class PromptManagerSettings(BaseSettings):
         default=DEFAULT_PROMPT_OUTPUT_FONT_SIZE,
         description="Font size (points) for workspace prompt output text.",
     )
+    prompt_output_font_color: str = Field(
+        default=DEFAULT_PROMPT_OUTPUT_FONT_COLOR,
+        description="Font colour (hex) applied to workspace prompt output text.",
+    )
     chat_font_family: str = Field(
         default=DEFAULT_CHAT_FONT_FAMILY,
         description="Font family applied to chat history messages in the workspace.",
@@ -351,6 +357,10 @@ class PromptManagerSettings(BaseSettings):
     chat_font_size: int = Field(
         default=DEFAULT_CHAT_FONT_SIZE,
         description="Font size (points) for chat history messages.",
+    )
+    chat_font_color: str = Field(
+        default=DEFAULT_CHAT_FONT_COLOR,
+        description="Font colour (hex) applied to workspace chat history messages.",
     )
     chat_user_bubble_color: str = Field(
         default=DEFAULT_CHAT_USER_BUBBLE_COLOR,
@@ -480,8 +490,13 @@ class PromptManagerSettings(BaseSettings):
                     "PROMPT_OUTPUT_FONT_SIZE",
                     "prompt_output_font_size",
                 ],
+                "prompt_output_font_color": [
+                    "PROMPT_OUTPUT_FONT_COLOR",
+                    "prompt_output_font_color",
+                ],
                 "chat_font_family": ["CHAT_FONT_FAMILY", "chat_font_family"],
                 "chat_font_size": ["CHAT_FONT_SIZE", "chat_font_size"],
+                "chat_font_color": ["CHAT_FONT_COLOR", "chat_font_color"],
                 "chat_user_bubble_color": ["CHAT_USER_BUBBLE_COLOR", "chat_user_bubble_color"],
                 "prompt_templates": ["PROMPT_TEMPLATES", "prompt_templates"],
                 "web_search_provider": ["WEB_SEARCH_PROVIDER", "web_search_provider"],
@@ -548,6 +563,14 @@ class PromptManagerSettings(BaseSettings):
         if value < 6 or value > 72:
             raise ValueError("font sizes must be between 6 and 72 points")
         return value
+
+    @field_validator("prompt_output_font_color", "chat_font_color")
+    def _validate_font_color(cls, value: str) -> str:
+        """Validate that font colours are hex values."""
+        cleaned = value.strip()
+        if not _CHAT_COLOR_PATTERN.match(cleaned):
+            raise ValueError("font colour must be a hex code such as #b5cfed")
+        return cleaned.lower()
 
     @field_validator("redis_dsn", mode="before")
     def _trim_redis_dsn(cls, value: str | None) -> str | None:
@@ -1023,8 +1046,10 @@ class PromptManagerSettings(BaseSettings):
                     "quick_actions",
                     "prompt_output_font_family",
                     "prompt_output_font_size",
+                    "prompt_output_font_color",
                     "chat_font_family",
                     "chat_font_size",
+                    "chat_font_color",
                     "chat_user_bubble_color",
                     "chat_colors",
                     "theme_mode",

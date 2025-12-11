@@ -100,8 +100,10 @@ class SettingsWorkflow:
                 "str | None", data.get("prompt_output_font_family")
             ),
             prompt_output_font_size=cast("int | None", data.get("prompt_output_font_size")),
+            prompt_output_font_color=cast("str | None", data.get("prompt_output_font_color")),
             chat_font_family=cast("str | None", data.get("chat_font_family")),
             chat_font_size=cast("int | None", data.get("chat_font_size")),
+            chat_font_color=cast("str | None", data.get("chat_font_color")),
             chat_colors=cast("dict[str, str] | None", data.get("chat_colors")),
             prompt_templates=cast("dict[str, str] | None", data.get("prompt_templates")),
             web_search_provider=cast("str | None", data.get("web_search_provider")),

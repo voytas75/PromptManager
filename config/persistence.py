@@ -22,12 +22,14 @@ from pathlib import Path
 from typing import Any, cast
 
 from config.settings import (
+    DEFAULT_CHAT_FONT_COLOR,
     DEFAULT_CHAT_FONT_FAMILY,
     DEFAULT_CHAT_FONT_SIZE,
     DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR,
     DEFAULT_CHAT_USER_BUBBLE_COLOR,
     DEFAULT_EMBEDDING_BACKEND,
     DEFAULT_EMBEDDING_MODEL,
+    DEFAULT_PROMPT_OUTPUT_FONT_COLOR,
     DEFAULT_PROMPT_OUTPUT_FONT_FAMILY,
     DEFAULT_PROMPT_OUTPUT_FONT_SIZE,
 )
@@ -115,6 +117,15 @@ def _normalise_font_size(value: object | None) -> int | None:
     return candidate
 
 
+def _normalise_font_color(value: object | None) -> str | None:
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not _CHAT_COLOR_PATTERN.match(text):
+        return None
+    return text.lower()
+
+
 def _normalise_prompt_templates(value: object | None) -> dict[str, str] | None:
     if value is None or not isinstance(value, Mapping):
         return None
@@ -169,6 +180,12 @@ def persist_settings_to_config(updates: dict[str, object | None]) -> None:
         if key == "chat_font_family":
             family = _normalise_font_family(value)
             value = None if family in (None, DEFAULT_CHAT_FONT_FAMILY) else family
+        if key == "prompt_output_font_color":
+            color = _normalise_font_color(value)
+            value = None if color in (None, DEFAULT_PROMPT_OUTPUT_FONT_COLOR) else color
+        if key == "chat_font_color":
+            color = _normalise_font_color(value)
+            value = None if color in (None, DEFAULT_CHAT_FONT_COLOR) else color
         if key == "prompt_output_font_size":
             size = _normalise_font_size(value)
             value = None if size in (None, DEFAULT_PROMPT_OUTPUT_FONT_SIZE) else size

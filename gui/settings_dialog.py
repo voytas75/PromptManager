@@ -90,8 +90,10 @@ class SettingsDialog(QDialog):
         theme_mode: str | None = None,
         prompt_output_font_family: str | None = None,
         prompt_output_font_size: int | None = None,
+        prompt_output_font_color: str | None = None,
         chat_font_family: str | None = None,
         chat_font_size: int | None = None,
+        chat_font_color: str | None = None,
         chat_colors: dict[str, str] | None = None,
         prompt_templates: dict[str, str] | None = None,
         web_search_provider: str | None = None,
@@ -189,11 +191,25 @@ class SettingsDialog(QDialog):
         self._chat_font_size = (
             chat_font_size if chat_font_size is not None else DEFAULT_CHAT_FONT_SIZE
         )
+        self._prompt_output_font_color = (
+            prompt_output_font_color.strip()
+            if isinstance(prompt_output_font_color, str)
+            else DEFAULT_PROMPT_OUTPUT_FONT_COLOR
+        )
+        if not QColor(self._prompt_output_font_color).isValid():
+            self._prompt_output_font_color = DEFAULT_PROMPT_OUTPUT_FONT_COLOR
+        self._chat_font_color = (
+            chat_font_color.strip() if isinstance(chat_font_color, str) else DEFAULT_CHAT_FONT_COLOR
+        )
+        if not QColor(self._chat_font_color).isValid():
+            self._chat_font_color = DEFAULT_CHAT_FONT_COLOR
         self._theme_combo: QComboBox | None = None
         self._prompt_output_font_family_input: QLineEdit | None = None
         self._prompt_output_font_size_input: QSpinBox | None = None
         self._chat_font_family_input: QLineEdit | None = None
         self._chat_font_size_input: QSpinBox | None = None
+        self._prompt_output_font_color_input: QLineEdit | None = None
+        self._chat_font_color_input: QLineEdit | None = None
         self._prompt_template_inputs: dict[str, QPlainTextEdit] = {}
         self._prompt_templates_value: dict[str, str] | None = None
         self._prompt_template_initials: dict[str, str] = {}
@@ -490,6 +506,11 @@ class SettingsDialog(QDialog):
         self._prompt_output_font_size_input = prompt_font_size_input
         appearance_form.addRow("Prompt output size", prompt_font_size_input)
 
+        prompt_font_color_input = QLineEdit(self._prompt_output_font_color, appearance_tab)
+        prompt_font_color_input.setPlaceholderText(DEFAULT_PROMPT_OUTPUT_FONT_COLOR)
+        self._prompt_output_font_color_input = prompt_font_color_input
+        appearance_form.addRow("Prompt output colour", prompt_font_color_input)
+
         chat_font_family_input = QLineEdit(self._chat_font_family, appearance_tab)
         chat_font_family_input.setPlaceholderText(DEFAULT_CHAT_FONT_FAMILY)
         self._chat_font_family_input = chat_font_family_input
@@ -500,6 +521,11 @@ class SettingsDialog(QDialog):
         chat_font_size_input.setValue(self._chat_font_size)
         self._chat_font_size_input = chat_font_size_input
         appearance_form.addRow("Chat font size", chat_font_size_input)
+
+        chat_font_color_input = QLineEdit(self._chat_font_color, appearance_tab)
+        chat_font_color_input.setPlaceholderText(DEFAULT_CHAT_FONT_COLOR)
+        self._chat_font_color_input = chat_font_color_input
+        appearance_form.addRow("Chat font colour", chat_font_color_input)
 
         chat_color_input = QLineEdit(self._chat_user_bubble_color, appearance_tab)
         chat_color_input.setPlaceholderText(self._default_chat_color)
@@ -751,6 +777,11 @@ class SettingsDialog(QDialog):
             if self._prompt_output_font_family_input
             else None
         )
+        prompt_output_font_color = (
+            _clean(self._prompt_output_font_color_input.text())
+            if self._prompt_output_font_color_input
+            else None
+        )
         chat_font_family = (
             _clean(self._chat_font_family_input.text()) if self._chat_font_family_input else None
         )
@@ -761,6 +792,9 @@ class SettingsDialog(QDialog):
         )
         chat_font_size = (
             self._chat_font_size_input.value() if self._chat_font_size_input else None
+        )
+        chat_font_color = (
+            _clean(self._chat_font_color_input.text()) if self._chat_font_color_input else None
         )
 
         workflow_models: dict[str, str] = {}
@@ -811,8 +845,10 @@ class SettingsDialog(QDialog):
             "theme_mode": self._theme_mode,
             "prompt_output_font_family": prompt_output_font_family,
             "prompt_output_font_size": prompt_output_font_size,
+            "prompt_output_font_color": prompt_output_font_color,
             "chat_font_family": chat_font_family,
             "chat_font_size": chat_font_size,
+            "chat_font_color": chat_font_color,
             "prompt_templates": self._prompt_templates_value,
             "web_search_provider": provider_choice,
             "exa_api_key": exa_api_key,
