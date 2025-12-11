@@ -2,6 +2,12 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.22.17] - 2025-12-11
+
+### Added
+
+- Workspace prompt output and chat panes now support configurable font families, sizes, and colours (default `#B5CFED`). Settings UI exposes the controls, environment bindings exist for runtime configuration, and persistence ensures the preferences survive restarts.
+
 ## [0.22.16] - 2025-12-10
 
 ### Removed
