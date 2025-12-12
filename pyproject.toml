@@ -53,7 +53,7 @@ dev = [
 
 [tool.setuptools.packages.find]
 include = ["config*", "core*", "gui*", "models*"]
-exclude = ["tests*", "data*"]
+exclude = ["tests*", "data*", "scripts*"]
 
 [tool.setuptools.package-data]
 "gui.resources" = ["*.ico"]
@@ -107,7 +107,7 @@ fail_under = 80
 
 [tool.pyright]
 include = ["main.py", "core", "config", "gui", "models", "tests"]
-exclude = ["data"]
+exclude = ["data", "scripts"]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
 reportMissingImports = "warning"
