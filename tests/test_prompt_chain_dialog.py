@@ -1,6 +1,7 @@
 """Prompt chain manager dialog tests.
 
 Updates:
+  v0.4.3 - 2025-12-12 - Assert chain web search tooltip reflects the active provider and Random rotation.
   v0.4.2 - 2025-12-08 - Accept case-insensitive chain headings for Markdown toggles.
   v0.4.1 - 2025-12-08 - Cast manager stubs, use Qt enums, and swap SimpleNamespace prompts.
   v0.4.0 - 2025-12-06 - Adapt to the plain-text chain manager/editor UX.
@@ -10,9 +11,6 @@ Updates:
   v0.2.7 - 2025-12-05 - Cover default-on web search toggle behaviour for chains.
   v0.2.6 - 2025-12-05 - Cover summarize toggle persistence and UI output section.
   v0.2.5 - 2025-12-05 - Ensure step IO renders outside code fences for Markdown formatting.
-  v0.2.4 - 2025-12-05 - Verify Markdown toggle preserves rendered text.
-  v0.2.3 - 2025-12-05 - Cover streaming preview rendering and settings detection.
-  pre-v0.2.3 - 2025-12-04 - Earlier releases introduced CRUD helpers and execution flows.
 """
 
 from __future__ import annotations
@@ -29,6 +27,7 @@ from PySide6.QtWidgets import QApplication, QDialog, QMessageBox, QTextEdit
 from core import PromptChainRunResult, PromptChainStepRun, PromptManager, PromptManagerError
 from core.execution import CodexExecutionResult
 from core.prompt_manager.execution_history import ExecutionOutcome
+from core.web_search import RandomWebSearchProvider, WebSearchService
 from gui.dialogs.prompt_chain_editor import PromptChainEditorDialog
 from gui.dialogs.prompt_chains import PromptChainManagerDialog, PromptChainManagerPanel
 from models.prompt_chain_model import PromptChain, PromptChainStep
@@ -197,6 +196,15 @@ class _ManagerStub:
         self._chains = [chain for chain in self._chains if chain.id != chain_id]
 
 
+class _FakeProvider:
+    def __init__(self, slug: str, display_name: str | None = None) -> None:
+        self.slug = slug
+        self.display_name = display_name or slug
+
+    async def search(self, query: str, *, limit: int = 5, **kwargs: Any) -> object:  # noqa: ARG002
+        return {}
+
+
 def _build_dialog(
     manager: _ManagerStub | None = None,
     **kwargs: Any,
@@ -265,6 +273,44 @@ def test_prompt_chain_dialog_populates_details(qt_app: QApplication) -> None:
         assert panel._chain_list.count() == 1  # noqa: SLF001
         assert panel._detail_title.text() == "Demo Chain"
         assert "Example" in panel._description_label.text()
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
+def test_prompt_chain_dialog_sets_provider_tooltip(qt_app: QApplication) -> None:
+    """Tooltip should describe the configured provider."""
+
+    manager = _ManagerStub()
+    manager.web_search_service = WebSearchService(_FakeProvider("exa", "Exa Search"))
+    manager.web_search = manager.web_search_service
+    dialog, panel, manager = _build_dialog(manager)
+    try:
+        assert panel._web_search_checkbox is not None  # noqa: SLF001
+        assert panel._web_search_checkbox.toolTip() == (
+            "Include live web search findings via Exa Search before each chain step executes."
+        )  # noqa: SLF001
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
+def test_prompt_chain_dialog_sets_random_provider_tooltip(qt_app: QApplication) -> None:
+    """Tooltip should list available providers when Random is configured."""
+
+    manager = _ManagerStub()
+    random_provider = RandomWebSearchProvider(
+        (_FakeProvider("exa", "Exa"), _FakeProvider("tavily", "Tavily"))
+    )
+    manager.web_search_service = WebSearchService(random_provider)
+    manager.web_search = manager.web_search_service
+    dialog, panel, manager = _build_dialog(manager)
+    try:
+        assert panel._web_search_checkbox is not None  # noqa: SLF001
+        assert panel._web_search_checkbox.toolTip() == (
+            "Include live web search findings via the Random provider, rotating between "
+            "Exa and Tavily before each chain step executes."
+        )  # noqa: SLF001
     finally:
         dialog.close()
         dialog.deleteLater()
