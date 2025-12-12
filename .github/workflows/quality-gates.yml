@@ -16,6 +16,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libegl1
 
+      - name: Prepare config defaults
+        run: |
+          mkdir -p config
+          if [ ! -f config/config.json ]; then
+            if [ -f config/config.template.json ]; then
+              cp config/config.template.json config/config.json
+            else
+              echo "{}" > config/config.json
+            fi
+          fi
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
