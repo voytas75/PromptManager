@@ -1,6 +1,7 @@
 """Provider protocol definitions and concrete provider implementations.
 
 Updates:
+  v0.1.8 - 2025-12-12 - Retry transient HTTP failures with exponential backoff.
   v0.1.7 - 2025-12-07 - Add Google Programmable Search provider and HTML snippet parsing.
   v0.1.6 - 2025-12-07 - Add resolve_web_search_provider helper for runtime wiring.
   v0.1.5 - 2025-12-07 - Add SerpApi provider and organic result normalisation helper.
@@ -23,6 +24,7 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 import httpx
 
 from ..exceptions import WebSearchProviderError, WebSearchUnavailable
+from ..retry import async_retry, is_retryable_httpx_error
 from .models import WebSearchDocument, WebSearchResult
 
 if TYPE_CHECKING:
@@ -327,8 +329,13 @@ class ExaWebSearchProvider:
         else:
             client = self.client_factory()
         try:
-            response = await client.post("/search", json=payload)
-            response.raise_for_status()
+
+            async def _send_request() -> httpx.Response:
+                response = await client.post("/search", json=payload)
+                response.raise_for_status()
+                return response
+
+            response = await async_retry(_send_request, should_retry=is_retryable_httpx_error)
         except httpx.HTTPError as exc:  # pragma: no cover - exercised via tests
             raise WebSearchProviderError("Exa search request failed") from exc
         finally:
@@ -426,8 +433,13 @@ class GoogleWebSearchProvider:
         else:
             client = self.client_factory()
         try:
-            response = await client.get(self.endpoint, params=params)
-            response.raise_for_status()
+
+            async def _send_request() -> httpx.Response:
+                response = await client.get(self.endpoint, params=params)
+                response.raise_for_status()
+                return response
+
+            response = await async_retry(_send_request, should_retry=is_retryable_httpx_error)
         except httpx.HTTPError as exc:  # pragma: no cover - exercised via tests
             raise WebSearchProviderError("Google search request failed") from exc
         finally:
@@ -516,8 +528,13 @@ class SerperWebSearchProvider:
             client = self.client_factory()
         endpoint = f"/{(search_type or 'search').strip().lstrip('/') or 'search'}"
         try:
-            response = await client.post(endpoint, json=payload)
-            response.raise_for_status()
+
+            async def _send_request() -> httpx.Response:
+                response = await client.post(endpoint, json=payload)
+                response.raise_for_status()
+                return response
+
+            response = await async_retry(_send_request, should_retry=is_retryable_httpx_error)
         except httpx.HTTPError as exc:  # pragma: no cover - exercised via tests
             raise WebSearchProviderError("Serper search request failed") from exc
         finally:
@@ -635,8 +652,13 @@ class SerpApiWebSearchProvider:
         else:
             client = self.client_factory()
         try:
-            response = await client.get("/search", params=params)
-            response.raise_for_status()
+
+            async def _send_request() -> httpx.Response:
+                response = await client.get("/search", params=params)
+                response.raise_for_status()
+                return response
+
+            response = await async_retry(_send_request, should_retry=is_retryable_httpx_error)
         except httpx.HTTPError as exc:  # pragma: no cover - exercised via tests
             raise WebSearchProviderError("SerpApi search request failed") from exc
         finally:
@@ -741,8 +763,13 @@ class TavilyWebSearchProvider:
         else:
             client = self.client_factory()
         try:
-            response = await client.post("/search", json=payload)
-            response.raise_for_status()
+
+            async def _send_request() -> httpx.Response:
+                response = await client.post("/search", json=payload)
+                response.raise_for_status()
+                return response
+
+            response = await async_retry(_send_request, should_retry=is_retryable_httpx_error)
         except httpx.HTTPError as exc:  # pragma: no cover - exercised via tests
             raise WebSearchProviderError("Tavily search request failed") from exc
         finally:

@@ -1,6 +1,7 @@
 """Prompt sharing helpers for external paste services.
 
 Updates:
+  v0.1.7 - 2025-12-12 - Retry transient network failures for share providers.
   v0.1.6 - 2025-12-07 - Add Rentry provider and management-note support.
   v0.1.5 - 2025-12-07 - Add PrivateBin provider for zero-knowledge sharing.
   v0.1.4 - 2025-12-07 - Provide shared footer helper for prompts and results.
@@ -29,6 +30,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 from core.exceptions import ShareProviderError
+from core.retry import is_retryable_httpx_error, is_retryable_url_error, retry
 
 if TYPE_CHECKING:
     from models.prompt_model import Prompt
@@ -256,8 +258,15 @@ class ShareTextProvider:
             },
         )
         try:
-            with urllib.request.urlopen(request, timeout=self._timeout) as response:
-                response_body = response.read()
+
+            def _send_request() -> bytes:
+                with urllib.request.urlopen(request, timeout=self._timeout) as response:
+                    return response.read()
+
+            response_body = retry(
+                _send_request,
+                should_retry=is_retryable_url_error,
+            )
         except urllib.error.URLError as exc:  # pragma: no cover - network failure
             reason = getattr(exc, "reason", str(exc))
             raise ShareProviderError(f"Unable to reach ShareText: {reason}") from exc
@@ -386,13 +395,18 @@ class PrivateBinProvider:
         }
         request_body = _compact_json_bytes(payload_dict)
         try:
-            response = httpx.post(
-                self._base_url,
-                content=request_body,
-                headers=self._headers,
-                timeout=self._timeout,
-            )
-            response.raise_for_status()
+
+            def _send_request() -> httpx.Response:
+                response = httpx.post(
+                    self._base_url,
+                    content=request_body,
+                    headers=self._headers,
+                    timeout=self._timeout,
+                )
+                response.raise_for_status()
+                return response
+
+            response = retry(_send_request, should_retry=is_retryable_httpx_error)
         except httpx.HTTPError as exc:
             raise ShareProviderError(f"Unable to reach PrivateBin: {exc}") from exc
         try:
@@ -464,12 +478,20 @@ class RentryProvider:
                 timeout=self._timeout,
                 follow_redirects=True,
             ) as client:
-                csrf_token = self._fetch_csrf_token(client)
-                response = client.post(
-                    f"{self._base_url}/api/new",
-                    data=self._build_request_body(csrf_token, stripped_payload),
+                csrf_token = retry(
+                    lambda: self._fetch_csrf_token(client),
+                    should_retry=is_retryable_httpx_error,
                 )
-                response.raise_for_status()
+
+                def _send_request() -> httpx.Response:
+                    response = client.post(
+                        f"{self._base_url}/api/new",
+                        data=self._build_request_body(csrf_token, stripped_payload),
+                    )
+                    response.raise_for_status()
+                    return response
+
+                response = retry(_send_request, should_retry=is_retryable_httpx_error)
         except httpx.HTTPError as exc:
             raise ShareProviderError(f"Unable to reach Rentry: {exc}") from exc
         try:

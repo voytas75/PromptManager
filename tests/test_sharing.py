@@ -1,6 +1,7 @@
 """Tests for prompt sharing helpers.
 
 Updates:
+  v0.1.3 - 2025-12-12 - Cover retry behaviour for transient share provider failures.
   v0.1.2 - 2025-12-10 - Cover prompt formatting helper and PrivateBin URL validation.
   v0.1.1 - 2025-12-07 - Cover PrivateBin provider payload construction and error handling.
   v0.1.0 - 2025-12-07 - Cover shared footer helper for prompts and results.
@@ -138,6 +139,51 @@ def test_privatebin_provider_handles_error(monkeypatch: MonkeyPatch) -> None:
         provider.share("payload", prompt=None)
 
     assert "rate limited" in str(excinfo.value)
+
+
+def test_privatebin_provider_retries_transient_http_failures(monkeypatch: MonkeyPatch) -> None:
+    """Retry transient HTTP failures when posting to PrivateBin."""
+    calls: list[int] = []
+
+    class _DummyResponse:
+        def __init__(self, status_code: int, payload: dict[str, object] | None = None) -> None:
+            self._status_code = status_code
+            self._payload = payload or {}
+
+        def raise_for_status(self) -> None:
+            if self._status_code < 400:
+                return None
+            request = httpx.Request("POST", "https://bin.example/secure/")
+            response = httpx.Response(self._status_code, request=request)
+            raise httpx.HTTPStatusError("error", request=request, response=response)
+
+        def json(self) -> dict[str, object]:
+            return self._payload
+
+    def fake_post(*_: object, **__: object) -> _DummyResponse:
+        calls.append(1)
+        if len(calls) == 1:
+            return _DummyResponse(503)
+        return _DummyResponse(200, {"status": 0, "id": "abc123", "deletetoken": "del-token"})
+
+    monkeypatch.setattr("core.retry.time.sleep", lambda _: None)
+    monkeypatch.setattr("core.sharing.httpx.post", fake_post)
+    monkeypatch.setattr("core.sharing.secrets.token_bytes", lambda size: bytes([size]) * size)
+    monkeypatch.setattr("core.sharing._base58_encode", lambda _: "encoded-key")
+
+    provider = PrivateBinProvider(
+        base_url="https://bin.example/secure/",
+        expiration="10min",
+        formatter="plaintext",
+        compression="none",
+        burn_after_reading=True,
+        open_discussion=True,
+    )
+
+    result = provider.share("Payload body", prompt=None)
+
+    assert len(calls) == 2
+    assert result.url == "https://bin.example/secure/?abc123#encoded-key"
 
 
 def test_rentry_provider_creates_entry(monkeypatch: MonkeyPatch) -> None:

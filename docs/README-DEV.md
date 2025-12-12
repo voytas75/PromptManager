@@ -18,6 +18,13 @@ PromptManager is a PySide6 desktop application for managing reusable AI prompts 
 - **Automation**: `nox -s format lint typecheck test` runs the full CI-equivalent workflow. Keep parity with AGENTS.md quality gates (Ruff + Pyright strict + coverage ≥80%).
 - **Security & Resilience**: wrap external I/O in timeouts, provide custom exception hierarchy, never use bare `except`, and include actionable context plus retries with exponential backoff where transient failures may occur.
 
+### Release hardening baseline (Beta → stable)
+
+- This baseline is non-negotiable for merges: strict Ruff/Pyright/Pytest+coverage gates, fail-fast settings validation, and external I/O resilience (timeouts + bounded retries + deterministic mocking).
+- CI uses `.github/workflows/quality-gates.yml`; the local parity command is `nox -s all` (or the individual `.venv/bin/ruff|pyright|pytest` invocations).
+- Validate settings early during development with `python -m main --no-gui --print-settings` or `python scripts/validate_settings.py`; configuration failures must be actionable and stop execution.
+- For HTTP I/O, prefer `httpx.AsyncClient(timeout=...)` plus retry helpers (e.g., `core.retry.async_retry`) and mock calls in tests with `httpx.MockTransport`, `respx`, or `vcrpy` (no live external calls in CI).
+
 ## Environment Setup
 
 ```bash

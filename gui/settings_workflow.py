@@ -96,9 +96,7 @@ class SettingsWorkflow:
             quick_actions=cast("list[dict[str, object]] | None", data.get("quick_actions")),
             chat_user_bubble_color=cast("str | None", data.get("chat_user_bubble_color")),
             theme_mode=cast("str | None", data.get("theme_mode")),
-            prompt_output_font_family=cast(
-                "str | None", data.get("prompt_output_font_family")
-            ),
+            prompt_output_font_family=cast("str | None", data.get("prompt_output_font_family")),
             prompt_output_font_size=cast("int | None", data.get("prompt_output_font_size")),
             prompt_output_font_color=cast("str | None", data.get("prompt_output_font_color")),
             chat_font_family=cast("str | None", data.get("chat_font_family")),

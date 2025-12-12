@@ -1,25 +1,29 @@
 """noxfile.py - Nox sessions for Prompt Manager.
 
 Updates:
+  v0.3.0 - 2025-12-12 - Align sessions with Ruff/Pyright/Pytest quality gates in `.venv`.
   v0.2.3 - 2025-11-29 - Convert missing-tool warning to f-string for Ruff UP031.
   v0.2.2 - 2025-11-11 - Switch type checker session from mypy to pyright.
   v0.2.1 - 2025-11-07 - Document dev extra prerequisite for automation sessions.
   v0.2.0 - 2025-10-30 - Switch sessions to host interpreter and add tool detection
   v0.1.0 - 2025-10-30 - Initial scaffold of fmt/lint/tests/type-check sessions
 
-Install the project with `pip install .[dev]` to provide pytest/pyright/black before
-running these sessions. This file defines automation sessions:
-- fmt: format code with black
-- lint: lint and check style with ruff (and black --check)
-- tests: run pytest with coverage
-- type_check: run pyright in strict mode over core modules
+Install the project with `pip install -e .[dev]` inside `.venv` before running these sessions.
+This file defines automation sessions:
+- format: format code with ruff
+- lint: run ruff lint checks
+- typecheck: run pyright in strict mode
+- test: run pytest with coverage
+- all: run the full quality gate suite
 
 Adjust tool versions/args as needed. Sessions run directly in the host Python
-environment (no isolated venv) so ensure required tools are installed locally.
+environment (no isolated venv) but invoke tools from the project `.venv`.
 """
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -54,19 +58,6 @@ else:  # pragma: no cover - runtime fallback when nox is unavailable
         Session = _NoxStubSession
 
 
-def _ensure_tool(session: Session, command: str, *version_args: str) -> None:
-    """Verify that an external tool is available before executing commands."""
-    args = (command, *(version_args or ("--version",)))
-    try:
-        session.run(*args, external=True)
-    except Exception as exc:  # noqa: BLE001
-        session.error(
-            f"Required tool '{command}' is missing or not executable. Install it in the host "
-            f"environment before running this session. Original error: {exc}"
-        )
-
-
-# Directories to operate on
 CODE_LOCATIONS: tuple[str, ...] = (
     "main.py",
     "config",
@@ -77,55 +68,116 @@ CODE_LOCATIONS: tuple[str, ...] = (
 )
 
 
-@nox.session(venv_backend="none")
-def fmt(session: nox.Session) -> None:
-    """Format code using black.
+def _venv_executable(command: str) -> Path:
+    """Return the path to *command* inside the project virtual environment."""
+    venv_dir = Path(".venv")
+    if sys.platform == "win32":
+        return venv_dir / "Scripts" / f"{command}.exe"
+    return venv_dir / "bin" / command
 
-    Usage: `nox -s fmt`
+
+def _require_venv_tool(session: Session, command: str) -> str:
+    """Return the `.venv` tool path, failing with guidance when missing."""
+    candidate = _venv_executable(command)
+    if candidate.exists():
+        return str(candidate)
+    session.error(
+        "Project virtual environment tool is missing: "
+        f"{candidate}. Create `.venv` and install dev tools with "
+        "`python -m venv .venv && . .venv/bin/activate && pip install -e .[dev]`."
+    )
+    raise RuntimeError("unreachable")  # pragma: no cover
+
+
+@nox.session(venv_backend="none")
+def format(session: nox.Session) -> None:
+    """Format code using ruff.
+
+    Usage: `nox -s format`
     """
-    _ensure_tool(session, "black")
-    session.run("black", *CODE_LOCATIONS, external=True)
+    ruff = _require_venv_tool(session, "ruff")
+    session.run(ruff, "format", *CODE_LOCATIONS, external=True)
 
 
 @nox.session(venv_backend="none")
 def lint(session: nox.Session) -> None:
-    """Lint code using ruff and check formatting with black --check.
+    """Lint code using ruff.
 
     Usage: `nox -s lint`
     """
-    _ensure_tool(session, "ruff")
-    _ensure_tool(session, "black")
-    # Ruff lint + fix unsafe disabled by default; change if you want autofixes
-    session.run("ruff", "check", *CODE_LOCATIONS, external=True)
-    session.run("black", "--check", *CODE_LOCATIONS, external=True)
+    ruff = _require_venv_tool(session, "ruff")
+    session.run(ruff, "check", *CODE_LOCATIONS, external=True)
 
 
 @nox.session(venv_backend="none")
-def tests(session: nox.Session) -> None:
+def typecheck(session: nox.Session) -> None:
+    """Run pyright in strict mode.
+
+    Usage: `nox -s typecheck`
+    """
+    pyright = _require_venv_tool(session, "pyright")
+    session.run(pyright, external=True)
+
+
+@nox.session(venv_backend="none")
+def test(session: nox.Session) -> None:
     """Run pytest with coverage.
 
-    Usage: `nox -s tests`
+    Usage: `nox -s test`
     """
-    _ensure_tool(session, "pytest")
-    # Add any env vars needed by tests here
+    pytest = _require_venv_tool(session, "pytest")
     session.run(
-        "pytest",
-        "-q",
-        "--cov=.",
+        pytest,
+        "-n",
+        "auto",
+        "--cov=core",
         "--cov-report=term-missing",
+        "--cov-fail-under=80",
         *CODE_LOCATIONS,
         external=True,
     )
 
 
 @nox.session(venv_backend="none")
-def type_check(session: nox.Session) -> None:
-    """Run pyright in strict mode against core modules.
+def all(session: nox.Session) -> None:
+    """Run the full Ruff/Pyright/Pytest quality gate suite.
 
-    Usage: `nox -s type_check`
+    Usage: `nox -s all`
     """
-    _ensure_tool(session, "pyright")
+    ruff = _require_venv_tool(session, "ruff")
+    pyright = _require_venv_tool(session, "pyright")
+    pytest = _require_venv_tool(session, "pytest")
 
-    # Pyright discovers configuration from pyproject.toml (tool.pyright section).
-    # Keeping the invocation simple ensures the config remains the source of truth.
-    session.run("pyright", external=True)
+    session.run(ruff, "check", "--fix", *CODE_LOCATIONS, external=True)
+    session.run(ruff, "format", *CODE_LOCATIONS, external=True)
+    session.run(ruff, "check", *CODE_LOCATIONS, external=True)
+    session.run(ruff, "format", "--check", *CODE_LOCATIONS, external=True)
+    session.run(pyright, external=True)
+    session.run(
+        pytest,
+        "-n",
+        "auto",
+        "--cov=core",
+        "--cov-report=term-missing",
+        "--cov-fail-under=80",
+        *CODE_LOCATIONS,
+        external=True,
+    )
+
+
+@nox.session(venv_backend="none")
+def fmt(session: nox.Session) -> None:
+    """Alias for the format session."""
+    format(session)
+
+
+@nox.session(venv_backend="none")
+def tests(session: nox.Session) -> None:
+    """Alias for the test session."""
+    test(session)
+
+
+@nox.session(venv_backend="none")
+def type_check(session: nox.Session) -> None:
+    """Alias for the typecheck session."""
+    typecheck(session)

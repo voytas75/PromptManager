@@ -1,0 +1,50 @@
+name: Quality Gates
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Create venv
+        run: python -m venv .venv
+
+      - name: Install dependencies
+        run: |
+          . .venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .[dev]
+
+      - name: Ruff (autofix)
+        run: .venv/bin/ruff check --fix .
+
+      - name: Ruff (format)
+        run: .venv/bin/ruff format .
+
+      - name: Ruff (verify)
+        run: |
+          .venv/bin/ruff check .
+          .venv/bin/ruff format --check .
+
+      - name: Pyright
+        run: .venv/bin/pyright
+
+      - name: Pytest
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: .venv/bin/pytest -n auto --cov=core --cov-report=term-missing --cov-fail-under=80
+
+      - name: Ensure clean tree
+        run: git diff --exit-code
+

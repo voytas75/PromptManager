@@ -1,6 +1,7 @@
 """Tests for the web search provider/service scaffolding.
 
 Updates:
+  v0.1.7 - 2025-12-12 - Cover retry behaviour for transient provider failures.
   v0.1.6 - 2025-12-07 - Cover Google provider success/error flows.
   v0.1.5 - 2025-12-07 - Cover SerpApi provider success/error flows.
   v0.1.4 - 2025-12-07 - Cover Serper provider success/error flows.
@@ -92,6 +93,37 @@ async def test_exa_provider_raises_on_error() -> None:
     with pytest.raises(WebSearchProviderError):
         await provider.search("latest news")
     await mock_client.aclose()
+
+
+@pytest.mark.asyncio()
+async def test_exa_provider_retries_transient_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Retry transient errors before failing a provider request."""
+    calls: list[int] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(1)
+        if len(calls) == 1:
+            return httpx.Response(503, json={"error": "upstream"}, request=request)
+        return httpx.Response(
+            200,
+            json={"results": [{"title": "Recovered", "url": "https://example.com/recovered"}]},
+            request=request,
+        )
+
+    async def _no_sleep(_: float) -> None:
+        return None
+
+    monkeypatch.setattr("core.retry.asyncio.sleep", _no_sleep)
+
+    transport = httpx.MockTransport(handler)
+    client = httpx.AsyncClient(transport=transport, base_url="https://api.exa.ai")
+
+    provider = ExaWebSearchProvider(api_key="test-key", client_factory=lambda: client)
+    result = await provider.search("latest news", limit=5)
+    await client.aclose()
+
+    assert len(calls) == 2
+    assert result.documents[0].title == "Recovered"
 
 
 @pytest.mark.asyncio()

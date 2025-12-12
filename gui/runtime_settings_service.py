@@ -23,9 +23,9 @@ from typing import TYPE_CHECKING, Literal, cast
 from PySide6.QtGui import QColor
 
 from config import (
+    DEFAULT_CHAT_FONT_COLOR,
     DEFAULT_CHAT_FONT_FAMILY,
     DEFAULT_CHAT_FONT_SIZE,
-    DEFAULT_CHAT_FONT_COLOR,
     DEFAULT_CHAT_USER_BUBBLE_COLOR,
     DEFAULT_EMBEDDING_BACKEND,
     DEFAULT_EMBEDDING_MODEL,
@@ -421,9 +421,7 @@ class RuntimeSettingsService:
         prompt_output_font_color = _clean_font_color(
             runtime.get("prompt_output_font_color"), DEFAULT_PROMPT_OUTPUT_FONT_COLOR
         )
-        chat_font_color = _clean_font_color(
-            runtime.get("chat_font_color"), DEFAULT_CHAT_FONT_COLOR
-        )
+        chat_font_color = _clean_font_color(runtime.get("chat_font_color"), DEFAULT_CHAT_FONT_COLOR)
         if "prompt_output_font_family" in updates:
             prompt_output_font_family = _clean_font_family(
                 updates.get("prompt_output_font_family"), DEFAULT_PROMPT_OUTPUT_FONT_FAMILY
@@ -437,9 +435,7 @@ class RuntimeSettingsService:
                 updates.get("prompt_output_font_size"), DEFAULT_PROMPT_OUTPUT_FONT_SIZE
             )
         if "chat_font_size" in updates:
-            chat_font_size = _clean_font_size(
-                updates.get("chat_font_size"), DEFAULT_CHAT_FONT_SIZE
-            )
+            chat_font_size = _clean_font_size(updates.get("chat_font_size"), DEFAULT_CHAT_FONT_SIZE)
         if "prompt_output_font_color" in updates:
             prompt_output_font_color = _clean_font_color(
                 updates.get("prompt_output_font_color"), DEFAULT_PROMPT_OUTPUT_FONT_COLOR

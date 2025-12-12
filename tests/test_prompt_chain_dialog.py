@@ -1,7 +1,8 @@
 """Prompt chain manager dialog tests.
 
 Updates:
-  v0.4.3 - 2025-12-12 - Assert chain web search tooltip reflects the active provider and Random rotation.
+  v0.4.4 - 2025-12-12 - Tighten web search stubs to satisfy Pyright strict mode.
+  v0.4.3 - 2025-12-12 - Assert chain web search tooltip matches provider/Random rotation.
   v0.4.2 - 2025-12-08 - Accept case-insensitive chain headings for Markdown toggles.
   v0.4.1 - 2025-12-08 - Cast manager stubs, use Qt enums, and swap SimpleNamespace prompts.
   v0.4.0 - 2025-12-06 - Adapt to the plain-text chain manager/editor UX.
@@ -9,8 +10,7 @@ Updates:
   v0.2.9 - 2025-12-05 - Cover schema toggle visibility and chain list activation.
   v0.2.8 - 2025-12-05 - Cover prompt name rendering and editor activation from the Chain tab.
   v0.2.7 - 2025-12-05 - Cover default-on web search toggle behaviour for chains.
-  v0.2.6 - 2025-12-05 - Cover summarize toggle persistence and UI output section.
-  v0.2.5 - 2025-12-05 - Ensure step IO renders outside code fences for Markdown formatting.
+  v0.2.6 - 2025-12-05 - Cover summarize toggle persistence and Markdown step IO rendering.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ from PySide6.QtWidgets import QApplication, QDialog, QMessageBox, QTextEdit
 from core import PromptChainRunResult, PromptChainStepRun, PromptManager, PromptManagerError
 from core.execution import CodexExecutionResult
 from core.prompt_manager.execution_history import ExecutionOutcome
-from core.web_search import RandomWebSearchProvider, WebSearchService
+from core.web_search import RandomWebSearchProvider, WebSearchResult, WebSearchService
 from gui.dialogs.prompt_chain_editor import PromptChainEditorDialog
 from gui.dialogs.prompt_chains import PromptChainManagerDialog, PromptChainManagerPanel
 from models.prompt_chain_model import PromptChain, PromptChainStep
@@ -103,6 +103,8 @@ class _ManagerStub:
         self._step_response_text = step_response_text
         self._step_reasoning_text = step_reasoning_text
         self.last_use_web_search: bool | None = None
+        self.web_search_service: WebSearchService = WebSearchService()
+        self.web_search: WebSearchService = self.web_search_service
         prompt_id = self._chains[0].steps[0].prompt_id
         self._prompt_record = _make_prompt_record(prompt_id)
 
@@ -201,8 +203,14 @@ class _FakeProvider:
         self.slug = slug
         self.display_name = display_name or slug
 
-    async def search(self, query: str, *, limit: int = 5, **kwargs: Any) -> object:  # noqa: ARG002
-        return {}
+    async def search(
+        self,
+        query: str,
+        *,
+        limit: int = 5,  # noqa: ARG002
+        **kwargs: Any,  # noqa: ARG002
+    ) -> WebSearchResult:
+        return WebSearchResult(provider=self.slug, query=query, documents=[])
 
 
 def _build_dialog(
