@@ -1,6 +1,7 @@
 """Prompt chain management surfaces for the GUI.
 
 Updates:
+  v0.6.2 - 2025-12-12 - Align chain web search tooltip with the active provider selection.
   v0.6.1 - 2025-12-09 - Show LLM configuration guidance before running chains when offline.
   v0.6.0 - 2025-12-06 - Redesign chain manager for plain-text inputs and linear chaining.
   v0.5.18 - 2025-12-06 - Improve default contrast and satisfy lint/type checks for toggles.
@@ -10,8 +11,6 @@ Updates:
   v0.5.14 - 2025-12-05 - Show prompt names in step tables and enable editing via activation.
   v0.5.13 - 2025-12-05 - Add default-on web search toggle for chain executions.
   v0.5.12 - 2025-12-05 - Color-code results sections and surface reasoning summaries.
-  v0.5.11 - 2025-12-05 - Ensure wrapped results by removing code fences from chain IO sections.
-  v0.5.10-v0.1.0 - 2025-12-05 - Earlier chain layout, streaming, and Markdown refinements.
 """
 
 from __future__ import annotations
@@ -330,9 +329,7 @@ class PromptChainManagerPanel(QWidget):
         actions_row.addWidget(self._clear_input_button)
         self._web_search_checkbox = QCheckBox("Use web search", run_container)
         self._web_search_checkbox.setChecked(self._load_web_search_preference())
-        self._web_search_checkbox.setToolTip(
-            "Include live web search findings before each chain step executes."
-        )
+        self._web_search_checkbox.setToolTip(self._build_web_search_tooltip())
         self._web_search_checkbox.stateChanged.connect(  # type: ignore[arg-type]
             self._handle_web_search_toggle
         )
@@ -1183,6 +1180,40 @@ class PromptChainManagerPanel(QWidget):
             if lowered in {"false", "0", "no"}:
                 return False
         return True
+
+    def _build_web_search_tooltip(self) -> str:
+        provider = getattr(getattr(self._manager, "web_search_service", None), "provider", None)
+        if provider is None:
+            return (
+                "Include live web search findings before each chain step executes. "
+                "Configure Exa, Tavily, Serper, SerpApi, or Google in Settings."
+            )
+        provider_slug = getattr(provider, "slug", None)
+        provider_label = getattr(provider, "display_name", None) or provider_slug or "the provider"
+        if provider_slug == "random":
+            inner_providers = getattr(provider, "providers", ()) or ()
+            labels = [
+                getattr(candidate, "display_name", None) or getattr(candidate, "slug", None)
+                for candidate in inner_providers
+                if candidate is not None
+            ]
+            filtered_labels = [label for label in labels if label]
+            if not filtered_labels:
+                return (
+                    "Include live web search findings via Random before each chain step executes."
+                )
+            if len(filtered_labels) == 1:
+                targets = filtered_labels[0]
+            else:
+                targets = " and ".join(filtered_labels)
+            return (
+                "Include live web search findings via the Random provider, rotating between "
+                f"{targets} before each chain step executes."
+            )
+        return (
+            "Include live web search findings via "
+            f"{provider_label} before each chain step executes."
+        )
 
     def _handle_web_search_toggle(self, state: int) -> None:
         self._settings.setValue("chainWebSearchEnabled", bool(state))
