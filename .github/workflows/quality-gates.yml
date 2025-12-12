@@ -11,6 +11,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -47,4 +52,3 @@ jobs:
 
       - name: Ensure clean tree
         run: git diff --exit-code
-

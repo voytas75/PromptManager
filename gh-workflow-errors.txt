@@ -1,0 +1,992 @@
+==================================== ERRORS ====================================
+______________ ERROR collecting tests/test_analytics_panel_gui.py ______________
+ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_analytics_panel_gui.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_analytics_panel_gui.py:18: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+_______________ ERROR collecting tests/test_category_matching.py _______________
+ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_category_matching.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+gui/application.py:22: in <module>
+    from PySide6.QtWidgets import QApplication, QStyleFactory
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_category_matching.py:5: in <module>
+    from gui.main_window import _match_category_label
+gui/__init__.py:30: in <module>
+    from .application import create_qapplication, launch_prompt_manager
+gui/application.py:24: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+________________ ERROR collecting tests/test_command_palette.py ________________
+ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_command_palette.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+gui/application.py:22: in <module>
+    from PySide6.QtWidgets import QApplication, QStyleFactory
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_command_palette.py:11: in <module>
+    from gui.command_palette import QuickAction, rank_prompts_for_action
+gui/__init__.py:30: in <module>
+    from .application import create_qapplication, launch_prompt_manager
+gui/application.py:24: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+____________ ERROR collecting tests/test_execute_context_history.py ____________
+ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_execute_context_history.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+gui/application.py:22: in <module>
+    from PySide6.QtWidgets import QApplication, QStyleFactory
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_execute_context_history.py:25: in <module>
+    from gui.layout_state import (
+gui/__init__.py:30: in <module>
+    from .application import create_qapplication, launch_prompt_manager
+gui/application.py:24: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+________________ ERROR collecting tests/test_language_tools.py _________________
+ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_language_tools.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+gui/application.py:22: in <module>
+    from PySide6.QtWidgets import QApplication, QStyleFactory
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_language_tools.py:5: in <module>
+    from gui.language_tools import detect_language
+gui/__init__.py:30: in <module>
+    from .application import create_qapplication, launch_prompt_manager
+gui/application.py:24: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+______________ ERROR collecting tests/test_main_window_bridges.py ______________
+ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_main_window_bridges.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+gui/application.py:22: in <module>
+    from PySide6.QtWidgets import QApplication, QStyleFactory
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_main_window_bridges.py:13: in <module>
+    from gui.main_window_bridges import PromptActionsBridge
+gui/__init__.py:30: in <module>
+    from .application import create_qapplication, launch_prompt_manager
+gui/application.py:24: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+______________ ERROR collecting tests/test_prompt_chain_dialog.py ______________
+ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_prompt_chain_dialog.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_prompt_chain_dialog.py:25: in <module>
+    from PySide6.QtWidgets import QApplication, QDialog, QMessageBox, QTextEdit
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+___________ ERROR collecting tests/test_prompt_dialog_refinement.py ____________
+ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_prompt_dialog_refinement.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_prompt_dialog_refinement.py:16: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+______________ ERROR collecting tests/test_prompt_editor_flow.py _______________
+ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_prompt_editor_flow.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_prompt_editor_flow.py:14: in <module>
+    from PySide6.QtWidgets import QDialog
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+____________ ERROR collecting tests/test_prompt_name_suggestion.py _____________
+ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_prompt_name_suggestion.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+gui/application.py:22: in <module>
+    from PySide6.QtWidgets import QApplication, QStyleFactory
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_prompt_name_suggestion.py:124: in <module>
+    dialogs = importlib.import_module("gui.dialogs")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+gui/__init__.py:30: in <module>
+    from .application import create_qapplication, launch_prompt_manager
+gui/application.py:24: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+_________ ERROR collecting tests/test_prompt_version_history_dialog.py _________
+ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_prompt_version_history_dialog.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_prompt_version_history_dialog.py:17: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+___________ ERROR collecting tests/test_runtime_settings_service.py ____________
+ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_runtime_settings_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+gui/application.py:22: in <module>
+    from PySide6.QtWidgets import QApplication, QStyleFactory
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_runtime_settings_service.py:21: in <module>
+    from gui.runtime_settings_service import RuntimeSettingsService
+gui/__init__.py:30: in <module>
+    from .application import create_qapplication, launch_prompt_manager
+gui/application.py:24: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+_______________ ERROR collecting tests/test_share_controller.py ________________
+ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_share_controller.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+gui/application.py:22: in <module>
+    from PySide6.QtWidgets import QApplication, QStyleFactory
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_share_controller.py:15: in <module>
+    from gui.share_controller import ShareController
+gui/__init__.py:30: in <module>
+    from .application import create_qapplication, launch_prompt_manager
+gui/application.py:24: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+____________ ERROR collecting tests/test_template_preview_widget.py ____________
+ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_template_preview_widget.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+gui/application.py:22: in <module>
+    from PySide6.QtWidgets import QApplication, QStyleFactory
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_template_preview_widget.py:127: in <module>
+    _TEMPLATE_PREVIEW_MODULE = _load_template_preview_module()
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_template_preview_widget.py:27: in _load_template_preview_module
+    return importlib.import_module("gui.template_preview")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+gui/__init__.py:30: in <module>
+    from .application import create_qapplication, launch_prompt_manager
+gui/application.py:24: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+___________ ERROR collecting tests/test_voice_playback_controller.py ___________
+ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_voice_playback_controller.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+gui/application.py:22: in <module>
+    from PySide6.QtWidgets import QApplication, QStyleFactory
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_voice_playback_controller.py:7: in <module>
+    from gui.voice_playback_controller import VoicePlaybackController, VoicePlaybackError
+gui/__init__.py:30: in <module>
+    from .application import create_qapplication, launch_prompt_manager
+gui/application.py:24: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+______________ ERROR collecting tests/test_web_search_tooltips.py ______________
+ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_web_search_tooltips.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+gui/application.py:22: in <module>
+    from PySide6.QtWidgets import QApplication, QStyleFactory
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_web_search_tooltips.py:11: in <module>
+    from gui.main_window import MainWindow
+gui/__init__.py:30: in <module>
+    from .application import create_qapplication, launch_prompt_manager
+gui/application.py:24: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+_______________ ERROR collecting tests/test_workbench_session.py _______________
+ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_workbench_session.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+gui/application.py:22: in <module>
+    from PySide6.QtWidgets import QApplication, QStyleFactory
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_workbench_session.py:9: in <module>
+    from gui.workbench.session import WorkbenchSession
+gui/__init__.py:30: in <module>
+    from .application import create_qapplication, launch_prompt_manager
+gui/application.py:24: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+=================================== FAILURES ===================================
+_______________ test_build_prompt_manager_forwards_dependencies ________________
+[gw1] linux -- Python 3.13.11 /home/runner/work/PromptManager/PromptManager/.venv/bin/python
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fe435307f20>
+
+    def test_build_prompt_manager_forwards_dependencies(monkeypatch: pytest.MonkeyPatch) -> None:
+        sentinel_redis = _as_redis(_RedisStub("sentinel"))
+        sentinel_repo = object()
+    
+        class _PromptManager:
+            def __init__(
+                self,
+                *,
+                chroma_path: str,
+                db_path: str,
+                cache_ttl_seconds: int,
+                redis_client: object,
+                chroma_client: object,
+                embedding_function: object,
+                repository: object,
+                embedding_provider: object = None,
+                embedding_worker: object = None,
+                enable_background_sync: bool = True,
+                name_generator: object = None,
+                description_generator: object = None,
+                intent_classifier: object = None,
+                notification_center: object = None,
+                **extra: object,
+            ) -> None:
+                self.kwargs = {
+                    "chroma_path": chroma_path,
+                    "db_path": db_path,
+                    "cache_ttl_seconds": cache_ttl_seconds,
+                    "redis_client": redis_client,
+                    "chroma_client": chroma_client,
+                    "embedding_function": embedding_function,
+                    "repository": repository,
+                    "embedding_provider": embedding_provider,
+                    "embedding_worker": embedding_worker,
+                    "enable_background_sync": enable_background_sync,
+                    "name_generator": name_generator,
+                    "description_generator": description_generator,
+                    "intent_classifier": intent_classifier,
+                    "notification_center": notification_center,
+                }
+                self.kwargs.update(extra)
+    
+        monkeypatch.setattr("core.factory.PromptManager", _PromptManager)
+        monkeypatch.setattr(
+            "core.factory._resolve_redis_client",
+            lambda dsn, client: sentinel_redis,
+        )
+    
+>       settings = _make_settings()
+                   ^^^^^^^^^^^^^^^^
+
+tests/test_factory_branches.py:150: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_factory_branches.py:60: in _make_settings
+    return PromptManagerSettings(**defaults)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/pydantic_settings/main.py:195: in __init__
+    **__pydantic_self__._settings_build_values(
+.venv/lib/python3.13/site-packages/pydantic_settings/main.py:438: in _settings_build_values
+    source_state = source()
+                   ^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+_ = None
+
+    def _loader(_: BaseSettings | None = None) -> dict[str, Any]:
+        explicit_path = os.getenv("PROMPT_MANAGER_CONFIG_JSON")
+        candidates: list[Path] = []
+        if explicit_path:
+            candidates.append(Path(explicit_path).expanduser())
+        candidates.append((Path("config") / "config.json").expanduser())
+    
+        for path in candidates:
+            if not path:
+                continue
+            if not path.exists():
+                if path == candidates[0]:
+>                   raise SettingsError(f"Configuration file not found: {path}")
+E                   config.settings.SettingsError: Configuration file not found: config/config.json
+
+config/settings.py:1009: SettingsError
+___________ test_build_prompt_manager_uses_passthrough_redis_client ____________
+[gw1] linux -- Python 3.13.11 /home/runner/work/PromptManager/PromptManager/.venv/bin/python
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fe435304f50>
+
+    def test_build_prompt_manager_uses_passthrough_redis_client(
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "core.factory._resolve_redis_client",
+            lambda dsn, client: client,
+        )
+        monkeypatch.setattr("core.factory.PromptManager", lambda **_: "manager")
+    
+>       settings = _make_settings(redis_dsn=None)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_factory_branches.py:175: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_factory_branches.py:60: in _make_settings
+    return PromptManagerSettings(**defaults)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/pydantic_settings/main.py:195: in __init__
+    **__pydantic_self__._settings_build_values(
+.venv/lib/python3.13/site-packages/pydantic_settings/main.py:438: in _settings_build_values
+    source_state = source()
+                   ^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+_ = None
+
+    def _loader(_: BaseSettings | None = None) -> dict[str, Any]:
+        explicit_path = os.getenv("PROMPT_MANAGER_CONFIG_JSON")
+        candidates: list[Path] = []
+        if explicit_path:
+            candidates.append(Path(explicit_path).expanduser())
+        candidates.append((Path("config") / "config.json").expanduser())
+    
+        for path in candidates:
+            if not path:
+                continue
+            if not path.exists():
+                if path == candidates[0]:
+>                   raise SettingsError(f"Configuration file not found: {path}")
+E                   config.settings.SettingsError: Configuration file not found: config/config.json
+
+config/settings.py:1009: SettingsError
+______________ test_build_prompt_manager_bubbles_embedding_errors ______________
+[gw1] linux -- Python 3.13.11 /home/runner/work/PromptManager/PromptManager/.venv/bin/python
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fe4354433f0>
+
+    def test_build_prompt_manager_bubbles_embedding_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+>       settings = _make_settings()
+                   ^^^^^^^^^^^^^^^^
+
+tests/test_factory_branches.py:182: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_factory_branches.py:60: in _make_settings
+    return PromptManagerSettings(**defaults)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/pydantic_settings/main.py:195: in __init__
+    **__pydantic_self__._settings_build_values(
+.venv/lib/python3.13/site-packages/pydantic_settings/main.py:438: in _settings_build_values
+    source_state = source()
+                   ^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+_ = None
+
+    def _loader(_: BaseSettings | None = None) -> dict[str, Any]:
+        explicit_path = os.getenv("PROMPT_MANAGER_CONFIG_JSON")
+        candidates: list[Path] = []
+        if explicit_path:
+            candidates.append(Path(explicit_path).expanduser())
+        candidates.append((Path("config") / "config.json").expanduser())
+    
+        for path in candidates:
+            if not path:
+                continue
+            if not path.exists():
+                if path == candidates[0]:
+>                   raise SettingsError(f"Configuration file not found: {path}")
+E                   config.settings.SettingsError: Configuration file not found: config/config.json
+
+config/settings.py:1009: SettingsError
+______________ test_determine_llm_status_requires_models_and_keys ______________
+[gw1] linux -- Python 3.13.11 /home/runner/work/PromptManager/PromptManager/.venv/bin/python
+
+    def test_determine_llm_status_requires_models_and_keys() -> None:
+>       settings = _make_settings(
+            litellm_model=None,
+            litellm_inference_model=None,
+            litellm_api_key=None,
+        )
+
+tests/test_factory_branches.py:196: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_factory_branches.py:60: in _make_settings
+    return PromptManagerSettings(**defaults)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/pydantic_settings/main.py:195: in __init__
+    **__pydantic_self__._settings_build_values(
+.venv/lib/python3.13/site-packages/pydantic_settings/main.py:438: in _settings_build_values
+    source_state = source()
+                   ^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+_ = None
+
+    def _loader(_: BaseSettings | None = None) -> dict[str, Any]:
+        explicit_path = os.getenv("PROMPT_MANAGER_CONFIG_JSON")
+        candidates: list[Path] = []
+        if explicit_path:
+            candidates.append(Path(explicit_path).expanduser())
+        candidates.append((Path("config") / "config.json").expanduser())
+    
+        for path in candidates:
+            if not path:
+                continue
+            if not path.exists():
+                if path == candidates[0]:
+>                   raise SettingsError(f"Configuration file not found: {path}")
+E                   config.settings.SettingsError: Configuration file not found: config/config.json
+
+config/settings.py:1009: SettingsError
+__________ test_determine_llm_status_requires_azure_base_and_version ___________
+[gw1] linux -- Python 3.13.11 /home/runner/work/PromptManager/PromptManager/.venv/bin/python
+
+    def test_determine_llm_status_requires_azure_base_and_version() -> None:
+>       settings = _make_settings(
+            litellm_model="azure/gpt-4o-mini",
+            litellm_api_key="test-key",
+            litellm_api_base=None,
+            litellm_api_version=None,
+        )
+
+tests/test_factory_branches.py:211: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_factory_branches.py:60: in _make_settings
+    return PromptManagerSettings(**defaults)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/pydantic_settings/main.py:195: in __init__
+    **__pydantic_self__._settings_build_values(
+.venv/lib/python3.13/site-packages/pydantic_settings/main.py:438: in _settings_build_values
+    source_state = source()
+                   ^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+_ = None
+
+    def _loader(_: BaseSettings | None = None) -> dict[str, Any]:
+        explicit_path = os.getenv("PROMPT_MANAGER_CONFIG_JSON")
+        candidates: list[Path] = []
+        if explicit_path:
+            candidates.append(Path(explicit_path).expanduser())
+        candidates.append((Path("config") / "config.json").expanduser())
+    
+        for path in candidates:
+            if not path:
+                continue
+            if not path.exists():
+                if path == candidates[0]:
+>                   raise SettingsError(f"Configuration file not found: {path}")
+E                   config.settings.SettingsError: Configuration file not found: config/config.json
+
+config/settings.py:1009: SettingsError
+___________ test_determine_embedding_status_marks_azure_missing_base ___________
+[gw1] linux -- Python 3.13.11 /home/runner/work/PromptManager/PromptManager/.venv/bin/python
+
+    def test_determine_embedding_status_marks_azure_missing_base() -> None:
+>       settings = _make_settings(
+            embedding_backend="litellm",
+            embedding_model="azure/text-embedding-3-small",
+            litellm_api_key="test-key",
+            litellm_api_base=None,
+            litellm_api_version=None,
+        )
+
+tests/test_factory_branches.py:227: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_factory_branches.py:60: in _make_settings
+    return PromptManagerSettings(**defaults)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/pydantic_settings/main.py:195: in __init__
+    **__pydantic_self__._settings_build_values(
+.venv/lib/python3.13/site-packages/pydantic_settings/main.py:438: in _settings_build_values
+    source_state = source()
+                   ^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+_ = None
+
+    def _loader(_: BaseSettings | None = None) -> dict[str, Any]:
+        explicit_path = os.getenv("PROMPT_MANAGER_CONFIG_JSON")
+        candidates: list[Path] = []
+        if explicit_path:
+            candidates.append(Path(explicit_path).expanduser())
+        candidates.append((Path("config") / "config.json").expanduser())
+    
+        for path in candidates:
+            if not path:
+                continue
+            if not path.exists():
+                if path == candidates[0]:
+>                   raise SettingsError(f"Configuration file not found: {path}")
+E                   config.settings.SettingsError: Configuration file not found: config/config.json
+
+config/settings.py:1009: SettingsError
+________ test_determine_embedding_status_accepts_deterministic_backend _________
+[gw1] linux -- Python 3.13.11 /home/runner/work/PromptManager/PromptManager/.venv/bin/python
+
+    def test_determine_embedding_status_accepts_deterministic_backend() -> None:
+>       settings = _make_settings(
+            embedding_backend="deterministic",
+            embedding_model="hash",
+        )
+
+tests/test_factory_branches.py:244: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_factory_branches.py:60: in _make_settings
+    return PromptManagerSettings(**defaults)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/pydantic_settings/main.py:195: in __init__
+    **__pydantic_self__._settings_build_values(
+.venv/lib/python3.13/site-packages/pydantic_settings/main.py:438: in _settings_build_values
+    source_state = source()
+                   ^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+_ = None
+
+    def _loader(_: BaseSettings | None = None) -> dict[str, Any]:
+        explicit_path = os.getenv("PROMPT_MANAGER_CONFIG_JSON")
+        candidates: list[Path] = []
+        if explicit_path:
+            candidates.append(Path(explicit_path).expanduser())
+        candidates.append((Path("config") / "config.json").expanduser())
+    
+        for path in candidates:
+            if not path:
+                continue
+            if not path.exists():
+                if path == candidates[0]:
+>                   raise SettingsError(f"Configuration file not found: {path}")
+E                   config.settings.SettingsError: Configuration file not found: config/config.json
+
+config/settings.py:1009: SettingsError
+=============================== warnings summary ===============================
+config/settings.py:29
+config/settings.py:29
+config/settings.py:29
+config/settings.py:29
+config/settings.py:29
+config/settings.py:29
+config/settings.py:29
+config/settings.py:29
+  /home/runner/work/PromptManager/PromptManager/config/settings.py:29: PydanticDeprecatedSince20: Importing FieldValidationInfo from `pydantic` is deprecated. This feature is either no longer supported, or is not public. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    from pydantic import (
+
+.venv/lib/python3.13/site-packages/pydantic_core/core_schema.py:4434
+.venv/lib/python3.13/site-packages/pydantic_core/core_schema.py:4434
+.venv/lib/python3.13/site-packages/pydantic_core/core_schema.py:4434
+.venv/lib/python3.13/site-packages/pydantic_core/core_schema.py:4434
+.venv/lib/python3.13/site-packages/pydantic_core/core_schema.py:4434
+.venv/lib/python3.13/site-packages/pydantic_core/core_schema.py:4434
+.venv/lib/python3.13/site-packages/pydantic_core/core_schema.py:4434
+.venv/lib/python3.13/site-packages/pydantic_core/core_schema.py:4434
+  /home/runner/work/PromptManager/PromptManager/.venv/lib/python3.13/site-packages/pydantic_core/core_schema.py:4434: DeprecationWarning: `FieldValidationInfo` is deprecated, use `ValidationInfo` instead.
+    warnings.warn(msg, DeprecationWarning, stacklevel=1)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================================ tests coverage ================================
+_______________ coverage: platform linux, python 3.13.11-final-0 _______________
+
+Name                                       Stmts   Miss  Cover   Missing
+------------------------------------------------------------------------
+core/__init__.py                              20      0   100%
+core/analytics_dashboard.py                  186     30    84%   95, 112-113, 123-124, 140, 155, 166, 177, 189, 206, 222, 317, 332, 335-336, 338, 341, 343, 369, 371, 373, 377, 380-381, 383, 385, 390, 394-395
+core/catalog_importer.py                     214     47    78%   63, 67, 73-74, 77-78, 80-88, 94, 97, 102, 104-107, 113, 159-164, 170-172, 219, 223, 351-361, 377, 394, 431-433, 440-442, 457
+core/category_registry.py                     97     45    54%   88-125, 142-143, 152-153, 166, 172, 176, 189, 195, 203-204, 210-213
+core/embedding.py                            236     44    81%   87, 103, 109, 118-119, 133, 135, 147-148, 164, 176-187, 190, 192, 194, 204, 212-216, 220, 226, 233, 235, 304-305, 367-374, 394-395, 402-415
+core/exceptions.py                            34      0   100%
+core/execution.py                            303     54    82%   89-90, 93, 108, 123, 171-172, 195-198, 262, 279, 307-310, 338-340, 346, 354, 362-371, 377, 393-398, 417-421, 443, 446, 489, 494, 497-498, 501-502, 506-509
+core/factory.py                              204    169    17%   62-69, 88-89, 102-135, 140-172, 177-202, 207-216, 233-409
+core/history_tracker.py                      236     57    76%   157-162, 168-169, 180-181, 194-204, 216, 222-223, 238, 241-242, 298-299, 339-340, 356-357, 400-401, 407-410, 422-425, 434, 437-443, 453, 463-464, 473-479, 484, 486, 489-490, 492
+core/intent_classifier.py                     81      3    96%   63, 175, 204
+core/litellm_adapter.py                       95     41    57%   39-68, 73-75, 80-86, 103, 107-113, 128, 155-165, 185
+core/name_generation.py                      157     29    82%   65, 83, 87, 89, 92, 112, 121, 145, 165, 167, 169, 171, 174, 203, 218, 222, 249, 251, 275, 277, 279, 281, 284, 297-298, 304, 313, 338, 347
+core/notifications.py                         93      9    90%   48, 67, 96, 102, 106, 129-130, 156-157
+core/prompt_engineering.py                   242     45    81%   104, 127, 129, 131, 133, 136, 167-168, 180, 188-189, 226-231, 265-271, 275-284, 309, 320, 330, 336-340, 349-351, 357-361, 373, 377, 389, 409-414, 422, 429, 437, 452-453
+core/prompt_manager/__init__.py               64      0   100%
+core/prompt_manager/analytics.py             144     26    82%   44, 47-48, 50, 114-115, 123, 163, 172-179, 186-187, 193-194, 198-199, 220-226, 229-230
+core/prompt_manager/backends.py               73     10    86%   126-127, 134-135, 139-140, 176, 179-184
+core/prompt_manager/bootstrap.py              62      0   100%
+core/prompt_manager/categories.py             48      5    90%   39, 70-71, 115-116
+core/prompt_manager/chains.py                322    215    33%   149-152, 156-161, 165-176, 180-185, 197-270, 289-327, 331-351, 358-371, 375-387, 399-501, 533, 543, 586-591, 594, 597-598, 600, 612, 615-632
+core/prompt_manager/engineering.py            15      7    53%   42-47, 61, 82
+core/prompt_manager/execution.py              16      6    62%   56, 79, 89-92
+core/prompt_manager/execution_history.py     283     55    81%   71, 74, 149, 243-244, 268, 271, 273, 281, 303, 314-315, 338-341, 356-378, 387, 441, 461-462, 471, 476-477, 486-488, 502-508, 521, 549-559, 567-573, 588, 597, 606-607, 644, 649-650
+core/prompt_manager/generation.py            256     76    70%   74, 77, 84, 222, 231, 238-241, 246-247, 254, 257, 264, 324, 334, 349-409, 414-418, 423-431, 443-454, 470, 472, 478, 481-482
+core/prompt_manager/lifecycle.py             245     12    95%   67, 114-115, 295-301, 307, 359, 363, 396, 430-431
+core/prompt_manager/litellm_helpers.py        72      1    99%   89
+core/prompt_manager/maintenance.py           427     46    89%   62, 83-84, 108, 118-119, 221, 224-225, 233, 257-258, 284-285, 304, 310-311, 380, 410-411, 431-432, 438-439, 443-444, 466-467, 483-484, 502-505, 519-523, 552, 555-556, 582, 595, 602-603
+core/prompt_manager/prompt_notes.py           40      0   100%
+core/prompt_manager/refinement.py             52      6    88%   32, 59, 90-91, 135-136
+core/prompt_manager/response_styles.py        40     16    60%   44-45, 51-54, 61-62, 69-72, 78-81
+core/prompt_manager/runtime.py               179     22    88%   87-98, 102, 107, 112, 165, 168-169, 175, 179, 182, 200, 205, 215-216, 221, 225, 230, 239, 312, 321
+core/prompt_manager/search.py                165      6    96%   58, 80-81, 201, 217, 283
+core/prompt_manager/state.py                  20      0   100%
+core/prompt_manager/storage.py                23     10    57%   57-63, 72, 77-78, 83, 88
+core/prompt_manager/versioning.py            123     23    81%   56-57, 63-66, 70-73, 84, 137, 167, 169, 178, 223-224, 232-233, 239-240, 258-259
+core/prompt_manager/workflows.py             132     18    86%   52-55, 69, 83, 117, 153-162, 168-177, 190, 192, 242-243
+core/repository/__init__.py                   19      0   100%
+core/repository/base.py                       97      4    96%   77, 100, 126, 144
+core/repository/chains.py                    119     99    17%   64-76, 80-98, 102-116, 120-140, 144-155, 159-168, 173-177, 180-186, 189-192, 200-203, 210-227
+core/repository/executions.py                228     41    82%   65-66, 78-79, 98-99, 115-116, 134-135, 180-181, 195-196, 236, 245-246, 277-278, 281, 304-305, 309-310, 312, 320-333, 369-370, 413-414, 453, 459-460, 478-479
+core/repository/maintenance.py                82      8    90%   228-231, 259, 261, 294, 314, 337-338
+core/repository/notes.py                      64     12    81%   43-46, 59-60, 73-74, 86-87, 98-99
+core/repository/profiles.py                   39      6    85%   52-53, 56-57, 76-77
+core/repository/prompts.py                   312     47    85%   116-117, 147-148, 160-161, 180-181, 196-197, 210-211, 217, 224-225, 246-247, 258-259, 261, 301-302, 316, 336, 361-362, 376, 386-387, 402-403, 460-461, 482-483, 489-490, 505-506, 525-526, 562-563, 582-583, 602-603
+core/repository/response_styles.py            82     11    87%   68, 83-84, 86, 97-98, 127-128, 139-140, 142
+core/retry.py                                 47      6    87%   37-39, 51, 88, 132
+core/scenario_generation.py                  130     14    89%   39, 59, 71, 81, 87, 95, 99, 169-170, 176, 179, 183, 187, 191
+core/sharing.py                              302     64    79%   71, 79, 95-109, 115, 128, 131, 191, 236-238, 246-285, 313-314, 317, 323, 329, 410-411, 414-415, 422, 426, 454-455, 474, 496, 503-504, 508, 510, 518-519
+core/templating.py                           227     55    76%   34, 36, 76, 79, 85, 98-110, 116, 148, 158, 181-182, 195-201, 226, 238, 248, 257-258, 271, 274, 283-284, 305, 310, 314, 320, 338, 340, 343-351, 359, 361, 363
+core/web_search/__init__.py                    5      0   100%
+core/web_search/context_formatting.py         26      2    92%   48, 63
+core/web_search/models.py                     20      0   100%
+core/web_search/providers.py                 462    105    77%   61, 66-67, 74, 77, 81, 89-90, 96-97, 124, 128, 132, 162, 166, 170, 186-187, 207, 212, 219, 224, 237, 280, 297, 312, 314, 316, 324, 343, 373, 375, 395, 407-409, 416-419, 422-425, 429, 447, 479, 497, 507-509, 522, 542, 574, 600, 627-630, 632, 637-640, 644, 648, 666, 698, 725, 758, 777, 828-878
+core/web_search/service.py                    18      3    83%   29, 33, 37
+------------------------------------------------------------------------
+TOTAL                                       7278   1610    78%
+FAIL Required test coverage of 80% not reached. Total coverage: 77.88%
+=========================== short test summary info ============================
+FAILED tests/test_factory_branches.py::test_build_prompt_manager_forwards_dependencies - config.settings.SettingsError: Configuration file not found: config/config.json
+FAILED tests/test_factory_branches.py::test_build_prompt_manager_uses_passthrough_redis_client - config.settings.SettingsError: Configuration file not found: config/config.json
+FAILED tests/test_factory_branches.py::test_build_prompt_manager_bubbles_embedding_errors - config.settings.SettingsError: Configuration file not found: config/config.json
+FAILED tests/test_factory_branches.py::test_determine_llm_status_requires_models_and_keys - config.settings.SettingsError: Configuration file not found: config/config.json
+FAILED tests/test_factory_branches.py::test_determine_llm_status_requires_azure_base_and_version - config.settings.SettingsError: Configuration file not found: config/config.json
+FAILED tests/test_factory_branches.py::test_determine_embedding_status_marks_azure_missing_base - config.settings.SettingsError: Configuration file not found: config/config.json
+FAILED tests/test_factory_branches.py::test_determine_embedding_status_accepts_deterministic_backend - config.settings.SettingsError: Configuration file not found: config/config.json
+ERROR tests/test_analytics_panel_gui.py - ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_analytics_panel_gui.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_analytics_panel_gui.py:18: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+ERROR tests/test_category_matching.py - ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_category_matching.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+gui/application.py:22: in <module>
+    from PySide6.QtWidgets import QApplication, QStyleFactory
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_category_matching.py:5: in <module>
+    from gui.main_window import _match_category_label
+gui/__init__.py:30: in <module>
+    from .application import create_qapplication, launch_prompt_manager
+gui/application.py:24: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+ERROR tests/test_command_palette.py - ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_command_palette.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+gui/application.py:22: in <module>
+    from PySide6.QtWidgets import QApplication, QStyleFactory
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_command_palette.py:11: in <module>
+    from gui.command_palette import QuickAction, rank_prompts_for_action
+gui/__init__.py:30: in <module>
+    from .application import create_qapplication, launch_prompt_manager
+gui/application.py:24: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+ERROR tests/test_execute_context_history.py - ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_execute_context_history.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+gui/application.py:22: in <module>
+    from PySide6.QtWidgets import QApplication, QStyleFactory
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_execute_context_history.py:25: in <module>
+    from gui.layout_state import (
+gui/__init__.py:30: in <module>
+    from .application import create_qapplication, launch_prompt_manager
+gui/application.py:24: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+ERROR tests/test_language_tools.py - ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_language_tools.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+gui/application.py:22: in <module>
+    from PySide6.QtWidgets import QApplication, QStyleFactory
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_language_tools.py:5: in <module>
+    from gui.language_tools import detect_language
+gui/__init__.py:30: in <module>
+    from .application import create_qapplication, launch_prompt_manager
+gui/application.py:24: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+ERROR tests/test_main_window_bridges.py - ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_main_window_bridges.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+gui/application.py:22: in <module>
+    from PySide6.QtWidgets import QApplication, QStyleFactory
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_main_window_bridges.py:13: in <module>
+    from gui.main_window_bridges import PromptActionsBridge
+gui/__init__.py:30: in <module>
+    from .application import create_qapplication, launch_prompt_manager
+gui/application.py:24: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+ERROR tests/test_prompt_chain_dialog.py - ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_prompt_chain_dialog.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_prompt_chain_dialog.py:25: in <module>
+    from PySide6.QtWidgets import QApplication, QDialog, QMessageBox, QTextEdit
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+ERROR tests/test_prompt_dialog_refinement.py - ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_prompt_dialog_refinement.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_prompt_dialog_refinement.py:16: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+ERROR tests/test_prompt_editor_flow.py - ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_prompt_editor_flow.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_prompt_editor_flow.py:14: in <module>
+    from PySide6.QtWidgets import QDialog
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+ERROR tests/test_prompt_name_suggestion.py - ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_prompt_name_suggestion.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+gui/application.py:22: in <module>
+    from PySide6.QtWidgets import QApplication, QStyleFactory
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_prompt_name_suggestion.py:124: in <module>
+    dialogs = importlib.import_module("gui.dialogs")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+gui/__init__.py:30: in <module>
+    from .application import create_qapplication, launch_prompt_manager
+gui/application.py:24: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+ERROR tests/test_prompt_version_history_dialog.py - ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_prompt_version_history_dialog.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_prompt_version_history_dialog.py:17: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+ERROR tests/test_runtime_settings_service.py - ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_runtime_settings_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+gui/application.py:22: in <module>
+    from PySide6.QtWidgets import QApplication, QStyleFactory
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_runtime_settings_service.py:21: in <module>
+    from gui.runtime_settings_service import RuntimeSettingsService
+gui/__init__.py:30: in <module>
+    from .application import create_qapplication, launch_prompt_manager
+gui/application.py:24: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+ERROR tests/test_share_controller.py - ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_share_controller.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+gui/application.py:22: in <module>
+    from PySide6.QtWidgets import QApplication, QStyleFactory
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_share_controller.py:15: in <module>
+    from gui.share_controller import ShareController
+gui/__init__.py:30: in <module>
+    from .application import create_qapplication, launch_prompt_manager
+gui/application.py:24: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+ERROR tests/test_template_preview_widget.py - ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_template_preview_widget.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+gui/application.py:22: in <module>
+    from PySide6.QtWidgets import QApplication, QStyleFactory
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_template_preview_widget.py:127: in <module>
+    _TEMPLATE_PREVIEW_MODULE = _load_template_preview_module()
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_template_preview_widget.py:27: in _load_template_preview_module
+    return importlib.import_module("gui.template_preview")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+gui/__init__.py:30: in <module>
+    from .application import create_qapplication, launch_prompt_manager
+gui/application.py:24: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+ERROR tests/test_voice_playback_controller.py - ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_voice_playback_controller.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+gui/application.py:22: in <module>
+    from PySide6.QtWidgets import QApplication, QStyleFactory
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_voice_playback_controller.py:7: in <module>
+    from gui.voice_playback_controller import VoicePlaybackController, VoicePlaybackError
+gui/__init__.py:30: in <module>
+    from .application import create_qapplication, launch_prompt_manager
+gui/application.py:24: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+ERROR tests/test_web_search_tooltips.py - ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_web_search_tooltips.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+gui/application.py:22: in <module>
+    from PySide6.QtWidgets import QApplication, QStyleFactory
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_web_search_tooltips.py:11: in <module>
+    from gui.main_window import MainWindow
+gui/__init__.py:30: in <module>
+    from .application import create_qapplication, launch_prompt_manager
+gui/application.py:24: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+ERROR tests/test_workbench_session.py - ImportError while importing test module '/home/runner/work/PromptManager/PromptManager/tests/test_workbench_session.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+gui/application.py:22: in <module>
+    from PySide6.QtWidgets import QApplication, QStyleFactory
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+
+During handling of the above exception, another exception occurred:
+/opt/hostedtoolcache/Python/3.13.11/x64/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_workbench_session.py:9: in <module>
+    from gui.workbench.session import WorkbenchSession
+gui/__init__.py:30: in <module>
+    from .application import create_qapplication, launch_prompt_manager
+gui/application.py:24: in <module>
+    from PySide6.QtWidgets import QApplication
+E   ImportError: libEGL.so.1: cannot open shared object file: No such file or directory
+============ 7 failed, 387 passed, 16 warnings, 17 errors in 13.87s ============

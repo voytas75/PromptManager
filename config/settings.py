@@ -1,6 +1,7 @@
 """Settings management utilities for Prompt Manager configuration.
 
 Updates:
+  v0.5.19 - 2025-12-12 - Allow missing default config file when no explicit path is set.
   v0.5.18 - 2025-12-12 - Normalise litellm_reasoning_effort aliases and tolerate blank font fields.
   v0.5.17 - 2025-12-11 - Add prompt/chat font colour preferences with validation and env bindings.
   v0.5.16 - 2025-12-11 - Add prompt/chat font preferences with validation and env bindings.
@@ -11,7 +12,6 @@ Updates:
   v0.5.11 - 2025-12-07 - Add Serper web search provider configuration and env parsing.
   v0.5.10 - 2025-12-07 - Allow random web search provider selection and validation.
   v0.5.9 - 2025-12-05 - Tighten dotenv helpers for lint compliance.
-  v0.5.8 - 2025-12-04 - Add auto-open share link preference with GUI binding.
 """
 
 from __future__ import annotations
@@ -1005,7 +1005,7 @@ class PromptManagerSettings(BaseSettings):
                 if not path:
                     continue
                 if not path.exists():
-                    if path == candidates[0]:
+                    if explicit_path and path == candidates[0]:
                         raise SettingsError(f"Configuration file not found: {path}")
                     continue
                 try:
