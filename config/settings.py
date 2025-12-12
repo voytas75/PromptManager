@@ -1,6 +1,7 @@
 """Settings management utilities for Prompt Manager configuration.
 
 Updates:
+  v0.5.20 - 2025-12-12 - Replace FieldValidationInfo with ValidationInfo to silence pydantic deprecation warnings.
   v0.5.19 - 2025-12-12 - Allow missing default config file when no explicit path is set.
   v0.5.18 - 2025-12-12 - Normalise litellm_reasoning_effort aliases and tolerate blank font fields.
   v0.5.17 - 2025-12-11 - Add prompt/chat font colour preferences with validation and env bindings.
@@ -11,7 +12,6 @@ Updates:
   v0.5.12 - 2025-12-07 - Add SerpApi web search provider configuration and env parsing.
   v0.5.11 - 2025-12-07 - Add Serper web search provider configuration and env parsing.
   v0.5.10 - 2025-12-07 - Allow random web search provider selection and validation.
-  v0.5.9 - 2025-12-05 - Tighten dotenv helpers for lint compliance.
 """
 
 from __future__ import annotations
@@ -29,8 +29,8 @@ from urllib.parse import urlsplit, urlunsplit
 from pydantic import (
     BaseModel,
     Field,
-    FieldValidationInfo,
     ValidationError,
+    ValidationInfo,
     field_validator,
     model_validator,
 )
@@ -566,7 +566,7 @@ class PromptManagerSettings(BaseSettings):
         return cleaned
 
     @field_validator("prompt_output_font_size", "chat_font_size", mode="before")
-    def _coerce_font_size(cls, value: object, info: FieldValidationInfo) -> object:
+    def _coerce_font_size(cls, value: object, info: ValidationInfo) -> object:
         """Allow empty strings to fall back to defaults before validation."""
         if value in ("", None):
             if info.field_name == "prompt_output_font_size":
@@ -582,7 +582,7 @@ class PromptManagerSettings(BaseSettings):
         return value
 
     @field_validator("prompt_output_font_color", "chat_font_color", mode="before")
-    def _coerce_font_color(cls, value: object, info: FieldValidationInfo) -> object:
+    def _coerce_font_color(cls, value: object, info: ValidationInfo) -> object:
         """Allow empty strings to fall back to defaults before validation."""
         if value in ("", None):
             if info.field_name == "prompt_output_font_color":
