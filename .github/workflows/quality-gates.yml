@@ -19,13 +19,7 @@ jobs:
       - name: Prepare config defaults
         run: |
           mkdir -p config
-          if [ ! -f config/config.json ]; then
-            if [ -f config/config.template.json ]; then
-              cp config/config.template.json config/config.json
-            else
-              echo "{}" > config/config.json
-            fi
-          fi
+          echo "{}" > config/config.json
 
       - name: Set up Python
         uses: actions/setup-python@v5
