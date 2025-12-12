@@ -48,10 +48,12 @@ from PySide6.QtWidgets import (
 from config import LITELLM_ROUTED_WORKFLOWS
 from config.persistence import persist_settings_to_config
 from config.settings import (
+    DEFAULT_CHAT_FONT_COLOR,
     DEFAULT_CHAT_FONT_FAMILY,
     DEFAULT_CHAT_FONT_SIZE,
     DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR,
     DEFAULT_CHAT_USER_BUBBLE_COLOR,
+    DEFAULT_PROMPT_OUTPUT_FONT_COLOR,
     DEFAULT_PROMPT_OUTPUT_FONT_FAMILY,
     DEFAULT_PROMPT_OUTPUT_FONT_SIZE,
 )
