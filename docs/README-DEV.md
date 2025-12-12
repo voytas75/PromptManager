@@ -13,9 +13,9 @@ PromptManager is a PySide6 desktop application for managing reusable AI prompts 
 ## Toolchain & Quality Gates
 
 - **Python**: 3.13+ (3.14 when stable) with `pyright` in strict mode; annotations are mandatory (no `type: ignore` in `core/`).
-- **Formatting/Linting**: `ruff --fix` plus `black --line-length 88`. Import ordering follows ruff/isort (builtin → stdlib → third-party → local).
-- **Testing**: `pytest -n auto --cov=core --cov-fail-under=90` with `pytest-asyncio`, `pytest-cov`, and `hypothesis` for parsing/generation code. Mock all external HTTP/DB calls (`respx`, `vcrpy`, `pytest-mock`).
-- **Automation**: `nox -s format lint typecheck test` runs the full CI-equivalent workflow. Add new sessions as needed but keep parity with AGENTS.md.
+- **Formatting/Linting**: `ruff check --fix .` followed by `ruff format .` (line length 100). Import ordering follows ruff/isort (builtin → stdlib → third-party → local).
+- **Testing**: `pytest -n auto --cov=core --cov-report=term-missing --cov-fail-under=80` with `pytest-asyncio`, `pytest-cov`, and `hypothesis` for parsing/generation code. Mock all external HTTP/DB calls (`respx`, `vcrpy`, `pytest-mock`).
+- **Automation**: `nox -s format lint typecheck test` runs the full CI-equivalent workflow. Keep parity with AGENTS.md quality gates (Ruff + Pyright strict + coverage ≥80%).
 - **Security & Resilience**: wrap external I/O in timeouts, provide custom exception hierarchy, never use bare `except`, and include actionable context plus retries with exponential backoff where transient failures may occur.
 
 ## Environment Setup
@@ -30,7 +30,7 @@ pip install -r requirements.txt
 pip install -e .[dev]
 
 # Optional developer extras
-pip install ruff black pytest pyright nox
+pip install ruff pytest pyright nox
 nox -s all
 ```
 
@@ -81,6 +81,12 @@ All settings are defined via `pydantic-settings` in `config/settings.py`. Provid
 | `PROMPT_MANAGER_EMBEDDING_MODEL` | Embedding model identifier | `text-embedding-3-large` |
 | `PROMPT_MANAGER_EMBEDDING_DEVICE` | Device hint for local embeddings | `cuda` |
 | `PROMPT_MANAGER_CHROMA_TELEMETRY` | Opt-in flag for Chroma telemetry (`1` to enable) | `0` |
+| `PROMPT_MANAGER_PROMPT_OUTPUT_FONT_FAMILY` | Workspace output font family | `JetBrains Mono` |
+| `PROMPT_MANAGER_PROMPT_OUTPUT_FONT_SIZE` | Workspace output font size (pt) | `13` |
+| `PROMPT_MANAGER_PROMPT_OUTPUT_FONT_COLOR` | Workspace output font colour (hex) | `#B5CFED` |
+| `PROMPT_MANAGER_CHAT_FONT_FAMILY` | Workspace chat font family | `Segoe UI` |
+| `PROMPT_MANAGER_CHAT_FONT_SIZE` | Workspace chat font size (pt) | `12` |
+| `PROMPT_MANAGER_CHAT_FONT_COLOR` | Workspace chat font colour (hex) | `#B5CFED` |
 
 Secrets must never be committed; rely on `.env` files ignored by git or host-level secret stores.
 
@@ -138,6 +144,7 @@ Key UI capabilities:
 - Workspace result metadata surfaces per-run token usage, and a dedicated label keeps running session totals alongside all-time totals fetched from history so authors immediately see spend.
 - Token rollup roadmap for per-query, per-session, and global scopes lives in `docs/token_usage_plan.md`; align upcoming UI/CLI work with that plan.
 - The GUI forces Qt's **Fusion** style at startup (see `gui/application.py`) so the palette-driven theming looks identical on Windows/macOS/Linux. If you experiment with alternative styles, verify Guided mode and the Link Variable dialog still use the dark palette before committing.
+- Workspace appearance controls (font family/size/colour for output and chat panes) are configurable via settings or env vars and apply at runtime; tooltips for the “Use web search” toggle reflect the active provider (Exa, Tavily, Serper, SerpApi, Google, or Random).
 - Guided wizard now uses a custom-styled dialog (not `QWizard`) to avoid native theme overrides; adjust `GuidedPromptWizard` inside `gui/workbench/workbench_window.py` when changing layout, palette, or button flow.
 - A Template Preview frame below the workspace renders the selected prompt as a strict Jinja2 template, accepts JSON variables, and surfaces validation/missing-field issues instantly.
 - Command palette (`Ctrl+K` / `Ctrl+Shift+P`) and shortcuts (`Ctrl+1`–`Ctrl+4`) jump directly into explain/fix/document/enhance workflows.
@@ -229,10 +236,10 @@ These commands share the same validation logic as the GUI; pass explicit paths a
 
 ## Testing & Type Checking
 
-- **Unit/Integration Tests**: `pytest -n auto --cov=core --cov-fail-under=90`.
+- **Unit/Integration Tests**: `pytest -n auto --cov=core --cov-report=term-missing --cov-fail-under=80`.
 - **Property-Based Tests**: Use `hypothesis` for prompt parsing, token-length sensitive logic, and JSON import/export features.
 - **Type Checking**: `pyright` must pass with zero warnings; enable strict mode for new packages and keep `pyproject.toml` aligned.
-- **Static Analysis**: `ruff --fix` (lint + autofix) followed by `black --check .`.
+- **Static Analysis**: `ruff check --fix .` (lint + autofix) followed by `ruff format --check .`.
 - **Recommended workflow**:
   ```bash
   nox -s format lint typecheck test

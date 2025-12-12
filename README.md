@@ -43,6 +43,13 @@ export PROMPT_MANAGER_TAVILY_API_KEY="tvly-***"
 # export PROMPT_MANAGER_SERPAPI_API_KEY="serpapi-***"  # when using SerpApi instead
 # export PROMPT_MANAGER_GOOGLE_API_KEY="AIza***"  # when using Google Programmable Search
 # export PROMPT_MANAGER_GOOGLE_CSE_ID="1234567890abcdef:ghijklmnop"
+# Optional: adjust workspace appearance
+# export PROMPT_MANAGER_PROMPT_OUTPUT_FONT_FAMILY="JetBrains Mono"
+# export PROMPT_MANAGER_PROMPT_OUTPUT_FONT_SIZE="13"
+# export PROMPT_MANAGER_PROMPT_OUTPUT_FONT_COLOR="#B5CFED"
+# export PROMPT_MANAGER_CHAT_FONT_FAMILY="Segoe UI"
+# export PROMPT_MANAGER_CHAT_FONT_SIZE="12"
+# export PROMPT_MANAGER_CHAT_FONT_COLOR="#B5CFED"
 # Optional: disable streaming playback if your platform struggles with simultaneous read/write
 # export PROMPT_MANAGER_LITELLM_TTS_STREAM="false"
 # Optional: keep share links in clipboard only
@@ -86,6 +93,7 @@ EOF
 - Token usage tracking that shows per-run prompt/completion/total tokens in the workspace and History tab, keeps running session totals (plus all-time totals) in the workspace header, and adds a dedicated token summary to the analytics dashboard and CLI outputs. Expanded per-query/session/global rollups are outlined in `docs/token_usage_plan.md`.
 - Voice playback button in the workspace overlay streams LiteLLM text-to-speech audio as it downloads (enabled by default, toggle via `PROMPT_MANAGER_LITELLM_TTS_STREAM`).
 - Provider-agnostic web search integrations (now supporting Exa, Tavily, Serper, SerpApi, and Google Programmable Search) plus a workspace “Use web search” toggle (on by default) that injects every available snippet (summary + highlights) before each run—when those snippets exceed roughly 5,000 words, the fast LiteLLM model condenses them automatically so prompts still stay concise.
+- Workspace appearance controls for prompt output and chat panes (font family, size, and colour) that apply at runtime without restarting; defaults are JetBrains Mono 13pt for output and Segoe UI 12pt for chat with `#B5CFED` colouring.
 - Dedicated Prompt Template editor dialog (toolbar button) that exposes every LiteLLM system prompt with inline validation and reset-to-default controls so teams can fine-tune guidance without editing config files.
 - Prompt chaining pipelines with CLI management (`prompt-chain-*` commands) plus a dedicated **Chain** tab in the GUI so teams can create/edit/delete chains, pick prompts from the catalog drop-down, and replay workflows with a single plain-text input that automatically flows from one step to the next—now with the same default-on “Use web search” enrichment (disable via the GUI toggle or `prompt-chain-run --no-web-search`) so each step can pull live context before executing.
 - Prompt sharing workflows baked into the prompt detail pane: choose whether to publish just the body, body + description, or body + description + scenarios, optionally include metadata, and then pick ShareText, Rentry (per the [official CLI/API README](https://github.com/radude/rentry/blob/master/README.md), retrieved 2025-12-07), or a PrivateBin instance (AES-256-GCM per the [PrivateBin API](https://github.com/PrivateBin/PrivateBin/wiki/API), retrieved 2025-12-07). The app handles encryption/uploading, copies the share URL to your clipboard, and surfaces the delete token or edit code returned by each provider.
