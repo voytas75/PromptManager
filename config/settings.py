@@ -1,7 +1,8 @@
 """Settings management utilities for Prompt Manager configuration.
 
 Updates:
-  v0.5.20 - 2025-12-12 - Replace FieldValidationInfo with ValidationInfo to silence pydantic deprecation warnings.
+  v0.5.20 - 2025-12-12 - Replace FieldValidationInfo with ValidationInfo to silence pydantic
+    deprecation warnings.
   v0.5.19 - 2025-12-12 - Allow missing default config file when no explicit path is set.
   v0.5.18 - 2025-12-12 - Normalise litellm_reasoning_effort aliases and tolerate blank font fields.
   v0.5.17 - 2025-12-11 - Add prompt/chat font colour preferences with validation and env bindings.
