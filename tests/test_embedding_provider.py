@@ -1,6 +1,7 @@
 """Unit tests covering embedding provider and sync worker utilities.
 
 Updates:
+  v0.3.3 - 2025-12-15 - Expect LiteLLM embedding name to be callable for Chroma.
   v0.3.2 - 2025-12-09 - Guard LiteLLM embedding availability and expose name for Chroma.
   v0.3.1 - 2025-12-09 - Ensure LiteLLM embedding function exposes name for Chroma.
   v0.3.0 - 2025-12-08 - Align stub signatures/casts for strict Pyright checks.
@@ -201,7 +202,8 @@ def test_litellm_embedding_function_exposes_name(monkeypatch: pytest.MonkeyPatch
         api_base=None,
     )
     assert isinstance(func, LiteLLMEmbeddingFunction)
-    assert func.name == "litellm:text-embedding-3-large"
+    assert callable(func.name)
+    assert func.name() == "litellm:text-embedding-3-large"
 
 
 def test_litellm_embedding_function_uses_adapter(monkeypatch: pytest.MonkeyPatch) -> None:

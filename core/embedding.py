@@ -1,6 +1,7 @@
 """Embedding provider and background synchronisation helpers for Prompt Manager.
 
 Updates:
+  v0.7.8 - 2025-12-15 - Make LiteLLM embedding name callable for Chroma validation.
   v0.7.7 - 2025-12-09 - Expose embedding function names as callables for Chroma.
   v0.7.6 - 2025-12-09 - Guard LiteLLM embedding availability and fall back gracefully.
   v0.7.5 - 2025-12-09 - Expose LiteLLM embedding function name for Chroma telemetry.
@@ -10,7 +11,6 @@ Updates:
   v0.7.1 - 2025-11-05 - Stop forwarding LiteLLM embedding timeouts by default.
   v0.7.0 - 2025-11-11 - Publish notifications for background embedding sync progress.
   v0.6.0 - 2025-11-07 - Add configurable LiteLLM and sentence-transformer backends.
-  v0.1.0 - 2025-11-05 - Introduce embedding provider with retry logic and sync worker.
 """
 
 from __future__ import annotations
@@ -90,7 +90,6 @@ class LiteLLMEmbeddingFunction:
         self._api_base = api_base
         self._timeout_seconds = timeout_seconds
 
-    @property
     def name(self) -> str:
         """Identifier surfaced to Chroma for telemetry/diagnostics."""
         return f"litellm:{self._model}"
