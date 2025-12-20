@@ -73,4 +73,5 @@ build/
 config/config.json
 .npm-cache/
 coverage.xml
+.memo/
 .codex/

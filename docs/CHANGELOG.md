@@ -75,7 +75,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 - Added Tavily as the second web search provider: `PromptManagerSettings` now accepts `web_search_provider="tavily"` plus a `PROMPT_MANAGER_TAVILY_API_KEY`/`TAVILY_API_KEY` secret, the factory builds a Tavily-backed provider when selected, and `python -m main --print-settings` surfaces masked credentials for both providers.
 - Extended the Settings dialog Integrations tab, runtime settings service, CLI summaries, and persistence guards so operators can enter/manage Tavily keys in-memory alongside Exa.
-- Documented the new provider in README/README-DEV, refreshed the web search integration plan with Tavily API details (`docs.tavily.com/documentation/api-reference/endpoint/search`, retrieved 2025-12-07), and updated `.codex` knowledge for future contributors.
+- Documented the new provider in README/README-DEV, refreshed the web search integration plan with Tavily API details (`docs.tavily.com/documentation/api-reference/endpoint/search`, retrieved 2025-12-07), and updated `.memo` knowledge for future contributors.
 - Added Tavily-focused unit tests covering provider parsing, HTTP failure handling, and configuration loading to keep parity with the existing Exa coverage.
 - Introduced a "Random" web search provider option that rotates calls between Exa and Tavily whenever both keys are configured (and falls back to the available provider), including GUI/CLI copy and tests documenting the behaviour.
 

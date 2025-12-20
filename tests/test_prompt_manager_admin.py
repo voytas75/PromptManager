@@ -411,7 +411,7 @@ def test_set_name_generator_configures_workflows(
     monkeypatch.setattr("core.prompt_manager.LiteLLMDescriptionGenerator", description_factory)
     monkeypatch.setattr("core.prompt_manager.PromptEngineer", engineer_factory)
     monkeypatch.setattr("core.prompt_manager.LiteLLMScenarioGenerator", scenario_factory)
-    monkeypatch.setattr("core.prompt_manager.CodexExecutor", executor_factory)
+    monkeypatch.setattr("core.prompt_manager.codexExecutor", executor_factory)
 
     overrides = {
         "name_generation": " Custom name template ",

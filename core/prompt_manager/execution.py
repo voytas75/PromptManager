@@ -1,7 +1,7 @@
 """Execution façade for Prompt Manager.
 
 This module provides lightweight wrappers around the existing low-level
-executor classes (e.g. :class:`core.execution.CodexExecutor`). The goal is to
+executor classes (e.g. :class:`core.execution.codexExecutor`). The goal is to
 decouple the high-level PromptManager API from direct dependency on a specific
 implementation so that we may later introduce alternative execution back-ends
 (streaming, batch, mock for testing) without touching calling code.
@@ -36,7 +36,7 @@ ExecutionResult = CodexExecutionResult
 
 
 class PromptExecutor:
-    """Facade over :class:`core.execution.CodexExecutor`."""
+    """Facade over :class:`core.execution.Executor`."""
 
     def __init__(
         self,
