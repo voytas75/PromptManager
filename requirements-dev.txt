@@ -1,0 +1,15 @@
+# Development dependencies for Prompt Manager.
+-r requirements.txt
+pytest==9.0.1
+pytest-cov==7.0.0
+pytest-xdist==3.8.0
+pyright==1.1.407
+ruff==0.14.7
+pytest-asyncio==1.3.0
+hypothesis==6.116.0
+respx==0.21.0
+vcrpy==6.0.1
+pytest-mock==3.14.0
+bandit==1.7.9
+py-spy==0.3.14
+tenacity==9.0.0
