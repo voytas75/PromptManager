@@ -4,13 +4,13 @@ version = "0.22.17"
 description = "Desktop application for cataloguing, searching, and launching AI prompts."
 readme = "README.md"
 requires-python = ">=3.13"
-license = {text = "Proprietary"}
+license = {text = "MIT"}
 authors = [{name = "Prompt Manager Team"}]
 keywords = ["prompts", "gui", "productivity", "ai"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: Other/Proprietary License",
+    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
