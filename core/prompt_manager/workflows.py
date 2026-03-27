@@ -32,7 +32,14 @@ logger = logging.getLogger(__name__)
 def _resolve_factory(name: str) -> Callable[..., Any]:
     """Return a constructor from the core.prompt_manager module."""
     module = import_module("core.prompt_manager")
-    factory = getattr(module, name)
+    alias_map = {
+        "CodexExecutor": "codexExecutor",
+    }
+    alias_name = alias_map.get(name)
+    if alias_name is not None and hasattr(module, alias_name):
+        factory = getattr(module, alias_name)
+    else:
+        factory = getattr(module, name, None)
     if not callable(factory):  # pragma: no cover - defensive
         raise NameGenerationError(f"{name} is not callable.")
     return factory

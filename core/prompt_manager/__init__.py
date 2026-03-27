@@ -107,6 +107,7 @@ from .workflows import LiteLLMWorkflowMixin
 
 sqlite3 = _sqlite3
 chromadb = _chromadb
+codexExecutor = CodexExecutor
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from collections.abc import Mapping, Sequence
