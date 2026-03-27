@@ -119,7 +119,6 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from models.prompt_model import UserProfile
 
     from ..embedding import EmbeddingProvider, EmbeddingSyncWorker
-    from ..execution import CodexExecutor
     from ..history_tracker import HistoryTracker
     from ..intent_classifier import IntentClassifier
     from ..notifications import NotificationCenter
