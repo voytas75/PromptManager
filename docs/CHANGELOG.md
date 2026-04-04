@@ -2,6 +2,13 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.22.19] - 2026-04-04
+
+### Fixed
+
+- Upgraded `litellm` from `1.80.7` to `1.83.0` to clear currently open GitHub Dependabot runtime advisories affecting vulnerable pre-`1.83.0` releases.
+- Upgraded `cryptography` from `46.0.5` to `46.0.6` to clear the open DNS name-constraint validation advisory for older versions.
+
 ## [0.22.18] - 2026-04-04
 
 ### Added
