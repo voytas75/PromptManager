@@ -9,6 +9,7 @@ PromptManager is a PySide6 desktop application for managing reusable AI prompts 
 - `core.prompt_manager.PromptManager` orchestrates persistence, optional Redis caching, LiteLLM execution, and ChromaDB similarity queries.
 - PySide6 GUI (`main.py --gui`) exposes list/search/detail panes, prompt editor with refinement workflow, quick action palette, notes, history, and taxonomy management dialogs.
 - Notification center, status tracking for long-running embedding/LLM tasks, and preference profile ensure responsive UX.
+- Product boundary SSOT now lives in [`docs/product-boundary-ssot.md`](product-boundary-ssot.md) and should be treated as the canonical source for what PromptManager is, what is core, and what is secondary/later.
 
 ## Toolchain & Quality Gates
 
@@ -260,6 +261,22 @@ These commands share the same validation logic as the GUI; pass explicit paths a
 - **Telemetry**: ChromaDB anonymized telemetry is disabled (`anonymized_telemetry=False`). Set `PROMPT_MANAGER_CHROMA_TELEMETRY=1` to opt in or adjust `core/prompt_manager.py` if you need different defaults.
 - **Usage analytics**: GUI intent workspace interactions are logged to `data/logs/intent_usage.jsonl` (timestamp, hashed query metadata, detected intents, top prompts). Disable via `gui.usage_logger.IntentUsageLogger` instantiation or by clearing the log path.
 - **Analytics dashboard**: The GUI **Analytics** tab (and `python -m main diagnostics analytics`) pulls execution history, benchmark metadata, embeddings health, and intent usage logs into configurable charts. Set the window/prompt limits via the panel controls or CLI flags (`--window-days`, `--prompt-limit`), choose datasets (`usage`, `model_costs`, `benchmark`, `intent`, `embedding`), and export any dataset with `--export-csv` or the tab's **Export CSV** button for downstream BI tooling. A dedicated token summary above the dashboard mirrors the current window totals plus overall history so teams can reconcile spend while pivoting between datasets.
+
+## Product Boundary
+
+Before proposing major new features or expanding roadmap scope, read [`docs/product-boundary-ssot.md`](product-boundary-ssot.md).
+
+Short version:
+- PromptManager is a **local-first prompt catalog and reuse workspace**.
+- The core loop is **capture → normalize → retrieve → inspect → reuse → refine**.
+- Execution, analytics, chains, and other advanced surfaces are supporting features only when they materially improve that loop.
+
+Use the SSOT to decide whether a change belongs in:
+- core,
+- supporting scope,
+- later/frozen scope.
+
+For the first bounded comparison between current implementation and the SSOT, see [`docs/product-boundary-alignment-audit-2026-04-04.md`](product-boundary-alignment-audit-2026-04-04.md).
 
 ## Prompt Catalogue Management
 

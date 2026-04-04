@@ -1,6 +1,8 @@
 """Factories that build callback bundles for gui.main_window.
 
 Updates:
+  v0.16.7 - 2026-04-04 - Map the toolbar Recent action to the prompt handlers.
+  v0.16.6 - 2026-04-04 - Map the toolbar Quick Capture action to the prompt handlers.
   v0.16.5 - 2025-12-07 - Wire workspace text-only run callback.
   v0.16.4 - 2025-12-05 - Remove prompt template callback after toolbar removal.
   v0.16.3 - 2025-12-05 - Remove chains toolbar callback now that the Chain tab is built-in.
@@ -31,6 +33,8 @@ def build_main_view_callbacks(window: MainWindow) -> MainViewCallbacks:
         search_requested=lambda text=None: prompt_search.search_requested(text, use_indicator=True),
         search_text_changed=prompt_search.search_changed,
         refresh_requested=prompt_actions.refresh_prompts,
+        recent_requested=prompt_actions.open_recent_prompts,
+        quick_capture_requested=prompt_actions.quick_capture_prompt,
         add_requested=prompt_actions.add_prompt,
         workbench_requested=prompt_actions.open_workbench,
         import_requested=prompt_actions.import_catalog,

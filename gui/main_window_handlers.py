@@ -1,6 +1,8 @@
 """Handlers extracted from :mod:`gui.main_window` for clarity.
 
 Updates:
+  v0.15.87 - 2026-04-04 - Add a bounded recent prompt reopen dialog flow.
+  v0.15.86 - 2026-04-04 - Route toolbar quick capture into the prompt editor flow.
   v0.15.85 - 2025-12-07 - Add workspace text-only execution handler.
   v0.15.84 - 2025-12-05 - Remove standalone prompt templates action after toolbar update.
   v0.15.83 - 2025-12-04 - Add prompt chain dialog launcher wiring.
@@ -11,9 +13,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QDialog, QMessageBox
 
 from core import PromptManager, PromptNotFoundError, PromptStorageError
+
+from .dialogs.recent_prompts import recent_prompts
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from collections.abc import Callable, Sequence
@@ -27,6 +31,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
 
     from .catalog_workflow_controller import CatalogWorkflowController
     from .dialog_launcher import DialogLauncher
+    from .dialogs.recent_prompts import RecentPromptsDialogFactory
     from .prompt_actions_controller import PromptActionsController
     from .prompt_editor_flow import PromptEditorFlow
     from .prompt_search_controller import PromptSearchController
@@ -55,6 +60,8 @@ class PromptActionsHandler:
         settings_workflow_supplier: Callable[[], SettingsWorkflow | None],
         dialog_launcher_supplier: Callable[[], DialogLauncher | None],
         share_workflow_supplier: Callable[[], ShareWorkflowCoordinator | None],
+        recent_prompts_dialog_factory: RecentPromptsDialogFactory,
+        select_prompt: Callable[[UUID], None],
         load_prompts: Callable[[str], None],
         current_search_text: Callable[[], str],
         status_callback: Callable[[str, int], None],
@@ -73,6 +80,8 @@ class PromptActionsHandler:
         self._settings_workflow_supplier = settings_workflow_supplier
         self._dialog_launcher_supplier = dialog_launcher_supplier
         self._share_workflow_supplier = share_workflow_supplier
+        self._recent_prompts_dialog_factory = recent_prompts_dialog_factory
+        self._select_prompt = select_prompt
         self._load_prompts = load_prompts
         self._current_search_text = current_search_text
         self._status_callback = status_callback
@@ -99,6 +108,27 @@ class PromptActionsHandler:
         if flow is None:
             return
         flow.create_prompt()
+
+    def quick_capture_prompt(self) -> None:
+        """Launch the compact quick-capture flow for draft prompts."""
+        flow = self._prompt_editor_flow_supplier()
+        if flow is None:
+            return
+        flow.quick_capture_prompt()
+
+    def open_recent_prompts(self) -> None:
+        """Display recent prompts and reopen the selected entry in the detail flow."""
+        prompts = recent_prompts(self._model_prompts_supplier())
+        if not prompts:
+            self._status_callback("No recent prompts available.", 3000)
+            return
+        dialog = self._recent_prompts_dialog_factory.build(self._parent, prompts)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        selected_prompt_id = dialog.selected_prompt_id
+        if selected_prompt_id is None:
+            return
+        self._select_prompt(selected_prompt_id)
 
     def edit_prompt(self, prompt: Prompt | None = None) -> None:
         """Edit *prompt* or the currently selected prompt when omitted."""

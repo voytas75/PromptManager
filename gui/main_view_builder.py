@@ -1,6 +1,8 @@
 r"""Composable builders for the Prompt Manager main window.
 
 Updates:
+  v0.2.14 - 2026-04-04 - Wire the Recent toolbar action into the main view callbacks.
+  v0.2.13 - 2026-04-04 - Wire the Quick Capture toolbar action into the main view callbacks.
   v0.2.12 - 2025-12-10 - Increase result metadata and token usage contrast for Windows.
   v0.2.11 - 2025-12-08 - Add token usage label beneath workspace result metadata.
   v0.2.10 - 2025-12-07 - Accept Path inputs for analytics log path.
@@ -8,9 +10,7 @@ Updates:
   v0.2.8 - 2025-12-07 - Convert Run Prompt button into split actions for prompt/text runs.
   v0.2.7 - 2025-12-07 - Provide provider-agnostic default tooltip for web search toggle.
   v0.2.6 - 2025-12-05 - Pass prompt edit callbacks into analytics and chain panels.
-  v0.2.5 - 2025-12-05 - Mark module docstring as raw for lint compliance.
-  v0.2.4 - 2025-12-05 - Remove prompt template toolbar wiring.
-  v0.2.0-and-earlier - 2025-11-30 - Extract main window UI assembly into reusable builder helpers.
+  v0.2.5-and-earlier - 2025-12-05 - Earlier builder extraction, toolbar cleanup, and docstring work.
 """
 
 from __future__ import annotations
@@ -67,6 +67,8 @@ class MainViewCallbacks:
     search_requested: Callable[[str | None], None]
     search_text_changed: Callable[[str], None]
     refresh_requested: Callable[[], None]
+    recent_requested: Callable[[], None]
+    quick_capture_requested: Callable[[], None]
     add_requested: Callable[[], None]
     workbench_requested: Callable[[], None]
     import_requested: Callable[[], None]
@@ -184,6 +186,8 @@ def build_main_view(
     toolbar.search_requested.connect(callbacks.search_requested)  # type: ignore[arg-type]
     toolbar.search_text_changed.connect(callbacks.search_text_changed)
     toolbar.refresh_requested.connect(callbacks.refresh_requested)
+    toolbar.recent_requested.connect(callbacks.recent_requested)  # type: ignore[arg-type]
+    toolbar.quick_capture_requested.connect(callbacks.quick_capture_requested)  # type: ignore[arg-type]
     toolbar.add_requested.connect(callbacks.add_requested)
     toolbar.workbench_requested.connect(callbacks.workbench_requested)
     toolbar.import_requested.connect(callbacks.import_requested)

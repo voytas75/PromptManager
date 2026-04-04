@@ -1,6 +1,7 @@
 """Prompt creation and editing helpers extracted from :mod:`gui.main_window`.
 
 Updates:
+  v0.15.83 - 2026-04-04 - Build quick-capture dialog flow alongside the full prompt editor.
   v0.15.82 - 2025-12-08 - Model execute-context handler signature using a Protocol.
   v0.15.81 - 2025-12-01 - Provide reusable prompt generation + editor factory service.
 """
@@ -14,7 +15,12 @@ from core import IntentLabel, PromptManager, PromptManagerError
 
 from .catalog_workflow_controller import CatalogWorkflowController
 from .language_tools import detect_language
-from .prompt_editor_flow import PromptDialogFactory, PromptEditorFlow, _DeletePromptCallable
+from .prompt_editor_flow import (
+    PromptDialogFactory,
+    PromptEditorFlow,
+    QuickCaptureDialogFactory,
+    _DeletePromptCallable,
+)
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from collections.abc import Callable, Sequence
@@ -116,10 +122,12 @@ class PromptGenerationService:
             version_history_handler=self._open_version_history_dialog,
             execute_context_handler=_execute_context_from_dialog,
         )
+        quick_capture_dialog_factory = QuickCaptureDialogFactory()
         editor_flow = PromptEditorFlow(
             parent=parent,
             manager=self._manager,
             dialog_factory=dialog_factory,
+            quick_capture_dialog_factory=quick_capture_dialog_factory,
             load_prompts=self._load_prompts,
             current_search_text=self._current_search_text,
             select_prompt=self._select_prompt,

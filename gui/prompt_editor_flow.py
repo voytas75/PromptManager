@@ -1,6 +1,7 @@
 """Prompt dialog factory and editor flow helpers.
 
 Updates:
+  v0.1.3 - 2026-04-04 - Add quick-capture draft flow that hands off into the editor.
   v0.1.2 - 2025-12-08 - Type prompt dialog references for Pyright compatibility.
   v0.1.1 - 2025-12-02 - Ensure delete flow bypasses confirmation via keyword arg.
   v0.1.0 - 2025-12-01 - Introduce shared dialog factory and CRUD flow coordinator.
@@ -15,6 +16,7 @@ from PySide6.QtWidgets import QDialog, QWidget
 from core import PromptManager, PromptManagerError, PromptNotFoundError, PromptStorageError
 
 from .dialogs import PromptDialog
+from .dialogs.quick_capture import QuickCaptureDialog
 from .processing_indicator import ProcessingIndicator
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
@@ -85,6 +87,14 @@ class PromptDialogFactory:
         return dialog
 
 
+class QuickCaptureDialogFactory:
+    """Build pre-configured :class:`QuickCaptureDialog` instances."""
+
+    def build(self, parent: QWidget) -> QuickCaptureDialog:
+        """Return a quick-capture dialog bound to *parent*."""
+        return QuickCaptureDialog(parent)
+
+
 class PromptEditorFlow:
     """Coordinate add/edit/fork flows using :class:`PromptDialogFactory`."""
 
@@ -94,6 +104,7 @@ class PromptEditorFlow:
         parent: QWidget,
         manager: PromptManager,
         dialog_factory: PromptDialogFactory,
+        quick_capture_dialog_factory: QuickCaptureDialogFactory,
         load_prompts: Callable[[str], None],
         current_search_text: Callable[[], str],
         select_prompt: Callable[[UUID], None],
@@ -105,6 +116,7 @@ class PromptEditorFlow:
         self._parent = parent
         self._manager = manager
         self._dialog_factory = dialog_factory
+        self._quick_capture_dialog_factory = quick_capture_dialog_factory
         self._load_prompts = load_prompts
         self._current_search_text = current_search_text
         self._select_prompt = select_prompt
@@ -127,6 +139,24 @@ class PromptEditorFlow:
             return
         self._load_prompts("")
         self._select_prompt(created.id)
+
+    def quick_capture_prompt(self) -> None:
+        """Capture raw text into a saved draft and open it in the full editor."""
+        dialog = self._quick_capture_dialog_factory.build(self._parent)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        draft = dialog.result_draft
+        if draft is None:
+            return
+        try:
+            created = self._manager.create_prompt(draft.to_prompt())
+        except (PromptStorageError, ValueError) as exc:
+            self._error_callback("Unable to create draft prompt", str(exc))
+            return
+        self._load_prompts("")
+        self._select_prompt(created.id)
+        self._status_callback("Draft prompt created.", 4000)
+        self.edit_prompt(created)
 
     def edit_prompt(self, prompt: Prompt) -> None:
         """Show the edit dialog for *prompt* and persist any changes."""
@@ -225,4 +255,4 @@ class PromptEditorFlow:
         self._status_callback("Prompt changes applied.", 4000)
 
 
-__all__ = ["PromptDialogFactory", "PromptEditorFlow"]
+__all__ = ["PromptDialogFactory", "PromptEditorFlow", "QuickCaptureDialogFactory"]

@@ -1,6 +1,8 @@
 """Toolbar widget containing search and primary catalog actions.
 
 Updates:
+  v0.2.7 - 2026-04-04 - Add a direct Recent toolbar action for quick prompt reopen.
+  v0.2.6 - 2026-04-04 - Make Quick Capture the primary new-item toolbar action.
   v0.2.5 - 2025-12-08 - Use QStyle.StandardPixmap enums for icon lookup typing.
   v0.2.4 - 2025-12-05 - Move import/export/maintenance/notifications into the Settings menu.
   v0.2.3 - 2025-12-05 - Combine Add/New prompt actions into a single menu button.
@@ -30,6 +32,8 @@ class PromptToolbar(QWidget):
     search_requested = Signal(str)
     search_text_changed = Signal(str)
     refresh_requested = Signal()
+    recent_requested = Signal()
+    quick_capture_requested = Signal()
     add_requested = Signal()
     workbench_requested = Signal()
     import_requested = Signal()
@@ -63,14 +67,25 @@ class PromptToolbar(QWidget):
         self._refresh_button.clicked.connect(self.refresh_requested)  # type: ignore[arg-type]
         layout.addWidget(self._refresh_button)
 
+        self._recent_button = QPushButton("Recent", self)
+        self._recent_button.setToolTip("Reopen one of the prompts you touched most recently.")
+        self._recent_button.clicked.connect(self.recent_requested)  # type: ignore[arg-type]
+        layout.addWidget(self._recent_button)
+
         self._new_button = QToolButton(self)
-        self._new_button.setText("🆕 New")
-        self._new_button.setToolTip("Create a prompt or open the Enhanced Prompt Workbench.")
+        self._new_button.setText("Quick Capture")
+        self._new_button.setToolTip(
+            "Paste raw prompt text into a draft record, or open the full prompt/workbench flows."
+        )
         self._new_button.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
-        self._new_button.clicked.connect(self.add_requested)  # type: ignore[arg-type]
+        self._new_button.clicked.connect(self.quick_capture_requested)  # type: ignore[arg-type]
         layout.addWidget(self._new_button)
 
         self._new_button_menu = QMenu(self._new_button)
+        quick_capture_action = self._new_button_menu.addAction("Quick Capture…")
+        quick_capture_action.triggered.connect(  # pragma: no cover
+            lambda *_: self.quick_capture_requested.emit()
+        )
         new_prompt_action = self._new_button_menu.addAction("New Prompt…")
         new_prompt_action.triggered.connect(  # pragma: no cover
             lambda *_: self.add_requested.emit()

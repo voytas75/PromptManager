@@ -1,6 +1,7 @@
 r"""Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.16.19 - 2026-04-04 - Wire the Recent toolbar action into the existing prompt detail flow.
   v0.16.18 - 2025-12-11 - Expose token counter reset hook for maintenance dialog.
   v0.16.17 - 2025-12-09 - Keep Run Prompt enabled but show LLM configuration guidance when offline.
   v0.16.15 - 2025-12-08 - Store token usage label for execution controller wiring.
@@ -38,6 +39,7 @@ from PySide6.QtWidgets import (
 from models.category_model import PromptCategory, slugify_category
 
 from .dialog_launcher import DialogLauncher
+from .dialogs.recent_prompts import RecentPromptsDialogFactory
 from .main_view_binder import MainViewBinderConfig, bind_main_view
 from .main_view_builder import build_main_view
 from .main_view_callbacks_factory import build_main_view_callbacks
@@ -463,6 +465,8 @@ class MainWindow(QMainWindow):
             settings_workflow_supplier=lambda: self._settings_workflow,
             dialog_launcher_supplier=lambda: self._dialog_launcher,
             share_workflow_supplier=lambda: self._share_workflow,
+            recent_prompts_dialog_factory=RecentPromptsDialogFactory(),
+            select_prompt=self._select_prompt,
             load_prompts=self._load_prompts,
             current_search_text=self._current_search_text,
             status_callback=self._show_status_message,
