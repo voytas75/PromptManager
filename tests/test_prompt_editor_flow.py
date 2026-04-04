@@ -1,6 +1,7 @@
 """Tests covering :mod:`gui.prompt_editor_flow` helpers.
 
 Updates:
+  v0.1.4 - 2026-04-04 - Cover advisory similar-prompt paths in draft promotion.
   v0.1.3 - 2026-04-04 - Add bounded draft-promotion happy-path coverage.
   v0.1.2 - 2026-04-04 - Add quick-capture happy-path coverage for draft creation handoff.
   v0.1.1 - 2025-12-08 - Cast QWidget parent and use DialogCode.Accepted for Pyright.
@@ -102,6 +103,7 @@ class _QuickCaptureDialogFactoryStub:
 @dataclass
 class _DraftPromoteDialogStub:
     result_prompt: Prompt | None = None
+    selected_existing_prompt_id: uuid.UUID | None = None
     dialog_code: int = QDialog.DialogCode.Accepted
 
     def exec(self) -> int:
@@ -113,8 +115,15 @@ class _DraftPromoteDialogStub:
 class _DraftPromoteDialogFactoryStub:
     dialog: _DraftPromoteDialogStub
     built_prompts: list[Prompt]
+    built_similar_prompts: list[list[Prompt]] = field(default_factory=list)
 
-    def build(self, *args: Any, prompt: Prompt | None = None, **__: Any) -> _DraftPromoteDialogStub:
+    def build(
+        self,
+        *args: Any,
+        prompt: Prompt | None = None,
+        similar_prompts: Any = (),
+        **__: Any,
+    ) -> _DraftPromoteDialogStub:
         """Return the shared draft-promotion dialog stub."""
         captured_prompt = prompt
         if captured_prompt is None and len(args) >= 2:
@@ -124,6 +133,7 @@ class _DraftPromoteDialogFactoryStub:
         if captured_prompt is None:
             raise AssertionError("Draft promotion should be invoked with a prompt.")
         self.built_prompts.append(captured_prompt)
+        self.built_similar_prompts.append(list(similar_prompts))
         return self.dialog
 
 
@@ -132,6 +142,8 @@ class _ManagerStub:
         """Track created prompts for happy-path assertions."""
         self.created_prompts: list[Prompt] = []
         self.updated_prompts: list[Prompt] = []
+        self.search_results: list[Prompt] = []
+        self.search_calls: list[dict[str, Any]] = []
 
     def create_prompt(self, prompt: Prompt) -> Prompt:
         """Record and return the created prompt."""
@@ -142,6 +154,24 @@ class _ManagerStub:
         """Record and return the updated prompt."""
         self.updated_prompts.append(prompt)
         return prompt
+
+    def search_prompts(
+        self,
+        query_text: str,
+        limit: int = 5,
+        where: dict[str, Any] | None = None,
+        embedding: list[float] | None = None,
+    ) -> list[Prompt]:
+        """Return pre-seeded similar-prompt candidates for advisory checks."""
+        self.search_calls.append(
+            {
+                "query_text": query_text,
+                "limit": limit,
+                "where": where,
+                "embedding": embedding,
+            }
+        )
+        return list(self.search_results)
 
 
 class _ProcessingIndicatorStub:
@@ -299,6 +329,7 @@ def test_promote_draft_updates_prompt_and_clears_draft_status(monkeypatch) -> No
     selected_ids: list[uuid.UUID] = []
     status_messages: list[tuple[str, int]] = []
     promoted_builds: list[Prompt] = []
+    promoted_similar_builds: list[list[Prompt]] = []
 
     original = Prompt(
         id=uuid.UUID("00000000-0000-0000-0000-000000000321"),
@@ -341,6 +372,7 @@ def test_promote_draft_updates_prompt_and_clears_draft_status(monkeypatch) -> No
         _DraftPromoteDialogFactoryStub(
             _DraftPromoteDialogStub(result_prompt=promoted),
             promoted_builds,
+            promoted_similar_builds,
         ),
     )
     flow = _build_flow(
@@ -357,6 +389,7 @@ def test_promote_draft_updates_prompt_and_clears_draft_status(monkeypatch) -> No
     flow.promote_draft_prompt(original)
 
     assert promoted_builds == [original]
+    assert promoted_similar_builds == [[]]
     assert len(manager.updated_prompts) == 1
     updated = manager.updated_prompts[0]
     assert updated.id == original.id
@@ -373,3 +406,77 @@ def test_promote_draft_updates_prompt_and_clears_draft_status(monkeypatch) -> No
     assert load_calls == [""]
     assert selected_ids == [original.id]
     assert status_messages == [("Draft promoted.", 4000)]
+
+
+def test_promote_draft_passes_similar_matches_and_can_open_existing(monkeypatch) -> None:
+    """Draft promotion should surface similar matches and allow opening one instead."""
+    monkeypatch.setattr(prompt_editor_flow_module, "ProcessingIndicator", _ProcessingIndicatorStub)
+    manager = _ManagerStub()
+    load_calls: list[str] = []
+    selected_ids: list[uuid.UUID] = []
+    status_messages: list[tuple[str, int]] = []
+    promoted_builds: list[Prompt] = []
+    promoted_similar_builds: list[list[Prompt]] = []
+
+    original = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000401"),
+        name="Draft title",
+        description="Quick capture draft.",
+        category="General",
+        context="Keep this prompt body exactly as-is.",
+        ext2={"capture_state": "draft", "capture_method": "quick_capture"},
+    )
+    existing = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000402"),
+        name="Existing reusable prompt",
+        description="Already curated.",
+        category="Operations",
+        tags=["ops"],
+        context="Keep this prompt body exactly as-is.",
+    )
+    existing.similarity = 0.91
+    manager.search_results = [original, existing]
+
+    dialog_factory = cast(
+        "PromptDialogFactory",
+        _DialogFactoryStub(
+            _DialogStub(delete_requested=False, dialog_code=QDialog.DialogCode.Rejected),
+            [],
+        ),
+    )
+    quick_capture_factory = cast(
+        "QuickCaptureDialogFactory",
+        _QuickCaptureDialogFactoryStub(
+            _QuickCaptureDialogStub(dialog_code=QDialog.DialogCode.Rejected)
+        ),
+    )
+    draft_promote_factory = cast(
+        "DraftPromoteDialogFactory",
+        _DraftPromoteDialogFactoryStub(
+            _DraftPromoteDialogStub(selected_existing_prompt_id=existing.id),
+            promoted_builds,
+            promoted_similar_builds,
+        ),
+    )
+    flow = _build_flow(
+        manager=cast("PromptManager", manager),
+        dialog_factory=dialog_factory,
+        quick_capture_dialog_factory=quick_capture_factory,
+        draft_promote_dialog_factory=draft_promote_factory,
+        delete_prompt=lambda *_args, **_kwargs: None,
+        load_prompts=load_calls.append,
+        select_prompt=selected_ids.append,
+        status_callback=lambda message, duration: status_messages.append((message, duration)),
+    )
+
+    flow.promote_draft_prompt(original)
+
+    assert len(manager.search_calls) == 1
+    assert manager.search_calls[0]["query_text"] == original.document
+    assert manager.search_calls[0]["limit"] == 6
+    assert promoted_builds == [original]
+    assert promoted_similar_builds == [[existing]]
+    assert manager.updated_prompts == []
+    assert load_calls == [""]
+    assert selected_ids == [existing.id]
+    assert status_messages == [("Opened similar existing prompt.", 4000)]

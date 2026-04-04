@@ -1,6 +1,7 @@
 """Prompt dialog factory and editor flow helpers.
 
 Updates:
+  v0.1.5 - 2026-04-04 - Add advisory similar-prompt lookup to draft promotion.
   v0.1.4 - 2026-04-04 - Add bounded draft-promotion flow that reuses prompt updates.
   v0.1.3 - 2026-04-04 - Add quick-capture draft flow that hands off into the editor.
   v0.1.2 - 2025-12-08 - Type prompt dialog references for Pyright compatibility.
@@ -104,14 +105,25 @@ class DraftPromoteDialogFactory:
         """Capture the category provider used to prefill promotion choices."""
         self._category_provider = category_provider
 
-    def build(self, parent: QWidget, prompt: Prompt) -> DraftPromoteDialog:
+    def build(
+        self,
+        parent: QWidget,
+        prompt: Prompt,
+        *,
+        similar_prompts: Sequence[Prompt] = (),
+    ) -> DraftPromoteDialog:
         """Return a compact draft-promotion dialog for *prompt*."""
         categories = [
             str(getattr(category, "label", "")).strip()
             for category in self._category_provider()
             if str(getattr(category, "label", "")).strip()
         ]
-        return DraftPromoteDialog(prompt, categories=categories, parent=parent)
+        return DraftPromoteDialog(
+            prompt,
+            categories=categories,
+            similar_prompts=similar_prompts,
+            parent=parent,
+        )
 
 
 class PromptEditorFlow:
@@ -183,8 +195,19 @@ class PromptEditorFlow:
         """Promote *prompt* from draft status through a compact metadata flow."""
         if not is_prompt_draft(prompt):
             return
-        dialog = self._draft_promote_dialog_factory.build(self._parent, prompt)
+        similar_prompts = self._find_similar_prompts(prompt)
+        dialog = self._draft_promote_dialog_factory.build(
+            self._parent,
+            prompt,
+            similar_prompts=similar_prompts,
+        )
         if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        selected_existing_prompt_id = dialog.selected_existing_prompt_id
+        if selected_existing_prompt_id is not None:
+            self._load_prompts(self._current_search_text())
+            self._select_prompt(selected_existing_prompt_id)
+            self._status_callback("Opened similar existing prompt.", 4000)
             return
         updated = dialog.result_prompt
         if updated is None:
@@ -280,6 +303,41 @@ class PromptEditorFlow:
         self._load_prompts(self._current_search_text())
         self._select_prompt(forked.id)
         self._status_callback("Prompt fork created.", 4000)
+
+    def _find_similar_prompts(self, prompt: Prompt) -> list[Prompt]:
+        """Return a short advisory list of prompts similar to the supplied draft."""
+        embedding_vector: list[float] | None
+        if prompt.ext4 is not None:
+            try:
+                embedding_vector = [float(value) for value in prompt.ext4]
+            except (TypeError, ValueError):
+                embedding_vector = None
+        else:
+            embedding_vector = None
+
+        if embedding_vector is None and not prompt.document.strip():
+            return []
+
+        try:
+            candidates = self._manager.search_prompts(
+                "" if embedding_vector is not None else prompt.document,
+                limit=6,
+                embedding=embedding_vector,
+            )
+        except PromptManagerError:
+            return []
+
+        similar_prompts: list[Prompt] = []
+        for candidate in candidates:
+            if candidate.id == prompt.id:
+                continue
+            similarity = getattr(candidate, "similarity", None)
+            if isinstance(similarity, int | float) and float(similarity) < 0.35:
+                continue
+            similar_prompts.append(candidate)
+            if len(similar_prompts) >= 3:
+                break
+        return similar_prompts
 
     def _handle_prompt_applied(self, prompt: Prompt, dialog: PromptDialog) -> None:
         try:

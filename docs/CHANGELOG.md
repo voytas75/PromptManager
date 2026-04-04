@@ -2,6 +2,16 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.22.21] - 2026-04-04
+
+### Added
+
+- Added an advisory similar-prompt check to the **Promote Draft** flow so operators can review a short list of likely existing prompt assets before promoting a captured draft as a new catalog item.
+
+### Fixed
+
+- Added focused regression coverage for the bounded promote-time similarity paths, including no-match, some-match, continue-as-new, and open-existing behavior.
+
 ## [0.22.20] - 2026-04-04
 
 ### Added

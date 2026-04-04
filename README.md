@@ -5,9 +5,11 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE.md)
 [![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](README.md#project-status)
 
-PromptManager is a local desktop app for **cataloguing, testing, versioning, and analysing AI prompts** in one place.
+PromptManager is a local-first desktop app for **capturing, organizing, retrieving, and refining prompt assets** in one place.
 
-It combines a PySide6 GUI, SQLite persistence, semantic search, prompt execution, and usage analytics so you can move beyond scattered prompt files, ad-hoc notes, and copy-paste workflows.
+Its product center is simple: act as a **canonical home for prompt assets** so useful prompts and LLM queries do not stay scattered across chats, notes, scripts, markdown files, and ad-hoc experiments.
+
+It combines a PySide6 GUI, SQLite persistence, semantic search, prompt editing, and lightweight execution support so you can move beyond scattered prompt files, ad-hoc notes, and copy-paste workflows.
 
 <p align="center">
   <img src="docs/images/main.png" alt="Prompt catalogue and workspace view" width="45%">
@@ -19,32 +21,34 @@ It combines a PySide6 GUI, SQLite persistence, semantic search, prompt execution
 
 ## Who it is for
 
-PromptManager is designed for people who actively work with prompts and want a more structured workflow:
+PromptManager is designed for people who actively work with prompts and want a more structured local-first workflow:
 
 - **AI developers** who maintain reusable prompts across projects
-- **prompt engineers** who want versioning, testing, and benchmarking
-- **solo builders** who want a local prompt workspace instead of scattered Markdown files
-- **small teams** who need a practical prompt catalog with execution history and analytics
+- **prompt engineers** who want a durable prompt base instead of scattered snippets
+- **solo builders** who want one local prompt workspace instead of loose Markdown files and chat fragments
+- **operators and researchers** who collect prompts from many places and want to find and reuse them quickly
 
 ## What it helps with
 
 Use PromptManager when you want to:
 
-- keep prompts in a searchable local catalog
+- capture useful prompts or LLM queries into a searchable local catalog
+- normalize drafts into reusable prompt assets with better titles, metadata, and provenance
+- reopen recent work quickly and inspect prompt context without hunting through metadata
 - preview and validate templated prompts before running them
-- execute prompts from a dedicated workspace
+- execute prompts from a dedicated workspace when lightweight validation or reuse helps
 - compare results, token usage, and execution history
-- reuse prompt parts, formatting rules, and prompt chains
 - keep prompt work local-first, with optional external providers
 
 ## Core capabilities
 
-- **Prompt catalog** — store, search, tag, edit, fork, and organise prompts
-- **Template preview** — render Jinja2 templates with JSON variables and validation feedback
-- **Execution workspace** — run prompts with LiteLLM-backed models and keep execution history
+- **Prompt catalog** — store, search, tag, edit, fork, and organize prompts as durable assets
+- **Quick Capture + Draft Promote** — capture raw prompt/query text fast, inspect it as a draft, then promote it into a reusable prompt asset
+- **Recent reopen + inspection cues** — get back to recent prompts quickly and see draft/source/last-modified context without opening raw metadata
 - **Semantic retrieval** — find prompts by meaning, not only exact text
-- **Analytics** — inspect usage, token spend, success trends, and benchmarks
-- **Prompt parts & chains** — compose reusable instruction blocks and multi-step workflows
+- **Template preview** — render Jinja2 templates with JSON variables and validation feedback
+- **Lightweight execution workspace** — run prompts with LiteLLM-backed models and keep execution history when validation or reuse benefits from it
+- **Analytics and prompt parts** — inspect usage trends and reuse supporting prompt components without losing structure
 
 ## Quick start
 
@@ -113,22 +117,22 @@ Most prompt workflows start as some combination of:
 - copied JSON payloads
 - half-reusable templates
 
-That works for a while, but it breaks down once you want repeatability, reuse, analytics, or proper versioning.
+That works for a while, but it breaks down once you want repeatability, reuse, better retrieval, or proper versioning.
 
-PromptManager gives you a dedicated workspace for prompt operations:
-- local-first
+PromptManager gives you a dedicated local-first home for prompt assets:
+- capture-oriented
 - structured
 - searchable
-- execution-aware
-- analytics-ready
+- reuse-friendly
+- execution-aware when needed
 
 ## Project status
 
 PromptManager is currently in **beta** and under active development.
 
 The current focus is:
-- improving prompt authoring workflows
-- strengthening execution analytics
+- strengthening the core prompt asset loop: capture, normalize, retrieve, inspect, reuse, refine
+- improving low-friction draft capture and promotion workflows
 - refining template and validation ergonomics
 - keeping the desktop experience responsive and local-first
 
