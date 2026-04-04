@@ -1,6 +1,7 @@
 """Prompt detail panel shared between main and template tabs.
 
 Updates:
+  v0.1.10 - 2026-04-04 - Surface compact always-visible inspection cues for source/draft status.
   v0.1.9 - 2025-12-09 - Collapse metadata spacing by hiding header/text when not in use.
   v0.1.8 - 2025-12-09 - Swap metadata table for a toggleable text view with close control.
   v0.1.7 - 2025-12-09 - Import QToolButton to restore GUI startup.
@@ -16,6 +17,7 @@ Updates:
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from html import escape
 from typing import TYPE_CHECKING
 
@@ -89,6 +91,7 @@ class PromptDetailWidget(QWidget):
         self._rating_label.setTextFormat(Qt.TextFormat.RichText)
         self._rating_label.setVisible(False)
         self._meta_label = QLabel("", content)
+        self._meta_label.setObjectName("promptInspectionCues")
         self._meta_label.setWordWrap(True)
         self._meta_label.setTextFormat(Qt.TextFormat.RichText)
         self._meta_label.setVisible(False)
@@ -283,8 +286,15 @@ class PromptDetailWidget(QWidget):
         self._version_label.setVisible(False)
         self._rating_label.clear()
         self._rating_label.setVisible(False)
-        self._meta_label.clear()
-        self._meta_label.setVisible(False)
+        inspection_cues = self._format_inspection_cues(prompt)
+        if inspection_cues:
+            self._meta_label.setText(
+                self._format_label_value("Inspection", inspection_cues, multiline=True)
+            )
+            self._meta_label.setVisible(True)
+        else:
+            self._meta_label.clear()
+            self._meta_label.setVisible(False)
         description_value = prompt.description or "No description provided."
         self._description.setText(
             self._format_label_value("Description", description_value, multiline=True)
@@ -356,6 +366,36 @@ class PromptDetailWidget(QWidget):
         # Collapse newlines (and other whitespace sequences) so the preview stays on one line.
         flattened = " ".join(limited.split())
         return flattened or "No prompt text provided."
+
+    def _format_inspection_cues(self, prompt: Prompt) -> str:
+        """Return compact always-visible provenance/status cues for the prompt."""
+        cues: list[str] = []
+
+        draft_cue = self._draft_status_cue(prompt)
+        if draft_cue:
+            cues.append(draft_cue)
+
+        source = (prompt.source or "").strip()
+        if source:
+            cues.append(f"Source: {source}")
+
+        cues.append(f"Last modified: {prompt.last_modified.isoformat()}")
+        return " • ".join(cues)
+
+    def _draft_status_cue(self, prompt: Prompt) -> str | None:
+        """Return a textual draft cue sourced only from existing quick-capture metadata."""
+        ext2 = prompt.ext2
+        if not isinstance(ext2, Mapping):
+            return None
+
+        capture_state = str(ext2.get("capture_state") or "").strip()
+        if capture_state != "draft":
+            return None
+
+        capture_method = str(ext2.get("capture_method") or "").strip()
+        if capture_method:
+            return f"Draft ({capture_method})"
+        return "Draft"
 
     def current_prompt(self) -> Prompt | None:
         """Return the currently displayed prompt, if any."""
