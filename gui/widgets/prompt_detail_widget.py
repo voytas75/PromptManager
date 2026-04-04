@@ -1,6 +1,7 @@
 """Prompt detail panel shared between main and template tabs.
 
 Updates:
+  v0.1.13 - 2026-04-04 - Add bounded quick-reuse actions for copy and workspace handoff.
   v0.1.12 - 2026-04-04 - Add one visible Promote Draft action for captured prompts.
   v0.1.11 - 2026-04-04 - Render inspection timestamps in a compact human-readable UTC format.
   v0.1.10 - 2026-04-04 - Surface compact always-visible inspection cues for source/draft status.
@@ -9,8 +10,8 @@ Updates:
   v0.1.7 - 2025-12-09 - Import QToolButton to restore GUI startup.
   v0.1.6 - 2025-12-09 - Show only the requested metadata and add close toggle.
   v0.1.5 - 2025-12-09 - Toggle metadata table off on repeat clicks and ensure full payload shows.
-  v0.1.4 - 2025-12-09 - Earlier metadata toggling and grouped-action refinements.
-  v0.1.2-and-earlier - 2025-12-08 - Initial widget extraction and palette alignment.
+  v0.1.4-and-earlier - 2025-12-08 - Initial widget extraction, palette alignment,
+    and grouped metadata refinements.
 """
 
 from __future__ import annotations
@@ -52,6 +53,8 @@ class PromptDetailWidget(QWidget):
     fork_requested = Signal()
     version_history_requested = Signal()
     refresh_scenarios_requested = Signal()
+    copy_prompt_body_requested = Signal()
+    open_in_workspace_requested = Signal()
     share_requested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -140,6 +143,30 @@ class PromptDetailWidget(QWidget):
         content_layout.addSpacing(4)
         content_layout.addWidget(self._examples)
         content_layout.addSpacing(8)
+
+        reuse_group = QGroupBox("Quick Reuse", content)
+        reuse_group.setObjectName("quickReuseGroup")
+        reuse_layout = QHBoxLayout(reuse_group)
+        reuse_layout.setContentsMargins(12, 8, 12, 8)
+        reuse_layout.setSpacing(8)
+
+        self._copy_prompt_body_button = QPushButton("Copy Prompt Body", reuse_group)
+        self._copy_prompt_body_button.setObjectName("copyPromptBodyButton")
+        self._copy_prompt_body_button.setEnabled(False)
+        self._copy_prompt_body_button.clicked.connect(  # type: ignore[arg-type]
+            self.copy_prompt_body_requested.emit
+        )
+        reuse_layout.addWidget(self._copy_prompt_body_button)
+
+        self._open_in_workspace_button = QPushButton("Open in Workspace", reuse_group)
+        self._open_in_workspace_button.setObjectName("openInWorkspaceButton")
+        self._open_in_workspace_button.setEnabled(False)
+        self._open_in_workspace_button.clicked.connect(  # type: ignore[arg-type]
+            self.open_in_workspace_requested.emit
+        )
+        reuse_layout.addWidget(self._open_in_workspace_button)
+        reuse_layout.addStretch(1)
+        content_layout.addWidget(reuse_group)
 
         metadata_group = QGroupBox("Metadata Views", content)
         metadata_group.setObjectName("metadataToggleGroup")
@@ -350,6 +377,9 @@ class PromptDetailWidget(QWidget):
         )
         self._current_prompt = prompt
         self._clear_metadata_view()
+        has_reusable_payload = bool((prompt.context or prompt.description or "").strip())
+        self._copy_prompt_body_button.setEnabled(has_reusable_payload)
+        self._open_in_workspace_button.setEnabled(has_reusable_payload)
         is_draft = self._is_draft_prompt(prompt)
         self._promote_draft_button.setEnabled(is_draft)
         self._promote_draft_button.setVisible(is_draft)
@@ -528,6 +558,8 @@ class PromptDetailWidget(QWidget):
         self._context.clear()
         self._scenarios.clear()
         self._examples.clear()
+        self._copy_prompt_body_button.setEnabled(False)
+        self._open_in_workspace_button.setEnabled(False)
         self._basic_metadata_button.setEnabled(False)
         self._all_metadata_button.setEnabled(False)
         self._clear_metadata_view()

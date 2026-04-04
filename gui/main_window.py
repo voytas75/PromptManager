@@ -1,6 +1,7 @@
 r"""Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.16.21 - 2026-04-04 - Wire detail-widget quick-reuse actions into the existing prompt flow.
   v0.16.20 - 2026-04-04 - Wire detail-widget draft promotion into the existing prompt flow.
   v0.16.19 - 2026-04-04 - Wire the Recent toolbar action into the existing prompt detail flow.
   v0.16.18 - 2025-12-11 - Expose token counter reset hook for maintenance dialog.
@@ -261,6 +262,8 @@ class MainWindow(QMainWindow):
             version_history_requested=self._prompt_actions_bridge.open_version_history_dialog,
             fork_requested=self._prompt_actions_bridge.fork_prompt,
             refresh_scenarios_requested=self._prompt_actions_bridge.handle_refresh_scenarios_request,
+            copy_prompt_body_requested=self._prompt_actions_bridge.copy_prompt,
+            open_in_workspace_requested=self._prompt_actions_bridge.open_prompt_in_workspace,
             share_requested=self._prompt_actions_bridge.share_prompt,
         )
 

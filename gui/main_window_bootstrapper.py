@@ -1,6 +1,7 @@
 """Helper utilities for bootstrapping the Prompt Manager main window.
 
 Updates:
+  v0.15.85 - 2026-04-04 - Wire detail-widget quick-reuse actions into prompt handlers.
   v0.15.84 - 2026-04-04 - Wire draft-promotion requests from the shared detail widget.
   v0.15.83 - 2025-12-08 - Tighten supplier typings and adapt toast callbacks for ShareController.
   v0.15.82 - 2025-12-07 - Register the Rentry share provider alongside ShareText and PrivateBin.
@@ -57,6 +58,8 @@ class DetailWidgetCallbacks:
     version_history_requested: Callable[[Prompt | None], None]
     fork_requested: Callable[[], None]
     refresh_scenarios_requested: Callable[[PromptDetailWidget], None]
+    copy_prompt_body_requested: Callable[[], None]
+    open_in_workspace_requested: Callable[[], None]
     share_requested: Callable[[], None]
 
 
@@ -122,6 +125,12 @@ class MainWindowBootstrapper:
         detail_widget.refresh_scenarios_requested.connect(  # type: ignore[arg-type]
             partial(self._detail_callbacks.refresh_scenarios_requested, detail_widget)
         )
+        detail_widget.copy_prompt_body_requested.connect(
+            self._detail_callbacks.copy_prompt_body_requested
+        )  # type: ignore[arg-type]
+        detail_widget.open_in_workspace_requested.connect(
+            self._detail_callbacks.open_in_workspace_requested
+        )  # type: ignore[arg-type]
         detail_widget.share_requested.connect(self._detail_callbacks.share_requested)  # type: ignore[arg-type]
 
         runtime_settings_service = RuntimeSettingsService(self._manager, self._settings)

@@ -1,7 +1,7 @@
 # PromptManager — Next Slice Brief
 
 Date: 2026-04-04
-Status: proposed
+Status: delivered
 Slice name: Quick Reuse Handoff v1
 Primary source: `docs/product-boundary-ssot.md`
 Supporting sources:
@@ -136,3 +136,14 @@ The slice is done when:
 - the implementation stays bounded,
 - the focused tests pass,
 - nothing peripheral expands.
+
+## Implementation note
+
+Delivered on 2026-04-05 as a compact **Quick Reuse** block in the existing prompt detail view.
+
+Rendered actions stay bounded to exactly:
+- `Copy Prompt Body`
+- `Open in Workspace`
+
+Implementation reuses the existing prompt payload semantics and existing workspace handoff path, while keeping `Open in Workspace` non-executing.
+Focused regression coverage protects the detail-widget action exposure, clipboard payload behavior, and non-executing workspace seeding path.

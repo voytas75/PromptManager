@@ -1,6 +1,7 @@
 """Prompt-specific actions separated from the main window.
 
 Updates:
+  v0.1.2 - 2026-04-04 - Add a non-executing workspace handoff for prompt detail reuse.
   v0.1.1 - 2025-12-08 - Fix dialog code comparison and toast callback usage for strict typing.
   v0.1.0 - 2025-12-01 - Extracted context menu, clipboard, and execute-as-context workflows.
 """
@@ -143,18 +144,14 @@ class PromptActionsController:
 
     def execute_prompt_from_body(self, prompt: Prompt) -> None:
         """Populate the workspace with the prompt body and execute immediately."""
-        raw_payload = prompt.context or prompt.description or ""
-        if not raw_payload.strip():
+        raw_payload = self._primary_prompt_payload(prompt)
+        if raw_payload is None:
             self._status_callback(
                 "Selected prompt does not include any text to execute.",
                 4000,
             )
             return
-        self._query_input.setPlainText(raw_payload)
-        cursor = self._query_input.textCursor()
-        cursor.movePosition(QTextCursor.MoveOperation.End)
-        self._query_input.setTextCursor(cursor)
-        self._query_input.setFocus(Qt.FocusReason.ShortcutFocusReason)
+        self._seed_workspace(raw_payload, focus=True)
         controller = self._execution_controller_supplier()
         if controller is None:
             self._error_callback("Workspace unavailable", "Execution controller is not ready.")
@@ -166,6 +163,15 @@ class PromptActionsController:
             empty_text_message="Selected prompt does not include any text to execute.",
             keep_text_after=True,
         )
+
+    def open_prompt_in_workspace(self, prompt: Prompt) -> None:
+        """Populate the workspace editor with the prompt text without executing it."""
+        payload = self._primary_prompt_payload(prompt)
+        if payload is None:
+            self._status_callback("Selected prompt does not include a body to open.", 3000)
+            return
+        self._seed_workspace(payload, focus=True)
+        self._toast_callback(f"Opened '{prompt.name}' in the workspace.", 2500)
 
     def execute_prompt_as_context(
         self,
@@ -226,14 +232,34 @@ class PromptActionsController:
 
     def copy_prompt_to_clipboard(self, prompt: Prompt) -> None:
         """Copy a prompt's primary text to the clipboard with status feedback."""
-        payload = prompt.context or prompt.description
-        if not payload:
+        payload = self._primary_prompt_payload(prompt)
+        if payload is None:
             self._status_callback("Selected prompt does not include a body to copy.", 3000)
             return
         clipboard = QGuiApplication.clipboard()
         clipboard.setText(payload)
         self._toast_callback(f"Copied '{prompt.name}' to the clipboard.", 2500)
         self._usage_logger.log_copy(prompt_name=prompt.name, prompt_has_body=bool(prompt.context))
+
+    @staticmethod
+    def _primary_prompt_payload(prompt: Prompt) -> str | None:
+        """Return the prompt text used by existing reuse flows, or ``None`` when empty."""
+        payload = (prompt.context or prompt.description or "").strip()
+        if not payload:
+            return None
+        return payload
+
+    def _seed_workspace(self, text: str, *, focus: bool) -> None:
+        """Populate the workspace editor using the existing view helper when available."""
+        if self._workspace_view is not None:
+            self._workspace_view.set_text(text, focus=focus)
+            return
+        self._query_input.setPlainText(text)
+        cursor = self._query_input.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        self._query_input.setTextCursor(cursor)
+        if focus:
+            self._query_input.setFocus(Qt.FocusReason.ShortcutFocusReason)
 
     def show_prompt_description(self, prompt: Prompt) -> None:
         """Display the prompt description in a dialog for quick reference."""

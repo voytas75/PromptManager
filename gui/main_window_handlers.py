@@ -1,6 +1,7 @@
 """Handlers extracted from :mod:`gui.main_window` for clarity.
 
 Updates:
+  v0.15.89 - 2026-04-04 - Add a non-executing workspace handoff for prompt detail reuse.
   v0.15.88 - 2026-04-04 - Add draft-promotion handler wiring for the detail flow.
   v0.15.87 - 2026-04-04 - Add a bounded recent prompt reopen dialog flow.
   v0.15.86 - 2026-04-04 - Route toolbar quick capture into the prompt editor flow.
@@ -215,6 +216,20 @@ class PromptActionsHandler:
         if controller is None:
             return
         controller.copy_prompt_to_clipboard(prompt)
+
+    def open_prompt_in_workspace(self, prompt: Prompt | None = None) -> None:
+        """Seed the workspace with *prompt* text without executing it."""
+        target = prompt or self._current_prompt_supplier()
+        if target is None:
+            prompts = self._model_prompts_supplier()
+            target = prompts[0] if prompts else None
+        if target is None:
+            self._status_callback("Select a prompt to open first.", 3000)
+            return
+        controller = self._prompt_actions_controller_supplier()
+        if controller is None:
+            return
+        controller.open_prompt_in_workspace(target)
 
     def show_prompt_description(self, prompt: Prompt) -> None:
         """Display the details dialog for *prompt*."""

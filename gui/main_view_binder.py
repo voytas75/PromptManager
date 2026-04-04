@@ -1,6 +1,7 @@
 """Bind :mod:`gui.main_view_builder` components to the :class:`MainWindow`.
 
 Updates:
+  v0.15.86 - 2026-04-04 - Wire template detail quick-reuse actions into prompt handlers.
   v0.15.85 - 2026-04-04 - Wire template detail draft-promotion requests into prompt handlers.
   v0.15.84 - 2025-12-08 - Bind token usage label for workspace execution summaries.
   v0.15.83 - 2025-12-07 - Store Workbench panel reference for tab activation.
@@ -151,6 +152,10 @@ def bind_main_view(
     template_detail.refresh_scenarios_requested.connect(  # type: ignore[arg-type]
         partial(window._handle_refresh_scenarios_request, template_detail)
     )
+    template_detail.copy_prompt_body_requested.connect(window._prompt_actions_bridge.copy_prompt)  # type: ignore[arg-type]
+    template_detail.open_in_workspace_requested.connect(
+        window._prompt_actions_bridge.open_prompt_in_workspace
+    )  # type: ignore[arg-type]
 
     window._workspace_view = WorkspaceViewController(
         window._query_input,
