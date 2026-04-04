@@ -1,6 +1,7 @@
 """Handlers extracted from :mod:`gui.main_window` for clarity.
 
 Updates:
+  v0.15.88 - 2026-04-04 - Add draft-promotion handler wiring for the detail flow.
   v0.15.87 - 2026-04-04 - Add a bounded recent prompt reopen dialog flow.
   v0.15.86 - 2026-04-04 - Route toolbar quick capture into the prompt editor flow.
   v0.15.85 - 2025-12-07 - Add workspace text-only execution handler.
@@ -115,6 +116,16 @@ class PromptActionsHandler:
         if flow is None:
             return
         flow.quick_capture_prompt()
+
+    def promote_draft_prompt(self, prompt: Prompt | None = None) -> None:
+        """Launch the compact promote-draft flow for the selected draft prompt."""
+        target = prompt or self._current_prompt_supplier()
+        if target is None:
+            return
+        flow = self._prompt_editor_flow_supplier()
+        if flow is None:
+            return
+        flow.promote_draft_prompt(target)
 
     def open_recent_prompts(self) -> None:
         """Display recent prompts and reopen the selected entry in the detail flow."""

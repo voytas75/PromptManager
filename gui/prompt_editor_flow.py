@@ -1,6 +1,7 @@
 """Prompt dialog factory and editor flow helpers.
 
 Updates:
+  v0.1.4 - 2026-04-04 - Add bounded draft-promotion flow that reuses prompt updates.
   v0.1.3 - 2026-04-04 - Add quick-capture draft flow that hands off into the editor.
   v0.1.2 - 2025-12-08 - Type prompt dialog references for Pyright compatibility.
   v0.1.1 - 2025-12-02 - Ensure delete flow bypasses confirmation via keyword arg.
@@ -16,11 +17,12 @@ from PySide6.QtWidgets import QDialog, QWidget
 from core import PromptManager, PromptManagerError, PromptNotFoundError, PromptStorageError
 
 from .dialogs import PromptDialog
+from .dialogs.draft_promote import DraftPromoteDialog, is_prompt_draft
 from .dialogs.quick_capture import QuickCaptureDialog
 from .processing_indicator import ProcessingIndicator
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
     from uuid import UUID
 
     from models.prompt_model import Prompt
@@ -95,6 +97,23 @@ class QuickCaptureDialogFactory:
         return QuickCaptureDialog(parent)
 
 
+class DraftPromoteDialogFactory:
+    """Build pre-configured :class:`DraftPromoteDialog` instances."""
+
+    def __init__(self, *, category_provider: Callable[[], Sequence[object]]) -> None:
+        """Capture the category provider used to prefill promotion choices."""
+        self._category_provider = category_provider
+
+    def build(self, parent: QWidget, prompt: Prompt) -> DraftPromoteDialog:
+        """Return a compact draft-promotion dialog for *prompt*."""
+        categories = [
+            str(getattr(category, "label", "")).strip()
+            for category in self._category_provider()
+            if str(getattr(category, "label", "")).strip()
+        ]
+        return DraftPromoteDialog(prompt, categories=categories, parent=parent)
+
+
 class PromptEditorFlow:
     """Coordinate add/edit/fork flows using :class:`PromptDialogFactory`."""
 
@@ -105,6 +124,7 @@ class PromptEditorFlow:
         manager: PromptManager,
         dialog_factory: PromptDialogFactory,
         quick_capture_dialog_factory: QuickCaptureDialogFactory,
+        draft_promote_dialog_factory: DraftPromoteDialogFactory,
         load_prompts: Callable[[str], None],
         current_search_text: Callable[[], str],
         select_prompt: Callable[[UUID], None],
@@ -117,6 +137,7 @@ class PromptEditorFlow:
         self._manager = manager
         self._dialog_factory = dialog_factory
         self._quick_capture_dialog_factory = quick_capture_dialog_factory
+        self._draft_promote_dialog_factory = draft_promote_dialog_factory
         self._load_prompts = load_prompts
         self._current_search_text = current_search_text
         self._select_prompt = select_prompt
@@ -157,6 +178,35 @@ class PromptEditorFlow:
         self._select_prompt(created.id)
         self._status_callback("Draft prompt created.", 4000)
         self.edit_prompt(created)
+
+    def promote_draft_prompt(self, prompt: Prompt) -> None:
+        """Promote *prompt* from draft status through a compact metadata flow."""
+        if not is_prompt_draft(prompt):
+            return
+        dialog = self._draft_promote_dialog_factory.build(self._parent, prompt)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        updated = dialog.result_prompt
+        if updated is None:
+            return
+        try:
+            stored = ProcessingIndicator(self._parent, "Promoting draft…").run(
+                self._manager.update_prompt,
+                updated,
+            )
+        except PromptNotFoundError:
+            self._error_callback(
+                "Prompt missing",
+                "The prompt cannot be located. Refresh and try again.",
+            )
+            self._load_prompts(self._current_search_text())
+            return
+        except PromptStorageError as exc:
+            self._error_callback("Unable to promote draft", str(exc))
+            return
+        self._load_prompts(self._current_search_text())
+        self._select_prompt(stored.id)
+        self._status_callback("Draft promoted.", 4000)
 
     def edit_prompt(self, prompt: Prompt) -> None:
         """Show the edit dialog for *prompt* and persist any changes."""
@@ -255,4 +305,9 @@ class PromptEditorFlow:
         self._status_callback("Prompt changes applied.", 4000)
 
 
-__all__ = ["PromptDialogFactory", "PromptEditorFlow", "QuickCaptureDialogFactory"]
+__all__ = [
+    "DraftPromoteDialogFactory",
+    "PromptDialogFactory",
+    "PromptEditorFlow",
+    "QuickCaptureDialogFactory",
+]

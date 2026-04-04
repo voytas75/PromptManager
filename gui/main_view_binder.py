@@ -1,6 +1,7 @@
 """Bind :mod:`gui.main_view_builder` components to the :class:`MainWindow`.
 
 Updates:
+  v0.15.85 - 2026-04-04 - Wire template detail draft-promotion requests into prompt handlers.
   v0.15.84 - 2025-12-08 - Bind token usage label for workspace execution summaries.
   v0.15.83 - 2025-12-07 - Store Workbench panel reference for tab activation.
   v0.15.82 - 2025-12-04 - Bind web search checkbox for execution controller.
@@ -141,6 +142,9 @@ def bind_main_view(
 
     template_detail = window._template_detail_widget
     template_detail.delete_requested.connect(window._on_delete_clicked)  # type: ignore[arg-type]
+    template_detail.promote_draft_requested.connect(
+        window._prompt_actions_bridge.promote_draft_prompt
+    )  # type: ignore[arg-type]
     template_detail.edit_requested.connect(window._on_edit_clicked)  # type: ignore[arg-type]
     template_detail.version_history_requested.connect(window._open_version_history_dialog)  # type: ignore[arg-type]
     template_detail.fork_requested.connect(window._on_fork_clicked)  # type: ignore[arg-type]

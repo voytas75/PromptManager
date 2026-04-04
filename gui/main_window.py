@@ -1,6 +1,7 @@
 r"""Main window widgets and models for the Prompt Manager GUI.
 
 Updates:
+  v0.16.20 - 2026-04-04 - Wire detail-widget draft promotion into the existing prompt flow.
   v0.16.19 - 2026-04-04 - Wire the Recent toolbar action into the existing prompt detail flow.
   v0.16.18 - 2025-12-11 - Expose token counter reset hook for maintenance dialog.
   v0.16.17 - 2025-12-09 - Keep Run Prompt enabled but show LLM configuration guidance when offline.
@@ -9,10 +10,7 @@ Updates:
   v0.16.13 - 2025-12-07 - Convert analytics log path to Path objects for typing.
   v0.16.12 - 2025-12-07 - Embed Workbench tab and expose activation hook.
   v0.16.11 - 2025-12-07 - Convert Run Prompt into a split button with text-only option.
-  v0.16.10 - 2025-12-07 - Include SerpApi in workspace web search tooltip messaging.
-  v0.16.9 - 2025-12-07 - Describe Serper provider in workspace web search tooltips.
-  v0.16.8 - 2025-12-07 - Sync \"Use web search\" tooltip with the configured provider.
-  v0.16.7-and-earlier - 2025-12-05 - Earlier chain routing, layout, and tooltip refinements.
+  v0.16.10-and-earlier - 2025-12-07 - Earlier workspace, web-search, chain, and layout refinements.
 """
 
 from __future__ import annotations
@@ -258,6 +256,7 @@ class MainWindow(QMainWindow):
 
         detail_callbacks = DetailWidgetCallbacks(
             delete_requested=self._prompt_actions_bridge.delete_current_prompt,
+            promote_draft_requested=self._prompt_actions_bridge.promote_draft_prompt,
             edit_requested=self._prompt_actions_bridge.edit_prompt,
             version_history_requested=self._prompt_actions_bridge.open_version_history_dialog,
             fork_requested=self._prompt_actions_bridge.fork_prompt,

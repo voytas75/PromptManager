@@ -1,6 +1,7 @@
 """Prompt creation and editing helpers extracted from :mod:`gui.main_window`.
 
 Updates:
+  v0.15.84 - 2026-04-04 - Build the bounded draft-promotion dialog flow beside quick capture.
   v0.15.83 - 2026-04-04 - Build quick-capture dialog flow alongside the full prompt editor.
   v0.15.82 - 2025-12-08 - Model execute-context handler signature using a Protocol.
   v0.15.81 - 2025-12-01 - Provide reusable prompt generation + editor factory service.
@@ -16,6 +17,7 @@ from core import IntentLabel, PromptManager, PromptManagerError
 from .catalog_workflow_controller import CatalogWorkflowController
 from .language_tools import detect_language
 from .prompt_editor_flow import (
+    DraftPromoteDialogFactory,
     PromptDialogFactory,
     PromptEditorFlow,
     QuickCaptureDialogFactory,
@@ -123,11 +125,15 @@ class PromptGenerationService:
             execute_context_handler=_execute_context_from_dialog,
         )
         quick_capture_dialog_factory = QuickCaptureDialogFactory()
+        draft_promote_dialog_factory = DraftPromoteDialogFactory(
+            category_provider=self._manager.list_categories,
+        )
         editor_flow = PromptEditorFlow(
             parent=parent,
             manager=self._manager,
             dialog_factory=dialog_factory,
             quick_capture_dialog_factory=quick_capture_dialog_factory,
+            draft_promote_dialog_factory=draft_promote_dialog_factory,
             load_prompts=self._load_prompts,
             current_search_text=self._current_search_text,
             select_prompt=self._select_prompt,

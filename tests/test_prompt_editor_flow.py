@@ -1,6 +1,7 @@
 """Tests covering :mod:`gui.prompt_editor_flow` helpers.
 
 Updates:
+  v0.1.3 - 2026-04-04 - Add bounded draft-promotion happy-path coverage.
   v0.1.2 - 2026-04-04 - Add quick-capture happy-path coverage for draft creation handoff.
   v0.1.1 - 2025-12-08 - Cast QWidget parent and use DialogCode.Accepted for Pyright.
   v0.1.0 - 2025-12-02 - Ensure delete flow skips confirmation via keyword argument.
@@ -14,6 +15,8 @@ from typing import TYPE_CHECKING, Any, cast
 
 from PySide6.QtWidgets import QDialog
 
+import gui.prompt_editor_flow as prompt_editor_flow_module
+from gui.dialogs.draft_promote import build_promoted_prompt
 from gui.dialogs.quick_capture import QuickCaptureDraft
 from gui.prompt_editor_flow import PromptEditorFlow
 from models.prompt_model import Prompt
@@ -24,9 +27,14 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from PySide6.QtWidgets import QWidget
 
     from core import PromptManager
-    from gui.prompt_editor_flow import PromptDialogFactory, QuickCaptureDialogFactory
+    from gui.prompt_editor_flow import (
+        DraftPromoteDialogFactory,
+        PromptDialogFactory,
+        QuickCaptureDialogFactory,
+    )
 else:  # pragma: no cover - runtime placeholders to avoid heavy imports
     PromptManager = object  # type: ignore[assignment]
+    DraftPromoteDialogFactory = object  # type: ignore[assignment]
     PromptDialogFactory = object  # type: ignore[assignment]
     QuickCaptureDialogFactory = object  # type: ignore[assignment]
     QWidget = object  # type: ignore[assignment]
@@ -91,15 +99,58 @@ class _QuickCaptureDialogFactoryStub:
         return self.dialog
 
 
+@dataclass
+class _DraftPromoteDialogStub:
+    result_prompt: Prompt | None = None
+    dialog_code: int = QDialog.DialogCode.Accepted
+
+    def exec(self) -> int:
+        """Return the pre-configured dialog result."""
+        return self.dialog_code
+
+
+@dataclass
+class _DraftPromoteDialogFactoryStub:
+    dialog: _DraftPromoteDialogStub
+    built_prompts: list[Prompt]
+
+    def build(self, *args: Any, prompt: Prompt | None = None, **__: Any) -> _DraftPromoteDialogStub:
+        """Return the shared draft-promotion dialog stub."""
+        captured_prompt = prompt
+        if captured_prompt is None and len(args) >= 2:
+            maybe_prompt = args[1]
+            if isinstance(maybe_prompt, Prompt):
+                captured_prompt = maybe_prompt
+        if captured_prompt is None:
+            raise AssertionError("Draft promotion should be invoked with a prompt.")
+        self.built_prompts.append(captured_prompt)
+        return self.dialog
+
+
 class _ManagerStub:
     def __init__(self) -> None:
         """Track created prompts for happy-path assertions."""
         self.created_prompts: list[Prompt] = []
+        self.updated_prompts: list[Prompt] = []
 
     def create_prompt(self, prompt: Prompt) -> Prompt:
         """Record and return the created prompt."""
         self.created_prompts.append(prompt)
         return prompt
+
+    def update_prompt(self, prompt: Prompt) -> Prompt:
+        """Record and return the updated prompt."""
+        self.updated_prompts.append(prompt)
+        return prompt
+
+
+class _ProcessingIndicatorStub:
+    def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+        """Mirror the production indicator constructor without GUI work."""
+
+    def run(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+        """Execute the provided callable synchronously."""
+        return func(*args, **kwargs)
 
 
 def _build_flow(
@@ -107,6 +158,7 @@ def _build_flow(
     manager: PromptManager,
     dialog_factory: PromptDialogFactory,
     quick_capture_dialog_factory: QuickCaptureDialogFactory,
+    draft_promote_dialog_factory: DraftPromoteDialogFactory,
     delete_prompt: Callable[..., None],
     load_prompts: Callable[[str], None],
     select_prompt: Callable[[uuid.UUID], None],
@@ -118,6 +170,7 @@ def _build_flow(
         manager=manager,
         dialog_factory=dialog_factory,
         quick_capture_dialog_factory=quick_capture_dialog_factory,
+        draft_promote_dialog_factory=draft_promote_dialog_factory,
         load_prompts=load_prompts,
         current_search_text=lambda: "",
         select_prompt=select_prompt,
@@ -145,10 +198,15 @@ def test_edit_prompt_delete_requests_skip_confirmation_keyword() -> None:
             _QuickCaptureDialogStub(dialog_code=QDialog.DialogCode.Rejected)
         ),
     )
+    draft_promote_factory = cast(
+        "DraftPromoteDialogFactory",
+        _DraftPromoteDialogFactoryStub(_DraftPromoteDialogStub(), []),
+    )
     flow = _build_flow(
         manager=cast("PromptManager", object()),
         dialog_factory=dialog_factory,
         quick_capture_dialog_factory=quick_capture_factory,
+        draft_promote_dialog_factory=draft_promote_factory,
         delete_prompt=_delete_prompt,
         load_prompts=lambda _: None,
         select_prompt=lambda _: None,
@@ -196,10 +254,15 @@ def test_quick_capture_creates_draft_selects_prompt_and_opens_editor() -> None:
             )
         ),
     )
+    draft_promote_factory = cast(
+        "DraftPromoteDialogFactory",
+        _DraftPromoteDialogFactoryStub(_DraftPromoteDialogStub(), []),
+    )
     flow = _build_flow(
         manager=cast("PromptManager", manager),
         dialog_factory=dialog_factory,
         quick_capture_dialog_factory=quick_capture_factory,
+        draft_promote_dialog_factory=draft_promote_factory,
         delete_prompt=lambda *_args, **_kwargs: None,
         load_prompts=load_calls.append,
         select_prompt=selected_ids.append,
@@ -226,3 +289,87 @@ def test_quick_capture_creates_draft_selects_prompt_and_opens_editor() -> None:
     assert selected_ids == [created.id]
     assert status_messages == [("Draft prompt created.", 4000)]
     assert editor_builds == [created]
+
+
+def test_promote_draft_updates_prompt_and_clears_draft_status(monkeypatch) -> None:
+    """Promoting a draft should reuse update flow and clear only active draft state."""
+    monkeypatch.setattr(prompt_editor_flow_module, "ProcessingIndicator", _ProcessingIndicatorStub)
+    manager = _ManagerStub()
+    load_calls: list[str] = []
+    selected_ids: list[uuid.UUID] = []
+    status_messages: list[tuple[str, int]] = []
+    promoted_builds: list[Prompt] = []
+
+    original = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000321"),
+        name="Draft title",
+        description="Quick capture draft.",
+        category="General",
+        tags=["raw", "capture"],
+        context="Keep this prompt body exactly as-is.",
+        source="chat thread",
+        ext2={
+            "capture_state": "draft",
+            "capture_method": "quick_capture",
+            "captured_by": "toolbar",
+        },
+    )
+    promoted = build_promoted_prompt(
+        original,
+        title="Curated title",
+        category="Operations",
+        tags_text="ops, reusable",
+        source="chat thread",
+        description="Normalized for reuse.",
+    )
+
+    dialog_factory = cast(
+        "PromptDialogFactory",
+        _DialogFactoryStub(
+            _DialogStub(delete_requested=False, dialog_code=QDialog.DialogCode.Rejected),
+            [],
+        ),
+    )
+    quick_capture_factory = cast(
+        "QuickCaptureDialogFactory",
+        _QuickCaptureDialogFactoryStub(
+            _QuickCaptureDialogStub(dialog_code=QDialog.DialogCode.Rejected)
+        ),
+    )
+    draft_promote_factory = cast(
+        "DraftPromoteDialogFactory",
+        _DraftPromoteDialogFactoryStub(
+            _DraftPromoteDialogStub(result_prompt=promoted),
+            promoted_builds,
+        ),
+    )
+    flow = _build_flow(
+        manager=cast("PromptManager", manager),
+        dialog_factory=dialog_factory,
+        quick_capture_dialog_factory=quick_capture_factory,
+        draft_promote_dialog_factory=draft_promote_factory,
+        delete_prompt=lambda *_args, **_kwargs: None,
+        load_prompts=load_calls.append,
+        select_prompt=selected_ids.append,
+        status_callback=lambda message, duration: status_messages.append((message, duration)),
+    )
+
+    flow.promote_draft_prompt(original)
+
+    assert promoted_builds == [original]
+    assert len(manager.updated_prompts) == 1
+    updated = manager.updated_prompts[0]
+    assert updated.id == original.id
+    assert updated.name == "Curated title"
+    assert updated.category == "Operations"
+    assert updated.tags == ["ops", "reusable"]
+    assert updated.description == "Normalized for reuse."
+    assert updated.context == "Keep this prompt body exactly as-is."
+    assert updated.source == "chat thread"
+    assert updated.ext2 == {
+        "capture_method": "quick_capture",
+        "captured_by": "toolbar",
+    }
+    assert load_calls == [""]
+    assert selected_ids == [original.id]
+    assert status_messages == [("Draft promoted.", 4000)]

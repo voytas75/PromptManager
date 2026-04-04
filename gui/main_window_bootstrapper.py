@@ -1,6 +1,7 @@
 """Helper utilities for bootstrapping the Prompt Manager main window.
 
 Updates:
+  v0.15.84 - 2026-04-04 - Wire draft-promotion requests from the shared detail widget.
   v0.15.83 - 2025-12-08 - Tighten supplier typings and adapt toast callbacks for ShareController.
   v0.15.82 - 2025-12-07 - Register the Rentry share provider alongside ShareText and PrivateBin.
   v0.15.81 - 2025-12-01 - Extracted widget/controller bootstrap helpers from gui.main_window.
@@ -51,6 +52,7 @@ class DetailWidgetCallbacks:
     """Signal handlers used while wiring the prompt detail widget."""
 
     delete_requested: Callable[[], None]
+    promote_draft_requested: Callable[[], None]
     edit_requested: Callable[[], None]
     version_history_requested: Callable[[Prompt | None], None]
     fork_requested: Callable[[], None]
@@ -109,6 +111,9 @@ class MainWindowBootstrapper:
         model = PromptListModel(parent=self._parent)
         detail_widget = PromptDetailWidget(self._parent)
         detail_widget.delete_requested.connect(self._detail_callbacks.delete_requested)  # type: ignore[arg-type]
+        detail_widget.promote_draft_requested.connect(
+            self._detail_callbacks.promote_draft_requested
+        )  # type: ignore[arg-type]
         detail_widget.edit_requested.connect(self._detail_callbacks.edit_requested)  # type: ignore[arg-type]
         detail_widget.version_history_requested.connect(
             self._detail_callbacks.version_history_requested

@@ -1,6 +1,7 @@
 """Prompt detail panel shared between main and template tabs.
 
 Updates:
+  v0.1.12 - 2026-04-04 - Add one visible Promote Draft action for captured prompts.
   v0.1.11 - 2026-04-04 - Render inspection timestamps in a compact human-readable UTC format.
   v0.1.10 - 2026-04-04 - Surface compact always-visible inspection cues for source/draft status.
   v0.1.9 - 2025-12-09 - Collapse metadata spacing by hiding header/text when not in use.
@@ -8,11 +9,8 @@ Updates:
   v0.1.7 - 2025-12-09 - Import QToolButton to restore GUI startup.
   v0.1.6 - 2025-12-09 - Show only the requested metadata and add close toggle.
   v0.1.5 - 2025-12-09 - Toggle metadata table off on repeat clicks and ensure full payload shows.
-  v0.1.4 - 2025-12-09 - Keep metadata hidden until toggled, showing both sets together inline.
-  v0.1.3 - 2025-12-09 - Display basic and full metadata together in an inline table.
-  v0.1.2 - 2025-12-08 - Align palette usage with Qt ColorRole enums.
-  v0.1.1 - 2025-12-08 - Reworked prompt detail layout with grouped actions.
-  v0.1.0 - 2025-11-30 - Extract prompt detail widget for reuse/testing.
+  v0.1.4 - 2025-12-09 - Earlier metadata toggling and grouped-action refinements.
+  v0.1.2-and-earlier - 2025-12-08 - Initial widget extraction and palette alignment.
 """
 
 from __future__ import annotations
@@ -49,6 +47,7 @@ class PromptDetailWidget(QWidget):
     _CONTEXT_PREVIEW_LIMIT = 200
 
     delete_requested = Signal()
+    promote_draft_requested = Signal()
     edit_requested = Signal()
     fork_requested = Signal()
     version_history_requested = Signal()
@@ -71,6 +70,12 @@ class PromptDetailWidget(QWidget):
 
         edit_button_row = QHBoxLayout()
         edit_button_row.setContentsMargins(0, 0, 0, 0)
+        self._promote_draft_button = QPushButton("Promote Draft", content)
+        self._promote_draft_button.setObjectName("promoteDraftButton")
+        self._promote_draft_button.setEnabled(False)
+        self._promote_draft_button.setVisible(False)
+        self._promote_draft_button.clicked.connect(self.promote_draft_requested.emit)  # type: ignore[arg-type]
+        edit_button_row.addWidget(self._promote_draft_button)
         edit_button_row.addStretch(1)
         self._edit_button = QPushButton("Edit Prompt", content)
         self._edit_button.setObjectName("editPromptButton")
@@ -345,6 +350,9 @@ class PromptDetailWidget(QWidget):
         )
         self._current_prompt = prompt
         self._clear_metadata_view()
+        is_draft = self._is_draft_prompt(prompt)
+        self._promote_draft_button.setEnabled(is_draft)
+        self._promote_draft_button.setVisible(is_draft)
         self._basic_metadata_button.setEnabled(True)
         self._all_metadata_button.setEnabled(True)
         self._edit_button.setEnabled(True)
@@ -386,18 +394,24 @@ class PromptDetailWidget(QWidget):
 
     def _draft_status_cue(self, prompt: Prompt) -> str | None:
         """Return a textual draft cue sourced only from existing quick-capture metadata."""
+        if not self._is_draft_prompt(prompt):
+            return None
+
         ext2 = prompt.ext2
         if not isinstance(ext2, Mapping):
             return None
-
-        capture_state = str(ext2.get("capture_state") or "").strip()
-        if capture_state != "draft":
-            return None
-
         capture_method = str(ext2.get("capture_method") or "").strip()
         if capture_method:
             return f"Draft ({capture_method})"
         return "Draft"
+
+    @staticmethod
+    def _is_draft_prompt(prompt: Prompt) -> bool:
+        """Return ``True`` when the prompt still carries active draft metadata."""
+        ext2 = prompt.ext2
+        if not isinstance(ext2, Mapping):
+            return False
+        return str(ext2.get("capture_state") or "").strip() == "draft"
 
     @staticmethod
     def _format_inspection_timestamp(value: datetime) -> str:
@@ -520,6 +534,8 @@ class PromptDetailWidget(QWidget):
         self._full_metadata_text = ""
         self._basic_metadata_text = ""
         self._current_prompt = None
+        self._promote_draft_button.setEnabled(False)
+        self._promote_draft_button.setVisible(False)
         self._edit_button.setEnabled(False)
         self._delete_button.setEnabled(False)
         self._fork_button.setEnabled(False)

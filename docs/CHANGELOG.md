@@ -2,6 +2,16 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.22.20] - 2026-04-04
+
+### Added
+
+- Added a bounded **Promote Draft** workflow that lets operators turn a quick-captured draft into a reusable prompt asset from the existing detail flow using the current update/persistence path.
+
+### Fixed
+
+- Added focused regression coverage for the draft-promotion happy path, including removal of the active draft marker while preserving existing provenance metadata.
+
 ## [0.22.19] - 2026-04-04
 
 ### Fixed
