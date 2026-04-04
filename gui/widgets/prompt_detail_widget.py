@@ -1,6 +1,7 @@
 """Prompt detail panel shared between main and template tabs.
 
 Updates:
+  v0.1.11 - 2026-04-04 - Render inspection timestamps in a compact human-readable UTC format.
   v0.1.10 - 2026-04-04 - Surface compact always-visible inspection cues for source/draft status.
   v0.1.9 - 2025-12-09 - Collapse metadata spacing by hiding header/text when not in use.
   v0.1.8 - 2025-12-09 - Swap metadata table for a toggleable text view with close control.
@@ -18,6 +19,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from html import escape
 from typing import TYPE_CHECKING
 
@@ -379,7 +381,7 @@ class PromptDetailWidget(QWidget):
         if source:
             cues.append(f"Source: {source}")
 
-        cues.append(f"Last modified: {prompt.last_modified.isoformat()}")
+        cues.append(f"Last modified: {self._format_inspection_timestamp(prompt.last_modified)}")
         return " • ".join(cues)
 
     def _draft_status_cue(self, prompt: Prompt) -> str | None:
@@ -396,6 +398,11 @@ class PromptDetailWidget(QWidget):
         if capture_method:
             return f"Draft ({capture_method})"
         return "Draft"
+
+    @staticmethod
+    def _format_inspection_timestamp(value: datetime) -> str:
+        """Render timestamps in a compact human-readable UTC form."""
+        return value.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC")
 
     def current_prompt(self) -> Prompt | None:
         """Return the currently displayed prompt, if any."""

@@ -1,6 +1,7 @@
 """Focused tests for prompt detail inspection cues.
 
 Updates:
+  v0.1.1 - 2026-04-04 - Expect a human-readable UTC timestamp in inspection cues.
   v0.1.0 - 2026-04-04 - Cover always-visible provenance/status cues for captured drafts.
 """
 
@@ -55,5 +56,5 @@ def test_prompt_detail_widget_shows_inspection_cues_for_captured_draft(qt_app: Q
     assert "Inspection:" in inspection_text
     assert "Draft (quick_capture)" in inspection_text
     assert "Source: chat thread" in inspection_text
-    assert "Last modified: 2026-04-04T10:30:00+00:00" in inspection_text
+    assert "Last modified: 2026-04-04 10:30 UTC" in inspection_text
     assert not widget._metadata_view.isVisible()  # noqa: SLF001

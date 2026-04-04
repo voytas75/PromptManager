@@ -2,6 +2,24 @@
 
 All notable changes to **Prompt Manager** will be documented in this file.
 
+## [0.22.18] - 2026-04-04
+
+### Added
+
+- Added a compact **Quick Capture** flow that saves pasted raw prompt/query text as a draft prompt record using the existing catalog persistence, then opens the created record directly in the editor/detail workflow.
+- Added a bounded **Recent** reopen flow from the main toolbar, backed by deterministic `last_modified` ordering with stable tie-breakers and no new persistence.
+- Added always-visible prompt inspection cues in the detail view so captured/reopened prompts surface draft status, source, and last-modified metadata without opening the raw metadata panel.
+- Added product-boundary documentation for the local-first prompt-asset posture, including a boundary SSOT, an alignment audit, and slice briefs/implementation notes for the 2026-04-04 core-loop alignment work.
+
+### Changed
+
+- Changed the prompt detail inspection line to render `last_modified` in a compact human-readable UTC format instead of raw ISO timestamps.
+- Made **Quick Capture** the primary new-item toolbar action while keeping the full prompt creation and workbench flows available from the same menu.
+
+### Fixed
+
+- Added focused regression coverage for quick-capture draft creation handoff, recent prompt reopen ordering/selection, and detail-view inspection cues to keep the new core-loop UX bounded and stable.
+
 ## [0.22.17] - 2025-12-11
 
 ### Added
