@@ -1,6 +1,7 @@
 """Prompt detail panel shared between main and template tabs.
 
 Updates:
+  v0.1.14 - 2026-04-05 - Add a bounded derived usage cue to the existing detail flow.
   v0.1.13 - 2026-04-04 - Add bounded quick-reuse actions for copy and workspace handoff.
   v0.1.12 - 2026-04-04 - Add one visible Promote Draft action for captured prompts.
   v0.1.11 - 2026-04-04 - Render inspection timestamps in a compact human-readable UTC format.
@@ -8,10 +9,7 @@ Updates:
   v0.1.9 - 2025-12-09 - Collapse metadata spacing by hiding header/text when not in use.
   v0.1.8 - 2025-12-09 - Swap metadata table for a toggleable text view with close control.
   v0.1.7 - 2025-12-09 - Import QToolButton to restore GUI startup.
-  v0.1.6 - 2025-12-09 - Show only the requested metadata and add close toggle.
-  v0.1.5 - 2025-12-09 - Toggle metadata table off on repeat clicks and ensure full payload shows.
-  v0.1.4-and-earlier - 2025-12-08 - Initial widget extraction, palette alignment,
-    and grouped metadata refinements.
+  v0.1.6-and-earlier - 2025-12-09 - Refined metadata toggles and initial widget extraction.
 """
 
 from __future__ import annotations
@@ -46,6 +44,8 @@ class PromptDetailWidget(QWidget):
     """Panel that summarises the currently selected prompt."""
 
     _CONTEXT_PREVIEW_LIMIT = 200
+    _USAGE_CUE_MAX_LENGTH = 140
+    _USAGE_CUE_MAX_WORDS = 24
 
     delete_requested = Signal()
     promote_draft_requested = Signal()
@@ -105,6 +105,11 @@ class PromptDetailWidget(QWidget):
         self._meta_label.setWordWrap(True)
         self._meta_label.setTextFormat(Qt.TextFormat.RichText)
         self._meta_label.setVisible(False)
+        self._usage_cue_label = QLabel("", content)
+        self._usage_cue_label.setObjectName("promptUsageCue")
+        self._usage_cue_label.setWordWrap(True)
+        self._usage_cue_label.setTextFormat(Qt.TextFormat.RichText)
+        self._usage_cue_label.setVisible(False)
         self._description = QLabel("", content)
         self._description.setWordWrap(True)
         self._description.setTextFormat(Qt.TextFormat.RichText)
@@ -132,6 +137,8 @@ class PromptDetailWidget(QWidget):
         content_layout.addWidget(self._rating_label)
         content_layout.addSpacing(4)
         content_layout.addWidget(self._meta_label)
+        content_layout.addSpacing(4)
+        content_layout.addWidget(self._usage_cue_label)
         content_layout.addSpacing(4)
         content_layout.addWidget(self._description)
         content_layout.addSpacing(4)
@@ -329,6 +336,15 @@ class PromptDetailWidget(QWidget):
         else:
             self._meta_label.clear()
             self._meta_label.setVisible(False)
+        usage_cue = self._resolve_usage_cue(prompt)
+        if usage_cue:
+            self._usage_cue_label.setText(
+                self._format_label_value("When to use", usage_cue, multiline=True)
+            )
+            self._usage_cue_label.setVisible(True)
+        else:
+            self._usage_cue_label.clear()
+            self._usage_cue_label.setVisible(False)
         description_value = prompt.description or "No description provided."
         self._description.setText(
             self._format_label_value("Description", description_value, multiline=True)
@@ -421,6 +437,37 @@ class PromptDetailWidget(QWidget):
 
         cues.append(f"Last modified: {self._format_inspection_timestamp(prompt.last_modified)}")
         return " • ".join(cues)
+
+    def _resolve_usage_cue(self, prompt: Prompt) -> str | None:
+        """Return one compact usage cue derived from existing prompt fields only."""
+        for scenario in prompt.scenarios:
+            candidate = self._normalise_usage_cue_candidate(scenario)
+            if self._is_compact_usage_cue(candidate, min_words=3):
+                return candidate
+
+        description = self._normalise_usage_cue_candidate(prompt.description)
+        if self._is_compact_usage_cue(description, min_words=4):
+            return description
+
+        example_input = self._normalise_usage_cue_candidate(prompt.example_input)
+        if self._is_compact_usage_cue(example_input, min_words=4):
+            return example_input
+
+        return None
+
+    @staticmethod
+    def _normalise_usage_cue_candidate(value: str | None) -> str:
+        """Flatten user-entered cue candidates into one bounded display line."""
+        if not value:
+            return ""
+        return " ".join(value.replace("•", " ").split()).strip()
+
+    def _is_compact_usage_cue(self, value: str, *, min_words: int) -> bool:
+        """Return ``True`` when *value* is short enough to act as a usage cue."""
+        if not value or len(value) > self._USAGE_CUE_MAX_LENGTH:
+            return False
+        words = value.split()
+        return min_words <= len(words) <= self._USAGE_CUE_MAX_WORDS
 
     def _draft_status_cue(self, prompt: Prompt) -> str | None:
         """Return a textual draft cue sourced only from existing quick-capture metadata."""
@@ -554,6 +601,8 @@ class PromptDetailWidget(QWidget):
         self._rating_label.setVisible(False)
         self._meta_label.clear()
         self._meta_label.setVisible(False)
+        self._usage_cue_label.clear()
+        self._usage_cue_label.setVisible(False)
         self._description.clear()
         self._context.clear()
         self._scenarios.clear()

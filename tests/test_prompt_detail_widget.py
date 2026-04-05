@@ -1,6 +1,7 @@
 """Focused tests for prompt detail inspection cues.
 
 Updates:
+  v0.1.4 - 2026-04-05 - Cover bounded derived usage cues in the shared detail widget.
   v0.1.3 - 2026-04-05 - Keep source visible in the inspect path after draft metadata is gone.
   v0.1.2 - 2026-04-04 - Cover bounded quick-reuse actions in the shared detail widget.
   v0.1.1 - 2026-04-04 - Expect a human-readable UTC timestamp in inspection cues.
@@ -91,6 +92,7 @@ def test_prompt_detail_widget_exposes_bounded_quick_reuse_actions(
     assert widget._open_in_workspace_button.text() == "Open in Workspace"  # noqa: SLF001
     assert widget._copy_prompt_body_button.isEnabled()  # noqa: SLF001
     assert widget._open_in_workspace_button.isEnabled()  # noqa: SLF001
+    assert not widget._usage_cue_label.isVisible()  # noqa: SLF001
 
     widget._copy_prompt_body_button.click()  # noqa: SLF001
     widget._open_in_workspace_button.click()  # noqa: SLF001
@@ -126,3 +128,83 @@ def test_prompt_detail_widget_keeps_source_visible_for_promoted_prompt(
     assert "Source: ops notebook" in inspection_text
     assert "Draft" not in inspection_text
     assert "Last modified: 2026-04-05 08:45 UTC" in inspection_text
+
+
+def test_prompt_detail_widget_shows_usage_cue_when_saved_signal_exists(
+    qt_app: QApplication,
+) -> None:
+    """Detail view should surface one compact usage cue from existing scenario text."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000126"),
+        name="Incident summary",
+        description="Fallback description",
+        category="Operations",
+        context="Summarize the incident and call out operator-facing risks.",
+        scenarios=["Use for quick summaries of incident notes before handoff."],
+        created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 5, 9, 15, tzinfo=UTC),
+    )
+
+    widget.show()
+    widget.display_prompt(prompt)
+    qt_app.processEvents()
+
+    assert widget._usage_cue_label.isVisible()  # noqa: SLF001
+    usage_text = widget._usage_cue_label.text()  # noqa: SLF001
+    assert "When to use:" in usage_text
+    assert "Use for quick summaries of incident notes before handoff." in usage_text
+
+
+def test_prompt_detail_widget_hides_usage_cue_when_no_credible_signal_exists(
+    qt_app: QApplication,
+) -> None:
+    """Detail view should stay quiet when no short usage signal is already stored."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000127"),
+        name="Bare prompt",
+        description="Fallback description",
+        category="General",
+        context="Prompt body without saved scenario or example text.",
+        created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 5, 9, 20, tzinfo=UTC),
+    )
+
+    widget.show()
+    widget.display_prompt(prompt)
+    qt_app.processEvents()
+
+    assert not widget._usage_cue_label.isVisible()  # noqa: SLF001
+    assert widget._usage_cue_label.text() == ""  # noqa: SLF001
+
+
+def test_prompt_detail_widget_keeps_usage_cue_bounded_in_existing_detail_flow(
+    qt_app: QApplication,
+) -> None:
+    """Usage cue should stay in the shared detail flow without altering inspection behaviour."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000128"),
+        name="Review prompt",
+        description="Review support notes before publishing the final response.",
+        category="Support",
+        context="Read the notes, identify the customer-visible issue, and draft the final reply.",
+        source="support queue",
+        created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 5, 9, 30, tzinfo=UTC),
+    )
+
+    widget.show()
+    widget.display_prompt(prompt)
+    qt_app.processEvents()
+
+    assert widget._meta_label.isVisible()  # noqa: SLF001
+    assert widget._usage_cue_label.isVisible()  # noqa: SLF001
+    assert "When to use:" not in widget._meta_label.text()  # noqa: SLF001
+    assert "Inspection:" in widget._meta_label.text()  # noqa: SLF001
+    assert "Source: support queue" in widget._meta_label.text()  # noqa: SLF001
+    assert "Description:" in widget._description.text()  # noqa: SLF001
+    assert "Prompt Body (preview):" in widget._context.text()  # noqa: SLF001
+    assert "Scenarios:" in widget._scenarios.text()  # noqa: SLF001
+    assert not widget._metadata_view.isVisible()  # noqa: SLF001
