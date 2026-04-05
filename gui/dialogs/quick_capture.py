@@ -1,6 +1,7 @@
 """Minimal dialog and helpers for quick prompt capture.
 
 Updates:
+  v0.1.1 - 2026-04-05 - Clarify source/provenance copy while keeping prompt.source storage.
   v0.1.0 - 2026-04-04 - Add quick capture draft dialog and deterministic prompt conversion.
 """
 
@@ -54,6 +55,11 @@ def parse_quick_capture_tags(raw_tags: str) -> list[str]:
     return [tag.strip() for tag in raw_tags.split(",") if tag.strip()]
 
 
+def resolve_quick_capture_source(source_label: str) -> str:
+    """Return the persisted source/provenance value for a quick-captured prompt."""
+    return source_label.strip() or _DEFAULT_SOURCE
+
+
 @dataclass(slots=True)
 class QuickCaptureDraft:
     """Structured payload captured from the quick-capture dialog."""
@@ -71,7 +77,7 @@ class QuickCaptureDraft:
             raise ValueError("Prompt body is required.")
         name = self.title.strip() or derive_quick_capture_title(body)
         description = self.description.strip() or _DEFAULT_DESCRIPTION
-        source = self.source_label.strip() or _DEFAULT_SOURCE
+        source = resolve_quick_capture_source(self.source_label)
         tags = parse_quick_capture_tags(self.tags_text)
         timestamp = datetime.now(UTC)
         return Prompt(
@@ -118,8 +124,10 @@ class QuickCaptureDialog(QDialog):
         form.addRow("Title", self._title_input)
 
         self._source_input = QLineEdit(self)
-        self._source_input.setPlaceholderText("Optional source label, e.g. Chat thread or notes")
-        form.addRow("Source", self._source_input)
+        self._source_input.setPlaceholderText(
+            "Optional source or provenance, e.g. chat thread, notes, or script"
+        )
+        form.addRow("Source / Provenance", self._source_input)
 
         self._tags_input = QLineEdit(self)
         self._tags_input.setPlaceholderText("Optional tags, comma-separated")
@@ -182,4 +190,5 @@ __all__ = [
     "QuickCaptureDraft",
     "derive_quick_capture_title",
     "parse_quick_capture_tags",
+    "resolve_quick_capture_source",
 ]

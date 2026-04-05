@@ -1,6 +1,7 @@
 """Focused tests for prompt detail inspection cues.
 
 Updates:
+  v0.1.3 - 2026-04-05 - Keep source visible in the inspect path after draft metadata is gone.
   v0.1.2 - 2026-04-04 - Cover bounded quick-reuse actions in the shared detail widget.
   v0.1.1 - 2026-04-04 - Expect a human-readable UTC timestamp in inspection cues.
   v0.1.0 - 2026-04-04 - Cover always-visible provenance/status cues for captured drafts.
@@ -97,3 +98,31 @@ def test_prompt_detail_widget_exposes_bounded_quick_reuse_actions(
 
     assert copy_requests == ["copy"]
     assert open_requests == ["open"]
+
+
+def test_prompt_detail_widget_keeps_source_visible_for_promoted_prompt(
+    qt_app: QApplication,
+) -> None:
+    """Inspect path should keep showing source even after the draft marker is cleared."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000125"),
+        name="Promoted prompt",
+        description="Normalized for reuse",
+        category="Operations",
+        context="Reusable prompt body",
+        created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 5, 8, 45, tzinfo=UTC),
+        source="ops notebook",
+        ext2={"capture_method": "quick_capture"},
+    )
+
+    widget.show()
+    widget.display_prompt(prompt)
+    qt_app.processEvents()
+
+    inspection_text = widget._meta_label.text()  # noqa: SLF001
+    assert "Inspection:" in inspection_text
+    assert "Source: ops notebook" in inspection_text
+    assert "Draft" not in inspection_text
+    assert "Last modified: 2026-04-05 08:45 UTC" in inspection_text
