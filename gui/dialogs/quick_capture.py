@@ -1,6 +1,7 @@
 """Minimal dialog and helpers for quick prompt capture.
 
 Updates:
+  v0.1.2 - 2026-04-06 - Use shared draft-title heuristics when no manual title is supplied.
   v0.1.1 - 2026-04-05 - Clarify source/provenance copy while keeping prompt.source storage.
   v0.1.0 - 2026-04-04 - Add quick capture draft dialog and deterministic prompt conversion.
 """
@@ -24,6 +25,8 @@ from PySide6.QtWidgets import (
 
 from models.prompt_model import Prompt
 
+from .base import resolve_draft_origin_title
+
 _DEFAULT_CATEGORY = "General"
 _DEFAULT_DESCRIPTION = "Quick capture draft."
 _DEFAULT_LANGUAGE = "en"
@@ -36,18 +39,8 @@ _TITLE_LIMIT = 80
 
 
 def derive_quick_capture_title(body: str, *, max_length: int = _TITLE_LIMIT) -> str:
-    """Return a deterministic title derived from the first non-empty line."""
-    for raw_line in body.splitlines():
-        line = " ".join(raw_line.strip().split())
-        if not line:
-            continue
-        if len(line) <= max_length:
-            return line
-        trimmed = line[: max_length - 1].rstrip()
-        if " " in trimmed:
-            trimmed = trimmed.rsplit(" ", 1)[0]
-        return f"{trimmed.rstrip()}…"
-    return "Quick Capture Draft"
+    """Return a deterministic title derived from the first meaningful body line."""
+    return resolve_draft_origin_title("", body, max_length=max_length)
 
 
 def parse_quick_capture_tags(raw_tags: str) -> list[str]:
@@ -120,7 +113,9 @@ class QuickCaptureDialog(QDialog):
         form.setSpacing(10)
 
         self._title_input = QLineEdit(self)
-        self._title_input.setPlaceholderText("Optional title; defaults to the first non-empty line")
+        self._title_input.setPlaceholderText(
+            "Optional title; defaults to the first meaningful line"
+        )
         form.addRow("Title", self._title_input)
 
         self._source_input = QLineEdit(self)

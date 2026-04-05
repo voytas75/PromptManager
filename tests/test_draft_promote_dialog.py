@@ -1,6 +1,7 @@
 """Focused tests for the draft promote dialog.
 
 Updates:
+  v0.1.1 - 2026-04-06 - Cover shared title-quality improvements for untouched draft titles.
   v0.1.0 - 2026-04-04 - Cover advisory similar-prompt rendering and actions.
 """
 
@@ -15,7 +16,7 @@ import pytest
 pytest.importorskip("PySide6")
 from PySide6.QtWidgets import QApplication, QPushButton
 
-from gui.dialogs.draft_promote import DraftPromoteDialog
+from gui.dialogs.draft_promote import DraftPromoteDialog, build_promoted_prompt
 from models.prompt_model import Prompt
 
 
@@ -122,9 +123,7 @@ def test_draft_promote_dialog_promote_as_new_keeps_existing_target_clear(
 
     dialog._title_input.setText("Curated title")  # noqa: SLF001
     promote_button = next(
-        button
-        for button in dialog.findChildren(QPushButton)
-        if button.text() == "Promote as New"
+        button for button in dialog.findChildren(QPushButton) if button.text() == "Promote as New"
     )
     promote_button.click()
     qt_app.processEvents()
@@ -133,3 +132,55 @@ def test_draft_promote_dialog_promote_as_new_keeps_existing_target_clear(
     assert dialog.result_prompt is not None
     assert dialog.result_prompt.name == "Curated title"
     assert dialog.result() == dialog.DialogCode.Accepted
+
+
+def test_draft_promote_dialog_prefills_improved_title_for_placeholder_draft(
+    qt_app: QApplication,
+) -> None:
+    """Promote flow should replace placeholder/raw draft titles before the user edits them."""
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000531"),
+        name="Quick Capture Draft",
+        description="Quick capture draft.",
+        category="General",
+        context="Title:\n# Weekly deployment checklist\nList risky steps first.",
+        ext2={"capture_state": "draft", "capture_method": "quick_capture"},
+    )
+
+    dialog = DraftPromoteDialog(prompt, categories=["General"])
+
+    assert dialog._title_input.text() == "Weekly deployment checklist"  # noqa: SLF001
+
+
+def test_build_promoted_prompt_improves_untouched_placeholder_title_only() -> None:
+    """Promotion should improve untouched low-quality draft titles but keep manual titles intact."""
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000532"),
+        name="Quick Capture Draft",
+        description="Quick capture draft.",
+        category="General",
+        context="Prompt:\n## Weekly deployment checklist\nList risky steps first.",
+        ext2={"capture_state": "draft", "capture_method": "quick_capture"},
+    )
+
+    improved = build_promoted_prompt(
+        prompt,
+        title="Quick Capture Draft",
+        category="General",
+        tags_text="",
+        source="",
+        description="",
+        allow_title_improvement=True,
+    )
+    manual = build_promoted_prompt(
+        prompt,
+        title="# keep raw marker",
+        category="General",
+        tags_text="",
+        source="",
+        description="",
+        allow_title_improvement=False,
+    )
+
+    assert improved.name == "Weekly deployment checklist"
+    assert manual.name == "# keep raw marker"

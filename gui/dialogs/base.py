@@ -1,6 +1,7 @@
 """Shared helpers for Prompt Manager dialog modules.
 
 Updates:
+  v0.1.1 - 2026-04-06 - Add shared draft-title quality helpers for capture/promote flows.
   v0.1.0 - 2025-12-03 - Extract common utilities from gui.dialogs monolith.
 """
 
@@ -24,6 +25,22 @@ if TYPE_CHECKING:
 logger = logging.getLogger("prompt_manager.gui.dialogs")
 
 _WORD_PATTERN = re.compile(r"[A-Za-z0-9]+")
+_DRAFT_TITLE_PREFIX_PATTERN = re.compile(r"^(?:[#>*-]+|\d+[.)])\s+")
+_DRAFT_TITLE_LABEL_PATTERN = re.compile(r"^(?:title|prompt|subject)\s*:\s*", re.IGNORECASE)
+_DRAFT_TITLE_PLACEHOLDERS = {
+    "captured draft",
+    "draft",
+    "new prompt",
+    "prompt",
+    "prompt draft",
+    "quick capture draft",
+    "subject",
+    "tbd",
+    "title",
+    "todo",
+    "untitled",
+    "untitled prompt",
+}
 
 
 class SystemInfo(NamedTuple):
@@ -224,6 +241,68 @@ def fallback_suggest_prompt_name(context: str, *, max_words: int = 5) -> str:
     return name
 
 
+def _trim_draft_title(text: str, *, max_length: int) -> str:
+    """Return *text* shortened to ``max_length`` without splitting the last word."""
+    if len(text) <= max_length:
+        return text
+    trimmed = text[: max_length - 1].rstrip()
+    if " " in trimmed:
+        trimmed = trimmed.rsplit(" ", 1)[0]
+    return f"{trimmed.rstrip()}…"
+
+
+def normalize_draft_title_candidate(text: str, *, max_length: int = 80) -> str:
+    """Return a cleaned draft-title candidate derived from free-form text."""
+    candidate = " ".join(text.strip().split())
+    if not candidate:
+        return ""
+
+    while True:
+        updated = candidate.strip("`'\" ")
+        updated = _DRAFT_TITLE_LABEL_PATTERN.sub("", updated).strip()
+        updated = _DRAFT_TITLE_PREFIX_PATTERN.sub("", updated).strip()
+        updated = updated.strip("`'\" ")
+        if updated == candidate:
+            break
+        candidate = updated
+
+    if not candidate:
+        return ""
+    if candidate.lower() in _DRAFT_TITLE_PLACEHOLDERS:
+        return ""
+    return _trim_draft_title(candidate, max_length=max_length)
+
+
+def has_draft_title_quality_issue(title: str) -> bool:
+    """Return ``True`` when *title* is empty, placeholder-like, or obviously raw."""
+    cleaned = " ".join(title.strip().split())
+    if not cleaned:
+        return True
+    normalized = normalize_draft_title_candidate(cleaned, max_length=max(len(cleaned), 80))
+    if not normalized:
+        return True
+    return normalized != cleaned
+
+
+def resolve_draft_origin_title(
+    title: str,
+    body: str,
+    *,
+    fallback: str = "Quick Capture Draft",
+    max_length: int = 80,
+) -> str:
+    """Return a deterministic title for draft-origin prompts using existing text only."""
+    cleaned_title = " ".join(title.strip().split())
+    if cleaned_title and not has_draft_title_quality_issue(cleaned_title):
+        return cleaned_title
+
+    for raw_line in body.splitlines():
+        candidate = normalize_draft_title_candidate(raw_line, max_length=max_length)
+        if candidate:
+            return candidate
+    return fallback
+
+
 def fallback_generate_description(context: str, *, max_length: int = 240) -> str:
     """Create a lightweight summary from the prompt body when LLMs are unavailable."""
     stripped = " ".join(context.split())
@@ -278,6 +357,9 @@ __all__ = [
     "fallback_generate_description",
     "fallback_generate_scenarios",
     "fallback_suggest_prompt_name",
+    "has_draft_title_quality_issue",
     "logger",
+    "normalize_draft_title_candidate",
+    "resolve_draft_origin_title",
     "strip_scenarios_metadata",
 ]

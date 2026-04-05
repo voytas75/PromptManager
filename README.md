@@ -43,7 +43,7 @@ Use PromptManager when you want to:
 ## Core capabilities
 
 - **Prompt catalog** — store, search, tag, edit, fork, and organize prompts as durable assets
-- **Quick Capture + Draft Promote** — capture raw prompt/query text fast, inspect it as a draft, then promote it into a reusable prompt asset
+- **Quick Capture + Draft Promote** — capture raw prompt/query text fast, inspect it as a draft, then promote it into a reusable prompt asset with bounded title-quality improvement for weak draft titles
 - **Recent reopen + inspection cues** — get back to recent prompts quickly and see draft/source/last-modified context without opening raw metadata
 - **Semantic retrieval** — find prompts by meaning, not only exact text
 - **Template preview** — render Jinja2 templates with JSON variables and validation feedback

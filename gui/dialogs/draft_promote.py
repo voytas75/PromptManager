@@ -1,6 +1,7 @@
 """Compact dialog and helpers for promoting captured draft prompts.
 
 Updates:
+  v0.1.2 - 2026-04-06 - Improve untouched placeholder/raw draft titles with the shared heuristic.
   v0.1.1 - 2026-04-04 - Add advisory similar-prompt review actions to draft promotion.
   v0.1.0 - 2026-04-04 - Add bounded draft promotion dialog that preserves prompt provenance.
 """
@@ -29,6 +30,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .base import resolve_draft_origin_title
 from .quick_capture import parse_quick_capture_tags
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
@@ -54,9 +56,15 @@ def build_promoted_prompt(
     tags_text: str,
     source: str,
     description: str,
+    allow_title_improvement: bool = False,
 ) -> Prompt:
     """Return an updated prompt with draft state cleared and provenance preserved."""
-    cleaned_title = title.strip()
+    cleaned_title = " ".join(title.strip().split())
+    if allow_title_improvement:
+        cleaned_title = resolve_draft_origin_title(
+            cleaned_title,
+            prompt.context or "",
+        )
     if not cleaned_title:
         raise ValueError("Prompt title is required.")
 
@@ -178,7 +186,8 @@ class DraftPromoteDialog(QDialog):
 
     def _populate(self, prompt: Prompt) -> None:
         """Fill the form from the current prompt metadata."""
-        self._title_input.setText(prompt.name)
+        self._title_input.setText(resolve_draft_origin_title(prompt.name, prompt.context or ""))
+        self._title_input.setModified(False)
         category = prompt.category.strip() or "General"
         index = self._category_input.findText(category)
         if index >= 0:
@@ -242,6 +251,7 @@ class DraftPromoteDialog(QDialog):
                 tags_text=self._tags_input.text(),
                 source=self._source_input.text(),
                 description=self._description_input.toPlainText(),
+                allow_title_improvement=not self._title_input.isModified(),
             )
         except ValueError as exc:
             QMessageBox.warning(self, "Title required", str(exc))

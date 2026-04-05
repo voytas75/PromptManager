@@ -1,6 +1,7 @@
 """Focused tests for the quick capture dialog and draft conversion.
 
 Updates:
+  v0.1.1 - 2026-04-06 - Cover shared draft-title normalization for quick capture defaults.
   v0.1.0 - 2026-04-05 - Cover source/provenance capture and prompt conversion.
 """
 
@@ -14,7 +15,11 @@ import pytest
 pytest.importorskip("PySide6")
 from PySide6.QtWidgets import QApplication
 
-from gui.dialogs.quick_capture import QuickCaptureDialog, resolve_quick_capture_source
+from gui.dialogs.quick_capture import (
+    QuickCaptureDialog,
+    derive_quick_capture_title,
+    resolve_quick_capture_source,
+)
 
 
 @pytest.fixture(scope="module")
@@ -52,3 +57,26 @@ def test_resolve_quick_capture_source_defaults_to_existing_storage_value() -> No
     """Empty capture provenance should fall back to the existing quick-capture source marker."""
     assert resolve_quick_capture_source("  ") == "quick_capture"
     assert resolve_quick_capture_source("notes") == "notes"
+
+
+def test_derive_quick_capture_title_skips_placeholder_lines_and_strips_raw_markers() -> None:
+    """Default quick-capture titles should come from the first meaningful normalized line."""
+    body = "\nPrompt:\n## Incident summary for handoff\n- Highlight operator-facing risks"
+
+    assert derive_quick_capture_title(body) == "Incident summary for handoff"
+
+
+def test_quick_capture_dialog_uses_shared_title_quality_heuristic_when_title_missing(
+    qt_app: QApplication,
+) -> None:
+    """Saving without a manual title should reuse the shared draft-title heuristic."""
+    dialog = QuickCaptureDialog()
+    dialog._body_input.setPlainText(  # noqa: SLF001
+        "Title:\n> Weekly deployment checklist\nList the risky steps first."
+    )
+
+    draft = dialog._build_draft()  # noqa: SLF001
+
+    assert draft is not None
+    prompt = draft.to_prompt()
+    assert prompt.name == "Weekly deployment checklist"
