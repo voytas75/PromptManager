@@ -1,6 +1,7 @@
 """Focused tests for prompt detail inspection cues.
 
 Updates:
+  v0.1.5 - 2026-04-06 - Expect Copy Prompt in the detail flow only when a body exists.
   v0.1.4 - 2026-04-05 - Cover bounded derived usage cues in the shared detail widget.
   v0.1.3 - 2026-04-05 - Keep source visible in the inspect path after draft metadata is gone.
   v0.1.2 - 2026-04-04 - Cover bounded quick-reuse actions in the shared detail widget.
@@ -88,7 +89,7 @@ def test_prompt_detail_widget_exposes_bounded_quick_reuse_actions(
     widget.display_prompt(prompt)
     qt_app.processEvents()
 
-    assert widget._copy_prompt_body_button.text() == "Copy Prompt Body"  # noqa: SLF001
+    assert widget._copy_prompt_body_button.text() == "Copy Prompt"  # noqa: SLF001
     assert widget._open_in_workspace_button.text() == "Open in Workspace"  # noqa: SLF001
     assert widget._copy_prompt_body_button.isEnabled()  # noqa: SLF001
     assert widget._open_in_workspace_button.isEnabled()  # noqa: SLF001
@@ -100,6 +101,29 @@ def test_prompt_detail_widget_exposes_bounded_quick_reuse_actions(
 
     assert copy_requests == ["copy"]
     assert open_requests == ["open"]
+
+
+def test_prompt_detail_widget_disables_copy_without_a_prompt_body(
+    qt_app: QApplication,
+) -> None:
+    """Detail view should not offer Copy Prompt when only descriptive metadata exists."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000129"),
+        name="Description-only prompt",
+        description="Helpful notes but no reusable body yet.",
+        category="General",
+        context=None,
+        created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 4, 10, 35, tzinfo=UTC),
+    )
+
+    widget.show()
+    widget.display_prompt(prompt)
+    qt_app.processEvents()
+
+    assert not widget._copy_prompt_body_button.isEnabled()  # noqa: SLF001
+    assert widget._open_in_workspace_button.isEnabled()  # noqa: SLF001
 
 
 def test_prompt_detail_widget_keeps_source_visible_for_promoted_prompt(

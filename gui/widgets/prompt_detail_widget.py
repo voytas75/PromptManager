@@ -1,6 +1,7 @@
 """Prompt detail panel shared between main and template tabs.
 
 Updates:
+  v0.1.15 - 2026-04-06 - Rename the detail reuse action to Copy Prompt and gate it on prompt bodies.
   v0.1.14 - 2026-04-05 - Add a bounded derived usage cue to the existing detail flow.
   v0.1.13 - 2026-04-04 - Add bounded quick-reuse actions for copy and workspace handoff.
   v0.1.12 - 2026-04-04 - Add one visible Promote Draft action for captured prompts.
@@ -157,7 +158,7 @@ class PromptDetailWidget(QWidget):
         reuse_layout.setContentsMargins(12, 8, 12, 8)
         reuse_layout.setSpacing(8)
 
-        self._copy_prompt_body_button = QPushButton("Copy Prompt Body", reuse_group)
+        self._copy_prompt_body_button = QPushButton("Copy Prompt", reuse_group)
         self._copy_prompt_body_button.setObjectName("copyPromptBodyButton")
         self._copy_prompt_body_button.setEnabled(False)
         self._copy_prompt_body_button.clicked.connect(  # type: ignore[arg-type]
@@ -393,8 +394,9 @@ class PromptDetailWidget(QWidget):
         )
         self._current_prompt = prompt
         self._clear_metadata_view()
+        has_prompt_body = bool((prompt.context or "").strip())
         has_reusable_payload = bool((prompt.context or prompt.description or "").strip())
-        self._copy_prompt_body_button.setEnabled(has_reusable_payload)
+        self._copy_prompt_body_button.setEnabled(has_prompt_body)
         self._open_in_workspace_button.setEnabled(has_reusable_payload)
         is_draft = self._is_draft_prompt(prompt)
         self._promote_draft_button.setEnabled(is_draft)

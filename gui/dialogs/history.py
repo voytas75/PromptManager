@@ -1,6 +1,7 @@
 """Dialog for viewing and restoring prompt version history.
 
 Updates:
+  v0.1.1 - 2026-04-06 - Align body-only copy controls with the shared Copy Prompt label.
   v0.1.0 - 2025-12-03 - Extract version history dialog from gui.dialogs.
 """
 
@@ -126,7 +127,7 @@ class PromptVersionHistoryDialog(QDialog):
         copy_snapshot_button.clicked.connect(self._copy_snapshot_to_clipboard)  # type: ignore[arg-type]
         button_row.addWidget(copy_snapshot_button)
 
-        copy_body_button = QPushButton("Copy Prompt Body", self)
+        copy_body_button = QPushButton("Copy Prompt", self)
         copy_body_button.clicked.connect(self._copy_body_to_clipboard)  # type: ignore[arg-type]
         button_row.addWidget(copy_body_button)
 
@@ -268,8 +269,8 @@ class PromptVersionHistoryDialog(QDialog):
             return
         body_text = self._body_text_for_version(version)
         QGuiApplication.clipboard().setText(body_text)
-        self._status_callback("Prompt body copied to clipboard", 2000)
-        show_toast(self, "Prompt body copied to clipboard.")
+        self._status_callback("Prompt copied to clipboard", 2000)
+        show_toast(self, "Prompt copied to clipboard.")
 
     def _on_restore_clicked(self) -> None:
         version = self._selected_version()

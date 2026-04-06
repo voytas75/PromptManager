@@ -45,6 +45,7 @@ Use PromptManager when you want to:
 - **Prompt catalog** — store, search, tag, edit, fork, and organize prompts as durable assets
 - **Quick Capture + Draft Promote** — capture raw prompt/query text fast, inspect it as a draft, then promote it into a reusable prompt asset with bounded title-quality improvement for weak draft titles
 - **Recent reopen + inspection cues** — get back to recent prompts quickly and see draft/source/last-modified context without opening raw metadata
+- **Quick reuse actions** — copy the real prompt body from detail view with one obvious `Copy Prompt` action, or open the prompt in the workspace without auto-running it
 - **Semantic retrieval** — find prompts by meaning, not only exact text
 - **Template preview** — render Jinja2 templates with JSON variables and validation feedback
 - **Lightweight execution workspace** — run prompts with LiteLLM-backed models and keep execution history when validation or reuse benefits from it
@@ -132,7 +133,7 @@ PromptManager is currently in **beta** and under active development.
 
 The current focus is:
 - strengthening the core prompt asset loop: capture, normalize, retrieve, inspect, reuse, refine
-- improving low-friction draft capture and promotion workflows
+- improving low-friction draft capture, promotion, and reuse workflows
 - refining template and validation ergonomics
 - keeping the desktop experience responsive and local-first
 

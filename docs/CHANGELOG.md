@@ -6,13 +6,15 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Added
 
-- Added bounded **Quick Reuse** actions to the prompt detail view so operators can copy the prompt body or open it in the workspace without auto-running it.
+- Added bounded **Quick Reuse** actions to the prompt detail view so operators can use one obvious `Copy Prompt` action for the stored prompt body or open it in the workspace without auto-running it.
 - Clarified the bounded **Quick Capture** source field as simple source/provenance while continuing to store it on the draft prompt via the existing `source` path.
 - Added one compact **When to use** cue to the prompt detail view when existing prompt data already contains a short credible usage signal (for example a saved scenario, description, or example text).
 - Added bounded **Title Quality v1** for draft-origin prompts so Quick Capture and Draft Promote can derive or preserve short readable titles using one shared deterministic heuristic without widening the prompt model.
 
 ### Fixed
 
+- Unified body-only prompt copy labels on the prompt actions menu and prompt version history dialog under the shared `Copy Prompt` wording, while leaving distinct payload actions such as `Copy Snapshot` unchanged.
+- Tightened prompt-detail clipboard reuse so `Copy Prompt` copies only the stored prompt body and no longer falls back to description-only payloads.
 - Added focused regression coverage for the prompt-detail quick reuse happy path, including clipboard copy semantics and non-executing workspace handoff.
 - Added focused regression coverage for quick-capture source input, source visibility in the inspect path after promote, and the existing draft-promotion source-preservation path.
 - Added focused regression coverage for visible/absent usage cues and stable bounded rendering in the existing prompt detail flow.

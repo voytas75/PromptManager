@@ -1,6 +1,8 @@
 """Prompt-specific actions separated from the main window.
 
 Updates:
+  v0.1.4 - 2026-04-06 - Align prompt body copy menu terminology with the shared Copy Prompt label.
+  v0.1.3 - 2026-04-06 - Restrict prompt copying to the stored prompt body.
   v0.1.2 - 2026-04-04 - Add a non-executing workspace handoff for prompt detail reuse.
   v0.1.1 - 2025-12-08 - Fix dialog code comparison and toast callback usage for strict typing.
   v0.1.0 - 2025-12-01 - Extracted context menu, clipboard, and execute-as-context workflows.
@@ -90,7 +92,7 @@ class PromptActionsController:
         similar_action = menu.addAction("Similar Prompts")
         execute_action = menu.addAction("Execute Prompt")
         execute_context_action = menu.addAction("Execute as Context…")
-        copy_action = menu.addAction("Copy Prompt Text")
+        copy_action = menu.addAction("Copy Prompt")
         description_action = menu.addAction("Show Description")
 
         if prompt is None:
@@ -232,14 +234,22 @@ class PromptActionsController:
 
     def copy_prompt_to_clipboard(self, prompt: Prompt) -> None:
         """Copy a prompt's primary text to the clipboard with status feedback."""
-        payload = self._primary_prompt_payload(prompt)
+        payload = self._copyable_prompt_body(prompt)
         if payload is None:
-            self._status_callback("Selected prompt does not include a body to copy.", 3000)
+            self._status_callback("Selected prompt does not include a prompt body to copy.", 3000)
             return
         clipboard = QGuiApplication.clipboard()
         clipboard.setText(payload)
         self._toast_callback(f"Copied '{prompt.name}' to the clipboard.", 2500)
         self._usage_logger.log_copy(prompt_name=prompt.name, prompt_has_body=bool(prompt.context))
+
+    @staticmethod
+    def _copyable_prompt_body(prompt: Prompt) -> str | None:
+        """Return the stored prompt body for clipboard reuse, or ``None`` when empty."""
+        payload = (prompt.context or "").strip()
+        if not payload:
+            return None
+        return payload
 
     @staticmethod
     def _primary_prompt_payload(prompt: Prompt) -> str | None:

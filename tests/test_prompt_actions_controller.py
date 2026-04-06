@@ -1,6 +1,8 @@
 """Focused tests for bounded prompt reuse actions.
 
 Updates:
+  v0.1.2 - 2026-04-06 - Lock the prompt actions menu copy label to the shared Copy Prompt wording.
+  v0.1.1 - 2026-04-06 - Lock prompt copying to the stored body with deterministic toast feedback.
   v0.1.0 - 2026-04-04 - Cover clipboard copy and non-executing workspace handoff paths.
 """
 
@@ -77,7 +79,33 @@ class _DummyClipboard:
         self.text = text
 
 
-def _build_prompt(*, context: str | None, description: str | None) -> Prompt:
+class _MenuAction:
+    def __init__(self, text: str) -> None:
+        self.text = text
+        self.enabled = True
+
+    def setEnabled(self, enabled: bool) -> None:
+        """Store enabled state like a Qt action."""
+        self.enabled = enabled
+
+
+class _MenuStub:
+    instances: list[_MenuStub] = []
+
+    def __init__(self, _parent: QWidget) -> None:
+        self.actions: list[_MenuAction] = []
+        _MenuStub.instances.append(self)
+
+    def addAction(self, text: str) -> _MenuAction:  # noqa: N802 - Qt style API
+        action = _MenuAction(text)
+        self.actions.append(action)
+        return action
+
+    def exec(self, _point: object) -> None:  # noqa: A003 - Qt style API
+        return None
+
+
+def _build_prompt(*, context: str | None, description: str) -> Prompt:
     """Create a minimal prompt for reuse-action tests."""
     return Prompt(
         id=uuid.UUID("00000000-0000-0000-0000-000000000125"),
@@ -157,10 +185,10 @@ def test_open_prompt_in_workspace_seeds_text_without_running(qt_app: QApplicatio
     assert toast_messages == [("Opened 'Reusable prompt' in the workspace.", 2500)]
 
 
-def test_copy_prompt_to_clipboard_uses_existing_fallback_payload(
+def test_copy_prompt_to_clipboard_copies_the_prompt_body(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Clipboard copy should reuse the established context-or-description semantics."""
+    """Clipboard copy should place only the stored prompt body on the clipboard."""
     clipboard = _DummyClipboard()
     monkeypatch.setattr("PySide6.QtGui.QGuiApplication.clipboard", lambda: clipboard)
     status_messages: list[tuple[str, int]] = []
@@ -172,10 +200,54 @@ def test_copy_prompt_to_clipboard_uses_existing_fallback_payload(
         toast_messages=toast_messages,
         execution_supplier=lambda: None,
     )
-    prompt = _build_prompt(context=None, description="Description fallback payload")
+    prompt = _build_prompt(
+        context="Prompt body to reuse immediately",
+        description="Description fallback payload",
+    )
 
     controller.copy_prompt_to_clipboard(prompt)
 
-    assert clipboard.text == "Description fallback payload"
+    assert clipboard.text == "Prompt body to reuse immediately"
     assert status_messages == []
     assert toast_messages == [("Copied 'Reusable prompt' to the clipboard.", 2500)]
+
+
+def test_show_context_menu_uses_shared_copy_prompt_label(
+    qt_app: QApplication,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Context menu should label body-only prompt copying as Copy Prompt."""
+    _MenuStub.instances.clear()
+    monkeypatch.setattr("gui.prompt_actions_controller.QMenu", _MenuStub)
+    query_input = QPlainTextEdit()
+    list_view = QListView()
+    status_messages: list[tuple[str, int]] = []
+    toast_messages: list[tuple[str, int]] = []
+    prompt = _build_prompt(context="Prompt body to reuse", description="Fallback description")
+
+    controller = PromptActionsController(
+        parent=QWidget(),
+        model=cast("PromptListModel", object()),
+        list_view=list_view,
+        query_input=query_input,
+        layout_state=cast("WindowStateManager", _LayoutStateStub()),
+        workspace_view=None,
+        execution_controller_supplier=lambda: None,
+        current_prompt_supplier=lambda: prompt,
+        edit_callback=lambda: None,
+        duplicate_callback=lambda _prompt: None,
+        fork_callback=lambda _prompt: None,
+        similar_callback=None,
+        status_callback=lambda message, duration: status_messages.append((message, duration)),
+        error_callback=lambda _title, _message: None,
+        toast_callback=lambda message, duration: toast_messages.append((message, duration)),
+        usage_logger=IntentUsageLogger(enabled=False),
+    )
+
+    controller.show_context_menu(list_view.viewport().rect().center())
+    qt_app.processEvents()
+
+    assert len(_MenuStub.instances) == 1
+    menu_texts = [action.text for action in _MenuStub.instances[0].actions]
+    assert "Copy Prompt" in menu_texts
+    assert "Copy Prompt Text" not in menu_texts

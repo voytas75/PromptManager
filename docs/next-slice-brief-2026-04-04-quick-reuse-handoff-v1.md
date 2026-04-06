@@ -14,7 +14,7 @@ Supporting sources:
 Add one bounded **Quick Reuse Handoff** improvement to the existing **prompt detail** flow.
 
 When an operator opens a prompt in the existing detail view, PromptManager should expose two immediate reuse actions:
-- **Copy Prompt Body**
+- **Copy Prompt**
 - **Open in Workspace**
 
 This slice should stay strictly within the current detail flow and should not widen into execution redesign, export expansion, or analytics.
@@ -61,7 +61,7 @@ Implement exactly one narrow improvement in the existing detail flow:
 
 1. Add one compact reuse action row to the existing prompt detail view.
 2. Expose exactly two actions:
-   - **Copy Prompt Body**
+   - **Copy Prompt**
    - **Open in Workspace**
 3. Reuse existing prompt payload semantics where possible:
    - primary payload should remain the prompt body / existing main text field
@@ -87,9 +87,9 @@ Implement exactly one narrow improvement in the existing detail flow:
 ## Acceptance checks
 
 1. The selected prompt detail view shows both:
-   - `Copy Prompt Body`
+   - `Copy Prompt`
    - `Open in Workspace`
-2. `Copy Prompt Body` copies the expected prompt payload.
+2. `Copy Prompt` copies the expected prompt payload.
 3. `Open in Workspace` seeds the workspace input with the expected prompt payload.
 4. `Open in Workspace` does **not** auto-run the prompt.
 5. The slice works for:
@@ -142,7 +142,7 @@ The slice is done when:
 Delivered on 2026-04-05 as a compact **Quick Reuse** block in the existing prompt detail view.
 
 Rendered actions stay bounded to exactly:
-- `Copy Prompt Body`
+- `Copy Prompt`
 - `Open in Workspace`
 
 Implementation reuses the existing prompt payload semantics and existing workspace handoff path, while keeping `Open in Workspace` non-executing.
