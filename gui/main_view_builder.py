@@ -1,6 +1,7 @@
 r"""Composable builders for the Prompt Manager main window.
 
 Updates:
+  v0.2.15 - 2026-04-06 - Attach a bounded retrieval-preview delegate to the main prompt list.
   v0.2.14 - 2026-04-04 - Wire the Recent toolbar action into the main view callbacks.
   v0.2.13 - 2026-04-04 - Wire the Quick Capture toolbar action into the main view callbacks.
   v0.2.12 - 2025-12-10 - Increase result metadata and token usage contrast for Windows.
@@ -45,6 +46,7 @@ from .analytics_panel import AnalyticsDashboardPanel
 from .dialogs.prompt_chains import PromptChainManagerPanel
 from .history_panel import HistoryPanel
 from .notes_panel import NotesPanel
+from .prompt_list_delegate import PromptListDelegate
 from .response_styles_panel import ResponseStylesPanel
 from .result_overlay import ResultActionsOverlay
 from .template_preview import TemplatePreviewWidget
@@ -311,6 +313,8 @@ def build_main_view(
 
     list_view = QListView(list_splitter)
     list_view.setModel(model)
+    list_view.setItemDelegate(PromptListDelegate(list_view))
+    list_view.setUniformItemSizes(False)
     list_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
     list_view.selectionModel().selectionChanged.connect(callbacks.selection_changed)
     list_view.doubleClicked.connect(callbacks.prompt_double_clicked)  # type: ignore[arg-type]
