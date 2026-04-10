@@ -196,7 +196,6 @@ def test_prompt_detail_widget_hides_low_signal_source_marker_in_inspection_cues(
     assert "Last modified: 2026-04-05 09:12 UTC" in inspection_text
 
 
-
 def test_prompt_detail_widget_shows_usage_cue_when_saved_signal_exists(
     qt_app: QApplication,
 ) -> None:
@@ -249,7 +248,6 @@ def test_prompt_detail_widget_uses_context_lead_for_usage_cue_when_saved_signals
     usage_text = widget._usage_cue_label.text()  # noqa: SLF001
     assert "When to use:" in usage_text
     assert "Use when summarizing deployment risks for the release handoff." in usage_text
-
 
 
 def test_prompt_detail_widget_hides_usage_cue_when_no_credible_signal_exists(
