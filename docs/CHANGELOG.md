@@ -15,6 +15,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 - Added one bounded **Context Lead Usage Cue v1** fallback in the detail view so `When to use` can reuse a short credible lead-in from the prompt body when saved scenario, description, and example cues are absent.
 - Added one bounded **Reuse Payload Tooltip v1** pass in the detail view so `Copy Prompt` and `Open in Workspace` explain their actual payload semantics, including disabled copy and description-only workspace fallback states.
 - Added one bounded **Credible Source Cue v1** consistency pass so the detail view hides low-signal technical source markers and reuses the same credible-source logic already used by retrieval-preview paths.
+- Added one bounded **Fence Unwrap v1** normalization step in Quick Capture so a pasted prompt wrapped in one obvious outer markdown code fence is stored as usable inner prompt text instead of raw wrapper noise.
 
 ### Fixed
 

@@ -1,6 +1,7 @@
 """Focused tests for the quick capture dialog and draft conversion.
 
 Updates:
+  v0.1.2 - 2026-04-10 - Cover bounded outer-fence unwrapping for messy quick-capture input.
   v0.1.1 - 2026-04-06 - Cover shared draft-title normalization for quick capture defaults.
   v0.1.0 - 2026-04-05 - Cover source/provenance capture and prompt conversion.
 """
@@ -17,8 +18,10 @@ from PySide6.QtWidgets import QApplication
 
 from gui.dialogs.quick_capture import (
     QuickCaptureDialog,
+    QuickCaptureDraft,
     derive_quick_capture_title,
     resolve_quick_capture_source,
+    unwrap_quick_capture_body,
 )
 
 
@@ -64,6 +67,24 @@ def test_derive_quick_capture_title_skips_placeholder_lines_and_strips_raw_marke
     body = "\nPrompt:\n## Incident summary for handoff\n- Highlight operator-facing risks"
 
     assert derive_quick_capture_title(body) == "Incident summary for handoff"
+
+
+def test_quick_capture_draft_unwraps_one_outer_markdown_fence() -> None:
+    """Quick capture should remove one obvious outer markdown fence before storing body text."""
+    draft = QuickCaptureDraft(body="```text\nSummarize deployment risks for the handoff.\n```")
+
+    prompt = draft.to_prompt()
+
+    assert prompt.context == "Summarize deployment risks for the handoff."
+
+
+
+def test_unwrap_quick_capture_body_keeps_non_wrapped_or_mixed_input_intact() -> None:
+    """Mixed prose plus fenced content should stay unchanged without one outer fence."""
+    body = "Intro note\n```text\nSummarize deployment risks.\n```"
+
+    assert unwrap_quick_capture_body(body) == body.strip()
+
 
 
 def test_quick_capture_dialog_uses_shared_title_quality_heuristic_when_title_missing(

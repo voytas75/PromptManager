@@ -62,6 +62,7 @@ Jeśli potrzebny jest kontekst wdrożeniowy dla reuse:
 11. `Context Lead Usage Cue v1`
 12. `Reuse Payload Tooltip v1`
 13. `Credible Source Cue v1`
+14. `Fence Unwrap v1`
 
 ### Practical meaning
 - draft capture działa,
@@ -75,6 +76,7 @@ Jeśli potrzebny jest kontekst wdrożeniowy dla reuse:
 - context-lead usage cue działa,
 - reuse payload tooltip działa,
 - credible-source cue działa,
+- fence unwrap działa,
 - body-only copy label jest spójny jako `Copy Prompt`,
 - aktywne docs są już wyrównane do `Copy Prompt`.
 

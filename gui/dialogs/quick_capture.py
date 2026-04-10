@@ -1,6 +1,7 @@
 """Minimal dialog and helpers for quick prompt capture.
 
 Updates:
+  v0.1.3 - 2026-04-10 - Unwrap one obvious outer markdown fence from captured prompt bodies.
   v0.1.2 - 2026-04-06 - Use shared draft-title heuristics when no manual title is supplied.
   v0.1.1 - 2026-04-05 - Clarify source/provenance copy while keeping prompt.source storage.
   v0.1.0 - 2026-04-04 - Add quick capture draft dialog and deterministic prompt conversion.
@@ -8,6 +9,7 @@ Updates:
 
 from __future__ import annotations
 
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -48,6 +50,16 @@ def parse_quick_capture_tags(raw_tags: str) -> list[str]:
     return [tag.strip() for tag in raw_tags.split(",") if tag.strip()]
 
 
+def unwrap_quick_capture_body(body: str) -> str:
+    """Remove one obvious outer markdown fence while preserving inner prompt text."""
+    stripped = body.strip()
+    match = re.fullmatch(r"```[A-Za-z0-9_-]*\n(?P<body>[\s\S]*?)\n```", stripped)
+    if not match:
+        return stripped
+    inner_body = match.group("body").strip()
+    return inner_body or stripped
+
+
 def resolve_quick_capture_source(source_label: str) -> str:
     """Return the persisted source/provenance value for a quick-captured prompt."""
     return source_label.strip() or _DEFAULT_SOURCE
@@ -65,7 +77,7 @@ class QuickCaptureDraft:
 
     def to_prompt(self) -> Prompt:
         """Build a draft prompt record using existing catalog fields."""
-        body = self.body.strip()
+        body = unwrap_quick_capture_body(self.body)
         if not body:
             raise ValueError("Prompt body is required.")
         name = self.title.strip() or derive_quick_capture_title(body)
@@ -186,4 +198,5 @@ __all__ = [
     "derive_quick_capture_title",
     "parse_quick_capture_tags",
     "resolve_quick_capture_source",
+    "unwrap_quick_capture_body",
 ]

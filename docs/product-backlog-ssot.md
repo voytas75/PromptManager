@@ -61,6 +61,7 @@ The following bounded slices are already delivered and should not be planned aga
 - Context Lead Usage Cue v1
 - Reuse Payload Tooltip v1
 - Credible Source Cue v1
+- Fence Unwrap v1
 
 These are current baseline, not open backlog.
 
@@ -163,6 +164,13 @@ Why this matters:
 - the founding thesis assumes prompts come from messy scattered places
 - capture loses value if rough source material still requires too much cleanup effort
 
+Delivered bounded slice under this priority:
+- **Fence Unwrap v1** in Quick Capture draft conversion
+- removes one obvious outer markdown fence from pasted prompt bodies while preserving inner text
+- keeps the current dialog, model, and capture flow unchanged
+
+Remaining work in this priority should only proceed if it removes obvious capture cleanup friction without turning Quick Capture into a general markdown or import parser.
+
 ### Priority 6 — Compare / Fork Clarity
 
 Make prompt lineage more useful during decision-making.
@@ -239,12 +247,12 @@ If not, do not start it without an explicit decision.
 
 Unless a stronger reason appears, the next implementation target should be:
 
-**Messy Input to Usable Draft**
+**Compare / Fork Clarity**
 
 Reason:
-- Retrieval Preview v1, Similar Match Preview v1, Context Lead Usage Cue v1, Reuse Payload Tooltip v1, and Credible Source Cue v1 are already delivered
-- retrieval, ingest confidence, inspect clarity, reuse clarity, and provenance clarity all improved in bounded steps
-- the next strong product gain is helping rough pasted input become a usable draft with less cleanup friction
+- Retrieval Preview v1, Similar Match Preview v1, Context Lead Usage Cue v1, Reuse Payload Tooltip v1, Credible Source Cue v1, and Fence Unwrap v1 are already delivered
+- retrieval, ingest confidence, inspect clarity, reuse clarity, provenance clarity, and basic messy-input cleanup all improved in bounded steps
+- the next strong product gain is making version and fork choice easier when similar prompt assets compete for reuse
 
 ## Relationship to other SSOT files
 
