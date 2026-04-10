@@ -1,6 +1,7 @@
 """Prompt detail panel shared between main and template tabs.
 
 Updates:
+  v0.1.18 - 2026-04-10 - Filter low-signal source markers from the shared inspection cues.
   v0.1.17 - 2026-04-10 - Explain quick-reuse payload semantics with bounded dynamic tooltips.
   v0.1.16 - 2026-04-10 - Add one bounded context-lead fallback for the existing usage cue.
   v0.1.15 - 2026-04-06 - Rename the detail reuse action to Copy Prompt and gate it on prompt bodies.
@@ -39,6 +40,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from ..prompt_preview import build_prompt_source_cue
 
 if TYPE_CHECKING:  # pragma: no cover - typing helper
     from models.prompt_model import Prompt
@@ -461,9 +464,9 @@ class PromptDetailWidget(QWidget):
         if draft_cue:
             cues.append(draft_cue)
 
-        source = (prompt.source or "").strip()
-        if source:
-            cues.append(f"Source: {source}")
+        source_cue = build_prompt_source_cue(prompt.source)
+        if source_cue:
+            cues.append(source_cue)
 
         cues.append(f"Last modified: {self._format_inspection_timestamp(prompt.last_modified)}")
         return " • ".join(cues)

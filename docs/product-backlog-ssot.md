@@ -60,6 +60,7 @@ The following bounded slices are already delivered and should not be planned aga
 - Similar Match Preview v1
 - Context Lead Usage Cue v1
 - Reuse Payload Tooltip v1
+- Credible Source Cue v1
 
 These are current baseline, not open backlog.
 
@@ -140,6 +141,13 @@ Scope:
 Why this matters:
 - provenance is already captured and should pay product value back
 - source often helps distinguish similar prompts faster than title alone
+
+Delivered bounded slice under this priority:
+- **Credible Source Cue v1** in the shared detail widget
+- filters low-signal technical source markers out of inspection cues while preserving credible provenance values
+- reuses the same source-credibility logic as retrieval preview
+
+Remaining work in this priority should only proceed if it increases source usefulness without widening into a provenance-management feature set.
 
 ### Priority 5 — Messy Input to Usable Draft
 
@@ -231,12 +239,12 @@ If not, do not start it without an explicit decision.
 
 Unless a stronger reason appears, the next implementation target should be:
 
-**Source / Provenance Leverage**
+**Messy Input to Usable Draft**
 
 Reason:
-- Retrieval Preview v1, Similar Match Preview v1, Context Lead Usage Cue v1, and Reuse Payload Tooltip v1 are already delivered
-- retrieve, ingest confidence, inspect clarity, and reuse clarity all improved in bounded steps
-- the next strong product gain is making existing source/provenance data pay back more retrieval and inspect value
+- Retrieval Preview v1, Similar Match Preview v1, Context Lead Usage Cue v1, Reuse Payload Tooltip v1, and Credible Source Cue v1 are already delivered
+- retrieval, ingest confidence, inspect clarity, reuse clarity, and provenance clarity all improved in bounded steps
+- the next strong product gain is helping rough pasted input become a usable draft with less cleanup friction
 
 ## Relationship to other SSOT files
 

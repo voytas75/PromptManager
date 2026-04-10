@@ -1,6 +1,7 @@
 """Focused tests for prompt detail inspection cues.
 
 Updates:
+  v0.1.8 - 2026-04-10 - Cover bounded credible-source filtering in shared inspection cues.
   v0.1.7 - 2026-04-10 - Cover bounded quick-reuse payload tooltips in the shared detail widget.
   v0.1.6 - 2026-04-10 - Cover bounded context-lead fallback for the shared usage cue.
   v0.1.5 - 2026-04-06 - Expect Copy Prompt in the detail flow only when a body exists.
@@ -167,6 +168,33 @@ def test_prompt_detail_widget_keeps_source_visible_for_promoted_prompt(
     assert "Source: ops notebook" in inspection_text
     assert "Draft" not in inspection_text
     assert "Last modified: 2026-04-05 08:45 UTC" in inspection_text
+
+
+def test_prompt_detail_widget_hides_low_signal_source_marker_in_inspection_cues(
+    qt_app: QApplication,
+) -> None:
+    """Detail view should not surface low-signal technical source markers as provenance."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000131"),
+        name="Local draft",
+        description="Fallback description",
+        category="General",
+        context="Prompt body",
+        source="quick_capture",
+        created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 5, 9, 12, tzinfo=UTC),
+    )
+
+    widget.show()
+    widget.display_prompt(prompt)
+    qt_app.processEvents()
+
+    inspection_text = widget._meta_label.text()  # noqa: SLF001
+    assert "Inspection:" in inspection_text
+    assert "Source:" not in inspection_text
+    assert "Last modified: 2026-04-05 09:12 UTC" in inspection_text
+
 
 
 def test_prompt_detail_widget_shows_usage_cue_when_saved_signal_exists(

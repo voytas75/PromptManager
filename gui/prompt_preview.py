@@ -1,6 +1,7 @@
 """Shared bounded preview helpers for prompt retrieval and ingest advisory surfaces.
 
 Updates:
+  v0.1.1 - 2026-04-10 - Add a shared credible-source helper for retrieval and inspection surfaces.
   v0.1.0 - 2026-04-10 - Extract shared preview selection and truncation logic.
 """
 
@@ -49,6 +50,17 @@ def is_credible_preview_text(value: str, *, minimum_length: int = 10) -> bool:
     return True
 
 
+def build_prompt_source_cue(source: str | None) -> str | None:
+    """Return one compact source cue only when the stored source is credible."""
+    normalized = flatten_preview_text(source or "")
+    if not normalized or normalized.casefold() in _LOW_SIGNAL_SOURCE_VALUES:
+        return None
+    cue = _SOURCE_PREFIX + normalized
+    if not is_credible_preview_text(cue, minimum_length=len(_SOURCE_PREFIX) + 3):
+        return None
+    return truncate_preview_text(cue)
+
+
 def build_prompt_preview(prompt: Prompt) -> str | None:
     """Derive one compact preview from existing prompt data in priority order."""
     name_key = prompt.name.strip().casefold()
@@ -66,17 +78,13 @@ def build_prompt_preview(prompt: Prompt) -> str | None:
         if normalized and is_credible_preview_text(normalized):
             return truncate_preview_text(normalized)
 
-    source = flatten_preview_text(prompt.source)
-    if source and source.casefold() not in _LOW_SIGNAL_SOURCE_VALUES:
-        preview = _SOURCE_PREFIX + source
-        if is_credible_preview_text(preview, minimum_length=len(_SOURCE_PREFIX) + 3):
-            return truncate_preview_text(preview)
-    return None
+    return build_prompt_source_cue(prompt.source)
 
 
 __all__ = [
     "PREVIEW_MAX_LENGTH",
     "build_prompt_preview",
+    "build_prompt_source_cue",
     "flatten_preview_text",
     "is_credible_preview_text",
     "truncate_preview_text",
