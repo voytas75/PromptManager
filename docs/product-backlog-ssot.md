@@ -58,6 +58,7 @@ The following bounded slices are already delivered and should not be planned aga
 - Usage Cue v1
 - Retrieval Preview v1
 - Similar Match Preview v1
+- Context Lead Usage Cue v1
 
 These are current baseline, not open backlog.
 
@@ -97,6 +98,13 @@ Scope:
 Why this matters:
 - inspect quality determines whether retrieval feels trustworthy
 - a catalog is weaker when the user still has to read too much to understand what a prompt is for
+
+Delivered bounded slice under this priority:
+- **Context Lead Usage Cue v1** in the shared detail widget
+- adds one bounded fallback so `When to use` can derive a compact cue from prompt body lead-in when saved cues are absent
+- keeps the current detail flow and current labels unchanged
+
+Remaining work in this priority should only proceed if it makes prompt fit easier to judge without turning detail view into a summary dashboard.
 
 ### Priority 3 — Reuse Friction Pass
 
@@ -215,12 +223,12 @@ If not, do not start it without an explicit decision.
 
 Unless a stronger reason appears, the next implementation target should be:
 
-**Detail View Clarity Pass**
+**Reuse Friction Pass**
 
 Reason:
-- Retrieval Preview v1 and Similar Match Preview v1 are already delivered
-- the next strong open area is inspect clarity after retrieval and ingest confidence improved
-- this should strengthen decision quality without widening the product surface
+- Retrieval Preview v1, Similar Match Preview v1, and Context Lead Usage Cue v1 are already delivered
+- retrieve, ingest confidence, and inspect clarity all improved in bounded steps
+- the next strongest product gain is reducing handoff friction from found prompt to actual reuse
 
 ## Relationship to other SSOT files
 

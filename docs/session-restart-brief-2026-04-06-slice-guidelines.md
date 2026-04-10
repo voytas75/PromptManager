@@ -59,6 +59,7 @@ Jeśli potrzebny jest kontekst wdrożeniowy dla reuse:
 8. `Usage Cue v1`
 9. `Retrieval Preview v1`
 10. `Similar Match Preview v1`
+11. `Context Lead Usage Cue v1`
 
 ### Practical meaning
 - draft capture działa,
@@ -69,6 +70,7 @@ Jeśli potrzebny jest kontekst wdrożeniowy dla reuse:
 - usage cue działa,
 - retrieval preview działa,
 - similar-match preview działa,
+- context-lead usage cue działa,
 - body-only copy label jest spójny jako `Copy Prompt`,
 - aktywne docs są już wyrównane do `Copy Prompt`.
 

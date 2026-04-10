@@ -1,6 +1,7 @@
 """Prompt detail panel shared between main and template tabs.
 
 Updates:
+  v0.1.16 - 2026-04-10 - Add one bounded context-lead fallback for the existing usage cue.
   v0.1.15 - 2026-04-06 - Rename the detail reuse action to Copy Prompt and gate it on prompt bodies.
   v0.1.14 - 2026-04-05 - Add a bounded derived usage cue to the existing detail flow.
   v0.1.13 - 2026-04-04 - Add bounded quick-reuse actions for copy and workspace handoff.
@@ -16,6 +17,7 @@ Updates:
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from html import escape
@@ -455,6 +457,10 @@ class PromptDetailWidget(QWidget):
         if self._is_compact_usage_cue(example_input, min_words=4):
             return example_input
 
+        context_lead = self._context_lead_usage_cue(prompt.context)
+        if self._is_compact_usage_cue(context_lead, min_words=4):
+            return context_lead
+
         return None
 
     @staticmethod
@@ -463,6 +469,37 @@ class PromptDetailWidget(QWidget):
         if not value:
             return ""
         return " ".join(value.replace("•", " ").split()).strip()
+
+    def _context_lead_usage_cue(self, context: str | None) -> str:
+        """Return one bounded context lead-in when the prompt body opens with a usable cue."""
+        if not context:
+            return ""
+
+        for line in context.splitlines():
+            candidate = line.strip()
+            if candidate:
+                break
+        else:
+            return ""
+
+        candidate = re.sub(r"^[#>*\-\s]+", "", candidate)
+        candidate = re.sub(
+            r"^(prompt|prompt body|instructions?|task|goal|context)\s*:\s*",
+            "",
+            candidate,
+            flags=re.IGNORECASE,
+        )
+        candidate = self._normalise_usage_cue_candidate(candidate)
+        sentence_match = re.match(r"(.+?[.!?])(?:\s|$)", candidate)
+        if sentence_match:
+            candidate = sentence_match.group(1).strip()
+
+        lowered = candidate.casefold()
+        if lowered in {"prompt", "prompt body", "instructions", "task", "goal", "context"}:
+            return ""
+        if lowered.startswith(("prompt body ", "prompt text ", "draft body ")):
+            return ""
+        return candidate
 
     def _is_compact_usage_cue(self, value: str, *, min_words: int) -> bool:
         """Return ``True`` when *value* is short enough to act as a usage cue."""

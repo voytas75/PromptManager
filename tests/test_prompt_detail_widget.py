@@ -1,6 +1,7 @@
 """Focused tests for prompt detail inspection cues.
 
 Updates:
+  v0.1.6 - 2026-04-10 - Cover bounded context-lead fallback for the shared usage cue.
   v0.1.5 - 2026-04-06 - Expect Copy Prompt in the detail flow only when a body exists.
   v0.1.4 - 2026-04-05 - Cover bounded derived usage cues in the shared detail widget.
   v0.1.3 - 2026-04-05 - Keep source visible in the inspect path after draft metadata is gone.
@@ -178,6 +179,35 @@ def test_prompt_detail_widget_shows_usage_cue_when_saved_signal_exists(
     usage_text = widget._usage_cue_label.text()  # noqa: SLF001
     assert "When to use:" in usage_text
     assert "Use for quick summaries of incident notes before handoff." in usage_text
+
+
+def test_prompt_detail_widget_uses_context_lead_for_usage_cue_when_saved_signals_are_absent(
+    qt_app: QApplication,
+) -> None:
+    """Detail view should fall back to a compact prompt-body lead-in when it is credible."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000130"),
+        name="Release handoff",
+        description="",
+        category="Operations",
+        context=(
+            "Use when summarizing deployment risks for the release handoff.\n"
+            "List blockers, rollback concerns, and owners."
+        ),
+        created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 5, 9, 18, tzinfo=UTC),
+    )
+
+    widget.show()
+    widget.display_prompt(prompt)
+    qt_app.processEvents()
+
+    assert widget._usage_cue_label.isVisible()  # noqa: SLF001
+    usage_text = widget._usage_cue_label.text()  # noqa: SLF001
+    assert "When to use:" in usage_text
+    assert "Use when summarizing deployment risks for the release handoff." in usage_text
+
 
 
 def test_prompt_detail_widget_hides_usage_cue_when_no_credible_signal_exists(
