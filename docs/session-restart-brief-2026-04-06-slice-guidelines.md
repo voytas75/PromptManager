@@ -41,8 +41,9 @@ Przy kolejnych decyzjach i briefach najpierw czytać:
 - `docs/product-backlog-ssot.md`
 - ten plik
 
-Jeśli potrzebny jest kontekst wdrożeniowy dla reuse:
+Jeśli potrzebny jest kontekst wdrożeniowy dla reuse lub nowszych bounded review:
 - `docs/implementation-review-2026-04-06-reuse-polish-v1.md`
+- `docs/implementation-review-2026-04-10-product-alignment-and-fork-state.md`
 - `docs/CHANGELOG.md`
 - `README.md`
 
@@ -63,6 +64,7 @@ Jeśli potrzebny jest kontekst wdrożeniowy dla reuse:
 12. `Reuse Payload Tooltip v1`
 13. `Credible Source Cue v1`
 14. `Fence Unwrap v1`
+15. `Fork Baseline Clarity v1`
 
 ### Practical meaning
 - draft capture działa,
@@ -77,6 +79,8 @@ Jeśli potrzebny jest kontekst wdrożeniowy dla reuse:
 - reuse payload tooltip działa,
 - credible-source cue działa,
 - fence unwrap działa,
+- forked prompts startują z czytelnym baseline `v1`,
+- lineage summary pokazuje `Forked from <prompt name>` gdy parent da się rozwiązać,
 - body-only copy label jest spójny jako `Copy Prompt`,
 - aktywne docs są już wyrównane do `Copy Prompt`.
 

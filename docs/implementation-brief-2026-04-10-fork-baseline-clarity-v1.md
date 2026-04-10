@@ -1,12 +1,23 @@
 # PromptManager — Implementation Brief
 
 Date: 2026-04-10
-Status: ready-for-delegation
+Status: delivered and spot-reviewed
 Feature: Fork Baseline Clarity v1
 Primary sources:
 - `docs/product-boundary-ssot.md`
 - `docs/product-backlog-ssot.md`
 - `docs/session-restart-brief-2026-04-06-slice-guidelines.md`
+
+## Implementation status
+
+Delivered in code and spot-reviewed on 2026-04-10.
+
+Validation:
+- `pytest -q tests/test_prompt_manager_branches.py tests/test_workspace_history_controller.py`
+- result: `47 passed`
+
+Review note:
+- `docs/implementation-review-2026-04-10-product-alignment-and-fork-state.md`
 
 ## Goal
 
