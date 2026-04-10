@@ -1,6 +1,7 @@
 """Prompt detail panel shared between main and template tabs.
 
 Updates:
+  v0.1.17 - 2026-04-10 - Explain quick-reuse payload semantics with bounded dynamic tooltips.
   v0.1.16 - 2026-04-10 - Add one bounded context-lead fallback for the existing usage cue.
   v0.1.15 - 2026-04-06 - Rename the detail reuse action to Copy Prompt and gate it on prompt bodies.
   v0.1.14 - 2026-04-05 - Add a bounded derived usage cue to the existing detail flow.
@@ -400,6 +401,7 @@ class PromptDetailWidget(QWidget):
         has_reusable_payload = bool((prompt.context or prompt.description or "").strip())
         self._copy_prompt_body_button.setEnabled(has_prompt_body)
         self._open_in_workspace_button.setEnabled(has_reusable_payload)
+        self._apply_reuse_tooltips(prompt)
         is_draft = self._is_draft_prompt(prompt)
         self._promote_draft_button.setEnabled(is_draft)
         self._promote_draft_button.setVisible(is_draft)
@@ -413,6 +415,30 @@ class PromptDetailWidget(QWidget):
         self._share_button.setEnabled(True)
         self._share_payload_combo.setEnabled(True)
         self._share_metadata_checkbox.setEnabled(True)
+
+    def _apply_reuse_tooltips(self, prompt: Prompt) -> None:
+        """Explain the current quick-reuse payload semantics without changing behavior."""
+        has_prompt_body = bool((prompt.context or "").strip())
+        has_description = bool((prompt.description or "").strip())
+
+        if has_prompt_body:
+            self._copy_prompt_body_button.setToolTip("Copy the stored prompt body.")
+            self._open_in_workspace_button.setToolTip(
+                "Open the stored prompt body in the workspace without running it."
+            )
+            return
+
+        self._copy_prompt_body_button.setToolTip(
+            "Copy Prompt is unavailable because this prompt has no stored prompt body."
+        )
+        if has_description:
+            self._open_in_workspace_button.setToolTip(
+                "Open the saved description in the workspace without running it."
+            )
+            return
+        self._open_in_workspace_button.setToolTip(
+            "Open in Workspace is unavailable because this prompt has no reusable text yet."
+        )
 
     def _format_context_preview(self, context: str | None) -> str:
         """Return a truncated, single-line context preview for the prompt summary."""
@@ -648,6 +674,8 @@ class PromptDetailWidget(QWidget):
         self._examples.clear()
         self._copy_prompt_body_button.setEnabled(False)
         self._open_in_workspace_button.setEnabled(False)
+        self._copy_prompt_body_button.setToolTip("Select a prompt with a stored prompt body.")
+        self._open_in_workspace_button.setToolTip("Select a prompt to seed the workspace.")
         self._basic_metadata_button.setEnabled(False)
         self._all_metadata_button.setEnabled(False)
         self._clear_metadata_view()

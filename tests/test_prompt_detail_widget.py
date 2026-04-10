@@ -1,6 +1,7 @@
 """Focused tests for prompt detail inspection cues.
 
 Updates:
+  v0.1.7 - 2026-04-10 - Cover bounded quick-reuse payload tooltips in the shared detail widget.
   v0.1.6 - 2026-04-10 - Cover bounded context-lead fallback for the shared usage cue.
   v0.1.5 - 2026-04-06 - Expect Copy Prompt in the detail flow only when a body exists.
   v0.1.4 - 2026-04-05 - Cover bounded derived usage cues in the shared detail widget.
@@ -94,6 +95,11 @@ def test_prompt_detail_widget_exposes_bounded_quick_reuse_actions(
     assert widget._open_in_workspace_button.text() == "Open in Workspace"  # noqa: SLF001
     assert widget._copy_prompt_body_button.isEnabled()  # noqa: SLF001
     assert widget._open_in_workspace_button.isEnabled()  # noqa: SLF001
+    assert widget._copy_prompt_body_button.toolTip() == "Copy the stored prompt body."  # noqa: SLF001
+    assert (
+        widget._open_in_workspace_button.toolTip()
+        == "Open the stored prompt body in the workspace without running it."
+    )  # noqa: SLF001
     assert not widget._usage_cue_label.isVisible()  # noqa: SLF001
 
     widget._copy_prompt_body_button.click()  # noqa: SLF001
@@ -125,6 +131,14 @@ def test_prompt_detail_widget_disables_copy_without_a_prompt_body(
 
     assert not widget._copy_prompt_body_button.isEnabled()  # noqa: SLF001
     assert widget._open_in_workspace_button.isEnabled()  # noqa: SLF001
+    assert (
+        widget._copy_prompt_body_button.toolTip()
+        == "Copy Prompt is unavailable because this prompt has no stored prompt body."
+    )  # noqa: SLF001
+    assert (
+        widget._open_in_workspace_button.toolTip()
+        == "Open the saved description in the workspace without running it."
+    )  # noqa: SLF001
 
 
 def test_prompt_detail_widget_keeps_source_visible_for_promoted_prompt(

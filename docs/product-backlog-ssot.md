@@ -59,6 +59,7 @@ The following bounded slices are already delivered and should not be planned aga
 - Retrieval Preview v1
 - Similar Match Preview v1
 - Context Lead Usage Cue v1
+- Reuse Payload Tooltip v1
 
 These are current baseline, not open backlog.
 
@@ -119,6 +120,13 @@ Scope:
 Why this matters:
 - PromptManager wins only if found prompts can be reused quickly
 - fast reuse is more valuable than adding adjacent power features
+
+Delivered bounded slice under this priority:
+- **Reuse Payload Tooltip v1** in the shared detail widget
+- explains what `Copy Prompt` and `Open in Workspace` will use in body-backed, description-fallback, and unavailable states
+- keeps labels, actions, and layout unchanged
+
+Remaining work in this priority should only proceed if it removes real reuse hesitation without creating a broader execution or helper framework.
 
 ### Priority 4 — Source / Provenance Leverage
 
@@ -223,12 +231,12 @@ If not, do not start it without an explicit decision.
 
 Unless a stronger reason appears, the next implementation target should be:
 
-**Reuse Friction Pass**
+**Source / Provenance Leverage**
 
 Reason:
-- Retrieval Preview v1, Similar Match Preview v1, and Context Lead Usage Cue v1 are already delivered
-- retrieve, ingest confidence, and inspect clarity all improved in bounded steps
-- the next strongest product gain is reducing handoff friction from found prompt to actual reuse
+- Retrieval Preview v1, Similar Match Preview v1, Context Lead Usage Cue v1, and Reuse Payload Tooltip v1 are already delivered
+- retrieve, ingest confidence, inspect clarity, and reuse clarity all improved in bounded steps
+- the next strong product gain is making existing source/provenance data pay back more retrieval and inspect value
 
 ## Relationship to other SSOT files
 
