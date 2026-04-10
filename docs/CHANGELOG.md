@@ -26,6 +26,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 - Added focused regression coverage for visible/absent usage cues and stable bounded rendering in the existing prompt detail flow.
 - Added focused regression coverage for draft-title normalization in the bounded Quick Capture and Draft Promote seam, including placeholder/raw-title improvement and manual-title preservation.
 - Clarified fork lineage surfaces so new forks start at a visible `v1` baseline and fork summaries prefer `Forked from <prompt name>` over raw UUIDs when the parent prompt can be resolved.
+- Upgraded `cryptography` from `46.0.6` to `46.0.7` to clear the current GitHub Dependabot advisory for `CVE-2026-39892` / `GHSA-p423-j2cm-9vmq`.
 
 ## [0.22.21] - 2026-04-04
 
