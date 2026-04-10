@@ -1,6 +1,7 @@
 """Focused tests for workspace lineage summary updates.
 
 Updates:
+  v0.2.0 - 2026-04-10 - Cover bounded changed-from-parent lineage cues for forks.
   v0.1.0 - 2026-04-10 - Cover human-readable parent lineage summaries for forks.
 """
 
@@ -33,7 +34,12 @@ else:  # pragma: no cover - runtime placeholders for typing-only imports
 
 
 class _ManagerStub:
-    def __init__(self, *, parent_prompt: Prompt, parent_link: PromptForkLink) -> None:
+    def __init__(
+        self,
+        *,
+        parent_prompt: Prompt | None = None,
+        parent_link: PromptForkLink | None = None,
+    ) -> None:
         self._parent_prompt = parent_prompt
         self._parent_link = parent_link
 
@@ -44,6 +50,7 @@ class _ManagerStub:
         return []
 
     def get_prompt(self, prompt_id: uuid.UUID) -> Prompt:
+        assert self._parent_prompt is not None
         assert prompt_id == self._parent_prompt.id
         return self._parent_prompt
 
@@ -116,7 +123,7 @@ def test_workspace_history_controller_uses_parent_prompt_name_in_lineage_summary
     fork_prompt = Prompt(
         id=uuid.UUID("00000000-0000-0000-0000-000000000202"),
         name="Fork prompt",
-        description="Child description",
+        description="Parent description",
         category="General",
     )
     parent_link = PromptForkLink(
@@ -143,3 +150,80 @@ def test_workspace_history_controller_uses_parent_prompt_name_in_lineage_summary
 
     assert detail_widget.lineage_summary == "Forked from Source prompt"
     assert template_detail_widget.lineage_summary == "Forked from Source prompt"
+
+
+def test_workspace_history_controller_shows_bounded_parent_difference_cue() -> None:
+    """Forked prompts should show only the bounded changed-field labels."""
+    parent_prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000211"),
+        name="Source prompt",
+        description="Parent description",
+        category="General",
+        tags=["baseline"],
+        context="Draft the original summary.",
+        source="import",
+    )
+    fork_prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000212"),
+        name="Fork prompt",
+        description="Parent description",
+        category="General",
+        tags=["baseline", "refined"],
+        context="Draft the revised summary.",
+        source="import",
+    )
+    parent_link = PromptForkLink(
+        id=2,
+        source_prompt_id=parent_prompt.id,
+        child_prompt_id=fork_prompt.id,
+        created_at=fork_prompt.created_at,
+    )
+    detail_widget = _PromptDetailWidgetStub()
+    template_detail_widget = _PromptDetailWidgetStub()
+    manager = _ManagerStub(parent_prompt=parent_prompt, parent_link=parent_link)
+    controller = WorkspaceHistoryController(
+        manager=_as_prompt_manager(manager),
+        model=_as_prompt_list_model(_PromptListModelStub()),
+        detail_widget=_as_prompt_detail_widget(detail_widget),
+        list_view=_as_list_view(_ListViewStub()),
+        current_prompt_supplier=lambda: fork_prompt,
+        template_detail_widget_supplier=_template_detail_supplier(template_detail_widget),
+        template_preview_controller_supplier=_template_preview_supplier(),
+        execution_controller_supplier=_execution_controller_supplier(),
+    )
+
+    controller.handle_selection_changed()
+
+    expected = "Forked from Source prompt | Changed from parent: body, tags"
+    assert detail_widget.lineage_summary == expected
+    assert template_detail_widget.lineage_summary == expected
+
+
+def test_workspace_history_controller_hides_difference_cue_without_parent_changes() -> None:
+    """Non-forks or identical forks should not show noisy changed-from-parent output."""
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000221"),
+        name="Standalone prompt",
+        description="Description",
+        category="General",
+        tags=["steady"],
+        context="Prompt body",
+        source="local",
+    )
+    detail_widget = _PromptDetailWidgetStub()
+    template_detail_widget = _PromptDetailWidgetStub()
+    controller = WorkspaceHistoryController(
+        manager=_as_prompt_manager(_ManagerStub()),
+        model=_as_prompt_list_model(_PromptListModelStub()),
+        detail_widget=_as_prompt_detail_widget(detail_widget),
+        list_view=_as_list_view(_ListViewStub()),
+        current_prompt_supplier=lambda: prompt,
+        template_detail_widget_supplier=_template_detail_supplier(template_detail_widget),
+        template_preview_controller_supplier=_template_preview_supplier(),
+        execution_controller_supplier=_execution_controller_supplier(),
+    )
+
+    controller.handle_selection_changed()
+
+    assert detail_widget.lineage_summary == "No lineage data yet."
+    assert template_detail_widget.lineage_summary == "No lineage data yet."

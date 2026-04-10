@@ -1,6 +1,7 @@
 """Coordinate prompt selection, lineage, and template preview updates.
 
 Updates:
+  v0.15.84 - 2026-04-10 - Add a bounded changed-from-parent lineage cue for forked prompts.
   v0.15.83 - 2026-04-10 - Resolve parent lineage summaries to human-readable prompt names.
   v0.15.82 - 2025-12-01 - Extract selection + lineage handling from gui.main_window.
 """
@@ -102,6 +103,12 @@ class WorkspaceHistoryController:
         if parent_link is not None:
             parent_label = self._resolve_prompt_name(parent_link.source_prompt_id)
             summary_parts.append(f"Forked from {parent_label}")
+            difference_summary = self._build_parent_difference_summary(
+                prompt=prompt,
+                parent_prompt_id=parent_link.source_prompt_id,
+            )
+            if difference_summary is not None:
+                summary_parts.append(difference_summary)
 
         try:
             children = self._manager.list_prompt_forks(prompt.id)
@@ -115,6 +122,30 @@ class WorkspaceHistoryController:
         template_detail = self._template_detail_widget_supplier()
         if template_detail is not None:
             template_detail.update_lineage_summary(summary_text)
+
+    def _build_parent_difference_summary(
+        self,
+        *,
+        prompt: Prompt,
+        parent_prompt_id: UUID,
+    ) -> str | None:
+        try:
+            parent_prompt = self._manager.get_prompt(parent_prompt_id)
+        except PromptManagerError:
+            return None
+
+        changed_fields: list[str] = []
+        if (prompt.context or "") != (parent_prompt.context or ""):
+            changed_fields.append("body")
+        if prompt.description != parent_prompt.description:
+            changed_fields.append("description")
+        if prompt.tags != parent_prompt.tags:
+            changed_fields.append("tags")
+        if prompt.source != parent_prompt.source:
+            changed_fields.append("source")
+        if not changed_fields:
+            return None
+        return f"Changed from parent: {', '.join(changed_fields)}"
 
     def _resolve_prompt_name(self, prompt_id: UUID) -> str:
         """Return a human-readable prompt label for lineage summaries."""
