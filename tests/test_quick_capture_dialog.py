@@ -78,13 +78,11 @@ def test_quick_capture_draft_unwraps_one_outer_markdown_fence() -> None:
     assert prompt.context == "Summarize deployment risks for the handoff."
 
 
-
 def test_unwrap_quick_capture_body_keeps_non_wrapped_or_mixed_input_intact() -> None:
     """Mixed prose plus fenced content should stay unchanged without one outer fence."""
     body = "Intro note\n```text\nSummarize deployment risks.\n```"
 
     assert unwrap_quick_capture_body(body) == body.strip()
-
 
 
 def test_quick_capture_dialog_uses_shared_title_quality_heuristic_when_title_missing(
