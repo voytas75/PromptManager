@@ -66,11 +66,7 @@ def build_prompt_preview(prompt: Prompt) -> str | None:
     name_key = prompt.name.strip().casefold()
 
     description = flatten_preview_text(prompt.description)
-    if (
-        description
-        and description.casefold() != name_key
-        and is_credible_preview_text(description)
-    ):
+    if description and description.casefold() != name_key and is_credible_preview_text(description):
         return truncate_preview_text(description)
 
     for scenario in prompt.scenarios:

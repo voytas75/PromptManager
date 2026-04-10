@@ -125,7 +125,6 @@ def test_draft_promote_dialog_keeps_clean_label_for_weak_signal_match(
     assert item.text() == "Existing reusable prompt — Operations"
 
 
-
 def test_draft_promote_dialog_promote_as_new_keeps_existing_target_clear(
     qt_app: QApplication,
 ) -> None:

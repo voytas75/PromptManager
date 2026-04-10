@@ -21,7 +21,6 @@ if TYPE_CHECKING:  # pragma: no cover - typing helper
     from models.prompt_model import Prompt
 
 
-
 class PromptListModel(QAbstractListModel):
     """List model providing prompt summaries for the QListView."""
 
