@@ -44,9 +44,11 @@ nox -s all
 
 There is no dedicated `requirements-dev.txt`; install the lint/type/test toolchain manually as shown above.
 
-1. Copy `config/config.template.json` to `config/config.json` for non-secret defaults.
-2. Export environment variables for anything secret or machine-specific (see below). Environment variables override JSON, which overrides built-in defaults.
-3. Run `python -m main --no-gui --print-settings` to verify filesystem paths, Redis, LiteLLM, and ChromaDB connectivity before coding.
+1. Copy `.env.example` to `.env` for a safe local starting point.
+2. Copy `config/config.template.json` to `config/config.json` for non-secret defaults.
+3. Export environment variables for anything secret or machine-specific (see below). Environment variables override JSON, which overrides built-in defaults.
+   - Set `PROMPT_MANAGER_ENV_FILE` if you want to load a different dotenv path.
+4. Run `python -m main --no-gui --print-settings` to verify filesystem paths, Redis, LiteLLM, and ChromaDB connectivity before coding.
 
 ## Configuration & Environment Variables
 
@@ -97,6 +99,7 @@ All settings are defined via `pydantic-settings` in `config/settings.py`. Provid
 | `PROMPT_MANAGER_CHAT_FONT_COLOR` | Workspace chat font colour (hex) | `#B5CFED` |
 
 Secrets must never be committed; rely on `.env` files ignored by git or host-level secret stores.
+The committed [`.env.example`](../.env.example) file is the canonical placeholder template for local setup and must never contain real credentials.
 
 Selecting `PROMPT_MANAGER_WEB_SEARCH_PROVIDER="random"` rotates calls between whichever providers currently have API keys configured; if only one provider has a key, Random behaves like that provider until another key is available.
 

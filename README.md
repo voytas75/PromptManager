@@ -64,7 +64,13 @@ pip install -r requirements.txt
 
 ### 2. Optional: add your API key
 
-If you want to execute prompts with LiteLLM-backed providers, set an API key:
+Start by copying the example environment file:
+
+```bash
+cp .env.example .env
+```
+
+If you want to execute prompts with LiteLLM-backed providers, fill in the LiteLLM values in `.env` or export them directly:
 
 ```bash
 export PROMPT_MANAGER_LITELLM_MODEL="gpt-4o-mini"
@@ -108,6 +114,8 @@ PromptManager supports optional integrations for:
 Advanced environment variables and full configuration details are documented in:
 - [`docs/README-DEV.md`](docs/README-DEV.md)
 - [`docs/web_search_plan.md`](docs/web_search_plan.md)
+
+The repository root also includes [`.env.example`](.env.example) as a safe starting point for local configuration.
 
 ## Why PromptManager
 
