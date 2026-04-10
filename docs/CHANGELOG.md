@@ -19,6 +19,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Fixed
 
+- Removed legacy `requirements.txt` and `requirements-dev.txt` from the repo so installation guidance now flows through `pyproject.toml` via `pip install -e .` / `pip install -e .[dev]`, and aligned GUI dependency messages plus README/developer docs with that single-source setup.
 - Unified body-only prompt copy labels on the prompt actions menu and prompt version history dialog under the shared `Copy Prompt` wording, while leaving distinct payload actions such as `Copy Snapshot` unchanged.
 - Tightened prompt-detail clipboard reuse so `Copy Prompt` copies only the stored prompt body and no longer falls back to description-only payloads.
 - Added focused regression coverage for the prompt-detail quick reuse happy path, including clipboard copy semantics and non-executing workspace handoff.

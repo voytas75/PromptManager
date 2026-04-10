@@ -1,4 +1,9 @@
-"""Default CLI behaviour for launching the Prompt Manager GUI."""
+"""Default CLI behaviour for launching the Prompt Manager GUI.
+
+Updates:
+  v0.1.1 - 2026-04-10 - Point GUI dependency guidance at pyproject-based installs.
+  v0.1.0 - 2025-11-01 - Add default GUI launcher flow for CLI mode.
+"""
 
 from __future__ import annotations
 
@@ -32,8 +37,8 @@ def run_default_mode(
         gui_module = importlib.import_module("gui")
     except ModuleNotFoundError as exc:  # pragma: no cover - import failure path
         logger.error(
-            "GUI launch requested but dependency %s is missing. Install requirements with "
-            "`pip install -r requirements.txt` or rerun without --gui.",
+            "GUI launch requested but dependency %s is missing. Install the project with "
+            "`pip install -e .` or rerun without --gui.",
             exc.name,
         )
         return 4
@@ -42,14 +47,14 @@ def run_default_mode(
     except AttributeError:  # pragma: no cover - misconfigured GUI package
         logger.error(
             "GUI module is missing the launch_prompt_manager entry point. "
-            "Reinstall dependencies with `pip install -r requirements.txt` "
+            "Reinstall the project with `pip install -e .` "
             "or launch without --gui."
         )
         return 4
     if not callable(launch_gui_callable):  # pragma: no cover - misconfigured entrypoint
         logger.error(
             "GUI module launch_prompt_manager entry point is not callable. "
-            "Reinstall dependencies with `pip install -r requirements.txt` "
+            "Reinstall the project with `pip install -e .` "
             "or launch without --gui."
         )
         return 4

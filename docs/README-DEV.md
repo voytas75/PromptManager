@@ -32,9 +32,6 @@ PromptManager is a PySide6 desktop application for managing reusable AI prompts 
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-pip install -r requirements.txt
-
-# Install dev extras (ruff, pyright, pytest, nox, etc.)
 pip install -e .[dev]
 
 # Optional developer extras
@@ -42,7 +39,7 @@ pip install ruff pytest pyright nox
 nox -s all
 ```
 
-There is no dedicated `requirements-dev.txt`; install the lint/type/test toolchain manually as shown above.
+`pyproject.toml` is the single source of truth for project dependencies; install the dev toolchain with `pip install -e .[dev]`.
 
 1. Copy `.env.example` to `.env` for a safe local starting point.
 2. Copy `config/config.template.json` to `config/config.json` for non-secret defaults.
@@ -169,7 +166,7 @@ Key UI capabilities:
 - Optional schema textarea supports JSON Schema (Draft 2020-12 via `jsonschema`) or derived Pydantic models. Choose the mode from the combo box to highlight failing top-level fields and show descriptive error text.
 - Custom filters available in prompt bodies: `truncate` (adds ellipsis), `slugify` (matches category helpers), and `json` (pretty printing with optional indent parameter).
 - Missing variables, schema violations, and undefined placeholders paint statuses red/orange in the variable list and block the rendered preview.
-- Dependencies `Jinja2==3.1.4` and `jsonschema==4.23.0` ship in `requirements.txt`; no optional extras are required for developers.
+- Dependencies such as `Jinja2` and `jsonschema` are declared in `pyproject.toml`; no extra install step is required beyond `pip install -e .[dev]`.
 
 ## Executing Prompts
 

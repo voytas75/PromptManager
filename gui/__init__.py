@@ -1,9 +1,11 @@
 """GUI module namespace for Prompt Manager.
 
-Updates: v0.3.1 - 2025-11-14 - Align dependency guidance with unified requirements install.
-Updates: v0.3.0 - 2025-11-05 - Handle missing PySide6 dependency with friendly error.
-Updates: v0.2.0 - 2025-11-04 - Expose PySide6 launcher utilities for prompt CRUD UI.
-Updates: v0.1.0 - 2025-10-30 - Package scaffold.
+Updates:
+  v0.3.2 - 2026-04-10 - Point missing-PySide6 guidance at pyproject-based installs.
+  v0.3.1 - 2025-11-14 - Align dependency guidance with unified requirements install.
+  v0.3.0 - 2025-11-05 - Handle missing PySide6 dependency with friendly error.
+  v0.2.0 - 2025-11-04 - Expose PySide6 launcher utilities for prompt CRUD UI.
+  v0.1.0 - 2025-10-30 - Package scaffold.
 """
 
 from __future__ import annotations
@@ -22,7 +24,7 @@ class GuiDependencyError(RuntimeError):
 
 
 _MISSING_PYSIDE6_MESSAGE = (
-    "PySide6 is not installed. Install dependencies with `pip install -r requirements.txt` "
+    "PySide6 is not installed. Install the project with `pip install -e .` "
     "before launching the GUI, or rerun with --no-gui."
 )
 

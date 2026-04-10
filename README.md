@@ -59,7 +59,7 @@ Use PromptManager when you want to:
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-pip install -r requirements.txt
+pip install -e .
 ```
 
 ### 2. Optional: add your API key
