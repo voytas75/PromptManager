@@ -1,7 +1,7 @@
 # PromptManager — Next Slice Brief
 
 Date: 2026-04-06
-Status: proposed
+Status: delivered
 Slice name: Retrieval Preview v1
 Primary source: `docs/product-boundary-ssot.md`
 Supporting sources:
@@ -132,3 +132,9 @@ The slice is done when:
 - the implementation stays bounded,
 - the focused tests pass,
 - nothing peripheral expands.
+
+## Implementation note
+
+Delivered as a bounded secondary preview line in the shared main prompt list.
+
+Implementation derives one compact preview only from existing prompt data, preferring description, then scenario text, then credible source, with deterministic flattening/truncation and focused regression coverage for visible, absent, and bounded rendering paths.

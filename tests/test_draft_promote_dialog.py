@@ -1,6 +1,7 @@
 """Focused tests for the draft promote dialog.
 
 Updates:
+  v0.1.2 - 2026-04-10 - Cover bounded similar-match preview cues in the advisory promote list.
   v0.1.1 - 2026-04-06 - Cover shared title-quality improvements for untouched draft titles.
   v0.1.0 - 2026-04-04 - Cover advisory similar-prompt rendering and actions.
 """
@@ -80,7 +81,7 @@ def test_draft_promote_dialog_lists_similar_prompts_and_opens_selection(
     assert not dialog._similar_prompts_list.isHidden()  # noqa: SLF001
     assert dialog._similar_prompts_list.count() == 1  # noqa: SLF001
     item = dialog._similar_prompts_list.item(0)  # noqa: SLF001
-    assert item.text() == "Existing reusable prompt — Operations"
+    assert item.text() == "Existing reusable prompt — Operations · Already curated."
     assert "Last modified: 2026-04-04 18:00 UTC" in item.toolTip()
     assert "Similarity: 0.87" in item.toolTip()
 
@@ -91,6 +92,38 @@ def test_draft_promote_dialog_lists_similar_prompts_and_opens_selection(
     assert dialog.selected_existing_prompt_id == similar.id
     assert dialog.result_prompt is None
     assert dialog.result() == dialog.DialogCode.Accepted
+
+
+def test_draft_promote_dialog_keeps_clean_label_for_weak_signal_match(
+    qt_app: QApplication,
+) -> None:
+    """Weak-signal similar prompts should keep the compact label without extra filler text."""
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000519"),
+        name="Captured draft",
+        description="Quick capture draft.",
+        category="General",
+        context="Draft body",
+        ext2={"capture_state": "draft", "capture_method": "quick_capture"},
+    )
+    similar = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000520"),
+        name="Existing reusable prompt",
+        description="",
+        category="Operations",
+        source="local",
+        context="Existing body",
+        last_modified=datetime(2026, 4, 4, 18, 0, tzinfo=UTC),
+    )
+
+    dialog = DraftPromoteDialog(prompt, categories=["General"], similar_prompts=[similar])
+    dialog.show()
+    qt_app.processEvents()
+
+    item = dialog._similar_prompts_list.item(0)  # noqa: SLF001
+
+    assert item.text() == "Existing reusable prompt — Operations"
+
 
 
 def test_draft_promote_dialog_promote_as_new_keeps_existing_target_clear(

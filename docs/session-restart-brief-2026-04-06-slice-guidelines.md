@@ -38,6 +38,7 @@ Nie rozlewać scope'u w stronę:
 Przy kolejnych decyzjach i briefach najpierw czytać:
 - `docs/product-boundary-ssot.md`
 - `docs/product-boundary-alignment-audit-2026-04-04.md`
+- `docs/product-backlog-ssot.md`
 - ten plik
 
 Jeśli potrzebny jest kontekst wdrożeniowy dla reuse:
@@ -54,12 +55,20 @@ Jeśli potrzebny jest kontekst wdrożeniowy dla reuse:
 4. `Reuse Polish v1`
 5. `Copy Prompt terminology consistency v1`
 6. `Copy Prompt docs cleanup v1`
+7. `Capture Provenance v1`
+8. `Usage Cue v1`
+9. `Retrieval Preview v1`
+10. `Similar Match Preview v1`
 
 ### Practical meaning
 - draft capture działa,
 - recent reopen działa,
 - promote draft działa,
 - detail-view quick reuse działa,
+- capture provenance działa,
+- usage cue działa,
+- retrieval preview działa,
+- similar-match preview działa,
 - body-only copy label jest spójny jako `Copy Prompt`,
 - aktywne docs są już wyrównane do `Copy Prompt`.
 
@@ -89,15 +98,17 @@ Każdy kolejny slice ma być:
 
 Preferowana kolejność pracy:
 1. wybrać dokładnie jeden bounded next slice,
-2. zrobić krótki build brief,
-3. zrobić brief delegacyjny dla Codexa,
+2. zawsze zrobić krótki build brief przed implementacją,
+3. jeśli delegacja jest użyta, zrobić brief delegacyjny dla Codexa,
 4. wdrożyć,
 5. zrobić krótki implementation review,
-6. zaktualizować minimalnie docs tylko tam, gdzie to naprawdę potrzebne.
+6. zawsze zaktualizować stosowne docs dla dowiezionego slice'a, minimalnie i bez docs-cleanup driftu.
 
 ## Hard constraints for next implementation passes
 
 - nie re-implementować slice'ów już dowiezionych,
+- nie zaczynać implementacji bez briefu dla danego slice'a,
+- nie kończyć slice'a bez aktualizacji stosownych dokumentów,
 - nie robić broad cleanup przy okazji małego celu,
 - nie mieszać kilku zmian produktowych w jednym slice'ie,
 - nie zmieniać semantyki istniejących flow bez osobnego briefu,

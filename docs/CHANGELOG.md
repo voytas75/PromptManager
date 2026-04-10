@@ -11,6 +11,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 - Added one compact **When to use** cue to the prompt detail view when existing prompt data already contains a short credible usage signal (for example a saved scenario, description, or example text).
 - Added bounded **Title Quality v1** for draft-origin prompts so Quick Capture and Draft Promote can derive or preserve short readable titles using one shared deterministic heuristic without widening the prompt model.
 - Added a bounded **Retrieval Preview v1** secondary line to the main prompt list when existing description, scenario, or source data already provides a short credible distinguishing signal.
+- Added one bounded **Similar Match Preview v1** cue to the Draft Promote advisory list so similar existing prompts expose a short visible distinguishing signal before the operator decides to open one or continue promoting as new.
 
 ### Fixed
 

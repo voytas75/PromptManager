@@ -1,6 +1,7 @@
 """Compact dialog and helpers for promoting captured draft prompts.
 
 Updates:
+  v0.1.3 - 2026-04-10 - Show one bounded distinguishing preview cue for similar prompt matches.
   v0.1.2 - 2026-04-06 - Improve untouched placeholder/raw draft titles with the shared heuristic.
   v0.1.1 - 2026-04-04 - Add advisory similar-prompt review actions to draft promotion.
   v0.1.0 - 2026-04-04 - Add bounded draft promotion dialog that preserves prompt provenance.
@@ -30,6 +31,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..prompt_preview import build_prompt_preview
 from .base import resolve_draft_origin_title
 from .quick_capture import parse_quick_capture_tags
 
@@ -261,9 +263,13 @@ class DraftPromoteDialog(QDialog):
 
     @staticmethod
     def _build_similar_prompt_label(prompt: Prompt) -> str:
-        """Return a compact single-line label for a similar prompt match."""
+        """Return a compact identifying label for a similar prompt match."""
         category = prompt.category.strip() or "Uncategorised"
-        return f"{prompt.name} — {category}"
+        label = f"{prompt.name} — {category}"
+        preview = build_prompt_preview(prompt)
+        if preview:
+            return f"{label} · {preview}"
+        return label
 
     @staticmethod
     def _build_similar_prompt_tooltip(prompt: Prompt) -> str:
