@@ -1,6 +1,7 @@
 """Prompt versioning and fork helpers for Prompt Manager.
 
 Updates:
+  v0.1.1 - 2026-04-10 - Reset forked prompts to a fresh visible version baseline.
   v0.1.0 - 2025-12-03 - Extract versioning, diff, and fork APIs into mixin.
 """
 
@@ -203,6 +204,7 @@ class PromptVersionMixin:
             source_prompt,
             id=uuid.uuid4(),
             name=fork_name,
+            version="1",
             last_modified=now,
             created_at=now,
             usage_count=0,

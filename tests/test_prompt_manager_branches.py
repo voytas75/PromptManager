@@ -1,6 +1,7 @@
 """Branch coverage tests for PromptManager edge cases.
 
 Updates:
+  v0.1.3 - 2026-04-10 - Verify forked prompts reset to a fresh visible version baseline.
   v0.1.2 - 2025-12-08 - Import ChromaError, add override decorator, reuse concrete stub for Pyright.
   v0.1.1 - 2025-11-22 - Seed version history for legacy prompts without snapshots.
   v0.1.0 - 2025-10-30 - Add unit tests for error handling and caching paths.
@@ -1164,10 +1165,18 @@ def test_prompt_fork_records_lineage() -> None:
     manager = _build_manager(repository=repo)
     prompt = _sample_prompt()
     manager.create_prompt(prompt)
+    prompt.context = "Base context v2"
+    prompt = manager.update_prompt(prompt)
+    prompt.context = "Base context v3"
+    prompt = manager.update_prompt(prompt)
 
     forked = manager.fork_prompt(prompt.id, name="Experiment")
     assert forked.name == "Experiment"
     assert forked.source == "fork"
+    assert forked.version == "1"
+
+    fork_versions = manager.list_prompt_versions(forked.id)
+    assert [version.version_number for version in fork_versions] == [1]
 
     parent_link = manager.get_prompt_parent_fork(forked.id)
     assert parent_link is not None

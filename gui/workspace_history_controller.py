@@ -1,6 +1,7 @@
 """Coordinate prompt selection, lineage, and template preview updates.
 
 Updates:
+  v0.15.83 - 2026-04-10 - Resolve parent lineage summaries to human-readable prompt names.
   v0.15.82 - 2025-12-01 - Extract selection + lineage handling from gui.main_window.
 """
 
@@ -8,7 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from core import PromptManager, PromptVersionError
+from core import PromptManager, PromptManagerError, PromptVersionError
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from collections.abc import Callable
@@ -99,7 +100,8 @@ class WorkspaceHistoryController:
         except PromptVersionError:
             parent_link = None
         if parent_link is not None:
-            summary_parts.append(f"Forked from {parent_link.source_prompt_id}")
+            parent_label = self._resolve_prompt_name(parent_link.source_prompt_id)
+            summary_parts.append(f"Forked from {parent_label}")
 
         try:
             children = self._manager.list_prompt_forks(prompt.id)
@@ -113,6 +115,15 @@ class WorkspaceHistoryController:
         template_detail = self._template_detail_widget_supplier()
         if template_detail is not None:
             template_detail.update_lineage_summary(summary_text)
+
+    def _resolve_prompt_name(self, prompt_id: UUID) -> str:
+        """Return a human-readable prompt label for lineage summaries."""
+        try:
+            parent_prompt = self._manager.get_prompt(prompt_id)
+        except PromptManagerError:
+            return str(prompt_id)
+        name = parent_prompt.name.strip()
+        return name or str(prompt_id)
 
     def _update_template_preview(self, prompt: Prompt | None) -> None:
         controller = self._template_preview_controller_supplier()
