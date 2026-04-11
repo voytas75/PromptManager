@@ -48,6 +48,8 @@ Use PromptManager when you want to:
 - **Optional validation workspace** — run prompts with LiteLLM-backed models only when lightweight validation or reuse benefits from it
 - **Supporting prompt parts and light history signals** — reuse supporting prompt components and inspect secondary support surfaces without changing the product center
 
+For one recommended operator flow through the current product center, see [`docs/canonical-usage-path-v1.md`](docs/canonical-usage-path-v1.md).
+
 ## Quick start
 
 ### 1. Create a virtual environment
