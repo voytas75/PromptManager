@@ -55,11 +55,23 @@ Use PromptManager when you want to:
 
 ### 1. Create a virtual environment
 
+Use either the existing `pip` flow or `uv`.
+
+**Option A — pip + venv**
+
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install -e .
+```
+
+**Option B — uv**
+
+```bash
+uv venv
+source .venv/bin/activate
+uv pip install -e .
 ```
 
 ### 2. Optional: add your API key
@@ -83,12 +95,16 @@ If you skip this step, PromptManager can still be used for local cataloguing, ed
 
 ```bash
 python -m main --no-gui --print-settings
+# or
+uv run python -m main --no-gui --print-settings
 ```
 
 ### 4. Launch the app
 
 ```bash
 python -m main
+# or
+uv run python -m main
 ```
 
 ## Minimal local setup

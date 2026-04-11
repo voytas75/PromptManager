@@ -28,6 +28,10 @@ PromptManager is a PySide6 desktop application for managing reusable AI prompts 
 
 ## Environment Setup
 
+Use either the existing `pip` flow or `uv`.
+
+**Option A — pip + venv**
+
 ```bash
 python -m venv .venv
 source .venv/bin/activate
@@ -39,13 +43,23 @@ pip install ruff pytest pyright nox
 nox -s all
 ```
 
-`pyproject.toml` is the single source of truth for project dependencies; install the dev toolchain with `pip install -e .[dev]`.
+**Option B — uv**
+
+```bash
+uv venv
+source .venv/bin/activate
+uv pip install -e .[dev]
+uv run pyright
+uv run pytest -n auto --cov=core --cov-report=term-missing --cov-fail-under=80
+```
+
+`pyproject.toml` is the single source of truth for project dependencies; install the dev toolchain with either `pip install -e .[dev]` or `uv pip install -e .[dev]`.
 
 1. Copy `.env.example` to `.env` for a safe local starting point.
 2. Copy `config/config.template.json` to `config/config.json` for non-secret defaults.
 3. Export environment variables for anything secret or machine-specific (see below). Environment variables override JSON, which overrides built-in defaults.
    - Set `PROMPT_MANAGER_ENV_FILE` if you want to load a different dotenv path.
-4. Run `python -m main --no-gui --print-settings` to verify filesystem paths, Redis, LiteLLM, and ChromaDB connectivity before coding.
+4. Run `python -m main --no-gui --print-settings` (or `uv run python -m main --no-gui --print-settings`) to verify filesystem paths, Redis, LiteLLM, and ChromaDB connectivity before coding.
 
 ## Configuration & Environment Variables
 
@@ -135,14 +149,20 @@ See [`docs/web_search_plan.md`](web_search_plan.md) for the staged web search in
 - Launch normally:
   ```bash
   python -m main
+  # or
+  uv run python -m main
   ```
 - Launch without the GUI (bootstrap/CLI mode):
   ```bash
   python -m main --no-gui
+  # or
+  uv run python -m main --no-gui
   ```
 - Smoke-test config and dependencies:
   ```bash
   python -m main --no-gui --print-settings
+  # or
+  uv run python -m main --no-gui --print-settings
   ```
 
 Key UI capabilities:
