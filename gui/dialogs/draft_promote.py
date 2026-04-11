@@ -1,6 +1,8 @@
 """Compact dialog and helpers for promoting captured draft prompts.
 
 Updates:
+  v0.1.6 - 2026-04-11 - Add one bounded likely-duplicate cue
+  for promote-time advisory matches with the same normalized body.
   v0.1.5 - 2026-04-11 - Nudge very close promote-time matches
   with a stronger open-existing button label.
   v0.1.4 - 2026-04-11 - Add one bounded visible
@@ -40,9 +42,11 @@ from .base import resolve_draft_origin_title
 from .quick_capture import parse_quick_capture_tags
 
 VERY_CLOSE_SIMILARITY_THRESHOLD = 0.85
+LIKELY_DUPLICATE_CUE = "Likely duplicate"
 VERY_CLOSE_MATCH_CUE = "Very close match"
 OPEN_SIMILAR_EXISTING_LABEL = "Open Existing Match"
 OPEN_VERY_CLOSE_EXISTING_LABEL = "Open Very Close Match"
+OPEN_LIKELY_DUPLICATE_LABEL = "Open Likely Duplicate"
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from collections.abc import Sequence
@@ -220,7 +224,12 @@ class DraftPromoteDialog(QDialog):
             self._open_existing_button.hide()
             return
 
-        if any(self._build_similarity_strength_cue(prompt) for prompt in self._similar_prompts):
+        if any(self._build_likely_duplicate_cue(prompt) for prompt in self._similar_prompts):
+            self._similarity_summary.setText(
+                "A likely duplicate may already exist. "
+                "Review it before promoting this draft as a new prompt."
+            )
+        elif any(self._build_similarity_strength_cue(prompt) for prompt in self._similar_prompts):
             self._similarity_summary.setText(
                 "A very close existing match may already exist. "
                 "Review it before promoting this draft as a new prompt."
@@ -252,7 +261,11 @@ class DraftPromoteDialog(QDialog):
         if row < 0 or row >= len(self._similar_prompts):
             self._open_existing_button.setText(OPEN_SIMILAR_EXISTING_LABEL)
             return
-        strength_cue = self._build_similarity_strength_cue(self._similar_prompts[row])
+        prompt = self._similar_prompts[row]
+        if self._build_likely_duplicate_cue(prompt) is not None:
+            self._open_existing_button.setText(OPEN_LIKELY_DUPLICATE_LABEL)
+            return
+        strength_cue = self._build_similarity_strength_cue(prompt)
         if strength_cue is not None:
             self._open_existing_button.setText(OPEN_VERY_CLOSE_EXISTING_LABEL)
             return
@@ -285,21 +298,39 @@ class DraftPromoteDialog(QDialog):
         self._selected_existing_prompt_id = None
         self.accept()
 
-    @staticmethod
-    def _build_similar_prompt_label(prompt: Prompt) -> str:
+    def _build_similar_prompt_label(self, prompt: Prompt) -> str:
         """Return a compact identifying label for a similar prompt match."""
         category = prompt.category.strip() or "Uncategorised"
         label = f"{prompt.name} — {category}"
         cue_parts: list[str] = []
-        strength_cue = DraftPromoteDialog._build_similarity_strength_cue(prompt)
-        if strength_cue:
-            cue_parts.append(strength_cue)
+        duplicate_cue = self._build_likely_duplicate_cue(prompt)
+        if duplicate_cue:
+            cue_parts.append(duplicate_cue)
+        else:
+            strength_cue = self._build_similarity_strength_cue(prompt)
+            if strength_cue:
+                cue_parts.append(strength_cue)
         preview = build_prompt_preview(prompt)
         if preview:
             cue_parts.append(preview)
         if cue_parts:
             return f"{label} · {' · '.join(cue_parts)}"
         return label
+
+    @staticmethod
+    def _normalize_duplicate_candidate_body(value: str | None) -> str:
+        """Return one bounded normalized body string for duplicate comparison."""
+        return " ".join((value or "").split())
+
+    def _build_likely_duplicate_cue(self, prompt: Prompt) -> str | None:
+        """Return one stronger cue when the advisory match body equals the draft body."""
+        draft_body = self._normalize_duplicate_candidate_body(self._source_prompt.context)
+        candidate_body = self._normalize_duplicate_candidate_body(prompt.context)
+        if not draft_body or not candidate_body:
+            return None
+        if draft_body != candidate_body:
+            return None
+        return LIKELY_DUPLICATE_CUE
 
     @staticmethod
     def _build_similarity_strength_cue(prompt: Prompt) -> str | None:

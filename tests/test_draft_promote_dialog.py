@@ -1,6 +1,8 @@
 """Focused tests for the draft promote dialog.
 
 Updates:
+  v0.1.5 - 2026-04-11 - Cover bounded likely-duplicate cues
+  and stronger selected-action wording.
   v0.1.4 - 2026-04-11 - Cover stronger open-existing button copy
   for very close promote-time matches.
   v0.1.3 - 2026-04-11 - Cover one bounded visible
@@ -55,16 +57,16 @@ def test_draft_promote_dialog_hides_similar_section_when_no_matches(qt_app: QApp
     assert dialog.selected_existing_prompt_id is None
 
 
-def test_draft_promote_dialog_lists_similar_prompts_and_opens_selection(
+def test_draft_promote_dialog_shows_likely_duplicate_cue_and_opens_selection(
     qt_app: QApplication,
 ) -> None:
-    """Some-match flow should show a compact list and support opening one existing prompt."""
+    """Likely duplicates should use stronger advisory wording than ordinary very-close matches."""
     prompt = Prompt(
         id=uuid.UUID("00000000-0000-0000-0000-000000000511"),
         name="Captured draft",
         description="Quick capture draft.",
         category="General",
-        context="Draft body",
+        context="Summarize deployment risks for the release handoff.",
         ext2={"capture_state": "draft", "capture_method": "quick_capture"},
     )
     similar = Prompt(
@@ -73,7 +75,7 @@ def test_draft_promote_dialog_lists_similar_prompts_and_opens_selection(
         description="Already curated.",
         category="Operations",
         tags=["ops", "reuse"],
-        context="Existing body",
+        context="  Summarize   deployment risks for the release handoff.  ",
         last_modified=datetime(2026, 4, 4, 18, 0, tzinfo=UTC),
     )
     similar.similarity = 0.87
@@ -82,20 +84,17 @@ def test_draft_promote_dialog_lists_similar_prompts_and_opens_selection(
     dialog.show()
     qt_app.processEvents()
 
-    assert "A very close existing match may already exist" in dialog._similarity_summary.text()  # noqa: SLF001
+    assert "A likely duplicate may already exist" in dialog._similarity_summary.text()  # noqa: SLF001
     assert not dialog._similar_prompts_list.isHidden()  # noqa: SLF001
     assert dialog._similar_prompts_list.count() == 1  # noqa: SLF001
     item = dialog._similar_prompts_list.item(0)  # noqa: SLF001
-    assert (
-        item.text()
-        == "Existing reusable prompt — Operations · Very close match · Already curated."
-    )
+    assert item.text() == "Existing reusable prompt — Operations · Likely duplicate · Already curated."
     assert "Last modified: 2026-04-04 18:00 UTC" in item.toolTip()
     assert "Similarity: 0.87" in item.toolTip()
     open_button = next(
         button
         for button in dialog.findChildren(QPushButton)
-        if button.text() == "Open Very Close Match"
+        if button.text() == "Open Likely Duplicate"
     )
     assert open_button.isEnabled()
 
@@ -213,6 +212,44 @@ def test_draft_promote_dialog_shows_strength_cue_at_threshold(qt_app: QApplicati
         button
         for button in dialog.findChildren(QPushButton)
         if button.text() == "Open Very Close Match"
+    )
+    assert open_button.isEnabled()
+
+
+def test_draft_promote_dialog_prefers_likely_duplicate_cue_over_very_close_match(
+    qt_app: QApplication,
+) -> None:
+    """Matching normalized bodies should override the ordinary very-close row cue path."""
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000527"),
+        name="Captured draft",
+        description="Quick capture draft.",
+        category="General",
+        context="Summarize deployment risks for the release handoff.",
+        ext2={"capture_state": "draft", "capture_method": "quick_capture"},
+    )
+    similar = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000528"),
+        name="Existing reusable prompt",
+        description="Already curated.",
+        category="Operations",
+        context="Summarize deployment risks for the release handoff.",
+        last_modified=datetime(2026, 4, 4, 18, 0, tzinfo=UTC),
+    )
+    similar.similarity = 0.97
+
+    dialog = DraftPromoteDialog(prompt, categories=["General"], similar_prompts=[similar])
+    dialog.show()
+    qt_app.processEvents()
+
+    item = dialog._similar_prompts_list.item(0)  # noqa: SLF001
+
+    assert "Likely duplicate" in item.text()
+    assert "Very close match" not in item.text()
+    open_button = next(
+        button
+        for button in dialog.findChildren(QPushButton)
+        if button.text() == "Open Likely Duplicate"
     )
     assert open_button.isEnabled()
 
