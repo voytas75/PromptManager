@@ -22,7 +22,7 @@ PromptManager is designed for people who actively work with prompts and want a m
 
 - **AI developers** who maintain reusable prompts across projects
 - **prompt engineers** who want a durable prompt base instead of scattered snippets
-- **solo builders** who want one local prompt workspace instead of loose Markdown files and chat fragments
+- **solo builders** who want one local prompt catalog instead of loose Markdown files and chat fragments
 - **operators and researchers** who collect prompts from many places and want to find and reuse them quickly
 
 ## What it helps with
@@ -32,9 +32,9 @@ Use PromptManager when you want to:
 - capture useful prompts or LLM queries into a searchable local catalog
 - normalize drafts into reusable prompt assets with better titles, metadata, and provenance
 - reopen recent work quickly and inspect prompt context without hunting through metadata
-- preview and validate templated prompts before running them
-- execute prompts from a dedicated workspace when lightweight validation or reuse helps
-- review prompt lineage, reuse context, and supporting execution history when needed
+- preview templated prompts before reuse or optional validation
+- use a lightweight workspace only when prompt validation or reuse benefits from it
+- review prompt lineage, reuse context, and light supporting history when needed
 - keep prompt work local-first, with optional external providers
 
 ## Core capabilities
@@ -45,8 +45,8 @@ Use PromptManager when you want to:
 - **Quick reuse actions** — copy the real prompt body from detail view with one obvious `Copy Prompt` action, or open the prompt in the workspace without auto-running it
 - **Semantic retrieval** — find prompts by meaning, not only exact text
 - **Template preview** — render Jinja2 templates with JSON variables and validation feedback
-- **Lightweight execution workspace** — run prompts with LiteLLM-backed models and keep execution history when validation or reuse benefits from it
-- **Supporting prompt parts and analytics** — reuse supporting prompt components and inspect lightweight history signals without changing the product center
+- **Optional validation workspace** — run prompts with LiteLLM-backed models only when lightweight validation or reuse benefits from it
+- **Supporting prompt parts and light history signals** — reuse supporting prompt components and inspect secondary support surfaces without changing the product center
 
 ## Quick start
 
@@ -146,7 +146,7 @@ PromptManager gives you a dedicated local-first home for prompt assets:
 - structured
 - searchable
 - reuse-friendly
-- execution-aware when needed
+- validation-aware when needed
 
 ## Project status
 
@@ -171,7 +171,7 @@ The current focus is:
 
 ### Supporting reuse, validation, and local operations
 
-- Prompt execution workspace supports LiteLLM-backed runs, streaming output, chat-style transcripts, export/import utilities, and persisted execution history when validation or reuse benefits from it.
+- Prompt execution workspace supports LiteLLM-backed runs and persisted execution history when lightweight validation or reuse benefits from it.
 - Dedicated Prompt Template editor exposes LiteLLM system prompts with inline validation and reset-to-default controls.
 - Typed configuration loading (`config.settings`) validates paths, TTLs, and provider settings from env vars or JSON.
 - Optional Redis-backed caching plus deterministic embeddings keep the app useful in offline or air-gapped workflows.
@@ -181,8 +181,7 @@ The current focus is:
 ### Supporting history and light analytics
 
 - Every run is logged to SQLite with request/response snippets, latency, token usage, status, and structured context metadata. The GUI History tab and programmatic APIs (`list_recent_executions`, `list_executions_for_prompt`) surface that data for review, troubleshooting, and light curation.
-- Token usage tracking shows per-run prompt/completion/total tokens, running session totals, and dashboard summaries. Expanded rollups are outlined in `docs/token_usage_plan.md`.
-- Analytics dashboard surfaces usage frequency, cost breakdowns, benchmark success, intent success trends, and embedding health with CSV export.
+- Token usage tracking and analytics surfaces exist for operators who want lightweight curation signals, cost visibility, or diagnostics, but they remain secondary to the prompt catalog itself.
 - Execution analytics CLI (`history-analytics`) summarises success rates, latency, and rating trends.
 - Diagnostics CLI targets (`python -m main diagnostics embeddings|analytics`) verify embedding backends, scan Chroma for inconsistencies, and export deeper analysis data.
 
