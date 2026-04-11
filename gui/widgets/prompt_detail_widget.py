@@ -49,11 +49,10 @@ if TYPE_CHECKING:  # pragma: no cover - typing helper
 
 
 class PromptDetailWidget(QWidget):
-    _TITLE_FONT_DELTA = 2.0
-    _BODY_FONT_DELTA = 1.0
-
     """Panel that summarises the currently selected prompt."""
 
+    _TITLE_FONT_DELTA = 2.0
+    _BODY_FONT_DELTA = 1.0
     _CONTEXT_PREVIEW_LIMIT = 200
     _USAGE_CUE_MAX_LENGTH = 140
     _USAGE_CUE_MAX_WORDS = 24

@@ -1,7 +1,8 @@
 """Custom delegate for bounded retrieval previews in the main prompt list.
 
 Updates:
-  v0.1.1 - 2026-04-11 - Keep the second preview line at the row base font size for better readability.
+  v0.1.1 - 2026-04-11 - Keep the second preview line
+  at the row base font size for better readability.
   v0.1.0 - 2026-04-06 - Render a muted second preview line when the model exposes one.
 """
 

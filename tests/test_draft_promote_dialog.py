@@ -1,8 +1,10 @@
 """Focused tests for the draft promote dialog.
 
 Updates:
-  v0.1.4 - 2026-04-11 - Cover stronger open-existing button copy for very close promote-time matches.
-  v0.1.3 - 2026-04-11 - Cover one bounded visible similarity-strength cue for very close promote-time matches.
+  v0.1.4 - 2026-04-11 - Cover stronger open-existing button copy
+  for very close promote-time matches.
+  v0.1.3 - 2026-04-11 - Cover one bounded visible
+  similarity-strength cue for very close promote-time matches.
   v0.1.2 - 2026-04-10 - Cover bounded similar-match preview cues in the advisory promote list.
   v0.1.1 - 2026-04-06 - Cover shared title-quality improvements for untouched draft titles.
   v0.1.0 - 2026-04-04 - Cover advisory similar-prompt rendering and actions.
@@ -84,11 +86,16 @@ def test_draft_promote_dialog_lists_similar_prompts_and_opens_selection(
     assert not dialog._similar_prompts_list.isHidden()  # noqa: SLF001
     assert dialog._similar_prompts_list.count() == 1  # noqa: SLF001
     item = dialog._similar_prompts_list.item(0)  # noqa: SLF001
-    assert item.text() == "Existing reusable prompt — Operations · Very close match · Already curated."
+    assert (
+        item.text()
+        == "Existing reusable prompt — Operations · Very close match · Already curated."
+    )
     assert "Last modified: 2026-04-04 18:00 UTC" in item.toolTip()
     assert "Similarity: 0.87" in item.toolTip()
     open_button = next(
-        button for button in dialog.findChildren(QPushButton) if button.text() == "Open Very Close Match"
+        button
+        for button in dialog.findChildren(QPushButton)
+        if button.text() == "Open Very Close Match"
     )
     assert open_button.isEnabled()
 
@@ -164,7 +171,9 @@ def test_draft_promote_dialog_hides_visible_strength_cue_for_non_close_match(
     assert "Similarity: 0.72" in item.toolTip()
     assert "Similar prompts already exist" in dialog._similarity_summary.text()  # noqa: SLF001
     open_button = next(
-        button for button in dialog.findChildren(QPushButton) if button.text() == "Open Existing Match"
+        button
+        for button in dialog.findChildren(QPushButton)
+        if button.text() == "Open Existing Match"
     )
     assert open_button.isEnabled()
 
@@ -195,10 +204,15 @@ def test_draft_promote_dialog_shows_strength_cue_at_threshold(qt_app: QApplicati
 
     item = dialog._similar_prompts_list.item(0)  # noqa: SLF001
 
-    assert item.text() == "Existing reusable prompt — Operations · Very close match · Already curated."
+    assert (
+        item.text()
+        == "Existing reusable prompt — Operations · Very close match · Already curated."
+    )
     assert "A very close existing match may already exist" in dialog._similarity_summary.text()  # noqa: SLF001
     open_button = next(
-        button for button in dialog.findChildren(QPushButton) if button.text() == "Open Very Close Match"
+        button
+        for button in dialog.findChildren(QPushButton)
+        if button.text() == "Open Very Close Match"
     )
     assert open_button.isEnabled()
 

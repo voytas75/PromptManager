@@ -1,8 +1,10 @@
 """Compact dialog and helpers for promoting captured draft prompts.
 
 Updates:
-  v0.1.5 - 2026-04-11 - Nudge very close promote-time matches with a stronger open-existing button label.
-  v0.1.4 - 2026-04-11 - Add one bounded visible similarity-strength cue for very close promote-time matches.
+  v0.1.5 - 2026-04-11 - Nudge very close promote-time matches
+  with a stronger open-existing button label.
+  v0.1.4 - 2026-04-11 - Add one bounded visible
+  similarity-strength cue for very close promote-time matches.
   v0.1.3 - 2026-04-10 - Show one bounded distinguishing preview cue for similar prompt matches.
   v0.1.2 - 2026-04-06 - Improve untouched placeholder/raw draft titles with the shared heuristic.
   v0.1.1 - 2026-04-04 - Add advisory similar-prompt review actions to draft promotion.
