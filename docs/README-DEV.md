@@ -15,14 +15,14 @@ PromptManager is a PySide6 desktop application for managing reusable AI prompts 
 
 - **Python**: 3.13+ (3.14 when stable) with `pyright` in strict mode; annotations are mandatory (no `type: ignore` in `core/`).
 - **Formatting/Linting**: `ruff check --fix .` followed by `ruff format .` (line length 100). Import ordering follows ruff/isort (builtin → stdlib → third-party → local).
-- **Testing**: `pytest -n auto --cov=core --cov-report=term-missing --cov-fail-under=80` with `pytest-asyncio`, `pytest-cov`, and `hypothesis` for parsing/generation code. Mock all external HTTP/DB calls (`respx`, `vcrpy`, `pytest-mock`).
+- **Testing**: `pytest -n auto --cov=core --cov-report=term-missing --cov-fail-under=80` with `pytest-asyncio`, `pytest-cov`, and `hypothesis` for parsing/generation code. Under `uv`, prefer `uv sync --extra dev` first, then `uv run pytest ...`, or use one-shot `uv run --extra dev pytest ...`. Mock all external HTTP/DB calls (`respx`, `vcrpy`, `pytest-mock`).
 - **Automation**: `nox -s format lint typecheck test` runs the full CI-equivalent workflow. Keep parity with AGENTS.md quality gates (Ruff + Pyright strict + coverage ≥80%).
 - **Security & Resilience**: wrap external I/O in timeouts, provide custom exception hierarchy, never use bare `except`, and include actionable context plus retries with exponential backoff where transient failures may occur.
 
 ### Release hardening baseline (Beta → stable)
 
 - This baseline is non-negotiable for merges: strict Ruff/Pyright/Pytest+coverage gates, fail-fast settings validation, and external I/O resilience (timeouts + bounded retries + deterministic mocking).
-- CI uses `.github/workflows/quality-gates.yml`; the local parity command is `nox -s all` (or the individual `.venv/bin/ruff|pyright|pytest` invocations).
+- CI uses `.github/workflows/quality-gates.yml`; the local parity command is `nox -s all` (or the individual `.venv/bin/ruff|pyright|pytest` invocations). For `uv`-driven local parity, sync dev extras first with `uv sync --extra dev`.
 - Validate settings early during development with `python -m main --no-gui --print-settings` or `python scripts/validate_settings.py`; configuration failures must be actionable and stop execution.
 - For HTTP I/O, prefer `httpx.AsyncClient(timeout=...)` plus retry helpers (e.g., `core.retry.async_retry`) and mock calls in tests with `httpx.MockTransport`, `respx`, or `vcrpy` (no live external calls in CI).
 
@@ -43,17 +43,21 @@ pip install ruff pytest pyright nox
 nox -s all
 ```
 
-**Option B — uv**
+**Option B — uv (recommended)**
 
 ```bash
-uv venv
-source .venv/bin/activate
-uv pip install -e .[dev]
+uv sync --extra dev
 uv run pyright
 uv run pytest -n auto --cov=core --cov-report=term-missing --cov-fail-under=80
 ```
 
-`pyproject.toml` is the single source of truth for project dependencies; install the dev toolchain with either `pip install -e .[dev]` or `uv pip install -e .[dev]`.
+`pyproject.toml` is the single source of truth for project dependencies. For `uv`, prefer `uv sync --extra dev` as the canonical repo setup path. If you only want a one-shot test invocation on a fresh machine, use:
+
+```bash
+uv run --extra dev pytest -n auto --cov=core --cov-report=term-missing --cov-fail-under=80
+```
+
+Do not assume plain `uv run pytest` will work in a freshly created environment, because `pytest` lives in the optional `dev` extra rather than in the base runtime dependencies.
 
 1. Copy `.env.example` to `.env` for a safe local starting point.
 2. Copy `config/config.template.json` to `config/config.json` for non-secret defaults.
