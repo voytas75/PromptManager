@@ -39,7 +39,7 @@ dev = [
     "pytest==9.0.1",
     "pytest-cov==7.0.0",
     "pytest-xdist==3.8.0",
-    "pyright==1.1.407",
+    "pyright==1.1.408",
     "ruff==0.14.7",
     "pytest-asyncio==1.3.0",  # Updated to support pytest 9.x
     "hypothesis==6.116.0",
