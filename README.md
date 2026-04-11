@@ -159,52 +159,44 @@ The current focus is:
 - keeping execution, analytics, chains, sharing, and voice as supporting surfaces rather than the product center
 - keeping the desktop experience responsive and local-first
 
-## Detailed features
+## Detailed features by product role
 
-### Authoring and organisation
+### Core prompt asset workflow
 
 - Full PySide6 GUI with list/search/detail panes, in-place CRUD, fork/version history, quick action palette, and refined prompt editing workflows.
-- Enhanced Prompt Workbench offers a guided wizard, block palette, template variable dialogs, Template Preview integration, LiteLLM Brainstorm/Peek/Run controls, and one-click export.
-- Live Jinja2 template preview renders prompts with JSON variables, includes custom filters (`truncate`, `slugify`, `json`), and validates payloads with optional JSON Schema or Pydantic feedback.
-- Dedicated Prompt Template editor exposes LiteLLM system prompts with inline validation and reset-to-default controls.
-- Workspace appearance controls let you adjust font family, size, and colour for prompt output and chat panes at runtime.
-
-### Retrieval and execution
-
+- Quick Capture, Draft Promote, recent reopen, and inspection cues keep rough prompt/query material close to the catalog instead of leaving it scattered across chats, notes, and ad-hoc files.
 - Semantic search embeds prompt facets such as name, description, tags, and scenarios via LiteLLM or sentence-transformers and returns cosine-ranked matches from ChromaDB.
-- Prompt execution workspace supports LiteLLM-backed runs, streaming output, chat-style transcripts, export/import utilities, and persisted execution history.
-- Web search enrichment supports Exa, Tavily, Serper, SerpApi, and Google Programmable Search, with a workspace toggle to inject live snippets before execution.
-- Voice playback can stream LiteLLM text-to-speech audio as it downloads; toggle via `PROMPT_MANAGER_LITELLM_TTS_STREAM`.
-- Prompt chaining pipelines are available via CLI (`prompt-chain-*`) and the dedicated **Chain** tab in the GUI.
+- Live Jinja2 template preview renders prompts with JSON variables, includes custom filters (`truncate`, `slugify`, `json`), and validates payloads with optional JSON Schema or Pydantic feedback.
+- Prompt Parts provide reusable response styles, system instructions, redaction rules, and formatting presets so supporting prompt components can stay structured and reusable.
 
-### Analytics and history
+### Supporting reuse, validation, and local operations
 
-- Token usage tracking shows per-run prompt/completion/total tokens, running session totals, and dashboard summaries. Expanded rollups are outlined in `docs/token_usage_plan.md`.
-- Analytics dashboard surfaces usage frequency, cost breakdowns, benchmark success, intent success trends, and embedding health with CSV export.
-- Execution analytics CLI (`history-analytics`) summarises success rates, latency, and rating trends.
-- Benchmark CLI (`benchmark`) runs prompts across configured LiteLLM models and prints duration and token metrics.
-- Diagnostics CLI targets (`python -m main diagnostics embeddings|analytics`) verify embedding backends, scan Chroma for inconsistencies, and export deeper analysis data.
-
-### Sharing, reuse, and operations
-
-- Prompt Parts provide reusable response styles, system instructions, redaction rules, and formatting presets in a dedicated GUI tab.
-- Prompt sharing supports ShareText, Rentry, and PrivateBin, with clipboard-friendly share URLs plus returned delete/edit credentials when available.
+- Prompt execution workspace supports LiteLLM-backed runs, streaming output, chat-style transcripts, export/import utilities, and persisted execution history when validation or reuse benefits from it.
+- Dedicated Prompt Template editor exposes LiteLLM system prompts with inline validation and reset-to-default controls.
 - Typed configuration loading (`config.settings`) validates paths, TTLs, and provider settings from env vars or JSON.
 - Optional Redis-backed caching plus deterministic embeddings keep the app useful in offline or air-gapped workflows.
 - Maintenance tooling includes one-click reset actions and a snapshot export that bundles the SQLite database, Chroma store, and manifest before risky changes.
 - CLI helpers such as `catalog-export`, `suggest`, `usage-report`, and `reembed` reuse the same validation stack for automation-friendly workflows.
 
-### Prompt parts and auditing
+### Supporting history and light analytics
 
-Prompt parts can store:
+- Every run is logged to SQLite with request/response snippets, latency, token usage, status, and structured context metadata. The GUI History tab and programmatic APIs (`list_recent_executions`, `list_executions_for_prompt`) surface that data for review, troubleshooting, and light curation.
+- Token usage tracking shows per-run prompt/completion/total tokens, running session totals, and dashboard summaries. Expanded rollups are outlined in `docs/token_usage_plan.md`.
+- Analytics dashboard surfaces usage frequency, cost breakdowns, benchmark success, intent success trends, and embedding health with CSV export.
+- Execution analytics CLI (`history-analytics`) summarises success rates, latency, and rating trends.
+- Diagnostics CLI targets (`python -m main diagnostics embeddings|analytics`) verify embedding backends, scan Chroma for inconsistencies, and export deeper analysis data.
 
-- part name and description for discovery,
-- tone or voice hints plus free-form guidelines,
-- format instructions and examples.
+### Secondary surfaces, available but not the product center
 
-They can be copied, exported to Markdown, and referenced from execution metadata so the same structure can be reused without duplicating large instruction blocks.
+- Enhanced Prompt Workbench offers a guided wizard, block palette, template variable dialogs, Template Preview integration, LiteLLM Brainstorm/Peek/Run controls, and one-click export.
+- Web search enrichment supports Exa, Tavily, Serper, SerpApi, and Google Programmable Search, with a workspace toggle to inject live snippets before execution.
+- Prompt chaining pipelines are available via CLI (`prompt-chain-*`) and the dedicated **Chain** tab in the GUI.
+- Prompt sharing supports ShareText, Rentry, and PrivateBin, with clipboard-friendly share URLs plus returned delete/edit credentials when available.
+- Voice playback can stream LiteLLM text-to-speech audio as it downloads; toggle via `PROMPT_MANAGER_LITELLM_TTS_STREAM`.
+- Workspace appearance controls let you adjust font family, size, and colour for prompt output and chat panes at runtime.
+- Benchmark CLI (`benchmark`) runs prompts across configured LiteLLM models and prints duration and token metrics.
 
-Every run is logged to SQLite with request/response snippets, latency, token usage, status, and structured context metadata. The GUI History tab and programmatic APIs (`list_recent_executions`, `list_executions_for_prompt`) surface that data for review, analytics, and troubleshooting.
+These surfaces can still be useful, but they are supporting or secondary to the core job: keeping prompt assets captured, understandable, retrievable, reusable, and refinable.
 
 ## Developer
 

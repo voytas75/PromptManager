@@ -4,6 +4,8 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ## [Unreleased]
 
+## [0.22.22] - 2026-04-11
+
 ### Added
 
 - Added bounded **Quick Reuse** actions to the prompt detail view so operators can use one obvious `Copy Prompt` action for the stored prompt body or open it in the workspace without auto-running it.
@@ -22,6 +24,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 ### Changed
 
 - Clarified backlog and restart-document alignment so `Compare / Fork Clarity` is treated as delivered baseline work, the default next target shifts to `README / Positioning Cleanup`, and the top-level README keeps execution/analytics breadth framed as supporting rather than product-center behavior.
+- Tightened the README below the fold so detailed feature sections are grouped by product role, making the prompt asset workflow clearly primary while execution, analytics, chains, sharing, voice, and other broader surfaces stay documented as supporting or secondary.
 
 ### Fixed
 
