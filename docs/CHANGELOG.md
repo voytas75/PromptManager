@@ -7,10 +7,12 @@ All notable changes to **Prompt Manager** will be documented in this file.
 ### Added
 
 - Added one bounded **Likely Duplicate Cue v1** in the `Promote Draft` advisory flow so matching normalized draft/existing prompt bodies surface a stronger `Likely duplicate` warning and selected-action wording without blocking `Promote as New` or widening into a duplicate-management workflow.
+- Added one bounded **Duplicate Reason Cue v1** in the `Promote Draft` advisory flow so the currently selected `Likely duplicate` or `Very close match` can explain itself with one short reason in the advisory summary without adding row-level noise, a compare screen, or score-heavy UI.
 
 ### Fixed
 
 - Added focused regression coverage for likely-duplicate promote-time advisory behavior, including stronger summary/button wording and precedence over the ordinary `Very close match` cue when normalized bodies are equal.
+- Added focused regression coverage for bounded selected-match reason cues in `Promote Draft`, including likely-duplicate, very-close, weak-match, and non-selected-row cleanliness paths.
 
 ## [0.22.22] - 2026-04-11
 

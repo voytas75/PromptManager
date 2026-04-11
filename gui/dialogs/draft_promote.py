@@ -1,6 +1,8 @@
 """Compact dialog and helpers for promoting captured draft prompts.
 
 Updates:
+  v0.1.7 - 2026-04-11 - Add one bounded selected-match reason cue
+  for likely-duplicate and very-close promote-time advisory states.
   v0.1.6 - 2026-04-11 - Add one bounded likely-duplicate cue
   for promote-time advisory matches with the same normalized body.
   v0.1.5 - 2026-04-11 - Nudge very close promote-time matches
@@ -47,6 +49,8 @@ VERY_CLOSE_MATCH_CUE = "Very close match"
 OPEN_SIMILAR_EXISTING_LABEL = "Open Existing Match"
 OPEN_VERY_CLOSE_EXISTING_LABEL = "Open Very Close Match"
 OPEN_LIKELY_DUPLICATE_LABEL = "Open Likely Duplicate"
+LIKELY_DUPLICATE_REASON = "Reason: Same normalized body."
+VERY_CLOSE_MATCH_REASON = "Reason: Very similar prompt body."
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from collections.abc import Sequence
@@ -224,21 +228,6 @@ class DraftPromoteDialog(QDialog):
             self._open_existing_button.hide()
             return
 
-        if any(self._build_likely_duplicate_cue(prompt) for prompt in self._similar_prompts):
-            self._similarity_summary.setText(
-                "A likely duplicate may already exist. "
-                "Review it before promoting this draft as a new prompt."
-            )
-        elif any(self._build_similarity_strength_cue(prompt) for prompt in self._similar_prompts):
-            self._similarity_summary.setText(
-                "A very close existing match may already exist. "
-                "Review it before promoting this draft as a new prompt."
-            )
-        else:
-            self._similarity_summary.setText(
-                "Similar prompts already exist. "
-                "Review one or continue promoting this draft as a new prompt."
-            )
         self._similar_prompts_list.show()
         self._open_existing_button.show()
 
@@ -260,16 +249,18 @@ class DraftPromoteDialog(QDialog):
         self._open_existing_button.setEnabled(row >= 0)
         if row < 0 or row >= len(self._similar_prompts):
             self._open_existing_button.setText(OPEN_SIMILAR_EXISTING_LABEL)
+            self._similarity_summary.setText(self._build_similarity_summary_text())
             return
         prompt = self._similar_prompts[row]
         if self._build_likely_duplicate_cue(prompt) is not None:
             self._open_existing_button.setText(OPEN_LIKELY_DUPLICATE_LABEL)
-            return
-        strength_cue = self._build_similarity_strength_cue(prompt)
-        if strength_cue is not None:
-            self._open_existing_button.setText(OPEN_VERY_CLOSE_EXISTING_LABEL)
-            return
-        self._open_existing_button.setText(OPEN_SIMILAR_EXISTING_LABEL)
+        else:
+            strength_cue = self._build_similarity_strength_cue(prompt)
+            if strength_cue is not None:
+                self._open_existing_button.setText(OPEN_VERY_CLOSE_EXISTING_LABEL)
+            else:
+                self._open_existing_button.setText(OPEN_SIMILAR_EXISTING_LABEL)
+        self._similarity_summary.setText(self._build_similarity_summary_text(prompt))
 
     def _open_selected_existing_prompt(self) -> None:
         """Accept the dialog with the selected similar prompt target."""
@@ -316,6 +307,39 @@ class DraftPromoteDialog(QDialog):
         if cue_parts:
             return f"{label} · {' · '.join(cue_parts)}"
         return label
+
+    def _build_similarity_summary_text(self, selected_prompt: Prompt | None = None) -> str:
+        """Return the bounded advisory summary, with an optional selected-match reason cue."""
+        if any(self._build_likely_duplicate_cue(prompt) for prompt in self._similar_prompts):
+            base = (
+                "A likely duplicate may already exist. "
+                "Review it before promoting this draft as a new prompt."
+            )
+        elif any(self._build_similarity_strength_cue(prompt) for prompt in self._similar_prompts):
+            base = (
+                "A very close existing match may already exist. "
+                "Review it before promoting this draft as a new prompt."
+            )
+        else:
+            base = (
+                "Similar prompts already exist. "
+                "Review one or continue promoting this draft as a new prompt."
+            )
+
+        if selected_prompt is None:
+            return base
+        reason = self._build_selected_reason_cue(selected_prompt)
+        if not reason:
+            return base
+        return f"{base}\n\n{reason}"
+
+    def _build_selected_reason_cue(self, prompt: Prompt) -> str | None:
+        """Return one bounded selected-match reason cue for strong advisory states."""
+        if self._build_likely_duplicate_cue(prompt) is not None:
+            return LIKELY_DUPLICATE_REASON
+        if self._build_similarity_strength_cue(prompt) is not None:
+            return VERY_CLOSE_MATCH_REASON
+        return None
 
     @staticmethod
     def _normalize_duplicate_candidate_body(value: str | None) -> str:

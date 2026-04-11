@@ -95,6 +95,8 @@ Delivered bounded slice under this priority:
 - adds one quiet visible `Very close match` cue for very high-similarity matches while keeping weaker matches on the clean existing row path
 - **Promote-time Likely Duplicate Cue v1** inside the same advisory list
 - adds one stronger visible `Likely duplicate` cue plus stronger selected-action wording when draft and existing prompt bodies match after bounded normalization, while keeping `Promote as New` available
+- **Duplicate Reason Cue v1** inside the same advisory flow
+- adds one short selected-state reason in the advisory summary for `Likely duplicate` or `Very close match` without adding reason text to every row or widening into compare/dedupe workflow
 
 Remaining work in this priority should only proceed if it still improves operator judgment at ingest time without widening into a duplicate-management subsystem.
 
@@ -215,6 +217,10 @@ Scope:
 Why this matters:
 - product confusion often starts in wording before it shows up in roadmap drift
 - if the README sells the wrong thing, future feature choices get worse
+
+Current posture:
+- treat the recent README / positioning cleanup as delivered baseline
+- do not reopen README work unless product/content changes materially affect what the file should say
 
 ### Priority 8 — Core / Supporting / Freeze Classification Pass
 

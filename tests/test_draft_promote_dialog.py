@@ -1,6 +1,8 @@
 """Focused tests for the draft promote dialog.
 
 Updates:
+  v0.1.6 - 2026-04-11 - Cover bounded selected-match reason cues
+  for likely-duplicate and very-close advisory states.
   v0.1.5 - 2026-04-11 - Cover bounded likely-duplicate cues
   and stronger selected-action wording.
   v0.1.4 - 2026-04-11 - Cover stronger open-existing button copy
@@ -85,6 +87,7 @@ def test_draft_promote_dialog_shows_likely_duplicate_cue_and_opens_selection(
     qt_app.processEvents()
 
     assert "A likely duplicate may already exist" in dialog._similarity_summary.text()  # noqa: SLF001
+    assert "Reason: Same normalized body." in dialog._similarity_summary.text()  # noqa: SLF001
     assert not dialog._similar_prompts_list.isHidden()  # noqa: SLF001
     assert dialog._similar_prompts_list.count() == 1  # noqa: SLF001
     item = dialog._similar_prompts_list.item(0)  # noqa: SLF001
@@ -169,6 +172,7 @@ def test_draft_promote_dialog_hides_visible_strength_cue_for_non_close_match(
     assert item.text() == "Existing reusable prompt — Operations · Already curated."
     assert "Similarity: 0.72" in item.toolTip()
     assert "Similar prompts already exist" in dialog._similarity_summary.text()  # noqa: SLF001
+    assert "Reason:" not in dialog._similarity_summary.text()  # noqa: SLF001
     open_button = next(
         button
         for button in dialog.findChildren(QPushButton)
@@ -208,6 +212,7 @@ def test_draft_promote_dialog_shows_strength_cue_at_threshold(qt_app: QApplicati
         == "Existing reusable prompt — Operations · Very close match · Already curated."
     )
     assert "A very close existing match may already exist" in dialog._similarity_summary.text()  # noqa: SLF001
+    assert "Reason: Very similar prompt body." in dialog._similarity_summary.text()  # noqa: SLF001
     open_button = next(
         button
         for button in dialog.findChildren(QPushButton)
@@ -246,12 +251,59 @@ def test_draft_promote_dialog_prefers_likely_duplicate_cue_over_very_close_match
 
     assert "Likely duplicate" in item.text()
     assert "Very close match" not in item.text()
+    assert "Reason: Same normalized body." in dialog._similarity_summary.text()  # noqa: SLF001
     open_button = next(
         button
         for button in dialog.findChildren(QPushButton)
         if button.text() == "Open Likely Duplicate"
     )
     assert open_button.isEnabled()
+
+
+def test_draft_promote_dialog_keeps_reason_cue_limited_to_selected_match(
+    qt_app: QApplication,
+) -> None:
+    """Only the selected strong match should add a reason cue to the advisory summary."""
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000533"),
+        name="Captured draft",
+        description="Quick capture draft.",
+        category="General",
+        context="Summarize deployment risks for the release handoff.",
+        ext2={"capture_state": "draft", "capture_method": "quick_capture"},
+    )
+    strong = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000534"),
+        name="Strong existing prompt",
+        description="Already curated.",
+        category="Operations",
+        context="Summarize deployment risks for the release handoff.",
+        last_modified=datetime(2026, 4, 4, 18, 0, tzinfo=UTC),
+    )
+    strong.similarity = 0.96
+    weak = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000535"),
+        name="Weak existing prompt",
+        description="Already curated.",
+        category="Operations",
+        context="Something else",
+        last_modified=datetime(2026, 4, 4, 18, 0, tzinfo=UTC),
+    )
+    weak.similarity = 0.72
+
+    dialog = DraftPromoteDialog(prompt, categories=["General"], similar_prompts=[strong, weak])
+    dialog.show()
+    qt_app.processEvents()
+
+    assert "Reason: Same normalized body." in dialog._similarity_summary.text()  # noqa: SLF001
+
+    dialog._similar_prompts_list.setCurrentRow(1)  # noqa: SLF001
+    qt_app.processEvents()
+
+    assert "A likely duplicate may already exist" in dialog._similarity_summary.text()  # noqa: SLF001
+    assert "Reason:" not in dialog._similarity_summary.text()  # noqa: SLF001
+    assert dialog._similar_prompts_list.item(0).text().count("Reason:") == 0  # noqa: SLF001
+    assert dialog._similar_prompts_list.item(1).text().count("Reason:") == 0  # noqa: SLF001
 
 
 def test_draft_promote_dialog_promote_as_new_keeps_existing_target_clear(

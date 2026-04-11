@@ -37,6 +37,24 @@ Use PromptManager when you want to:
 - review prompt lineage, reuse context, and light supporting history when needed
 - keep prompt work local-first, with optional external providers
 
+## Recommended usage path
+
+If you are unsure where to start, use this sequence:
+
+1. **Quick Capture** a useful prompt or LLM query before it gets lost in chat, notes, or scratch files.
+2. **Promote Draft** once it is worth keeping as a reusable prompt asset.
+3. **Use Recent or search** to get back to it quickly.
+4. **Inspect the detail view** to confirm fit, context, provenance, and any lineage cues.
+5. **Reuse with `Copy Prompt` or `Open in Workspace`** when you want the stored prompt body or lightweight validation.
+
+Short version:
+
+**`Quick Capture` → `Promote Draft` → `Recent` / search → inspect → `Copy Prompt` or `Open in Workspace`**
+
+This is the canonical PromptManager v1 flow. It keeps the catalog at the center and treats execution, analytics, chains, sharing, and other secondary surfaces as supporting tools rather than the default front door.
+
+For a slightly fuller operator-facing version, see [`docs/canonical-usage-path-v1.md`](docs/canonical-usage-path-v1.md).
+
 ## Core capabilities
 
 - **Prompt catalog** — store, search, tag, edit, fork, and organize prompts as durable assets
@@ -47,8 +65,6 @@ Use PromptManager when you want to:
 - **Template preview** — render Jinja2 templates with JSON variables and validation feedback
 - **Optional validation workspace** — run prompts with LiteLLM-backed models only when lightweight validation or reuse benefits from it
 - **Supporting prompt parts and light history signals** — reuse supporting prompt components and inspect secondary support surfaces without changing the product center
-
-For one recommended operator flow through the current product center, see [`docs/canonical-usage-path-v1.md`](docs/canonical-usage-path-v1.md).
 
 ## Quick start
 
@@ -171,33 +187,37 @@ The current focus is:
 - Live Jinja2 template preview renders prompts with JSON variables, includes custom filters (`truncate`, `slugify`, `json`), and validates payloads with optional JSON Schema or Pydantic feedback.
 - Prompt Parts provide reusable response styles, system instructions, redaction rules, and formatting presets so supporting prompt components can stay structured and reusable.
 
-### Supporting reuse, validation, and local operations
+### Supporting validation and local operations
 
-- Prompt execution workspace supports LiteLLM-backed runs and persisted execution history when lightweight validation or reuse benefits from it.
-- Dedicated Prompt Template editor exposes LiteLLM system prompts with inline validation and reset-to-default controls.
-- Typed configuration loading (`config.settings`) validates paths, TTLs, and provider settings from env vars or JSON.
-- Optional Redis-backed caching plus deterministic embeddings keep the app useful in offline or air-gapped workflows.
-- Maintenance tooling includes one-click reset actions and a snapshot export that bundles the SQLite database, Chroma store, and manifest before risky changes.
-- CLI helpers such as `catalog-export`, `suggest`, `usage-report`, and `reembed` reuse the same validation stack for automation-friendly workflows.
+These capabilities support the prompt catalog when validation, maintenance, or automation becomes useful, but they are not the default front door:
+
+- an optional LiteLLM-backed execution workspace for lightweight validation or reuse
+- Prompt Template editing and template-preview support
+- typed configuration loading plus optional Redis-backed caching
+- maintenance tooling such as reset actions and snapshot export
+- CLI helpers such as `catalog-export`, `suggest`, `usage-report`, and `reembed`
 
 ### Supporting history and light analytics
 
-- Every run is logged to SQLite with request/response snippets, latency, token usage, status, and structured context metadata. The GUI History tab and programmatic APIs (`list_recent_executions`, `list_executions_for_prompt`) surface that data for review, troubleshooting, and light curation.
-- Token usage tracking and analytics surfaces exist for operators who want lightweight curation signals, cost visibility, or diagnostics, but they remain secondary to the prompt catalog itself.
-- Execution analytics CLI (`history-analytics`) summarises success rates, latency, and rating trends.
-- Diagnostics CLI targets (`python -m main diagnostics embeddings|analytics`) verify embedding backends, scan Chroma for inconsistencies, and export deeper analysis data.
+These surfaces exist to help curation and troubleshooting, not to redefine the product:
 
-### Secondary surfaces, available but not the product center
+- persisted run history in SQLite, surfaced in the GUI History tab and related APIs
+- lightweight token, latency, and rating visibility
+- `history-analytics` and diagnostics helpers for bounded operator insight
 
-- Enhanced Prompt Workbench offers a guided wizard, block palette, template variable dialogs, Template Preview integration, LiteLLM Brainstorm/Peek/Run controls, and one-click export.
-- Web search enrichment supports Exa, Tavily, Serper, SerpApi, and Google Programmable Search, with a workspace toggle to inject live snippets before execution.
-- Prompt chaining pipelines are available via CLI (`prompt-chain-*`) and the dedicated **Chain** tab in the GUI.
-- Prompt sharing supports ShareText, Rentry, and PrivateBin, with clipboard-friendly share URLs plus returned delete/edit credentials when available.
-- Voice playback can stream LiteLLM text-to-speech audio as it downloads; toggle via `PROMPT_MANAGER_LITELLM_TTS_STREAM`.
-- Workspace appearance controls let you adjust font family, size, and colour for prompt output and chat panes at runtime.
-- Benchmark CLI (`benchmark`) runs prompts across configured LiteLLM models and prints duration and token metrics.
+### Secondary surfaces, available but intentionally demoted
 
-These surfaces can still be useful, but they are supporting or secondary to the core job: keeping prompt assets captured, understandable, retrievable, reusable, and refinable.
+The repository still includes broader surfaces that may be useful in some workflows, but they are not the product center and should be read as optional:
+
+- Prompt Workbench and related guided authoring helpers
+- web search enrichment before execution
+- prompt chaining flows
+- prompt sharing helpers
+- voice/TTS playback
+- workspace appearance controls
+- benchmark tooling
+
+The core job remains the same: keep prompt assets captured, understandable, retrievable, reusable, and refinable.
 
 ## Developer
 

@@ -69,6 +69,7 @@ Jeśli potrzebny jest kontekst wdrożeniowy dla reuse lub nowszych bounded revie
 17. `Similarity Strength Cue v1`
 18. `Catalog Readability Typography v1`
 19. `Promote-time Likely Duplicate Cue v1`
+20. `Duplicate Reason Cue v1`
 
 ### Practical meaning
 - draft capture działa,
@@ -88,6 +89,7 @@ Jeśli potrzebny jest kontekst wdrożeniowy dla reuse lub nowszych bounded revie
 - fork detail może pokazać cichy cue `Changed from parent: ...` dla bounded różnic względem parenta,
 - Draft Promote może pokazać cichy widoczny cue `Very close match` dla bardzo bliskich existing matchy,
 - Draft Promote może też pokazać mocniejszy cue `Likely duplicate`, gdy draft i existing prompt mają ten sam znormalizowany body,
+- dla zaznaczonego strong matcha w Draft Promote może też pokazać krótki reason cue w summary, bez dodawania hałasu do całej listy,
 - główna lista promptów nie pomniejsza już preview line poniżej bazowego rozmiaru fontu,
 - shared detail widget ma lekko większą domyślną typografię dla title i key inspection text,
 - body-only copy label jest spójny jako `Copy Prompt`,
@@ -156,9 +158,10 @@ Najpierw:
 2. wskazać jeden sensowny następny bounded slice,
 3. dopiero potem iść w build brief / delegację / implementację.
 
-Current default after the delivered fork-clarity passes:
+Current default after the delivered fork-clarity and README-positioning passes:
 - nie wracać domyślnie do `Compare / Fork Clarity`, bo bounded fork slices są już dowiezione,
-- jeśli nie ma silniejszego powodu produktowego, następnym domyślnym torem powinno być `README / Positioning Cleanup`.
+- nie wracać też do README bez wyraźnych prac zmieniających realną zawartość produktu,
+- jeśli nie ma silniejszego powodu produktowego, następne defaultowe decyzje powinny wracać do małych slice'ów w core loop, nie do docs cleanup.
 
 ## Recommended operator wording after reset
 
