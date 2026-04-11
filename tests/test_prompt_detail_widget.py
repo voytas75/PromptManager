@@ -1,6 +1,7 @@
 """Focused tests for prompt detail inspection cues.
 
 Updates:
+  v0.1.9 - 2026-04-11 - Cover bounded readability typography defaults in the shared detail widget.
   v0.1.8 - 2026-04-10 - Cover bounded credible-source filtering in shared inspection cues.
   v0.1.7 - 2026-04-10 - Cover bounded quick-reuse payload tooltips in the shared detail widget.
   v0.1.6 - 2026-04-10 - Cover bounded context-lead fallback for the shared usage cue.
@@ -34,6 +35,20 @@ def qt_app() -> QApplication:
     if app is None:
         app = QApplication([])
     return cast("QApplication", app)
+
+
+def test_prompt_detail_widget_applies_readable_default_font_sizes(
+    qt_app: QApplication,
+) -> None:
+    """Shared detail typography should make title/body text easier to read by default."""
+    widget = PromptDetailWidget()
+
+    widget.show()
+    qt_app.processEvents()
+
+    assert widget._name_label.font().pointSizeF() > widget.font().pointSizeF()  # noqa: SLF001
+    assert widget._description.font().pointSizeF() > widget.font().pointSizeF()  # noqa: SLF001
+    assert widget._metadata_view.font().pointSizeF() > widget.font().pointSizeF()  # noqa: SLF001
 
 
 def test_prompt_detail_widget_shows_inspection_cues_for_captured_draft(

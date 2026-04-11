@@ -63,6 +63,7 @@ The following bounded slices are already delivered and should not be planned aga
 - Credible Source Cue v1
 - Fence Unwrap v1
 - Similarity Strength Cue v1
+- Catalog Readability Typography v1
 
 These are current baseline, not open backlog.
 
@@ -109,6 +110,8 @@ Delivered bounded slice under this priority:
 - **Context Lead Usage Cue v1** in the shared detail widget
 - adds one bounded fallback so `When to use` can derive a compact cue from prompt body lead-in when saved cues are absent
 - keeps the current detail flow and current labels unchanged
+- **Catalog Readability Typography v1** across the shared prompt list/detail catalog surfaces
+- keeps the existing information structure intact while removing the forced smaller preview-list text and slightly enlarging the key shared detail text by default
 
 Remaining work in this priority should only proceed if it makes prompt fit easier to judge without turning detail view into a summary dashboard.
 

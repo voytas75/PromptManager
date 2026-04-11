@@ -1,6 +1,7 @@
 """Prompt detail panel shared between main and template tabs.
 
 Updates:
+  v0.1.19 - 2026-04-11 - Apply one bounded readability typography pass to shared detail text.
   v0.1.18 - 2026-04-10 - Filter low-signal source markers from the shared inspection cues.
   v0.1.17 - 2026-04-10 - Explain quick-reuse payload semantics with bounded dynamic tooltips.
   v0.1.16 - 2026-04-10 - Add one bounded context-lead fallback for the existing usage cue.
@@ -26,7 +27,7 @@ from html import escape
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor, QPalette
+from PySide6.QtGui import QColor, QFont, QPalette
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -48,6 +49,9 @@ if TYPE_CHECKING:  # pragma: no cover - typing helper
 
 
 class PromptDetailWidget(QWidget):
+    _TITLE_FONT_DELTA = 2.0
+    _BODY_FONT_DELTA = 1.0
+
     """Panel that summarises the currently selected prompt."""
 
     _CONTEXT_PREVIEW_LIMIT = 200
@@ -232,6 +236,8 @@ class PromptDetailWidget(QWidget):
         self._metadata_visible_label: str | None = None
         metadata_layout.addWidget(self._metadata_view)
         content_layout.addWidget(metadata_group)
+
+        self._apply_readability_typography()
 
         self._full_metadata_text = ""
         self._basic_metadata_text = ""
@@ -659,6 +665,41 @@ class PromptDetailWidget(QWidget):
         lighter = max(lum_a, lum_b)
         darker = min(lum_a, lum_b)
         return (lighter + 0.05) / (darker + 0.05)
+
+    @classmethod
+    def _scaled_font(cls, font: QFont, delta: float) -> QFont:
+        """Return *font* scaled by one small readable step."""
+        scaled = QFont(font)
+        current_size = scaled.pointSizeF()
+        if current_size <= 0:
+            current_size = float(scaled.pointSize())
+        if current_size <= 0:
+            current_size = 10.0
+        scaled.setPointSizeF(max(1.0, current_size + delta))
+        return scaled
+
+    def _apply_readability_typography(self) -> None:
+        """Apply one bounded readability pass to the shared detail text surfaces."""
+        self._name_label.setFont(self._scaled_font(self._name_label.font(), self._TITLE_FONT_DELTA))
+
+        readable_widgets = (
+            self._version_label,
+            self._rating_label,
+            self._meta_label,
+            self._usage_cue_label,
+            self._description,
+            self._lineage_label,
+            self._context,
+            self._scenarios,
+            self._examples,
+            self._metadata_label,
+        )
+        for widget in readable_widgets:
+            widget.setFont(self._scaled_font(widget.font(), self._BODY_FONT_DELTA))
+
+        self._metadata_view.setFont(
+            self._scaled_font(self._metadata_view.font(), self._BODY_FONT_DELTA)
+        )
 
     def clear(self) -> None:
         """Reset the panel to its empty state."""

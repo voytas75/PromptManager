@@ -1,6 +1,7 @@
 """Focused tests for bounded retrieval previews in the main prompt list.
 
 Updates:
+  v0.1.1 - 2026-04-11 - Keep preview text at the row base font size for readability.
   v0.1.0 - 2026-04-06 - Cover visible, hidden, and truncated retrieval-preview paths.
 """
 
@@ -115,3 +116,13 @@ def test_prompt_list_delegate_returns_taller_rows_when_preview_exists(
     without_height = delegate.sizeHint(option, without_preview.index(0, 0)).height()
 
     assert with_height > without_height
+
+
+def test_prompt_list_delegate_keeps_preview_font_at_base_size(qt_app: QApplication) -> None:
+    """Preview text should not shrink below the row base font size."""
+    delegate = PromptListDelegate()
+    option = QStyleOptionViewItem()
+    title_font = option.font
+    preview_font = delegate._preview_font(title_font)  # noqa: SLF001
+
+    assert preview_font.pointSizeF() == title_font.pointSizeF()
