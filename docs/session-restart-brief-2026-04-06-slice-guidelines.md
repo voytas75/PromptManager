@@ -72,6 +72,7 @@ Jeśli potrzebny jest kontekst wdrożeniowy dla reuse lub nowszych bounded revie
 20. `Duplicate Reason Cue v1`
 21. `Prompt Label Strip v1`
 22. `Template Variable Cue v1`
+23. `Blockquote Unwrap v1`
 
 ### Practical meaning
 - draft capture działa,
@@ -87,6 +88,7 @@ Jeśli potrzebny jest kontekst wdrożeniowy dla reuse lub nowszych bounded revie
 - credible-source cue działa,
 - fence unwrap działa,
 - quick capture może zdjąć jeden oczywisty outer label typu `Prompt:` / `User prompt:` / `System prompt:` gdy to tylko wrapper noise,
+- quick capture może też zdjąć jeden oczywisty outer markdown blockquote wrapper, ale tylko gdy wszystkie niepuste linie są quoted,
 - forked prompts startują z czytelnym baseline `v1`,
 - lineage summary pokazuje `Forked from <prompt name>` gdy parent da się rozwiązać,
 - fork detail może pokazać cichy cue `Changed from parent: ...` dla bounded różnic względem parenta,

@@ -1,6 +1,7 @@
 """Minimal dialog and helpers for quick prompt capture.
 
 Updates:
+  v0.1.5 - 2026-04-11 - Unwrap one obvious outer markdown blockquote from quick-capture bodies.
   v0.1.4 - 2026-04-11 - Strip one obvious outer prompt label from quick-capture bodies.
   v0.1.3 - 2026-04-10 - Unwrap one obvious outer markdown fence from captured prompt bodies.
   v0.1.2 - 2026-04-06 - Use shared draft-title heuristics when no manual title is supplied.
@@ -63,6 +64,32 @@ def unwrap_quick_capture_body(body: str) -> str:
     return inner_body or stripped
 
 
+def unwrap_quick_capture_blockquote(body: str) -> str:
+    """Remove one obvious outer markdown blockquote wrapper when every non-empty line is quoted."""
+    stripped = body.strip()
+    if not stripped:
+        return stripped
+    lines = stripped.splitlines()
+    unwrapped_lines: list[str] = []
+    saw_non_empty_line = False
+    for line in lines:
+        if not line.strip():
+            unwrapped_lines.append("")
+            continue
+        normalized = line.lstrip()
+        if not normalized.startswith(">"):
+            return stripped
+        saw_non_empty_line = True
+        remainder = normalized[1:]
+        if remainder.startswith(" "):
+            remainder = remainder[1:]
+        unwrapped_lines.append(remainder)
+    if not saw_non_empty_line:
+        return stripped
+    unwrapped = "\n".join(unwrapped_lines).strip()
+    return unwrapped or stripped
+
+
 def strip_quick_capture_prompt_label(body: str) -> str:
     """Strip one obvious outer prompt label when the remainder is clearly prompt body."""
     stripped = body.strip()
@@ -105,7 +132,9 @@ class QuickCaptureDraft:
 
     def to_prompt(self) -> Prompt:
         """Build a draft prompt record using existing catalog fields."""
-        body = strip_quick_capture_prompt_label(unwrap_quick_capture_body(self.body))
+        body = strip_quick_capture_prompt_label(
+            unwrap_quick_capture_body(unwrap_quick_capture_blockquote(self.body))
+        )
         if not body:
             raise ValueError("Prompt body is required.")
         name = self.title.strip() or derive_quick_capture_title(body)
@@ -227,5 +256,6 @@ __all__ = [
     "parse_quick_capture_tags",
     "resolve_quick_capture_source",
     "strip_quick_capture_prompt_label",
+    "unwrap_quick_capture_blockquote",
     "unwrap_quick_capture_body",
 ]

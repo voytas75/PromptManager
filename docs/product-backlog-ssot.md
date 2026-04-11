@@ -187,6 +187,8 @@ Delivered bounded slices under this priority:
 - keeps the current dialog, model, and capture flow unchanged
 - **Prompt Label Strip v1** in the same Quick Capture draft conversion seam
 - removes one obvious outer `Prompt:` / `User prompt:` / `System prompt:` wrapper when it is clearly just top-level noise before real prompt text, while leaving ambiguous or transcript-like input unchanged
+- **Blockquote Unwrap v1** in the same Quick Capture draft conversion seam
+- removes one obvious outer markdown blockquote wrapper when every non-empty line is quoted, while leaving mixed or effectively empty quoted input unchanged
 
 Remaining work in this priority should only proceed if it removes obvious capture cleanup friction without turning Quick Capture into a general markdown or import parser.
 

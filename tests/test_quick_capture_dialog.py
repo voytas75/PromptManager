@@ -1,6 +1,7 @@
 """Focused tests for the quick capture dialog and draft conversion.
 
 Updates:
+  v0.1.4 - 2026-04-11 - Cover one obvious outer blockquote unwrap and unchanged mixed input.
   v0.1.3 - 2026-04-11 - Cover one allowed outer prompt label strip and unchanged ambiguous input.
   v0.1.2 - 2026-04-10 - Cover bounded outer-fence unwrapping for messy quick-capture input.
   v0.1.1 - 2026-04-06 - Cover shared draft-title normalization for quick capture defaults.
@@ -23,6 +24,7 @@ from gui.dialogs.quick_capture import (
     derive_quick_capture_title,
     resolve_quick_capture_source,
     strip_quick_capture_prompt_label,
+    unwrap_quick_capture_blockquote,
     unwrap_quick_capture_body,
 )
 
@@ -80,6 +82,26 @@ def test_quick_capture_draft_unwraps_one_outer_markdown_fence() -> None:
     assert prompt.context == "Summarize deployment risks for the handoff."
 
 
+def test_quick_capture_draft_unwraps_one_outer_markdown_blockquote() -> None:
+    """Quick capture should remove one obvious outer markdown blockquote before storing."""
+    draft = QuickCaptureDraft(body="> Summarize deployment risks for this release.")
+
+    prompt = draft.to_prompt()
+
+    assert prompt.context == "Summarize deployment risks for this release."
+
+
+def test_quick_capture_draft_unwraps_one_outer_multiline_markdown_blockquote() -> None:
+    """Quick capture should unwrap multiline quoted content when all non-empty lines are quoted."""
+    draft = QuickCaptureDraft(
+        body="> Summarize deployment risks for this release.\n> Keep the output terse."
+    )
+
+    prompt = draft.to_prompt()
+
+    assert prompt.context == "Summarize deployment risks for this release.\nKeep the output terse."
+
+
 def test_quick_capture_draft_strips_one_allowed_outer_prompt_label() -> None:
     """Quick capture should remove one obvious top-level prompt label before storing."""
     draft = QuickCaptureDraft(body="Prompt: Summarize deployment risks for this release.")
@@ -124,6 +146,15 @@ def test_unwrap_quick_capture_body_keeps_non_wrapped_or_mixed_input_intact() -> 
     body = "Intro note\n```text\nSummarize deployment risks.\n```"
 
     assert unwrap_quick_capture_body(body) == body.strip()
+
+
+def test_unwrap_quick_capture_blockquote_keeps_mixed_or_effectively_empty_input_intact() -> None:
+    """Mixed quoted/unquoted input or wrapper-only content should remain unchanged."""
+    mixed_body = "> Summarize deployment risks.\nNot quoted"
+    empty_body = ">   \n>"
+
+    assert unwrap_quick_capture_blockquote(mixed_body) == mixed_body.strip()
+    assert unwrap_quick_capture_blockquote(empty_body) == empty_body.strip()
 
 
 def test_quick_capture_dialog_uses_shared_title_quality_heuristic_when_title_missing(
