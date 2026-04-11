@@ -62,6 +62,7 @@ The following bounded slices are already delivered and should not be planned aga
 - Reuse Payload Tooltip v1
 - Credible Source Cue v1
 - Fence Unwrap v1
+- Similarity Strength Cue v1
 
 These are current baseline, not open backlog.
 
@@ -86,6 +87,8 @@ Delivered bounded slice under this priority:
 - **Similar Match Preview v1** inside the existing Draft Promote advisory list
 - adds one compact visible distinguishing cue for similar prompt matches using existing prompt data
 - keeps the existing advisory flow and actions unchanged
+- **Similarity Strength Cue v1** inside the same advisory list
+- adds one quiet visible `Very close match` cue for very high-similarity matches while keeping weaker matches on the clean existing row path
 
 Remaining work in this priority should only proceed if it still improves operator judgment at ingest time without widening into a duplicate-management subsystem.
 

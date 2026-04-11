@@ -16,6 +16,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 - Added one bounded **Reuse Payload Tooltip v1** pass in the detail view so `Copy Prompt` and `Open in Workspace` explain their actual payload semantics, including disabled copy and description-only workspace fallback states.
 - Added one bounded **Credible Source Cue v1** consistency pass so the detail view hides low-signal technical source markers and reuses the same credible-source logic already used by retrieval-preview paths.
 - Added one bounded **Fence Unwrap v1** normalization step in Quick Capture so a pasted prompt wrapped in one obvious outer markdown code fence is stored as usable inner prompt text instead of raw wrapper noise.
+- Added one bounded **Similarity Strength Cue v1** in the Draft Promote advisory list so very close existing matches surface a quiet visible `Very close match` cue without exposing raw numeric scores in the row, the advisory summary nudges more clearly when such a close match exists, the open-existing button copy strengthens to `Open Very Close Match` for the selected very-close case, and the calmer baseline wording now uses `Open Existing Match`.
 
 ### Fixed
 
@@ -26,7 +27,9 @@ All notable changes to **Prompt Manager** will be documented in this file.
 - Added focused regression coverage for quick-capture source input, source visibility in the inspect path after promote, and the existing draft-promotion source-preservation path.
 - Added focused regression coverage for visible/absent usage cues and stable bounded rendering in the existing prompt detail flow.
 - Added focused regression coverage for draft-title normalization in the bounded Quick Capture and Draft Promote seam, including placeholder/raw-title improvement and manual-title preservation.
+- Added focused regression coverage for the bounded visible similarity-strength cue in the Draft Promote advisory list, including visible and absent row-level cue states, threshold-bound behavior, stronger summary copy for very close matches, and stronger open-existing button copy for the selected very-close case.
 - Clarified fork lineage surfaces so new forks start at a visible `v1` baseline and fork summaries prefer `Forked from <prompt name>` over raw UUIDs when the parent prompt can be resolved.
+- Added one bounded fork-difference cue in the prompt detail flow so forked prompts can show a compact `Changed from parent: ...` summary for meaningful parent-field changes without introducing a diff UI or new compare workflow.
 - Upgraded `cryptography` from `46.0.6` to `46.0.7` to clear the current GitHub Dependabot advisory for `CVE-2026-39892` / `GHSA-p423-j2cm-9vmq`.
 
 ## [0.22.21] - 2026-04-04

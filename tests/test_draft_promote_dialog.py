@@ -1,6 +1,8 @@
 """Focused tests for the draft promote dialog.
 
 Updates:
+  v0.1.4 - 2026-04-11 - Cover stronger open-existing button copy for very close promote-time matches.
+  v0.1.3 - 2026-04-11 - Cover one bounded visible similarity-strength cue for very close promote-time matches.
   v0.1.2 - 2026-04-10 - Cover bounded similar-match preview cues in the advisory promote list.
   v0.1.1 - 2026-04-06 - Cover shared title-quality improvements for untouched draft titles.
   v0.1.0 - 2026-04-04 - Cover advisory similar-prompt rendering and actions.
@@ -46,6 +48,7 @@ def test_draft_promote_dialog_hides_similar_section_when_no_matches(qt_app: QApp
     qt_app.processEvents()
 
     assert "No similar prompts found" in dialog._similarity_summary.text()  # noqa: SLF001
+    assert "promote this draft as a new prompt" in dialog._similarity_summary.text()  # noqa: SLF001
     assert dialog._similar_prompts_list.isHidden()  # noqa: SLF001
     assert dialog.selected_existing_prompt_id is None
 
@@ -77,13 +80,17 @@ def test_draft_promote_dialog_lists_similar_prompts_and_opens_selection(
     dialog.show()
     qt_app.processEvents()
 
-    assert "Possible similar prompts already exist" in dialog._similarity_summary.text()  # noqa: SLF001
+    assert "A very close existing match may already exist" in dialog._similarity_summary.text()  # noqa: SLF001
     assert not dialog._similar_prompts_list.isHidden()  # noqa: SLF001
     assert dialog._similar_prompts_list.count() == 1  # noqa: SLF001
     item = dialog._similar_prompts_list.item(0)  # noqa: SLF001
-    assert item.text() == "Existing reusable prompt — Operations · Already curated."
+    assert item.text() == "Existing reusable prompt — Operations · Very close match · Already curated."
     assert "Last modified: 2026-04-04 18:00 UTC" in item.toolTip()
     assert "Similarity: 0.87" in item.toolTip()
+    open_button = next(
+        button for button in dialog.findChildren(QPushButton) if button.text() == "Open Very Close Match"
+    )
+    assert open_button.isEnabled()
 
     dialog._similar_prompts_list.setCurrentRow(0)  # noqa: SLF001
     dialog._open_selected_existing_prompt()  # noqa: SLF001
@@ -123,6 +130,77 @@ def test_draft_promote_dialog_keeps_clean_label_for_weak_signal_match(
     item = dialog._similar_prompts_list.item(0)  # noqa: SLF001
 
     assert item.text() == "Existing reusable prompt — Operations"
+
+
+def test_draft_promote_dialog_hides_visible_strength_cue_for_non_close_match(
+    qt_app: QApplication,
+) -> None:
+    """Moderate similarity can stay in the tooltip without adding row-level strength wording."""
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000523"),
+        name="Captured draft",
+        description="Quick capture draft.",
+        category="General",
+        context="Draft body",
+        ext2={"capture_state": "draft", "capture_method": "quick_capture"},
+    )
+    similar = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000524"),
+        name="Existing reusable prompt",
+        description="Already curated.",
+        category="Operations",
+        context="Existing body",
+        last_modified=datetime(2026, 4, 4, 18, 0, tzinfo=UTC),
+    )
+    similar.similarity = 0.72
+
+    dialog = DraftPromoteDialog(prompt, categories=["General"], similar_prompts=[similar])
+    dialog.show()
+    qt_app.processEvents()
+
+    item = dialog._similar_prompts_list.item(0)  # noqa: SLF001
+
+    assert item.text() == "Existing reusable prompt — Operations · Already curated."
+    assert "Similarity: 0.72" in item.toolTip()
+    assert "Similar prompts already exist" in dialog._similarity_summary.text()  # noqa: SLF001
+    open_button = next(
+        button for button in dialog.findChildren(QPushButton) if button.text() == "Open Existing Match"
+    )
+    assert open_button.isEnabled()
+
+
+def test_draft_promote_dialog_shows_strength_cue_at_threshold(qt_app: QApplication) -> None:
+    """Threshold-bound matches should still get the row-level very-close cue."""
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000525"),
+        name="Captured draft",
+        description="Quick capture draft.",
+        category="General",
+        context="Draft body",
+        ext2={"capture_state": "draft", "capture_method": "quick_capture"},
+    )
+    similar = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000526"),
+        name="Existing reusable prompt",
+        description="Already curated.",
+        category="Operations",
+        context="Existing body",
+        last_modified=datetime(2026, 4, 4, 18, 0, tzinfo=UTC),
+    )
+    similar.similarity = 0.85
+
+    dialog = DraftPromoteDialog(prompt, categories=["General"], similar_prompts=[similar])
+    dialog.show()
+    qt_app.processEvents()
+
+    item = dialog._similar_prompts_list.item(0)  # noqa: SLF001
+
+    assert item.text() == "Existing reusable prompt — Operations · Very close match · Already curated."
+    assert "A very close existing match may already exist" in dialog._similarity_summary.text()  # noqa: SLF001
+    open_button = next(
+        button for button in dialog.findChildren(QPushButton) if button.text() == "Open Very Close Match"
+    )
+    assert open_button.isEnabled()
 
 
 def test_draft_promote_dialog_promote_as_new_keeps_existing_target_clear(

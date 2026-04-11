@@ -1,6 +1,8 @@
 """Compact dialog and helpers for promoting captured draft prompts.
 
 Updates:
+  v0.1.5 - 2026-04-11 - Nudge very close promote-time matches with a stronger open-existing button label.
+  v0.1.4 - 2026-04-11 - Add one bounded visible similarity-strength cue for very close promote-time matches.
   v0.1.3 - 2026-04-10 - Show one bounded distinguishing preview cue for similar prompt matches.
   v0.1.2 - 2026-04-06 - Improve untouched placeholder/raw draft titles with the shared heuristic.
   v0.1.1 - 2026-04-04 - Add advisory similar-prompt review actions to draft promotion.
@@ -34,6 +36,11 @@ from PySide6.QtWidgets import (
 from ..prompt_preview import build_prompt_preview
 from .base import resolve_draft_origin_title
 from .quick_capture import parse_quick_capture_tags
+
+VERY_CLOSE_SIMILARITY_THRESHOLD = 0.85
+VERY_CLOSE_MATCH_CUE = "Very close match"
+OPEN_SIMILAR_EXISTING_LABEL = "Open Existing Match"
+OPEN_VERY_CLOSE_EXISTING_LABEL = "Open Very Close Match"
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from collections.abc import Sequence
@@ -178,7 +185,7 @@ class DraftPromoteDialog(QDialog):
             QDialogButtonBox.ButtonRole.AcceptRole,
         )
         self._open_existing_button = self._buttons.addButton(
-            "Open Similar Existing",
+            OPEN_SIMILAR_EXISTING_LABEL,
             QDialogButtonBox.ButtonRole.ActionRole,
         )
         self._buttons.accepted.connect(self._on_accept)  # type: ignore[arg-type]
@@ -205,16 +212,22 @@ class DraftPromoteDialog(QDialog):
         self._similar_prompts_list.clear()
         if not self._similar_prompts:
             self._similarity_summary.setText(
-                "No similar prompts found. You can continue promoting this draft as a new prompt."
+                "No similar prompts found. You can promote this draft as a new prompt."
             )
             self._similar_prompts_list.hide()
             self._open_existing_button.hide()
             return
 
-        self._similarity_summary.setText(
-            "Possible similar prompts already exist. "
-            "Review one or continue promoting this draft as a new prompt."
-        )
+        if any(self._build_similarity_strength_cue(prompt) for prompt in self._similar_prompts):
+            self._similarity_summary.setText(
+                "A very close existing match may already exist. "
+                "Review it before promoting this draft as a new prompt."
+            )
+        else:
+            self._similarity_summary.setText(
+                "Similar prompts already exist. "
+                "Review one or continue promoting this draft as a new prompt."
+            )
         self._similar_prompts_list.show()
         self._open_existing_button.show()
 
@@ -232,7 +245,16 @@ class DraftPromoteDialog(QDialog):
 
     def _sync_open_existing_button(self) -> None:
         """Enable the open-existing action only when a similar prompt is selected."""
-        self._open_existing_button.setEnabled(self._similar_prompts_list.currentRow() >= 0)
+        row = self._similar_prompts_list.currentRow()
+        self._open_existing_button.setEnabled(row >= 0)
+        if row < 0 or row >= len(self._similar_prompts):
+            self._open_existing_button.setText(OPEN_SIMILAR_EXISTING_LABEL)
+            return
+        strength_cue = self._build_similarity_strength_cue(self._similar_prompts[row])
+        if strength_cue is not None:
+            self._open_existing_button.setText(OPEN_VERY_CLOSE_EXISTING_LABEL)
+            return
+        self._open_existing_button.setText(OPEN_SIMILAR_EXISTING_LABEL)
 
     def _open_selected_existing_prompt(self) -> None:
         """Accept the dialog with the selected similar prompt target."""
@@ -266,10 +288,26 @@ class DraftPromoteDialog(QDialog):
         """Return a compact identifying label for a similar prompt match."""
         category = prompt.category.strip() or "Uncategorised"
         label = f"{prompt.name} — {category}"
+        cue_parts: list[str] = []
+        strength_cue = DraftPromoteDialog._build_similarity_strength_cue(prompt)
+        if strength_cue:
+            cue_parts.append(strength_cue)
         preview = build_prompt_preview(prompt)
         if preview:
-            return f"{label} · {preview}"
+            cue_parts.append(preview)
+        if cue_parts:
+            return f"{label} · {' · '.join(cue_parts)}"
         return label
+
+    @staticmethod
+    def _build_similarity_strength_cue(prompt: Prompt) -> str | None:
+        """Return one quiet visible cue only for very close similarity matches."""
+        similarity = getattr(prompt, "similarity", None)
+        if not isinstance(similarity, int | float):
+            return None
+        if float(similarity) < VERY_CLOSE_SIMILARITY_THRESHOLD:
+            return None
+        return VERY_CLOSE_MATCH_CUE
 
     @staticmethod
     def _build_similar_prompt_tooltip(prompt: Prompt) -> str:

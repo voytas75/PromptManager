@@ -65,6 +65,8 @@ Jeśli potrzebny jest kontekst wdrożeniowy dla reuse lub nowszych bounded revie
 13. `Credible Source Cue v1`
 14. `Fence Unwrap v1`
 15. `Fork Baseline Clarity v1`
+16. `Fork Difference Cue v1`
+17. `Similarity Strength Cue v1`
 
 ### Practical meaning
 - draft capture działa,
@@ -81,6 +83,8 @@ Jeśli potrzebny jest kontekst wdrożeniowy dla reuse lub nowszych bounded revie
 - fence unwrap działa,
 - forked prompts startują z czytelnym baseline `v1`,
 - lineage summary pokazuje `Forked from <prompt name>` gdy parent da się rozwiązać,
+- fork detail może pokazać cichy cue `Changed from parent: ...` dla bounded różnic względem parenta,
+- Draft Promote może pokazać cichy widoczny cue `Very close match` dla bardzo bliskich existing matchy,
 - body-only copy label jest spójny jako `Copy Prompt`,
 - aktywne docs są już wyrównane do `Copy Prompt`.
 
