@@ -1,6 +1,7 @@
 """Prompt detail panel shared between main and template tabs.
 
 Updates:
+  v0.1.20 - 2026-04-11 - Show one bounded template-variable cue in the shared detail flow.
   v0.1.19 - 2026-04-11 - Apply one bounded readability typography pass to shared detail text.
   v0.1.18 - 2026-04-10 - Filter low-signal source markers from the shared inspection cues.
   v0.1.17 - 2026-04-10 - Explain quick-reuse payload semantics with bounded dynamic tooltips.
@@ -42,6 +43,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.templating import TemplateRenderer
 from ..prompt_preview import build_prompt_source_cue
 
 if TYPE_CHECKING:  # pragma: no cover - typing helper
@@ -56,6 +58,7 @@ class PromptDetailWidget(QWidget):
     _CONTEXT_PREVIEW_LIMIT = 200
     _USAGE_CUE_MAX_LENGTH = 140
     _USAGE_CUE_MAX_WORDS = 24
+    _TEMPLATE_VARIABLE_NAME_LIMIT = 2
 
     delete_requested = Signal()
     promote_draft_requested = Signal()
@@ -120,6 +123,11 @@ class PromptDetailWidget(QWidget):
         self._usage_cue_label.setWordWrap(True)
         self._usage_cue_label.setTextFormat(Qt.TextFormat.RichText)
         self._usage_cue_label.setVisible(False)
+        self._template_variable_cue_label = QLabel("", content)
+        self._template_variable_cue_label.setObjectName("promptTemplateVariableCue")
+        self._template_variable_cue_label.setWordWrap(True)
+        self._template_variable_cue_label.setTextFormat(Qt.TextFormat.RichText)
+        self._template_variable_cue_label.setVisible(False)
         self._description = QLabel("", content)
         self._description.setWordWrap(True)
         self._description.setTextFormat(Qt.TextFormat.RichText)
@@ -149,6 +157,8 @@ class PromptDetailWidget(QWidget):
         content_layout.addWidget(self._meta_label)
         content_layout.addSpacing(4)
         content_layout.addWidget(self._usage_cue_label)
+        content_layout.addSpacing(4)
+        content_layout.addWidget(self._template_variable_cue_label)
         content_layout.addSpacing(4)
         content_layout.addWidget(self._description)
         content_layout.addSpacing(4)
@@ -357,6 +367,15 @@ class PromptDetailWidget(QWidget):
         else:
             self._usage_cue_label.clear()
             self._usage_cue_label.setVisible(False)
+        template_variable_cue = self._resolve_template_variable_cue(prompt)
+        if template_variable_cue:
+            self._template_variable_cue_label.setText(
+                self._format_label_value("Template variables", template_variable_cue, multiline=True)
+            )
+            self._template_variable_cue_label.setVisible(True)
+        else:
+            self._template_variable_cue_label.clear()
+            self._template_variable_cue_label.setVisible(False)
         description_value = prompt.description or "No description provided."
         self._description.setText(
             self._format_label_value("Description", description_value, multiline=True)
@@ -542,6 +561,21 @@ class PromptDetailWidget(QWidget):
         words = value.split()
         return min_words <= len(words) <= self._USAGE_CUE_MAX_WORDS
 
+    def _resolve_template_variable_cue(self, prompt: Prompt) -> str | None:
+        """Return one bounded template-variable requirement cue from the prompt body only."""
+        context = (prompt.context or "").strip()
+        if not context:
+            return None
+        variable_names = TemplateRenderer().extract_variables(context)
+        if not variable_names:
+            return None
+        visible_names = variable_names[: self._TEMPLATE_VARIABLE_NAME_LIMIT]
+        remaining_count = len(variable_names) - len(visible_names)
+        summary = ", ".join(visible_names)
+        if remaining_count > 0:
+            summary = f"{summary} +{remaining_count}"
+        return f"Requires variables: {summary}"
+
     def _draft_status_cue(self, prompt: Prompt) -> str | None:
         """Return a textual draft cue sourced only from existing quick-capture metadata."""
         if not self._is_draft_prompt(prompt):
@@ -686,6 +720,7 @@ class PromptDetailWidget(QWidget):
             self._rating_label,
             self._meta_label,
             self._usage_cue_label,
+            self._template_variable_cue_label,
             self._description,
             self._lineage_label,
             self._context,
@@ -711,6 +746,8 @@ class PromptDetailWidget(QWidget):
         self._meta_label.setVisible(False)
         self._usage_cue_label.clear()
         self._usage_cue_label.setVisible(False)
+        self._template_variable_cue_label.clear()
+        self._template_variable_cue_label.setVisible(False)
         self._description.clear()
         self._context.clear()
         self._scenarios.clear()

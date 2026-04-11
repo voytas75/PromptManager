@@ -71,6 +71,7 @@ Jeśli potrzebny jest kontekst wdrożeniowy dla reuse lub nowszych bounded revie
 19. `Promote-time Likely Duplicate Cue v1`
 20. `Duplicate Reason Cue v1`
 21. `Prompt Label Strip v1`
+22. `Template Variable Cue v1`
 
 ### Practical meaning
 - draft capture działa,
@@ -94,6 +95,7 @@ Jeśli potrzebny jest kontekst wdrożeniowy dla reuse lub nowszych bounded revie
 - dla zaznaczonego strong matcha w Draft Promote może też pokazać krótki reason cue w summary, bez dodawania hałasu do całej listy,
 - główna lista promptów nie pomniejsza już preview line poniżej bazowego rozmiaru fontu,
 - shared detail widget ma lekko większą domyślną typografię dla title i key inspection text,
+- shared detail view może pokazać cichy cue `Requires variables: ...` gdy body promptu faktycznie zawiera zmienne szablonu,
 - body-only copy label jest spójny jako `Copy Prompt`,
 - aktywne docs są już wyrównane do `Copy Prompt`.
 

@@ -1,6 +1,7 @@
 """Focused tests for prompt detail inspection cues.
 
 Updates:
+  v0.1.10 - 2026-04-11 - Cover bounded template-variable cue rendering in the shared detail widget.
   v0.1.9 - 2026-04-11 - Cover bounded readability typography defaults in the shared detail widget.
   v0.1.8 - 2026-04-10 - Cover bounded credible-source filtering in shared inspection cues.
   v0.1.7 - 2026-04-10 - Cover bounded quick-reuse payload tooltips in the shared detail widget.
@@ -48,6 +49,7 @@ def test_prompt_detail_widget_applies_readable_default_font_sizes(
 
     assert widget._name_label.font().pointSizeF() > widget.font().pointSizeF()  # noqa: SLF001
     assert widget._description.font().pointSizeF() > widget.font().pointSizeF()  # noqa: SLF001
+    assert widget._template_variable_cue_label.font().pointSizeF() > widget.font().pointSizeF()  # noqa: SLF001
     assert widget._metadata_view.font().pointSizeF() > widget.font().pointSizeF()  # noqa: SLF001
 
 
@@ -288,6 +290,81 @@ def test_prompt_detail_widget_hides_usage_cue_when_no_credible_signal_exists(
     assert widget._usage_cue_label.text() == ""  # noqa: SLF001
 
 
+def test_prompt_detail_widget_shows_template_variable_cue_when_prompt_requires_variables(
+    qt_app: QApplication,
+) -> None:
+    """Detail view should expose one compact variable-requirement cue for template prompts."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000132"),
+        name="Templated prompt",
+        description="Fallback description",
+        category="Operations",
+        context="Summarize {{ customer_name }} risk posture for {{ region }}.",
+        created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 5, 9, 32, tzinfo=UTC),
+    )
+
+    widget.show()
+    widget.display_prompt(prompt)
+    qt_app.processEvents()
+
+    assert widget._template_variable_cue_label.isVisible()  # noqa: SLF001
+    cue_text = widget._template_variable_cue_label.text()  # noqa: SLF001
+    assert "Template variables:" in cue_text
+    assert "Requires variables: customer_name, region" in cue_text
+    assert "When to use:" not in cue_text
+
+
+def test_prompt_detail_widget_hides_template_variable_cue_for_plain_prompt(
+    qt_app: QApplication,
+) -> None:
+    """Plain prompt bodies should not gain template-variable noise in detail view."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000133"),
+        name="Plain prompt",
+        description="Fallback description",
+        category="General",
+        context="Summarize the incident and call out operator-facing risks.",
+        created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 5, 9, 34, tzinfo=UTC),
+    )
+
+    widget.show()
+    widget.display_prompt(prompt)
+    qt_app.processEvents()
+
+    assert not widget._template_variable_cue_label.isVisible()  # noqa: SLF001
+    assert widget._template_variable_cue_label.text() == ""  # noqa: SLF001
+
+
+def test_prompt_detail_widget_bounds_template_variable_cue_summary(
+    qt_app: QApplication,
+) -> None:
+    """Template variable cue should show at most two names before a count suffix."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000134"),
+        name="Large template",
+        description="Fallback description",
+        category="Operations",
+        context=(
+            "Summarize {{ customer_name }} risk posture for {{ region }} using {{ product_name }} "
+            "and {{ severity_level }}."
+        ),
+        created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 5, 9, 36, tzinfo=UTC),
+    )
+
+    widget.show()
+    widget.display_prompt(prompt)
+    qt_app.processEvents()
+
+    cue_text = widget._template_variable_cue_label.text()  # noqa: SLF001
+    assert "Requires variables: customer_name, product_name +2" in cue_text
+
+
 def test_prompt_detail_widget_keeps_usage_cue_bounded_in_existing_detail_flow(
     qt_app: QApplication,
 ) -> None:
@@ -310,6 +387,7 @@ def test_prompt_detail_widget_keeps_usage_cue_bounded_in_existing_detail_flow(
 
     assert widget._meta_label.isVisible()  # noqa: SLF001
     assert widget._usage_cue_label.isVisible()  # noqa: SLF001
+    assert not widget._template_variable_cue_label.isVisible()  # noqa: SLF001
     assert "When to use:" not in widget._meta_label.text()  # noqa: SLF001
     assert "Inspection:" in widget._meta_label.text()  # noqa: SLF001
     assert "Source: support queue" in widget._meta_label.text()  # noqa: SLF001

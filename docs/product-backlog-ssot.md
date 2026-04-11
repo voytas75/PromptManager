@@ -120,6 +120,9 @@ Delivered bounded slice under this priority:
 - keeps the current detail flow and current labels unchanged
 - **Catalog Readability Typography v1** across the shared prompt list/detail catalog surfaces
 - keeps the existing information structure intact while removing the forced smaller preview-list text and slightly enlarging the key shared detail text by default
+- **Template Variable Cue v1** in the shared detail widget
+- adds one compact `Requires variables: ...` cue when prompt bodies contain real template variables, with at most two explicit names before a `+N` suffix
+- keeps the cue inside the existing detail information flow and separate from `When to use`, metadata dump, and any new panel
 
 Remaining work in this priority should only proceed if it makes prompt fit easier to judge without turning detail view into a summary dashboard.
 
