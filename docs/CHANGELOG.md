@@ -19,6 +19,10 @@ All notable changes to **Prompt Manager** will be documented in this file.
 - Added one bounded **Similarity Strength Cue v1** in the Draft Promote advisory list so very close existing matches surface a quiet visible `Very close match` cue without exposing raw numeric scores in the row, the advisory summary nudges more clearly when such a close match exists, the open-existing button copy strengthens to `Open Very Close Match` for the selected very-close case, and the calmer baseline wording now uses `Open Existing Match`.
 - Added bounded **Catalog Readability Typography v1** across the shared prompt-list/detail catalog surfaces so retrieval preview rows keep a readable base font size and the shared detail widget uses slightly larger default typography for the title and key inspection text.
 
+### Changed
+
+- Clarified backlog and restart-document alignment so `Compare / Fork Clarity` is treated as delivered baseline work, the default next target shifts to `README / Positioning Cleanup`, and the top-level README keeps execution/analytics breadth framed as supporting rather than product-center behavior.
+
 ### Fixed
 
 - Removed legacy `requirements.txt` and `requirements-dev.txt` from the repo so installation guidance now flows through `pyproject.toml` via `pip install -e .` / `pip install -e .[dev]` or the equivalent `uv pip install -e .` / `uv pip install -e .[dev]` flows, and aligned GUI dependency messages plus README/developer docs with that single-source setup.

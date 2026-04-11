@@ -9,14 +9,11 @@ PromptManager is a local-first desktop app for **capturing, organizing, retrievi
 
 Its product center is simple: act as a **canonical home for prompt assets** so useful prompts and LLM queries do not stay scattered across chats, notes, scripts, markdown files, and ad-hoc experiments.
 
-It combines a PySide6 GUI, SQLite persistence, semantic search, prompt editing, and lightweight execution support so you can move beyond scattered prompt files, ad-hoc notes, and copy-paste workflows.
+It combines a PySide6 GUI, SQLite persistence, semantic search, prompt editing, and optional lightweight execution support, but the product center stays the prompt catalog itself rather than analytics, chains, or general AI-workstation behavior.
 
 <p align="center">
   <img src="docs/images/main.png" alt="Prompt catalogue and workspace view" width="45%">
   <img src="docs/images/template.png" alt="Template preview validating JSON variables" width="45%">
-</p>
-<p align="center">
-  <img src="docs/images/analytics.png" alt="Analytics dashboard with usage, cost, and benchmark charts" width="80%">
 </p>
 
 ## Who it is for
@@ -37,7 +34,7 @@ Use PromptManager when you want to:
 - reopen recent work quickly and inspect prompt context without hunting through metadata
 - preview and validate templated prompts before running them
 - execute prompts from a dedicated workspace when lightweight validation or reuse helps
-- compare results, token usage, and execution history
+- review prompt lineage, reuse context, and supporting execution history when needed
 - keep prompt work local-first, with optional external providers
 
 ## Core capabilities
@@ -49,7 +46,7 @@ Use PromptManager when you want to:
 - **Semantic retrieval** — find prompts by meaning, not only exact text
 - **Template preview** — render Jinja2 templates with JSON variables and validation feedback
 - **Lightweight execution workspace** — run prompts with LiteLLM-backed models and keep execution history when validation or reuse benefits from it
-- **Analytics and prompt parts** — inspect usage trends and reuse supporting prompt components without losing structure
+- **Supporting prompt parts and analytics** — reuse supporting prompt components and inspect lightweight history signals without changing the product center
 
 ## Quick start
 
@@ -158,7 +155,8 @@ PromptManager is currently in **beta** and under active development.
 The current focus is:
 - strengthening the core prompt asset loop: capture, normalize, retrieve, inspect, reuse, refine
 - improving low-friction draft capture, promotion, and reuse workflows
-- refining template and validation ergonomics
+- refining template and validation ergonomics where they directly support prompt assets
+- keeping execution, analytics, chains, sharing, and voice as supporting surfaces rather than the product center
 - keeping the desktop experience responsive and local-first
 
 ## Detailed features

@@ -154,6 +154,10 @@ Najpierw:
 2. wskazać jeden sensowny następny bounded slice,
 3. dopiero potem iść w build brief / delegację / implementację.
 
+Current default after the delivered fork-clarity passes:
+- nie wracać domyślnie do `Compare / Fork Clarity`, bo bounded fork slices są już dowiezione,
+- jeśli nie ma silniejszego powodu produktowego, następnym domyślnym torem powinno być `README / Positioning Cleanup`.
+
 ## Recommended operator wording after reset
 
 Jeśli Wojtek napisze w stylu:

@@ -64,6 +64,8 @@ The following bounded slices are already delivered and should not be planned aga
 - Fence Unwrap v1
 - Similarity Strength Cue v1
 - Catalog Readability Typography v1
+- Fork Baseline Clarity v1
+- Fork Difference Cue v1
 
 These are current baseline, not open backlog.
 
@@ -190,6 +192,14 @@ Why this matters:
 - refine quality depends on preserving useful history without making the catalog feel noisy
 - version/fork support only matters if it helps a real reuse decision
 
+Delivered bounded slices under this priority:
+- **Fork Baseline Clarity v1**
+- makes new forks start from a visible `v1` baseline and prefers `Forked from <prompt name>` over raw UUID lineage wording where the parent can be resolved
+- **Fork Difference Cue v1**
+- adds one compact `Changed from parent: ...` cue for meaningful parent-field differences without adding a compare screen or diff workflow
+
+Remaining work in this priority should only proceed if it improves reuse/refine decisions between similar prompt assets without widening into a comparison subsystem.
+
 ### Priority 7 — README / Positioning Cleanup
 
 Tighten product-facing language so the public story matches the actual product center.
@@ -253,12 +263,12 @@ If not, do not start it without an explicit decision.
 
 Unless a stronger reason appears, the next implementation target should be:
 
-**Compare / Fork Clarity**
+**README / Positioning Cleanup**
 
 Reason:
-- Retrieval Preview v1, Similar Match Preview v1, Context Lead Usage Cue v1, Reuse Payload Tooltip v1, Credible Source Cue v1, and Fence Unwrap v1 are already delivered
-- retrieval, ingest confidence, inspect clarity, reuse clarity, provenance clarity, and basic messy-input cleanup all improved in bounded steps
-- the next strong product gain is making version and fork choice easier when similar prompt assets compete for reuse
+- `Compare / Fork Clarity` is no longer the best default target because its bounded slices are already delivered in the current baseline
+- the repo still presents some visible workstation/analytics breadth in public-facing surfaces, especially README emphasis
+- the next strong product gain is reducing product-story drift so future slice selection stays anchored to prompt asset management
 
 ## Relationship to other SSOT files
 
