@@ -73,6 +73,7 @@ Jeśli potrzebny jest kontekst wdrożeniowy dla reuse lub nowszych bounded revie
 21. `Prompt Label Strip v1`
 22. `Template Variable Cue v1`
 23. `Blockquote Unwrap v1`
+24. `Template Workspace Handoff Cue v1`
 
 ### Practical meaning
 - draft capture działa,
@@ -98,6 +99,7 @@ Jeśli potrzebny jest kontekst wdrożeniowy dla reuse lub nowszych bounded revie
 - główna lista promptów nie pomniejsza już preview line poniżej bazowego rozmiaru fontu,
 - shared detail widget ma lekko większą domyślną typografię dla title i key inspection text,
 - shared detail view może pokazać cichy cue `Requires variables: ...` gdy body promptu faktycznie zawiera zmienne szablonu,
+- dla promptów szablonowych `Open in Workspace` może też cicho doprecyzować w tooltipie, że Workspace jest ścieżką do uzupełnienia zmiennych,
 - body-only copy label jest spójny jako `Copy Prompt`,
 - aktywne docs są już wyrównane do `Copy Prompt`.
 

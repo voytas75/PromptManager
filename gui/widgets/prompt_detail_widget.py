@@ -1,6 +1,8 @@
 """Prompt detail panel shared between main and template tabs.
 
 Updates:
+  v0.1.21 - 2026-04-11 - Make the workspace handoff tooltip template-aware
+    using the shared bounded variable summary.
   v0.1.20 - 2026-04-11 - Show one bounded template-variable cue in the shared detail flow.
   v0.1.19 - 2026-04-11 - Apply one bounded readability typography pass to shared detail text.
   v0.1.18 - 2026-04-10 - Filter low-signal source markers from the shared inspection cues.
@@ -44,6 +46,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.templating import TemplateRenderer
+
 from ..prompt_preview import build_prompt_source_cue
 
 if TYPE_CHECKING:  # pragma: no cover - typing helper
@@ -370,7 +373,11 @@ class PromptDetailWidget(QWidget):
         template_variable_cue = self._resolve_template_variable_cue(prompt)
         if template_variable_cue:
             self._template_variable_cue_label.setText(
-                self._format_label_value("Template variables", template_variable_cue, multiline=True)
+                self._format_label_value(
+                    "Template variables",
+                    template_variable_cue,
+                    multiline=True,
+                )
             )
             self._template_variable_cue_label.setVisible(True)
         else:
@@ -447,12 +454,18 @@ class PromptDetailWidget(QWidget):
         """Explain the current quick-reuse payload semantics without changing behavior."""
         has_prompt_body = bool((prompt.context or "").strip())
         has_description = bool((prompt.description or "").strip())
+        template_variable_summary = self._resolve_template_variable_summary(prompt.context)
 
         if has_prompt_body:
             self._copy_prompt_body_button.setToolTip("Copy the stored prompt body.")
-            self._open_in_workspace_button.setToolTip(
-                "Open the stored prompt body in the workspace without running it."
-            )
+            if template_variable_summary:
+                self._open_in_workspace_button.setToolTip(
+                    f"Open the prompt in Workspace to fill variables: {template_variable_summary}."
+                )
+            else:
+                self._open_in_workspace_button.setToolTip(
+                    "Open the stored prompt body in the workspace without running it."
+                )
             return
 
         self._copy_prompt_body_button.setToolTip(
@@ -563,10 +576,17 @@ class PromptDetailWidget(QWidget):
 
     def _resolve_template_variable_cue(self, prompt: Prompt) -> str | None:
         """Return one bounded template-variable requirement cue from the prompt body only."""
-        context = (prompt.context or "").strip()
-        if not context:
+        summary = self._resolve_template_variable_summary(prompt.context)
+        if not summary:
             return None
-        variable_names = TemplateRenderer().extract_variables(context)
+        return f"Requires variables: {summary}"
+
+    def _resolve_template_variable_summary(self, context: str | None) -> str | None:
+        """Return one bounded template-variable summary from the prompt body only."""
+        context_text = (context or "").strip()
+        if not context_text:
+            return None
+        variable_names = TemplateRenderer().extract_variables(context_text)
         if not variable_names:
             return None
         visible_names = variable_names[: self._TEMPLATE_VARIABLE_NAME_LIMIT]
@@ -574,7 +594,7 @@ class PromptDetailWidget(QWidget):
         summary = ", ".join(visible_names)
         if remaining_count > 0:
             summary = f"{summary} +{remaining_count}"
-        return f"Requires variables: {summary}"
+        return summary
 
     def _draft_status_cue(self, prompt: Prompt) -> str | None:
         """Return a textual draft cue sourced only from existing quick-capture metadata."""

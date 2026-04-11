@@ -144,6 +144,9 @@ Delivered bounded slice under this priority:
 - **Reuse Payload Tooltip v1** in the shared detail widget
 - explains what `Copy Prompt` and `Open in Workspace` will use in body-backed, description-fallback, and unavailable states
 - keeps labels, actions, and layout unchanged
+- **Template Workspace Handoff Cue v1** in the shared detail widget
+- makes `Open in Workspace` tooltip explain that Workspace is the next handoff path when detected template variables still need filling
+- keeps labels, actions, and layout unchanged while reusing the same bounded variable-summary posture as `Template Variable Cue v1`
 
 Remaining work in this priority should only proceed if it removes real reuse hesitation without creating a broader execution or helper framework.
 

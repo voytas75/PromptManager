@@ -1,6 +1,8 @@
 """Focused tests for prompt detail inspection cues.
 
 Updates:
+  v0.1.11 - 2026-04-11 - Cover template-aware workspace handoff tooltips in
+    the shared detail widget.
   v0.1.10 - 2026-04-11 - Cover bounded template-variable cue rendering in the shared detail widget.
   v0.1.9 - 2026-04-11 - Cover bounded readability typography defaults in the shared detail widget.
   v0.1.8 - 2026-04-10 - Cover bounded credible-source filtering in shared inspection cues.
@@ -316,6 +318,32 @@ def test_prompt_detail_widget_shows_template_variable_cue_when_prompt_requires_v
     assert "When to use:" not in cue_text
 
 
+def test_prompt_detail_widget_makes_workspace_tooltip_template_aware(
+    qt_app: QApplication,
+) -> None:
+    """Template prompts should explain that Workspace is the next handoff path."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000135"),
+        name="Templated workspace handoff",
+        description="Fallback description",
+        category="Operations",
+        context="Summarize {{ customer_name }} risk posture for {{ region }}.",
+        created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 5, 9, 38, tzinfo=UTC),
+    )
+
+    widget.show()
+    widget.display_prompt(prompt)
+    qt_app.processEvents()
+
+    assert widget._copy_prompt_body_button.toolTip() == "Copy the stored prompt body."  # noqa: SLF001
+    assert (
+        widget._open_in_workspace_button.toolTip()
+        == "Open the prompt in Workspace to fill variables: customer_name, region."
+    )  # noqa: SLF001
+
+
 def test_prompt_detail_widget_hides_template_variable_cue_for_plain_prompt(
     qt_app: QApplication,
 ) -> None:
@@ -363,6 +391,34 @@ def test_prompt_detail_widget_bounds_template_variable_cue_summary(
 
     cue_text = widget._template_variable_cue_label.text()  # noqa: SLF001
     assert "Requires variables: customer_name, product_name +2" in cue_text
+
+
+def test_prompt_detail_widget_bounds_template_aware_workspace_tooltip_summary(
+    qt_app: QApplication,
+) -> None:
+    """Template-aware workspace handoff tooltips should stay bounded for large templates."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000136"),
+        name="Large template handoff",
+        description="Fallback description",
+        category="Operations",
+        context=(
+            "Summarize {{ customer_name }} risk posture for {{ region }} using {{ product_name }} "
+            "and {{ severity_level }}."
+        ),
+        created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 5, 9, 40, tzinfo=UTC),
+    )
+
+    widget.show()
+    widget.display_prompt(prompt)
+    qt_app.processEvents()
+
+    assert (
+        widget._open_in_workspace_button.toolTip()
+        == "Open the prompt in Workspace to fill variables: customer_name, product_name +2."
+    )  # noqa: SLF001
 
 
 def test_prompt_detail_widget_keeps_usage_cue_bounded_in_existing_detail_flow(
