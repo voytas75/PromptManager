@@ -1,6 +1,7 @@
 """Focused tests for the quick capture dialog and draft conversion.
 
 Updates:
+  v0.1.3 - 2026-04-11 - Cover one allowed outer prompt label strip and unchanged ambiguous input.
   v0.1.2 - 2026-04-10 - Cover bounded outer-fence unwrapping for messy quick-capture input.
   v0.1.1 - 2026-04-06 - Cover shared draft-title normalization for quick capture defaults.
   v0.1.0 - 2026-04-05 - Cover source/provenance capture and prompt conversion.
@@ -21,6 +22,7 @@ from gui.dialogs.quick_capture import (
     QuickCaptureDraft,
     derive_quick_capture_title,
     resolve_quick_capture_source,
+    strip_quick_capture_prompt_label,
     unwrap_quick_capture_body,
 )
 
@@ -76,6 +78,45 @@ def test_quick_capture_draft_unwraps_one_outer_markdown_fence() -> None:
     prompt = draft.to_prompt()
 
     assert prompt.context == "Summarize deployment risks for the handoff."
+
+
+def test_quick_capture_draft_strips_one_allowed_outer_prompt_label() -> None:
+    """Quick capture should remove one obvious top-level prompt label before storing."""
+    draft = QuickCaptureDraft(body="Prompt: Summarize deployment risks for this release.")
+
+    prompt = draft.to_prompt()
+
+    assert prompt.context == "Summarize deployment risks for this release."
+
+
+def test_quick_capture_draft_strips_one_allowed_multiline_system_prompt_label() -> None:
+    """Quick capture should remove one allowed label line when real prompt text follows."""
+    draft = QuickCaptureDraft(body="System prompt:\nKeep the summary terse and operator-focused.")
+
+    prompt = draft.to_prompt()
+
+    assert prompt.context == "Keep the summary terse and operator-focused."
+
+
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        ("Prompt:", "Prompt:"),
+        (
+            "Meeting notes mention prompt: summarize risks later.",
+            "Meeting notes mention prompt: summarize risks later.",
+        ),
+        (
+            "Prompt:\nUser: summarize the release risk\nAssistant: acknowledged",
+            "Prompt:\nUser: summarize the release risk\nAssistant: acknowledged",
+        ),
+    ],
+)
+def test_strip_quick_capture_prompt_label_keeps_non_obvious_input_unchanged(
+    body: str, expected: str
+) -> None:
+    """Ambiguous, incomplete, or transcript-like input should remain unchanged."""
+    assert strip_quick_capture_prompt_label(body) == expected
 
 
 def test_unwrap_quick_capture_body_keeps_non_wrapped_or_mixed_input_intact() -> None:

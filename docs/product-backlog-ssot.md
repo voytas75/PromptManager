@@ -62,6 +62,7 @@ The following bounded slices are already delivered and should not be planned aga
 - Reuse Payload Tooltip v1
 - Credible Source Cue v1
 - Fence Unwrap v1
+- Prompt Label Strip v1
 - Similarity Strength Cue v1
 - Catalog Readability Typography v1
 - Promote-time Likely Duplicate Cue v1
@@ -177,10 +178,12 @@ Why this matters:
 - the founding thesis assumes prompts come from messy scattered places
 - capture loses value if rough source material still requires too much cleanup effort
 
-Delivered bounded slice under this priority:
+Delivered bounded slices under this priority:
 - **Fence Unwrap v1** in Quick Capture draft conversion
 - removes one obvious outer markdown fence from pasted prompt bodies while preserving inner text
 - keeps the current dialog, model, and capture flow unchanged
+- **Prompt Label Strip v1** in the same Quick Capture draft conversion seam
+- removes one obvious outer `Prompt:` / `User prompt:` / `System prompt:` wrapper when it is clearly just top-level noise before real prompt text, while leaving ambiguous or transcript-like input unchanged
 
 Remaining work in this priority should only proceed if it removes obvious capture cleanup friction without turning Quick Capture into a general markdown or import parser.
 

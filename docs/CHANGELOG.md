@@ -8,11 +8,13 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 - Added one bounded **Likely Duplicate Cue v1** in the `Promote Draft` advisory flow so matching normalized draft/existing prompt bodies surface a stronger `Likely duplicate` warning and selected-action wording without blocking `Promote as New` or widening into a duplicate-management workflow.
 - Added one bounded **Duplicate Reason Cue v1** in the `Promote Draft` advisory flow so the currently selected `Likely duplicate` or `Very close match` can explain itself with one short reason in the advisory summary without adding row-level noise, a compare screen, or score-heavy UI.
+- Added one bounded **Prompt Label Strip v1** normalization step in Quick Capture so a single obvious outer `Prompt:`, `User prompt:`, or `System prompt:` wrapper is removed before storing while ambiguous, empty, and transcript-like input remains unchanged.
 
 ### Fixed
 
 - Added focused regression coverage for likely-duplicate promote-time advisory behavior, including stronger summary/button wording and precedence over the ordinary `Very close match` cue when normalized bodies are equal.
 - Added focused regression coverage for bounded selected-match reason cues in `Promote Draft`, including likely-duplicate, very-close, weak-match, and non-selected-row cleanliness paths.
+- Added focused regression coverage for Quick Capture prompt-label stripping, including stripped inline/multiline allowed labels and unchanged ambiguous, empty, and transcript-like inputs.
 
 ## [0.22.22] - 2026-04-11
 

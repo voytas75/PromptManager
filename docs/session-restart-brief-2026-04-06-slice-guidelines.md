@@ -70,6 +70,7 @@ Jeśli potrzebny jest kontekst wdrożeniowy dla reuse lub nowszych bounded revie
 18. `Catalog Readability Typography v1`
 19. `Promote-time Likely Duplicate Cue v1`
 20. `Duplicate Reason Cue v1`
+21. `Prompt Label Strip v1`
 
 ### Practical meaning
 - draft capture działa,
@@ -84,6 +85,7 @@ Jeśli potrzebny jest kontekst wdrożeniowy dla reuse lub nowszych bounded revie
 - reuse payload tooltip działa,
 - credible-source cue działa,
 - fence unwrap działa,
+- quick capture może zdjąć jeden oczywisty outer label typu `Prompt:` / `User prompt:` / `System prompt:` gdy to tylko wrapper noise,
 - forked prompts startują z czytelnym baseline `v1`,
 - lineage summary pokazuje `Forked from <prompt name>` gdy parent da się rozwiązać,
 - fork detail może pokazać cichy cue `Changed from parent: ...` dla bounded różnic względem parenta,

@@ -1,6 +1,7 @@
 """Minimal dialog and helpers for quick prompt capture.
 
 Updates:
+  v0.1.4 - 2026-04-11 - Strip one obvious outer prompt label from quick-capture bodies.
   v0.1.3 - 2026-04-10 - Unwrap one obvious outer markdown fence from captured prompt bodies.
   v0.1.2 - 2026-04-06 - Use shared draft-title heuristics when no manual title is supplied.
   v0.1.1 - 2026-04-05 - Clarify source/provenance copy while keeping prompt.source storage.
@@ -38,6 +39,8 @@ _DRAFT_METADATA = {
     "capture_method": "quick_capture",
 }
 _TITLE_LIMIT = 80
+_OUTER_PROMPT_LABELS = ("Prompt:", "User prompt:", "System prompt:")
+_TRANSCRIPT_ROLE_PREFIXES = ("User:", "Assistant:", "System:")
 
 
 def derive_quick_capture_title(body: str, *, max_length: int = _TITLE_LIMIT) -> str:
@@ -60,6 +63,31 @@ def unwrap_quick_capture_body(body: str) -> str:
     return inner_body or stripped
 
 
+def strip_quick_capture_prompt_label(body: str) -> str:
+    """Strip one obvious outer prompt label when the remainder is clearly prompt body."""
+    stripped = body.strip()
+    for label in _OUTER_PROMPT_LABELS:
+        for separator in (" ", "\n"):
+            prefix = f"{label}{separator}"
+            if not stripped.startswith(prefix):
+                continue
+            remainder = stripped[len(prefix) :]
+            if not remainder.strip() or _starts_with_transcript_role(remainder):
+                return stripped
+            return remainder
+    return stripped
+
+
+def _starts_with_transcript_role(body: str) -> bool:
+    """Return whether the first non-empty line starts like a transcript role marker."""
+    for line in body.splitlines():
+        normalized = line.lstrip()
+        if not normalized:
+            continue
+        return any(normalized.startswith(prefix) for prefix in _TRANSCRIPT_ROLE_PREFIXES)
+    return False
+
+
 def resolve_quick_capture_source(source_label: str) -> str:
     """Return the persisted source/provenance value for a quick-captured prompt."""
     return source_label.strip() or _DEFAULT_SOURCE
@@ -77,7 +105,7 @@ class QuickCaptureDraft:
 
     def to_prompt(self) -> Prompt:
         """Build a draft prompt record using existing catalog fields."""
-        body = unwrap_quick_capture_body(self.body)
+        body = strip_quick_capture_prompt_label(unwrap_quick_capture_body(self.body))
         if not body:
             raise ValueError("Prompt body is required.")
         name = self.title.strip() or derive_quick_capture_title(body)
@@ -198,5 +226,6 @@ __all__ = [
     "derive_quick_capture_title",
     "parse_quick_capture_tags",
     "resolve_quick_capture_source",
+    "strip_quick_capture_prompt_label",
     "unwrap_quick_capture_body",
 ]
