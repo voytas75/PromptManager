@@ -64,6 +64,7 @@ The following bounded slices are already delivered and should not be planned aga
 - Fence Unwrap v1
 - Similarity Strength Cue v1
 - Catalog Readability Typography v1
+- Promote-time Likely Duplicate Cue v1
 - Fork Baseline Clarity v1
 - Fork Difference Cue v1
 
@@ -92,6 +93,8 @@ Delivered bounded slice under this priority:
 - keeps the existing advisory flow and actions unchanged
 - **Similarity Strength Cue v1** inside the same advisory list
 - adds one quiet visible `Very close match` cue for very high-similarity matches while keeping weaker matches on the clean existing row path
+- **Promote-time Likely Duplicate Cue v1** inside the same advisory list
+- adds one stronger visible `Likely duplicate` cue plus stronger selected-action wording when draft and existing prompt bodies match after bounded normalization, while keeping `Promote as New` available
 
 Remaining work in this priority should only proceed if it still improves operator judgment at ingest time without widening into a duplicate-management subsystem.
 
