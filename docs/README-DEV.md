@@ -116,6 +116,38 @@ Selecting `PROMPT_MANAGER_WEB_SEARCH_PROVIDER="random"` rotates calls between wh
 
 See [`docs/web_search_plan.md`](web_search_plan.md) for the staged web search integration plan (Exa + Tavily + Serper + SerpApi + Google Programmable Search) if you are extending the provider surface.
 
+## Versioning & release trail
+
+Treat versioning as a deliberately small system:
+
+- **`pyproject.toml` is the SSOT for the package version.**
+- **`docs/CHANGELOG.md` is the SSOT for release history.**
+- **`*.egg-info/` and `PKG-INFO` are generated local metadata, not version SSOT and not a git-tracked source of truth.**
+
+### Practical rules
+
+- When cutting a new release, bump `project.version` in `pyproject.toml` and move the current changelog content from `## [Unreleased]` into a dated release heading.
+- Leave a fresh empty `## [Unreleased]` section at the top after closing a release.
+- Do not manually treat `prompt_manager.egg-info/PKG-INFO` as canonical project state. It reflects the local installed/editable package metadata and may be stale until refreshed.
+- If the GUI or maintenance surfaces show an old version, refresh the editable install metadata locally:
+  - `pip install -e .[dev]`
+  - or `uv pip install -e .[dev]`
+- After a version bump, verify the runtime-visible version with:
+  - `python - <<'PY'
+from importlib.metadata import version
+print(version("prompt-manager"))
+PY`
+
+### Minimal release checklist
+
+1. Update `pyproject.toml` version.
+2. Close the current changelog under a dated release heading.
+3. Keep a fresh `## [Unreleased]` section ready for the next cycle.
+4. Refresh editable metadata locally if needed.
+5. Spot-check that `importlib.metadata.version("prompt-manager")` matches the intended release.
+
+This keeps repo truth and runtime-visible package metadata aligned without pretending generated local metadata should be hand-maintained in git.
+
 ## Detailed Getting Started
 
 1. **Validate configuration**
