@@ -1,6 +1,7 @@
 """Prompt detail panel shared between main and template tabs.
 
 Updates:
+  v0.1.22 - 2026-04-12 - Add one bounded usage-confidence cue from existing usage counts.
   v0.1.21 - 2026-04-11 - Make the workspace handoff tooltip template-aware
     using the shared bounded variable summary.
   v0.1.20 - 2026-04-11 - Show one bounded template-variable cue in the shared detail flow.
@@ -126,6 +127,11 @@ class PromptDetailWidget(QWidget):
         self._usage_cue_label.setWordWrap(True)
         self._usage_cue_label.setTextFormat(Qt.TextFormat.RichText)
         self._usage_cue_label.setVisible(False)
+        self._reuse_signal_label = QLabel("", content)
+        self._reuse_signal_label.setObjectName("promptReuseSignalCue")
+        self._reuse_signal_label.setWordWrap(True)
+        self._reuse_signal_label.setTextFormat(Qt.TextFormat.RichText)
+        self._reuse_signal_label.setVisible(False)
         self._template_variable_cue_label = QLabel("", content)
         self._template_variable_cue_label.setObjectName("promptTemplateVariableCue")
         self._template_variable_cue_label.setWordWrap(True)
@@ -160,6 +166,8 @@ class PromptDetailWidget(QWidget):
         content_layout.addWidget(self._meta_label)
         content_layout.addSpacing(4)
         content_layout.addWidget(self._usage_cue_label)
+        content_layout.addSpacing(4)
+        content_layout.addWidget(self._reuse_signal_label)
         content_layout.addSpacing(4)
         content_layout.addWidget(self._template_variable_cue_label)
         content_layout.addSpacing(4)
@@ -370,6 +378,15 @@ class PromptDetailWidget(QWidget):
         else:
             self._usage_cue_label.clear()
             self._usage_cue_label.setVisible(False)
+        reuse_signal_cue = self._resolve_reuse_signal_cue(prompt)
+        if reuse_signal_cue:
+            self._reuse_signal_label.setText(
+                self._format_label_value("Reuse signal", reuse_signal_cue, multiline=True)
+            )
+            self._reuse_signal_label.setVisible(True)
+        else:
+            self._reuse_signal_label.clear()
+            self._reuse_signal_label.setVisible(False)
         template_variable_cue = self._resolve_template_variable_cue(prompt)
         if template_variable_cue:
             self._template_variable_cue_label.setText(
@@ -574,6 +591,14 @@ class PromptDetailWidget(QWidget):
         words = value.split()
         return min_words <= len(words) <= self._USAGE_CUE_MAX_WORDS
 
+    def _resolve_reuse_signal_cue(self, prompt: Prompt) -> str | None:
+        """Return one compact confidence cue from existing usage counts only."""
+        usage_count = int(prompt.usage_count or 0)
+        if usage_count <= 0:
+            return None
+        noun = "time" if usage_count == 1 else "times"
+        return f"used {usage_count} {noun}"
+
     def _resolve_template_variable_cue(self, prompt: Prompt) -> str | None:
         """Return one bounded template-variable requirement cue from the prompt body only."""
         summary = self._resolve_template_variable_summary(prompt.context)
@@ -740,6 +765,7 @@ class PromptDetailWidget(QWidget):
             self._rating_label,
             self._meta_label,
             self._usage_cue_label,
+            self._reuse_signal_label,
             self._template_variable_cue_label,
             self._description,
             self._lineage_label,
@@ -766,6 +792,8 @@ class PromptDetailWidget(QWidget):
         self._meta_label.setVisible(False)
         self._usage_cue_label.clear()
         self._usage_cue_label.setVisible(False)
+        self._reuse_signal_label.clear()
+        self._reuse_signal_label.setVisible(False)
         self._template_variable_cue_label.clear()
         self._template_variable_cue_label.setVisible(False)
         self._description.clear()

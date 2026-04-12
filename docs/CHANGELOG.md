@@ -6,6 +6,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Added
 
+- Added one bounded **Usage Confidence Cue v1** in the shared detail view so prompts that already saw real use can show one quiet `Reuse signal: used N time(s)` cue from the existing `usage_count`, without adding analytics, ranking, or a new metrics panel.
 - Added one bounded **Edit Dialog Promote Draft Shortcut v1** so draft prompts being edited can hand off directly into the existing `Promote Draft` flow without backing out to the detail view, using one safe apply-first confirm when unsaved changes exist.
 - Added one bounded **Source-Matched Preview Priority v1** pass to the existing main prompt list so an active plain-text search can let a credible matching `Source: ...` cue become the preview line without changing no-search preview priority, ranking, filtering, selection, or list layout.
 - Added one bounded **Search Match Highlight v1** pass to the existing main prompt list so active plain-text search can subtly emphasize matching text already visible in the title row and bounded preview line without changing ranking, filtering, selection, or list layout.
@@ -20,6 +21,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 - `Execute as Context` no longer duplicates the prompt body as both system instructions and an extra `Context:` block in the user payload, and now runs through one transient context-execution path that sends the prompt body as context and the entered task as the user request.
 - LiteLLM execution no longer sends `reasoning` payloads to `gpt-4.1`, preventing Azure `400 Bad Request` failures on that model family while keeping reasoning-effort payloads for supported reasoning models such as `gpt-5` and `o*`.
+- Added focused regression coverage for bounded usage-confidence cue rendering, including visible plural/singular wording and clean zero-usage silence.
 - Added focused regression coverage for the draft-only editor handoff path, including visible shortcut gating, unsaved-change confirm handling, and save-then-promote flow reuse.
 - Prompt search failures now preserve one sanitized backend detail line in the existing `Unable to search prompts` popup path when Chroma returns a useful message, while noisy traceback-only failures still fall back to the generic search error text.
 - Added focused regression coverage for active-search source-priority preview behavior, including no-search fallback stability, weak-source guardrails, and preview-role refresh when search changes the chosen preview text.

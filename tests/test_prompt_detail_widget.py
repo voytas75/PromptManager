@@ -1,6 +1,7 @@
 """Focused tests for prompt detail inspection cues.
 
 Updates:
+  v0.1.12 - 2026-04-12 - Cover bounded usage-confidence cue rendering from usage counts.
   v0.1.11 - 2026-04-11 - Cover template-aware workspace handoff tooltips in
     the shared detail widget.
   v0.1.10 - 2026-04-11 - Cover bounded template-variable cue rendering in the shared detail widget.
@@ -290,6 +291,85 @@ def test_prompt_detail_widget_hides_usage_cue_when_no_credible_signal_exists(
 
     assert not widget._usage_cue_label.isVisible()  # noqa: SLF001
     assert widget._usage_cue_label.text() == ""  # noqa: SLF001
+
+
+def test_prompt_detail_widget_shows_reuse_signal_when_prompt_has_usage_history(
+    qt_app: QApplication,
+) -> None:
+    """Detail view should show one quiet reuse-confidence cue when usage exists."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000136"),
+        name="Reusable prompt",
+        description="Fallback description",
+        category="Operations",
+        context="Prompt body",
+        usage_count=4,
+        created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 5, 9, 40, tzinfo=UTC),
+    )
+
+    widget.show()
+    widget.display_prompt(prompt)
+    qt_app.processEvents()
+
+    assert widget._reuse_signal_label.isVisible()  # noqa: SLF001
+    cue_text = widget._reuse_signal_label.text()  # noqa: SLF001
+    assert "Reuse signal:" in cue_text
+    assert "used 4 times" in cue_text
+
+
+
+def test_prompt_detail_widget_uses_singular_reuse_signal_wording(
+    qt_app: QApplication,
+) -> None:
+    """Detail view should use singular wording for one prior use."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000137"),
+        name="Reusable prompt",
+        description="Fallback description",
+        category="Operations",
+        context="Prompt body",
+        usage_count=1,
+        created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 5, 9, 41, tzinfo=UTC),
+    )
+
+    widget.show()
+    widget.display_prompt(prompt)
+    qt_app.processEvents()
+
+    assert widget._reuse_signal_label.isVisible()  # noqa: SLF001
+    cue_text = widget._reuse_signal_label.text()  # noqa: SLF001
+    assert "used 1 time" in cue_text
+    assert "used 1 times" not in cue_text
+
+
+
+def test_prompt_detail_widget_hides_reuse_signal_without_usage_history(
+    qt_app: QApplication,
+) -> None:
+    """Detail view should stay quiet when no usage count exists yet."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000138"),
+        name="Stored prompt",
+        description="Fallback description",
+        category="Operations",
+        context="Prompt body",
+        usage_count=0,
+        created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 5, 9, 42, tzinfo=UTC),
+    )
+
+    widget.show()
+    widget.display_prompt(prompt)
+    qt_app.processEvents()
+
+    assert not widget._reuse_signal_label.isVisible()  # noqa: SLF001
+    assert widget._reuse_signal_label.text() == ""  # noqa: SLF001
+
 
 
 def test_prompt_detail_widget_shows_template_variable_cue_when_prompt_requires_variables(
