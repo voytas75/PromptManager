@@ -19,7 +19,7 @@ import asyncio
 import logging
 import uuid
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from html import escape
 from typing import TYPE_CHECKING, Any, cast
 
@@ -412,6 +412,53 @@ class ExecutionController:
         if not trimmed:
             self._status("Type or paste some text before running it.", 4000)
             return
+        prompt = self._build_freeform_prompt()
+        self._execute_ad_hoc_prompt(
+            display_prompt=prompt,
+            execution_prompt=prompt,
+            request_text=trimmed,
+            conversation_user_text=trimmed,
+            status_message_template="Executed workspace text run in {duration_ms} ms.",
+            count_usage_for_prompt=False,
+        )
+
+    def execute_prompt_as_context(self, prompt: Prompt, *, task_text: str, context_text: str) -> None:
+        """Run a prompt body as context for an ad-hoc task without duplicating the context payload."""
+        cleaned_task = (task_text or "").strip()
+        cleaned_context = (context_text or "").strip()
+        if not cleaned_task:
+            self._status("Enter a task before executing.", 4000)
+            return
+        if not cleaned_context:
+            self._status("Provide context text before executing.", 4000)
+            return
+        execution_prompt = replace(prompt, context=cleaned_context)
+        conversation_user_text = (
+            "You will receive a task and a context block. "
+            "Use the context exclusively when fulfilling the task.\n\n"
+            f"Task:\n{cleaned_task}\n\n"
+            f"Context:\n{cleaned_context}"
+        )
+        self._execute_ad_hoc_prompt(
+            display_prompt=prompt,
+            execution_prompt=execution_prompt,
+            request_text=cleaned_task,
+            conversation_user_text=conversation_user_text,
+            status_message_template=f"Executed context '{prompt.name}' in {{duration_ms}} ms.",
+            count_usage_for_prompt=True,
+        )
+
+    def _execute_ad_hoc_prompt(
+        self,
+        *,
+        display_prompt: Prompt,
+        execution_prompt: Prompt,
+        request_text: str,
+        conversation_user_text: str,
+        status_message_template: str,
+        count_usage_for_prompt: bool,
+    ) -> None:
+        """Execute a transient prompt configuration without relying on catalog persistence."""
         if not getattr(self._manager, "llm_available", True):
             message = self._manager.llm_status_message("Prompt execution")
             self._error("Prompt execution unavailable", message)
@@ -422,15 +469,14 @@ class ExecutionController:
             self._error("Prompt execution unavailable", "Configure LiteLLM before running text.")
             self._status("Prompt execution unavailable.", 4000)
             return
-        prompt = self._build_freeform_prompt()
-        payload = self._maybe_enrich_request(prompt, trimmed)
+        payload = self._maybe_enrich_request(execution_prompt, request_text)
         streaming_enabled = self._is_streaming_enabled()
         callback = self._handle_stream_chunk if streaming_enabled else None
         if streaming_enabled:
-            self._begin_streaming_run(prompt)
+            self._begin_streaming_run(display_prompt)
         try:
             result = executor.execute(
-                prompt,
+                execution_prompt,
                 payload,
                 conversation=None,
                 stream=streaming_enabled,
@@ -440,7 +486,7 @@ class ExecutionController:
             if streaming_enabled and self._streaming_in_progress:
                 self._end_streaming_run()
             self._usage_logger.log_execute(
-                prompt_name=prompt.name,
+                prompt_name=display_prompt.name,
                 success=False,
                 duration_ms=None,
                 error=str(exc),
@@ -451,7 +497,7 @@ class ExecutionController:
             if streaming_enabled and self._streaming_in_progress:
                 self._end_streaming_run()
             self._usage_logger.log_execute(
-                prompt_name=prompt.name,
+                prompt_name=display_prompt.name,
                 success=False,
                 duration_ms=None,
                 error=str(exc),
@@ -462,7 +508,7 @@ class ExecutionController:
             if streaming_enabled and self._streaming_in_progress:
                 self._end_streaming_run()
 
-        conversation = [{"role": "user", "content": trimmed}]
+        conversation = [{"role": "user", "content": conversation_user_text}]
         if result.response_text:
             conversation.append({"role": "assistant", "content": result.response_text})
         has_response = bool((result.response_text or "").strip())
@@ -472,20 +518,22 @@ class ExecutionController:
             conversation=conversation,
         )
         self._display_execution_result(
-            prompt,
+            display_prompt,
             outcome,
             enable_save=has_response,
             freeform_chat=True,
         )
+        if count_usage_for_prompt:
+            try:
+                self._manager.increment_usage(display_prompt.id)
+            except (PromptManagerError, PromptNotFoundError):
+                logger.debug("Unable to increment prompt usage after context execution", exc_info=True)
         self._usage_logger.log_execute(
-            prompt_name=prompt.name,
+            prompt_name=display_prompt.name,
             success=True,
             duration_ms=result.duration_ms,
         )
-        self._status(
-            f"Executed workspace text run in {result.duration_ms} ms.",
-            5000,
-        )
+        self._status(status_message_template.format(duration_ms=result.duration_ms), 5000)
 
     def continue_chat(self) -> None:
         """Send the workspace text as a follow-up within the active chat session."""

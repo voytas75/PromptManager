@@ -210,23 +210,15 @@ class PromptActionsController:
         self._last_execute_context_task = task_text
         self._layout_state.persist_last_execute_task(task_text)
         self._layout_state.record_execute_task(task_text, self._execute_context_history)
-        request_payload = (
-            "You will receive a task and a context block. "
-            "Use the context exclusively when fulfilling the task.\n\n"
-            f"Task:\n{cleaned_task}\n\n"
-            f"Context:\n{cleaned_context}"
-        )
         controller = self._execution_controller_supplier()
         if controller is None:
             self._error_callback("Workspace unavailable", "Execution controller is not ready.")
             return
         try:
-            controller.execute_prompt_with_text(
+            controller.execute_prompt_as_context(
                 prompt,
-                request_payload,
-                status_prefix="Executed context",
-                empty_text_message="Provide context text before executing.",
-                keep_text_after=False,
+                task_text=cleaned_task,
+                context_text=cleaned_context,
             )
         finally:
             if self._workspace_view is not None:

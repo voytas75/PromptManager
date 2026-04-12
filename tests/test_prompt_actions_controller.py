@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
+import gui.prompt_actions_controller as prompt_actions_controller_module
 from gui.prompt_actions_controller import PromptActionsController
 from gui.usage_logger import IntentUsageLogger
 from gui.workspace_view_controller import WorkspaceViewController
@@ -103,6 +104,25 @@ class _MenuStub:
 
     def exec(self, _point: object) -> None:  # noqa: A003 - Qt style API
         return None
+
+
+class _ExecuteContextDialogStub:
+    def __init__(self, *_args: object, **_kwargs: object) -> None:
+        self._task_text = "Summarize the key risks."
+
+    def exec(self) -> int:
+        return 1
+
+    def task_text(self) -> str:
+        return self._task_text
+
+
+class _ExecutionControllerStub:
+    def __init__(self) -> None:
+        self.context_calls: list[tuple[Prompt, str, str]] = []
+
+    def execute_prompt_as_context(self, prompt: Prompt, *, task_text: str, context_text: str) -> None:
+        self.context_calls.append((prompt, task_text, context_text))
 
 
 def _build_prompt(*, context: str | None, description: str) -> Prompt:
@@ -210,6 +230,50 @@ def test_copy_prompt_to_clipboard_copies_the_prompt_body(
     assert clipboard.text == "Prompt body to reuse immediately"
     assert status_messages == []
     assert toast_messages == [("Copied 'Reusable prompt' to the clipboard.", 2500)]
+
+
+def test_execute_prompt_as_context_delegates_task_and_context(
+    qt_app: QApplication,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    query_input = QPlainTextEdit()
+    workspace_view = WorkspaceViewController(
+        query_input,
+        QTabWidget(),
+        QLabel(),
+        status_callback=lambda *_: None,
+        execution_controller_supplier=lambda: None,
+        quick_action_controller_supplier=lambda: None,
+    )
+    status_messages: list[tuple[str, int]] = []
+    toast_messages: list[tuple[str, int]] = []
+    execution_controller = _ExecutionControllerStub()
+    prompt = _build_prompt(context="Prompt body to reuse", description="Fallback description")
+
+    monkeypatch.setattr(
+        prompt_actions_controller_module,
+        "ExecuteContextDialog",
+        _ExecuteContextDialogStub,
+    )
+
+    controller = _build_controller(
+        query_input=query_input,
+        workspace_view=workspace_view,
+        status_messages=status_messages,
+        toast_messages=toast_messages,
+        execution_supplier=lambda: execution_controller,
+    )
+
+    controller.execute_prompt_as_context(prompt)
+    qt_app.processEvents()
+
+    assert query_input.toPlainText() == "Prompt body to reuse"
+    assert execution_controller.context_calls == [
+        (prompt, "Summarize the key risks.", "Prompt body to reuse")
+    ]
+    assert status_messages == []
+    assert toast_messages == []
+
 
 
 def test_show_context_menu_uses_shared_copy_prompt_label(
