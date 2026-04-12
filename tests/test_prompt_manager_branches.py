@@ -1,6 +1,7 @@
 """Branch coverage tests for PromptManager edge cases.
 
 Updates:
+  v0.1.4 - 2026-04-12 - Cover sanitized prompt search backend errors and generic fallback.
   v0.1.3 - 2026-04-10 - Verify forked prompts reset to a fresh visible version baseline.
   v0.1.2 - 2025-12-08 - Import ChromaError, add override decorator, reuse concrete stub for Pyright.
   v0.1.1 - 2025-11-22 - Seed version history for legacy prompts without snapshots.
@@ -1032,11 +1033,54 @@ def test_delete_prompt_handles_repository_and_chroma_errors() -> None:
         manager_chroma.delete_prompt(prompt.id)
 
 
-def test_search_prompts_raises_when_query_fails() -> None:
-    collection = _StubCollection(query_exception=_TestChromaError("query"))
+def test_search_prompts_surfaces_sanitized_backend_query_error() -> None:
+    collection = _StubCollection(
+        query_exception=_TestChromaError(
+            "Embedding dimension 1536 does not match collection dimension 3072.\n"
+            "Traceback (most recent call last):\n"
+            '  File "/tmp/chroma.py", line 10, in query\n'
+            "ValueError: mismatch"
+        )
+    )
     manager = _build_manager(collection=collection)
-    with pytest.raises(PromptStorageError):
+    with pytest.raises(PromptStorageError) as exc_info:
         manager.search_prompts(query_text="hello")
+    assert (
+        str(exc_info.value)
+        == "Failed to query prompts: Embedding dimension 1536 does not match "
+        "collection dimension 3072."
+    )
+
+
+def test_search_prompts_falls_back_for_unsuitable_backend_query_error() -> None:
+    class _IncludeQueryCollection(_StubCollection):
+        def query(
+            self,
+            *,
+            query_texts: list[str] | None = None,  # noqa: ARG002
+            query_embeddings: list[list[float]] | None = None,  # noqa: ARG002
+            n_results: int,  # noqa: ARG002
+            where: dict[str, Any] | None = None,  # noqa: ARG002
+            include: list[str] | None = None,  # noqa: ARG002
+        ) -> dict[str, Any]:
+            return super().query(
+                query_texts=query_texts,
+                query_embeddings=query_embeddings,
+                n_results=n_results,
+                where=where,
+            )
+
+    collection = _IncludeQueryCollection(
+        query_exception=_TestChromaError(
+            "Traceback (most recent call last):\n"
+            '  File "/tmp/chroma.py", line 10, in query\n'
+            "RuntimeError: backend exploded"
+        )
+    )
+    manager = _build_manager(collection=collection)
+    with pytest.raises(PromptStorageError) as exc_info:
+        manager.search_prompts(query_text="hello")
+    assert str(exc_info.value) == "Failed to query prompts"
 
 
 def test_increment_usage_updates_repository() -> None:

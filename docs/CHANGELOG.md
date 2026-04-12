@@ -17,6 +17,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Fixed
 
+- Prompt search failures now preserve one sanitized backend detail line in the existing `Unable to search prompts` popup path when Chroma returns a useful message, while noisy traceback-only failures still fall back to the generic search error text.
 - Added focused regression coverage for active-search source-priority preview behavior, including no-search fallback stability, weak-source guardrails, and preview-role refresh when search changes the chosen preview text.
 - Added focused regression coverage for active-search and no-search prompt-list highlight behavior, including bounded title/preview match spans and delegate emphasis-run rendering.
 - Added focused regression coverage for template-aware workspace handoff tooltips, including bounded variable-summary rendering and unchanged plain-prompt tooltip behavior.

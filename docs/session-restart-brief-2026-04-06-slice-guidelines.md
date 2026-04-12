@@ -76,6 +76,7 @@ Jeśli potrzebny jest kontekst wdrożeniowy dla reuse lub nowszych bounded revie
 24. `Template Workspace Handoff Cue v1`
 25. `Search Match Highlight v1`
 26. `Source-Matched Preview Priority v1`
+27. `Search Error Specificity v1`
 
 ### Practical meaning
 - draft capture działa,
@@ -104,6 +105,7 @@ Jeśli potrzebny jest kontekst wdrożeniowy dla reuse lub nowszych bounded revie
 - dla promptów szablonowych `Open in Workspace` może też cicho doprecyzować w tooltipie, że Workspace jest ścieżką do uzupełnienia zmiennych,
 - przy aktywnym zwykłym searchu główna lista promptów może też subtelnie podświetlić trafione fragmenty w title i preview line, bez ruszania rankingu ani layoutu,
 - przy aktywnym zwykłym searchu preview line może też tymczasowo preferować wiarygodny cue `Source: ...`, jeśli to właśnie source najlepiej tłumaczy match, bez zmiany zwykłego no-search priority,
+- przy błędzie zwykłego searchu popup może teraz zachować jedną czytelną linię realnego backend/Chroma error, jeśli taka istnieje, zamiast zawsze kończyć na całkiem ogólnym komunikacie,
 - body-only copy label jest spójny jako `Copy Prompt`,
 - aktywne docs są już wyrównane do `Copy Prompt`.
 

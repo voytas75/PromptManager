@@ -1,6 +1,7 @@
 """Semantic search and recommendation helpers for Prompt Manager.
 
 Updates:
+  v0.1.1 - 2026-04-12 - Preserve sanitized backend detail for prompt search query failures.
   v0.1.0 - 2025-12-03 - Extract search, suggestion, and personalisation mixin.
 """
 
@@ -35,6 +36,9 @@ logger = logging.getLogger(__name__)
 
 __all__ = ["IntentSuggestions", "PromptSearchMixin"]
 
+_QUERY_PROMPTS_ERROR_MESSAGE = "Failed to query prompts"
+_MAX_QUERY_ERROR_DETAIL_LENGTH = 240
+
 
 @dataclass(slots=True)
 class IntentSuggestions:
@@ -43,6 +47,60 @@ class IntentSuggestions:
     prediction: IntentPrediction
     prompts: list[Prompt]
     fallback_used: bool = False
+
+
+def _build_query_failure_message(error: BaseException) -> str:
+    """Return a readable prompt-search failure message for callers."""
+    detail = _extract_query_failure_detail(error)
+    if detail is None:
+        return _QUERY_PROMPTS_ERROR_MESSAGE
+    return f"{_QUERY_PROMPTS_ERROR_MESSAGE}: {detail}"
+
+
+def _extract_query_failure_detail(error: BaseException | None) -> str | None:
+    """Return the first sanitized backend detail from an explicit cause chain."""
+    seen: set[int] = set()
+    current = error
+    for _ in range(5):
+        if current is None or id(current) in seen:
+            return None
+        seen.add(id(current))
+
+        detail = _sanitize_query_failure_detail(str(current))
+        if detail is not None:
+            return detail
+
+        current = current.__cause__
+    return None
+
+
+def _sanitize_query_failure_detail(message: str) -> str | None:
+    """Reduce backend error text to a single readable detail line."""
+    stripped = message.strip()
+    if not stripped:
+        return None
+
+    parts: list[str] = []
+    for raw_line in stripped.splitlines():
+        line = " ".join(raw_line.split())
+        if not line:
+            continue
+        lowered = line.casefold()
+        if lowered.startswith("traceback (most recent call last):"):
+            break
+        if line.startswith('File "') or lowered.startswith("during handling of the above"):
+            break
+        parts.append(line)
+        if len(" ".join(parts)) >= _MAX_QUERY_ERROR_DETAIL_LENGTH:
+            break
+
+    if not parts:
+        return None
+
+    normalized = " ".join(parts)
+    if len(normalized) > _MAX_QUERY_ERROR_DETAIL_LENGTH:
+        normalized = normalized[: _MAX_QUERY_ERROR_DETAIL_LENGTH - 3].rstrip(" .,;:") + "..."
+    return normalized or None
 
 
 class PromptSearchMixin:
@@ -98,7 +156,7 @@ class PromptSearchMixin:
                     include=None,
                 )
         except ChromaError as exc:
-            raise PromptStorageError("Failed to query prompts") from exc
+            raise PromptStorageError(_build_query_failure_message(exc)) from exc
 
         prompts: list[Prompt] = []
         ids = results.get("ids", [[]])[0]
