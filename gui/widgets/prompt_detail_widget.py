@@ -1,24 +1,16 @@
 """Prompt detail panel shared between main and template tabs.
 
 Updates:
+  v0.1.23 - 2026-04-12 - Add one visible template-only workspace handoff cue in Quick Reuse.
   v0.1.22 - 2026-04-12 - Add one bounded usage-confidence cue from existing usage counts.
-  v0.1.21 - 2026-04-11 - Make the workspace handoff tooltip template-aware
-    using the shared bounded variable summary.
+  v0.1.21 - 2026-04-11 - Make the workspace handoff tooltip template-aware using the shared bounded variable summary.
   v0.1.20 - 2026-04-11 - Show one bounded template-variable cue in the shared detail flow.
   v0.1.19 - 2026-04-11 - Apply one bounded readability typography pass to shared detail text.
   v0.1.18 - 2026-04-10 - Filter low-signal source markers from the shared inspection cues.
   v0.1.17 - 2026-04-10 - Explain quick-reuse payload semantics with bounded dynamic tooltips.
   v0.1.16 - 2026-04-10 - Add one bounded context-lead fallback for the existing usage cue.
   v0.1.15 - 2026-04-06 - Rename the detail reuse action to Copy Prompt and gate it on prompt bodies.
-  v0.1.14 - 2026-04-05 - Add a bounded derived usage cue to the existing detail flow.
-  v0.1.13 - 2026-04-04 - Add bounded quick-reuse actions for copy and workspace handoff.
-  v0.1.12 - 2026-04-04 - Add one visible Promote Draft action for captured prompts.
-  v0.1.11 - 2026-04-04 - Render inspection timestamps in a compact human-readable UTC format.
-  v0.1.10 - 2026-04-04 - Surface compact always-visible inspection cues for source/draft status.
-  v0.1.9 - 2025-12-09 - Collapse metadata spacing by hiding header/text when not in use.
-  v0.1.8 - 2025-12-09 - Swap metadata table for a toggleable text view with close control.
-  v0.1.7 - 2025-12-09 - Import QToolButton to restore GUI startup.
-  v0.1.6-and-earlier - 2025-12-09 - Refined metadata toggles and initial widget extraction.
+  v0.1.14-and-earlier - 2026-04-05 - Added quick-reuse/detail cues, UTC timestamps, metadata toggles, and initial widget extraction.
 """
 
 from __future__ import annotations
@@ -184,9 +176,13 @@ class PromptDetailWidget(QWidget):
 
         reuse_group = QGroupBox("Quick Reuse", content)
         reuse_group.setObjectName("quickReuseGroup")
-        reuse_layout = QHBoxLayout(reuse_group)
+        reuse_layout = QVBoxLayout(reuse_group)
         reuse_layout.setContentsMargins(12, 8, 12, 8)
-        reuse_layout.setSpacing(8)
+        reuse_layout.setSpacing(6)
+
+        reuse_button_row = QHBoxLayout()
+        reuse_button_row.setContentsMargins(0, 0, 0, 0)
+        reuse_button_row.setSpacing(8)
 
         self._copy_prompt_body_button = QPushButton("Copy Prompt", reuse_group)
         self._copy_prompt_body_button.setObjectName("copyPromptBodyButton")
@@ -194,7 +190,7 @@ class PromptDetailWidget(QWidget):
         self._copy_prompt_body_button.clicked.connect(  # type: ignore[arg-type]
             self.copy_prompt_body_requested.emit
         )
-        reuse_layout.addWidget(self._copy_prompt_body_button)
+        reuse_button_row.addWidget(self._copy_prompt_body_button)
 
         self._open_in_workspace_button = QPushButton("Open in Workspace", reuse_group)
         self._open_in_workspace_button.setObjectName("openInWorkspaceButton")
@@ -202,8 +198,16 @@ class PromptDetailWidget(QWidget):
         self._open_in_workspace_button.clicked.connect(  # type: ignore[arg-type]
             self.open_in_workspace_requested.emit
         )
-        reuse_layout.addWidget(self._open_in_workspace_button)
-        reuse_layout.addStretch(1)
+        reuse_button_row.addWidget(self._open_in_workspace_button)
+        reuse_button_row.addStretch(1)
+        reuse_layout.addLayout(reuse_button_row)
+
+        self._workspace_handoff_cue_label = QLabel("", reuse_group)
+        self._workspace_handoff_cue_label.setObjectName("promptWorkspaceHandoffCue")
+        self._workspace_handoff_cue_label.setWordWrap(True)
+        self._workspace_handoff_cue_label.setTextFormat(Qt.TextFormat.RichText)
+        self._workspace_handoff_cue_label.setVisible(False)
+        reuse_layout.addWidget(self._workspace_handoff_cue_label)
         content_layout.addWidget(reuse_group)
 
         metadata_group = QGroupBox("Metadata Views", content)
@@ -453,6 +457,13 @@ class PromptDetailWidget(QWidget):
         self._copy_prompt_body_button.setEnabled(has_prompt_body)
         self._open_in_workspace_button.setEnabled(has_reusable_payload)
         self._apply_reuse_tooltips(prompt)
+        workspace_handoff_cue = self._resolve_workspace_handoff_cue(prompt)
+        if workspace_handoff_cue:
+            self._workspace_handoff_cue_label.setText(workspace_handoff_cue)
+            self._workspace_handoff_cue_label.setVisible(True)
+        else:
+            self._workspace_handoff_cue_label.clear()
+            self._workspace_handoff_cue_label.setVisible(False)
         is_draft = self._is_draft_prompt(prompt)
         self._promote_draft_button.setEnabled(is_draft)
         self._promote_draft_button.setVisible(is_draft)
@@ -605,6 +616,17 @@ class PromptDetailWidget(QWidget):
         if not summary:
             return None
         return f"Requires variables: {summary}"
+
+    def _resolve_workspace_handoff_cue(self, prompt: Prompt) -> str | None:
+        """Return one bounded visible workspace handoff cue for template prompts only."""
+        summary = self._resolve_template_variable_summary(prompt.context)
+        if not summary:
+            return None
+        return self._format_label_value(
+            "Next step",
+            "Open in Workspace to fill variables before reuse.",
+            multiline=True,
+        )
 
     def _resolve_template_variable_summary(self, context: str | None) -> str | None:
         """Return one bounded template-variable summary from the prompt body only."""
@@ -767,6 +789,7 @@ class PromptDetailWidget(QWidget):
             self._usage_cue_label,
             self._reuse_signal_label,
             self._template_variable_cue_label,
+            self._workspace_handoff_cue_label,
             self._description,
             self._lineage_label,
             self._context,
@@ -796,6 +819,8 @@ class PromptDetailWidget(QWidget):
         self._reuse_signal_label.setVisible(False)
         self._template_variable_cue_label.clear()
         self._template_variable_cue_label.setVisible(False)
+        self._workspace_handoff_cue_label.clear()
+        self._workspace_handoff_cue_label.setVisible(False)
         self._description.clear()
         self._context.clear()
         self._scenarios.clear()

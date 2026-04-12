@@ -424,6 +424,56 @@ def test_prompt_detail_widget_makes_workspace_tooltip_template_aware(
     )  # noqa: SLF001
 
 
+def test_prompt_detail_widget_shows_visible_workspace_handoff_cue_for_template_prompt(
+    qt_app: QApplication,
+) -> None:
+    """Template prompts should get one visible reuse cue without adding a second CTA."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000139"),
+        name="Template reuse cue",
+        description="Fallback description",
+        category="Operations",
+        context="Summarize {{ customer_name }} risk posture for {{ region }}.",
+        created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 5, 9, 43, tzinfo=UTC),
+    )
+
+    widget.show()
+    widget.display_prompt(prompt)
+    qt_app.processEvents()
+
+    assert widget._open_in_workspace_button.text() == "Open in Workspace"  # noqa: SLF001
+    assert widget._workspace_handoff_cue_label.isVisible()  # noqa: SLF001
+    cue_text = widget._workspace_handoff_cue_label.text()  # noqa: SLF001
+    assert "Next step:" in cue_text
+    assert "Open in Workspace to fill variables before reuse." in cue_text
+
+
+def test_prompt_detail_widget_hides_visible_workspace_handoff_cue_for_plain_prompt(
+    qt_app: QApplication,
+) -> None:
+    """Plain prompts should not show the template-specific visible workspace cue."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000140"),
+        name="Plain reuse cue",
+        description="Fallback description",
+        category="General",
+        context="Summarize the incident and call out operator-facing risks.",
+        created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 5, 9, 44, tzinfo=UTC),
+    )
+
+    widget.show()
+    widget.display_prompt(prompt)
+    qt_app.processEvents()
+
+    assert widget._open_in_workspace_button.text() == "Open in Workspace"  # noqa: SLF001
+    assert not widget._workspace_handoff_cue_label.isVisible()  # noqa: SLF001
+    assert widget._workspace_handoff_cue_label.text() == ""  # noqa: SLF001
+
+
 def test_prompt_detail_widget_hides_template_variable_cue_for_plain_prompt(
     qt_app: QApplication,
 ) -> None:
