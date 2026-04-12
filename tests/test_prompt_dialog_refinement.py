@@ -8,16 +8,18 @@ Updates:
 
 from __future__ import annotations
 
+import uuid
 from typing import cast
 
 import pytest
 
 pytest.importorskip("PySide6")
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMessageBox
 
 from core.prompt_engineering import PromptRefinement
 from gui.dialogs import PromptDialog, _strip_scenarios_metadata
 from models.category_model import PromptCategory
+from models.prompt_model import Prompt
 
 
 @pytest.fixture(scope="module")
@@ -72,6 +74,72 @@ def test_prompt_dialog_normalises_category_from_registry(qt_app: QApplication) -
     finally:
         dialog.close()
         dialog.deleteLater()
+
+
+def test_prompt_dialog_shows_promote_shortcut_only_for_draft_prompts(qt_app: QApplication) -> None:
+    draft_prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000611"),
+        name="Captured draft",
+        description="Quick capture draft.",
+        category="General",
+        context="Prompt body",
+        ext2={"capture_state": "draft", "capture_method": "quick_capture"},
+    )
+    saved_prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000612"),
+        name="Saved prompt",
+        description="Curated prompt.",
+        category="General",
+        context="Prompt body",
+    )
+
+    draft_dialog = PromptDialog(prompt=draft_prompt)
+    saved_dialog = PromptDialog(prompt=saved_prompt)
+    try:
+        assert draft_dialog._promote_draft_button is not None  # noqa: SLF001
+        assert draft_dialog._promote_draft_button.text() == "Promote Draft…"  # noqa: SLF001
+        assert saved_dialog._promote_draft_button is None  # noqa: SLF001
+    finally:
+        draft_dialog.close()
+        draft_dialog.deleteLater()
+        saved_dialog.close()
+        saved_dialog.deleteLater()
+
+
+
+def test_prompt_dialog_can_request_promote_with_unsaved_changes(
+    qt_app: QApplication,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000613"),
+        name="Captured draft",
+        description="Quick capture draft.",
+        category="General",
+        context="Prompt body",
+        tags=["raw"],
+        ext2={"capture_state": "draft", "capture_method": "quick_capture"},
+    )
+    dialog = PromptDialog(prompt=prompt)
+    try:
+        monkeypatch.setattr(
+            QMessageBox,
+            "question",
+            lambda *args, **kwargs: QMessageBox.StandardButton.Yes,
+        )
+        dialog._tags_input.setText("raw, reusable")  # noqa: SLF001
+
+        dialog._on_promote_draft_clicked()  # noqa: SLF001
+        qt_app.processEvents()
+
+        assert dialog.promote_requested
+        assert dialog.result_prompt is not None
+        assert dialog.result_prompt.tags == ["raw", "reusable"]
+        assert dialog.result() == dialog.DialogCode.Accepted
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
 
 
 def test_strip_scenarios_metadata_removes_entries() -> None:

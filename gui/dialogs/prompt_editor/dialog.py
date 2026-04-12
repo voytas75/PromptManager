@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
 from models.prompt_model import Prompt
 
 from ..base import CollapsibleTextSection, strip_scenarios_metadata
+from ..draft_promote import is_prompt_draft
 from .mixins import (
     _PromptDialogCategoryMixin,
     _PromptDialogRefinementMixin,
@@ -58,6 +59,7 @@ class PromptDialog(
 
     applied = Signal(Prompt)
     execute_context_requested = Signal(Prompt, str)
+    promote_draft_requested = Signal()
 
     def __init__(
         self,
@@ -87,8 +89,10 @@ class PromptDialog(
         self._scenario_generator = scenario_generator
         self._categories: list[PromptCategory] = []
         self._delete_requested = False
+        self._promote_requested = False
         self._delete_button: QPushButton | None = None
         self._apply_button: QPushButton | None = None
+        self._promote_draft_button: QPushButton | None = None
         self._version_label: QLabel | None = None
         self._version_history_button: QPushButton | None = None
         self._version_history_handler = version_history_handler
@@ -117,6 +121,11 @@ class PromptDialog(
     def source_prompt(self) -> Prompt | None:
         """Expose the prompt supplied to the dialog for convenience."""
         return self._source_prompt
+
+    @property
+    def promote_requested(self) -> bool:
+        """Return True when the dialog should hand off into draft promotion."""
+        return self._promote_requested
 
     def _build_ui(self) -> None:
         """Construct the dialog layout and wire interactions."""
@@ -322,6 +331,16 @@ class PromptDialog(
             apply_button.setToolTip("Save changes without closing the dialog.")
             apply_button.clicked.connect(self._on_apply_clicked)  # type: ignore[arg-type]
             self._apply_button = apply_button
+            if is_prompt_draft(self._source_prompt):
+                promote_button = self._buttons.addButton(
+                    "Promote Draft…",
+                    QDialogButtonBox.ButtonRole.ActionRole,
+                )
+                promote_button.setToolTip(
+                    "Apply current changes if needed, then continue in Promote Draft."
+                )
+                promote_button.clicked.connect(self._on_promote_draft_clicked)  # type: ignore[arg-type]
+                self._promote_draft_button = promote_button
             delete_button = self._buttons.addButton(
                 "Delete",
                 QDialogButtonBox.ButtonRole.DestructiveRole,
@@ -387,6 +406,30 @@ class PromptDialog(
             return
         self._delete_requested = True
         self._result_prompt = None
+        self.accept()
+
+    def _on_promote_draft_clicked(self) -> None:
+        """Hand off the current draft into the bounded promote flow."""
+        if self._source_prompt is None or not is_prompt_draft(self._source_prompt):
+            return
+        current_prompt = self._build_prompt()
+        if current_prompt is None:
+            return
+        if self._has_unsaved_changes(current_prompt):
+            confirmation = QMessageBox.question(
+                self,
+                "Promote Draft",
+                "Apply changes and continue to Promote Draft?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes,
+            )
+            if confirmation != QMessageBox.StandardButton.Yes:
+                return
+            self._result_prompt = current_prompt
+        else:
+            self._result_prompt = None
+        self._promote_requested = True
+        self.promote_draft_requested.emit()
         self.accept()
 
     def _on_execute_context_clicked(self) -> None:
@@ -493,8 +536,27 @@ class PromptDialog(
     def update_source_prompt(self, prompt: Prompt) -> None:
         """Refresh the backing prompt after an in-place update."""
         self._source_prompt = prompt
+        self._promote_requested = False
         self._populate(prompt)
         self._refresh_execute_context_button()
+
+    def _has_unsaved_changes(self, prompt: Prompt) -> bool:
+        """Return True when editable fields differ from the current stored prompt."""
+        source = self._source_prompt
+        if source is None:
+            return False
+        return (
+            prompt.name != source.name
+            or prompt.description != source.description
+            or prompt.category != source.category
+            or list(prompt.tags) != list(source.tags)
+            or prompt.language != source.language
+            or prompt.context != source.context
+            or prompt.example_input != source.example_input
+            or prompt.example_output != source.example_output
+            or list(prompt.scenarios) != list(source.scenarios)
+            or prompt.author != source.author
+        )
 
     def _update_version_controls(self, version: str | None) -> None:
         """Refresh the version label and history button state."""

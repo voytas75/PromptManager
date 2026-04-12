@@ -52,6 +52,7 @@ class _DialogStub:
     delete_requested: bool
     result_prompt: Prompt | None = None
     dialog_code: int = QDialog.DialogCode.Accepted
+    promote_requested: bool = False
     applied: _SignalStub = field(default_factory=_SignalStub)
 
     def exec(self) -> int:
@@ -63,6 +64,10 @@ class _DialogStub:
 
     def setWindowTitle(self, _title: str) -> None:
         """Mirror the PromptDialog API used by fork flows."""
+
+    def update_source_prompt(self, prompt: Prompt) -> None:
+        """Mirror the PromptDialog API used by the editor flow."""
+        self.result_prompt = prompt
 
 
 @dataclass
@@ -406,6 +411,98 @@ def test_promote_draft_updates_prompt_and_clears_draft_status(monkeypatch) -> No
     assert load_calls == [""]
     assert selected_ids == [original.id]
     assert status_messages == [("Draft promoted.", 4000)]
+
+
+def test_edit_prompt_can_apply_changes_then_handoff_into_promote(monkeypatch) -> None:
+    """Draft editor shortcut should save pending changes before entering promote flow."""
+    monkeypatch.setattr(prompt_editor_flow_module, "ProcessingIndicator", _ProcessingIndicatorStub)
+    manager = _ManagerStub()
+    load_calls: list[str] = []
+    selected_ids: list[uuid.UUID] = []
+    status_messages: list[tuple[str, int]] = []
+    promoted_builds: list[Prompt] = []
+
+    original = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000451"),
+        name="Draft title",
+        description="Quick capture draft.",
+        category="General",
+        tags=["raw"],
+        context="Keep this prompt body exactly as-is.",
+        source="chat thread",
+        ext2={"capture_state": "draft", "capture_method": "quick_capture"},
+    )
+    edited = Prompt(
+        id=original.id,
+        name="Draft title improved",
+        description="Quick capture draft.",
+        category="General",
+        tags=["raw", "ops"],
+        context="Keep this prompt body exactly as-is.",
+        source="chat thread",
+        ext2={"capture_state": "draft", "capture_method": "quick_capture"},
+    )
+    promoted = build_promoted_prompt(
+        edited,
+        title="Curated title",
+        category="Operations",
+        tags_text="ops, reusable",
+        source="chat thread",
+        description="Normalized for reuse.",
+    )
+
+    dialog_factory = cast(
+        "PromptDialogFactory",
+        _DialogFactoryStub(
+            _DialogStub(
+                delete_requested=False,
+                result_prompt=edited,
+                promote_requested=True,
+            ),
+            [],
+        ),
+    )
+    quick_capture_factory = cast(
+        "QuickCaptureDialogFactory",
+        _QuickCaptureDialogFactoryStub(
+            _QuickCaptureDialogStub(dialog_code=QDialog.DialogCode.Rejected)
+        ),
+    )
+    draft_promote_factory = cast(
+        "DraftPromoteDialogFactory",
+        _DraftPromoteDialogFactoryStub(
+            _DraftPromoteDialogStub(result_prompt=promoted),
+            promoted_builds,
+        ),
+    )
+    flow = _build_flow(
+        manager=cast("PromptManager", manager),
+        dialog_factory=dialog_factory,
+        quick_capture_dialog_factory=quick_capture_factory,
+        draft_promote_dialog_factory=draft_promote_factory,
+        delete_prompt=lambda *_args, **_kwargs: None,
+        load_prompts=load_calls.append,
+        select_prompt=selected_ids.append,
+        status_callback=lambda message, duration: status_messages.append((message, duration)),
+    )
+
+    flow.edit_prompt(original)
+
+    assert len(manager.updated_prompts) == 2
+    assert manager.updated_prompts[0].name == "Draft title improved"
+    assert manager.updated_prompts[0].ext2 == {
+        "capture_state": "draft",
+        "capture_method": "quick_capture",
+    }
+    assert promoted_builds == [manager.updated_prompts[0]]
+    assert manager.updated_prompts[1].name == "Curated title"
+    assert manager.updated_prompts[1].ext2 == {"capture_method": "quick_capture"}
+    assert load_calls == ["", ""]
+    assert selected_ids == [original.id, original.id]
+    assert status_messages == [
+        ("Prompt changes applied.", 4000),
+        ("Draft promoted.", 4000),
+    ]
 
 
 def test_promote_draft_passes_similar_matches_and_can_open_existing(monkeypatch) -> None:

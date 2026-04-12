@@ -66,6 +66,7 @@ The following bounded slices are already delivered and should not be planned aga
 - Similarity Strength Cue v1
 - Catalog Readability Typography v1
 - Promote-time Likely Duplicate Cue v1
+- Edit Dialog Promote Draft Shortcut v1
 - Fork Baseline Clarity v1
 - Fork Difference Cue v1
 

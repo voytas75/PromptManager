@@ -242,26 +242,23 @@ class PromptEditorFlow:
         if dialog.delete_requested:
             self._delete_prompt(prompt, skip_confirmation=True)
             return
+        if dialog.promote_requested:
+            prompt_for_promotion = prompt
+            updated_for_handoff = dialog.result_prompt
+            if updated_for_handoff is not None:
+                stored = self._persist_prompt_update(updated_for_handoff, dialog)
+                if stored is None:
+                    return
+                dialog.update_source_prompt(stored)
+                prompt_for_promotion = stored
+            self.promote_draft_prompt(prompt_for_promotion)
+            return
         updated = dialog.result_prompt
         if updated is None:
             return
-        try:
-            stored = ProcessingIndicator(self._parent, "Saving prompt changes…").run(
-                self._manager.update_prompt,
-                updated,
-            )
-        except PromptNotFoundError:
-            self._error_callback(
-                "Prompt missing",
-                "The prompt cannot be located. Refresh and try again.",
-            )
-            self._load_prompts(self._current_search_text())
+        stored = self._persist_prompt_update(updated, self._parent)
+        if stored is None:
             return
-        except PromptStorageError as exc:
-            self._error_callback("Unable to update prompt", str(exc))
-            return
-        self._load_prompts(self._current_search_text())
-        self._select_prompt(stored.id)
 
     def duplicate_prompt(self, prompt: Prompt) -> None:
         """Duplicate *prompt* via a pre-filled creation dialog."""
@@ -340,8 +337,15 @@ class PromptEditorFlow:
         return similar_prompts
 
     def _handle_prompt_applied(self, prompt: Prompt, dialog: PromptDialog) -> None:
+        stored = self._persist_prompt_update(prompt, dialog)
+        if stored is None:
+            return
+        dialog.update_source_prompt(stored)
+
+    def _persist_prompt_update(self, prompt: Prompt, owner: QWidget) -> Prompt | None:
+        """Save an updated prompt through the shared update path and refresh selection."""
         try:
-            stored = ProcessingIndicator(dialog, "Saving prompt changes…").run(
+            stored = ProcessingIndicator(owner, "Saving prompt changes…").run(
                 self._manager.update_prompt,
                 prompt,
             )
@@ -350,17 +354,16 @@ class PromptEditorFlow:
                 "Prompt missing",
                 "The prompt cannot be located. Refresh and try again.",
             )
-            self._load_prompts("")
-            dialog.reject()
-            return
+            self._load_prompts(self._current_search_text())
+            return None
         except PromptStorageError as exc:
             self._error_callback("Unable to update prompt", str(exc))
-            return
+            return None
 
-        dialog.update_source_prompt(stored)
         self._load_prompts(self._current_search_text())
         self._select_prompt(stored.id)
         self._status_callback("Prompt changes applied.", 4000)
+        return stored
 
 
 __all__ = [
