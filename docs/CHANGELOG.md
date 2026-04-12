@@ -4,6 +4,8 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ## [Unreleased]
 
+## [0.22.23] - 2026-04-12
+
 ### Added
 
 - Added one bounded **Scenario-Matched Preview Priority v1** pass to the existing main prompt list so active plain-text search can prefer the first credible matching stored scenario over a non-matching generic description, while preserving the existing source-match override, no-search preview order, and single-line preview contract.
