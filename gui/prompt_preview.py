@@ -1,6 +1,7 @@
 """Shared bounded preview helpers for prompt retrieval and ingest advisory surfaces.
 
 Updates:
+  v0.1.2 - 2026-04-12 - Allow active plain-text search to prefer a matching credible source cue.
   v0.1.1 - 2026-04-10 - Add a shared credible-source helper for retrieval and inspection surfaces.
   v0.1.0 - 2026-04-10 - Extract shared preview selection and truncation logic.
 """
@@ -61,9 +62,17 @@ def build_prompt_source_cue(source: str | None) -> str | None:
     return truncate_preview_text(cue)
 
 
-def build_prompt_preview(prompt: Prompt) -> str | None:
+def build_prompt_preview(
+    prompt: Prompt,
+    *,
+    active_search_terms: tuple[str, ...] = (),
+) -> str | None:
     """Derive one compact preview from existing prompt data in priority order."""
     name_key = prompt.name.strip().casefold()
+    source_cue = build_prompt_source_cue(prompt.source)
+
+    if source_cue and _text_matches_search_terms(source_cue, active_search_terms):
+        return source_cue
 
     description = flatten_preview_text(prompt.description)
     if description and description.casefold() != name_key and is_credible_preview_text(description):
@@ -74,7 +83,15 @@ def build_prompt_preview(prompt: Prompt) -> str | None:
         if normalized and is_credible_preview_text(normalized):
             return truncate_preview_text(normalized)
 
-    return build_prompt_source_cue(prompt.source)
+    return source_cue
+
+
+def _text_matches_search_terms(text: str, active_search_terms: tuple[str, ...]) -> bool:
+    """Return whether *text* contains any active plain-text search term."""
+    if not active_search_terms:
+        return False
+    lowered_text = text.casefold()
+    return any(term in lowered_text for term in active_search_terms)
 
 
 __all__ = [

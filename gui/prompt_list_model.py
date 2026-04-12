@@ -1,6 +1,7 @@
 """Qt list model that exposes prompt summaries for list views.
 
 Updates:
+  v0.1.5 - 2026-04-12 - Let active-search source-matched previews reuse the existing preview role.
   v0.1.4 - 2026-04-12 - Expose bounded active-search match spans for prompt title and preview text.
   v0.1.3 - 2026-04-10 - Reuse a shared prompt-preview helper across UI surfaces.
   v0.1.2 - 2026-04-06 - Add bounded retrieval-preview roles derived from existing prompt data.
@@ -61,11 +62,11 @@ class PromptListModel(QAbstractListModel):
         if role == self.PromptRole:
             return prompt
         if role == self.PreviewRole:
-            return build_prompt_preview(prompt)
+            return self._preview_text(prompt)
         if role == self.TitleMatchRole:
             return self._match_ranges(self._display_text(prompt))
         if role == self.PreviewMatchRole:
-            return self._match_ranges(build_prompt_preview(prompt))
+            return self._match_ranges(self._preview_text(prompt))
         return None
 
     def prompt_at(self, row: int) -> Prompt | None:
@@ -94,12 +95,16 @@ class PromptListModel(QAbstractListModel):
         self.dataChanged.emit(
             top_left,
             bottom_right,
-            [self.TitleMatchRole, self.PreviewMatchRole],
+            [self.PreviewRole, self.TitleMatchRole, self.PreviewMatchRole],
         )
 
     def prompts(self) -> Sequence[Prompt]:
         """Expose the underlying prompts for selection helpers."""
         return tuple(self._prompts)
+
+    def _preview_text(self, prompt: Prompt) -> str | None:
+        """Return the current bounded preview text for *prompt*."""
+        return build_prompt_preview(prompt, active_search_terms=self._active_search_terms)
 
     @staticmethod
     def _display_text(prompt: Prompt) -> str:

@@ -1,6 +1,7 @@
 """Focused tests for bounded retrieval previews in the main prompt list.
 
 Updates:
+  v0.1.3 - 2026-04-12 - Cover active-search source-priority while keeping ordinary preview fallback unchanged.
   v0.1.2 - 2026-04-12 - Cover active-search match spans and bounded delegate emphasis runs.
   v0.1.1 - 2026-04-11 - Keep preview text at the row base font size for readability.
   v0.1.0 - 2026-04-06 - Cover visible, hidden, and truncated retrieval-preview paths.
@@ -71,6 +72,70 @@ def test_prompt_list_model_prefers_description_preview_when_available(qt_app: QA
     )
 
 
+def test_prompt_list_model_prefers_matching_source_preview_for_active_search(
+    qt_app: QApplication,
+) -> None:
+    """Active plain-text search can promote a credible matching source cue."""
+    prompt = _build_prompt(
+        description="Summarise incident updates for the next on-call handoff.",
+        scenarios=["Use after timeline review."],
+        source="PagerDuty ops notebook",
+    )
+    model = PromptListModel([prompt])
+    model.set_active_search_text("notebook")
+
+    index = model.index(0, 0)
+
+    assert index.data(PromptListModel.PreviewRole) == "Source: PagerDuty ops notebook"
+
+
+def test_prompt_list_model_keeps_no_search_preview_priority_unchanged(
+    qt_app: QApplication,
+) -> None:
+    """Without active search, description-first preview selection stays unchanged."""
+    prompt = _build_prompt(
+        description="Summarise incident updates for the next on-call handoff.",
+        scenarios=["Use after timeline review."],
+        source="PagerDuty ops notebook",
+    )
+    model = PromptListModel([prompt])
+    model.set_active_search_text("")
+
+    index = model.index(0, 0)
+
+    assert index.data(PromptListModel.PreviewRole) == (
+        "Summarise incident updates for the next on-call handoff."
+    )
+
+
+def test_prompt_list_model_ignores_generic_or_weak_source_for_active_search_priority(
+    qt_app: QApplication,
+) -> None:
+    """Generic or weak source values should not override the ordinary preview path."""
+    low_signal_prompt = _build_prompt(
+        description="Summarise incident updates for the next on-call handoff.",
+        scenarios=[],
+        source="local",
+    )
+    weak_prompt = _build_prompt(
+        description="Summarise incident updates for the next on-call handoff.",
+        scenarios=[],
+        source="qa",
+    )
+
+    low_signal_model = PromptListModel([low_signal_prompt])
+    low_signal_model.set_active_search_text("local")
+    weak_model = PromptListModel([weak_prompt])
+    weak_model.set_active_search_text("qa")
+
+    assert low_signal_model.index(0, 0).data(PromptListModel.PreviewRole) == (
+        "Summarise incident updates for the next on-call handoff."
+    )
+    assert weak_model.index(0, 0).data(PromptListModel.PreviewRole) == (
+        "Summarise incident updates for the next on-call handoff."
+    )
+
+
 def test_prompt_list_model_hides_preview_for_low_signal_prompt_data(qt_app: QApplication) -> None:
     """No preview should render when only empty fields or generic source markers exist."""
     prompt = _build_prompt(description=" ", scenarios=[], source="quick_capture")
@@ -127,6 +192,33 @@ def test_prompt_list_model_exposes_title_and_preview_match_spans_for_active_sear
     assert [preview[start : start + length].lower() for start, length in preview_spans] == [
         "incident",
         "updates",
+    ]
+
+
+def test_prompt_list_model_emits_preview_role_when_search_changes_preview_choice(
+    qt_app: QApplication,
+) -> None:
+    """Changing the active search should notify views when the preview text itself changes."""
+    prompt = _build_prompt(
+        description="Summarise incident updates for the next on-call handoff.",
+        scenarios=[],
+        source="PagerDuty ops notebook",
+    )
+    model = PromptListModel([prompt])
+    emitted_roles: list[list[int]] = []
+
+    model.dataChanged.connect(
+        lambda _top_left, _bottom_right, roles: emitted_roles.append(list(roles))
+    )
+
+    model.set_active_search_text("notebook")
+
+    assert emitted_roles == [
+        [
+            PromptListModel.PreviewRole,
+            PromptListModel.TitleMatchRole,
+            PromptListModel.PreviewMatchRole,
+        ]
     ]
 
 
