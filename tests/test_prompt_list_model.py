@@ -1,6 +1,7 @@
 """Focused tests for bounded retrieval previews in the main prompt list.
 
 Updates:
+  v0.1.2 - 2026-04-12 - Cover active-search match spans and bounded delegate emphasis runs.
   v0.1.1 - 2026-04-11 - Keep preview text at the row base font size for readability.
   v0.1.0 - 2026-04-06 - Cover visible, hidden, and truncated retrieval-preview paths.
 """
@@ -9,7 +10,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import cast
+from typing import Any, cast
 
 import pytest
 
@@ -101,6 +102,48 @@ def test_prompt_list_model_flattens_and_truncates_scenario_preview(qt_app: QAppl
     assert len(preview) <= PromptListModel.PreviewMaxLength
 
 
+def test_prompt_list_model_exposes_title_and_preview_match_spans_for_active_search(
+    qt_app: QApplication,
+) -> None:
+    """Active plain-text search should expose bounded match spans for visible row text."""
+    prompt = _build_prompt(
+        description="Summarise incident updates for the next on-call handoff.",
+        scenarios=[],
+        source="ops notebook",
+    )
+    model = PromptListModel([prompt])
+    model.set_active_search_text("incident updates")
+
+    index = model.index(0, 0)
+    title = cast("str", index.data(Qt.ItemDataRole.DisplayRole))
+    preview = cast("str", index.data(PromptListModel.PreviewRole))
+    title_spans = cast("tuple[tuple[int, int], ...]", index.data(PromptListModel.TitleMatchRole))
+    preview_spans = cast(
+        "tuple[tuple[int, int], ...]",
+        index.data(PromptListModel.PreviewMatchRole),
+    )
+
+    assert [title[start : start + length].lower() for start, length in title_spans] == ["incident"]
+    assert [preview[start : start + length].lower() for start, length in preview_spans] == [
+        "incident",
+        "updates",
+    ]
+
+
+def test_prompt_list_model_keeps_match_roles_empty_without_active_search(
+    qt_app: QApplication,
+) -> None:
+    """No active search should leave match roles empty while row text stays unchanged."""
+    prompt = _build_prompt(description="Summarise incident updates for the next on-call handoff.")
+    model = PromptListModel([prompt])
+
+    index = model.index(0, 0)
+
+    assert index.data(Qt.ItemDataRole.DisplayRole) == "Incident triage (Ops)"
+    assert not index.data(PromptListModel.TitleMatchRole)
+    assert not index.data(PromptListModel.PreviewMatchRole)
+
+
 def test_prompt_list_delegate_returns_taller_rows_when_preview_exists(
     qt_app: QApplication,
 ) -> None:
@@ -122,7 +165,20 @@ def test_prompt_list_delegate_keeps_preview_font_at_base_size(qt_app: QApplicati
     """Preview text should not shrink below the row base font size."""
     delegate = PromptListDelegate()
     option = QStyleOptionViewItem()
-    title_font = option.font
+    option_any = cast("Any", option)
+    title_font = cast("Any", option_any).font
     preview_font = delegate._preview_font(title_font)  # noqa: SLF001
 
     assert preview_font.pointSizeF() == title_font.pointSizeF()
+
+
+def test_prompt_list_delegate_builds_emphasis_runs_from_match_spans(qt_app: QApplication) -> None:
+    """Delegate should split text into plain and emphasized fragments for drawing."""
+    delegate = PromptListDelegate()
+
+    runs = delegate._build_text_runs(  # noqa: SLF001
+        "Incident triage (Ops)",
+        ((0, 8),),
+    )
+
+    assert runs == (("Incident", True), (" triage (Ops)", False))

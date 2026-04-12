@@ -6,6 +6,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Added
 
+- Added one bounded **Search Match Highlight v1** pass to the existing main prompt list so active plain-text search can subtly emphasize matching text already visible in the title row and bounded preview line without changing ranking, filtering, selection, or list layout.
 - Added one bounded **Template Workspace Handoff Cue v1** in the shared prompt detail flow so `Open in Workspace` explains that Workspace is the next handoff path for filling detected template variables while keeping button labels, action semantics, and the existing plain-prompt tooltip behavior unchanged.
 - Added one bounded **Likely Duplicate Cue v1** in the `Promote Draft` advisory flow so matching normalized draft/existing prompt bodies surface a stronger `Likely duplicate` warning and selected-action wording without blocking `Promote as New` or widening into a duplicate-management workflow.
 - Added one bounded **Duplicate Reason Cue v1** in the `Promote Draft` advisory flow so the currently selected `Likely duplicate` or `Very close match` can explain itself with one short reason in the advisory summary without adding row-level noise, a compare screen, or score-heavy UI.
@@ -15,6 +16,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Fixed
 
+- Added focused regression coverage for active-search and no-search prompt-list highlight behavior, including bounded title/preview match spans and delegate emphasis-run rendering.
 - Added focused regression coverage for template-aware workspace handoff tooltips, including bounded variable-summary rendering and unchanged plain-prompt tooltip behavior.
 - Added focused regression coverage for likely-duplicate promote-time advisory behavior, including stronger summary/button wording and precedence over the ordinary `Very close match` cue when normalized bodies are equal.
 - Added focused regression coverage for bounded selected-match reason cues in `Promote Draft`, including likely-duplicate, very-close, weak-match, and non-selected-row cleanliness paths.

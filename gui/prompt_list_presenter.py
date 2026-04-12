@@ -1,6 +1,7 @@
 """Prompt list presenter abstraction for MainWindow.
 
 Updates:
+  v0.1.1 - 2026-04-12 - Mirror active plain-text search state into prompt-list highlight rendering.
   v0.1.0 - 2025-12-01 - Extract presenter to centralize prompt list filtering logic.
 """
 
@@ -77,6 +78,7 @@ class PromptListPresenter:
         self._pending_quality_value: float | None = None
         self._sort_order = PromptSortOrder.NAME_ASC
         self._suggestions: PromptManager.IntentSuggestions | None = None
+        self._active_search_text = ""
 
     # ------------------------------------------------------------------
     # Public API
@@ -102,6 +104,7 @@ class PromptListPresenter:
 
     def load_prompts(self, search_text: str = "", *, use_indicator: bool = False) -> None:
         """Fetch prompts and refresh the list view."""
+        active_search_text = search_text.strip()
         try:
             if use_indicator:
                 result = self._run_with_indicator(
@@ -114,6 +117,7 @@ class PromptListPresenter:
         except RepositoryError as exc:
             self._callbacks.show_error("Unable to load prompts", str(exc))
             return
+        self._set_active_search_text(active_search_text)
         self._apply_prompt_load_result(result)
 
     def refresh_filtered_view(self, *, preserve_order: bool | None = None) -> None:
@@ -127,6 +131,7 @@ class PromptListPresenter:
             if use_preserve_flag
             else self._coordinator.sort_prompts(filtered, self._sort_order)
         )
+        self._model.set_active_search_text(self._active_search_text)
         self._model.set_prompts(prompts_to_show)
         self._list_view.clearSelection()
         if not prompts_to_show:
@@ -144,6 +149,7 @@ class PromptListPresenter:
             panel.set_sort_value(sort_order.value)
         filtered = self._coordinator.apply_filters(panel, self._current_prompts)
         sorted_prompts = self._coordinator.sort_prompts(filtered, sort_order)
+        self._model.set_active_search_text(self._active_search_text)
         self._model.set_prompts(sorted_prompts)
         if selected_prompt and any(prompt.id == selected_prompt.id for prompt in sorted_prompts):
             self._callbacks.select_prompt(selected_prompt.id)
@@ -171,6 +177,7 @@ class PromptListPresenter:
 
         filtered = self._coordinator.apply_filters(self._filter_panel, self._current_prompts)
         sorted_prompts = self._coordinator.sort_prompts(filtered, self._sort_order)
+        self._model.set_active_search_text(self._active_search_text)
         self._model.set_prompts(sorted_prompts)
         if not sorted_prompts:
             self._detail_widget.clear()
@@ -187,6 +194,7 @@ class PromptListPresenter:
         self._current_prompts = list(suggestions.prompts)
         filtered = self._coordinator.apply_filters(self._filter_panel, self._current_prompts)
         sorted_prompts = self._coordinator.sort_prompts(filtered, self._sort_order)
+        self._set_active_search_text("")
         self._model.set_prompts(sorted_prompts)
         self._list_view.clearSelection()
         if sorted_prompts:
@@ -249,6 +257,7 @@ class PromptListPresenter:
         self._current_prompts = list(recommendations)
         self._preserve_search_order = True
         filtered = self._coordinator.apply_filters(self._filter_panel, self._current_prompts)
+        self._set_active_search_text("")
         self._model.set_prompts(filtered)
         self._list_view.clearSelection()
         if filtered:
@@ -286,6 +295,7 @@ class PromptListPresenter:
             if preserve_order
             else self._coordinator.sort_prompts(filtered, self._sort_order)
         )
+        self._set_active_search_text("")
         self._model.set_prompts(prompts_to_show)
         self._list_view.clearSelection()
         if selected_prompt_id and any(
@@ -353,6 +363,7 @@ class PromptListPresenter:
             self._suggestions = None
             self._current_prompts = list(result.search_results)
             filtered = self._coordinator.apply_filters(panel, self._current_prompts)
+            self._model.set_active_search_text(self._active_search_text)
             self._model.set_prompts(filtered)
             self._list_view.clearSelection()
             if filtered:
@@ -367,6 +378,7 @@ class PromptListPresenter:
 
         filtered = self._coordinator.apply_filters(panel, self._current_prompts)
         sorted_prompts = self._coordinator.sort_prompts(filtered, self._sort_order)
+        self._model.set_active_search_text(self._active_search_text)
         self._model.set_prompts(sorted_prompts)
         self._list_view.clearSelection()
         if not sorted_prompts:
@@ -396,6 +408,11 @@ class PromptListPresenter:
                 collection[index] = updated
                 return True
         return False
+
+    def _set_active_search_text(self, search_text: str) -> None:
+        """Persist the active text-search state for prompt-list row rendering."""
+        self._active_search_text = search_text
+        self._model.set_active_search_text(search_text)
 
 
 __all__ = ["PromptListCallbacks", "PromptListPresenter"]
