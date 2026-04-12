@@ -33,6 +33,7 @@ def _clear_litellm_env(monkeypatch: MonkeyPatch) -> None:
         "PROMPT_MANAGER_LITELLM_API_KEY",
         "PROMPT_MANAGER_LITELLM_API_BASE",
         "PROMPT_MANAGER_LITELLM_API_VERSION",
+        "PROMPT_MANAGER_LITELLM_DROP_PARAMS",
         "PROMPT_MANAGER_LITELLM_WORKFLOW_MODELS",
         "PROMPT_MANAGER_LITELLM_TTS_MODEL",
         "PROMPT_MANAGER_LITELLM_TTS_STREAM",
@@ -47,6 +48,7 @@ def _clear_litellm_env(monkeypatch: MonkeyPatch) -> None:
         "LITELLM_API_KEY",
         "LITELLM_API_BASE",
         "LITELLM_API_VERSION",
+        "LITELLM_DROP_PARAMS",
         "LITELLM_WORKFLOW_MODELS",
         "LITELLM_TTS_MODEL",
         "LITELLM_TTS_STREAM",
@@ -794,11 +796,42 @@ def test_litellm_settings_accept_azure_aliases(monkeypatch: MonkeyPatch, tmp_pat
     assert settings.litellm_drop_params is None
 
 
+def test_litellm_drop_params_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    """Read LiteLLM drop params from environment variables."""
+    _clear_litellm_env(monkeypatch)
+    config_path = tmp_path / "config.json"
+    config_path.write_text("{}", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
+    monkeypatch.setenv("PROMPT_MANAGER_LITELLM_DROP_PARAMS", "max_tokens, temperature")
+
+    settings = load_settings()
+
+    assert settings.litellm_drop_params == ["max_tokens", "temperature"]
+
+
+def test_litellm_drop_params_from_dotenv(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    """Read LiteLLM drop params from a .env file when env vars are unset."""
+    _clear_litellm_env(monkeypatch)
+    config_path = tmp_path / "config.json"
+    config_path.write_text("{}", encoding="utf-8")
+    env_file = tmp_path / ".env"
+    env_file.write_text('PROMPT_MANAGER_LITELLM_DROP_PARAMS=["max_tokens", "temperature"]\n', encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
+    monkeypatch.setenv("PROMPT_MANAGER_ENV_FILE", str(env_file))
+
+    settings = load_settings()
+
+    assert settings.litellm_drop_params == ["max_tokens", "temperature"]
+
+
 def test_litellm_drop_params_from_json_not_overridden_by_empty_env(
     monkeypatch: MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     """Keep JSON drop params even if env variables are empty."""
+    _clear_litellm_env(monkeypatch)
     config_path = tmp_path / "config.json"
     config_path.write_text(json.dumps({"litellm_drop_params": ["max_tokens"]}), encoding="utf-8")
     monkeypatch.chdir(tmp_path)

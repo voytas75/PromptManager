@@ -905,6 +905,10 @@ class PromptManagerSettings(BaseSettings):
                     "litellm_api_version",
                     "AZURE_OPENAI_API_VERSION",
                 ],
+                "litellm_drop_params": [
+                    "LITELLM_DROP_PARAMS",
+                    "litellm_drop_params",
+                ],
                 "litellm_workflow_models": [
                     "LITELLM_WORKFLOW_MODELS",
                     "litellm_workflow_models",
