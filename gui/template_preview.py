@@ -1,6 +1,7 @@
 """Workspace template preview widget with live variable validation.
 
 Updates:
+  v0.2.4 - 2026-04-12 - Bound missing-variable status summaries in template preview.
   v0.2.3 - 2025-12-08 - Align Qt enums, wrapping modes, and schema helpers for Pyright.
   v0.2.2 - 2025-11-29 - Allow programmatic variable population and refresh hooks
     for external editors.
@@ -53,6 +54,7 @@ class TemplatePreviewWidget(QWidget):
 
     _SUCCESS_COLOR = "#047857"
     _ERROR_COLOR = "#b91c1c"
+    _MISSING_VARIABLE_NAMES_LIMIT = 2
 
     def __init__(self, parent: QWidget | None = None) -> None:
         """Construct the preview UI and load persisted template state."""
@@ -337,7 +339,7 @@ class TemplatePreviewWidget(QWidget):
             self._last_rendered_text = render_result.rendered_text
             if missing:
                 self._set_status(
-                    f"Missing variables: {', '.join(sorted(missing))}",
+                    self._format_missing_variables_status(missing),
                     is_error=True,
                 )
                 self._refresh_run_button_state()
@@ -374,6 +376,15 @@ class TemplatePreviewWidget(QWidget):
             if top_level:
                 invalid.add(top_level)
         return invalid
+
+    def _format_missing_variables_status(self, missing: set[str]) -> str:
+        names = sorted(name for name in missing if name)
+        visible_names = names[: self._MISSING_VARIABLE_NAMES_LIMIT]
+        remainder = len(names) - len(visible_names)
+        summary = ", ".join(visible_names)
+        if remainder > 0:
+            summary = f"{summary} +{remainder}"
+        return f"Missing variables: {summary}"
 
     def _set_status(self, message: str, *, is_error: bool) -> None:
         color = self._ERROR_COLOR if is_error else self._SUCCESS_COLOR

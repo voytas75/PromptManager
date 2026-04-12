@@ -1,6 +1,7 @@
 """Tests for template preview widget error fallbacks.
 
 Updates:
+  v0.1.2 - 2026-04-12 - Cover bounded missing-variable status summaries in template preview.
   v0.1.1 - 2025-11-29 - Extend preview helper with persistence/run state fields.
   v0.1.0 - 2025-11-27 - Ensure parse/render errors keep raw template text visible.
 """
@@ -249,6 +250,68 @@ def test_preview_displays_template_text_when_rendering_fails() -> None:
 
     assert widget._rendered_view.toPlainText() == "{{ invalid syntax }}"
     assert widget._status_label.text_value == "boom"
+
+
+def test_preview_bounds_missing_variable_status_summary() -> None:
+    """Missing-variable status should stay compact when several inputs are absent."""
+    widget = _make_preview()
+    widget._template_text = "Hello {{ customer_name }} from {{ region }} owned by {{ owner }} ({{ priority }})."
+    widget._template_parse_error = None
+    widget._variable_names = []
+
+    class _StubRenderer:
+        def render(self, *_: object, **__: object) -> TemplateRenderResult:
+            return TemplateRenderResult(
+                rendered_text="Hello",
+                errors=[],
+                missing_variables={"customer_name", "region", "owner", "priority"},
+            )
+
+    widget._renderer = _StubRenderer()
+
+    widget._update_preview()
+
+    assert widget._rendered_view.toPlainText() == "Hello"
+    assert widget._status_label.text_value == "Missing variables: customer_name, owner +2"
+
+
+
+def test_preview_hides_missing_variable_status_when_render_is_ready() -> None:
+    """A complete render should surface readiness instead of missing-variable noise."""
+    widget = _make_preview()
+    widget._template_text = "Hello {{ customer_name }}"
+    widget._template_parse_error = None
+    widget._variable_names = ["customer_name"]
+    widget._variable_inputs = {"customer_name": _DummyTextEdit("ACME")}
+
+    class _StubRenderer:
+        def render(self, *_: object, **__: object) -> TemplateRenderResult:
+            return TemplateRenderResult(
+                rendered_text="Hello ACME",
+                errors=[],
+                missing_variables=set(),
+            )
+
+    widget._renderer = _StubRenderer()
+
+    widget._update_preview()
+
+    assert widget._rendered_view.toPlainText() == "Hello ACME"
+    assert widget._status_label.text_value == "Preview ready."
+
+
+
+def test_preview_keeps_parse_errors_primary_over_missing_variable_status() -> None:
+    """Syntax issues should remain primary and suppress missing-variable messaging."""
+    widget = _make_preview()
+    widget._template_text = "{{ broken"
+    widget._template_parse_error = "syntax issue"
+
+    widget._update_preview()
+
+    assert widget._status_label.text_value == "syntax issue"
+    assert "Missing variables:" not in widget._status_label.text_value
+
 
 
 def test_apply_variable_values_populates_matching_inputs() -> None:

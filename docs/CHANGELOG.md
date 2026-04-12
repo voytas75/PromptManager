@@ -15,6 +15,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 - Added one bounded **Duplicate Reason Cue v1** in the `Promote Draft` advisory flow so the currently selected `Likely duplicate` or `Very close match` can explain itself with one short reason in the advisory summary without adding row-level noise, a compare screen, or score-heavy UI.
 - Added one bounded **Prompt Label Strip v1** normalization step in Quick Capture so a single obvious outer `Prompt:`, `User prompt:`, or `System prompt:` wrapper is removed before storing while ambiguous, empty, and transcript-like input remains unchanged.
 - Added one bounded **Template Variable Cue v1** in the shared prompt detail flow so prompts with detected template variables surface one compact `Requires variables: ...` cue without widening into a template dashboard, metadata dump, or new panel.
+- Added one bounded **Template Missing Variables Cue v1** in `Template Preview` so valid templates with incomplete inputs show one compact `Missing variables: ...` blocker summary near the existing preview/status surface without adding autofill, a wizard, or a new validation panel.
 - Added one bounded **Blockquote Unwrap v1** normalization step in Quick Capture so a fully quoted pasted prompt can lose one obvious outer `>` wrapper before storing while mixed or effectively empty quoted input remains unchanged.
 
 ### Fixed
@@ -31,6 +32,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 - Added focused regression coverage for bounded selected-match reason cues in `Promote Draft`, including likely-duplicate, very-close, weak-match, and non-selected-row cleanliness paths.
 - Added focused regression coverage for Quick Capture prompt-label stripping, including stripped inline/multiline allowed labels and unchanged ambiguous, empty, and transcript-like inputs.
 - Added focused regression coverage for shared detail template-variable cues, including visible, absent, and bounded-summary rendering paths.
+- Added focused regression coverage for bounded template-preview missing-variable summaries, including compact `+N` rendering, clean preview-ready state, and syntax-error precedence.
 - Added focused regression coverage for Quick Capture blockquote unwrapping, including single-line, multiline, mixed-content, and effectively-empty quoted input paths.
 
 ## [0.22.22] - 2026-04-11
