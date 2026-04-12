@@ -1,6 +1,7 @@
 """Focused tests for prompt detail inspection cues.
 
 Updates:
+  v0.1.13 - 2026-04-12 - Keep `Add Favorite` before `Promote Draft` in the shared draft detail action row.
   v0.1.12 - 2026-04-12 - Cover bounded usage-confidence cue rendering from usage counts.
   v0.1.11 - 2026-04-11 - Cover template-aware workspace handoff tooltips in
     the shared detail widget.
@@ -170,6 +171,32 @@ def test_prompt_detail_widget_toggles_favorite_action_from_detail_flow(
 
     assert widget._favorite_button.text() == "Remove Favorite"  # noqa: SLF001
     assert widget._favorite_button.toolTip() == "Remove this prompt from favorites."  # noqa: SLF001
+
+
+
+def test_prompt_detail_widget_keeps_favorite_before_promote_for_draft_prompts(
+    qt_app: QApplication,
+) -> None:
+    """Draft detail actions should keep favorite to the left of the promote action."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000133"),
+        name="Draft favorite candidate",
+        description="Reusable and worth keeping close.",
+        category="General",
+        context="Prompt body",
+        is_favorite=False,
+        ext2={"capture_state": "draft", "capture_method": "quick_capture"},
+        created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 5, 11, 0, tzinfo=UTC),
+    )
+
+    widget.show()
+    widget.display_prompt(prompt)
+    qt_app.processEvents()
+
+    assert widget._promote_draft_button.isVisible()  # noqa: SLF001
+    assert widget._edit_button_row.indexOf(widget._favorite_button) < widget._edit_button_row.indexOf(widget._promote_draft_button)  # noqa: SLF001
 
 
 

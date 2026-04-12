@@ -1,6 +1,7 @@
 """Prompt detail panel shared between main and template tabs.
 
 Updates:
+  v0.1.25 - 2026-04-12 - Keep `Add Favorite` before `Promote Draft` in the shared draft detail action row.
   v0.1.24 - 2026-04-12 - Add one bounded favorite toggle to the shared detail flow.
   v0.1.23 - 2026-04-12 - Add one visible template-only workspace handoff cue in Quick Reuse.
   v0.1.22 - 2026-04-12 - Add one bounded usage-confidence cue from existing usage counts.
@@ -84,17 +85,18 @@ class PromptDetailWidget(QWidget):
 
         edit_button_row = QHBoxLayout()
         edit_button_row.setContentsMargins(0, 0, 0, 0)
+        self._edit_button_row = edit_button_row
+        self._favorite_button = QPushButton("Add Favorite", content)
+        self._favorite_button.setObjectName("favoritePromptButton")
+        self._favorite_button.setEnabled(False)
+        self._favorite_button.clicked.connect(self.favorite_toggled_requested.emit)  # type: ignore[arg-type]
+        edit_button_row.addWidget(self._favorite_button)
         self._promote_draft_button = QPushButton("Promote Draft", content)
         self._promote_draft_button.setObjectName("promoteDraftButton")
         self._promote_draft_button.setEnabled(False)
         self._promote_draft_button.setVisible(False)
         self._promote_draft_button.clicked.connect(self.promote_draft_requested.emit)  # type: ignore[arg-type]
         edit_button_row.addWidget(self._promote_draft_button)
-        self._favorite_button = QPushButton("Add Favorite", content)
-        self._favorite_button.setObjectName("favoritePromptButton")
-        self._favorite_button.setEnabled(False)
-        self._favorite_button.clicked.connect(self.favorite_toggled_requested.emit)  # type: ignore[arg-type]
-        edit_button_row.addWidget(self._favorite_button)
         edit_button_row.addStretch(1)
         self._edit_button = QPushButton("Edit Prompt", content)
         self._edit_button.setObjectName("editPromptButton")
