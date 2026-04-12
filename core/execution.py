@@ -41,9 +41,9 @@ class ExecutionError(Exception):
 
 
 def _supports_reasoning(model: str) -> bool:
-    """Return True when the target model supports OpenAI reasoning payloads."""
+    """Return True when the target model supports reasoning-effort payloads."""
     lowered = model.lower()
-    reasoning_markers = ("o1", "o3", "o4", "gpt-4.1", "gpt-5")
+    reasoning_markers = ("o1", "o3", "o4", "gpt-5")
     return any(marker in lowered for marker in reasoning_markers)
 
 

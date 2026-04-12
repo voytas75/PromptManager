@@ -19,6 +19,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 ### Fixed
 
 - `Execute as Context` no longer duplicates the prompt body as both system instructions and an extra `Context:` block in the user payload, and now runs through one transient context-execution path that sends the prompt body as context and the entered task as the user request.
+- LiteLLM execution no longer sends `reasoning` payloads to `gpt-4.1`, preventing Azure `400 Bad Request` failures on that model family while keeping reasoning-effort payloads for supported reasoning models such as `gpt-5` and `o*`.
 - Added focused regression coverage for the draft-only editor handoff path, including visible shortcut gating, unsaved-change confirm handling, and save-then-promote flow reuse.
 - Prompt search failures now preserve one sanitized backend detail line in the existing `Unable to search prompts` popup path when Chroma returns a useful message, while noisy traceback-only failures still fall back to the generic search error text.
 - Added focused regression coverage for active-search source-priority preview behavior, including no-search fallback stability, weak-source guardrails, and preview-role refresh when search changes the chosen preview text.

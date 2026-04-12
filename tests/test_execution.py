@@ -97,7 +97,7 @@ def test_codex_executor_stream_requires_iterable(monkeypatch) -> None:
 def test_codex_executor_non_stream_request_builds_payload(monkeypatch: pytest.MonkeyPatch) -> None:
     prompt = _make_prompt()
     executor = CodexExecutor(
-        model="gpt-4.1",
+        model="gpt-5.4",
         api_key="secret",
         api_base="https://api.example.com",
         api_version="2024-06-01",
@@ -141,7 +141,7 @@ def test_codex_executor_non_stream_request_builds_payload(monkeypatch: pytest.Mo
         "completion_tokens": 20,
         "total_tokens": 30,
     }
-    assert captured_request["model"] == "gpt-4.1"
+    assert captured_request["model"] == "gpt-5.4"
     assert captured_request["messages"][0]["content"] == prompt.context
     assert captured_request["messages"][-1]["content"] == "Run quality checks"
     assert captured_request["reasoning"] == {"effort": "medium"}
@@ -169,9 +169,43 @@ def test_codex_executor_validates_conversation(monkeypatch: pytest.MonkeyPatch) 
 
 
 def test_supports_reasoning_marks_reasoning_models() -> None:
-    assert _supports_reasoning("gpt-4.1") is True
+    assert _supports_reasoning("gpt-5.4") is True
     assert _supports_reasoning("o1-mini") is True
+    assert _supports_reasoning("gpt-4.1") is False
     assert _supports_reasoning("gpt-3.5") is False
+
+
+def test_codex_executor_skips_reasoning_for_gpt41(monkeypatch: pytest.MonkeyPatch) -> None:
+    prompt = _make_prompt()
+    executor = CodexExecutor(
+        model="gpt-4.1",
+        reasoning_effort="medium",
+    )
+    captured_request: dict[str, Any] = {}
+
+    def fake_get_completion() -> tuple[Callable[..., Any], type[Exception]]:
+        return (lambda **_: {"choices": []}), RuntimeError
+
+    def fake_call_completion(
+        request: Mapping[str, Any],
+        completion: Callable[..., Any],  # noqa: ARG001
+        lite_llm_exception: type[Exception],  # noqa: ARG001
+        *,
+        drop_candidates: Sequence[str],  # noqa: ARG001
+        pre_dropped: Sequence[str],  # noqa: ARG001
+    ) -> Mapping[str, Any]:
+        captured_request.update(request)
+        return {
+            "choices": [{"message": {"content": "Execution succeeded"}}],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 20},
+        }
+
+    monkeypatch.setattr("core.execution.get_completion", fake_get_completion)
+    monkeypatch.setattr("core.execution.call_completion_with_fallback", fake_call_completion)
+
+    executor.execute(prompt, "Run quality checks")
+
+    assert "reasoning" not in captured_request
 
 
 def test_codex_executor_normalises_usage_objects(monkeypatch: pytest.MonkeyPatch) -> None:
