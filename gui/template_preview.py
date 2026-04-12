@@ -1,6 +1,7 @@
 """Workspace template preview widget with live variable validation.
 
 Updates:
+  v0.2.5 - 2026-04-12 - Add subtle per-variable missing and invalid state styling.
   v0.2.4 - 2026-04-12 - Bound missing-variable status summaries in template preview.
   v0.2.3 - 2025-12-08 - Align Qt enums, wrapping modes, and schema helpers for Pyright.
   v0.2.2 - 2025-11-29 - Allow programmatic variable population and refresh hooks
@@ -55,6 +56,16 @@ class TemplatePreviewWidget(QWidget):
     _SUCCESS_COLOR = "#047857"
     _ERROR_COLOR = "#b91c1c"
     _MISSING_VARIABLE_NAMES_LIMIT = 2
+    _FIELD_LABEL_STYLES: dict[str, str] = {
+        "neutral": "color: #334155; font-weight: 500;",
+        "missing": "color: #92400e; font-weight: 600;",
+        "invalid": "color: #991b1b; font-weight: 600;",
+    }
+    _FIELD_INPUT_STYLES: dict[str, str] = {
+        "neutral": "border: 1px solid #cbd5e1; background-color: #ffffff; color: #0f172a;",
+        "missing": "border: 1px solid #f59e0b; background-color: #fffbeb; color: #0f172a;",
+        "invalid": "border: 1px solid #ef4444; background-color: #fef2f2; color: #0f172a;",
+    }
 
     def __init__(self, parent: QWidget | None = None) -> None:
         """Construct the preview UI and load persisted template state."""
@@ -64,6 +75,7 @@ class TemplatePreviewWidget(QWidget):
         self._template_text: str = ""
         self._variable_names: list[str] = []
         self._variable_inputs: dict[str, QPlainTextEdit] = {}
+        self._variable_labels: dict[str, QLabel] = {}
         self._template_parse_error: str | None = None
         self._schema_visible = False
         self._preview_ready = False
@@ -229,6 +241,7 @@ class TemplatePreviewWidget(QWidget):
             if widget is not None:
                 widget.deleteLater()
         self._variable_inputs.clear()
+        self._variable_labels.clear()
         if not self._variable_names:
             self._variables_layout.addStretch(1)
             return
@@ -250,7 +263,9 @@ class TemplatePreviewWidget(QWidget):
             container_layout.addWidget(field)
             self._variables_layout.addWidget(container)
             self._variable_inputs[name] = field
+            self._variable_labels[name] = label
         self._variables_layout.addStretch(1)
+        self._update_variable_states(set(), set(), set())
 
     def _collect_variables(self) -> dict[str, str]:
         values: dict[str, str] = {}
@@ -291,20 +306,22 @@ class TemplatePreviewWidget(QWidget):
     def _update_preview(self) -> None:
         self._last_rendered_text = ""
         self._preview_ready = False
+        variables = self._collect_variables()
+        missing = {name for name in self._variable_names if name not in variables}
         try:
             if not self._template_text.strip():
+                self._update_variable_states(set(), set(), set())
                 self._rendered_view.clear()
                 self._set_status("Select a prompt to enable template previews.", is_error=False)
                 self._refresh_run_button_state()
                 return
 
             if self._template_parse_error:
+                self._update_variable_states(set(), set(), set())
                 self._rendered_view.setPlainText(self._template_text)
                 self._set_status(self._template_parse_error, is_error=True)
                 self._refresh_run_button_state()
                 return
-
-            variables = self._collect_variables()
 
             schema_mode = SchemaValidationMode.from_string(
                 self._schema_mode.currentData()
@@ -313,8 +330,9 @@ class TemplatePreviewWidget(QWidget):
             )
             schema_text = self._schema_input.toPlainText() if self._schema_visible else ""
             schema_result = self._validator.validate(variables, schema_text, mode=schema_mode)
-            invalid_fields: set[str] = self._top_level_fields(schema_result.field_errors)
+            invalid_fields = self._top_level_fields(schema_result.field_errors) - missing
             if not schema_result.is_valid:
+                self._update_variable_states(set(variables), missing, invalid_fields)
                 message = "; ".join(
                     schema_result.errors or [schema_result.schema_error or "Schema error"]
                 )
@@ -324,12 +342,13 @@ class TemplatePreviewWidget(QWidget):
                 return
 
             render_result = self._renderer.render(self._template_text, variables)
-            missing = set(render_result.missing_variables)
+            missing |= set(render_result.missing_variables)
             for name in self._variable_names:
                 if name not in variables:
                     missing.add(name)
 
             if render_result.errors:
+                self._update_variable_states(set(variables), missing, invalid_fields)
                 self._rendered_view.setPlainText(self._template_text)
                 self._set_status("; ".join(render_result.errors), is_error=True)
                 self._refresh_run_button_state()
@@ -337,6 +356,7 @@ class TemplatePreviewWidget(QWidget):
 
             self._rendered_view.setPlainText(render_result.rendered_text)
             self._last_rendered_text = render_result.rendered_text
+            self._update_variable_states(set(variables), missing, invalid_fields)
             if missing:
                 self._set_status(
                     self._format_missing_variables_status(missing),
@@ -390,6 +410,24 @@ class TemplatePreviewWidget(QWidget):
         color = self._ERROR_COLOR if is_error else self._SUCCESS_COLOR
         self._status_label.setStyleSheet(f"color: {color};")
         self._status_label.setText(message)
+
+    def _update_variable_states(
+        self,
+        provided: set[str],
+        missing: set[str],
+        invalid: set[str],
+    ) -> None:
+        for name, field in self._variable_inputs.items():
+            state = "neutral"
+            if name in missing and name not in provided:
+                state = "missing"
+            elif name in invalid:
+                state = "invalid"
+
+            label = self._variable_labels.get(name)
+            if label is not None:
+                label.setStyleSheet(self._FIELD_LABEL_STYLES[state])
+            field.setStyleSheet(self._FIELD_INPUT_STYLES[state])
 
     def set_run_enabled(self, enabled: bool) -> None:
         """Enable or disable the Run Prompt button based on executor availability."""

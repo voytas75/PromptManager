@@ -6,6 +6,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Added
 
+- Added one bounded **Template Variable State Highlight v1** pass in `Template Preview` so each existing variable input now shows subtle local missing vs schema-invalid vs neutral styling without adding panels, buttons, helper text blocks, or workflow changes.
 - Added one bounded **Usage Confidence Cue v1** in the shared detail view so prompts that already saw real use can show one quiet `Reuse signal: used N time(s)` cue from the existing `usage_count`, without adding analytics, ranking, or a new metrics panel.
 - Added one bounded **Edit Dialog Promote Draft Shortcut v1** so draft prompts being edited can hand off directly into the existing `Promote Draft` flow without backing out to the detail view, using one safe apply-first confirm when unsaved changes exist.
 - Added one bounded **Source-Matched Preview Priority v1** pass to the existing main prompt list so an active plain-text search can let a credible matching `Source: ...` cue become the preview line without changing no-search preview priority, ranking, filtering, selection, or list layout.
@@ -20,6 +21,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Fixed
 
+- Added focused regression coverage for template-preview variable state styling, including missing, schema-invalid, and corrected-neutral transitions at the existing widget seam.
 - `Execute as Context` no longer duplicates the prompt body as both system instructions and an extra `Context:` block in the user payload, and now runs through one transient context-execution path that sends the prompt body as context and the entered task as the user request.
 - LiteLLM execution no longer sends `reasoning` payloads to `gpt-4.1`, preventing Azure `400 Bad Request` failures on that model family while keeping reasoning-effort payloads for supported reasoning models such as `gpt-5` and `o*`.
 - Added focused regression coverage for bounded usage-confidence cue rendering, including visible plural/singular wording and clean zero-usage silence.

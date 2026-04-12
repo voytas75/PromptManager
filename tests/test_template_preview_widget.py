@@ -1,6 +1,7 @@
 """Tests for template preview widget error fallbacks.
 
 Updates:
+  v0.1.3 - 2026-04-12 - Cover per-variable missing, invalid, and neutral state styling.
   v0.1.2 - 2026-04-12 - Cover bounded missing-variable status summaries in template preview.
   v0.1.1 - 2025-11-29 - Extend preview helper with persistence/run state fields.
   v0.1.0 - 2025-11-27 - Ensure parse/render errors keep raw template text visible.
@@ -133,6 +134,7 @@ class _DummyTextEdit:
     def __init__(self, text: str = "") -> None:
         self._text = text
         self.blocked = False
+        self.style_value = ""
 
     def setPlainText(self, text: str) -> None:
         self._text = text
@@ -145,6 +147,9 @@ class _DummyTextEdit:
 
     def blockSignals(self, value: bool) -> None:  # pragma: no cover - behaviour tracked externally
         self.blocked = bool(value)
+
+    def setStyleSheet(self, value: str) -> None:
+        self.style_value = value
 
 
 class _DummyLabel:
@@ -175,6 +180,7 @@ def _make_preview() -> TemplatePreviewWidget:
     widget._template_parse_error = None
     widget._variable_names = []
     widget._variable_inputs = {}
+    widget._variable_labels = {}
     widget._schema_visible = False
     widget._schema_mode = types.SimpleNamespace(currentData=lambda: None)
     widget._schema_input = _DummyTextEdit()
@@ -255,7 +261,9 @@ def test_preview_displays_template_text_when_rendering_fails() -> None:
 def test_preview_bounds_missing_variable_status_summary() -> None:
     """Missing-variable status should stay compact when several inputs are absent."""
     widget = _make_preview()
-    widget._template_text = "Hello {{ customer_name }} from {{ region }} owned by {{ owner }} ({{ priority }})."
+    widget._template_text = (
+        "Hello {{ customer_name }} from {{ region }} owned by {{ owner }} ({{ priority }})."
+    )
     widget._template_parse_error = None
     widget._variable_names = []
 
@@ -273,7 +281,6 @@ def test_preview_bounds_missing_variable_status_summary() -> None:
 
     assert widget._rendered_view.toPlainText() == "Hello"
     assert widget._status_label.text_value == "Missing variables: customer_name, owner +2"
-
 
 
 def test_preview_hides_missing_variable_status_when_render_is_ready() -> None:
@@ -300,7 +307,6 @@ def test_preview_hides_missing_variable_status_when_render_is_ready() -> None:
     assert widget._status_label.text_value == "Preview ready."
 
 
-
 def test_preview_keeps_parse_errors_primary_over_missing_variable_status() -> None:
     """Syntax issues should remain primary and suppress missing-variable messaging."""
     widget = _make_preview()
@@ -311,7 +317,6 @@ def test_preview_keeps_parse_errors_primary_over_missing_variable_status() -> No
 
     assert widget._status_label.text_value == "syntax issue"
     assert "Missing variables:" not in widget._status_label.text_value
-
 
 
 def test_apply_variable_values_populates_matching_inputs() -> None:
@@ -343,3 +348,83 @@ def test_refresh_preview_invokes_internal_update() -> None:
     widget.refresh_preview()
 
     assert invoked["count"] == 1
+
+
+def test_update_variable_states_marks_missing_fields_with_quiet_attention_style() -> None:
+    """Missing fields should get the bounded missing-state styling."""
+    widget = _make_preview()
+    widget._variable_inputs = {"customer": _DummyTextEdit()}
+    widget._variable_labels = {"customer": _DummyLabel()}
+    widget._update_variable_states = types.MethodType(
+        TemplatePreviewWidget._update_variable_states,
+        widget,
+    )
+
+    widget._update_variable_states(set(), {"customer"}, set())
+
+    assert "#f59e0b" in widget._variable_inputs["customer"].style_value
+    assert "#92400e" in widget._variable_labels["customer"].style_value
+
+
+def test_update_preview_marks_schema_invalid_fields_without_flagging_other_inputs() -> None:
+    """Schema-invalid provided fields should be distinct while unrelated fields stay neutral."""
+    widget = _make_preview()
+    widget._template_text = "Hello {{ customer_name }} from {{ region }}"
+    widget._template_parse_error = None
+    widget._variable_names = ["customer_name", "region"]
+    widget._variable_inputs = {
+        "customer_name": _DummyTextEdit("ACME"),
+        "region": _DummyTextEdit(""),
+    }
+    widget._variable_labels = {
+        "customer_name": _DummyLabel(),
+        "region": _DummyLabel(),
+    }
+    widget._schema_visible = True
+    widget._schema_input = _DummyTextEdit(
+        "{\n"
+        '  "type": "object",\n'
+        '  "properties": {\n'
+        '    "customer_name": {"type": "integer"},\n'
+        '    "region": {"type": "string"}\n'
+        "  }\n"
+        "}"
+    )
+    widget._schema_mode = types.SimpleNamespace(
+        currentData=lambda: _TEMPLATE_PREVIEW_MODULE.SchemaValidationMode.JSON_SCHEMA.value
+    )
+    widget._update_variable_states = types.MethodType(
+        TemplatePreviewWidget._update_variable_states,
+        widget,
+    )
+
+    widget._update_preview()
+
+    assert widget._status_label.text_value == "customer_name: 'ACME' is not of type 'integer'"
+    assert "#ef4444" in widget._variable_inputs["customer_name"].style_value
+    assert "#991b1b" in widget._variable_labels["customer_name"].style_value
+    assert "#f59e0b" in widget._variable_inputs["region"].style_value
+    assert "#92400e" in widget._variable_labels["region"].style_value
+
+
+def test_update_variable_states_reset_to_neutral_after_correction() -> None:
+    """Corrected fields should drop warning styling and return to the neutral look."""
+    widget = _make_preview()
+    widget._variable_inputs = {"customer": _DummyTextEdit()}
+    widget._variable_labels = {"customer": _DummyLabel()}
+    widget._update_variable_states = types.MethodType(
+        TemplatePreviewWidget._update_variable_states,
+        widget,
+    )
+
+    widget._update_variable_states(set(), {"customer"}, set())
+    widget._update_variable_states({"customer"}, set(), set())
+
+    assert (
+        widget._variable_inputs["customer"].style_value
+        == (TemplatePreviewWidget._FIELD_INPUT_STYLES["neutral"])
+    )
+    assert (
+        widget._variable_labels["customer"].style_value
+        == (TemplatePreviewWidget._FIELD_LABEL_STYLES["neutral"])
+    )
