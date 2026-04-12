@@ -1,6 +1,7 @@
 """Focused tests for the draft promote dialog.
 
 Updates:
+  v0.1.7 - 2026-04-12 - Cover prompt-body lead fallback for similar-match advisory labels.
   v0.1.6 - 2026-04-11 - Cover bounded selected-match reason cues
   for likely-duplicate and very-close advisory states.
   v0.1.5 - 2026-04-11 - Cover bounded likely-duplicate cues
@@ -139,6 +140,40 @@ def test_draft_promote_dialog_keeps_clean_label_for_weak_signal_match(
     item = dialog._similar_prompts_list.item(0)  # noqa: SLF001
 
     assert item.text() == "Existing reusable prompt — Operations"
+
+
+def test_draft_promote_dialog_uses_body_lead_preview_when_metadata_is_absent(
+    qt_app: QApplication,
+) -> None:
+    """Similar-match labels can reuse the shared body-lead fallback when metadata is weak."""
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000540"),
+        name="Captured draft",
+        description="Quick capture draft.",
+        category="General",
+        context="Draft body",
+        ext2={"capture_state": "draft", "capture_method": "quick_capture"},
+    )
+    similar = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000541"),
+        name="Existing reusable prompt",
+        description="",
+        category="Operations",
+        source="local",
+        context="Summarize deployment risks for this release and call out rollback concerns.",
+        last_modified=datetime(2026, 4, 4, 18, 0, tzinfo=UTC),
+    )
+
+    dialog = DraftPromoteDialog(prompt, categories=["General"], similar_prompts=[similar])
+    dialog.show()
+    qt_app.processEvents()
+
+    item = dialog._similar_prompts_list.item(0)  # noqa: SLF001
+
+    assert item.text() == (
+        "Existing reusable prompt — Operations · "
+        "Summarize deployment risks for this release and call out rollback concerns."
+    )
 
 
 def test_draft_promote_dialog_hides_visible_strength_cue_for_non_close_match(

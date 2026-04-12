@@ -1,6 +1,7 @@
 """Focused tests for bounded retrieval previews in the main prompt list.
 
 Updates:
+  v0.1.4 - 2026-04-12 - Cover prompt-body lead fallback while keeping stronger preview priorities unchanged.
   v0.1.3 - 2026-04-12 - Cover active-search source-priority while keeping ordinary preview fallback unchanged.
   v0.1.2 - 2026-04-12 - Cover active-search match spans and bounded delegate emphasis runs.
   v0.1.1 - 2026-04-11 - Keep preview text at the row base font size for readability.
@@ -40,6 +41,7 @@ def _build_prompt(
     description: str = "",
     scenarios: list[str] | None = None,
     source: str = "local",
+    context: str = "Review the latest incident timeline and summarise the next operator actions.",
 ) -> Prompt:
     """Create a prompt tailored to retrieval-preview tests."""
     return Prompt(
@@ -47,7 +49,7 @@ def _build_prompt(
         name="Incident triage",
         description=description,
         category="Ops",
-        context="Review the latest incident timeline and summarise the next operator actions.",
+        context=context,
         scenarios=scenarios or [],
         source=source,
         created_at=datetime(2026, 4, 6, 9, 0, tzinfo=UTC),
@@ -136,9 +138,33 @@ def test_prompt_list_model_ignores_generic_or_weak_source_for_active_search_prio
     )
 
 
+def test_prompt_list_model_falls_back_to_body_lead_when_metadata_is_weak(
+    qt_app: QApplication,
+) -> None:
+    """Prompt body lead should provide one compact preview only after stronger cues fail."""
+    prompt = _build_prompt(
+        description=" ",
+        scenarios=[],
+        source="quick_capture",
+        context="Summarize deployment risks for this release and call out rollback concerns.",
+    )
+    model = PromptListModel([prompt])
+
+    index = model.index(0, 0)
+
+    assert index.data(PromptListModel.PreviewRole) == (
+        "Summarize deployment risks for this release and call out rollback concerns."
+    )
+
+
 def test_prompt_list_model_hides_preview_for_low_signal_prompt_data(qt_app: QApplication) -> None:
     """No preview should render when only empty fields or generic source markers exist."""
-    prompt = _build_prompt(description=" ", scenarios=[], source="quick_capture")
+    prompt = _build_prompt(
+        description=" ",
+        scenarios=[],
+        source="quick_capture",
+        context="Draft body",
+    )
     model = PromptListModel([prompt])
 
     index = model.index(0, 0)
@@ -147,7 +173,7 @@ def test_prompt_list_model_hides_preview_for_low_signal_prompt_data(qt_app: QApp
 
 
 def test_prompt_list_model_flattens_and_truncates_scenario_preview(qt_app: QApplication) -> None:
-    """Scenario fallback should stay on one line and use deterministic truncation."""
+    """Scenario fallback should stay on one line and outrank the later body fallback."""
     prompt = _build_prompt(
         description="",
         scenarios=[
@@ -155,6 +181,7 @@ def test_prompt_list_model_flattens_and_truncates_scenario_preview(qt_app: QAppl
             "then compare responder actions against the handoff checklist before posting."
         ],
         source="local",
+        context="Summarize deployment risks for this release and call out rollback concerns.",
     )
     model = PromptListModel([prompt])
 
@@ -165,6 +192,7 @@ def test_prompt_list_model_flattens_and_truncates_scenario_preview(qt_app: QAppl
     assert "\n" not in preview
     assert preview.endswith("...")
     assert len(preview) <= PromptListModel.PreviewMaxLength
+    assert preview.startswith("Use after collecting timeline notes,")
 
 
 def test_prompt_list_model_exposes_title_and_preview_match_spans_for_active_search(
@@ -241,9 +269,11 @@ def test_prompt_list_delegate_returns_taller_rows_when_preview_exists(
 ) -> None:
     """Rows with a preview should reserve enough height for the second line."""
     with_preview = PromptListModel(
-        [_build_prompt(description="", scenarios=[], source="support queue")]
+        [_build_prompt(description="", scenarios=[], source="support queue", context=" ")]
     )
-    without_preview = PromptListModel([_build_prompt(description="", scenarios=[], source="local")])
+    without_preview = PromptListModel(
+        [_build_prompt(description="", scenarios=[], source="local", context=" ")]
+    )
     delegate = PromptListDelegate()
     option = QStyleOptionViewItem()
 

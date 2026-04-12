@@ -1,6 +1,7 @@
 """Shared bounded preview helpers for prompt retrieval and ingest advisory surfaces.
 
 Updates:
+  v0.1.3 - 2026-04-12 - Add one final bounded prompt-body lead fallback when metadata previews are absent.
   v0.1.2 - 2026-04-12 - Allow active plain-text search to prefer a matching credible source cue.
   v0.1.1 - 2026-04-10 - Add a shared credible-source helper for retrieval and inspection surfaces.
   v0.1.0 - 2026-04-10 - Extract shared preview selection and truncation logic.
@@ -28,6 +29,17 @@ _LOW_SIGNAL_SOURCE_VALUES = {
     "quick_capture",
     "unknown",
 }
+_LOW_SIGNAL_BODY_VALUES = {
+    "prompt",
+    "prompt body",
+    "prompt text",
+    "instructions",
+    "task",
+    "goal",
+    "context",
+    "draft body",
+}
+_BODY_PREVIEW_MIN_WORDS = 4
 
 
 def flatten_preview_text(value: str) -> str:
@@ -83,7 +95,49 @@ def build_prompt_preview(
         if normalized and is_credible_preview_text(normalized):
             return truncate_preview_text(normalized)
 
-    return source_cue
+    if source_cue is not None:
+        return source_cue
+
+    return build_prompt_body_lead(prompt.context)
+
+
+def build_prompt_body_lead(context: str | None) -> str | None:
+    """Return one bounded body-lead preview only when the opening prompt text is credible."""
+    if not context:
+        return None
+
+    for raw_line in context.splitlines():
+        candidate = raw_line.strip()
+        if not candidate:
+            continue
+        candidate = re.sub(r"^[#>*\-\s]+", "", candidate)
+        candidate = re.sub(
+            r"^(prompt|prompt body|instructions?|task|goal|context)\s*:\s*",
+            "",
+            candidate,
+            flags=re.IGNORECASE,
+        )
+        candidate = flatten_preview_text(candidate)
+        if not candidate:
+            continue
+        sentence_match = re.match(r"(.+?[.!?])(?:\s|$)", candidate)
+        if sentence_match:
+            candidate = sentence_match.group(1).strip()
+        if _is_credible_body_preview(candidate):
+            return truncate_preview_text(candidate)
+    return None
+
+
+def _is_credible_body_preview(value: str) -> bool:
+    """Return whether *value* is strong enough to use as a body-derived preview."""
+    if not is_credible_preview_text(value):
+        return False
+    if len(value.split()) < _BODY_PREVIEW_MIN_WORDS:
+        return False
+    lowered = value.casefold()
+    if lowered in _LOW_SIGNAL_BODY_VALUES:
+        return False
+    return not lowered.startswith(("prompt body ", "prompt text ", "draft body "))
 
 
 def _text_matches_search_terms(text: str, active_search_terms: tuple[str, ...]) -> bool:
@@ -96,6 +150,7 @@ def _text_matches_search_terms(text: str, active_search_terms: tuple[str, ...]) 
 
 __all__ = [
     "PREVIEW_MAX_LENGTH",
+    "build_prompt_body_lead",
     "build_prompt_preview",
     "build_prompt_source_cue",
     "flatten_preview_text",
