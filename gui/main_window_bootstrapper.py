@@ -60,6 +60,7 @@ class DetailWidgetCallbacks:
     refresh_scenarios_requested: Callable[[PromptDetailWidget], None]
     copy_prompt_body_requested: Callable[[], None]
     open_in_workspace_requested: Callable[[], None]
+    favorite_toggled_requested: Callable[[], None]
     share_requested: Callable[[], None]
 
 
@@ -130,6 +131,9 @@ class MainWindowBootstrapper:
         )  # type: ignore[arg-type]
         detail_widget.open_in_workspace_requested.connect(
             self._detail_callbacks.open_in_workspace_requested
+        )  # type: ignore[arg-type]
+        detail_widget.favorite_toggled_requested.connect(
+            self._detail_callbacks.favorite_toggled_requested
         )  # type: ignore[arg-type]
         detail_widget.share_requested.connect(self._detail_callbacks.share_requested)  # type: ignore[arg-type]
 

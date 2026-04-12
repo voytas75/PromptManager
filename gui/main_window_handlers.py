@@ -13,6 +13,7 @@ Updates:
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import QDialog, QMessageBox
@@ -230,6 +231,32 @@ class PromptActionsHandler:
         if controller is None:
             return
         controller.open_prompt_in_workspace(target)
+
+    def toggle_favorite_prompt(self, prompt: Prompt | None = None) -> None:
+        """Flip the favorite state for *prompt* through the existing update path."""
+        target = prompt or self._current_prompt_supplier()
+        if target is None:
+            self._status_callback("Select a prompt to favorite first.", 3000)
+            return
+        updated_prompt = target.__class__.from_record(target.to_record())
+        updated_prompt.is_favorite = not target.is_favorite
+        updated_prompt.last_modified = datetime.now(UTC)
+        try:
+            stored = self._manager.update_prompt(updated_prompt)
+        except PromptNotFoundError:
+            QMessageBox.warning(
+                self._parent,
+                "Prompt missing",
+                "The selected prompt no longer exists in the catalogue.",
+            )
+            return
+        except PromptStorageError as exc:
+            QMessageBox.critical(self._parent, "Unable to update favorite", str(exc))
+            return
+        self._load_prompts(self._current_search_text())
+        self._select_prompt(stored.id)
+        action = "Added to favorites" if stored.is_favorite else "Removed from favorites"
+        self._status_callback(f"{action}: {stored.name}", 2500)
 
     def show_prompt_description(self, prompt: Prompt) -> None:
         """Display the details dialog for *prompt*."""

@@ -110,6 +110,7 @@ class PromptListCoordinator:
 
         selected_category = panel.category_slug()
         selected_tag = panel.tag_value()
+        favorites_only = panel.favorites_only()
         min_quality = panel.min_quality()
 
         filtered: list[Prompt] = []
@@ -119,6 +120,8 @@ class PromptListCoordinator:
                 if prompt_slug != selected_category:
                     continue
             if selected_tag and selected_tag not in prompt.tags:
+                continue
+            if favorites_only and not prompt.is_favorite:
                 continue
             if min_quality > 0.0:
                 quality = prompt.quality_score or 0.0

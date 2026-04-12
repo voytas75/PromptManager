@@ -115,6 +115,22 @@ def _deserialize_list(value: Any) -> list[str]:
     return [str(value)]
 
 
+def _coerce_bool(value: Any) -> bool:
+    """Return a predictable boolean for mixed persisted truthy values."""
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    if isinstance(value, (int, float)):
+        return bool(value)
+    text = str(value).strip().casefold()
+    if text in {"1", "true", "yes", "on"}:
+        return True
+    if text in {"0", "false", "no", "off", "", "none", "null"}:
+        return False
+    return bool(text)
+
+
 def _normalize_version_label(value: Any) -> str:
     """Return an integer-only version label derived from mixed inputs."""
     if value is None:
@@ -173,6 +189,7 @@ class Prompt:
     is_active: bool = True
     source: str = "local"
     checksum: str | None = None
+    is_favorite: bool = False
     ext1: str | None = None
     ext2: MutableMapping[str, Any] | None = None
     ext3: str | None = None
@@ -184,7 +201,7 @@ class Prompt:
     similarity: float | None = field(default=None, compare=False, repr=False)
 
     def __post_init__(self) -> None:
-        """Normalise stored scenarios and mirror them into ext5 metadata."""
+        """Normalise stored scenarios/favorite state and mirror them into ext5 metadata."""
         ext5_mapping: MutableMapping[str, Any] | None
         if isinstance(self.ext5, MutableMapping):
             ext5_mapping = self.ext5
@@ -201,20 +218,33 @@ class Prompt:
 
         normalised = _sanitize_scenarios(combined_sources)
         self.scenarios = normalised
-
-        if normalised:
-            if ext5_mapping is None:
-                ext5_mapping = {}
-            ext5_mapping["scenarios"] = list(normalised)
-        elif ext5_mapping is not None and "scenarios" in ext5_mapping:
-            ext5_mapping.pop("scenarios", None)
-            if not ext5_mapping:
-                ext5_mapping = None
-
-        self.ext5 = ext5_mapping
+        self.is_favorite = self.is_favorite or _coerce_bool(
+            ext5_mapping.get("favorite") if ext5_mapping is not None else None
+        )
+        self.ext5 = self._serializable_ext5()
         slug_value = slugify_category(self.category_slug or self.category)
         self.category_slug = slug_value or None
         self.version = _normalize_version_label(self.version)
+
+    def _serializable_ext5(self) -> MutableMapping[str, Any] | None:
+        """Return ext5 metadata with prompt-owned convenience flags kept in sync."""
+        ext5_mapping: MutableMapping[str, Any] = {}
+        if isinstance(self.ext5, MutableMapping):
+            ext5_mapping.update(self.ext5)
+        elif isinstance(self.ext5, Mapping):
+            ext5_mapping.update(dict(self.ext5))
+
+        if self.scenarios:
+            ext5_mapping["scenarios"] = list(self.scenarios)
+        else:
+            ext5_mapping.pop("scenarios", None)
+
+        if self.is_favorite:
+            ext5_mapping["favorite"] = True
+        else:
+            ext5_mapping.pop("favorite", None)
+
+        return ext5_mapping or None
 
     @property
     def document(self) -> str:
@@ -259,11 +289,12 @@ class Prompt:
             "is_active": self.is_active,
             "source": self.source,
             "checksum": self.checksum,
+            "is_favorite": self.is_favorite,
             "ext1": self.ext1,
             "ext2": _serialize_metadata(self.ext2),
             "ext3": self.ext3,
             "ext4": _serialize_metadata(self.ext4),
-            "ext5": _serialize_metadata(self.ext5),
+            "ext5": _serialize_metadata(self._serializable_ext5()),
         }
         return {key: value for key, value in metadata.items() if value is not None}
 
@@ -294,11 +325,12 @@ class Prompt:
             "is_active": self.is_active,
             "source": self.source,
             "checksum": self.checksum,
+            "is_favorite": self.is_favorite,
             "ext1": self.ext1,
             "ext2": self.ext2,
             "ext3": self.ext3,
             "ext4": list(self.ext4) if self.ext4 is not None else None,
-            "ext5": self.ext5,
+            "ext5": self._serializable_ext5(),
         }
         return record
 
@@ -332,6 +364,7 @@ class Prompt:
             is_active=bool(data.get("is_active", True)),
             source=str(data.get("source") or "local"),
             checksum=data.get("checksum"),
+            is_favorite=_coerce_bool(data.get("is_favorite")),
             ext1=data.get("ext1"),
             ext2=_deserialize_metadata(data.get("ext2")),
             ext3=data.get("ext3"),
@@ -368,6 +401,7 @@ class Prompt:
             "is_active": metadata.get("is_active", True),
             "source": metadata.get("source"),
             "checksum": metadata.get("checksum"),
+            "is_favorite": metadata.get("is_favorite"),
             "ext1": metadata.get("ext1"),
             "ext2": metadata.get("ext2"),
             "ext3": metadata.get("ext3"),

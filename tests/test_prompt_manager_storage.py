@@ -392,11 +392,14 @@ def test_repository_roundtrip(tmp_path) -> None:
 
     prompt.description = "Updated description"
     prompt.usage_count = 3
+    prompt.is_favorite = True
     repository.update(prompt)
 
     updated = repository.get(prompt.id)
     assert updated.description == "Updated description"
     assert updated.usage_count == 3
+    assert updated.is_favorite is True
+    assert updated.ext5 == {"favorite": True}
 
     repository.delete(prompt.id)
     with pytest.raises(RepositoryNotFoundError):

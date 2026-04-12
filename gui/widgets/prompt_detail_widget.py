@@ -1,6 +1,7 @@
 """Prompt detail panel shared between main and template tabs.
 
 Updates:
+  v0.1.24 - 2026-04-12 - Add one bounded favorite toggle to the shared detail flow.
   v0.1.23 - 2026-04-12 - Add one visible template-only workspace handoff cue in Quick Reuse.
   v0.1.22 - 2026-04-12 - Add one bounded usage-confidence cue from existing usage counts.
   v0.1.21 - 2026-04-11 - Make the workspace handoff tooltip template-aware using the shared bounded variable summary.
@@ -64,6 +65,7 @@ class PromptDetailWidget(QWidget):
     refresh_scenarios_requested = Signal()
     copy_prompt_body_requested = Signal()
     open_in_workspace_requested = Signal()
+    favorite_toggled_requested = Signal()
     share_requested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -88,6 +90,11 @@ class PromptDetailWidget(QWidget):
         self._promote_draft_button.setVisible(False)
         self._promote_draft_button.clicked.connect(self.promote_draft_requested.emit)  # type: ignore[arg-type]
         edit_button_row.addWidget(self._promote_draft_button)
+        self._favorite_button = QPushButton("Add Favorite", content)
+        self._favorite_button.setObjectName("favoritePromptButton")
+        self._favorite_button.setEnabled(False)
+        self._favorite_button.clicked.connect(self.favorite_toggled_requested.emit)  # type: ignore[arg-type]
+        edit_button_row.addWidget(self._favorite_button)
         edit_button_row.addStretch(1)
         self._edit_button = QPushButton("Edit Prompt", content)
         self._edit_button.setObjectName("editPromptButton")
@@ -456,6 +463,15 @@ class PromptDetailWidget(QWidget):
         has_reusable_payload = bool((prompt.context or prompt.description or "").strip())
         self._copy_prompt_body_button.setEnabled(has_prompt_body)
         self._open_in_workspace_button.setEnabled(has_reusable_payload)
+        self._favorite_button.setEnabled(True)
+        self._favorite_button.setText(
+            "Remove Favorite" if prompt.is_favorite else "Add Favorite"
+        )
+        self._favorite_button.setToolTip(
+            "Remove this prompt from favorites."
+            if prompt.is_favorite
+            else "Add this prompt to favorites for faster retrieval later."
+        )
         self._apply_reuse_tooltips(prompt)
         workspace_handoff_cue = self._resolve_workspace_handoff_cue(prompt)
         if workspace_handoff_cue:
@@ -837,6 +853,9 @@ class PromptDetailWidget(QWidget):
         self._current_prompt = None
         self._promote_draft_button.setEnabled(False)
         self._promote_draft_button.setVisible(False)
+        self._favorite_button.setEnabled(False)
+        self._favorite_button.setText("Add Favorite")
+        self._favorite_button.setToolTip("Select a prompt to mark it as a favorite.")
         self._edit_button.setEnabled(False)
         self._delete_button.setEnabled(False)
         self._fork_button.setEnabled(False)

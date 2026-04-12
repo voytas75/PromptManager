@@ -1,4 +1,4 @@
-"""Filter panel widget for category, tag, quality, and sort controls.
+"""Filter panel widget for category, tag, favorite, quality, and sort controls.
 
 Updates:
   v0.1.1 - 2025-12-08 - Adopt ButtonSymbols enum for quality spin box typing.
@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractSpinBox,
+    QCheckBox,
     QComboBox,
     QDoubleSpinBox,
     QHBoxLayout,
@@ -65,6 +66,10 @@ class PromptFilterPanel(QWidget):
         self._tag_combo.addItem("All tags", None)
         self._tag_combo.currentIndexChanged.connect(self.filters_changed)  # type: ignore[arg-type]
         layout.addWidget(self._tag_combo)
+
+        self._favorites_only_checkbox = QCheckBox("Favorites only", self)
+        self._favorites_only_checkbox.toggled.connect(self.filters_changed)  # type: ignore[arg-type]
+        layout.addWidget(self._favorites_only_checkbox)
 
         layout.addWidget(QLabel("Quality ≥", self))
         self._quality_spin = QDoubleSpinBox(self)
@@ -135,6 +140,18 @@ class PromptFilterPanel(QWidget):
     def tag_value(self) -> str | None:
         """Return the currently selected tag value."""
         return self._clean_text(self._tag_combo.currentData())
+
+    def favorites_only(self) -> bool:
+        """Return True when the list should show favorite prompts only."""
+        return self._favorites_only_checkbox.isChecked()
+
+    def set_favorites_only(self, value: bool) -> None:
+        """Toggle the favorites-only filter without emitting signals."""
+        previous = self._favorites_only_checkbox.blockSignals(True)
+        try:
+            self._favorites_only_checkbox.setChecked(bool(value))
+        finally:
+            self._favorites_only_checkbox.blockSignals(previous)
 
     def min_quality(self) -> float:
         """Return the minimum quality threshold."""

@@ -264,6 +264,7 @@ class MainWindow(QMainWindow):
             refresh_scenarios_requested=self._prompt_actions_bridge.handle_refresh_scenarios_request,
             copy_prompt_body_requested=self._prompt_actions_bridge.copy_prompt,
             open_in_workspace_requested=self._prompt_actions_bridge.open_prompt_in_workspace,
+            favorite_toggled_requested=self._prompt_actions_bridge.toggle_favorite_prompt,
             share_requested=self._prompt_actions_bridge.share_prompt,
         )
 

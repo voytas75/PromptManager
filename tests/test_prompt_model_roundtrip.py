@@ -74,6 +74,7 @@ def test_prompt_roundtrip_metadata_and_record() -> None:
         rating_sum=27.0,
         related_prompts=["other"],
         modified_by="ci",
+        is_favorite=True,
         ext2={"nested": True},
         ext4=[0.1, 0.2],
         ext5={"list": [1, 2]},
@@ -98,6 +99,7 @@ def test_prompt_roundtrip_metadata_and_record() -> None:
     assert reconstructed.id == prompt.id
     assert reconstructed.ext2 == {"nested": True}
     assert reconstructed.ext4 == [0.1, 0.2]
+    assert reconstructed.is_favorite is True
     assert reconstructed.scenarios == [
         "Use for quick summaries",
         "Share with onboarding teammates",

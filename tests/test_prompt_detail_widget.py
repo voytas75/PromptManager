@@ -131,6 +131,48 @@ def test_prompt_detail_widget_exposes_bounded_quick_reuse_actions(
     assert open_requests == ["open"]
 
 
+def test_prompt_detail_widget_toggles_favorite_action_from_detail_flow(
+    qt_app: QApplication,
+) -> None:
+    """Detail flow should expose one bounded favorite toggle for the current prompt."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000132"),
+        name="Favorite candidate",
+        description="Reusable and worth keeping close.",
+        category="General",
+        context="Prompt body",
+        is_favorite=False,
+        created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 5, 11, 0, tzinfo=UTC),
+    )
+    favorite_requests: list[str] = []
+    widget.favorite_toggled_requested.connect(lambda: favorite_requests.append("toggle"))
+
+    widget.show()
+    widget.display_prompt(prompt)
+    qt_app.processEvents()
+
+    assert widget._favorite_button.isEnabled()  # noqa: SLF001
+    assert widget._favorite_button.text() == "Add Favorite"  # noqa: SLF001
+    assert (
+        widget._favorite_button.toolTip()
+        == "Add this prompt to favorites for faster retrieval later."
+    )  # noqa: SLF001
+
+    widget._favorite_button.click()  # noqa: SLF001
+    qt_app.processEvents()
+
+    assert favorite_requests == ["toggle"]
+
+    widget.display_prompt(Prompt.from_record({**prompt.to_record(), "is_favorite": True}))
+    qt_app.processEvents()
+
+    assert widget._favorite_button.text() == "Remove Favorite"  # noqa: SLF001
+    assert widget._favorite_button.toolTip() == "Remove this prompt from favorites."  # noqa: SLF001
+
+
+
 def test_prompt_detail_widget_disables_copy_without_a_prompt_body(
     qt_app: QApplication,
 ) -> None:
