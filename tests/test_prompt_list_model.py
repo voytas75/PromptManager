@@ -1,6 +1,7 @@
 """Focused tests for bounded retrieval previews in the main prompt list.
 
 Updates:
+  v0.1.5 - 2026-04-12 - Cover active-search scenario-priority while keeping source and description precedence unchanged.
   v0.1.4 - 2026-04-12 - Cover prompt-body lead fallback while keeping stronger preview priorities unchanged.
   v0.1.3 - 2026-04-12 - Cover active-search source-priority while keeping ordinary preview fallback unchanged.
   v0.1.2 - 2026-04-12 - Cover active-search match spans and bounded delegate emphasis runs.
@@ -80,7 +81,7 @@ def test_prompt_list_model_prefers_matching_source_preview_for_active_search(
     """Active plain-text search can promote a credible matching source cue."""
     prompt = _build_prompt(
         description="Summarise incident updates for the next on-call handoff.",
-        scenarios=["Use after timeline review."],
+        scenarios=["Use after notebook review before the next handoff."],
         source="PagerDuty ops notebook",
     )
     model = PromptListModel([prompt])
@@ -89,6 +90,54 @@ def test_prompt_list_model_prefers_matching_source_preview_for_active_search(
     index = model.index(0, 0)
 
     assert index.data(PromptListModel.PreviewRole) == "Source: PagerDuty ops notebook"
+
+
+def test_prompt_list_model_prefers_matching_scenario_over_non_matching_description_for_active_search(
+    qt_app: QApplication,
+) -> None:
+    """Active search can promote the first matching credible scenario over a generic description."""
+    prompt = _build_prompt(
+        description="Reusable incident handoff prompt for routine operator transitions.",
+        scenarios=[
+            "Use after rollback review for release readiness decisions.",
+            "Use after on-call handoff cleanup.",
+        ],
+        source="ops notebook",
+    )
+    model = PromptListModel([prompt])
+    model.set_active_search_text("rollback review")
+
+    index = model.index(0, 0)
+    preview = cast("str", index.data(PromptListModel.PreviewRole))
+    preview_spans = cast(
+        "tuple[tuple[int, int], ...]",
+        index.data(PromptListModel.PreviewMatchRole),
+    )
+
+    assert preview == "Use after rollback review for release readiness decisions."
+    assert [preview[start : start + length].lower() for start, length in preview_spans] == [
+        "rollback",
+        "review",
+    ]
+
+
+def test_prompt_list_model_keeps_matching_description_over_matching_scenario_for_active_search(
+    qt_app: QApplication,
+) -> None:
+    """A matching description should stay visible instead of switching to a matching scenario."""
+    prompt = _build_prompt(
+        description="Rollback review checklist for release readiness and operator handoff.",
+        scenarios=["Use after rollback review for release readiness decisions."],
+        source="ops notebook",
+    )
+    model = PromptListModel([prompt])
+    model.set_active_search_text("rollback review")
+
+    index = model.index(0, 0)
+
+    assert index.data(PromptListModel.PreviewRole) == (
+        "Rollback review checklist for release readiness and operator handoff."
+    )
 
 
 def test_prompt_list_model_keeps_no_search_preview_priority_unchanged(

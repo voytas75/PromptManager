@@ -6,6 +6,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Added
 
+- Added one bounded **Scenario-Matched Preview Priority v1** pass to the existing main prompt list so active plain-text search can prefer the first credible matching stored scenario over a non-matching generic description, while preserving the existing source-match override, no-search preview order, and single-line preview contract.
 - Added one bounded **Favorites v1** slice so operators can mark a prompt as favorite from the shared detail flow, persist that prompt-local favorite state through the existing prompt storage path, and use one `Favorites only` filter in the existing prompt list surface without widening into collections, saved sets, pinning, or management panels.
 - Added one bounded **Single-Turn User Prefix Strip v1** cleanup step in Quick Capture so a pasted prompt wrapped as one obvious outer `User:` turn can be stored without that wrapper, while `Assistant:`, `System:`, and transcript-like multi-turn input remain unchanged.
 - Added one bounded **Body-Lead Preview Fallback v1** pass in the shared preview seam so prompts with weak or empty description/scenario/source metadata can still show one compact preview derived from the stored prompt body, without changing search ranking, list layout, or Quick Capture behavior.
@@ -24,6 +25,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Fixed
 
+- Added focused regression coverage for active-search scenario-priority preview behavior, including matching-scenario promotion over a non-matching description, unchanged source-match precedence, matching-description retention, and preview highlight spans on the chosen scenario line.
 - Added focused regression coverage for Favorites v1 across prompt-model serialization, repository persistence, shared detail toggle wiring, and favorites-only list filtering while keeping the slice local to prompt storage, detail action, and list filtering.
 - Added focused regression coverage for Single-Turn User Prefix Strip v1, including stripped inline/multiline `User:` cases and unchanged bare, transcript-like, `Assistant:`, and `System:` inputs.
 - Added focused regression coverage for Body-Lead Preview Fallback v1, including body-fallback rendering when metadata is weak, unchanged stronger preview-priority paths, weak-body silence, and similar-match row reuse through the shared preview helper.
