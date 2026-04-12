@@ -7,6 +7,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 ### Added
 
 - Added one bounded **Favorites v1** slice so operators can mark a prompt as favorite from the shared detail flow, persist that prompt-local favorite state through the existing prompt storage path, and use one `Favorites only` filter in the existing prompt list surface without widening into collections, saved sets, pinning, or management panels.
+- Added one bounded **Single-Turn User Prefix Strip v1** cleanup step in Quick Capture so a pasted prompt wrapped as one obvious outer `User:` turn can be stored without that wrapper, while `Assistant:`, `System:`, and transcript-like multi-turn input remain unchanged.
 - Added one bounded **Template Variable State Highlight v1** pass in `Template Preview` so each existing variable input now shows subtle local missing vs schema-invalid vs neutral styling without adding panels, buttons, helper text blocks, or workflow changes.
 - Added one bounded **Usage Confidence Cue v1** in the shared detail view so prompts that already saw real use can show one quiet `Reuse signal: used N time(s)` cue from the existing `usage_count`, without adding analytics, ranking, or a new metrics panel.
 - Added one bounded **Edit Dialog Promote Draft Shortcut v1** so draft prompts being edited can hand off directly into the existing `Promote Draft` flow without backing out to the detail view, using one safe apply-first confirm when unsaved changes exist.
@@ -23,6 +24,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 ### Fixed
 
 - Added focused regression coverage for Favorites v1 across prompt-model serialization, repository persistence, shared detail toggle wiring, and favorites-only list filtering while keeping the slice local to prompt storage, detail action, and list filtering.
+- Added focused regression coverage for Single-Turn User Prefix Strip v1, including stripped inline/multiline `User:` cases and unchanged bare, transcript-like, `Assistant:`, and `System:` inputs.
 - Added focused regression coverage for template-preview variable state styling, including missing, schema-invalid, and corrected-neutral transitions at the existing widget seam.
 - `Execute as Context` no longer duplicates the prompt body as both system instructions and an extra `Context:` block in the user payload, and now runs through one transient context-execution path that sends the prompt body as context and the entered task as the user request.
 - LiteLLM execution no longer sends `reasoning` payloads to `gpt-4.1`, preventing Azure `400 Bad Request` failures on that model family while keeping reasoning-effort payloads for supported reasoning models such as `gpt-5` and `o*`.

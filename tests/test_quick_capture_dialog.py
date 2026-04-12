@@ -1,6 +1,7 @@
 """Focused tests for the quick capture dialog and draft conversion.
 
 Updates:
+  v0.1.5 - 2026-04-12 - Cover one outer `User:` strip and unchanged transcript-like role input.
   v0.1.4 - 2026-04-11 - Cover one obvious outer blockquote unwrap and unchanged mixed input.
   v0.1.3 - 2026-04-11 - Cover one allowed outer prompt label strip and unchanged ambiguous input.
   v0.1.2 - 2026-04-10 - Cover bounded outer-fence unwrapping for messy quick-capture input.
@@ -24,6 +25,7 @@ from gui.dialogs.quick_capture import (
     derive_quick_capture_title,
     resolve_quick_capture_source,
     strip_quick_capture_prompt_label,
+    strip_quick_capture_single_turn_user_prefix,
     unwrap_quick_capture_blockquote,
     unwrap_quick_capture_body,
 )
@@ -123,6 +125,40 @@ def test_quick_capture_draft_strips_one_allowed_multiline_system_prompt_label() 
 @pytest.mark.parametrize(
     ("body", "expected"),
     [
+        (
+            "User: Summarize the deployment risks for this release.",
+            "Summarize the deployment risks for this release.",
+        ),
+        (
+            "User:\nSummarize the deployment risks for this release.",
+            "Summarize the deployment risks for this release.",
+        ),
+        ("User:", "User:"),
+        (
+            "User:\nAssistant: ok, here is the summary",
+            "User:\nAssistant: ok, here is the summary",
+        ),
+        (
+            "User: first line\nAssistant: second line",
+            "User: first line\nAssistant: second line",
+        ),
+        ("System: Keep the answer terse.", "System: Keep the answer terse."),
+        (
+            "Assistant: Rewrite this prompt for executives.",
+            "Assistant: Rewrite this prompt for executives.",
+        ),
+    ],
+)
+def test_strip_quick_capture_single_turn_user_prefix_handles_stripped_and_unchanged_cases(
+    body: str, expected: str
+) -> None:
+    """Only clearly single-turn outer `User:` wrappers should be removed."""
+    assert strip_quick_capture_single_turn_user_prefix(body) == expected
+
+
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
         ("Prompt:", "Prompt:"),
         (
             "Meeting notes mention prompt: summarize risks later.",
@@ -171,3 +207,41 @@ def test_quick_capture_dialog_uses_shared_title_quality_heuristic_when_title_mis
     assert draft is not None
     prompt = draft.to_prompt()
     assert prompt.name == "Weekly deployment checklist"
+
+
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        (
+            "User: Summarize the deployment risks for this release.",
+            "Summarize the deployment risks for this release.",
+        ),
+        (
+            "User:\nSummarize the deployment risks for this release.",
+            "Summarize the deployment risks for this release.",
+        ),
+        ("User:", "User:"),
+        (
+            "User:\nAssistant: ok, here is the summary",
+            "User:\nAssistant: ok, here is the summary",
+        ),
+        (
+            "User: first line\nAssistant: second line",
+            "User: first line\nAssistant: second line",
+        ),
+        ("System: Keep the answer terse.", "System: Keep the answer terse."),
+        (
+            "Assistant: Rewrite this prompt for executives.",
+            "Assistant: Rewrite this prompt for executives.",
+        ),
+    ],
+)
+def test_quick_capture_draft_to_prompt_applies_only_the_bounded_user_prefix_cleanup(
+    body: str, expected: str
+) -> None:
+    """Quick capture should persist only the narrow `User:` cleanup result."""
+    draft = QuickCaptureDraft(body=body)
+
+    prompt = draft.to_prompt()
+
+    assert prompt.context == expected

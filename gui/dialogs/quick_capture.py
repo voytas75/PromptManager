@@ -1,6 +1,8 @@
 """Minimal dialog and helpers for quick prompt capture.
 
 Updates:
+  v0.1.6 - 2026-04-12 - Strip one outer `User:` wrapper only for clearly
+  single-turn quick-capture input.
   v0.1.5 - 2026-04-11 - Unwrap one obvious outer markdown blockquote from quick-capture bodies.
   v0.1.4 - 2026-04-11 - Strip one obvious outer prompt label from quick-capture bodies.
   v0.1.3 - 2026-04-10 - Unwrap one obvious outer markdown fence from captured prompt bodies.
@@ -105,6 +107,24 @@ def strip_quick_capture_prompt_label(body: str) -> str:
     return stripped
 
 
+def strip_quick_capture_single_turn_user_prefix(body: str) -> str:
+    """Strip one outer `User:` wrapper only when the remainder is clearly one user turn."""
+    stripped = body.strip()
+    for separator in (" ", "\n"):
+        prefix = f"User:{separator}"
+        if not stripped.startswith(prefix):
+            continue
+        remainder = stripped[len(prefix) :]
+        if (
+            not remainder.strip()
+            or _starts_with_transcript_role(remainder)
+            or _has_following_transcript_role_line(remainder)
+        ):
+            return stripped
+        return remainder
+    return stripped
+
+
 def _starts_with_transcript_role(body: str) -> bool:
     """Return whether the first non-empty line starts like a transcript role marker."""
     for line in body.splitlines():
@@ -112,6 +132,21 @@ def _starts_with_transcript_role(body: str) -> bool:
         if not normalized:
             continue
         return any(normalized.startswith(prefix) for prefix in _TRANSCRIPT_ROLE_PREFIXES)
+    return False
+
+
+def _has_following_transcript_role_line(body: str) -> bool:
+    """Return whether any later non-empty line starts like a transcript role marker."""
+    saw_first_non_empty_line = False
+    for line in body.splitlines():
+        normalized = line.lstrip()
+        if not normalized:
+            continue
+        if not saw_first_non_empty_line:
+            saw_first_non_empty_line = True
+            continue
+        if any(normalized.startswith(prefix) for prefix in _TRANSCRIPT_ROLE_PREFIXES):
+            return True
     return False
 
 
@@ -132,8 +167,10 @@ class QuickCaptureDraft:
 
     def to_prompt(self) -> Prompt:
         """Build a draft prompt record using existing catalog fields."""
-        body = strip_quick_capture_prompt_label(
-            unwrap_quick_capture_body(unwrap_quick_capture_blockquote(self.body))
+        body = strip_quick_capture_single_turn_user_prefix(
+            strip_quick_capture_prompt_label(
+                unwrap_quick_capture_body(unwrap_quick_capture_blockquote(self.body))
+            )
         )
         if not body:
             raise ValueError("Prompt body is required.")
@@ -256,6 +293,7 @@ __all__ = [
     "parse_quick_capture_tags",
     "resolve_quick_capture_source",
     "strip_quick_capture_prompt_label",
+    "strip_quick_capture_single_turn_user_prefix",
     "unwrap_quick_capture_blockquote",
     "unwrap_quick_capture_body",
 ]
