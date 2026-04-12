@@ -1,6 +1,7 @@
 """Printable summaries for Prompt Manager configuration.
 
 Updates:
+  v0.1.9 - 2026-04-12 - Surface LiteLLM drop params in CLI settings summaries.
   v0.1.8 - 2025-12-10 - Surface LiteLLM logging toggle in summaries.
   v0.1.7 - 2025-12-07 - Surface Google web search credentials in CLI summaries.
   v0.1.6 - 2025-12-07 - Include PrivateBin share configuration in summaries.
@@ -37,6 +38,7 @@ def print_settings_summary(settings: PromptManagerSettings) -> None:
     litellm_api_base = getattr(settings, "litellm_api_base", None)
     litellm_api_version = getattr(settings, "litellm_api_version", None)
     litellm_reasoning_effort = getattr(settings, "litellm_reasoning_effort", None)
+    litellm_drop_params = getattr(settings, "litellm_drop_params", None)
     litellm_tts_model = getattr(settings, "litellm_tts_model", None)
     litellm_tts_stream = getattr(settings, "litellm_tts_stream", True)
     litellm_stream = getattr(settings, "litellm_stream", False)
@@ -103,6 +105,7 @@ def print_settings_summary(settings: PromptManagerSettings) -> None:
         f"LiteLLM API base: {litellm_api_base or 'not set'}",
         f"LiteLLM API version: {litellm_api_version or 'not set'}",
         f"Reasoning effort: {litellm_reasoning_effort or 'not set'}",
+        f"Drop params: {', '.join(litellm_drop_params) if litellm_drop_params else 'not set'}",
         f"Streaming enabled: {'yes' if litellm_stream else 'no'}",
         f"LiteLLM logging: {'enabled' if litellm_logging_enabled else 'disabled'}",
         "",

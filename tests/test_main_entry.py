@@ -218,7 +218,9 @@ def test_main_print_settings_logs_and_exits(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setattr("sys.argv", ["prompt-manager", "--print-settings"])
-    _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
+    settings = _DummySettings()
+    settings.litellm_drop_params = ["max_tokens", "temperature"]
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
     manager = _DummyManager()
     _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
 
@@ -228,6 +230,7 @@ def test_main_print_settings_logs_and_exits(
     captured = capsys.readouterr()
     assert "Prompt Manager configuration summary" in captured.out
     assert "LiteLLM API key: not set" in captured.out
+    assert "Drop params: max_tokens, temperature" in captured.out
     assert "Streaming enabled:" in captured.out
 
 

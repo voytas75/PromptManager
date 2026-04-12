@@ -82,7 +82,7 @@ All settings are defined via `pydantic-settings` in `config/settings.py`. Provid
 | `PROMPT_MANAGER_LITELLM_WORKFLOW_MODELS` | JSON mapping of workflows to `fast`/`inference` | `{"prompt_execution": "inference"}` |
 | `PROMPT_MANAGER_LITELLM_API_KEY` / `AZURE_OPENAI_API_KEY` | LiteLLM or Azure credentials (environment only) | `sk-***` |
 | `PROMPT_MANAGER_LITELLM_API_BASE` / `AZURE_OPENAI_ENDPOINT` | Override LiteLLM base URL | `https://proxy.example.com` |
-| `PROMPT_MANAGER_LITELLM_DROP_PARAMS` | Comma/JSON list of parameters stripped before sending | `max_tokens,temperature` |
+| `PROMPT_MANAGER_LITELLM_DROP_PARAMS` | Comma-separated string or JSON array of parameters stripped before sending | `max_tokens,temperature` or `["max_tokens","temperature"]` |
 | `PROMPT_MANAGER_LITELLM_REASONING_EFFORT` | `minimal`, `medium`, or `high` for OpenAI reasoning models | `medium` |
 | `PROMPT_MANAGER_LITELLM_STREAM` | Enable streaming responses (`true`/`false`) | `true` |
 | `PROMPT_MANAGER_LITELLM_LOGGING` | Allow LiteLLM library logs to surface (`true`/`false`) | `false` |
