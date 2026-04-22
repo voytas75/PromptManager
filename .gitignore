@@ -75,3 +75,4 @@ config/config.json
 coverage.xml
 .memo/
 .codex/
+.hermes/
