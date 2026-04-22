@@ -118,9 +118,7 @@ def test_prompt_list_model_prefers_matching_scenario_over_non_matching_descripti
     )
 
     assert preview == "Use after rollback review for release readiness decisions."
-    assert [
-        preview[start : start + length].lower() for start, length in preview_spans
-    ] == [
+    assert [preview[start : start + length].lower() for start, length in preview_spans] == [
         "rollback",
         "review",
     ]

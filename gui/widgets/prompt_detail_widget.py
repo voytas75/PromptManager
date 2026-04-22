@@ -469,9 +469,7 @@ class PromptDetailWidget(QWidget):
         self._copy_prompt_body_button.setEnabled(has_prompt_body)
         self._open_in_workspace_button.setEnabled(has_reusable_payload)
         self._favorite_button.setEnabled(True)
-        self._favorite_button.setText(
-            "Remove Favorite" if prompt.is_favorite else "Add Favorite"
-        )
+        self._favorite_button.setText("Remove Favorite" if prompt.is_favorite else "Add Favorite")
         self._favorite_button.setToolTip(
             "Remove this prompt from favorites."
             if prompt.is_favorite

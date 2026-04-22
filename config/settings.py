@@ -1003,7 +1003,8 @@ class PromptManagerSettings(BaseSettings):
                         if (
                             not env_file_explicit
                             and not config_path_explicit
-                            and field in {
+                            and field
+                            in {
                                 "litellm_api_key",
                                 "litellm_api_base",
                                 "litellm_api_version",

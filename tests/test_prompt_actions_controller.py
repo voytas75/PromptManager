@@ -281,7 +281,6 @@ def test_execute_prompt_as_context_delegates_task_and_context(
     assert toast_messages == []
 
 
-
 def test_show_context_menu_uses_shared_copy_prompt_label(
     qt_app: QApplication,
     monkeypatch: pytest.MonkeyPatch,

@@ -93,8 +93,7 @@ def test_draft_promote_dialog_shows_likely_duplicate_cue_and_opens_selection(
     assert dialog._similar_prompts_list.count() == 1  # noqa: SLF001
     item = dialog._similar_prompts_list.item(0)  # noqa: SLF001
     assert item.text() == (
-        "Existing reusable prompt — Operations · Likely duplicate · "
-        "Already curated."
+        "Existing reusable prompt — Operations · Likely duplicate · Already curated."
     )
     assert "Last modified: 2026-04-04 18:00 UTC" in item.toolTip()
     assert "Similarity: 0.87" in item.toolTip()
@@ -246,8 +245,7 @@ def test_draft_promote_dialog_shows_strength_cue_at_threshold(qt_app: QApplicati
     item = dialog._similar_prompts_list.item(0)  # noqa: SLF001
 
     assert (
-        item.text()
-        == "Existing reusable prompt — Operations · Very close match · Already curated."
+        item.text() == "Existing reusable prompt — Operations · Very close match · Already curated."
     )
     assert "A very close existing match may already exist" in dialog._similarity_summary.text()  # noqa: SLF001
     assert "Reason: Very similar prompt body." in dialog._similarity_summary.text()  # noqa: SLF001

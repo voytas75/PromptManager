@@ -174,7 +174,6 @@ def test_prompt_detail_widget_toggles_favorite_action_from_detail_flow(
     assert widget._favorite_button.toolTip() == "Remove this prompt from favorites."  # noqa: SLF001
 
 
-
 def test_prompt_detail_widget_keeps_favorite_before_promote_for_draft_prompts(
     qt_app: QApplication,
 ) -> None:
@@ -200,7 +199,6 @@ def test_prompt_detail_widget_keeps_favorite_before_promote_for_draft_prompts(
     assert widget._edit_button_row.indexOf(widget._favorite_button) < (
         widget._edit_button_row.indexOf(widget._promote_draft_button)
     )  # noqa: SLF001
-
 
 
 def test_prompt_detail_widget_disables_copy_without_a_prompt_body(
@@ -391,7 +389,6 @@ def test_prompt_detail_widget_shows_reuse_signal_when_prompt_has_usage_history(
     assert "used 4 times" in cue_text
 
 
-
 def test_prompt_detail_widget_uses_singular_reuse_signal_wording(
     qt_app: QApplication,
 ) -> None:
@@ -418,7 +415,6 @@ def test_prompt_detail_widget_uses_singular_reuse_signal_wording(
     assert "used 1 times" not in cue_text
 
 
-
 def test_prompt_detail_widget_hides_reuse_signal_without_usage_history(
     qt_app: QApplication,
 ) -> None:
@@ -441,7 +437,6 @@ def test_prompt_detail_widget_hides_reuse_signal_without_usage_history(
 
     assert not widget._reuse_signal_label.isVisible()  # noqa: SLF001
     assert widget._reuse_signal_label.text() == ""  # noqa: SLF001
-
 
 
 def test_prompt_detail_widget_shows_template_variable_cue_when_prompt_requires_variables(

@@ -106,7 +106,6 @@ def test_prompt_dialog_shows_promote_shortcut_only_for_draft_prompts(qt_app: QAp
         saved_dialog.deleteLater()
 
 
-
 def test_prompt_dialog_can_request_promote_with_unsaved_changes(
     qt_app: QApplication,
     monkeypatch: pytest.MonkeyPatch,
@@ -139,7 +138,6 @@ def test_prompt_dialog_can_request_promote_with_unsaved_changes(
     finally:
         dialog.close()
         dialog.deleteLater()
-
 
 
 def test_strip_scenarios_metadata_removes_entries() -> None:

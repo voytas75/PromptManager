@@ -1046,8 +1046,7 @@ def test_search_prompts_surfaces_sanitized_backend_query_error() -> None:
     with pytest.raises(PromptStorageError) as exc_info:
         manager.search_prompts(query_text="hello")
     assert (
-        str(exc_info.value)
-        == "Failed to query prompts: Embedding dimension 1536 does not match "
+        str(exc_info.value) == "Failed to query prompts: Embedding dimension 1536 does not match "
         "collection dimension 3072."
     )
 
