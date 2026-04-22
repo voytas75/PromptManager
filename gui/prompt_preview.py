@@ -1,8 +1,10 @@
 """Shared bounded preview helpers for prompt retrieval and ingest advisory surfaces.
 
 Updates:
-  v0.1.4 - 2026-04-12 - Let active plain-text search prefer the first matching credible scenario over a non-matching description.
-  v0.1.3 - 2026-04-12 - Add one final bounded prompt-body lead fallback when metadata previews are absent.
+  v0.1.4 - 2026-04-12 - Let active plain-text search prefer the first matching
+             credible scenario over a non-matching description.
+  v0.1.3 - 2026-04-12 - Add one final bounded prompt-body lead fallback when
+             metadata previews are absent.
   v0.1.2 - 2026-04-12 - Allow active plain-text search to prefer a matching credible source cue.
   v0.1.1 - 2026-04-10 - Add a shared credible-source helper for retrieval and inspection surfaces.
   v0.1.0 - 2026-04-10 - Extract shared preview selection and truncation logic.

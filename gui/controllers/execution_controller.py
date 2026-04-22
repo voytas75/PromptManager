@@ -422,8 +422,14 @@ class ExecutionController:
             count_usage_for_prompt=False,
         )
 
-    def execute_prompt_as_context(self, prompt: Prompt, *, task_text: str, context_text: str) -> None:
-        """Run a prompt body as context for an ad-hoc task without duplicating the context payload."""
+    def execute_prompt_as_context(
+        self,
+        prompt: Prompt,
+        *,
+        task_text: str,
+        context_text: str,
+    ) -> None:
+        """Run prompt context for an ad-hoc task without duplicating the payload."""
         cleaned_task = (task_text or "").strip()
         cleaned_context = (context_text or "").strip()
         if not cleaned_task:
@@ -527,7 +533,10 @@ class ExecutionController:
             try:
                 self._manager.increment_usage(display_prompt.id)
             except (PromptManagerError, PromptNotFoundError):
-                logger.debug("Unable to increment prompt usage after context execution", exc_info=True)
+                logger.debug(
+                    "Unable to increment prompt usage after context execution",
+                    exc_info=True,
+                )
         self._usage_logger.log_execute(
             prompt_name=display_prompt.name,
             success=True,

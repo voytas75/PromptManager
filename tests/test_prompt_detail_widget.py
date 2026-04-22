@@ -1,7 +1,8 @@
 """Focused tests for prompt detail inspection cues.
 
 Updates:
-  v0.1.13 - 2026-04-12 - Keep `Add Favorite` before `Promote Draft` in the shared draft detail action row.
+  v0.1.13 - 2026-04-12 - Keep `Add Favorite` before `Promote Draft` in the
+             shared draft detail action row.
   v0.1.12 - 2026-04-12 - Cover bounded usage-confidence cue rendering from usage counts.
   v0.1.11 - 2026-04-11 - Cover template-aware workspace handoff tooltips in
     the shared detail widget.
@@ -196,7 +197,9 @@ def test_prompt_detail_widget_keeps_favorite_before_promote_for_draft_prompts(
     qt_app.processEvents()
 
     assert widget._promote_draft_button.isVisible()  # noqa: SLF001
-    assert widget._edit_button_row.indexOf(widget._favorite_button) < widget._edit_button_row.indexOf(widget._promote_draft_button)  # noqa: SLF001
+    assert widget._edit_button_row.indexOf(widget._favorite_button) < (
+        widget._edit_button_row.indexOf(widget._promote_draft_button)
+    )  # noqa: SLF001
 
 
 

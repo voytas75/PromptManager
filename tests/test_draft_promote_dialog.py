@@ -92,7 +92,10 @@ def test_draft_promote_dialog_shows_likely_duplicate_cue_and_opens_selection(
     assert not dialog._similar_prompts_list.isHidden()  # noqa: SLF001
     assert dialog._similar_prompts_list.count() == 1  # noqa: SLF001
     item = dialog._similar_prompts_list.item(0)  # noqa: SLF001
-    assert item.text() == "Existing reusable prompt — Operations · Likely duplicate · Already curated."
+    assert item.text() == (
+        "Existing reusable prompt — Operations · Likely duplicate · "
+        "Already curated."
+    )
     assert "Last modified: 2026-04-04 18:00 UTC" in item.toolTip()
     assert "Similarity: 0.87" in item.toolTip()
     open_button = next(

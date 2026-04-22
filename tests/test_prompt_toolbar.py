@@ -34,7 +34,9 @@ def test_prompt_toolbar_exposes_canonical_front_door_actions(qt_app: QApplicatio
 
     assert toolbar._recent_button.text() == "Recent"  # noqa: SLF001
     assert toolbar._new_button.text() == "Quick Capture"  # noqa: SLF001
-    assert toolbar._recent_button.toolTip() == "Reopen one of the prompts you touched most recently."  # noqa: SLF001
+    assert toolbar._recent_button.toolTip() == (
+        "Reopen one of the prompts you touched most recently."
+    )  # noqa: SLF001
     assert toolbar._new_button.toolTip() == (
         "Paste raw prompt text into a draft record, or open the full prompt/workbench flows."
     )  # noqa: SLF001

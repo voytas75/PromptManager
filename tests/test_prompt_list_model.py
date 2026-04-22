@@ -1,9 +1,12 @@
 """Focused tests for bounded retrieval previews in the main prompt list.
 
 Updates:
-  v0.1.5 - 2026-04-12 - Cover active-search scenario-priority while keeping source and description precedence unchanged.
-  v0.1.4 - 2026-04-12 - Cover prompt-body lead fallback while keeping stronger preview priorities unchanged.
-  v0.1.3 - 2026-04-12 - Cover active-search source-priority while keeping ordinary preview fallback unchanged.
+  v0.1.5 - 2026-04-12 - Cover active-search scenario-priority while keeping
+             source and description precedence unchanged.
+  v0.1.4 - 2026-04-12 - Cover prompt-body lead fallback while keeping stronger
+             preview priorities unchanged.
+  v0.1.3 - 2026-04-12 - Cover active-search source-priority while keeping
+             ordinary preview fallback unchanged.
   v0.1.2 - 2026-04-12 - Cover active-search match spans and bounded delegate emphasis runs.
   v0.1.1 - 2026-04-11 - Keep preview text at the row base font size for readability.
   v0.1.0 - 2026-04-06 - Cover visible, hidden, and truncated retrieval-preview paths.
@@ -92,7 +95,7 @@ def test_prompt_list_model_prefers_matching_source_preview_for_active_search(
     assert index.data(PromptListModel.PreviewRole) == "Source: PagerDuty ops notebook"
 
 
-def test_prompt_list_model_prefers_matching_scenario_over_non_matching_description_for_active_search(
+def test_prompt_list_model_prefers_matching_scenario_over_non_matching_description(
     qt_app: QApplication,
 ) -> None:
     """Active search can promote the first matching credible scenario over a generic description."""
@@ -115,7 +118,9 @@ def test_prompt_list_model_prefers_matching_scenario_over_non_matching_descripti
     )
 
     assert preview == "Use after rollback review for release readiness decisions."
-    assert [preview[start : start + length].lower() for start, length in preview_spans] == [
+    assert [
+        preview[start : start + length].lower() for start, length in preview_spans
+    ] == [
         "rollback",
         "review",
     ]

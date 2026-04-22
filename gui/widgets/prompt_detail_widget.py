@@ -1,18 +1,21 @@
 """Prompt detail panel shared between main and template tabs.
 
 Updates:
-  v0.1.25 - 2026-04-12 - Keep `Add Favorite` before `Promote Draft` in the shared draft detail action row.
+  v0.1.25 - 2026-04-12 - Keep `Add Favorite` before `Promote Draft` in the
+             shared draft detail action row.
   v0.1.24 - 2026-04-12 - Add one bounded favorite toggle to the shared detail flow.
   v0.1.23 - 2026-04-12 - Add one visible template-only workspace handoff cue in Quick Reuse.
   v0.1.22 - 2026-04-12 - Add one bounded usage-confidence cue from existing usage counts.
-  v0.1.21 - 2026-04-11 - Make the workspace handoff tooltip template-aware using the shared bounded variable summary.
+  v0.1.21 - 2026-04-11 - Make the workspace handoff tooltip template-aware
+             using the shared bounded variable summary.
   v0.1.20 - 2026-04-11 - Show one bounded template-variable cue in the shared detail flow.
   v0.1.19 - 2026-04-11 - Apply one bounded readability typography pass to shared detail text.
   v0.1.18 - 2026-04-10 - Filter low-signal source markers from the shared inspection cues.
   v0.1.17 - 2026-04-10 - Explain quick-reuse payload semantics with bounded dynamic tooltips.
   v0.1.16 - 2026-04-10 - Add one bounded context-lead fallback for the existing usage cue.
   v0.1.15 - 2026-04-06 - Rename the detail reuse action to Copy Prompt and gate it on prompt bodies.
-  v0.1.14-and-earlier - 2026-04-05 - Added quick-reuse/detail cues, UTC timestamps, metadata toggles, and initial widget extraction.
+  v0.1.14-and-earlier - 2026-04-05 - Added quick-reuse/detail cues, UTC
+             timestamps, metadata toggles, and initial widget extraction.
 """
 
 from __future__ import annotations

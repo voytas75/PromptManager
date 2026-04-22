@@ -121,7 +121,13 @@ class _ExecutionControllerStub:
     def __init__(self) -> None:
         self.context_calls: list[tuple[Prompt, str, str]] = []
 
-    def execute_prompt_as_context(self, prompt: Prompt, *, task_text: str, context_text: str) -> None:
+    def execute_prompt_as_context(
+        self,
+        prompt: Prompt,
+        *,
+        task_text: str,
+        context_text: str,
+    ) -> None:
         self.context_calls.append((prompt, task_text, context_text))
 
 

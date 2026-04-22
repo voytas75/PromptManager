@@ -157,7 +157,9 @@ def bind_main_view(
         window._prompt_actions_bridge.open_prompt_in_workspace
     )  # type: ignore[arg-type]
     template_detail.favorite_toggled_requested.connect(  # type: ignore[arg-type]
-        lambda: window._prompt_actions_bridge.toggle_favorite_prompt(template_detail.current_prompt())
+        lambda: window._prompt_actions_bridge.toggle_favorite_prompt(
+            template_detail.current_prompt()
+        )
     )
 
     window._workspace_view = WorkspaceViewController(
