@@ -1,13 +1,21 @@
 {
   "include": [
-    "."
+    "main.py",
+    "core",
+    "config",
+    "gui",
+    "models",
+    "tests"
+  ],
+  "exclude": [
+    "data",
+    "scripts"
   ],
   "venvPath": ".",
   "venv": ".venv",
   "pythonVersion": "3.13",
   "typeCheckingMode": "strict",
-  "exclude": [
-    "data",
-    "scripts"
-  ]
+  "reportMissingImports": "warning",
+  "reportMissingTypeStubs": "warning",
+  "useLibraryCodeForTypes": true
 }
