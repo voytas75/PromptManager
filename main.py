@@ -82,11 +82,17 @@ def _initialise_manager(
 
 def _should_offer_config_creation(exc: Exception) -> bool:
     """Return True when settings loading failed because the default config is missing."""
-    if os.getenv("PROMPT_MANAGER_CONFIG_JSON"):
+    config_path_override = os.getenv("PROMPT_MANAGER_CONFIG_JSON")
+    if config_path_override and config_path_override != str(DEFAULT_CONFIG_PATH):
         return False
-    if not isinstance(exc, SettingsError):
-        return False
-    return not DEFAULT_CONFIG_PATH.exists()
+    config_path = DEFAULT_CONFIG_PATH.expanduser()
+    template_path = CONFIG_TEMPLATE_PATH.expanduser()
+    try:
+        config_path = config_path.resolve(strict=False)
+        template_path = template_path.resolve(strict=False)
+    except OSError:
+        pass
+    return (not config_path.exists()) and template_path.exists()
 
 
 def _prompt_create_default_config(logger: logging.Logger) -> bool:

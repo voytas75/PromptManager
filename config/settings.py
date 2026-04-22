@@ -731,15 +731,16 @@ class PromptManagerSettings(BaseSettings):
         if backend == "litellm":
             resolved_model = model or DEFAULT_EMBEDDING_MODEL
             object.__setattr__(self, "embedding_model", resolved_model)
-            model = resolved_model
+            return self
 
-        if backend == "deterministic" and model:
+        if backend == "deterministic":
             object.__setattr__(self, "embedding_model", None)
             return self
 
-        if backend != "deterministic" and not model:
+        if backend == "sentence-transformers" and not model:
             raise ValueError(
-                f"embedding_model must be provided when embedding_backend is set to '{backend}'"
+                "embedding_model must be provided when embedding_backend is "
+                "set to 'sentence-transformers'"
             )
         return self
 
@@ -859,8 +860,9 @@ class PromptManagerSettings(BaseSettings):
         Order (highest → lowest):
             1. Explicit keyword arguments (e.g. load_settings(litellm_model="...")).
             2. JSON configuration file (application settings).
-            3. Environment variables / aliases.
-            4. File secrets.
+            3. Environment variables using the canonical PROMPT_MANAGER_* names.
+            4. Legacy/provider alias environment variables (e.g. AZURE_OPENAI_*).
+            5. File secrets.
         """
 
         # Compose an environment source that also considers aliases explicitly
@@ -868,7 +870,11 @@ class PromptManagerSettings(BaseSettings):
             data: dict[str, Any] = {}
             config_dict = cast("dict[str, Any]", cls.model_config)
             prefix = str(config_dict.get("env_prefix", ""))
-            dotenv_values = _read_dotenv_values()
+            config_path_explicit = bool(os.getenv("PROMPT_MANAGER_CONFIG_JSON"))
+            env_file_explicit = os.getenv("PROMPT_MANAGER_ENV_FILE") is not None
+            dotenv_values = (
+                _read_dotenv_values() if (env_file_explicit or not config_path_explicit) else {}
+            )
 
             def _lookup(candidate: str) -> str | None:
                 value = os.getenv(candidate)
@@ -879,22 +885,57 @@ class PromptManagerSettings(BaseSettings):
                 stripped_value = str(value).strip()
                 return stripped_value or None
 
-            # Collect both alias and field-name keys from environment
-            mapping = {
+            canonical_mapping = {
+                "db_path": [f"{prefix}DB_PATH", f"{prefix}DATABASE_PATH"],
+                "chroma_path": [f"{prefix}CHROMA_PATH"],
+                "redis_dsn": [f"{prefix}REDIS_DSN"],
+                "cache_ttl_seconds": [f"{prefix}CACHE_TTL_SECONDS"],
+                "litellm_model": [f"{prefix}LITELLM_MODEL"],
+                "litellm_inference_model": [f"{prefix}LITELLM_INFERENCE_MODEL"],
+                "litellm_api_key": [f"{prefix}LITELLM_API_KEY"],
+                "litellm_api_base": [f"{prefix}LITELLM_API_BASE"],
+                "litellm_api_version": [f"{prefix}LITELLM_API_VERSION"],
+                "litellm_drop_params": [f"{prefix}LITELLM_DROP_PARAMS"],
+                "litellm_workflow_models": [f"{prefix}LITELLM_WORKFLOW_MODELS"],
+                "litellm_tts_model": [f"{prefix}LITELLM_TTS_MODEL"],
+                "litellm_reasoning_effort": [f"{prefix}LITELLM_REASONING_EFFORT"],
+                "litellm_tts_stream": [f"{prefix}LITELLM_TTS_STREAM"],
+                "litellm_stream": [f"{prefix}LITELLM_STREAM"],
+                "litellm_logging_enabled": [
+                    f"{prefix}LITELLM_LOGGING",
+                    f"{prefix}LITELLM_LOGS",
+                    f"{prefix}LITELLM_LOGGING_ENABLED",
+                ],
+                "embedding_backend": [f"{prefix}EMBEDDING_BACKEND"],
+                "embedding_model": [f"{prefix}EMBEDDING_MODEL"],
+                "embedding_device": [f"{prefix}EMBEDDING_DEVICE"],
+                "quick_actions": [f"{prefix}QUICK_ACTIONS"],
+                "web_search_provider": [f"{prefix}WEB_SEARCH_PROVIDER"],
+                "exa_api_key": [f"{prefix}EXA_API_KEY"],
+                "tavily_api_key": [f"{prefix}TAVILY_API_KEY"],
+                "serper_api_key": [f"{prefix}SERPER_API_KEY"],
+                "serpapi_api_key": [f"{prefix}SERPAPI_API_KEY"],
+                "google_api_key": [f"{prefix}GOOGLE_API_KEY"],
+                "google_cse_id": [f"{prefix}GOOGLE_CSE_ID"],
+                "auto_open_share_links": [
+                    f"{prefix}AUTO_OPEN_SHARE_LINKS",
+                    f"{prefix}SHARE_AUTO_OPEN_BROWSER",
+                ],
+                "privatebin_url": [f"{prefix}PRIVATEBIN_URL"],
+                "privatebin_expiration": [f"{prefix}PRIVATEBIN_EXPIRATION"],
+                "privatebin_format": [f"{prefix}PRIVATEBIN_FORMAT"],
+                "privatebin_compression": [f"{prefix}PRIVATEBIN_COMPRESSION"],
+                "privatebin_burn_after_reading": [f"{prefix}PRIVATEBIN_BURN_AFTER_READING"],
+                "privatebin_open_discussion": [f"{prefix}PRIVATEBIN_OPEN_DISCUSSION"],
+            }
+            alias_mapping = {
                 "db_path": ["DB_PATH", "DATABASE_PATH", "db_path", "database_path"],
                 "chroma_path": ["CHROMA_PATH", "chroma_path"],
                 "redis_dsn": ["REDIS_DSN", "redis_dsn"],
                 "cache_ttl_seconds": ["CACHE_TTL_SECONDS", "cache_ttl_seconds"],
                 "litellm_model": ["LITELLM_MODEL", "litellm_model"],
-                "litellm_inference_model": [
-                    "LITELLM_INFERENCE_MODEL",
-                    "litellm_inference_model",
-                ],
-                "litellm_api_key": [
-                    "LITELLM_API_KEY",
-                    "litellm_api_key",
-                    "AZURE_OPENAI_API_KEY",
-                ],
+                "litellm_inference_model": ["LITELLM_INFERENCE_MODEL", "litellm_inference_model"],
+                "litellm_api_key": ["LITELLM_API_KEY", "litellm_api_key", "AZURE_OPENAI_API_KEY"],
                 "litellm_api_base": [
                     "LITELLM_API_BASE",
                     "litellm_api_base",
@@ -905,18 +946,9 @@ class PromptManagerSettings(BaseSettings):
                     "litellm_api_version",
                     "AZURE_OPENAI_API_VERSION",
                 ],
-                "litellm_drop_params": [
-                    "LITELLM_DROP_PARAMS",
-                    "litellm_drop_params",
-                ],
-                "litellm_workflow_models": [
-                    "LITELLM_WORKFLOW_MODELS",
-                    "litellm_workflow_models",
-                ],
-                "litellm_tts_model": [
-                    "LITELLM_TTS_MODEL",
-                    "litellm_tts_model",
-                ],
+                "litellm_drop_params": ["LITELLM_DROP_PARAMS", "litellm_drop_params"],
+                "litellm_workflow_models": ["LITELLM_WORKFLOW_MODELS", "litellm_workflow_models"],
+                "litellm_tts_model": ["LITELLM_TTS_MODEL", "litellm_tts_model"],
                 "embedding_backend": ["EMBEDDING_BACKEND", "embedding_backend"],
                 "embedding_model": ["EMBEDDING_MODEL", "embedding_model"],
                 "embedding_device": ["EMBEDDING_DEVICE", "embedding_device"],
@@ -925,10 +957,7 @@ class PromptManagerSettings(BaseSettings):
                     "LITELLM_REASONING_EFFORT",
                     "litellm_reasoning_effort",
                 ],
-                "litellm_tts_stream": [
-                    "LITELLM_TTS_STREAM",
-                    "litellm_tts_stream",
-                ],
+                "litellm_tts_stream": ["LITELLM_TTS_STREAM", "litellm_tts_stream"],
                 "litellm_stream": ["LITELLM_STREAM", "litellm_stream"],
                 "litellm_logging_enabled": [
                     "LITELLM_LOGGING",
@@ -952,10 +981,7 @@ class PromptManagerSettings(BaseSettings):
                 "privatebin_url": ["PRIVATEBIN_URL", "privatebin_url"],
                 "privatebin_expiration": ["PRIVATEBIN_EXPIRATION", "privatebin_expiration"],
                 "privatebin_format": ["PRIVATEBIN_FORMAT", "privatebin_format"],
-                "privatebin_compression": [
-                    "PRIVATEBIN_COMPRESSION",
-                    "privatebin_compression",
-                ],
+                "privatebin_compression": ["PRIVATEBIN_COMPRESSION", "privatebin_compression"],
                 "privatebin_burn_after_reading": [
                     "PRIVATEBIN_BURN_AFTER_READING",
                     "privatebin_burn_after_reading",
@@ -965,24 +991,43 @@ class PromptManagerSettings(BaseSettings):
                     "privatebin_open_discussion",
                 ],
             }
-            for field, keys in mapping.items():
-                for key in keys:
-                    candidates = [f"{prefix}{key}", f"{prefix}{key.upper()}"]
-                    if key.isupper():
-                        candidates.append(key)
-                    for candidate in candidates:
+
+            for mapping in (canonical_mapping, alias_mapping):
+                for field, keys in mapping.items():
+                    if field in data:
+                        continue
+                    for candidate in keys:
                         val = _lookup(candidate)
                         if val is None:
                             continue
-                        # Map to canonical field keys accepted by the model
+                        if (
+                            not env_file_explicit
+                            and not config_path_explicit
+                            and field in {
+                                "litellm_api_key",
+                                "litellm_api_base",
+                                "litellm_api_version",
+                                "embedding_model",
+                            }
+                        ):
+                            continue
+                        if (
+                            mapping is alias_mapping
+                            and field
+                            in {
+                                "litellm_api_key",
+                                "litellm_api_base",
+                                "litellm_api_version",
+                                "embedding_model",
+                            }
+                            and config_path_explicit
+                        ):
+                            continue
                         if field in {"db_path", "chroma_path"}:
                             data[field] = str(val)
                         else:
                             data[field] = val
                         break
-                    else:
-                        continue
-                    break
             return data
 
         return (
@@ -1110,12 +1155,91 @@ class PromptManagerSettings(BaseSettings):
 
 def load_settings(**overrides: Any) -> PromptManagerSettings:
     """Return validated settings, raising SettingsError on failure."""
+    isolated_overrides = dict(overrides)
+    config_path = os.getenv("PROMPT_MANAGER_CONFIG_JSON")
+    env_file = os.getenv("PROMPT_MANAGER_ENV_FILE")
+    original_alias_env = {
+        "AZURE_OPENAI_API_KEY": os.environ.get("AZURE_OPENAI_API_KEY"),
+        "AZURE_OPENAI_ENDPOINT": os.environ.get("AZURE_OPENAI_ENDPOINT"),
+        "AZURE_OPENAI_API_VERSION": os.environ.get("AZURE_OPENAI_API_VERSION"),
+        "AZURE_OPENAI_BASE_URL": os.environ.get("AZURE_OPENAI_BASE_URL"),
+    }
+    should_isolate_azure_aliases = bool(config_path)
     try:
-        return PromptManagerSettings(**overrides)
+        if should_isolate_azure_aliases:
+            for key in original_alias_env:
+                os.environ.pop(key, None)
+        settings = PromptManagerSettings(**isolated_overrides)
     except SettingsError:
         raise
     except ValidationError as exc:
         raise SettingsError("Invalid Prompt Manager configuration") from exc
+    finally:
+        if should_isolate_azure_aliases:
+            for key, value in original_alias_env.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
+    if should_isolate_azure_aliases:
+        dotenv_values = _read_dotenv_values() if env_file is not None else {}
+        if (
+            settings.litellm_api_key is None
+            and original_alias_env["AZURE_OPENAI_API_KEY"] is not None
+        ):
+            object.__setattr__(
+                settings,
+                "litellm_api_key",
+                original_alias_env["AZURE_OPENAI_API_KEY"],
+            )
+        if (
+            settings.litellm_api_base is None
+            and original_alias_env["AZURE_OPENAI_ENDPOINT"] is not None
+        ):
+            object.__setattr__(
+                settings,
+                "litellm_api_base",
+                original_alias_env["AZURE_OPENAI_ENDPOINT"],
+            )
+        elif (
+            settings.litellm_api_base is None
+            and original_alias_env["AZURE_OPENAI_BASE_URL"] is not None
+        ):
+            object.__setattr__(
+                settings,
+                "litellm_api_base",
+                original_alias_env["AZURE_OPENAI_BASE_URL"],
+            )
+        if (
+            settings.litellm_api_version is None
+            and original_alias_env["AZURE_OPENAI_API_VERSION"] is not None
+        ):
+            object.__setattr__(
+                settings,
+                "litellm_api_version",
+                original_alias_env["AZURE_OPENAI_API_VERSION"],
+            )
+        if settings.litellm_api_key is None:
+            object.__setattr__(
+                settings,
+                "litellm_api_key",
+                dotenv_values.get("AZURE_OPENAI_API_KEY"),
+            )
+        if settings.litellm_api_base is None:
+            object.__setattr__(
+                settings,
+                "litellm_api_base",
+                dotenv_values.get("AZURE_OPENAI_ENDPOINT")
+                or dotenv_values.get("AZURE_OPENAI_BASE_URL"),
+            )
+        if settings.litellm_api_version is None:
+            object.__setattr__(
+                settings,
+                "litellm_api_version",
+                dotenv_values.get("AZURE_OPENAI_API_VERSION"),
+            )
+    return settings
 
 
 logger = logging.getLogger("prompt_manager.settings")

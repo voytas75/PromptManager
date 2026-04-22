@@ -37,6 +37,9 @@ def _clear_litellm_env(monkeypatch: MonkeyPatch) -> None:
         "PROMPT_MANAGER_LITELLM_WORKFLOW_MODELS",
         "PROMPT_MANAGER_LITELLM_TTS_MODEL",
         "PROMPT_MANAGER_LITELLM_TTS_STREAM",
+        "PROMPT_MANAGER_LITELLM_STREAM",
+        "PROMPT_MANAGER_EMBEDDING_BACKEND",
+        "PROMPT_MANAGER_EMBEDDING_MODEL",
         "PROMPT_MANAGER_LITELLM_LOGGING_ENABLED",
         "PROMPT_MANAGER_LITELLM_LOGGING",
         "PROMPT_MANAGER_LITELLM_LOGS",
@@ -780,6 +783,7 @@ def test_reasoning_effort_rejects_invalid(monkeypatch: MonkeyPatch, tmp_path: Pa
 
 def test_litellm_settings_accept_azure_aliases(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     """Allow Azure-specific LiteLLM identifiers when loading from env."""
+    _clear_litellm_env(monkeypatch)
     tmp_config = tmp_path / "config.json"
     tmp_config.write_text("{}", encoding="utf-8")
     monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(tmp_config))
@@ -816,7 +820,10 @@ def test_litellm_drop_params_from_dotenv(monkeypatch: MonkeyPatch, tmp_path: Pat
     config_path = tmp_path / "config.json"
     config_path.write_text("{}", encoding="utf-8")
     env_file = tmp_path / ".env"
-    env_file.write_text('PROMPT_MANAGER_LITELLM_DROP_PARAMS=["max_tokens", "temperature"]\n', encoding="utf-8")
+    env_file.write_text(
+        'PROMPT_MANAGER_LITELLM_DROP_PARAMS=["max_tokens", "temperature"]\n',
+        encoding="utf-8",
+    )
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
     monkeypatch.setenv("PROMPT_MANAGER_ENV_FILE", str(env_file))
@@ -869,6 +876,7 @@ def test_litellm_logging_flag_from_env(monkeypatch: MonkeyPatch, tmp_path: Path)
 
 def test_embedding_backend_defaults_to_litellm(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     """Fallback to LiteLLM embeddings when no backend overrides are provided."""
+    _clear_litellm_env(monkeypatch)
     config_path = tmp_path / "config.json"
     config_path.write_text("{}", encoding="utf-8")
     monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
@@ -880,6 +888,7 @@ def test_embedding_backend_defaults_to_litellm(monkeypatch: MonkeyPatch, tmp_pat
 
 def test_embedding_backend_requires_model(monkeypatch: MonkeyPatch) -> None:
     """Require a model name when selecting the sentence-transformers backend."""
+    _clear_litellm_env(monkeypatch)
     monkeypatch.setenv("PROMPT_MANAGER_EMBEDDING_BACKEND", "sentence-transformers")
     with pytest.raises(SettingsError):
         load_settings()
@@ -890,6 +899,7 @@ def test_embedding_backend_defaults_to_configured_constant_when_missing(
     tmp_path: Path,
 ) -> None:
     """Use the configured constant when embedding settings are omitted."""
+    _clear_litellm_env(monkeypatch)
     tmp_config = tmp_path / "config.json"
     tmp_config.write_text("{}", encoding="utf-8")
     monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(tmp_config))
