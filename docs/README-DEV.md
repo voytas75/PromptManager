@@ -13,7 +13,7 @@ PromptManager is a PySide6 desktop application for managing reusable AI prompts 
 
 ## Toolchain & Quality Gates
 
-- **Python**: 3.13+ (3.14 when stable) with `pyright` in strict mode; annotations are mandatory (no `type: ignore` in `core/`).
+- **Python**: 3.13+ (3.14 when stable). GitHub currently enforces `pyright main.py config` as the stable typed-entrypoint gate; broader strict coverage for `core/`, `gui/`, `models/`, and `tests/` is tracked as incremental technical-debt work. Annotations remain mandatory for new or touched code (no `type: ignore` in `core/`).
 - **Formatting/Linting**: `ruff check --fix .` followed by `ruff format .` (line length 100). Import ordering follows ruff/isort (builtin → stdlib → third-party → local).
 - **Testing**: `pytest -n auto --cov=core --cov-report=term-missing --cov-fail-under=80` with `pytest-asyncio`, `pytest-cov`, and `hypothesis` for parsing/generation code. Under `uv`, prefer `uv sync --extra dev` first, then `uv run pytest ...`, or use one-shot `uv run --extra dev pytest ...`. Mock all external HTTP/DB calls (`respx`, `vcrpy`, `pytest-mock`).
 - **Automation**: `nox -s format lint typecheck test` runs the full CI-equivalent workflow. Keep parity with AGENTS.md quality gates (Ruff + Pyright strict + coverage ≥80%).
@@ -22,7 +22,7 @@ PromptManager is a PySide6 desktop application for managing reusable AI prompts 
 ### Release hardening baseline (Beta → stable)
 
 - This baseline is non-negotiable for merges: strict Ruff/Pyright/Pytest+coverage gates, fail-fast settings validation, and external I/O resilience (timeouts + bounded retries + deterministic mocking).
-- CI uses `.github/workflows/quality-gates.yml`; the local parity command is `nox -s all` (or the individual `.venv/bin/ruff|pyright|pytest` invocations). For `uv`-driven local parity, sync dev extras first with `uv sync --extra dev`.
+- CI uses `.github/workflows/quality-gates.yml`; the local parity command is `nox -s all` (or the individual `.venv/bin/ruff`, `.venv/bin/pyright main.py config`, and `.venv/bin/pytest ...` invocations). For `uv`-driven local parity, sync dev extras first with `uv sync --extra dev`.
 - Validate settings early during development with `python -m main --no-gui --print-settings` or `python scripts/validate_settings.py`; configuration failures must be actionable and stop execution.
 - For HTTP I/O, prefer `httpx.AsyncClient(timeout=...)` plus retry helpers (e.g., `core.retry.async_retry`) and mock calls in tests with `httpx.MockTransport`, `respx`, or `vcrpy` (no live external calls in CI).
 
