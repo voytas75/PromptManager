@@ -9,7 +9,7 @@ PromptManager is a PySide6 desktop application for managing reusable AI prompts 
 - `core.prompt_manager.PromptManager` orchestrates persistence, optional Redis caching, LiteLLM execution, and ChromaDB similarity queries.
 - PySide6 GUI (`main.py --gui`) exposes list/search/detail panes, prompt editor with refinement workflow, quick action palette, notes, history, and taxonomy management dialogs.
 - Notification center, status tracking for long-running embedding/LLM tasks, and preference profile ensure responsive UX.
-- Product boundary SSOT now lives in [`docs/product-boundary-ssot.md`](product-boundary-ssot.md) and should be treated as the canonical source for what PromptManager is, what is core, and what is secondary/later.
+- Product boundary SSOT now lives in [`docs/product-direction-ssot.md`](product-direction-ssot.md) and should be treated as the canonical source for what PromptManager is, what is core, and what is secondary/later.
 
 ## Toolchain & Quality Gates
 
