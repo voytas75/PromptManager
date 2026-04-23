@@ -14,13 +14,17 @@ from typing import TYPE_CHECKING, cast
 from .utils import print_and_log
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
+    import argparse
     from collections.abc import Callable
+
+    from config import PromptManagerSettings
+    from core.prompt_manager import PromptManager
 
 
 def run_default_mode(
-    manager,
-    settings,
-    args,
+    manager: PromptManager | None,
+    settings: PromptManagerSettings,
+    args: argparse.Namespace,
     logger: logging.Logger,
 ) -> int:
     """Print readiness messages and optionally launch the GUI."""

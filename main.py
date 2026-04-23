@@ -19,25 +19,19 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 try:
-    from config import PromptManagerSettings, SettingsError, load_settings
+    from config import load_settings
 except (ImportError, AttributeError):  # pragma: no cover - fallback for test stubs
     import config as _config
 
-    PromptManagerSettings = getattr(_config, "PromptManagerSettings", object)
-    SettingsError = getattr(_config, "SettingsError", Exception)
     load_settings = _config.load_settings
-else:
-    import config as _config
 
 if TYPE_CHECKING:
-    from config import PromptManagerSettings as PromptManagerSettingsType
+    from config import PromptManagerSettings
 else:
-    from typing import Any as _Any
-
-    PromptManagerSettingsType = _Any
+    PromptManagerSettings = Any
 from cli.gui_launcher import run_default_mode
 from cli.parser import parse_args
 from cli.runtime import configure_litellm_logging, setup_logging as _runtime_setup_logging
@@ -58,9 +52,7 @@ DEFAULT_CONFIG_PATH = Path("config/config.json")
 CONFIG_TEMPLATE_PATH = Path("config/config.template.json")
 
 
-def _setup_logging(config_path) -> None:
-    """Compatibility wrapper for older test harnesses expecting main._setup_logging."""
-    _runtime_setup_logging(config_path)
+_setup_logging = _runtime_setup_logging
 
 
 from cli.commands import COMMAND_SPECS  # noqa: E402  (import moved for compatibility)
@@ -70,7 +62,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
 
 
 def _initialise_manager(
-    settings: PromptManagerSettingsType,
+    settings: PromptManagerSettings,
     logger: logging.Logger,
 ) -> PromptManager | None:
     try:
