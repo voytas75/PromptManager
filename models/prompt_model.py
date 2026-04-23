@@ -660,13 +660,9 @@ class UserProfile:
                 else None
             ),
             category_weights={
-                str(key): int(value)
-                for key, value in dict(category_weights_value).items()
+                str(key): int(value) for key, value in dict(category_weights_value).items()
             },
-            tag_weights={
-                str(key): int(value)
-                for key, value in dict(tag_weights_value).items()
-            },
+            tag_weights={str(key): int(value) for key, value in dict(tag_weights_value).items()},
             recent_prompts=_serialize_list(data.get("recent_prompts")),
             settings=settings_dict,
             updated_at=_ensure_datetime(data.get("updated_at")),
