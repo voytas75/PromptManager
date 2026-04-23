@@ -875,9 +875,7 @@ class PromptManagerSettings(BaseSettings):
                 raw_dotenv_values.get("PROMPT_MANAGER_CONFIG_JSON", "").strip()
             )
             env_file_explicit = os.getenv("PROMPT_MANAGER_ENV_FILE") is not None
-            dotenv_values = (
-                raw_dotenv_values if (env_file_explicit or not config_path_explicit) else {}
-            )
+            dotenv_values = raw_dotenv_values
 
             def _lookup(candidate: str) -> str | None:
                 value = os.getenv(candidate)
@@ -1217,7 +1215,7 @@ def load_settings(**overrides: Any) -> PromptManagerSettings:
                 dotenv_values["PROMPT_MANAGER_LITELLM_API_VERSION"],
             )
         if (
-            settings.embedding_model is None
+            settings.embedding_model == DEFAULT_EMBEDDING_MODEL
             and dotenv_values.get("PROMPT_MANAGER_EMBEDDING_MODEL") is not None
         ):
             object.__setattr__(

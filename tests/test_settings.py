@@ -136,6 +136,39 @@ def test_json_precedes_env_when_both_provided(monkeypatch: MonkeyPatch, tmp_path
     ]
 
 
+def test_load_settings_reads_embedding_model_from_dotenv_when_config_path_comes_from_dotenv(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Keep canonical embedding env from .env when config path also comes from .env."""
+    _clear_litellm_env(monkeypatch)
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    config_path = config_dir / "config.json"
+    config_path.write_text(json.dumps({"litellm_model": "azure/gpt-4.1"}), encoding="utf-8")
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        "\n".join(
+            [
+                f"PROMPT_MANAGER_CONFIG_JSON={config_path}",
+                "PROMPT_MANAGER_EMBEDDING_BACKEND=litellm",
+                "PROMPT_MANAGER_EMBEDDING_MODEL=azure/UDTEMBED3L",
+                "PROMPT_MANAGER_LITELLM_API_BASE=https://example.invalid",
+                "PROMPT_MANAGER_LITELLM_API_VERSION=2025-04-01-preview",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROMPT_MANAGER_ENV_FILE", str(env_path))
+
+    settings = load_settings()
+
+    assert settings.embedding_backend == "litellm"
+    assert settings.embedding_model == "azure/UDTEMBED3L"
+
+
 def test_json_with_litellm_api_key_is_ignored(
     monkeypatch: MonkeyPatch,
     tmp_path: Path,
