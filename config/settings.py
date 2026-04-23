@@ -870,10 +870,13 @@ class PromptManagerSettings(BaseSettings):
             data: dict[str, Any] = {}
             config_dict = cast("dict[str, Any]", cls.model_config)
             prefix = str(config_dict.get("env_prefix", ""))
-            config_path_explicit = bool(os.getenv("PROMPT_MANAGER_CONFIG_JSON"))
+            raw_dotenv_values = _read_dotenv_values()
+            config_path_explicit = bool(os.getenv("PROMPT_MANAGER_CONFIG_JSON")) or bool(
+                raw_dotenv_values.get("PROMPT_MANAGER_CONFIG_JSON", "").strip()
+            )
             env_file_explicit = os.getenv("PROMPT_MANAGER_ENV_FILE") is not None
             dotenv_values = (
-                _read_dotenv_values() if (env_file_explicit or not config_path_explicit) else {}
+                raw_dotenv_values if (env_file_explicit or not config_path_explicit) else {}
             )
 
             def _lookup(candidate: str) -> str | None:
@@ -1157,8 +1160,10 @@ class PromptManagerSettings(BaseSettings):
 def load_settings(**overrides: Any) -> PromptManagerSettings:
     """Return validated settings, raising SettingsError on failure."""
     isolated_overrides = dict(overrides)
-    config_path = os.getenv("PROMPT_MANAGER_CONFIG_JSON")
-    env_file = os.getenv("PROMPT_MANAGER_ENV_FILE")
+    dotenv_values = _read_dotenv_values()
+    config_path = os.getenv("PROMPT_MANAGER_CONFIG_JSON") or dotenv_values.get(
+        "PROMPT_MANAGER_CONFIG_JSON"
+    )
     original_alias_env = {
         "AZURE_OPENAI_API_KEY": os.environ.get("AZURE_OPENAI_API_KEY"),
         "AZURE_OPENAI_ENDPOINT": os.environ.get("AZURE_OPENAI_ENDPOINT"),
@@ -1184,7 +1189,42 @@ def load_settings(**overrides: Any) -> PromptManagerSettings:
                     os.environ[key] = value
 
     if should_isolate_azure_aliases:
-        dotenv_values = _read_dotenv_values() if env_file is not None else {}
+        if (
+            settings.litellm_api_key is None
+            and dotenv_values.get("PROMPT_MANAGER_LITELLM_API_KEY") is not None
+        ):
+            object.__setattr__(
+                settings,
+                "litellm_api_key",
+                dotenv_values["PROMPT_MANAGER_LITELLM_API_KEY"],
+            )
+        if (
+            settings.litellm_api_base is None
+            and dotenv_values.get("PROMPT_MANAGER_LITELLM_API_BASE") is not None
+        ):
+            object.__setattr__(
+                settings,
+                "litellm_api_base",
+                dotenv_values["PROMPT_MANAGER_LITELLM_API_BASE"],
+            )
+        if (
+            settings.litellm_api_version is None
+            and dotenv_values.get("PROMPT_MANAGER_LITELLM_API_VERSION") is not None
+        ):
+            object.__setattr__(
+                settings,
+                "litellm_api_version",
+                dotenv_values["PROMPT_MANAGER_LITELLM_API_VERSION"],
+            )
+        if (
+            settings.embedding_model is None
+            and dotenv_values.get("PROMPT_MANAGER_EMBEDDING_MODEL") is not None
+        ):
+            object.__setattr__(
+                settings,
+                "embedding_model",
+                dotenv_values["PROMPT_MANAGER_EMBEDDING_MODEL"],
+            )
         if (
             settings.litellm_api_key is None
             and original_alias_env["AZURE_OPENAI_API_KEY"] is not None
