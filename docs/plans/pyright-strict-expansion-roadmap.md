@@ -1,22 +1,21 @@
 # Pyright Strict Expansion Roadmap
 
 ## Current enforced CI scope
-- `pyright main.py config`
-
-## Verified baseline
-- local verification on 2026-04-23: `pyright main.py config` → `0 errors, 0 warnings, 0 informations`
-- GitHub Actions verification on 2026-04-23: run `24840076043` (`Quality Gates`) succeeded for commit `503e546`
-- current gate is intentionally narrow and should stay stable while typed coverage expands incrementally
-
-## Next candidate scope
 - `pyright main.py config models`
 
+## Verified baseline
+- local verification on 2026-04-23: `pyright main.py config models` → `0 errors, 0 warnings, 0 informations`
+- GitHub Actions verification on 2026-04-23 is still only confirmed for the previous scope (`pyright main.py config`), run `24848111847` (`Quality Gates`) on commit `c05d771`
+- current local gate candidate is ready to widen, but still needs push + green GitHub run before treating the expanded scope as remotely enforced
+
+## Next candidate scope
+- `pyright main.py config models core`
+
 ## Phase backlog
-1. `models`
-2. `core` (small typed-safe modules first)
-3. `core` (remaining modules)
-4. `gui`
-5. `tests`
+1. `core` (small typed-safe modules first)
+2. `core` (remaining modules)
+3. `gui`
+4. `tests`
 
 ## Rules
 - never widen CI scope before a local green run for the exact next scope

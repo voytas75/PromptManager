@@ -12,7 +12,7 @@ import uuid
 from collections.abc import Mapping, MutableMapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 _SUMMARY_METADATA_KEY = "summarize_last_response"
 
@@ -43,14 +43,18 @@ def _ensure_datetime(value: datetime | str | None) -> datetime:
     return parsed
 
 
-def _coerce_metadata(value: Any | None) -> MutableMapping[str, Any] | None:
+def _coerce_metadata(value: object) -> MutableMapping[str, Any] | None:
     """Return metadata as a mutable mapping when possible."""
     if value is None:
         return None
     if isinstance(value, MutableMapping):
-        return value
+        mapping_value = cast("MutableMapping[object, Any]", value)
+        items = [(key, item) for key, item in mapping_value.items()]
+        return {str(key): item for key, item in items}
     if isinstance(value, Mapping):
-        return dict(value)
+        mapping_value = cast("Mapping[object, Any]", value)
+        items = [(key, item) for key, item in mapping_value.items()]
+        return {str(key): item for key, item in items}
     return {"value": value}
 
 
@@ -111,7 +115,7 @@ class PromptChain:
     summarize_last_response: bool = True
     created_at: datetime = field(default_factory=_utc_now)
     updated_at: datetime = field(default_factory=_utc_now)
-    steps: list[PromptChainStep] = field(default_factory=list)
+    steps: list[PromptChainStep] = field(default_factory=lambda: cast("list[PromptChainStep]", []))
 
     def to_record(self) -> dict[str, Any]:
         """Return a dictionary suitable for SQLite persistence."""
@@ -187,18 +191,24 @@ def chain_from_payload(payload: Mapping[str, Any]) -> PromptChain:
     chain_id_text = payload.get("id")
     chain_id = uuid.uuid4() if not chain_id_text else uuid.UUID(str(chain_id_text))
     description = str(payload.get("description") or "")
-    steps_payload = payload.get("steps") or []
+    steps_payload_obj = payload.get("steps")
+    if isinstance(steps_payload_obj, list):
+        steps_payload = cast("list[object]", steps_payload_obj)
+    else:
+        steps_payload = []
     steps: list[PromptChainStep] = []
-    if not isinstance(steps_payload, list):
+    if steps_payload_obj is not None and not isinstance(steps_payload_obj, list):
         raise ValueError("'steps' must be an array.")
-    for index, step_payload in enumerate(steps_payload, start=1):
-        if not isinstance(step_payload, Mapping):
+    for index, step_payload_obj in enumerate(steps_payload, start=1):
+        if not isinstance(step_payload_obj, Mapping):
             raise ValueError(f"Step {index} must be an object.")
+        step_payload = cast("Mapping[str, Any]", step_payload_obj)
         prompt_id_value = step_payload.get("prompt_id")
         if not prompt_id_value:
             raise ValueError(f"Step {index} is missing 'prompt_id'.")
         step_id_value = step_payload.get("id")
-        order_index = int(step_payload.get("order_index") or index)
+        order_index_value = step_payload.get("order_index")
+        order_index = int(order_index_value) if order_index_value not in (None, "") else index
         input_template = str(step_payload.get("input_template") or "")
         output_variable = str(step_payload.get("output_variable") or f"step_{order_index}")
         condition_text = str(step_payload.get("condition") or "").strip()

@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
@@ -79,7 +79,7 @@ class PromptCategory:
     color: str | None = None
     icon: str | None = None
     min_quality: float | None = None
-    default_tags: list[str] = field(default_factory=list)
+    default_tags: list[str] = field(default_factory=lambda: cast("list[str]", []))
     is_active: bool = True
     created_at: datetime = field(default_factory=_utc_now)
     updated_at: datetime = field(default_factory=_utc_now)
@@ -157,7 +157,7 @@ class PromptCategory:
             color=payload.get("color"),
             icon=payload.get("icon"),
             min_quality=payload.get("min_quality"),
-            default_tags=payload.get("default_tags") or [],
+            default_tags=cast("list[str]", payload.get("default_tags") or []),
             is_active=bool(payload.get("is_active", True)),
         )
 

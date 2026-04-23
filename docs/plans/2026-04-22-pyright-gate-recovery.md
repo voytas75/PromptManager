@@ -15,9 +15,12 @@
 ### Potwierdzone
 - repo: `/home/voytas/projects/PromptManager`
 - branch: `master`
-- working tree: czyste
+- working tree: brudne lokalnie (do weryfikacji przed kolejnym commitem)
+  - modified: `models/category_model.py`
+  - modified: `models/response_style.py`
+  - untracked: `docs/plans/2026-04-23-models-pyright-mini-plan.md`
 - remote: `https://github.com/voytas75/PromptManager.git`
-- `HEAD`: `0898558` — `fix: preserve embedding model from dotenv config`
+- `HEAD`: `c05d771` — `docs: refresh pyright recovery plan status`
 - `pyrightconfig.json` **nie** ma już `include: ["."]`; obecny include to:
   - `main.py`
   - `core`
@@ -25,18 +28,18 @@
   - `gui`
   - `models`
   - `tests`
-- `.github/workflows/quality-gates.yml` uruchamia dziś:
+- `.github/workflows/quality-gates.yml` uruchamia dziś lokalnie przygotowany scope:
 
 ```yaml
 - name: Pyright
-  run: .venv/bin/pyright main.py config
+  run: .venv/bin/pyright main.py config models
 ```
 
-- `docs/README-DEV.md` jest już urealnione do aktualnego gate'u `pyright main.py config`.
+- `docs/README-DEV.md` zostało już zaktualizowane lokalnie do scope `pyright main.py config models`, ale ta zmiana nadal czeka na push i zielony GH run.
 - commity związane z tym etapem już istnieją:
   - `2f15f0b` — `fix: type main entrypoint for pyright gate expansion`
   - `503e546` — `ci: expand pyright gate and align docs`
-- lokalna weryfikacja wykonana 2026-04-23 na tym środowisku potwierdza `pyright main.py config`:
+- lokalna weryfikacja wykonana ponownie 2026-04-23 na tym środowisku potwierdza `pyright main.py config models`:
 
 ```text
 0 errors, 0 warnings, 0 informations
@@ -47,14 +50,14 @@
   - status: `success`
   - commit: `503e546` — `ci: expand pyright gate and align docs`
   - job `quality`: wszystkie kroki zielone, w tym `Pyright`, `Pytest` i `Ensure clean tree`
-- potwierdzony GH run po fixie precedence dla `PROMPT_MANAGER_EMBEDDING_MODEL` z dotenv:
-  - run id: `24847766599`
+- potwierdzony GH run po odświeżeniu samego planu:
+  - run id: `24848111847`
   - status: `success`
-  - commit: `0898558` — `fix: preserve embedding model from dotenv config`
+  - commit: `c05d771` — `docs: refresh pyright recovery plan status`
   - job `quality`: wszystkie kroki zielone, w tym `Ruff (autofix)`, `Ruff (format)`, `Ruff (verify)`, `Pyright`, `Pytest` i `Ensure clean tree`
 
 ### Nadal otwarte
-- roadmapa dalszego rozszerzania strict coverage **już istnieje** w `docs/plans/pyright-strict-expansion-roadmap.md`; trzeba ją teraz traktować jako aktywny plan kolejnych etapów, nie jako brakujący artefakt.
+- roadmapa dalszego rozszerzania strict coverage istnieje i została lokalnie przesunięta na następny kandydat `core`, ale ten stan nadal wymaga push + zielonego GH run dla nowego scope `models`.
 - regres dla `PROMPT_MANAGER_ENV_FILE` / dotenv alias precedence został już częściowo domknięty testem dla `PROMPT_MANAGER_EMBEDDING_MODEL`, ale warto dopisać osobne przypadki dla pozostałych canonical pól LiteLLM i alias fallbacków, żeby nie wrócił podobny bug w innej gałęzi precedence.
 - podczas uruchamiania GUI analytics panel wykonuje startowy probe embeddingów przez `manager.diagnose_embeddings()`. Na tym środowisku aktywna konfiguracja LiteLLM dla embeddings wymaga modelu w formacie deployment-aware dla Azure (np. `azure/UDTEMBED3L`); pozostawienie samego `text-embedding-3-large` kończy się błędem backendu i powoduje trzy banery LiteLLM przy starcie okna. To nie jest problem samego GUI, tylko hałaśliwe ujawnienie błędnej nazwy modelu/deploymentu dla embeddingów.
 
@@ -111,6 +114,23 @@
 **Evidence:**
 - commit `2f15f0b` — `fix: type main entrypoint for pyright gate expansion`
 - commit `503e546` — `ci: expand pyright gate and align docs`
+
+#### Completed D: Domknij `models` lokalnie i przygotuj rozszerzenie gate do `main.py config models`
+
+**Status:** completed locally, remote verification pending
+
+**What changed:**
+- `models/response_style.py`, `models/prompt_chain_model.py` i `models/prompt_model.py` zostały doprowadzone do zielonego Pyright,
+- lokalny scope `pyright models` przechodzi,
+- workflow i dokumentacja zostały lokalnie przygotowane do rozszerzenia gate do `main.py config models`.
+
+**Evidence:**
+- lokalnie potwierdzone:
+  - `.venv/bin/pyright models/response_style.py` → zielone
+  - `.venv/bin/pyright models/prompt_chain_model.py` → zielone
+  - `.venv/bin/pyright models/prompt_model.py` → zielone
+  - `.venv/bin/pyright models` → zielone
+  - `.venv/bin/pyright main.py config models` → zielone
 
 ---
 

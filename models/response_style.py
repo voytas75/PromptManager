@@ -6,21 +6,63 @@ Updates: v0.1.0 - 2025-12-05 - Introduce ResponseStyle dataclass for formatting 
 
 from __future__ import annotations
 
+import json
 import uuid
-from collections.abc import Mapping, MutableMapping
+from collections.abc import Iterable, Mapping, MutableMapping
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from datetime import UTC, datetime
+from typing import Any, cast
 
-from .prompt_model import (
-    _deserialize_metadata,
-    _ensure_datetime,
-    _ensure_uuid,
-    _serialize_list,
-    _utc_now,
-)
 
-if TYPE_CHECKING:  # pragma: no cover - typing only
-    from datetime import datetime
+def utc_now() -> datetime:
+    """Return an aware UTC timestamp."""
+    return datetime.now(UTC)
+
+
+def ensure_uuid(value: Any) -> uuid.UUID:
+    """Parse arbitrary UUID representations into a uuid.UUID instance."""
+    if isinstance(value, uuid.UUID):
+        return value
+    return uuid.UUID(str(value))
+
+
+def ensure_datetime(value: Any) -> datetime:
+    """Parse incoming datetime values (isoformat strings or datetime)."""
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
+    if value is None:
+        return utc_now()
+    parsed = datetime.fromisoformat(str(value))
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+
+
+def serialize_list(items: Iterable[Any] | None) -> list[Any]:
+    """Normalize iterable inputs into JSON-serialisable lists."""
+    if items is None:
+        return []
+    if isinstance(items, (list, tuple, set)):
+        return list(items)
+    if isinstance(items, str):
+        return [items]
+    return list(items)
+
+
+def deserialize_metadata(value: object) -> Any | None:
+    """Deserialize metadata stored as JSON strings."""
+    if value is None:
+        return None
+    if isinstance(value, list):
+        return cast("list[Any]", value)
+    if isinstance(value, dict):
+        return cast("dict[str, Any]", value)
+    if isinstance(value, str):
+        if value in ("", "null"):
+            return None
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            return value
+    return value
 
 
 @dataclass(slots=True)
@@ -35,20 +77,20 @@ class ResponseStyle:
     voice: str | None = None
     format_instructions: str | None = None
     guidelines: str | None = None
-    tags: list[str] = field(default_factory=list)
-    examples: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=lambda: cast("list[str]", []))
+    examples: list[str] = field(default_factory=lambda: cast("list[str]", []))
     metadata: MutableMapping[str, Any] | None = None
     is_active: bool = True
     version: str = "1.0"
-    created_at: datetime = field(default_factory=_utc_now)
-    last_modified: datetime = field(default_factory=_utc_now)
+    created_at: datetime = field(default_factory=utc_now)
+    last_modified: datetime = field(default_factory=utc_now)
     ext1: str | None = None
     ext2: MutableMapping[str, Any] | None = None
     ext3: MutableMapping[str, Any] | None = None
 
     def touch(self) -> None:
         """Refresh the modification timestamp."""
-        self.last_modified = _utc_now()
+        self.last_modified = utc_now()
 
     def to_record(self) -> dict[str, Any]:
         """Return a serialisable mapping suitable for SQLite persistence."""
@@ -83,14 +125,23 @@ class ResponseStyle:
     def from_record(cls, data: Mapping[str, Any]) -> ResponseStyle:
         """Hydrate a ResponseStyle from a mapping."""
         metadata_value = data.get("metadata")
+        metadata_dict: dict[str, Any] | None
         if isinstance(metadata_value, Mapping):
-            metadata_dict = {str(key): metadata_value[key] for key in metadata_value}
+            metadata_items = cast("Iterable[tuple[object, Any]]", metadata_value.items())
+            metadata_dict = {str(key): value for key, value in metadata_items}
         else:
-            metadata_dict = _deserialize_metadata(metadata_value)
-            metadata_dict = dict(metadata_dict) if isinstance(metadata_dict, Mapping) else None
+            deserialized_metadata = deserialize_metadata(metadata_value)
+            if isinstance(deserialized_metadata, Mapping):
+                deserialized_items = cast(
+                    "Iterable[tuple[object, Any]]",
+                    deserialized_metadata.items(),
+                )
+                metadata_dict = {str(key): value for key, value in deserialized_items}
+            else:
+                metadata_dict = None
 
         return cls(
-            id=_ensure_uuid(data.get("id") or uuid.uuid4()),
+            id=ensure_uuid(data.get("id") or uuid.uuid4()),
             name=str(data.get("name") or ""),
             description=str(data.get("description") or ""),
             prompt_part=str(data.get("prompt_part") or "Response Style"),
@@ -98,14 +149,20 @@ class ResponseStyle:
             voice=str(data.get("voice") or "") or None,
             format_instructions=str(data.get("format_instructions") or "") or None,
             guidelines=str(data.get("guidelines") or "") or None,
-            tags=[str(tag) for tag in _serialize_list(data.get("tags"))],
-            examples=[str(example) for example in _serialize_list(data.get("examples"))],
+            tags=[str(tag) for tag in serialize_list(data.get("tags"))],
+            examples=[str(example) for example in serialize_list(data.get("examples"))],
             metadata=metadata_dict,
             is_active=bool(int(data.get("is_active", 1))),
             version=str(data.get("version") or "1.0"),
-            created_at=_ensure_datetime(data.get("created_at")),
-            last_modified=_ensure_datetime(data.get("last_modified")),
+            created_at=ensure_datetime(data.get("created_at")),
+            last_modified=ensure_datetime(data.get("last_modified")),
             ext1=data.get("ext1"),
-            ext2=_deserialize_metadata(data.get("ext2")),
-            ext3=_deserialize_metadata(data.get("ext3")),
+            ext2=cast(
+                "MutableMapping[str, Any] | None",
+                deserialize_metadata(cast("str | None", data.get("ext2"))),
+            ),
+            ext3=cast(
+                "MutableMapping[str, Any] | None",
+                deserialize_metadata(cast("str | None", data.get("ext3"))),
+            ),
         )

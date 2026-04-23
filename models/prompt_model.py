@@ -22,7 +22,7 @@ from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
 from .category_model import slugify_category
 
@@ -88,8 +88,10 @@ def _deserialize_metadata(value: str | None) -> Any | None:
     """Deserialize metadata stored as JSON strings."""
     if value is None:
         return None
-    if isinstance(value, (list, dict)):
-        return value
+    if isinstance(value, list):
+        return cast("list[Any]", value)
+    if isinstance(value, dict):
+        return cast("dict[str, Any]", value)
     if value in ("", "null"):
         return None
     try:
@@ -106,12 +108,14 @@ def _deserialize_list(value: Any) -> list[str]:
         try:
             parsed = json.loads(value)
             if isinstance(parsed, list):
-                return [str(item) for item in parsed]
+                parsed_list = cast("list[Any]", parsed)
+                return [str(item) for item in parsed_list]
         except json.JSONDecodeError:
             return [value]
         return [value]
     if isinstance(value, (list, tuple, set)):
-        return [str(item) for item in value]
+        sequence_items = cast("Iterable[Any]", value)
+        return [str(item) for item in sequence_items]
     return [str(value)]
 
 
@@ -170,12 +174,12 @@ class Prompt:
     description: str
     category: str
     category_slug: str | None = None
-    tags: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=lambda: cast("list[str]", []))
     language: str = "en"
     context: str | None = None
     example_input: str | None = None
     example_output: str | None = None
-    scenarios: list[str] = field(default_factory=list)
+    scenarios: list[str] = field(default_factory=lambda: cast("list[str]", []))
     last_modified: datetime = field(default_factory=_utc_now)
     version: str = "1"
     author: str | None = None
@@ -183,7 +187,7 @@ class Prompt:
     usage_count: int = 0
     rating_count: int = 0
     rating_sum: float = 0.0
-    related_prompts: list[str] = field(default_factory=list)
+    related_prompts: list[str] = field(default_factory=lambda: cast("list[str]", []))
     created_at: datetime = field(default_factory=_utc_now)
     modified_by: str | None = None
     is_active: bool = True
@@ -203,10 +207,9 @@ class Prompt:
     def __post_init__(self) -> None:
         """Normalise stored scenarios/favorite state and mirror them into ext5 metadata."""
         ext5_mapping: MutableMapping[str, Any] | None
-        if isinstance(self.ext5, MutableMapping):
-            ext5_mapping = self.ext5
-        elif isinstance(self.ext5, Mapping):
-            ext5_mapping = dict(self.ext5)
+        ext5_value = self.ext5
+        if isinstance(ext5_value, Mapping):
+            ext5_mapping = dict(ext5_value)
         else:
             ext5_mapping = None
 
@@ -229,10 +232,9 @@ class Prompt:
     def _serializable_ext5(self) -> MutableMapping[str, Any] | None:
         """Return ext5 metadata with prompt-owned convenience flags kept in sync."""
         ext5_mapping: MutableMapping[str, Any] = {}
-        if isinstance(self.ext5, MutableMapping):
-            ext5_mapping.update(self.ext5)
-        elif isinstance(self.ext5, Mapping):
-            ext5_mapping.update(dict(self.ext5))
+        ext5_value = self.ext5
+        if isinstance(ext5_value, Mapping):
+            ext5_mapping.update(dict(ext5_value))
 
         if self.scenarios:
             ext5_mapping["scenarios"] = list(self.scenarios)
@@ -375,8 +377,8 @@ class Prompt:
     @classmethod
     def from_chroma(cls, record: Mapping[str, Any]) -> Prompt:
         """Instantiate from a ChromaDB metadata record."""
-        metadata = record.get("metadata") or {}
-        base = {
+        metadata = cast("Mapping[str, Any]", record.get("metadata") or {})
+        base: dict[str, Any] = {
             "id": record.get("id"),
             "name": metadata.get("name"),
             "description": metadata.get("description"),
@@ -553,10 +555,14 @@ class UserProfile:
     id: uuid.UUID
     username: str = "default"
     preferred_language: str | None = None
-    category_weights: MutableMapping[str, int] = field(default_factory=dict)
-    tag_weights: MutableMapping[str, int] = field(default_factory=dict)
-    recent_prompts: list[str] = field(default_factory=list)
-    settings: MutableMapping[str, Any] = field(default_factory=dict)
+    category_weights: MutableMapping[str, int] = field(
+        default_factory=lambda: cast("dict[str, int]", {})
+    )
+    tag_weights: MutableMapping[str, int] = field(
+        default_factory=lambda: cast("dict[str, int]", {})
+    )
+    recent_prompts: list[str] = field(default_factory=lambda: cast("list[str]", []))
+    settings: MutableMapping[str, Any] = field(default_factory=lambda: cast("dict[str, Any]", {}))
     updated_at: datetime = field(default_factory=_utc_now)
     ext1: str | None = None
     ext2: MutableMapping[str, Any] | None = None
@@ -629,10 +635,21 @@ class UserProfile:
     def from_record(cls, data: Mapping[str, Any]) -> UserProfile:
         """Hydrate a profile from a mapping."""
         settings_value = data.get("settings")
+        settings_dict: dict[str, Any]
         if isinstance(settings_value, Mapping):
-            settings_dict = {str(key): settings_value[key] for key in settings_value}
+            settings_items = cast("Iterable[tuple[object, Any]]", settings_value.items())
+            settings_dict = {str(key): value for key, value in settings_items}
         else:
             settings_dict = {}
+
+        category_weights_value = cast(
+            "Mapping[object, Any]",
+            data.get("category_weights") or {},
+        )
+        tag_weights_value = cast(
+            "Mapping[object, Any]",
+            data.get("tag_weights") or {},
+        )
 
         return cls(
             id=_ensure_uuid(data.get("id") or DEFAULT_PROFILE_ID),
@@ -644,10 +661,11 @@ class UserProfile:
             ),
             category_weights={
                 str(key): int(value)
-                for key, value in dict(data.get("category_weights") or {}).items()
+                for key, value in dict(category_weights_value).items()
             },
             tag_weights={
-                str(key): int(value) for key, value in dict(data.get("tag_weights") or {}).items()
+                str(key): int(value)
+                for key, value in dict(tag_weights_value).items()
             },
             recent_prompts=_serialize_list(data.get("recent_prompts")),
             settings=settings_dict,
