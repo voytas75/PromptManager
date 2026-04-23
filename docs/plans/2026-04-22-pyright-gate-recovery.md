@@ -17,6 +17,7 @@
 - branch: `master`
 - working tree: czyste
 - remote: `https://github.com/voytas75/PromptManager.git`
+- `HEAD`: `0898558` — `fix: preserve embedding model from dotenv config`
 - `pyrightconfig.json` **nie** ma już `include: ["."]`; obecny include to:
   - `main.py`
   - `core`
@@ -46,11 +47,15 @@
   - status: `success`
   - commit: `503e546` — `ci: expand pyright gate and align docs`
   - job `quality`: wszystkie kroki zielone, w tym `Pyright`, `Pytest` i `Ensure clean tree`
+- potwierdzony GH run po fixie precedence dla `PROMPT_MANAGER_EMBEDDING_MODEL` z dotenv:
+  - run id: `24847766599`
+  - status: `success`
+  - commit: `0898558` — `fix: preserve embedding model from dotenv config`
+  - job `quality`: wszystkie kroki zielone, w tym `Ruff (autofix)`, `Ruff (format)`, `Ruff (verify)`, `Pyright`, `Pytest` i `Ensure clean tree`
 
 ### Nadal otwarte
 - roadmapa dalszego rozszerzania strict coverage **już istnieje** w `docs/plans/pyright-strict-expansion-roadmap.md`; trzeba ją teraz traktować jako aktywny plan kolejnych etapów, nie jako brakujący artefakt.
-- lokalny checkout jest obecnie `ahead 1` względem `origin/master`; na HEAD jest dodatkowy commit `0929d38` — `fix: load litellm secrets when config path comes from dotenv`. Do potwierdzenia na GitHubie po pushu: osobny run CI dla tego nowszego stanu.
-- regres dla `PROMPT_MANAGER_ENV_FILE` / dotenv alias precedence nie ma jeszcze trwałego testu w repo; próba dodania osobnego testu ujawniła, że w tym środowisku istnieją ambient alias env vars (`AZURE_OPENAI_*`), które mieszają w oczekiwanym precedence i wymagają osobnej, czystej reprodukcji.
+- regres dla `PROMPT_MANAGER_ENV_FILE` / dotenv alias precedence został już częściowo domknięty testem dla `PROMPT_MANAGER_EMBEDDING_MODEL`, ale warto dopisać osobne przypadki dla pozostałych canonical pól LiteLLM i alias fallbacków, żeby nie wrócił podobny bug w innej gałęzi precedence.
 - podczas uruchamiania GUI analytics panel wykonuje startowy probe embeddingów przez `manager.diagnose_embeddings()`. Na tym środowisku aktywna konfiguracja LiteLLM dla embeddings wymaga modelu w formacie deployment-aware dla Azure (np. `azure/UDTEMBED3L`); pozostawienie samego `text-embedding-3-large` kończy się błędem backendu i powoduje trzy banery LiteLLM przy starcie okna. To nie jest problem samego GUI, tylko hałaśliwe ujawnienie błędnej nazwy modelu/deploymentu dla embeddingów.
 
 ### Historyczny zestaw błędów w `main.py` z momentu tworzenia planu
