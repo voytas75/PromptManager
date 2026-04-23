@@ -47,7 +47,7 @@ jobs:
           .venv/bin/ruff format --check .
 
       - name: Pyright
-        run: .venv/bin/pyright config
+        run: .venv/bin/pyright main.py config
 
       - name: Pytest
         env:

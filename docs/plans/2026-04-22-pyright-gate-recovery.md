@@ -2,64 +2,200 @@
 
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
 
-**Goal:** Przywrócić zielony quality gate na GitHubie bez udawania pełnej zgodności całego repo z `pyright strict`, a jednocześnie zostawić jasną ścieżkę do etapowego porządkowania długu typów.
+**Goal:** Utrzymać zielony quality gate na GitHubie, urealnić plan względem stanu repo i przygotować bezpieczny następny etap rozszerzania typed coverage bez rozwalania CI.
 
-**Architecture:** Rozdzielamy problem na dwa poziomy. Najpierw odblokowujemy CI przez ograniczenie zakresu Pyrighta w workflow do obszaru o najwyższym ROI i najniższym długu typów. Potem osobno utrzymujemy roadmapę dochodzenia do szerszego strict-checka dla `core`, `gui`, `models` i `tests`.
+**Architecture:** Część recovery już została wykonana: GH gate jest zielony po zawężeniu scope do `config`. Plan nie powinien już zakładać pracy „od zera”, tylko rozdzielać stan osiągnięty od kolejnych kroków. Następny sensowny etap to domknięcie `main.py`, tak aby można było rozszerzyć gate z `config` do `main.py + config`, a dopiero potem przechodzić do większych obszarów.
 
 **Tech Stack:** GitHub Actions, Pyright 1.1.408, Python 3.13, repo PromptManager.
 
 ---
 
-## Current diagnosis
+## Current verified status (2026-04-23)
 
-- `pyrightconfig.json` z `include: ["."]` powodował zbyt szeroki skan; to zostało już naprawione.
-- Ostatni GH run `24802329186` kończy się szybko (~1m34s), więc problem performance został zbity.
-- Pyright nadal failuje na **1634 błędach**, głównie w:
-  - `core/`
-  - `gui/`
-  - `models/`
-  - `tests/`
-- Najczęstsze klasy błędów:
-  - `reportUnknownVariableType`
-  - `reportUnknownArgumentType`
-  - `reportUnknownMemberType`
-  - `reportMissingParameterType`
-  - `reportPrivateUsage`
-  - `reportUnnecessaryIsInstance`
-- Developer guide nadal deklaruje pełny strict gate, więc po zmianie workflow trzeba zaktualizować też dokumentację SSOT dla jakości.
+### Potwierdzone
+- repo: `/home/voytas/projects/PromptManager`
+- branch: `master`
+- working tree: czyste
+- remote: `https://github.com/voytas75/PromptManager.git`
+- `pyrightconfig.json` **nie** ma już `include: ["."]`; obecny include to:
+  - `main.py`
+  - `core`
+  - `config`
+  - `gui`
+  - `models`
+  - `tests`
+- `.github/workflows/quality-gates.yml` uruchamia dziś:
+
+```yaml
+- name: Pyright
+  run: .venv/bin/pyright config
+```
+
+- lokalnie `./.venv/bin/pyright config` przechodzi:
+
+```text
+0 errors, 0 warnings, 0 informations
+```
+
+- ostatni udany GH run:
+  - run id: `24804265867`
+  - status: `success`
+  - commit: `docs: add product direction SSOT`
+- `docs/README-DEV.md` zostało już częściowo urealnione i opisuje, że obecny gate dotyczy `pyright config`.
+
+### Nadal otwarte
+- `./.venv/bin/pyright main.py config` nadal failuje na `main.py` z **7 błędami**.
+- dokumentacja jest jeszcze niespójna wewnętrznie:
+  - u góry mówi o gate `pyright config`,
+  - niżej nadal zawiera starsze sformułowanie typu „`pyright` must pass with zero warnings”.
+- nie ma jeszcze osobnego pliku roadmapy rozszerzania strict coverage.
+
+### Aktualny zestaw błędów w `main.py`
+
+```text
+/home/voytas/projects/PromptManager/main.py:25:24 - error: Import "PromptManagerSettings" is not accessed (reportUnusedImport)
+/home/voytas/projects/PromptManager/main.py:25:47 - error: Import "SettingsError" is not accessed (reportUnusedImport)
+/home/voytas/projects/PromptManager/main.py:41:30 - error: Type of "run_default_mode" is partially unknown
+/home/voytas/projects/PromptManager/main.py:61:5 - error: Function "_setup_logging" is not accessed (reportUnusedFunction)
+/home/voytas/projects/PromptManager/main.py:61:20 - error: Type of parameter "config_path" is unknown (reportUnknownParameterType)
+/home/voytas/projects/PromptManager/main.py:61:20 - error: Type annotation is missing for parameter "config_path" (reportMissingParameterType)
+/home/voytas/projects/PromptManager/main.py:63:28 - error: Argument type is unknown (reportUnknownArgumentType)
+```
 
 ---
 
-### Task 1: Ogranicz GH gate do minimalnego, stabilnego scope
+## Reframed plan
 
-**Objective:** Zmienić workflow tak, by GitHub Actions uruchamiał Pyright tylko dla najwęższego sensownego zakresu, który można utrzymać zielony teraz.
+### Done already
+
+#### Completed A: Zawęź GH gate do stabilnego scope
+
+**Status:** completed
+
+**What changed:**
+- workflow nie uruchamia już pełnego `pyright`,
+- aktywny gate to obecnie `pyright config`,
+- GH Actions jest znowu zielone i szybkie.
+
+**Evidence:**
+- `.github/workflows/quality-gates.yml`
+- GH run `24804265867` = success
+
+#### Completed B: Usuń `include: ["."]` z `pyrightconfig.json`
+
+**Status:** completed
+
+**What changed:**
+- problem z niekontrolowanym zakresem skanowania został usunięty,
+- performance issue nie wrócił.
+
+**Evidence:**
+- `pyrightconfig.json` ma jawny include list zamiast `.`
+
+---
+
+### Task 1: Domknij `main.py`, żeby przygotować rozszerzenie gate
+
+**Objective:** Doprowadzić `pyright main.py config` do zielonego stanu lokalnie bez naruszania obecnie działającego CI.
+
+**Files:**
+- Modify: `main.py`
+- Verify: `config/`
+
+**Step 1: Usuń nieużywane importy w `main.py`**
+
+Usuń lub przebuduj import fallbackowy tak, by Pyright nie widział nieużywanych symboli:
+- `PromptManagerSettings`
+- `SettingsError`
+
+Najpierw sprawdź, czy te symbole naprawdę są potrzebne runtime’owo. Jeśli służą tylko kompatybilności testów/stubów, uprość blok `try/except` tak, żeby nie zostawiać martwych importów.
+
+**Step 2: Daj jawny typ helperowi `_setup_logging`**
+
+Obecnie:
+
+```python
+def _setup_logging(config_path) -> None:
+    _runtime_setup_logging(config_path)
+```
+
+Docelowy minimalny kierunek:
+
+```python
+from pathlib import Path
+
+def _setup_logging(config_path: str | Path) -> None:
+    _runtime_setup_logging(config_path)
+```
+
+Jeśli `_runtime_setup_logging` oczekuje węższego typu, dopasuj anotację do realnej sygnatury.
+
+**Step 3: Rozwiąż `run_default_mode` partially unknown**
+
+Najpierw przeczytaj definicję `cli.gui_launcher.run_default_mode` i popraw typy u źródła, jeśli tam brakuje jawnych anotacji.
+
+Preferowana kolejność:
+1. popraw sygnaturę w `cli/gui_launcher.py`,
+2. jeśli trzeba, doprecyzuj importowane typy (`PromptManager`, settings, argparse namespace),
+3. unikaj lokalnych obejść typu `cast(...)` bez potrzeby.
+
+**Step 4: Rozwiąż `reportUnusedFunction` dla `_setup_logging`**
+
+Jeżeli wrapper `_setup_logging` jest potrzebny tylko dla kompatybilności testów/legacy entry points, sprawdź testy i użycia.
+
+Możliwe bezpieczne opcje:
+- jeśli istnieje rzeczywiste użycie poza runtime, zostaw wrapper i udokumentuj/oznacz go tak, by Pyright nie traktował go jako martwego kodu tylko wtedy, gdy to uzasadnione,
+- jeśli nie ma już żadnego użycia, usuń wrapper i zaktualizuj testy.
+
+Nie wyciszaj ostrzeżenia „na ślepo”. Najpierw potwierdź potrzebę wrappera.
+
+**Step 5: Zweryfikuj lokalnie**
+
+Run:
+
+```bash
+.venv/bin/pyright main.py config
+```
+
+Expected:
+
+```text
+0 errors, 0 warnings, 0 informations
+```
+
+**Step 6: Commit**
+
+```bash
+git add main.py cli/gui_launcher.py config
+git commit -m "fix: type main entrypoint for pyright gate expansion"
+```
+
+---
+
+### Task 2: Rozszerz GH gate z `config` do `main.py config`
+
+**Objective:** Podnieść wartość typed smoke gate bez wracania do szerokiego czerwonego scope.
 
 **Files:**
 - Modify: `.github/workflows/quality-gates.yml`
-- Test: lokalne odpalenie tej samej komendy Pyright
 
 **Step 1: Zmień komendę Pyright w workflow**
 
 Zamień:
 
 ```yaml
-      - name: Pyright
-        run: .venv/bin/pyright
+- name: Pyright
+  run: .venv/bin/pyright config
 ```
 
 na:
 
 ```yaml
-      - name: Pyright
-        run: .venv/bin/pyright main.py config
+- name: Pyright
+  run: .venv/bin/pyright main.py config
 ```
 
-**Dlaczego ten zakres:**
-- `config` już lokalnie przechodził bez błędów,
-- `main.py` ma małą powierzchnię i szybki feedback,
-- to daje realny typowy gate zamiast fikcji lub totalnego czerwonego stanu.
-
-**Step 2: Zweryfikuj lokalnie**
+**Step 2: Zweryfikuj lokalnie przed push**
 
 Run:
 
@@ -68,100 +204,46 @@ Run:
 ```
 
 Expected:
-- jeśli są błędy w `main.py`, zobaczysz mały, konkretny zestaw do poprawy,
-- nie powinno być już tysięcy błędów.
+- zielono lokalnie,
+- brak nowych błędów.
 
 **Step 3: Commit**
 
 ```bash
 git add .github/workflows/quality-gates.yml
-git commit -m "ci: narrow pyright gate to stable entrypoints"
+git commit -m "ci: expand pyright gate to main entrypoint"
 ```
 
 ---
 
-### Task 2: Napraw mały zestaw błędów z `main.py`
+### Task 3: Dopnij dokumentację quality gate do realnego stanu
 
-**Objective:** Doprowadzić `pyright main.py config` do stanu zielonego.
-
-**Files:**
-- Modify: `main.py`
-- Verify: `config/` (jeśli Pyright wskaże dodatkowe drobne problemy)
-
-**Known likely errors from local reproduction:**
-- unused imports:
-  - `PromptManagerSettings`
-  - `SettingsError`
-- unknown / missing parameter types przy helperach w `main.py`
-- partially unknown `run_default_mode`
-
-**Step 1: Usuń nieużywane importy**
-
-Usuń importy, których Pyright zgłasza jako nieużywane.
-
-**Step 2: Dodaj jawne anotacje helperom w `main.py`**
-
-Jeżeli występuje np. `_setup_logging(config_path)`, doprecyzuj parametr jako `Path | str` albo właściwy typ zgodny z użyciem.
-
-Przykład wzorca:
-
-```python
-from pathlib import Path
-
-
-def _setup_logging(config_path: str | Path) -> None:
-    ...
-```
-
-**Step 3: Doprecyzuj import / typ `run_default_mode`**
-
-Jeśli Pyright widzi `Unknown`, użyj jednego z podejść:
-- popraw typ w miejscu definicji funkcji,
-- albo zaimportuj ją z modułu, który ma pełne anotacje,
-- albo dodaj lokalny Protocol / Callable typ tylko jeśli to konieczne.
-
-**Step 4: Uruchom lokalnie**
-
-Run:
-
-```bash
-.venv/bin/pyright main.py config
-```
-
-Expected:
-- `0 errors, 0 warnings, 0 informations`
-
-**Step 5: Commit**
-
-```bash
-git add main.py config
-git commit -m "fix: satisfy narrowed pyright gate"
-```
-
----
-
-### Task 3: Zsynchronizuj dokumentację quality gate
-
-**Objective:** Urealnić dokumentację tak, żeby repo nie deklarowało czegoś, czego CI faktycznie nie egzekwuje.
+**Objective:** Usunąć sprzeczność między sekcjami `docs/README-DEV.md`.
 
 **Files:**
 - Modify: `docs/README-DEV.md`
 
-**Step 1: Zmień opis quality gate**
+**Step 1: Ujednolić opis gate**
 
-Zastąp sformułowania typu:
-- „Pyright must pass with zero warnings”
-- „strict mode for the whole repo”
+Zostaw jedną prawdę spójną z CI:
+- obecnie gate = `pyright config`,
+- po wykonaniu Task 2 gate = `pyright main.py config`.
 
-na komunikat zgodny z rzeczywistością, np.:
+W trakcie aktualizacji nie zostawiaj w dalszej części pliku starych zdań typu:
+- `pyright must pass with zero warnings`
+- ogólników sugerujących strict gate dla całego repo, jeśli CI tego nie egzekwuje.
 
-```md
-- **Type Checking**: GitHub quality gate currently enforces `pyright main.py config` as the stable typed entrypoint set. Wider strict coverage for `core`, `gui`, `models`, and `tests` is tracked as incremental technical-debt reduction work.
+**Step 2: Urealnij komendy lokalne**
+
+Wstaw komendę parity zgodną z aktualnym etapem planu:
+
+**przed Task 2:**
+
+```bash
+.venv/bin/pyright config
 ```
 
-**Step 2: Dodaj lokalną komendę parity**
-
-W sekcji toolchain dopisz realny odpowiednik CI, np.:
+**po Task 2:**
 
 ```bash
 .venv/bin/pyright main.py config
@@ -171,14 +253,14 @@ W sekcji toolchain dopisz realny odpowiednik CI, np.:
 
 ```bash
 git add docs/README-DEV.md
-git commit -m "docs: align pyright guidance with enforced gate"
+git commit -m "docs: align pyright gate guidance with actual CI scope"
 ```
 
 ---
 
-### Task 4: Wypchnij i zweryfikuj GH run
+### Task 4: Wypchnij i potwierdź GH run po rozszerzeniu gate
 
-**Objective:** Potwierdzić, że nowy workflow działa i Pyright nie blokuje już pipeline’u przez dług albo zbyt szeroki scope.
+**Objective:** Zweryfikować, że rozszerzony gate nadal kończy się szybko i przewidywalnie.
 
 **Files:**
 - No code changes required
@@ -199,49 +281,77 @@ gh run view --repo voytas75/PromptManager <run_id>
 ```
 
 **Expected:**
-- `Pyright` kończy się szybko,
-- jeśli `main.py config` jest zielone, pipeline przechodzi do `Pytest`.
-
-**Step 3: Jeśli fail nadal dotyczy tylko `main.py config`, popraw od razu i zrób follow-up commit**
+- `Pyright` nadal kończy się szybko,
+- pipeline pozostaje zielony,
+- brak regresji do szerokiego scope.
 
 ---
 
-### Task 5: Zapisz roadmapę rozszerzania strict coverage
+### Task 5: Zapisz roadmapę dalszego rozszerzania strict coverage
 
-**Objective:** Nie gubić długu typów po odblokowaniu gate’a.
+**Objective:** Po odblokowaniu `main.py` zachować kontrolowany plan zdejmowania długu typów.
 
 **Files:**
-- Create or update: `docs/plans/pyright-strict-expansion-roadmap.md` (lub osobna notka)
+- Create: `docs/plans/pyright-strict-expansion-roadmap.md`
 
 **Recommended phases:**
-1. `main.py` + `config`
-2. `models`
-3. `core/execution.py` i małe moduły w `core`
-4. reszta `core/prompt_manager`
-5. `gui`
-6. `tests`
+1. `config`
+2. `main.py`
+3. `models`
+4. małe moduły w `core`
+5. reszta `core`
+6. `gui`
+7. `tests`
 
 **Suggested success metric per phase:**
-- brak nowych błędów Pyright w danym obszarze,
-- scope w workflow rozszerzony o kolejny katalog,
-- zielony GH po każdym etapie.
+- lokalny Pyright dla danego scope = zielony,
+- workflow scope rozszerzony dopiero po lokalnym potwierdzeniu,
+- GH run zielony po każdym etapie,
+- dokumentacja zaktualizowana przy każdej zmianie scope.
+
+**Suggested minimal file skeleton:**
+
+```md
+# Pyright Strict Expansion Roadmap
+
+## Current enforced CI scope
+- pyright config
+
+## Next candidate scope
+- pyright main.py config
+
+## Phase backlog
+1. models
+2. core (small modules first)
+3. core (remaining)
+4. gui
+5. tests
+
+## Rules
+- never widen CI scope before local green run
+- no blanket suppressions
+- no whole-repo strict claim until CI actually enforces it
+```
 
 ---
 
 ## Verification checklist
 
-- [ ] `pyrightconfig.json` nie ma już `include: ["."]`
-- [ ] `.github/workflows/quality-gates.yml` używa zawężonego scope Pyrighta
+- [x] `pyrightconfig.json` nie ma już `include: ["."]`
+- [x] `.github/workflows/quality-gates.yml` używa zawężonego scope Pyrighta
+- [x] `.venv/bin/pyright config` jest zielone lokalnie
+- [x] GH run kończy Pyright szybko i przewidywalnie
 - [ ] `.venv/bin/pyright main.py config` jest zielone lokalnie
-- [ ] GH run kończy Pyright szybko i przewidywalnie
-- [ ] `docs/README-DEV.md` odpowiada faktycznemu gate’owi
-- [ ] jest zapisany plan dochodzenia do szerszego strict-checka
+- [ ] workflow rozszerzono do `main.py config`
+- [ ] `docs/README-DEV.md` jest całkowicie spójny z faktycznym gate’em
+- [ ] istnieje zapisany plan dalszego rozszerzania strict-checka
 
 ---
 
 ## Notes / guardrails
 
 - Nie wracaj do `include: ["."]`.
-- Nie próbuj „naprawiać” 1634 błędów jednym commitem.
-- Nie wyłączaj całkiem Pyrighta z CI — stracisz typed smoke test dla entrypointów.
-- Jeżeli pojawi się presja na szybkie „zielone”, najbezpieczniejszy kompromis to **mały typed gate + jawna roadmapa rozszerzania**.
+- Nie wyłączaj Pyrighta z CI.
+- Nie rozszerzaj workflow na kolejny obszar, dopóki lokalny scope nie jest zielony.
+- Nie zostawiaj w dokumentacji deklaracji szerszych niż realny CI.
+- Najbliższy sensowny krok to **naprawa `main.py`**, nie ruszanie od razu `core`, `gui`, `models` ani `tests`.
