@@ -4,23 +4,21 @@
 
 **Goal:** Utrzymać zielony quality gate na GitHubie, urealnić plan względem stanu repo i przygotować bezpieczny następny etap rozszerzania typed coverage bez rozwalania CI.
 
-**Architecture:** Część recovery już została wykonana: GH gate jest zielony po zawężeniu scope do `config`. Plan nie powinien już zakładać pracy „od zera”, tylko rozdzielać stan osiągnięty od kolejnych kroków. Następny sensowny etap to domknięcie `main.py`, tak aby można było rozszerzyć gate z `config` do `main.py + config`, a dopiero potem przechodzić do większych obszarów.
+**Architecture:** Recovery nie startuje już od zera: aktywny GitHub quality gate jest dziś zielony dla `pyright main.py config models`. Ten plan ma odróżniać etapy już domknięte i zdalnie zweryfikowane od kolejnych prac, zamiast powtarzać historyczne kroki. Następny sensowny etap to kontrolowane rozszerzenie typed coverage na `core`, a dopiero potem na większe obszary jak `gui` i `tests`.
 
 **Tech Stack:** GitHub Actions, Pyright 1.1.408, Python 3.13, repo PromptManager.
 
 ---
 
-## Current verified status (2026-04-23, refreshed)
+## Current verified status (2026-04-23, refreshed after models gate expansion)
 
 ### Potwierdzone
 - repo: `/home/voytas/projects/PromptManager`
 - branch: `master`
-- working tree: brudne lokalnie (do weryfikacji przed kolejnym commitem)
-  - modified: `models/category_model.py`
-  - modified: `models/response_style.py`
-  - untracked: `docs/plans/2026-04-23-models-pyright-mini-plan.md`
 - remote: `https://github.com/voytas75/PromptManager.git`
-- `HEAD`: `c05d771` — `docs: refresh pyright recovery plan status`
+- working tree: czyste commity wypchnięte na origin; lokalnie został tylko jeden nieśledzony szkic planu:
+  - untracked: `docs/plans/2026-04-23-models-pyright-mini-plan.md`
+- `HEAD`: `5d36d07` — `style: apply ruff formatting after models gate expansion`
 - `pyrightconfig.json` **nie** ma już `include: ["."]`; obecny include to:
   - `main.py`
   - `core`
@@ -28,36 +26,41 @@
   - `gui`
   - `models`
   - `tests`
-- `.github/workflows/quality-gates.yml` uruchamia dziś lokalnie przygotowany scope:
+- `.github/workflows/quality-gates.yml` uruchamia dziś realnie egzekwowany scope:
 
 ```yaml
 - name: Pyright
   run: .venv/bin/pyright main.py config models
 ```
 
-- `docs/README-DEV.md` zostało już zaktualizowane lokalnie do scope `pyright main.py config models`, ale ta zmiana nadal czeka na push i zielony GH run.
+- `docs/README-DEV.md` jest już zgodne z aktywnym CI i opisuje scope `pyright main.py config models`.
 - commity związane z tym etapem już istnieją:
   - `2f15f0b` — `fix: type main entrypoint for pyright gate expansion`
   - `503e546` — `ci: expand pyright gate and align docs`
-- lokalna weryfikacja wykonana ponownie 2026-04-23 na tym środowisku potwierdza `pyright main.py config models`:
+  - `0ae3179` — `ci: expand pyright gate to models`
+  - `5d36d07` — `style: apply ruff formatting after models gate expansion`
+- lokalna weryfikacja na tym środowisku potwierdza `pyright main.py config models`:
 
 ```text
 0 errors, 0 warnings, 0 informations
 ```
 
-- potwierdzony GH run po rozszerzeniu gate:
+- potwierdzony GH run dla obecnego scope `main.py config models`:
+  - run id: `24857102545`
+  - status: `success`
+  - commit: `5d36d07` — `style: apply ruff formatting after models gate expansion`
+  - job `quality`: wszystkie kroki zielone, w tym `Ruff (autofix)`, `Ruff (format)`, `Ruff (verify)`, `Pyright`, `Pytest` i `Ensure clean tree`
+- potwierdzony wcześniejszy GH run po rozszerzeniu gate do `main.py config`:
   - run id: `24840076043`
   - status: `success`
   - commit: `503e546` — `ci: expand pyright gate and align docs`
-  - job `quality`: wszystkie kroki zielone, w tym `Pyright`, `Pytest` i `Ensure clean tree`
 - potwierdzony GH run po odświeżeniu samego planu:
   - run id: `24848111847`
   - status: `success`
   - commit: `c05d771` — `docs: refresh pyright recovery plan status`
-  - job `quality`: wszystkie kroki zielone, w tym `Ruff (autofix)`, `Ruff (format)`, `Ruff (verify)`, `Pyright`, `Pytest` i `Ensure clean tree`
 
 ### Nadal otwarte
-- roadmapa dalszego rozszerzania strict coverage istnieje i została lokalnie przesunięta na następny kandydat `core`, ale ten stan nadal wymaga push + zielonego GH run dla nowego scope `models`.
+- następny kandydat rozszerzenia strict coverage to `core`; roadmapa powinna już traktować `models` jako etap domknięty lokalnie i zdalnie.
 - regres dla `PROMPT_MANAGER_ENV_FILE` / dotenv alias precedence został już częściowo domknięty testem dla `PROMPT_MANAGER_EMBEDDING_MODEL`, ale warto dopisać osobne przypadki dla pozostałych canonical pól LiteLLM i alias fallbacków, żeby nie wrócił podobny bug w innej gałęzi precedence.
 - podczas uruchamiania GUI analytics panel wykonuje startowy probe embeddingów przez `manager.diagnose_embeddings()`. Na tym środowisku aktywna konfiguracja LiteLLM dla embeddings wymaga modelu w formacie deployment-aware dla Azure (np. `azure/UDTEMBED3L`); pozostawienie samego `text-embedding-3-large` kończy się błędem backendu i powoduje trzy banery LiteLLM przy starcie okna. To nie jest problem samego GUI, tylko hałaśliwe ujawnienie błędnej nazwy modelu/deploymentu dla embeddingów.
 
@@ -104,31 +107,33 @@
 
 #### Completed C: Domknij `main.py` i rozszerz gate do `main.py config`
 
-**Status:** completed in repo, local re-verification pending
+**Status:** completed and remotely verified
 
 **What changed:**
 - `main.py` został poprawiony pod gate expansion,
 - workflow uruchamia już `pyright main.py config`,
-- `docs/README-DEV.md` opisuje obecny scope zgodny z CI.
+- `docs/README-DEV.md` opisuje scope zgodny z CI dla tego etapu.
 
 **Evidence:**
 - commit `2f15f0b` — `fix: type main entrypoint for pyright gate expansion`
 - commit `503e546` — `ci: expand pyright gate and align docs`
+- GH run `24840076043` — `success`
 
-#### Completed D: Domknij `models` lokalnie i przygotuj rozszerzenie gate do `main.py config models`
+#### Completed D: Domknij `models` i rozszerz gate do `main.py config models`
 
-**Status:** completed locally, remote verification pending
+**Status:** completed and remotely verified
 
 **What changed:**
-- `models/response_style.py`, `models/prompt_chain_model.py` i `models/prompt_model.py` zostały doprowadzone do zielonego Pyright,
-- lokalny scope `pyright models` przechodzi,
-- workflow i dokumentacja zostały lokalnie przygotowane do rozszerzenia gate do `main.py config models`.
+- `models/response_style.py`, `models/prompt_chain_model.py`, `models/prompt_model.py` i powiązane modele zostały doprowadzone do zielonego Pyright,
+- workflow uruchamia już `pyright main.py config models`,
+- `docs/README-DEV.md` i roadmapa zostały zrównane z nowym enforce’owanym scope,
+- po pierwszym pushu CI wykryło drift formatowania w `models/prompt_model.py`; osobny commit Ruff domknął `Ensure clean tree`.
 
 **Evidence:**
+- commit `0ae3179` — `ci: expand pyright gate to models`
+- commit `5d36d07` — `style: apply ruff formatting after models gate expansion`
+- GH run `24857102545` — `success`
 - lokalnie potwierdzone:
-  - `.venv/bin/pyright models/response_style.py` → zielone
-  - `.venv/bin/pyright models/prompt_chain_model.py` → zielone
-  - `.venv/bin/pyright models/prompt_model.py` → zielone
   - `.venv/bin/pyright models` → zielone
   - `.venv/bin/pyright main.py config models` → zielone
 
@@ -136,51 +141,23 @@
 
 ### Task 1: Potwierdź aktualny stan gate na żywym checkoutcie
 
-**Objective:** Zweryfikować lokalnie i na GitHubie, że etap `main.py + config` naprawdę jest domknięty na bieżącym stanie repo.
+**Status:** completed
+
+**Objective:** Zweryfikować lokalnie i na GitHubie, że etap `main.py + config + models` jest naprawdę domknięty na bieżącym stanie repo.
 
 **Files:**
 - Verify: `.github/workflows/quality-gates.yml`
 - Verify: `docs/README-DEV.md`
 - Verify: `main.py`
+- Verify: `models/`
 
-**Step 1: Odtwórz środowisko lokalne**
+**Verified result:**
+- lokalnie: `.venv/bin/pyright main.py config models` → `0 errors, 0 warnings, 0 informations`
+- GitHub Actions: run `24857102545` (`Quality Gates`) → `success`
+- enforce’owany scope CI: `pyright main.py config models`
 
-Run:
-
-```bash
-python3 -m ensurepip --upgrade
-python3 -m venv .venv
-. .venv/bin/activate
-python -m ensurepip --upgrade
-pip install -e .[dev]
-```
-
-**Step 2: Uruchom faktyczny gate lokalnie**
-
-Run:
-
-```bash
-.venv/bin/pyright main.py config
-```
-
-**Expected:**
-
-```text
-0 errors, 0 warnings, 0 informations
-```
-
-Jeśli wynik nie jest zielony, zaktualizuj ten plan o realny zestaw błędów zamiast ufać historycznym wpisom.
-
-**Step 3: Potwierdź GH Actions po właściwych commitach**
-
-Run:
-
-```bash
-gh run list --repo voytas75/PromptManager --limit 5
-gh run view --repo voytas75/PromptManager <run_id>
-```
-
-Potwierdź run dla commitów `2f15f0b` / `503e546` lub nowszych.
+**Follow-up rule:**
+Jeśli kolejny refresh pokaże inny stan niż powyżej, zaktualizuj ten plan o realny zestaw różnic zamiast ufać historycznym założeniom.
 
 ---
 
@@ -208,17 +185,17 @@ Potwierdź run dla commitów `2f15f0b` / `503e546` lub nowszych.
 
 ### Task 3: Utrzymuj i aktualizuj roadmapę dalszego rozszerzania strict coverage
 
-**Status:** artifact already created, maintain forward
+**Status:** active
 
-**Objective:** Po odblokowaniu `main.py + config` utrzymać kontrolowany plan zdejmowania długu typów i prowadzić kolejne etapy z jednego aktywnego pliku roadmapy.
+**Objective:** Po odblokowaniu `main.py + config + models` utrzymać kontrolowany plan zdejmowania długu typów i prowadzić kolejne etapy z jednego aktywnego pliku roadmapy.
 
 **Files:**
 - Maintain: `docs/plans/pyright-strict-expansion-roadmap.md`
 
 **Current status:**
 - plik roadmapy już istnieje,
-- obecny baseline zapisany w roadmapie to `pyright main.py config`,
-- następny kandydat scope to `models`.
+- obecny baseline zapisany w roadmapie powinien być `pyright main.py config models`,
+- następny kandydat scope to `core`.
 
 **Maintenance rules:**
 1. aktualizuj roadmapę po każdym realnym rozszerzeniu scope,
