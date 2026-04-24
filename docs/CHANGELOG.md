@@ -4,6 +4,10 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Tightened the top-level README positioning so PromptManager reads more clearly as a **local-first home for prompt assets**, with validation, history, analytics, chains, sharing, and other broader surfaces framed as supporting or secondary rather than co-equal product centers.
+
 ## [0.22.23] - 2026-04-12
 
 ### Added

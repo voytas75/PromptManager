@@ -5,11 +5,11 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE.md)
 [![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](README.md#project-status)
 
-PromptManager is a local-first desktop app for **capturing, organizing, retrieving, and refining prompt assets** in one place.
+PromptManager is a local-first desktop app for **capturing, organizing, retrieving, inspecting, and reusing prompt assets** in one place.
 
 Its product center is simple: act as a **canonical home for prompt assets** so useful prompts and LLM queries do not stay scattered across chats, notes, scripts, markdown files, and ad-hoc experiments.
 
-It combines a PySide6 GUI, SQLite persistence, semantic search, prompt editing, and optional lightweight execution support, but the product center stays the prompt catalog itself rather than analytics, chains, or general AI-workstation behavior.
+It combines a PySide6 GUI, SQLite persistence, semantic search, prompt editing, and optional lightweight validation support, but the product center stays the prompt catalog itself rather than analytics, chains, or general AI-workstation behavior.
 
 <p align="center">
   <img src="docs/images/main.png" alt="Prompt catalogue and workspace view" width="45%">
@@ -59,12 +59,10 @@ For a slightly fuller operator-facing version, see [`docs/canonical-usage-path-v
 
 - **Prompt catalog** — store, search, tag, edit, fork, and organize prompts as durable assets
 - **Quick Capture + Draft Promote** — capture raw prompt/query text fast, inspect it as a draft, then promote it into a reusable prompt asset with bounded title-quality improvement for weak draft titles
-- **Recent reopen + inspection cues** — get back to recent prompts quickly and see draft/source/last-modified context without opening raw metadata
+- **Recent reopen + semantic retrieval** — get back to recent prompts quickly and find prompts by meaning, not only exact text
+- **Inspect + provenance cues** — review draft/source/last-modified context, lineage, and related prompt signals without opening raw metadata first
 - **Quick reuse actions** — copy the real prompt body from detail view with one obvious `Copy Prompt` action, or open the prompt in the workspace without auto-running it
-- **Semantic retrieval** — find prompts by meaning, not only exact text
-- **Template preview** — render Jinja2 templates with JSON variables and validation feedback
-- **Optional validation workspace** — run prompts with LiteLLM-backed models only when lightweight validation or reuse benefits from it
-- **Supporting prompt parts and light history signals** — reuse supporting prompt components and inspect secondary support surfaces without changing the product center
+- **Template preview and lightweight validation** — render Jinja2 templates with JSON variables and validation feedback when reuse benefits from an extra check
 
 ## Quick start
 
@@ -171,11 +169,18 @@ PromptManager gives you a dedicated local-first home for prompt assets:
 PromptManager is currently in **beta** and under active development.
 
 The current focus is:
-- strengthening the core prompt asset loop: capture, normalize, retrieve, inspect, reuse, refine
+- strengthening the core prompt asset loop: capture, organize, retrieve, inspect, and reuse
 - improving low-friction draft capture, promotion, and reuse workflows
 - refining template and validation ergonomics where they directly support prompt assets
 - keeping execution, analytics, chains, sharing, and voice as supporting surfaces rather than the product center
 - keeping the desktop experience responsive and local-first
+
+## What PromptManager is not
+
+PromptManager is not primarily positioned today as:
+- a general desktop chatbot
+- an agent platform
+- an AI workbench for everything
 
 ## Detailed features by product role
 
@@ -191,7 +196,7 @@ The current focus is:
 
 These capabilities support the prompt catalog when validation, maintenance, or automation becomes useful, but they are not the default front door:
 
-- an optional LiteLLM-backed execution workspace for lightweight validation or reuse
+- an optional LiteLLM-backed workspace for lightweight validation or reuse
 - Prompt Template editing and template-preview support
 - typed configuration loading plus optional Redis-backed caching
 - maintenance tooling such as reset actions and snapshot export
@@ -205,11 +210,11 @@ These surfaces exist to help curation and troubleshooting, not to redefine the p
 - lightweight token, latency, and rating visibility
 - `history-analytics` and diagnostics helpers for bounded operator insight
 
-### Secondary surfaces, available but intentionally demoted
+### Secondary surfaces
 
-The repository still includes broader surfaces that may be useful in some workflows, but they are not the product center and should be read as optional:
+Additional surfaces remain available for operators who need them, but they are intentionally secondary to the prompt asset workflow:
 
-- Prompt Workbench and related guided authoring helpers
+- Prompt Workbench and guided authoring helpers
 - web search enrichment before execution
 - prompt chaining flows
 - prompt sharing helpers
