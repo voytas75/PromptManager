@@ -19,7 +19,7 @@ import random
 import re
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 
 import httpx
 
@@ -67,51 +67,89 @@ def _parse_datetime(value: str | None) -> datetime | None:
         return None
 
 
+def _mapping_str_any(value: object) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    return cast("dict[str, Any]", value)
+
+
+def _list_objects(value: object) -> list[object]:
+    if isinstance(value, list):
+        return cast("list[object]", value)
+    return []
+
+
+def _float_or_none(value: object) -> float | None:
+    if isinstance(value, bool):
+        return float(value)
+    if isinstance(value, int | float | str):
+        try:
+            return float(value)
+        except ValueError:
+            return None
+    return None
+
+
+def _string_or_none(value: object) -> str | None:
+    if isinstance(value, str):
+        text = value.strip()
+        return text or None
+    return None
+
+
+def _mapping_value(mapping: Mapping[str, Any], key: str) -> object | None:
+    return mapping.get(key)
+
+
+def _first_present(mapping: Mapping[str, Any], *keys: str) -> object | None:
+    for key in keys:
+        value = _mapping_value(mapping, key)
+        if value not in (None, ""):
+            return value
+    return None
+
+
 def _extract_documents(payload: Mapping[str, Any], provider_slug: str) -> list[WebSearchDocument]:
     documents: list[WebSearchDocument] = []
-    results = payload.get("results") or []
-    if not isinstance(results, list):
-        return documents
-    for entry in results:
-        if not isinstance(entry, dict):
+    results = _list_objects(_mapping_value(payload, "results"))
+    for raw_entry in results:
+        entry = _mapping_str_any(raw_entry)
+        if entry is None:
             continue
-        title = str(entry.get("title") or "").strip()
-        url = str(entry.get("url") or "").strip()
+        title = _string_or_none(_mapping_value(entry, "title"))
+        url = _string_or_none(_mapping_value(entry, "url"))
         if not title or not url:
             continue
-        highlights = entry.get("highlights") or []
+        highlights = _list_objects(_mapping_value(entry, "highlights"))
         highlight_list = [str(item).strip() for item in highlights if str(item).strip()]
-        scores = entry.get("highlightScores") or []
+        scores = _list_objects(_mapping_value(entry, "highlightScores"))
         score_value = None
-        if isinstance(scores, list) and scores:
-            try:
-                score_value = float(scores[0])
-            except (ValueError, TypeError):
-                score_value = None
+        if scores:
+            score_value = _float_or_none(scores[0])
         if score_value is None:
-            raw_score = entry.get("score")
+            raw_score = _mapping_value(entry, "score")
             if raw_score is not None:
-                try:
-                    score_value = float(raw_score)
-                except (ValueError, TypeError):
-                    score_value = None
+                score_value = _float_or_none(raw_score)
         summary_text = (
-            str(entry.get("summary") or "").strip()
-            or str(entry.get("content") or "").strip()
+            _string_or_none(_mapping_value(entry, "summary"))
+            or _string_or_none(_mapping_value(entry, "content"))
             or None
         )
-        published_value = entry.get("publishedDate") or entry.get("published_date")
-        raw_entry = entry.get("raw") if isinstance(entry.get("raw"), dict) else entry
+        published_value = _string_or_none(
+            _first_present(entry, "publishedDate", "published_date")
+        )
+        raw_candidate = _mapping_str_any(_mapping_value(entry, "raw"))
+        raw_entry_payload = raw_candidate or dict(entry)
         documents.append(
             WebSearchDocument(
                 title=title,
                 url=url,
                 summary=summary_text,
                 highlights=highlight_list,
-                author=str(entry.get("author") or "").strip() or None,
+                author=_string_or_none(_mapping_value(entry, "author")),
                 published_at=_parse_datetime(published_value),
                 score=score_value,
-                raw=raw_entry,
+                raw=raw_entry_payload,
             )
         )
     return documents
@@ -119,32 +157,31 @@ def _extract_documents(payload: Mapping[str, Any], provider_slug: str) -> list[W
 
 def _normalise_serper_results(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
     r"""Normalise Serper "organic" entries into the canonical result schema."""
-    organic_entries = payload.get("organic") or []
-    if not isinstance(organic_entries, list):
-        return []
+    organic_entries = _list_objects(_mapping_value(payload, "organic"))
     normalised: list[dict[str, Any]] = []
-    for entry in organic_entries:
-        if not isinstance(entry, dict):
+    for raw_entry in organic_entries:
+        entry = _mapping_str_any(raw_entry)
+        if entry is None:
             continue
-        title = str(entry.get("title") or "").strip()
-        url = str(entry.get("link") or "").strip()
+        title = _string_or_none(_mapping_value(entry, "title"))
+        url = _string_or_none(_mapping_value(entry, "link"))
         if not title or not url:
             continue
-        snippet = str(entry.get("snippet") or "").strip() or None
-        highlight_source = entry.get("snippetHighlighted") or entry.get("snippet_highlighted") or []
-        highlights: list[str] = []
-        if isinstance(highlight_source, list):
-            highlights = [str(item).strip() for item in highlight_source if str(item).strip()]
+        snippet = _string_or_none(_mapping_value(entry, "snippet"))
+        highlight_source = _list_objects(
+            _first_present(entry, "snippetHighlighted", "snippet_highlighted")
+        )
+        highlights = [str(item).strip() for item in highlight_source if str(item).strip()]
         normalised.append(
             {
                 "title": title,
                 "url": url,
                 "summary": snippet,
                 "highlights": highlights,
-                "score": entry.get("score"),
-                "publishedDate": entry.get("date"),
-                "author": entry.get("source"),
-                "raw": entry,
+                "score": _mapping_value(entry, "score"),
+                "publishedDate": _mapping_value(entry, "date"),
+                "author": _mapping_value(entry, "source"),
+                "raw": dict(entry),
             }
         )
     return normalised
@@ -152,39 +189,32 @@ def _normalise_serper_results(payload: Mapping[str, Any]) -> list[dict[str, Any]
 
 def _normalise_serpapi_results(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
     """Normalise SerpApi organic results into the canonical result schema."""
-    organic_entries = (
-        payload.get("organic_results")
-        or payload.get("organic")
-        or payload.get("search_results")
-        or []
+    organic_entries = _list_objects(
+        _first_present(payload, "organic_results", "organic", "search_results")
     )
-    if not isinstance(organic_entries, list):
-        return []
     normalised: list[dict[str, Any]] = []
-    for entry in organic_entries:
-        if not isinstance(entry, dict):
+    for raw_entry in organic_entries:
+        entry = _mapping_str_any(raw_entry)
+        if entry is None:
             continue
-        title = str(entry.get("title") or "").strip()
-        url = str(entry.get("link") or entry.get("url") or "").strip()
+        title = _string_or_none(_mapping_value(entry, "title"))
+        url = _string_or_none(_first_present(entry, "link", "url"))
         if not title or not url:
             continue
-        snippet = str(entry.get("snippet") or "").strip() or None
-        highlights_source = (
-            entry.get("snippet_highlighted_words")
-            or entry.get("snippetHighlightedWords")
-            or entry.get("snippetHighlighted")
-            or []
+        snippet = _string_or_none(_mapping_value(entry, "snippet"))
+        highlights_source = _list_objects(
+            _first_present(
+                entry,
+                "snippet_highlighted_words",
+                "snippetHighlightedWords",
+                "snippetHighlighted",
+            )
         )
-        highlights: list[str] = []
-        if isinstance(highlights_source, list):
-            highlights = [str(item).strip() for item in highlights_source if str(item).strip()]
+        highlights = [str(item).strip() for item in highlights_source if str(item).strip()]
         score_value = None
-        position_value = entry.get("position") or entry.get("rank")
+        position_value = _first_present(entry, "position", "rank")
         if position_value is not None:
-            try:
-                score_value = float(position_value)
-            except (TypeError, ValueError):
-                score_value = None
+            score_value = _float_or_none(position_value)
         normalised.append(
             {
                 "title": title,
@@ -192,9 +222,9 @@ def _normalise_serpapi_results(payload: Mapping[str, Any]) -> list[dict[str, Any
                 "summary": snippet,
                 "highlights": highlights,
                 "score": score_value,
-                "publishedDate": entry.get("date"),
-                "author": entry.get("source") or entry.get("displayed_link"),
-                "raw": entry,
+                "publishedDate": _mapping_value(entry, "date"),
+                "author": _first_present(entry, "source", "displayed_link"),
+                "raw": dict(entry),
             }
         )
     return normalised
@@ -202,9 +232,7 @@ def _normalise_serpapi_results(payload: Mapping[str, Any]) -> list[dict[str, Any
 
 def _normalise_google_results(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
     """Normalise Google Programmable Search entries into the canonical schema."""
-    items = payload.get("items") or []
-    if not isinstance(items, list):
-        return []
+    items = _list_objects(_mapping_value(payload, "items"))
     normalised: list[dict[str, Any]] = []
 
     def _clean_html(text: str | None) -> str | None:
@@ -214,50 +242,49 @@ def _normalise_google_results(payload: Mapping[str, Any]) -> list[dict[str, Any]
         collapsed = " ".join(stripped.split())
         return collapsed or None
 
-    for index, entry in enumerate(items, start=1):
-        if not isinstance(entry, dict):
+    for index, raw_entry in enumerate(items, start=1):
+        entry_dict = _mapping_str_any(raw_entry)
+        if entry_dict is None:
             continue
-        entry_dict = entry
-        title = str(entry_dict.get("title") or "").strip()
-        url = str(entry_dict.get("link") or "").strip()
+        title = _string_or_none(_mapping_value(entry_dict, "title"))
+        url = _string_or_none(_mapping_value(entry_dict, "link"))
         if not title or not url:
             continue
-        snippet = str(entry_dict.get("snippet") or "").strip() or None
+        snippet = _string_or_none(_mapping_value(entry_dict, "snippet"))
         highlight_text = _clean_html(
-            entry_dict.get("htmlSnippet") or entry_dict.get("html_snippet")
+            _string_or_none(_first_present(entry_dict, "htmlSnippet", "html_snippet"))
         )
         highlights = [highlight_text] if highlight_text else []
-        pagemap_value = entry_dict.get("pagemap")
-        pagemap = pagemap_value if isinstance(pagemap_value, dict) else {}
-        metatags = pagemap.get("metatags")
+        pagemap = _mapping_str_any(_mapping_value(entry_dict, "pagemap")) or {}
+        metatags = _list_objects(_mapping_value(pagemap, "metatags"))
         published_value: str | None = None
-        if isinstance(metatags, list):
-            for tag in metatags:
-                if not isinstance(tag, dict):
-                    continue
-                for key in (
-                    "article:published_time",
-                    "article:modified_time",
-                    "og:updated_time",
-                    "og:published_time",
-                    "pubdate",
-                ):
-                    candidate = tag.get(key)
-                    if isinstance(candidate, str) and candidate.strip():
-                        published_value = candidate
-                        break
-                if published_value:
+        for raw_tag in metatags:
+            tag = _mapping_str_any(raw_tag)
+            if tag is None:
+                continue
+            for key in (
+                "article:published_time",
+                "article:modified_time",
+                "og:updated_time",
+                "og:published_time",
+                "pubdate",
+            ):
+                candidate = _string_or_none(_mapping_value(tag, key))
+                if candidate:
+                    published_value = candidate
                     break
+            if published_value:
+                break
         normalised.append(
             {
                 "title": title,
                 "url": url,
                 "summary": snippet,
                 "highlights": highlights,
-                "author": entry_dict.get("displayLink"),
+                "author": _mapping_value(entry_dict, "displayLink"),
                 "publishedDate": published_value,
                 "score": float(index),
-                "raw": entry_dict,
+                "raw": dict(entry_dict),
             }
         )
     return normalised
@@ -800,7 +827,7 @@ class RandomWebSearchProvider:
 
     def __post_init__(self) -> None:
         """Ensure at least one downstream provider is configured."""
-        cleaned = tuple(provider for provider in self.providers if provider is not None)
+        cleaned = tuple(self.providers)
         if not cleaned:
             raise WebSearchUnavailable(
                 "Random web search requires at least one configured provider"
