@@ -6,9 +6,10 @@ from typing import cast
 
 import pytest
 
+from gui.settings_dialog import SettingsDialog
+
 pytest.importorskip("PySide6")
 from PySide6.QtWidgets import QApplication, QLabel
-
 
 EXPECTED_DIAGNOSTICS_STYLE_SNIPPETS = (
     "background-color: #eaf4ff",
@@ -21,8 +22,6 @@ EXPECTED_REDIS_READY_STYLE_SNIPPETS = (
     "color: #12324a",
     "border: 1px solid #5b89a6",
 )
-
-from gui.settings_dialog import SettingsDialog
 
 
 @pytest.fixture(scope="module")

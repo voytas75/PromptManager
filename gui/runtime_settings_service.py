@@ -83,7 +83,9 @@ class RuntimeSettingsService:
             "inference_model_configured": bool(
                 isinstance(litellm_inference_model, str) and litellm_inference_model.strip()
             ),
-            "api_key_configured": bool(isinstance(litellm_api_key, str) and litellm_api_key.strip()),
+            "api_key_configured": bool(
+                isinstance(litellm_api_key, str) and litellm_api_key.strip()
+            ),
             "embedding_backend": embedding_backend,
             "embedding_model": embedding_model,
             "tts_configured": bool(

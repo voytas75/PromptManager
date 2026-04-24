@@ -340,7 +340,8 @@ class SettingsDialog(QDialog):
         foreground_color, background_color, border_color = self._build_routing_preview_state()[1:]
         self._routing_preview_label.setText(self._build_routing_preview_text())
         self._routing_preview_label.setStyleSheet(
-            f"background-color: {background_color}; color: {foreground_color}; border: 1px solid {border_color}; "
+            f"background-color: {background_color}; "
+            f"color: {foreground_color}; border: 1px solid {border_color}; "
             "border-radius: 6px; padding: 8px; margin-bottom: 8px; font-weight: 600;"
         )
 

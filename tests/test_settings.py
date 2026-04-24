@@ -919,11 +919,15 @@ def test_embedding_backend_defaults_to_litellm(monkeypatch: MonkeyPatch, tmp_pat
     assert settings.embedding_model == DEFAULT_EMBEDDING_MODEL
 
 
-def test_embedding_backend_requires_model(monkeypatch: MonkeyPatch) -> None:
+def test_embedding_backend_requires_model(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     """Require a model name when selecting the sentence-transformers backend."""
     _clear_litellm_env(monkeypatch)
+    config_path = tmp_path / "config.json"
+    config_path.write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
     monkeypatch.setenv("PROMPT_MANAGER_EMBEDDING_BACKEND", "sentence-transformers")
-    with pytest.raises(SettingsError):
+
+    with pytest.raises(SettingsError, match="Invalid Prompt Manager configuration"):
         load_settings()
 
 

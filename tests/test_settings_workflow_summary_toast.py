@@ -62,7 +62,10 @@ def test_apply_settings_emits_summary_toast_after_success() -> None:
         RuntimeSettingsResult(
             theme_mode="dark",
             has_executor=True,
-            summary_message="Fast model: azure/gpt-4.1-mini | Inference model: azure/gpt-5.4 | Routing: inference for: prompt_generation",
+            summary_message=(
+                "Fast model: azure/gpt-4.1-mini | Inference model: azure/gpt-5.4 | "
+                "Routing: inference for: prompt_generation"
+            ),
         )
     )
 
@@ -90,7 +93,10 @@ def test_apply_settings_emits_summary_toast_after_success() -> None:
     workflow.apply_settings({"litellm_model": "azure/gpt-4.1-mini"})
 
     assert toasts == [
-        "Fast model: azure/gpt-4.1-mini | Inference model: azure/gpt-5.4 | Routing: inference for: prompt_generation"
+        (
+            "Fast model: azure/gpt-4.1-mini | Inference model: azure/gpt-5.4 | "
+            "Routing: inference for: prompt_generation"
+        )
     ]
     assert appearance.applied_theme == "dark"
     assert load_calls == ["hello"]
