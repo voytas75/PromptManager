@@ -73,7 +73,7 @@ class SettingsDialog(QDialog):
 
     def __init__(
         self,
-        parent=None,
+        parent: QWidget | None = None,
         *,
         litellm_model: str | None = None,
         litellm_inference_model: str | None = None,
@@ -107,6 +107,7 @@ class SettingsDialog(QDialog):
         google_cse_id: str | None = None,
         auto_open_share_links: bool | None = None,
         redis_status: str | None = None,
+        config_diagnostics: Mapping[str, object | None] | None = None,
     ) -> None:
         """Build the settings UI with existing runtime values pre-populated."""
         super().__init__(parent)
@@ -115,10 +116,9 @@ class SettingsDialog(QDialog):
         self.setMinimumWidth(860)
         screen = QGuiApplication.primaryScreen()
         target_height = 720
-        if screen is not None:
-            available_height = screen.availableGeometry().height()
-            target_height = max(640, int(available_height * 0.85))
-            self.setMaximumHeight(available_height)
+        available_height = screen.availableGeometry().height()
+        target_height = max(640, int(available_height * 0.85))
+        self.setMaximumHeight(available_height)
         self.resize(self.minimumWidth(), target_height)
         self._restore_window_size(default_width=self.width(), default_height=self.height())
         self._litellm_model = litellm_model or ""
@@ -145,9 +145,8 @@ class SettingsDialog(QDialog):
         self._google_api_key = google_api_key or ""
         self._google_cse_id = google_cse_id or ""
         self._redis_status = (redis_status or "").strip()
-        original_actions = [
-            dict(entry) for entry in (quick_actions or []) if isinstance(entry, dict)
-        ]
+        self._config_diagnostics = dict(config_diagnostics or {})
+        original_actions = [dict(entry) for entry in (quick_actions or [])]
         self._original_quick_actions = original_actions
         self._quick_actions_value: list[dict[str, object]] | None = original_actions or None
         self._workflow_models: dict[str, str] = {}
@@ -156,12 +155,11 @@ class SettingsDialog(QDialog):
                 key_str = str(key).strip()
                 if key_str not in LITELLM_ROUTED_WORKFLOWS:
                     continue
-                if value is None:
-                    continue
                 choice = str(value).strip().lower()
                 if choice == "inference":
                     self._workflow_models[key_str] = "inference"
         self._workflow_groups: dict[str, QButtonGroup] = {}
+        self._routing_preview_label: QLabel | None = None
         self._default_chat_color = DEFAULT_CHAT_USER_BUBBLE_COLOR
         palette_dict = chat_colors or {}
         user_initial = palette_dict.get("user", chat_user_bubble_color) or self._default_chat_color
@@ -248,6 +246,104 @@ class SettingsDialog(QDialog):
         self._settings.setValue("height", self.height())
         super().closeEvent(event)
 
+    def _build_banner_styles(
+        self,
+        *,
+        background_color: str,
+        foreground_color: str,
+        border_color: str,
+    ) -> str:
+        """Return a readable shared banner stylesheet for dark-theme settings headers."""
+        return (
+            f"background-color: {background_color}; color: {foreground_color}; "
+            f"border: 1px solid {border_color}; border-radius: 6px; "
+            "padding: 8px; margin-bottom: 8px; font-weight: 600;"
+        )
+
+    def _build_diagnostics_banner(self, parent: QWidget) -> QLabel | None:
+        """Build a compact configuration summary banner when diagnostics are available."""
+        if not self._config_diagnostics:
+            return None
+        models_configured = bool(self._config_diagnostics.get("models_configured"))
+        inference_configured = bool(self._config_diagnostics.get("inference_model_configured"))
+        api_key_configured = bool(self._config_diagnostics.get("api_key_configured"))
+        tts_configured = bool(self._config_diagnostics.get("tts_configured"))
+        embedding_backend = str(self._config_diagnostics.get("embedding_backend") or "n/a")
+        embedding_model = str(self._config_diagnostics.get("embedding_model") or "n/a")
+        lines = [
+            "Configuration summary",
+            f"Primary model: {'configured' if models_configured else 'missing'}",
+            f"Inference model: {'configured' if inference_configured else 'missing'}",
+            f"API key: {'configured' if api_key_configured else 'missing'}",
+            f"Embedding: {embedding_backend} / {embedding_model}",
+            f"TTS: {'configured' if tts_configured else 'missing'}",
+        ]
+        banner = QLabel("\n".join(lines), parent)
+        banner.setWordWrap(True)
+        banner.setObjectName("configDiagnosticsBanner")
+        banner.setStyleSheet(
+            self._build_banner_styles(
+                background_color="#eaf4ff",
+                foreground_color="#12324a",
+                border_color="#5b89a6",
+            )
+        )
+        return banner
+
+    def _build_routing_preview_state(self) -> tuple[str, str, str, str]:
+        """Return preview status label plus foreground/background/border colours."""
+        fast_model = self._model_input.text().strip()
+        inference_model = self._inference_model_input.text().strip()
+        inference_selected = False
+        for group in self._workflow_groups.values():
+            button = cast("QRadioButton", group.checkedButton())
+            choice = str(button.property("routeChoice") or "").strip().lower()
+            if choice == "inference":
+                inference_selected = True
+                break
+        if not fast_model:
+            return ("🔴 Status: fast model missing", "#5a1616", "#fdeaea", "#a61b1b")
+        if inference_selected and not inference_model:
+            return (
+                "🟡 Status: inference model missing",
+                "#5f3b00",
+                "#fff6db",
+                "#a15c00",
+            )
+        return ("🟢 Status: ready", "#12351a", "#eaf7ea", "#1f7a1f")
+
+    def _build_routing_preview_text(self) -> str:
+        """Return a compact live summary of model + routing selections."""
+        fast_model = self._model_input.text().strip()
+        inference_model = self._inference_model_input.text().strip()
+        inference_workflows: list[str] = []
+        for workflow_key, group in self._workflow_groups.items():
+            button = cast("QRadioButton", group.checkedButton())
+            choice = str(button.property("routeChoice") or "").strip().lower()
+            if choice == "inference":
+                inference_workflows.append(workflow_key)
+        inference_summary = ", ".join(inference_workflows) if inference_workflows else "none"
+        status_label, _, _, _ = self._build_routing_preview_state()
+        return "\n".join(
+            [
+                status_label,
+                f"Fast model: {fast_model or 'missing'}",
+                f"Inference model: {inference_model or 'missing'}",
+                f"Inference workflows: {inference_summary}",
+            ]
+        )
+
+    def _refresh_routing_preview(self) -> None:
+        """Update the live routing preview label when fields change."""
+        if self._routing_preview_label is None:
+            return
+        foreground_color, background_color, border_color = self._build_routing_preview_state()[1:]
+        self._routing_preview_label.setText(self._build_routing_preview_text())
+        self._routing_preview_label.setStyleSheet(
+            f"background-color: {background_color}; color: {foreground_color}; border: 1px solid {border_color}; "
+            "border-radius: 6px; padding: 8px; margin-bottom: 8px; font-weight: 600;"
+        )
+
     def _build_ui(self) -> None:
         palette = self.palette()
         window_color = palette.color(QPalette.ColorRole.Window)
@@ -258,7 +354,10 @@ class SettingsDialog(QDialog):
         )
         border_color.setAlpha(255)
 
+        main_layout = QVBoxLayout(self)
+
         outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
         container = QFrame(self)
         container.setObjectName("settingsContainer")
         container.setStyleSheet(
@@ -269,16 +368,23 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(container)
         layout.setContentsMargins(12, 12, 12, 12)
         outer_layout.addWidget(container)
+        main_layout.addLayout(outer_layout)
+
+        diagnostics_banner = self._build_diagnostics_banner(container)
+        if diagnostics_banner is not None:
+            layout.addWidget(diagnostics_banner)
 
         if self._redis_status:
             redis_banner = QLabel(self._redis_status, container)
             redis_banner.setWordWrap(True)
             redis_banner.setObjectName("redisStatusBanner")
-            banner_color = "#fff7e6" if "disabled" in self._redis_status.lower() else "#e6f4ff"
-            border_color = "#f0ad4e" if "disabled" in self._redis_status.lower() else "#7aa7c7"
+            redis_disabled = "disabled" in self._redis_status.lower()
             redis_banner.setStyleSheet(
-                f"background-color: {banner_color}; border: 1px solid {border_color}; "
-                "border-radius: 6px; padding: 8px; margin-bottom: 8px;"
+                self._build_banner_styles(
+                    background_color="#fff6db" if redis_disabled else "#eaf4ff",
+                    foreground_color="#5f3b00" if redis_disabled else "#12324a",
+                    border_color="#a15c00" if redis_disabled else "#5b89a6",
+                )
             )
             layout.addWidget(redis_banner)
 
@@ -291,9 +397,11 @@ class SettingsDialog(QDialog):
         litellm_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
 
         self._model_input = QLineEdit(self._litellm_model, litellm_tab)
+        self._model_input.textChanged.connect(self._refresh_routing_preview)  # type: ignore[arg-type]
         litellm_form.addRow("LiteLLM fast model", self._model_input)
 
         self._inference_model_input = QLineEdit(self._litellm_inference_model, litellm_tab)
+        self._inference_model_input.textChanged.connect(self._refresh_routing_preview)  # type: ignore[arg-type]
         litellm_form.addRow("LiteLLM inference model", self._inference_model_input)
 
         self._embedding_model_input = QLineEdit(self._embedding_model, litellm_tab)
@@ -350,6 +458,13 @@ class SettingsDialog(QDialog):
         routing_hint.setWordWrap(True)
         routing_layout.addWidget(routing_hint)
 
+        routing_preview = QLabel(self._build_routing_preview_text(), routing_tab)
+        routing_preview.setObjectName("routingPreviewLabel")
+        routing_preview.setWordWrap(True)
+        self._routing_preview_label = routing_preview
+        self._refresh_routing_preview()
+        routing_layout.addWidget(routing_preview)
+
         matrix_layout = QGridLayout()
         matrix_layout.setContentsMargins(0, 8, 0, 0)
         matrix_layout.setHorizontalSpacing(16)
@@ -380,6 +495,8 @@ class SettingsDialog(QDialog):
             group.setExclusive(True)
             group.addButton(fast_button)
             group.addButton(inference_button)
+            fast_button.toggled.connect(self._refresh_routing_preview)  # type: ignore[arg-type]
+            inference_button.toggled.connect(self._refresh_routing_preview)  # type: ignore[arg-type]
             self._workflow_groups[workflow_key] = group
 
             selected_choice = self._workflow_models.get(workflow_key, "fast")
@@ -709,7 +826,8 @@ class SettingsDialog(QDialog):
                     "Quick actions must be provided as a JSON array of objects.",
                 )
                 return
-            for entry in data:
+            validated_data = cast("list[object]", data)
+            for entry in validated_data:
                 if not isinstance(entry, dict):
                     QMessageBox.critical(
                         self,
@@ -717,7 +835,9 @@ class SettingsDialog(QDialog):
                         "Each quick action entry must be a JSON object.",
                     )
                     return
-            self._quick_actions_value = data
+            self._quick_actions_value = [
+                dict(cast("dict[str, object]", entry)) for entry in validated_data
+            ]
         else:
             self._quick_actions_value = None
 
@@ -799,9 +919,7 @@ class SettingsDialog(QDialog):
 
         workflow_models: dict[str, str] = {}
         for key, group in self._workflow_groups.items():
-            button = group.checkedButton()
-            if button is None:
-                continue
+            button = cast("QRadioButton", group.checkedButton())
             choice = str(button.property("routeChoice") or "").strip().lower()
             if choice == "inference":
                 workflow_models[key] = "inference"
