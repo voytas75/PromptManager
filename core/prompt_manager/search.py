@@ -322,11 +322,7 @@ class PromptSearchMixin:
         """Normalise returned Chroma distance vectors."""
         distances = results.get("distances")
         distance_values: list[float | None]
-        if (
-            isinstance(distances, list)
-            and distances
-            and isinstance(distances[0], list)
-        ):
+        if isinstance(distances, list) and distances and isinstance(distances[0], list):
             raw_distance_values = cast("list[Any]", distances[0])
             distance_values = [
                 float(value) if isinstance(value, (int, float)) else None

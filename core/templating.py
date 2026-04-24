@@ -317,9 +317,7 @@ class SchemaValidator:
 
         required_value = schema.get("required", [])
         required_items = (
-            cast("Sequence[Any]", required_value)
-            if isinstance(required_value, Sequence)
-            else ()
+            cast("Sequence[Any]", required_value) if isinstance(required_value, Sequence) else ()
         )
         required = {str(item) for item in required_items}
         fields: dict[str, tuple[type[Any], Any]] = {}

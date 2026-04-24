@@ -359,9 +359,7 @@ class PromptChainMixin:
             parts.append(prompt.category.strip())
         tags = PromptChainMixin._prompt_tags(prompt)
         if tags:
-            parts.append(
-                ", ".join(tag.strip() for tag in tags[:3] if tag.strip())
-            )
+            parts.append(", ".join(tag.strip() for tag in tags[:3] if tag.strip()))
         description = (getattr(prompt, "description", "") or "").strip()
         if description:
             parts.append(description[:160])
@@ -558,9 +556,7 @@ class PromptChainMixin:
             return None
         prompt_templates = getattr(self, "_prompt_templates", None)
         prompt_overrides = (
-            cast("dict[str, str]", prompt_templates)
-            if isinstance(prompt_templates, dict)
-            else {}
+            cast("dict[str, str]", prompt_templates) if isinstance(prompt_templates, dict) else {}
         )
         system_prompt = prompt_overrides.get("chain_summary") or _CHAIN_SUMMARY_SYSTEM_PROMPT
         executor = getattr(self, "_executor", None)

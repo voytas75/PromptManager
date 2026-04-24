@@ -135,9 +135,7 @@ def _extract_documents(payload: Mapping[str, Any], provider_slug: str) -> list[W
             or _string_or_none(_mapping_value(entry, "content"))
             or None
         )
-        published_value = _string_or_none(
-            _first_present(entry, "publishedDate", "published_date")
-        )
+        published_value = _string_or_none(_first_present(entry, "publishedDate", "published_date"))
         raw_candidate = _mapping_str_any(_mapping_value(entry, "raw"))
         raw_entry_payload = raw_candidate or dict(entry)
         documents.append(

@@ -382,9 +382,7 @@ class GenerationMixin:
             return
 
         try:
-            suggestion_raw = generator.generate(
-                context_text, categories=categories
-            )
+            suggestion_raw = generator.generate(context_text, categories=categories)
         except CategorySuggestionError as exc:
             logger.debug(
                 "Category drift suggestion failed",
