@@ -45,7 +45,7 @@ from ..web_search.context_formatting import (
     build_numbered_search_results,
     wrap_search_results_block,
 )
-from .execution_history import ExecutionOutcome, _normalise_conversation
+from .execution_history import ExecutionOutcome
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers only
     from collections.abc import Callable, Mapping
@@ -61,7 +61,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers only
     class _PromptChainHost(Protocol):
         def get_prompt(self, prompt_id: uuid.UUID) -> Prompt: ...
 
-        def _build_execution_context_metadata(  # noqa: D401 - typing helper only
+        def build_execution_context_metadata(
             self,
             prompt: Prompt,
             *,
@@ -73,7 +73,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers only
             response_style: Mapping[str, Any] | None = None,
         ) -> dict[str, Any]: ...
 
-        def _log_execution_failure(
+        def log_execution_failure(
             self,
             prompt_id: uuid.UUID,
             request_text: str,
@@ -84,7 +84,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers only
             extra_metadata: Mapping[str, Any] | None = None,
         ) -> PromptExecution | None: ...
 
-        def _log_execution_success(
+        def log_execution_success(
             self,
             prompt_id: uuid.UUID,
             request_text: str,
@@ -327,16 +327,41 @@ class PromptChainMixin:
         return f"{provider_label} findings:\n{formatted_block}\n\nUser request:\n{request_text}"
 
     @staticmethod
+    def _normalise_conversation(
+        messages: Sequence[Mapping[str, str]] | None,
+    ) -> list[dict[str, str]]:
+        """Return a sanitised copy of conversation messages for chain execution."""
+        normalised: list[dict[str, str]] = []
+        if not messages:
+            return normalised
+        for index, message in enumerate(messages):
+            role = str(message.get("role", "")).strip()
+            if not role:
+                raise PromptExecutionError(f"Conversation entry {index} is missing a role.")
+            content = message.get("content")
+            if content is None:
+                raise PromptExecutionError(f"Conversation entry {index} is missing content.")
+            normalised.append({"role": role, "content": str(content)})
+        return normalised
+
+    @staticmethod
+    def _prompt_tags(prompt: Prompt) -> list[str]:
+        raw_tags = getattr(prompt, "tags", None)
+        if not isinstance(raw_tags, list):
+            return []
+        return cast("list[str]", raw_tags)
+
+    @staticmethod
     def _build_web_search_query(prompt: Prompt, request_text: str) -> str:
         parts: list[str] = []
         if prompt.name:
             parts.append(prompt.name.strip())
         if prompt.category:
             parts.append(prompt.category.strip())
-        tags = getattr(prompt, "tags", None) or []
+        tags = PromptChainMixin._prompt_tags(prompt)
         if tags:
             parts.append(
-                ", ".join(tag.strip() for tag in tags[:3] if isinstance(tag, str) and tag.strip())
+                ", ".join(tag.strip() for tag in tags[:3] if tag.strip())
             )
         description = (getattr(prompt, "description", "") or "").strip()
         if description:
@@ -378,9 +403,10 @@ class PromptChainMixin:
             summary_text = str(summary).strip()
             if summary_text:
                 parts.append(summary_text)
-        highlights = getattr(document, "highlights", None) or []
-        if isinstance(highlights, Sequence) and not isinstance(highlights, (str, bytes, bytearray)):
-            for entry in highlights:
+        highlights = getattr(document, "highlights", None)
+        if isinstance(highlights, list):
+            entries = cast("list[object]", highlights)
+            for entry in entries:
                 text = str(entry or "").strip()
                 if text:
                     parts.append(text)
@@ -405,7 +431,7 @@ class PromptChainMixin:
                 else "Prompt execution is not configured for this manager instance."
             )
             raise PromptChainExecutionError(message)
-        conversation_history = _normalise_conversation(None)
+        conversation_history = self._normalise_conversation(None)
         stream_enabled = executor.stream
 
         def _handle_stream(chunk: str) -> None:
@@ -433,7 +459,7 @@ class PromptChainMixin:
         except ExecutionError as exc:
             failed_messages = list(conversation_history)
             failed_messages.append({"role": "user", "content": request_text.strip()})
-            failure_context = host._build_execution_context_metadata(
+            failure_context = host.build_execution_context_metadata(
                 prompt,
                 stream_enabled=stream_enabled,
                 executor_model=getattr(executor, "model", None),
@@ -441,7 +467,7 @@ class PromptChainMixin:
                 request_text=request_text,
                 response_text="",
             )
-            host._log_execution_failure(
+            host.log_execution_failure(
                 prompt.id,
                 request_text,
                 str(exc),
@@ -465,7 +491,7 @@ class PromptChainMixin:
         augmented_conversation.append({"role": "user", "content": request_text.strip()})
         if result.response_text:
             augmented_conversation.append({"role": "assistant", "content": result.response_text})
-        context_metadata = host._build_execution_context_metadata(
+        context_metadata = host.build_execution_context_metadata(
             prompt,
             stream_enabled=stream_enabled,
             executor_model=getattr(executor, "model", None),
@@ -473,7 +499,7 @@ class PromptChainMixin:
             request_text=request_text,
             response_text=result.response_text,
         )
-        history_entry = host._log_execution_success(
+        history_entry = host.log_execution_success(
             prompt.id,
             request_text,
             result,
@@ -531,7 +557,8 @@ class PromptChainMixin:
         trimmed = response_text.strip()
         if not trimmed:
             return None
-        prompt_overrides = getattr(self, "_prompt_templates", None) or {}
+        prompt_templates = getattr(self, "_prompt_templates", None)
+        prompt_overrides = cast("dict[str, str]", prompt_templates) if isinstance(prompt_templates, dict) else {}
         system_prompt = prompt_overrides.get("chain_summary") or _CHAIN_SUMMARY_SYSTEM_PROMPT
         executor = getattr(self, "_executor", None)
         model = (

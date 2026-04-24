@@ -115,7 +115,7 @@ class ExecutionHistoryMixin:
     _litellm_fast_model: str | None
     _litellm_inference_model: str | None
 
-    def _build_execution_context_metadata(
+    def build_execution_context_metadata(
         self,
         prompt: Prompt,
         *,
@@ -200,7 +200,7 @@ class ExecutionHistoryMixin:
             except ExecutionError as exc:
                 failed_messages = list(conversation_history)
                 failed_messages.append({"role": "user", "content": request_text.strip()})
-                failure_context = self._build_execution_context_metadata(
+                failure_context = self.build_execution_context_metadata(
                     prompt,
                     stream_enabled=stream_enabled,
                     executor_model=getattr(self._executor, "model", None),
@@ -208,7 +208,7 @@ class ExecutionHistoryMixin:
                     request_text=request_text,
                     response_text="",
                 )
-                self._log_execution_failure(
+                self.log_execution_failure(
                     prompt.id,
                     request_text,
                     str(exc),
@@ -223,7 +223,7 @@ class ExecutionHistoryMixin:
                 augmented_conversation.append(
                     {"role": "assistant", "content": result.response_text}
                 )
-            context_metadata = self._build_execution_context_metadata(
+            context_metadata = self.build_execution_context_metadata(
                 prompt,
                 stream_enabled=stream_enabled,
                 executor_model=getattr(self._executor, "model", None),
@@ -231,7 +231,7 @@ class ExecutionHistoryMixin:
                 request_text=request_text,
                 response_text=result.response_text,
             )
-            history_entry = self._log_execution_success(
+            history_entry = self.log_execution_success(
                 prompt.id,
                 request_text,
                 result,
@@ -307,7 +307,7 @@ class ExecutionHistoryMixin:
         def _executor_for_model(model_name: str) -> CodexExecutor:
             if base_executor.model == model_name:
                 return base_executor
-            if not isinstance(base_executor, CodexExecutor):
+            if type(base_executor) is not CodexExecutor:
                 raise PromptExecutionUnavailable(
                     "Only configured LiteLLM executors can benchmark against multiple models."
                 )
@@ -367,7 +367,7 @@ class ExecutionHistoryMixin:
                         )
                     )
                     if persist_history:
-                        self._log_execution_failure(
+                        self.log_execution_failure(
                             prompt.id,
                             text,
                             str(exc),
@@ -404,7 +404,7 @@ class ExecutionHistoryMixin:
                         {"role": "user", "content": text},
                         {"role": "assistant", "content": result.response_text},
                     ]
-                    context_metadata = self._build_execution_context_metadata(
+                    context_metadata = self.build_execution_context_metadata(
                         prompt,
                         stream_enabled=bool(getattr(executor_for_model, "stream", False)),
                         executor_model=model_name,
@@ -412,7 +412,7 @@ class ExecutionHistoryMixin:
                         request_text=text,
                         response_text=result.response_text,
                     )
-                    self._log_execution_success(
+                    self.log_execution_success(
                         prompt.id,
                         text,
                         result,
@@ -572,7 +572,7 @@ class ExecutionHistoryMixin:
         except HistoryTrackerError as exc:
             raise PromptHistoryError(str(exc)) from exc
 
-    def _log_execution_success(
+    def log_execution_success(
         self,
         prompt_id: uuid.UUID,
         request_text: str,
@@ -593,8 +593,8 @@ class ExecutionHistoryMixin:
             usage_metadata = {}
         if not usage_metadata:
             raw_usage = result.raw_response.get("usage")
-            if isinstance(raw_usage, Mapping):
-                usage_metadata = {str(key): value for key, value in raw_usage.items()}
+            if isinstance(raw_usage, dict):
+                usage_metadata = cast("dict[str, Any]", raw_usage)
         if "total_tokens" not in usage_metadata:
             prompt_tokens = usage_metadata.get("prompt_tokens")
             completion_tokens = usage_metadata.get("completion_tokens")
@@ -628,7 +628,7 @@ class ExecutionHistoryMixin:
             )
             return None
 
-    def _log_execution_failure(
+    def log_execution_failure(
         self,
         prompt_id: uuid.UUID,
         request_text: str,

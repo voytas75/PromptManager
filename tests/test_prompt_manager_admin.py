@@ -1173,7 +1173,7 @@ def test_log_execution_success_and_failure_paths(
         usage={"prompt_tokens": 5},
         raw_response={"choices": []},
     )
-    logged_success = manager._log_execution_success(
+    logged_success = manager.log_execution_success(
         prompt.id,
         "hello",
         result,
@@ -1184,11 +1184,11 @@ def test_log_execution_success_and_failure_paths(
     assert tracker_calls["success"][0]["metadata"]["usage"]["prompt_tokens"] == 5
 
     tracker.raise_on_success = True
-    assert manager._log_execution_success(prompt.id, "hello", result) is None, (
+    assert manager.log_execution_success(prompt.id, "hello", result) is None, (
         "should swallow tracker errors"
     )
 
-    logged_failure = manager._log_execution_failure(
+    logged_failure = manager.log_execution_failure(
         prompt.id,
         "hello",
         "boom",
@@ -1197,7 +1197,7 @@ def test_log_execution_success_and_failure_paths(
     )
     assert logged_failure is not None
     tracker.raise_on_failure = True
-    assert manager._log_execution_failure(prompt.id, "hello", "boom") is None
+    assert manager.log_execution_failure(prompt.id, "hello", "boom") is None
 
 
 def test_manager_initialises_litellm_defaults_from_helpers(tmp_path: Path) -> None:
