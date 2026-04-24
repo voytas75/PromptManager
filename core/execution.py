@@ -387,9 +387,8 @@ def _normalise_usage(usage_value: object | None) -> dict[str, Any]:
         usage_mapping = cast("Mapping[str, Any]", usage_value)
         return {str(key): value for key, value in usage_mapping.items()}
     serialised = serialise_litellm_response(usage_value)
-    if serialised and isinstance(serialised, Mapping):
-        serialised_mapping = cast("Mapping[str, Any]", serialised)
-        return {str(key): value for key, value in serialised_mapping.items()}
+    if isinstance(serialised, dict):
+        return {str(key): value for key, value in serialised.items()}
     prompt_tokens = getattr(usage_value, "prompt_tokens", None)
     completion_tokens = getattr(usage_value, "completion_tokens", None)
     total_tokens = getattr(usage_value, "total_tokens", None)
@@ -400,6 +399,21 @@ def _normalise_usage(usage_value: object | None) -> dict[str, Any]:
         "completion_tokens": completion_tokens,
         "total_tokens": total_tokens,
     }
+
+
+def _coerce_token_count(value: object | None) -> int:
+    """Safely coerce a token counter value to int."""
+    if value in (None, ""):
+        return 0
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        return int(value)
+    raise TypeError("Unsupported token count value")
 
 
 def _coerce_usage_tokens(usage: Mapping[str, Any] | None) -> dict[str, int]:
@@ -487,24 +501,25 @@ def _estimate_usage(
         }
     if not isinstance(usage, Mapping):
         return {}
-    prompt_tokens = usage.get("prompt_tokens")
-    completion_tokens = usage.get("completion_tokens")
-    total_tokens = usage.get("total_tokens")
+    usage_mapping = cast("Mapping[str, object]", usage)
+    prompt_tokens = usage_mapping.get("prompt_tokens")
+    completion_tokens = usage_mapping.get("completion_tokens")
+    total_tokens = usage_mapping.get("total_tokens")
     if prompt_tokens is None and completion_tokens is None and total_tokens is None:
         return {}
     try:
-        prompt_value = int(prompt_tokens or 0)
+        prompt_value = _coerce_token_count(prompt_tokens)
     except (TypeError, ValueError):
         prompt_value = 0
     try:
-        completion_value = int(completion_tokens or 0)
+        completion_value = _coerce_token_count(completion_tokens)
     except (TypeError, ValueError):
         completion_value = 0
     if total_tokens is None:
         total_value = prompt_value + completion_value
     else:
         try:
-            total_value = int(total_tokens)
+            total_value = _coerce_token_count(total_tokens)
         except (TypeError, ValueError):
             total_value = prompt_value + completion_value
     return {
