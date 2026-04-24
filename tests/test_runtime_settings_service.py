@@ -1,6 +1,7 @@
 """Tests for runtime settings service web search reconfiguration.
 
 Updates:
+  v0.1.1 - 2026-04-24 - Cover compact GUI diagnostics summary fields.
   v0.1.0 - 2025-12-07 - Ensure runtime settings rewire web search providers.
 """
 
@@ -32,9 +33,54 @@ class _DummyPromptManager:
         self.web_search_service = WebSearchService()
         self.web_search = self.web_search_service
         self.set_name_generator_calls: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
+        self.redis_unavailable_reason: str | None = None
+        self._redis_client = None
 
     def set_name_generator(self, *args: Any, **kwargs: Any) -> None:
         self.set_name_generator_calls.append((args, kwargs))
+
+
+class _DummyChatColors:
+    def __init__(self) -> None:
+        self.user = DEFAULT_CHAT_USER_BUBBLE_COLOR
+        self.assistant = "#f4f4f5"
+
+
+class _DummySettings:
+    def __init__(self) -> None:
+        self.litellm_model = "azure/gpt-4.1"
+        self.litellm_inference_model = "azure/gpt-5.4"
+        self.litellm_api_key = "secret-key"
+        self.litellm_api_base = "https://example.azure.com"
+        self.litellm_api_version = "2025-04-01-preview"
+        self.litellm_reasoning_effort = None
+        self.litellm_tts_model = "azure/tts-1"
+        self.litellm_tts_stream = True
+        self.litellm_stream = False
+        self.litellm_workflow_models = None
+        self.litellm_drop_params = None
+        self.embedding_backend = "litellm"
+        self.embedding_model = "azure/UDTEMBED3L"
+        self.quick_actions = None
+        self.chat_user_bubble_color = DEFAULT_CHAT_USER_BUBBLE_COLOR
+        self.theme_mode = DEFAULT_THEME_MODE
+        self.prompt_output_font_family = None
+        self.prompt_output_font_size = None
+        self.prompt_output_font_color = None
+        self.chat_font_family = None
+        self.chat_font_size = None
+        self.chat_font_color = None
+        self.chat_colors = _DummyChatColors()
+        self.prompt_templates = None
+        self.web_search_provider = None
+        self.exa_api_key = None
+        self.tavily_api_key = None
+        self.serper_api_key = None
+        self.serpapi_api_key = None
+        self.google_api_key = None
+        self.google_cse_id = None
+        self.auto_open_share_links = True
+        self.redis_dsn = None
 
 
 def _base_runtime_settings() -> dict[str, object | None]:
@@ -69,10 +115,13 @@ def _base_runtime_settings() -> dict[str, object | None]:
 
 
 @pytest.fixture(autouse=True)
-def _stub_persistence(monkeypatch: MonkeyPatch) -> None:
+def _persist_settings_stub(monkeypatch: MonkeyPatch) -> None:  # pyright: ignore[reportUnusedFunction]
+    def _noop_persist(*_args: object, **_kwargs: object) -> None:
+        return None
+
     monkeypatch.setattr(
         "gui.runtime_settings_service.persist_settings_to_config",
-        lambda *_args, **_kwargs: None,
+        _noop_persist,
     )
 
 
@@ -124,3 +173,47 @@ def test_apply_updates_clears_web_search_provider_when_disabled() -> None:
 
     assert runtime["web_search_provider"] is None
     assert manager.web_search_service.provider is None
+
+
+def test_apply_updates_returns_user_facing_model_routing_summary() -> None:
+    """Applying model/routing changes should return a concise toast summary."""
+    runtime = _base_runtime_settings()
+    manager = _DummyPromptManager()
+    service = RuntimeSettingsService(cast("PromptManager", manager), None)
+
+    result = service.apply_updates(
+        runtime,
+        {
+            "litellm_model": "azure/gpt-4.1-mini",
+            "litellm_inference_model": "azure/gpt-5.4",
+            "litellm_workflow_models": {
+                "prompt_generation": "inference",
+                "chat_title": "fast",
+            },
+        },
+    )
+
+    assert result.summary_message is not None
+    assert "Fast model: azure/gpt-4.1-mini" in result.summary_message
+    assert "Inference model: azure/gpt-5.4" in result.summary_message
+    assert "Routing: inference for: prompt_generation" in result.summary_message
+
+
+def test_build_initial_runtime_settings_includes_compact_diagnostics_summary() -> None:
+    """Initial runtime snapshot should expose a compact user-facing diagnostics summary."""
+    manager = _DummyPromptManager()
+    settings = _DummySettings()
+    service = RuntimeSettingsService(cast("PromptManager", manager), cast("Any", settings))
+
+    runtime = service.build_initial_runtime_settings()
+
+    diagnostics = runtime["config_diagnostics"]
+    assert diagnostics == {
+        "models_configured": True,
+        "inference_model_configured": True,
+        "api_key_configured": True,
+        "embedding_backend": "litellm",
+        "embedding_model": "azure/UDTEMBED3L",
+        "tts_configured": True,
+        "redis_status": "Redis caching disabled (no DSN configured).",
+    }

@@ -12,7 +12,7 @@ import tempfile
 import threading
 from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 from PySide6.QtCore import QObject, QUrl, Signal
 
@@ -25,7 +25,7 @@ else:  # pragma: no cover - runtime placeholders when Qt multimedia is missing
     QAudioOutputType = Any
     QMediaPlayerType = Any
 
-_LITELLM_IMPORT_ERROR: str | None = None
+_litellm_import_error: str | None = None
 
 try:  # pragma: no cover - optional dependency import
     import litellm
@@ -34,23 +34,25 @@ try:  # pragma: no cover - optional dependency import
         from litellm.exceptions import LiteLLMException  # type: ignore[attr-defined]
     except Exception as exc:  # pragma: no cover - missing attribute variations
         LiteLLMException = RuntimeError  # type: ignore[assignment]
-        _LITELLM_IMPORT_ERROR = str(exc)
+        _litellm_import_error = str(exc)
 except ModuleNotFoundError:  # pragma: no cover - handled at runtime
     litellm = None  # type: ignore[assignment]
     LiteLLMException = RuntimeError  # type: ignore[assignment]
 except Exception as exc:  # pragma: no cover - surface actual import failures
     litellm = None  # type: ignore[assignment]
     LiteLLMException = RuntimeError  # type: ignore[assignment]
-    _LITELLM_IMPORT_ERROR = str(exc)
+    _litellm_import_error = str(exc)
+
+LiteLLMExceptionType = cast("type[Exception]", LiteLLMException)
 
 try:  # pragma: no cover - depends on optional Qt plugins
     from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
 except Exception:  # pragma: no cover - Qt multimedia missing
     QAudioOutput = None  # type: ignore[assignment]
     QMediaPlayer = None  # type: ignore[assignment]
-    _MULTIMEDIA_AVAILABLE = False
+    _multimedia_available = False
 else:  # pragma: no cover - exercised in GUI runtime
-    _MULTIMEDIA_AVAILABLE = True
+    _multimedia_available = True
 
 DEFAULT_TTS_VOICE = "alloy"
 
@@ -79,24 +81,33 @@ class VoicePlaybackController(QObject):
     def __init__(self, *, parent: QObject | None = None) -> None:
         """Initialise the controller with optional QObject *parent*."""
         super().__init__(parent)
-        self._supported = bool(_MULTIMEDIA_AVAILABLE and QMediaPlayer and QAudioOutput)
+        self._supported = bool(_multimedia_available and QMediaPlayer and QAudioOutput)
         self._player: QMediaPlayerType | None = None
         self._audio_output: QAudioOutputType | None = None
-        if self._supported and QMediaPlayer is not None and QAudioOutput is not None:
-            player = QMediaPlayer(self)
-            audio_output = QAudioOutput(self)
-            player.setAudioOutput(audio_output)
-            player.playbackStateChanged.connect(  # type: ignore[arg-type]
-                self._handle_state_changed
-            )
-            self._player = player
-            self._audio_output = audio_output
-            self.playback_ready.connect(self._handle_playback_ready)
         self._worker: threading.Thread | None = None
         self._stop_event = threading.Event()
         self._temp_path: Path | None = None
         self._is_preparing = False
         self._is_playing = False
+
+    def _ensure_backend(self) -> None:
+        """Create Qt multimedia objects lazily when the backend is available."""
+        if not self._supported:
+            return
+        if self._player is not None and self._audio_output is not None:
+            return
+        if QMediaPlayer is None or QAudioOutput is None:
+            self._supported = False
+            return
+        player = QMediaPlayer(self)
+        audio_output = QAudioOutput(self)
+        player.setAudioOutput(audio_output)
+        player.playbackStateChanged.connect(  # type: ignore[arg-type]
+            self._handle_state_changed
+        )
+        self._player = player
+        self._audio_output = audio_output
+        self.playback_ready.connect(self._handle_playback_ready)
 
     @property
     def is_supported(self) -> bool:
@@ -117,8 +128,7 @@ class VoicePlaybackController(QObject):
         stream_audio: bool = True,
     ) -> None:
         """Start LiteLLM text-to-speech playback for *text*."""
-        if not isinstance(runtime, Mapping):
-            raise VoicePlaybackError("Runtime settings must be a mapping.")
+        self._ensure_backend()
         if not self._supported:
             raise VoicePlaybackError("Qt multimedia backend is unavailable on this system.")
         if self._is_preparing or self._is_playing:
@@ -176,7 +186,7 @@ class VoicePlaybackController(QObject):
         stream_audio: bool,
     ) -> None:
         if litellm is None:
-            message = _LITELLM_IMPORT_ERROR or (
+            message = _litellm_import_error or (
                 "LiteLLM is not installed; install litellm to enable voice playback."
             )
             self.playback_failed.emit(message)
@@ -192,8 +202,8 @@ class VoicePlaybackController(QObject):
                 api_base=runtime_payload.get("api_base"),
                 api_version=runtime_payload.get("api_version"),
             )
-        except LiteLLMException as exc:  # pragma: no cover - requires API access
-            self.playback_failed.emit(f"LiteLLM TTS failed: {exc}")
+        except LiteLLMExceptionType as exc:  # pragma: no cover - requires API access
+            self.playback_failed.emit(f"LiteLLM TTS failed: {str(exc)}")
             self._is_preparing = False
             return
         except Exception as exc:  # pragma: no cover - network/runtime errors
@@ -213,10 +223,10 @@ class VoicePlaybackController(QObject):
             self.playback_failed.emit(str(exc))
             self._is_preparing = False
             return
-        except LiteLLMException as exc:  # pragma: no cover - requires API access
+        except LiteLLMExceptionType as exc:  # pragma: no cover - requires API access
             path.unlink(missing_ok=True)
             self._temp_path = None
-            self.playback_failed.emit(f"LiteLLM TTS failed: {exc}")
+            self.playback_failed.emit(f"LiteLLM TTS failed: {str(exc)}")
             self._is_preparing = False
             return
         except Exception as exc:  # pragma: no cover - network/runtime errors
@@ -276,7 +286,8 @@ class VoicePlaybackController(QObject):
                     raise VoicePlaybackError("LiteLLM response did not expose audio content.")
                 if not isinstance(content, (bytes, bytearray, memoryview)):
                     raise VoicePlaybackError("LiteLLM response returned unexpected payload type.")
-                path.write_bytes(bytes(content))
+                payload = cast("bytes | bytearray | memoryview[int]", content)
+                path.write_bytes(bytes(payload))
             try:
                 size = path.stat().st_size
             except FileNotFoundError:

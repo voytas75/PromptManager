@@ -113,6 +113,9 @@ class SettingsWorkflow:
             google_cse_id=cast("str | None", data.get("google_cse_id")),
             auto_open_share_links=cast("bool | None", data.get("auto_open_share_links")),
             redis_status=cast("str | None", data.get("redis_status")),
+            config_diagnostics=cast(
+                "Mapping[str, object | None] | None", data.get("config_diagnostics")
+            ),
         )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
@@ -160,6 +163,8 @@ class SettingsWorkflow:
             )
         else:
             self._web_search_tooltip_updater()
+            if result.summary_message:
+                self._toast(result.summary_message)
 
         controller = self._quick_action_supplier()
         if controller is not None:

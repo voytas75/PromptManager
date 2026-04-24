@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from PySide6.QtGui import QColor
 
@@ -49,6 +49,7 @@ if TYPE_CHECKING:
 
 RuntimeSettings = dict[str, object | None]
 WorkflowRouting = dict[str, Literal["fast", "inference"]]
+ConfigDiagnostics = dict[str, object | None]
 
 
 @dataclass(slots=True)
@@ -57,6 +58,7 @@ class RuntimeSettingsResult:
 
     theme_mode: str
     has_executor: bool
+    summary_message: str | None = None
 
 
 class RuntimeSettingsService:
@@ -66,6 +68,29 @@ class RuntimeSettingsService:
         """Store references to the PromptManager and persisted settings snapshot."""
         self._manager = manager
         self._settings = settings
+
+    def _build_config_diagnostics(self, redis_status: str | None) -> ConfigDiagnostics:
+        """Return a compact user-facing configuration summary for the settings dialog."""
+        settings = self._settings
+        litellm_model = getattr(settings, "litellm_model", None)
+        litellm_inference_model = getattr(settings, "litellm_inference_model", None)
+        litellm_api_key = getattr(settings, "litellm_api_key", None)
+        embedding_backend = getattr(settings, "embedding_backend", DEFAULT_EMBEDDING_BACKEND)
+        embedding_model = getattr(settings, "embedding_model", DEFAULT_EMBEDDING_MODEL)
+        litellm_tts_model = getattr(settings, "litellm_tts_model", None)
+        return {
+            "models_configured": bool(isinstance(litellm_model, str) and litellm_model.strip()),
+            "inference_model_configured": bool(
+                isinstance(litellm_inference_model, str) and litellm_inference_model.strip()
+            ),
+            "api_key_configured": bool(isinstance(litellm_api_key, str) and litellm_api_key.strip()),
+            "embedding_backend": embedding_backend,
+            "embedding_model": embedding_model,
+            "tts_configured": bool(
+                isinstance(litellm_tts_model, str) and litellm_tts_model.strip()
+            ),
+            "redis_status": redis_status,
+        }
 
     def build_initial_runtime_settings(self) -> RuntimeSettings:
         """Load current settings snapshot from configuration and config files."""
@@ -139,6 +164,7 @@ class RuntimeSettingsService:
                 settings.auto_open_share_links if settings is not None else True
             ),
             "redis_status": None,
+            "config_diagnostics": None,
         }
 
         if settings is not None:
@@ -154,6 +180,9 @@ class RuntimeSettingsService:
                     )
             else:
                 runtime["redis_status"] = "Redis caching disabled (no DSN configured)."
+            runtime["config_diagnostics"] = self._build_config_diagnostics(
+                cast("str | None", runtime.get("redis_status"))
+            )
 
         config_path = Path("config/config.json")
         if config_path.exists():
@@ -184,9 +213,13 @@ class RuntimeSettingsService:
                 if runtime.get("litellm_drop_params") is None:
                     drop_value = data.get("litellm_drop_params")
                     if isinstance(drop_value, list):
-                        runtime["litellm_drop_params"] = [
-                            str(item).strip() for item in drop_value if str(item).strip()
-                        ]
+                        drop_items = cast("list[Any]", drop_value)
+                        cleaned_drop_value: list[str] = []
+                        for item in drop_items:
+                            item_text = item.strip() if isinstance(item, str) else str(item).strip()
+                            if item_text:
+                                cleaned_drop_value.append(item_text)
+                        runtime["litellm_drop_params"] = cleaned_drop_value
                     elif isinstance(drop_value, str):
                         parsed = [part.strip() for part in drop_value.split(",") if part.strip()]
                         runtime["litellm_drop_params"] = parsed or None
@@ -213,22 +246,31 @@ class RuntimeSettingsService:
                 if runtime.get("litellm_workflow_models") is None:
                     routing_value = data.get("litellm_workflow_models")
                     if isinstance(routing_value, dict):
-                        runtime["litellm_workflow_models"] = {
-                            str(key): "inference"
-                            for key, value in routing_value.items()
-                            if isinstance(value, str) and value.strip().lower() == "inference"
-                        }
+                        routing_items = cast("dict[object, object]", routing_value)
+                        cleaned_workflow_models: WorkflowRouting = {}
+                        for key, value in routing_items.items():
+                            key_text = key.strip() if isinstance(key, str) else str(key).strip()
+                            if isinstance(value, str) and value.strip().lower() == "inference":
+                                cleaned_workflow_models[key_text] = "inference"
+                        runtime["litellm_workflow_models"] = cleaned_workflow_models
                 if runtime["quick_actions"] is None and isinstance(data.get("quick_actions"), list):
-                    runtime["quick_actions"] = [
-                        dict(entry) for entry in data["quick_actions"] if isinstance(entry, dict)
-                    ]
+                    quick_actions_value = cast("list[object]", data["quick_actions"])
+                    cleaned_quick_actions: list[dict[str, object]] = []
+                    for entry in quick_actions_value:
+                        if isinstance(entry, dict):
+                            entry_dict = cast("dict[str, object]", entry)
+                            cleaned_quick_actions.append(dict(entry_dict))
+                    runtime["quick_actions"] = cleaned_quick_actions
                 color_value = data.get("chat_user_bubble_color")
                 if isinstance(color_value, str) and color_value.strip():
                     runtime["chat_user_bubble_color"] = color_value.strip()
                 palette_value = data.get("chat_colors")
-                palette = normalise_chat_palette(
-                    palette_value if isinstance(palette_value, dict) else None
+                palette_mapping = (
+                    cast("Mapping[str, object]", palette_value)
+                    if isinstance(palette_value, dict)
+                    else None
                 )
+                palette = normalise_chat_palette(palette_mapping)
                 if palette:
                     runtime["chat_colors"] = palette
                 if runtime.get("prompt_output_font_size") is None:
@@ -308,6 +350,36 @@ class RuntimeSettingsService:
         self._manager.web_search_service = service
         self._manager.web_search = service
 
+    def _build_runtime_summary(self, runtime: RuntimeSettings) -> str:
+        """Return a compact user-facing summary after applying model/routing settings."""
+
+        def _clean(value: object | None) -> str | None:
+            if not isinstance(value, str):
+                return None
+            text = value.strip()
+            return text or None
+
+        fast_model = _clean(runtime.get("litellm_model")) or "missing"
+        inference_model = _clean(runtime.get("litellm_inference_model")) or "missing"
+        routing_value = runtime.get("litellm_workflow_models")
+        if not isinstance(routing_value, dict) or not routing_value:
+            routing_summary = "all workflows use the fast model"
+        else:
+            inference_workflows = sorted(
+                key.strip() if isinstance(key, str) else str(key).strip()
+                for key, route in cast("dict[object, object]", routing_value).items()
+                if isinstance(route, str) and route.strip().lower() == "inference"
+            )
+            if inference_workflows:
+                routing_summary = "inference for: " + ", ".join(inference_workflows)
+            else:
+                routing_summary = "all workflows use the fast model"
+        return (
+            f"Fast model: {fast_model} | "
+            f"Inference model: {inference_model} | "
+            f"Routing: {routing_summary}"
+        )
+
     def apply_updates(
         self,
         runtime: RuntimeSettings,
@@ -365,9 +437,12 @@ class RuntimeSettingsService:
         if "litellm_drop_params" in updates:
             drop_params_value = updates.get("litellm_drop_params")
             if isinstance(drop_params_value, list):
-                cleaned_drop_params = [
-                    str(item).strip() for item in drop_params_value if str(item).strip()
-                ]
+                drop_params_items = cast("list[Any]", drop_params_value)
+                cleaned_drop_params = []
+                for item in drop_params_items:
+                    item_text = item.strip() if isinstance(item, str) else str(item).strip()
+                    if item_text:
+                        cleaned_drop_params.append(item_text)
             elif isinstance(drop_params_value, str):
                 cleaned_drop_params = [
                     part.strip() for part in drop_params_value.split(",") if part.strip()
@@ -454,10 +529,12 @@ class RuntimeSettingsService:
         def _normalise_workflows(value: object | None) -> WorkflowRouting | None:
             if not isinstance(value, dict):
                 return None
+            workflow_items = cast("dict[object, object]", value)
             cleaned: WorkflowRouting = {}
-            for key, route in value.items():
+            for key, route in workflow_items.items():
+                key_text = key.strip() if isinstance(key, str) else str(key).strip()
                 if isinstance(route, str) and route.strip().lower() == "inference":
-                    cleaned[str(key)] = "inference"
+                    cleaned[key_text] = "inference"
             return cleaned or None
 
         cleaned_workflow_models = _normalise_workflows(runtime.get("litellm_workflow_models"))
@@ -468,15 +545,21 @@ class RuntimeSettingsService:
         cleaned_quick_actions: list[dict[str, object]] | None = None
         existing_quick_actions = runtime.get("quick_actions")
         if isinstance(existing_quick_actions, list):
-            cleaned_quick_actions = [
-                dict(entry) for entry in existing_quick_actions if isinstance(entry, dict)
-            ]
+            existing_quick_actions_list = cast("list[object]", existing_quick_actions)
+            cleaned_quick_actions = []
+            for entry in existing_quick_actions_list:
+                if isinstance(entry, dict):
+                    entry_dict = cast("dict[str, object]", entry)
+                    cleaned_quick_actions.append(dict(entry_dict))
         if "quick_actions" in updates:
             quick_actions_value = updates.get("quick_actions")
             if isinstance(quick_actions_value, list):
-                cleaned_quick_actions = [
-                    dict(entry) for entry in quick_actions_value if isinstance(entry, dict)
-                ]
+                quick_actions_list = cast("list[object]", quick_actions_value)
+                cleaned_quick_actions = []
+                for entry in quick_actions_list:
+                    if isinstance(entry, dict):
+                        entry_dict = cast("dict[str, object]", entry)
+                        cleaned_quick_actions.append(dict(entry_dict))
             else:
                 cleaned_quick_actions = None
             runtime["quick_actions"] = cleaned_quick_actions
@@ -495,10 +578,10 @@ class RuntimeSettingsService:
             runtime["chat_user_bubble_color"] = chat_colour
 
         cleaned_palette = normalise_chat_palette(
-            cast("Mapping[str, object] | None", runtime.get("chat_colors"))
+            cast("dict[str, object] | None", runtime.get("chat_colors"))
         )
         if "chat_colors" in updates:
-            palette_input = cast("Mapping[str, object] | None", updates.get("chat_colors"))
+            palette_input = cast("dict[str, object] | None", updates.get("chat_colors"))
             cleaned_palette = normalise_chat_palette(palette_input)
             runtime["chat_colors"] = cleaned_palette or None
 
@@ -525,11 +608,14 @@ class RuntimeSettingsService:
         if "prompt_templates" in updates:
             prompt_templates_value = updates.get("prompt_templates")
             if isinstance(prompt_templates_value, dict):
-                cleaned_prompt_templates = {
-                    str(key): value.strip()
-                    for key, value in prompt_templates_value.items()
-                    if isinstance(value, str) and value.strip()
-                }
+                prompt_template_items = cast("dict[object, object]", prompt_templates_value)
+                cleaned_prompt_templates: dict[str, str] = {}
+                for key, value in prompt_template_items.items():
+                    key_text = key.strip() if isinstance(key, str) else str(key).strip()
+                    if isinstance(value, str):
+                        value_text = value.strip()
+                        if value_text:
+                            cleaned_prompt_templates[key_text] = value_text
                 prompt_templates_payload = cleaned_prompt_templates or None
             else:
                 prompt_templates_payload = None
@@ -647,6 +733,7 @@ class RuntimeSettingsService:
         prompt_templates_value = cast("Mapping[str, object] | None", prompt_templates_payload)
 
         self._refresh_web_search_provider(runtime)
+        summary_message = self._build_runtime_summary(runtime)
         self._manager.set_name_generator(
             litellm_model_value,
             litellm_api_key_value,
@@ -663,6 +750,7 @@ class RuntimeSettingsService:
         return RuntimeSettingsResult(
             theme_mode=theme_choice,
             has_executor=self._manager.executor is not None,
+            summary_message=summary_message,
         )
 
 
