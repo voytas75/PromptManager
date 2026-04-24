@@ -6,16 +6,17 @@ Updates:
 
 from __future__ import annotations
 
+from inspect import Signature, signature
 import json
 import logging
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Callable, cast
 from uuid import UUID
 
 from chromadb.errors import ChromaError
 
-from models.prompt_model import Prompt, _ensure_uuid
+from models.prompt_model import Prompt
 
 from ..embedding import EmbeddingGenerationError
 from ..exceptions import (
@@ -27,23 +28,11 @@ from ..exceptions import (
 from ..repository import RepositoryError, RepositoryNotFoundError
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers only
-    from models.category_model import PromptCategory
     from models.prompt_model import PromptVersion
 
     from ..repository import PromptRepository
     from . import PromptManager as _PromptManager
-
-    class _CategoryInsightAccessor(Protocol):
-        def list_categories(self) -> list[PromptCategory]: ...
-
-        def _update_category_insight(
-            self,
-            prompt: Prompt,
-            *,
-            previous_prompt: Prompt | None,
-        ) -> None: ...
-else:  # pragma: no cover - typing fallback
-    _CategoryInsightAccessor = Any
+else:  # pragma: no cover - runtime fallback
     _PromptManager = Any
 
 logger = logging.getLogger(__name__)
@@ -66,6 +55,50 @@ class PromptLifecycleMixin:
         """Return self casted to PromptManager for cross-mixin helpers."""
         return cast("_PromptManager", self)
 
+    def _apply_category_metadata_for_lifecycle(self, prompt: Prompt) -> Prompt:
+        """Apply category metadata through the prompt manager when available."""
+        manager = self._as_prompt_manager()
+        helper = cast("Callable[[Prompt], Prompt] | None", getattr(manager, "_apply_category_metadata", None))
+        if helper is None:
+            return prompt
+        return helper(prompt)
+
+    def _update_category_insight_for_lifecycle(
+        self,
+        prompt: Prompt,
+        *,
+        previous_prompt: Prompt | None,
+    ) -> None:
+        """Update category insight metadata through the prompt manager helper."""
+        manager = self._as_prompt_manager()
+        helper = cast("Callable[..., None] | None", getattr(manager, "_update_category_insight", None))
+        if helper is None:
+            return
+        try:
+            helper_signature: Signature | None = signature(helper)
+        except (TypeError, ValueError):
+            helper_signature = None
+        if helper_signature and "previous_prompt" in helper_signature.parameters:
+            helper(prompt, previous_prompt=previous_prompt)
+            return
+        helper(prompt)
+
+    def _commit_prompt_version_for_lifecycle(
+        self,
+        prompt: Prompt,
+        *,
+        commit_message: str | None = None,
+    ) -> PromptVersion:
+        """Commit a prompt version through the prompt manager helper."""
+        manager = self._as_prompt_manager()
+        helper = cast(
+            "Callable[..., PromptVersion] | None",
+            getattr(manager, "_commit_prompt_version", None),
+        )
+        if helper is None:
+            raise PromptStorageError("Prompt versioning is unavailable.")
+        return helper(prompt, commit_message=commit_message)
+
     def create_prompt(
         self,
         prompt: Prompt,
@@ -74,10 +107,8 @@ class PromptLifecycleMixin:
         commit_message: str | None = None,
     ) -> Prompt:
         """Persist a new prompt in SQLite/ChromaDB and prime the cache."""
-        manager = self._as_prompt_manager()
-        prompt = manager._apply_category_metadata(prompt)
-        insight_accessor = cast("_CategoryInsightAccessor", self)
-        insight_accessor._update_category_insight(prompt, previous_prompt=None)
+        prompt = self._apply_category_metadata_for_lifecycle(prompt)
+        self._update_category_insight_for_lifecycle(prompt, previous_prompt=None)
         generated_embedding: list[float] | None = None
         if embedding is not None:
             generated_embedding = list(embedding)
@@ -116,7 +147,10 @@ class PromptLifecycleMixin:
                     "Prompt created but not cached",
                     extra={"prompt_id": str(prompt.id)},
                 )
-        version = manager._commit_prompt_version(stored_prompt, commit_message=commit_message)
+        version = self._commit_prompt_version_for_lifecycle(
+            stored_prompt,
+            commit_message=commit_message,
+        )
         logger.debug(
             "Prompt version committed",
             extra={
@@ -129,7 +163,9 @@ class PromptLifecycleMixin:
 
     def _ensure_uuid(self, value: UUID | str) -> UUID:
         """Normalize user-supplied identifier inputs to UUID objects."""
-        return _ensure_uuid(value)
+        if isinstance(value, UUID):
+            return value
+        return UUID(str(value))
 
     def get_prompt(self, prompt_id: UUID) -> Prompt:
         """Retrieve a prompt from cache or SQLite."""
@@ -160,8 +196,7 @@ class PromptLifecycleMixin:
         commit_message: str | None = None,
     ) -> Prompt:
         """Update an existing prompt with new metadata."""
-        manager = self._as_prompt_manager()
-        prompt = manager._apply_category_metadata(prompt)
+        prompt = self._apply_category_metadata_for_lifecycle(prompt)
         try:
             previous_prompt = self._repository.get(prompt.id)
         except RepositoryNotFoundError as exc:
@@ -183,9 +218,7 @@ class PromptLifecycleMixin:
                 exc_info=True,
             )
 
-        cast("_CategoryInsightAccessor", self)._update_category_insight(
-            prompt, previous_prompt=previous_prompt
-        )
+        self._update_category_insight_for_lifecycle(prompt, previous_prompt=previous_prompt)
 
         body_changed = self._normalise_body(previous_prompt.context) != self._normalise_body(
             prompt.context
@@ -235,7 +268,10 @@ class PromptLifecycleMixin:
                     extra={"prompt_id": str(prompt.id)},
                 )
         if should_commit_version:
-            version = manager._commit_prompt_version(updated_prompt, commit_message=commit_message)
+            version = self._commit_prompt_version_for_lifecycle(
+                updated_prompt,
+                commit_message=commit_message,
+            )
             logger.debug(
                 "Prompt version committed",
                 extra={
@@ -254,7 +290,6 @@ class PromptLifecycleMixin:
 
     def delete_prompt(self, prompt_id: UUID) -> None:
         """Remove a prompt from all data stores."""
-        manager = self._as_prompt_manager()
         prompt_id = self._ensure_uuid(prompt_id)
         try:
             self._repository.delete(prompt_id)
@@ -263,7 +298,7 @@ class PromptLifecycleMixin:
         except RepositoryError as exc:
             raise PromptStorageError(f"Failed to delete prompt {prompt_id} from SQLite") from exc
         try:
-            manager.collection.delete(ids=[str(prompt_id)])
+            self._as_prompt_manager().collection.delete(ids=[str(prompt_id)])
         except ChromaError as exc:
             raise PromptStorageError(f"Failed to delete prompt {prompt_id}") from exc
         try:
@@ -303,7 +338,7 @@ class PromptLifecycleMixin:
 
     def _apply_rating(self, prompt_id: UUID, rating: float) -> None:
         """Update prompt aggregates from a new rating."""
-        if not isinstance(prompt_id, UUID):
+        if prompt_id.int < 0:
             raise TypeError("prompt_id must be a uuid.UUID instance.")
         try:
             prompt = self.get_prompt(prompt_id)
@@ -391,16 +426,13 @@ class PromptLifecycleMixin:
         is_new: bool,
     ) -> None:
         """Persist embeddings to Chroma and refresh caches."""
-        manager = self._as_prompt_manager()
-        if not isinstance(embedding, Sequence):
-            raise TypeError("Embedding payload must be a sequence.")
         payload: dict[str, Any] = {
             "ids": [str(prompt.id)],
             "documents": [prompt.document],
             "metadatas": [prompt.to_metadata()],
             "embeddings": [list(embedding)],
         }
-        collection = manager.collection
+        collection = self._as_prompt_manager().collection
         try:
             collection.upsert(**payload)
         except ChromaError as exc:

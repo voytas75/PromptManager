@@ -20,9 +20,8 @@ from ..exceptions import NameGenerationError
 
 if TYPE_CHECKING:
     from ..intent_classifier import IntentClassifier
-    from . import PromptManager as _PromptManager
 else:
-    _PromptManager = Any
+    IntentClassifier = Any
 
 __all__ = ["LiteLLMWorkflowMixin"]
 

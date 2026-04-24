@@ -229,7 +229,7 @@ class Prompt:
         self.category_slug = slug_value or None
         self.version = _normalize_version_label(self.version)
 
-    def _serializable_ext5(self) -> MutableMapping[str, Any] | None:
+    def serializable_ext5(self) -> MutableMapping[str, Any] | None:
         """Return ext5 metadata with prompt-owned convenience flags kept in sync."""
         ext5_mapping: MutableMapping[str, Any] = {}
         ext5_value = self.ext5
@@ -247,6 +247,10 @@ class Prompt:
             ext5_mapping.pop("favorite", None)
 
         return ext5_mapping or None
+
+    def _serializable_ext5(self) -> MutableMapping[str, Any] | None:
+        """Backward-compatible private shim for legacy callers."""
+        return self.serializable_ext5()
 
     @property
     def document(self) -> str:

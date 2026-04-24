@@ -21,7 +21,7 @@ class WebSearchDocument:
     title: str
     url: str
     summary: str | None = None
-    highlights: list[str] = field(default_factory=list)
+    highlights: list[str] = field(default_factory=lambda: [])
     author: str | None = None
     published_at: datetime | None = None
     score: float | None = None

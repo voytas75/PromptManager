@@ -637,7 +637,7 @@ class PromptStoreMixin:
             "ext2": _json_dumps(prompt.ext2),
             "ext3": prompt.ext3,
             "ext4": _json_dumps(list(prompt.ext4) if prompt.ext4 is not None else None),
-            "ext5": _json_dumps(prompt._serializable_ext5()),
+            "ext5": _json_dumps(prompt.serializable_ext5()),
         }
 
     def _row_to_prompt(self, row: sqlite3.Row) -> Prompt:

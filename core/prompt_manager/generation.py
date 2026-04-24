@@ -102,17 +102,45 @@ class GenerationMixin:
         message = manager.llm_status_message(capability)
         raise error_type(message)
 
-    def generate_prompt_name(self, context: str) -> str:
-        """Return a prompt name using the configured LiteLLM generator."""
+    def _name_generator_or_raise(self) -> Any:
+        """Return the configured name generator or raise an offline-aware error."""
         manager = self._as_prompt_manager()
-        if manager._name_generator is None:
+        generator = getattr(manager, "_name_generator", None)
+        if generator is None:
             self._raise_llm_unavailable(
                 NameGenerationError,
                 "Prompt name generation",
             )
+        return generator
+
+    def _description_generator_instance(self) -> Any | None:
+        """Return the configured description generator when available."""
+        manager = self._as_prompt_manager()
+        return getattr(manager, "_description_generator", None)
+
+    def _scenario_generator_or_raise(self) -> Any:
+        """Return the configured scenario generator or raise an offline-aware error."""
+        manager = self._as_prompt_manager()
+        generator = getattr(manager, "_scenario_generator", None)
+        if generator is None:
+            self._raise_llm_unavailable(
+                ScenarioGenerationError,
+                "Prompt scenario generation",
+            )
+        return generator
+
+    def _category_generator_instance(self) -> Any | None:
+        """Return the configured category generator when available."""
+        manager = self._as_prompt_manager()
+        return getattr(manager, "_category_generator", None)
+
+    def generate_prompt_name(self, context: str) -> str:
+        """Return a prompt name using the configured LiteLLM generator."""
+        manager = self._as_prompt_manager()
+        generator = self._name_generator_or_raise()
         task_id = f"name-gen:{uuid.uuid4()}"
         metadata = {"context_length": len(context or "")}
-        with manager._notification_center.track_task(
+        with manager.notification_center.track_task(
             title="Prompt name generation",
             task_id=task_id,
             start_message="Generating prompt name via LiteLLM…",
@@ -122,7 +150,7 @@ class GenerationMixin:
             level=NotificationLevel.INFO,
         ):
             try:
-                suggestion = manager._name_generator.generate(context)
+                suggestion = generator.generate(context)
             except Exception as exc:  # pragma: no cover - backend determined
                 raise NameGenerationError(str(exc)) from exc
         return suggestion
@@ -141,7 +169,8 @@ class GenerationMixin:
             raise DescriptionGenerationError(
                 "Prompt context is required to generate a description."
             )
-        if manager._description_generator is None:
+        description_generator = self._description_generator_instance()
+        if description_generator is None:
             if allow_fallback:
                 logger.debug("Description generator missing; using fallback summary")
                 return manager._build_description_fallback(text, prompt=prompt)
@@ -151,7 +180,7 @@ class GenerationMixin:
             )
         task_id = f"description-gen:{uuid.uuid4()}"
         metadata = {"context_length": len(text)}
-        with manager._notification_center.track_task(
+        with manager.notification_center.track_task(
             title="Prompt description generation",
             task_id=task_id,
             start_message="Generating prompt description via LiteLLM…",
@@ -161,7 +190,7 @@ class GenerationMixin:
             level=NotificationLevel.INFO,
         ):
             try:
-                summary = manager._description_generator.generate(text)
+                summary = description_generator.generate(text)
             except Exception as exc:  # pragma: no cover - backend determined
                 if allow_fallback:
                     logger.warning(
@@ -180,17 +209,13 @@ class GenerationMixin:
     ) -> list[str]:
         """Return usage scenarios for a prompt via the configured LiteLLM helper."""
         manager = self._as_prompt_manager()
-        if manager._scenario_generator is None:
-            self._raise_llm_unavailable(
-                ScenarioGenerationError,
-                "Prompt scenario generation",
-            )
+        generator = self._scenario_generator_or_raise()
         task_id = f"scenario-gen:{uuid.uuid4()}"
         metadata = {
             "context_length": len(context or ""),
             "max_scenarios": max(0, int(max_scenarios)),
         }
-        with manager._notification_center.track_task(
+        with manager.notification_center.track_task(
             title="Prompt scenario generation",
             task_id=task_id,
             start_message="Generating scenarios via LiteLLM…",
@@ -200,7 +225,7 @@ class GenerationMixin:
             level=NotificationLevel.INFO,
         ):
             try:
-                scenarios = manager._scenario_generator.generate(
+                scenarios = generator.generate(
                     context,
                     max_scenarios=max_scenarios,
                 )
@@ -227,8 +252,6 @@ class GenerationMixin:
         ext5_payload: MutableMapping[str, Any] | None
         if isinstance(prompt.ext5, MutableMapping):
             ext5_payload = prompt.ext5
-        elif isinstance(prompt.ext5, Mapping):
-            ext5_payload = dict(prompt.ext5)
         else:
             ext5_payload = None
         if scenarios:
@@ -256,7 +279,7 @@ class GenerationMixin:
         if not categories:
             return ""
 
-        if manager._category_generator is not None:
+        if self._category_generator_instance() is not None:
             suggestion = manager._run_category_generator(text, categories)
             if suggestion:
                 matched = _match_category_label(suggestion, categories)
@@ -272,14 +295,15 @@ class GenerationMixin:
     ) -> str:
         """Return category suggestion from LiteLLM, logging failures for fallbacks."""
         manager = self._as_prompt_manager()
-        if manager._category_generator is None:
+        generator = self._category_generator_instance()
+        if generator is None:
             return ""
         task_id = f"category-suggest:{uuid.uuid4()}"
         metadata = {
             "context_length": len(context or ""),
             "category_count": len(categories),
         }
-        with manager._notification_center.track_task(
+        with manager.notification_center.track_task(
             title="Prompt category suggestion",
             task_id=task_id,
             start_message="Suggesting prompt category via LiteLLM…",
@@ -289,7 +313,7 @@ class GenerationMixin:
             level=NotificationLevel.INFO,
         ):
             try:
-                return manager._category_generator.generate(context, categories=categories)
+                return generator.generate(context, categories=categories)
             except CategorySuggestionError as exc:
                 logger.debug(
                     "LiteLLM category suggestion failed",
@@ -307,7 +331,7 @@ class GenerationMixin:
     ) -> str:
         """Return a category suggestion using heuristics and classifier hints."""
         manager = self._as_prompt_manager()
-        classifier = getattr(manager, "_intent_classifier", None)
+        classifier = manager.intent_classifier
         if classifier is not None:
             prediction = classifier.classify(context)
             if prediction.category_hints:
@@ -342,7 +366,8 @@ class GenerationMixin:
     ) -> None:
         """Capture LiteLLM-backed category drift metadata on the prompt."""
         manager = self._as_prompt_manager()
-        if manager._category_generator is None:
+        generator = self._category_generator_instance()
+        if generator is None:
             manager._set_category_insight_metadata(prompt, None)
             return
 
@@ -357,7 +382,7 @@ class GenerationMixin:
             return
 
         try:
-            suggestion_raw = manager._category_generator.generate(
+            suggestion_raw = generator.generate(
                 context_text, categories=categories
             )
         except CategorySuggestionError as exc:
@@ -427,7 +452,8 @@ class GenerationMixin:
             return None
         payload = ext2.get(_CATEGORY_INSIGHT_KEY)
         if isinstance(payload, Mapping):
-            return {str(key): value for key, value in payload.items()}
+            typed_payload = cast(Mapping[object, Any], payload)
+            return {str(key): value for key, value in typed_payload.items()}
         return None
 
     def _build_category_adoption_insight(
@@ -468,8 +494,6 @@ class GenerationMixin:
         """Persist or clear category insight metadata on the prompt record."""
         if isinstance(prompt.ext2, MutableMapping):
             metadata: dict[str, Any] = dict(prompt.ext2)
-        elif isinstance(prompt.ext2, Mapping):
-            metadata = dict(prompt.ext2)
         else:
             metadata = {}
 

@@ -321,8 +321,17 @@ class PromptSearchMixin:
     def _extract_distances(self, results: dict[str, Any], target_length: int) -> list[float | None]:
         """Normalise returned Chroma distance vectors."""
         distances = results.get("distances")
-        if isinstance(distances, list) and distances:
-            distance_values = distances[0]
+        distance_values: list[float | None]
+        if (
+            isinstance(distances, list)
+            and distances
+            and isinstance(distances[0], list)
+        ):
+            raw_distance_values = cast(list[Any], distances[0])
+            distance_values = [
+                float(value) if isinstance(value, (int, float)) else None
+                for value in raw_distance_values
+            ]
         else:
             distance_values = []
         if len(distance_values) < target_length:

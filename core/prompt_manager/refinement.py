@@ -69,7 +69,7 @@ class PromptRefinementMixin:
             "tag_count": len(tags or []),
         }
         manager = self._as_prompt_manager()
-        with manager._notification_center.track_task(  # noqa: SLF001
+        with manager.notification_center.track_task(
             title="Prompt refinement",
             task_id=task_id,
             start_message="Analysing prompt via LiteLLM…",
@@ -115,7 +115,7 @@ class PromptRefinementMixin:
             "mode": "structure",
         }
         manager = self._as_prompt_manager()
-        with manager._notification_center.track_task(  # noqa: SLF001
+        with manager.notification_center.track_task(
             title="Prompt structure refinement",
             task_id=task_id,
             start_message="Reformatting prompt via LiteLLM…",
