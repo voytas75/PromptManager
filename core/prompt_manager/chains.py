@@ -18,7 +18,6 @@ import asyncio
 import logging
 import re
 import uuid
-from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
@@ -47,8 +46,8 @@ from ..web_search.context_formatting import (
 )
 from .execution_history import ExecutionOutcome
 
-if TYPE_CHECKING:  # pragma: no cover - typing helpers only
-    from collections.abc import Callable, Mapping
+if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping, Sequence
     from typing import Protocol
 
     from models.prompt_chain_model import PromptChain, PromptChainStep
@@ -558,7 +557,11 @@ class PromptChainMixin:
         if not trimmed:
             return None
         prompt_templates = getattr(self, "_prompt_templates", None)
-        prompt_overrides = cast("dict[str, str]", prompt_templates) if isinstance(prompt_templates, dict) else {}
+        prompt_overrides = (
+            cast("dict[str, str]", prompt_templates)
+            if isinstance(prompt_templates, dict)
+            else {}
+        )
         system_prompt = prompt_overrides.get("chain_summary") or _CHAIN_SUMMARY_SYSTEM_PROMPT
         executor = getattr(self, "_executor", None)
         model = (

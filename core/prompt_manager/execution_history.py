@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
@@ -32,6 +31,7 @@ from ..history_tracker import (
 from ..notifications import NotificationCenter, NotificationLevel
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping, Sequence
     from datetime import datetime
     from typing import Protocol
 

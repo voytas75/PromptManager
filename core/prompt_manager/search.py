@@ -327,7 +327,7 @@ class PromptSearchMixin:
             and distances
             and isinstance(distances[0], list)
         ):
-            raw_distance_values = cast(list[Any], distances[0])
+            raw_distance_values = cast("list[Any]", distances[0])
             distance_values = [
                 float(value) if isinstance(value, (int, float)) else None
                 for value in raw_distance_values

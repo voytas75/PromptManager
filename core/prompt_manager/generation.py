@@ -452,7 +452,7 @@ class GenerationMixin:
             return None
         payload = ext2.get(_CATEGORY_INSIGHT_KEY)
         if isinstance(payload, Mapping):
-            typed_payload = cast(Mapping[object, Any], payload)
+            typed_payload = cast("Mapping[object, Any]", payload)
             return {str(key): value for key, value in typed_payload.items()}
         return None
 

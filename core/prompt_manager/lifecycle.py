@@ -6,12 +6,11 @@ Updates:
 
 from __future__ import annotations
 
-from inspect import Signature, signature
 import json
 import logging
-from collections.abc import Sequence
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Callable, cast
+from inspect import Signature, signature
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 from chromadb.errors import ChromaError
@@ -28,6 +27,8 @@ from ..exceptions import (
 from ..repository import RepositoryError, RepositoryNotFoundError
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers only
+    from collections.abc import Callable, Sequence
+
     from models.prompt_model import PromptVersion
 
     from ..repository import PromptRepository
@@ -58,7 +59,10 @@ class PromptLifecycleMixin:
     def _apply_category_metadata_for_lifecycle(self, prompt: Prompt) -> Prompt:
         """Apply category metadata through the prompt manager when available."""
         manager = self._as_prompt_manager()
-        helper = cast("Callable[[Prompt], Prompt] | None", getattr(manager, "_apply_category_metadata", None))
+        helper = cast(
+            "Callable[[Prompt], Prompt] | None",
+            getattr(manager, "_apply_category_metadata", None),
+        )
         if helper is None:
             return prompt
         return helper(prompt)
@@ -71,7 +75,10 @@ class PromptLifecycleMixin:
     ) -> None:
         """Update category insight metadata through the prompt manager helper."""
         manager = self._as_prompt_manager()
-        helper = cast("Callable[..., None] | None", getattr(manager, "_update_category_insight", None))
+        helper = cast(
+            "Callable[..., None] | None",
+            getattr(manager, "_update_category_insight", None),
+        )
         if helper is None:
             return
         try:

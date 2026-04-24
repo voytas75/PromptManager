@@ -22,9 +22,7 @@ from pydantic import BaseModel, Field, ValidationError, create_model
 from models.category_model import slugify_category
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
-    from typing import TypeAlias
-
-    JsonSchema: TypeAlias = Mapping[str, Any]
+    type JsonSchema = Mapping[str, Any]
 else:
     JsonSchema = Mapping[str, Any]
 
@@ -55,8 +53,8 @@ class TemplateRenderResult:
     """Outcome of rendering a template preview."""
 
     rendered_text: str
-    errors: list[str] = field(default_factory=lambda: cast(list[str], []))
-    missing_variables: set[str] = field(default_factory=lambda: cast(set[str], set()))
+    errors: list[str] = field(default_factory=lambda: cast("list[str]", []))
+    missing_variables: set[str] = field(default_factory=lambda: cast("set[str]", set()))
 
 
 def format_template_syntax_error(template_text: str, exc: TemplateSyntaxError) -> str:
@@ -208,8 +206,8 @@ class SchemaValidationResult:
     """Outcome of validating user variables against an optional schema."""
 
     is_valid: bool
-    errors: list[str] = field(default_factory=lambda: cast(list[str], []))
-    field_errors: set[str] = field(default_factory=lambda: cast(set[str], set()))
+    errors: list[str] = field(default_factory=lambda: cast("list[str]", []))
+    field_errors: set[str] = field(default_factory=lambda: cast("set[str]", set()))
     schema_error: str | None = None
 
 
@@ -243,7 +241,7 @@ class SchemaValidator:
                 schema_error="Schema root is not an object",
             )
 
-        schema = cast(JsonSchema, parsed_schema)
+        schema = cast("JsonSchema", parsed_schema)
         if mode is SchemaValidationMode.JSON_SCHEMA:
             return self._validate_with_json_schema(variables, schema)
         if mode is SchemaValidationMode.PYDANTIC:
@@ -268,7 +266,7 @@ class SchemaValidator:
         errors: list[str] = []
         field_errors: set[str] = set()
         validate_mapping = cast("Any", validator)
-        for error in cast(Sequence[Any], validate_mapping.iter_errors(dict(variables))):
+        for error in cast("Sequence[Any]", validate_mapping.iter_errors(dict(variables))):
             path = self._format_error_path(error.path)
             errors.append(f"{path}: {error.message}" if path else error.message)
             if path:
@@ -318,15 +316,23 @@ class SchemaValidator:
             raise ValueError("Schema must define object properties for Pydantic validation")
 
         required_value = schema.get("required", [])
-        required_items = cast(Sequence[Any], required_value) if isinstance(required_value, Sequence) else ()
+        required_items = (
+            cast("Sequence[Any]", required_value)
+            if isinstance(required_value, Sequence)
+            else ()
+        )
         required = {str(item) for item in required_items}
         fields: dict[str, tuple[type[Any], Any]] = {}
-        typed_properties = cast(Mapping[str, JsonSchema], properties)
+        typed_properties = cast("Mapping[str, JsonSchema]", properties)
         for name, definition in typed_properties.items():
             python_type = self._resolve_python_type(definition)
             default = definition.get("default", ... if name in required else None)
             constraints = self._field_constraints(definition)
-            field_info = Field(default, description=cast("str | None", definition.get("description")), **constraints)
+            field_info = Field(
+                default,
+                description=cast("str | None", definition.get("description")),
+                **constraints,
+            )
             field_type = cast("type[Any]", python_type)
             fields[str(name)] = (field_type, field_info)
 
@@ -347,9 +353,11 @@ class SchemaValidator:
             return bool
         if schema_type == "array":
             items = definition.get("items")
-            typed_items = cast(JsonSchema, items) if isinstance(items, Mapping) else None
+            typed_items = cast("JsonSchema", items) if isinstance(items, Mapping) else None
             item_type = (
-                SchemaValidator._resolve_python_type(typed_items) if typed_items is not None else Any
+                SchemaValidator._resolve_python_type(typed_items)
+                if typed_items is not None
+                else Any
             )
             return list[item_type]  # type: ignore[index]
         if schema_type == "object":

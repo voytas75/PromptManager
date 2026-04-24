@@ -188,8 +188,8 @@ class MaintenanceMixin:
         pool = getattr(client, "connection_pool", None)
         if pool is not None:
             raw_kwargs = getattr(pool, "connection_kwargs", None)
-            kwargs = cast(dict[str, Any], raw_kwargs) if isinstance(raw_kwargs, dict) else {}
-            host = cast(str | None, kwargs.get("host") or kwargs.get("unix_socket_path"))
+            kwargs = cast("dict[str, Any]", raw_kwargs) if isinstance(raw_kwargs, dict) else {}
+            host = cast("str | None", kwargs.get("host") or kwargs.get("unix_socket_path"))
             if host:
                 connection["host"] = host
             if kwargs.get("port") is not None:
@@ -292,7 +292,11 @@ class MaintenanceMixin:
         if self._collection_instance() is None:
             return
         try:
-            delete_collection = getattr(getattr(manager, "_chroma_client", None), "delete_collection", None)
+            delete_collection = getattr(
+                getattr(manager, "_chroma_client", None),
+                "delete_collection",
+                None,
+            )
             if callable(delete_collection):
                 delete_collection(name=getattr(manager, "_collection_name", ""))
                 self._initialise_chroma_collection()
