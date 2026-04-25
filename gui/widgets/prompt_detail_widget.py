@@ -155,6 +155,11 @@ class PromptDetailWidget(QWidget):
         self._decision_label.setWordWrap(True)
         self._decision_label.setTextFormat(Qt.TextFormat.RichText)
         self._decision_label.setVisible(False)
+        self._run_summary_label = QLabel("", content)
+        self._run_summary_label.setObjectName("promptRunSummary")
+        self._run_summary_label.setWordWrap(True)
+        self._run_summary_label.setTextFormat(Qt.TextFormat.RichText)
+        self._run_summary_label.setVisible(False)
 
         self._context = QLabel("", content)
         self._context.setWordWrap(True)
@@ -185,6 +190,8 @@ class PromptDetailWidget(QWidget):
         content_layout.addWidget(self._lineage_label)
         content_layout.addSpacing(4)
         content_layout.addWidget(self._decision_label)
+        content_layout.addSpacing(4)
+        content_layout.addWidget(self._run_summary_label)
         content_layout.addSpacing(4)
         content_layout.addWidget(self._context)
         content_layout.addSpacing(4)
@@ -819,6 +826,7 @@ class PromptDetailWidget(QWidget):
             self._description,
             self._lineage_label,
             self._decision_label,
+            self._run_summary_label,
             self._context,
             self._scenarios,
             self._examples,
@@ -880,6 +888,8 @@ class PromptDetailWidget(QWidget):
         self._lineage_label.setVisible(False)
         self._decision_label.clear()
         self._decision_label.setVisible(False)
+        self._run_summary_label.clear()
+        self._run_summary_label.setVisible(False)
 
     def share_button(self) -> QPushButton:
         """Return the share button so callers can anchor menus."""
@@ -946,6 +956,15 @@ class PromptDetailWidget(QWidget):
         else:
             self._decision_label.clear()
             self._decision_label.setVisible(False)
+
+    def update_run_summary(self, text: str | None) -> None:
+        """Display one compact last-run evidence cue for the current prompt."""
+        if text:
+            self._run_summary_label.setText(text)
+            self._run_summary_label.setVisible(True)
+        else:
+            self._run_summary_label.clear()
+            self._run_summary_label.setVisible(False)
 
 
 __all__ = ["PromptDetailWidget"]

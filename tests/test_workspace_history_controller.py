@@ -33,15 +33,42 @@ else:  # pragma: no cover - runtime placeholders for typing-only imports
     TemplatePreviewController = Any
 
 
+class _ExecutionEntryStub:
+    def __init__(
+        self,
+        *,
+        status: str = "success",
+        model: str = "gpt-4o-mini",
+        duration_ms: int | None = 120,
+        prompt_version: int = 1,
+        conversation_messages: int = 3,
+    ) -> None:
+        self.status = type("_Status", (), {"value": status})()
+        self.duration_ms = duration_ms
+        self.executed_at = None
+        self.metadata = {
+            "context": {
+                "execution": {"model": model},
+                "run": {
+                    "kind": "prompt_execution",
+                    "prompt_version": prompt_version,
+                    "conversation_messages": conversation_messages,
+                },
+            }
+        }
+
+
 class _ManagerStub:
     def __init__(
         self,
         *,
         parent_prompt: Prompt | None = None,
         parent_link: PromptForkLink | None = None,
+        execution_entries: dict[uuid.UUID, list[_ExecutionEntryStub]] | None = None,
     ) -> None:
         self._parent_prompt = parent_prompt
         self._parent_link = parent_link
+        self._execution_entries = execution_entries or {}
 
     def get_prompt_parent_fork(self, prompt_id: uuid.UUID) -> PromptForkLink | None:  # noqa: ARG002
         return self._parent_link
@@ -53,6 +80,9 @@ class _ManagerStub:
         assert self._parent_prompt is not None
         assert prompt_id == self._parent_prompt.id
         return self._parent_prompt
+
+    def list_execution_history(self, prompt_id: uuid.UUID, *, limit: int = 20) -> list[_ExecutionEntryStub]:
+        return list(self._execution_entries.get(prompt_id, [])[:limit])
 
 
 class _PromptListModelStub:
@@ -67,10 +97,12 @@ class _PromptDetailWidgetStub:
     def __init__(self) -> None:
         self.lineage_summary: str | None = None
         self.decision_summary: str | None = None
+        self.run_summary: str | None = None
 
     def clear(self) -> None:
         self.lineage_summary = None
         self.decision_summary = None
+        self.run_summary = None
 
     def display_prompt(self, prompt: Prompt) -> None:  # noqa: ARG002
         return
@@ -80,6 +112,9 @@ class _PromptDetailWidgetStub:
 
     def update_decision_summary(self, text: str | None) -> None:
         self.decision_summary = text
+
+    def update_run_summary(self, text: str | None) -> None:
+        self.run_summary = text
 
 
 class _ListViewStub:
@@ -208,16 +243,60 @@ def test_workspace_history_controller_shows_bounded_parent_difference_cue() -> N
     assert template_detail_widget.decision_summary == "Refine before reuse"
 
 
-def test_workspace_history_controller_hides_difference_cue_without_parent_changes() -> None:
-    """Non-forks or identical forks should not show noisy changed-from-parent output."""
+def test_workspace_history_controller_surfaces_last_run_summary_for_prompt() -> None:
+    """Inspect flow should expose one compact last-run provenance summary when history exists."""
     prompt = Prompt(
-        id=uuid.UUID("00000000-0000-0000-0000-000000000221"),
-        name="Standalone prompt",
+        id=uuid.UUID("00000000-0000-0000-0000-000000000231"),
+        name="Reusable prompt",
         description="Description",
         category="General",
-        tags=["steady"],
         context="Prompt body",
-        source="local",
+    )
+    detail_widget = _PromptDetailWidgetStub()
+    template_detail_widget = _PromptDetailWidgetStub()
+    manager = _ManagerStub(
+        execution_entries={
+            prompt.id: [
+                _ExecutionEntryStub(
+                    status="success",
+                    model="gpt-4o-mini",
+                    duration_ms=120,
+                    prompt_version=prompt.version,
+                    conversation_messages=3,
+                )
+            ]
+        }
+    )
+    controller = WorkspaceHistoryController(
+        manager=_as_prompt_manager(manager),
+        model=_as_prompt_list_model(_PromptListModelStub()),
+        detail_widget=_as_prompt_detail_widget(detail_widget),
+        list_view=_as_list_view(_ListViewStub()),
+        current_prompt_supplier=lambda: prompt,
+        template_detail_widget_supplier=_template_detail_supplier(template_detail_widget),
+        template_preview_controller_supplier=_template_preview_supplier(),
+        execution_controller_supplier=_execution_controller_supplier(),
+    )
+
+    controller.handle_selection_changed()
+
+    assert detail_widget.run_summary is not None
+    assert template_detail_widget.run_summary is not None
+    assert "Last run" in detail_widget.run_summary
+    assert "gpt-4o-mini" in detail_widget.run_summary
+    assert str(prompt.version) in detail_widget.run_summary
+    assert "3 messages" in detail_widget.run_summary
+    assert "120 ms" in detail_widget.run_summary
+
+
+def test_workspace_history_controller_hides_last_run_summary_when_prompt_has_no_history() -> None:
+    """Inspect flow should stay quiet when the prompt has no execution history yet."""
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000232"),
+        name="Reusable prompt",
+        description="Description",
+        category="General",
+        context="Prompt body",
     )
     detail_widget = _PromptDetailWidgetStub()
     template_detail_widget = _PromptDetailWidgetStub()
@@ -234,7 +313,5 @@ def test_workspace_history_controller_hides_difference_cue_without_parent_change
 
     controller.handle_selection_changed()
 
-    assert detail_widget.lineage_summary == "No lineage data yet."
-    assert template_detail_widget.lineage_summary == "No lineage data yet."
-    assert detail_widget.decision_summary == "Reuse as-is"
-    assert template_detail_widget.decision_summary == "Reuse as-is"
+    assert detail_widget.run_summary is None
+    assert template_detail_widget.run_summary is None

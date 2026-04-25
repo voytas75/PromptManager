@@ -41,7 +41,7 @@ Po **każdej** implementacji wykonaj w tej kolejności:
 - [x] search/recent/retrieval ergonomics improvements
 
 ### Stage 3 — Trustworthy prompt operations
-- [ ] structured runs v1 linked to prompt assets
+- [x] structured runs v1 linked to prompt assets
 - [ ] baseline vs candidate comparison slice
 
 ### Stage 4 — Controlled automation surfaces
@@ -275,11 +275,20 @@ Introduce bounded blocking-state detection for critical paths such as missing fa
 
 ### Task 7: Structured runs v1
 
-**Status:** completed
+**Status:** implemented
 
 **Objective:** Record prompt-linked runs with enough provenance to support refinement decisions.
 
----
+**Implemented:**
+- Added persisted `run` provenance in execution context metadata for prompt executions: run kind, prompt id, prompt version, and conversation message count.
+- Surfaced a bounded `Last run` evidence cue in inspect/detail flow using existing execution history metadata instead of a new UI-side model.
+- Kept the slice compact and inspect-oriented: latest run summary now shows status, model, prompt version, conversation message count, and duration when available.
+
+**Verified:**
+- `.venv/bin/pytest tests/test_workspace_history_controller.py tests/test_prompt_detail_widget.py tests/test_canonical_operator_path_parity.py tests/test_history_tracker.py -q`
+- result: `37 passed`
+- `.venv/bin/pytest tests/test_prompt_manager_execution_history.py tests/test_history_tracker.py tests/test_workspace_history_controller.py tests/test_prompt_detail_widget.py -q`
+- result: `39 passed`
 
 ### Task 8: CLI/API parity expansion
 
@@ -311,5 +320,7 @@ Introduce bounded blocking-state detection for critical paths such as missing fa
 - Verified Task 3 with targeted startup tests and related trust suite: `2 passed`, then `43 passed`.
 - Implemented Task 7: structured run provenance in execution context metadata.
 - Verified Task 7 with targeted execution-history tests plus related tracker coverage: `10 passed`; pyright on touched files: `0 errors`.
+- Extended Task 7: surfaced bounded `Last run` evidence in inspect/detail from persisted execution history provenance.
+- Verified Task 7 evidence surface with targeted + nearby suites: `37 passed`, then `39 passed`.
 - Implemented Task 8: bounded CLI/headless parity coverage for shared analytics snapshot rendering.
 - Verified Task 8 with targeted CLI analytics test: `1 passed`; related CLI/execution suite: `36 passed`.

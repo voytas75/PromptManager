@@ -43,6 +43,37 @@ def qt_app() -> QApplication:
     return cast("QApplication", app)
 
 
+def test_prompt_detail_widget_renders_last_run_summary_label(
+    qt_app: QApplication,
+) -> None:
+    """Detail view should render one compact last-run cue when the controller provides it."""
+    widget = PromptDetailWidget()
+
+    widget.show()
+    widget.update_run_summary("Last run: success via gpt-4o-mini · v1 · 3 messages · 120 ms")
+    qt_app.processEvents()
+
+    assert widget._run_summary_label.isVisible()  # noqa: SLF001
+    summary_text = widget._run_summary_label.text()  # noqa: SLF001
+    assert "Last run:" in summary_text
+    assert "gpt-4o-mini" in summary_text
+
+
+def test_prompt_detail_widget_hides_last_run_summary_when_empty(
+    qt_app: QApplication,
+) -> None:
+    """Detail view should clear the last-run cue when the controller removes it."""
+    widget = PromptDetailWidget()
+
+    widget.show()
+    widget.update_run_summary("Last run: success")
+    widget.update_run_summary(None)
+    qt_app.processEvents()
+
+    assert not widget._run_summary_label.isVisible()  # noqa: SLF001
+    assert widget._run_summary_label.text() == ""  # noqa: SLF001
+
+
 def test_prompt_detail_widget_renders_decision_summary_label(
     qt_app: QApplication,
 ) -> None:

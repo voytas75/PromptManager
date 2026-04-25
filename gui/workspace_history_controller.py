@@ -85,6 +85,7 @@ class WorkspaceHistoryController:
             template_detail.display_prompt(prompt)
         self._update_prompt_lineage_summary(prompt)
         self._update_prompt_decision_summary(prompt)
+        self._update_prompt_run_summary(prompt)
         self._update_template_preview(prompt)
 
     def select_prompt(self, prompt_id: UUID) -> None:
@@ -150,6 +151,54 @@ class WorkspaceHistoryController:
         template_detail = self._template_detail_widget_supplier()
         if template_detail is not None:
             template_detail.update_decision_summary(decision_text)
+
+    def _update_prompt_run_summary(self, prompt: Prompt) -> None:
+        """Render one bounded last-run evidence cue using existing execution history."""
+        run_summary = self._build_run_summary(prompt)
+        self._detail_widget.update_run_summary(run_summary)
+        template_detail = self._template_detail_widget_supplier()
+        if template_detail is not None:
+            template_detail.update_run_summary(run_summary)
+
+    def _build_run_summary(self, prompt: Prompt) -> str | None:
+        entries = self._list_execution_history(prompt)
+        if not entries:
+            return None
+        latest = entries[0]
+        metadata = getattr(latest, "metadata", None) or {}
+        context = metadata.get("context", {}) if isinstance(metadata, dict) else {}
+        execution = context.get("execution", {}) if isinstance(context, dict) else {}
+        run = context.get("run", {}) if isinstance(context, dict) else {}
+
+        status_value = getattr(getattr(latest, "status", None), "value", None) or "unknown"
+        model = execution.get("model") if isinstance(execution, dict) else None
+        prompt_version = run.get("prompt_version") if isinstance(run, dict) else None
+        conversation_messages = run.get("conversation_messages") if isinstance(run, dict) else None
+        duration_ms = getattr(latest, "duration_ms", None)
+
+        parts = [f"Last run: {status_value}"]
+        if model:
+            parts.append(f"via {model}")
+        if prompt_version is not None:
+            parts.append(f"v{prompt_version}")
+        if conversation_messages is not None:
+            message_label = "message" if int(conversation_messages) == 1 else "messages"
+            parts.append(f"{conversation_messages} {message_label}")
+        if duration_ms is not None:
+            parts.append(f"{duration_ms} ms")
+        return " · ".join(parts)
+
+    def _list_execution_history(self, prompt: Prompt) -> list[object]:
+        list_history = getattr(self._manager, "list_execution_history", None)
+        if not callable(list_history):
+            return []
+        try:
+            entries = list_history(prompt.id, limit=1)
+        except PromptManagerError:
+            return []
+        if not isinstance(entries, list):
+            return []
+        return entries
 
     def _build_decision_summary(self, prompt: Prompt) -> str:
         try:
