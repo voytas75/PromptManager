@@ -272,7 +272,7 @@ class WorkspaceHistoryController:
         if decision_text == "Safe to compare":
             return "Compare before promoting"
         if decision_text == "Refine before reuse":
-            return "Refine candidate"
+            return "Refine before reuse"
         if decision_text == "Fork before editing":
             return "Fork before editing"
         return "Reuse as-is"

@@ -332,6 +332,26 @@ Introduce bounded blocking-state detection for critical paths such as missing fa
 - `python -m main --no-gui --print-settings`
 - result: diagnostics block rendered before database/path/provider sections
 
+### Task 5: Bounded next-action cues in inspect/detail from existing evidence
+
+**Status:** implemented
+
+**Objective:** Surface one compact operator-facing next-step cue in inspect/detail without adding new workflow branches.
+
+**Implemented:**
+- Added a bounded `Recommended next action` cue in inspect/detail derived from existing decision + run evidence.
+- Centralized the decision-to-next-action mapping so shared and template detail surfaces stay aligned.
+- Tightened the operator wording so the refine path now reuses the same user-visible phrase as the decision cue (`Refine before reuse`) instead of the more technical `Refine candidate` label.
+- Kept the slice bounded to existing evidence and wording only: no new actions, no new persistence, no new compare flow.
+
+**Verified:**
+- `.venv/bin/pytest tests/test_workspace_history_controller.py tests/test_prompt_detail_widget.py -q`
+- result: `37 passed`
+- `.venv/bin/ruff check gui/workspace_history_controller.py tests/test_workspace_history_controller.py tests/test_prompt_detail_widget.py`
+- result: `All checks passed!`
+
+---
+
 ## Update log
 
 ### 2026-04-25

@@ -255,8 +255,8 @@ def test_workspace_history_controller_shows_bounded_parent_difference_cue() -> N
     assert template_detail_widget.lineage_summary == expected
     assert detail_widget.decision_summary == "Refine before reuse"
     assert template_detail_widget.decision_summary == "Refine before reuse"
-    assert detail_widget.next_action_summary == "Refine candidate"
-    assert template_detail_widget.next_action_summary == "Refine candidate"
+    assert detail_widget.next_action_summary == "Refine before reuse"
+    assert template_detail_widget.next_action_summary == "Refine before reuse"
 
 
 def test_workspace_history_controller_surfaces_last_run_summary_for_prompt() -> None:
@@ -543,7 +543,7 @@ def test_workspace_history_controller_maps_default_next_action_to_reuse_as_is() 
     )
 
     assert controller._map_decision_to_next_action("Safe to compare") == "Compare before promoting"  # noqa: SLF001
-    assert controller._map_decision_to_next_action("Refine before reuse") == "Refine candidate"  # noqa: SLF001
+    assert controller._map_decision_to_next_action("Refine before reuse") == "Refine before reuse"  # noqa: SLF001
     assert controller._map_decision_to_next_action("Fork before editing") == "Fork before editing"  # noqa: SLF001
     assert controller._map_decision_to_next_action("Anything else") == "Reuse as-is"  # noqa: SLF001
 
