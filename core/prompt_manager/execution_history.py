@@ -144,6 +144,12 @@ class ExecutionHistoryMixin:
         context: dict[str, Any] = {
             "prompt": prompt_metadata,
             "execution": execution_metadata,
+            "run": {
+                "kind": "prompt_execution",
+                "prompt_id": str(prompt.id),
+                "prompt_version": prompt.version,
+                "conversation_messages": conversation_length,
+            },
         }
         if response_style:
             context["response_style"] = dict(response_style)

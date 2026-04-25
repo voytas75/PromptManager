@@ -223,3 +223,26 @@ def test_save_execution_result_persists_manual_entry_and_rating() -> None:
     assert entry.response_text == "Manual response"
     assert harness.rating_calls == [(prompt.id, 0.75)]
     assert harness.tracker.manual_successes == 1
+
+
+def test_build_execution_context_metadata_includes_prompt_run_provenance() -> None:
+    prompt = _make_prompt()
+    harness = _ExecutionHarness(prompt)
+
+    context = harness.build_execution_context_metadata(
+        prompt,
+        stream_enabled=True,
+        executor_model="gpt-test",
+        conversation_length=3,
+        request_text="Manual input",
+        response_text="Manual response",
+    )
+
+    run = context.get("run")
+    assert isinstance(run, dict)
+    assert run == {
+        "kind": "prompt_execution",
+        "prompt_id": str(prompt.id),
+        "prompt_version": prompt.version,
+        "conversation_messages": 3,
+    }
