@@ -526,6 +526,11 @@ def test_workspace_history_controller_maps_default_next_action_to_reuse_as_is() 
         execution_controller_supplier=_execution_controller_supplier(),
     )
 
+    assert controller._map_decision_to_next_action("Safe to compare") == "Compare before promoting"  # noqa: SLF001
+    assert controller._map_decision_to_next_action("Refine before reuse") == "Refine candidate"  # noqa: SLF001
+    assert controller._map_decision_to_next_action("Fork before editing") == "Fork before editing"  # noqa: SLF001
+    assert controller._map_decision_to_next_action("Anything else") == "Reuse as-is"  # noqa: SLF001
+
     controller.handle_selection_changed()
 
     assert detail_widget.decision_summary == "Reuse as-is"

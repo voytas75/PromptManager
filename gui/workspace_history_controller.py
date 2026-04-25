@@ -1,8 +1,9 @@
 """Coordinate prompt selection, lineage, and template preview updates.
 
 Updates:
+  v0.15.86 - 2026-04-25 - Centralize bounded decision -> next-action mapping for inspect cues.
   v0.15.85 - 2026-04-10 - Add bounded candidate-vs-baseline comparison cues to run summaries.
-  v0.15.84 - 2026-04-10 - Add a bounded changed-from-parent lineage cue for forked prompts.
+  v0.15.84 - 2026-04-10 - Add bounded changed-from-parent lineage cue for forked prompts.
   v0.15.83 - 2026-04-10 - Resolve parent lineage summaries to human-readable prompt names.
   v0.15.82 - 2025-12-01 - Extract selection + lineage handling from gui.main_window.
 """
@@ -263,6 +264,11 @@ class WorkspaceHistoryController:
     def _build_next_action_summary(self, prompt: Prompt) -> str:
         """Map the bounded decision cue to one compact recommended next action."""
         decision_text = self._build_decision_summary(prompt)
+        return self._map_decision_to_next_action(decision_text)
+
+    @staticmethod
+    def _map_decision_to_next_action(decision_text: str) -> str:
+        """Translate bounded decision wording into one compact operator-facing action."""
         if decision_text == "Safe to compare":
             return "Compare before promoting"
         if decision_text == "Refine before reuse":
