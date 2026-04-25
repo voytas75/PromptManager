@@ -126,3 +126,52 @@ def test_print_settings_summary_marks_fully_configured_stack_as_ok(
     assert "Overall status: OK" in output
     assert "OK | Redis cache: Redis caching configured via redis://localhost:6379/0" in output
     assert "Next steps:" not in output
+
+
+def test_print_settings_summary_shows_precedence_explanation_for_env_override(
+    capsys: CaptureFixture[str],
+) -> None:
+    settings = _SummarySettings()
+    settings.litellm_model = "azure/gpt-4.1-env"
+    settings.litellm_api_key = "secret-key"
+    settings._diagnostics_sources = {
+        "litellm_model": "env",
+        "litellm_model_config": "azure/gpt-4.1-config",
+        "litellm_api_key": "env",
+        "litellm_api_key_config": "configured in config.json",
+        "embedding_model": "derived",
+        "redis_dsn": "runtime",
+    }
+
+    output = _render(settings, capsys)
+
+    assert (
+        "OK | Fast model: azure/gpt-4.1-env [env; env overrides config (azure/gpt-4.1-config)]"
+        in output
+    )
+    assert (
+        "OK | API key: configured [env; env overrides config (configured in config.json)]"
+        in output
+    )
+
+
+def test_print_settings_summary_shows_default_and_derived_precedence_labels(
+    capsys: CaptureFixture[str],
+) -> None:
+    settings = _SummarySettings()
+    settings.litellm_model = "azure/gpt-4.1"
+    settings.litellm_api_key = "secret-key"
+    settings.embedding_model = settings.litellm_model
+    settings._diagnostics_sources = {
+        "litellm_model": "config",
+        "litellm_inference_model": "default",
+        "litellm_api_key": "config",
+        "embedding_model": "derived",
+        "litellm_tts_model": "default",
+        "redis_dsn": "runtime",
+    }
+
+    output = _render(settings, capsys)
+
+    assert "WARN | Inference model: not configured [default; default value in effect]" in output
+    assert "OK | Embeddings: litellm / azure/gpt-4.1 [derived; derived from fast model]" in output

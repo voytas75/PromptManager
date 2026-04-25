@@ -16,9 +16,13 @@ Updates:
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
+
+if TYPE_CHECKING:
+    from core import PromptManager
 
 from PySide6.QtGui import QColor
 
@@ -43,14 +47,14 @@ from .appearance_controller import normalise_chat_palette, palette_differs_from_
 from .settings_dialog import persist_settings_to_config
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-
     from core import PromptManager
 
 RuntimeSettings = dict[str, object | None]
 WorkflowRouting = dict[str, Literal["fast", "inference"]]
 DiagnosticsStatus = Literal["OK", "WARN", "FAIL"]
+DiagnosticsSource = Literal["default", "config", "env", "runtime", "derived", "unknown"]
 DiagnosticsItem = dict[str, str]
+DiagnosticsSources = Mapping[str, str]
 ConfigDiagnostics = dict[str, object | None]
 
 
@@ -73,6 +77,7 @@ def build_config_diagnostics_items(
     embedding_model: object,
     litellm_tts_model: object,
     redis_status: str | None,
+    sources: DiagnosticsSources | None = None,
 ) -> ConfigDiagnostics:
     """Return compact OK/WARN/FAIL diagnostics for the settings surface."""
 
@@ -83,43 +88,91 @@ def build_config_diagnostics_items(
                 return text
         return fallback
 
+    def _source(name: str, fallback: DiagnosticsSource = "unknown") -> str:
+        if sources is None:
+            return fallback
+        resolved = sources.get(name, fallback)
+        return str(resolved)
+
+    def _source_detail(name: str) -> str | None:
+        if sources is None:
+            return None
+        detail = sources.get(name)
+        if not isinstance(detail, str):
+            return None
+        text = detail.strip()
+        return text or None
+
+    def _precedence(name: str, source: str) -> str | None:
+        if source == "env":
+            overridden = _source_detail(f"{name}_config")
+            if overridden:
+                return f"env overrides config ({overridden})"
+            return "env override in effect"
+        if source == "derived":
+            return "derived from fast model"
+        if source == "default":
+            return "default value in effect"
+        return None
+
     fast_model_text = _text(litellm_model, "")
     inference_model_text = _text(litellm_inference_model, "")
     api_key_present = isinstance(litellm_api_key, str) and bool(litellm_api_key.strip())
     tts_model_text = _text(litellm_tts_model, "")
     embeddings_text = f"{_text(embedding_backend)} / {_text(embedding_model)}"
     redis_text = (redis_status or "not configured").strip()
+    fast_model_source = _source("litellm_model", "unknown" if fast_model_text else "default")
+    inference_model_source = _source(
+        "litellm_inference_model",
+        "unknown" if inference_model_text else "default",
+    )
+    api_key_source = _source("litellm_api_key", "unknown" if api_key_present else "default")
+    embeddings_source = _source("embedding_model", "unknown")
+    tts_source = _source("litellm_tts_model", "unknown" if tts_model_text else "default")
+    redis_source = _source("redis_dsn", "runtime")
 
     items: list[DiagnosticsItem] = [
         {
             "label": "Fast model",
             "status": "OK" if fast_model_text else "FAIL",
             "detail": fast_model_text or "missing",
+            "source": fast_model_source,
+            **({"precedence": value} if (value := _precedence("litellm_model", fast_model_source)) else {}),
         },
         {
             "label": "Inference model",
             "status": "OK" if inference_model_text else "WARN",
             "detail": inference_model_text or "not configured",
+            "source": inference_model_source,
+            **({"precedence": value} if (value := _precedence("litellm_inference_model", inference_model_source)) else {}),
         },
         {
             "label": "API key",
             "status": "OK" if api_key_present else "FAIL",
             "detail": "configured" if api_key_present else "missing",
+            "source": api_key_source,
+            **({"precedence": value} if (value := _precedence("litellm_api_key", api_key_source)) else {}),
         },
         {
             "label": "Embeddings",
             "status": "OK",
             "detail": embeddings_text,
+            "source": embeddings_source,
+            **({"precedence": value} if (value := _precedence("embedding_model", embeddings_source)) else {}),
         },
         {
             "label": "TTS",
             "status": "OK" if tts_model_text else "WARN",
             "detail": tts_model_text or "not configured",
+            "source": tts_source,
+            **({"precedence": value} if (value := _precedence("litellm_tts_model", tts_source)) else {}),
         },
         {
             "label": "Redis cache",
             "status": "WARN" if "disabled" in redis_text.lower() else "OK",
             "detail": redis_text,
+            "source": redis_source,
+            **({"precedence": value} if (value := _precedence("redis_dsn", redis_source)) else {}),
         },
     ]
     summary_status = summarise_diagnostics_severity(items)
@@ -170,6 +223,14 @@ class RuntimeSettingsService:
             embedding_model=getattr(settings, "embedding_model", DEFAULT_EMBEDDING_MODEL),
             litellm_tts_model=getattr(settings, "litellm_tts_model", None),
             redis_status=redis_status,
+            sources={
+                "litellm_model": "config",
+                "litellm_inference_model": "config",
+                "litellm_api_key": "config",
+                "embedding_model": "config",
+                "litellm_tts_model": "config",
+                "redis_dsn": "config",
+            },
         )
 
     def build_initial_runtime_settings(self) -> RuntimeSettings:

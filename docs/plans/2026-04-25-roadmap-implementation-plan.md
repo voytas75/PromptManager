@@ -1,0 +1,269 @@
+# PromptManager Roadmap Implementation Plan
+
+> **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
+
+**Goal:** Przełożyć aktualny product SSOT PromptManager na sekwencję małych wdrożeń, które po każdym kroku aktualizują plan, docs i SSOT tylko wtedy, gdy stan produktu realnie się zmienił.
+
+**Architecture:** Plan jest kanonicznym dokumentem wykonawczym dla najbliższych prac roadmapowych. Każdy slice ma kończyć się trzema kontrolami: (1) kod i testy, (2) aktualizacja tego planu, (3) aktualizacja README / SSOT tylko wtedy, gdy zmienia się rzeczywisty stan produktu, język produktu albo priorytet roadmapy. Najpierw domykamy trust infrastructure, potem asset loop, potem structured runs, potem automation surfaces.
+
+**Tech Stack:** Python 3.13, PySide6, pytest, PromptManager runtime settings stack, product docs under `docs/`.
+
+---
+
+## Canonical workflow rule
+
+Po **każdej** implementacji wykonaj w tej kolejności:
+
+1. zaktualizuj status odpowiedniego taska w tym pliku,
+2. dopisz krótki `Implemented:` / `Verified:` note pod taskiem,
+3. zaktualizuj `README.md` jeśli zmienił się user-visible product story,
+4. zaktualizuj `docs/product-ssot.md` tylko jeśli zmienił się produktowy stan, priorytet albo definicja warstwy,
+5. zaktualizuj `docs/product-roadmap-ssot.md` tylko jeśli zmieniła się kolejność lub definicja etapów,
+6. uruchom adekwatne testy i zanotuj wynik w planie.
+
+**Rule:** nie przepisywać SSOT dla kosmetycznych zmian implementacyjnych. SSOT aktualizować tylko przy zmianie produktu, nie przy samym postępie kodu.
+
+---
+
+## Current roadmap status
+
+### Stage 1 — Trust and operability foundation
+- [x] compact diagnostics with `OK` / `WARN` / `FAIL`
+- [x] GUI/CLI diagnostics wording alignment — first slice
+- [x] effective config source-of-value visibility
+- [x] canonical precedence visibility in diagnostics output
+- [x] fail-fast / blocking validation for critical runtime state
+- [ ] explicit routing/embedding provenance in user-visible summaries
+
+### Stage 2 — Core prompt asset loop quality
+- [ ] inspect view as decision-support surface
+- [ ] stronger draft → asset promotion with duplicate/similarity judgment
+- [ ] search/recent/retrieval ergonomics improvements
+
+### Stage 3 — Trustworthy prompt operations
+- [ ] structured runs v1 linked to prompt assets
+- [ ] baseline vs candidate comparison slice
+
+### Stage 4 — Controlled automation surfaces
+- [ ] CLI/API parity on inspection and status surfaces
+
+---
+
+## Recommended execution order
+
+1. effective config source-of-value
+2. precedence visibility in diagnostics
+3. startup fail-fast for blocking misconfig
+4. inspect decision-support improvements
+5. draft promotion duplicate/similarity support
+6. retrieval ergonomics
+7. structured runs v1
+8. CLI/API parity expansion
+
+---
+
+### Task 1: Effective config source-of-value in diagnostics
+
+**Status:** implemented
+
+**Objective:** Pokazać w GUI/CLI nie tylko wartość konfiguracji, ale też jej źródło dla kluczowych runtime settings.
+
+**Files:**
+- Modify: `gui/runtime_settings_service.py`
+- Modify: `cli/settings_summary.py`
+- Modify: `gui/settings_dialog.py`
+- Modify: `tests/test_runtime_settings_service.py`
+- Modify: `tests/test_settings_dialog_diagnostics.py`
+- Modify: `tests/test_settings_summary.py`
+- Maintain: `docs/plans/2026-04-25-roadmap-implementation-plan.md`
+- Update later if needed: `README.md`, `docs/product-ssot.md`, `docs/product-roadmap-ssot.md`
+
+**Implementation target:**
+Add a first user-visible `source` field for the most important diagnostics rows, starting with:
+- fast model
+- inference model
+- embeddings
+- API key presence
+
+At minimum the source labels should support:
+- `default`
+- `config`
+- `env`
+- `runtime`
+- `derived`
+- `unknown` (only as safe fallback)
+
+**Step 1: Write failing tests for diagnostics items with source metadata**
+
+Add tests that expect diagnostics items to include a `source` key and user-facing detail/source consistency.
+
+**Step 2: Run targeted tests to verify failure**
+
+```bash
+.venv/bin/pytest tests/test_gui_diagnostics_status.py tests/test_runtime_settings_service.py tests/test_settings_summary.py -q
+```
+
+**Step 3: Implement minimal source-aware diagnostics model**
+
+Introduce a small internal helper / shape in `gui/runtime_settings_service.py` that can build items like:
+
+```python
+{
+    "label": "Fast model",
+    "status": "OK",
+    "detail": "azure/gpt-4.1",
+    "source": "env",
+}
+```
+
+Do not over-generalize yet. Start with a bounded mapping for currently visible settings.
+
+**Step 4: Surface source in CLI and GUI summaries**
+
+Examples:
+- CLI: `OK | Fast model: azure/gpt-4.1 [env]`
+- GUI: `OK | Fast model: azure/gpt-4.1 (env)`
+
+Prefer compact rendering.
+
+**Step 5: Run targeted verification**
+
+```bash
+.venv/bin/pytest tests/test_gui_diagnostics_status.py tests/test_runtime_settings_service.py tests/test_settings_dialog_diagnostics.py tests/test_settings_summary.py tests/test_main_entry.py -q
+```
+
+**Step 6: Update this plan after implementation**
+
+When green:
+- change Task 1 status to `implemented`
+- add `Implemented:` bullet with what was shipped
+- add `Verified:` bullet with exact test command/result
+- decide whether README or SSOT wording needs change
+
+**Implemented:**
+- Added `source` metadata to diagnostics items for GUI/CLI summaries.
+- Surfaced compact source labels in CLI (`[config]`, `[default]`, etc.) and GUI (`(config)`, `(default)`, etc.).
+- Wired first bounded source mapping for fast model, inference model, API key, embeddings, TTS, and Redis.
+
+**Verified:**
+- `.venv/bin/pytest tests/test_gui_diagnostics_status.py tests/test_runtime_settings_service.py tests/test_settings_dialog_diagnostics.py tests/test_settings_summary.py tests/test_main_entry.py -q`
+- result: `37 passed`
+
+---
+
+### Task 2: Canonical precedence visibility in diagnostics output
+
+**Status:** implemented
+
+**Objective:** Make the precedence model visible enough that a user can tell *why* a value won.
+
+**Files:**
+- Modified: `gui/runtime_settings_service.py`
+- Modified: `cli/settings_summary.py`
+- Modified: `tests/test_runtime_settings_service.py`
+- Modified: `tests/test_settings_summary.py`
+- Modified: `tests/test_gui_diagnostics_status.py`
+- Modified: `tests/test_main_entry.py`
+- Maintain: `docs/plans/2026-04-25-roadmap-implementation-plan.md`
+
+**Implementation target:**
+Extend Task 1 from simple source labels to explicit precedence explanation for overridden values where useful.
+
+**Done looks like:**
+- diagnostics can explain when env overrides config
+- derived/default values are clearly distinguished
+- no silent ambiguity for core model-routing values
+
+**Implemented:**
+- Added bounded `precedence` text to diagnostics items for core runtime rows.
+- Diagnostics now explain `env overrides config` when override context is available, otherwise show `env override in effect`.
+- Distinguished `derived from fast model` vs `default value in effect` in shared diagnostics and CLI output.
+- Extended CLI diagnostics rendering to print `[source; precedence]` when precedence context exists.
+
+**Verified:**
+- `.venv/bin/pytest tests/test_runtime_settings_service.py tests/test_settings_summary.py -q`
+- result: `12 passed`
+- `.venv/bin/pytest tests/test_gui_diagnostics_status.py tests/test_runtime_settings_service.py tests/test_settings_dialog_diagnostics.py tests/test_settings_summary.py tests/test_main_entry.py -q`
+- result: `41 passed`
+
+---
+
+### Task 3: Fail-fast / blocking startup validation
+
+**Status:** implemented
+
+**Objective:** Distinguish blockers from warnings so invalid critical runtime state is not presented as merely advisory.
+
+**Files:**
+- Modified: `main.py`
+- Modified: `tests/test_main_entry.py`
+- Maintain: `docs/plans/2026-04-25-roadmap-implementation-plan.md`
+
+**Implementation target:**
+Introduce bounded blocking-state detection for critical paths such as missing fast model / missing auth when runtime execution is expected.
+
+**Implemented:**
+- Added bounded startup blocker detection in `main.py` using the shared diagnostics contract.
+- Normal startup now fails fast when core runtime execution prerequisites are missing: LiteLLM fast model or LiteLLM API key.
+- Blocking validation applies only to default app startup; `--print-settings` and explicit CLI commands remain available for inspection and remediation workflows.
+- Startup now prints a compact `Blocking configuration issues:` section plus a pointer to `--print-settings`.
+
+**Verified:**
+- `.venv/bin/pytest tests/test_main_entry.py::test_main_blocks_default_startup_when_critical_runtime_state_is_invalid tests/test_main_entry.py::test_main_allows_print_settings_even_when_runtime_state_is_blocking -q`
+- result: `2 passed`
+- `.venv/bin/pytest tests/test_gui_diagnostics_status.py tests/test_runtime_settings_service.py tests/test_settings_dialog_diagnostics.py tests/test_settings_summary.py tests/test_main_entry.py -q`
+- result: `43 passed`
+
+---
+
+### Task 4: Inspect view as reuse/refine/fork decision surface
+
+**Status:** pending
+
+**Objective:** Make inspect/detail view more useful for prompt decisions instead of raw metadata browsing.
+
+---
+
+### Task 5: Draft → asset promotion with duplicate/similarity judgment
+
+**Status:** pending
+
+**Objective:** Reduce prompt-library clutter by showing stronger duplicate and related-prompt cues during promotion.
+
+---
+
+### Task 6: Retrieval ergonomics improvements
+
+**Status:** pending
+
+**Objective:** Improve recent/search/retrieval speed and legibility.
+
+---
+
+### Task 7: Structured runs v1
+
+**Status:** pending
+
+**Objective:** Record prompt-linked runs with enough provenance to support refinement decisions.
+
+---
+
+### Task 8: CLI/API parity expansion
+
+**Status:** pending
+
+**Objective:** Extend the same product model to headless/automation surfaces without creating a shadow model.
+
+---
+
+## Update log
+
+### 2026-04-25
+- Created this canonical roadmap implementation plan.
+- Confirmed current order remains: trust infrastructure → asset loop → structured runs → automation.
+- Implemented Task 1: source-of-value labels in diagnostics for GUI/CLI.
+- Verified Task 1 with targeted diagnostics/settings test suite: `37 passed`.
+- Implemented Task 2: precedence explanations in shared diagnostics and CLI output.
+- Verified Task 2 with targeted + related suite runs: `12 passed`, then `41 passed`.
+- Implemented Task 3: bounded fail-fast startup validation for missing fast model / API key.
+- Verified Task 3 with targeted startup tests and related trust suite: `2 passed`, then `43 passed`.

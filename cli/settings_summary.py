@@ -92,6 +92,10 @@ def _redis_runtime_status(redis_dsn: str | None) -> str:
 
 def _format_cli_diagnostics_block(settings: PromptManagerSettings) -> list[str]:
     """Return CLI-ready diagnostics summary matching the GUI status model."""
+    diagnostics_sources = cast(
+        "dict[str, str]",
+        getattr(settings, "_diagnostics_sources", None) or {},
+    )
     diagnostics = build_config_diagnostics_items(
         litellm_model=getattr(settings, "litellm_model", None),
         litellm_inference_model=getattr(settings, "litellm_inference_model", None),
@@ -100,6 +104,17 @@ def _format_cli_diagnostics_block(settings: PromptManagerSettings) -> list[str]:
         embedding_model=getattr(settings, "embedding_model", DEFAULT_EMBEDDING_MODEL),
         litellm_tts_model=getattr(settings, "litellm_tts_model", None),
         redis_status=_redis_runtime_status(getattr(settings, "redis_dsn", None)),
+        sources=diagnostics_sources
+        or {
+            "litellm_model": "config" if getattr(settings, "litellm_model", None) else "default",
+            "litellm_inference_model": (
+                "config" if getattr(settings, "litellm_inference_model", None) else "default"
+            ),
+            "litellm_api_key": "config" if getattr(settings, "litellm_api_key", None) else "default",
+            "embedding_model": "config" if getattr(settings, "embedding_model", None) else "derived",
+            "litellm_tts_model": "config" if getattr(settings, "litellm_tts_model", None) else "default",
+            "redis_dsn": "config" if getattr(settings, "redis_dsn", None) else "runtime",
+        },
     )
     lines = [
         "Diagnostics",
@@ -114,7 +129,10 @@ def _format_cli_diagnostics_block(settings: PromptManagerSettings) -> list[str]:
             status = str(item.get("status") or "OK").upper()
             label = str(item.get("label") or "Item")
             detail = str(item.get("detail") or "n/a")
-            lines.append(f"{status} | {label}: {detail}")
+            source = str(item.get("source") or "unknown")
+            precedence = str(item.get("precedence") or "").strip()
+            suffix = f"[{source}; {precedence}]" if precedence else f"[{source}]"
+            lines.append(f"{status} | {label}: {detail} {suffix}")
     raw_next_steps = diagnostics.get("next_steps")
     if isinstance(raw_next_steps, list) and raw_next_steps:
         lines.append("Next steps:")

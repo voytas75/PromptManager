@@ -40,20 +40,59 @@ def test_build_config_diagnostics_items_returns_operational_statuses() -> None:
         embedding_model="azure/UDTEMBED3L",
         litellm_tts_model=None,
         redis_status="Redis caching disabled (no DSN configured).",
+        sources={
+            "litellm_model": "env",
+            "litellm_inference_model": "default",
+            "litellm_api_key": "env",
+            "embedding_model": "derived",
+            "litellm_tts_model": "default",
+            "redis_dsn": "runtime",
+        },
     )
 
     assert diagnostics["summary_status"] == "WARN"
     items = diagnostics["items"]
     assert items == [
-        {"label": "Fast model", "status": "OK", "detail": "azure/gpt-4.1"},
-        {"label": "Inference model", "status": "WARN", "detail": "not configured"},
-        {"label": "API key", "status": "OK", "detail": "configured"},
-        {"label": "Embeddings", "status": "OK", "detail": "litellm / azure/UDTEMBED3L"},
-        {"label": "TTS", "status": "WARN", "detail": "not configured"},
+        {
+            "label": "Fast model",
+            "status": "OK",
+            "detail": "azure/gpt-4.1",
+            "source": "env",
+            "precedence": "env override in effect",
+        },
+        {
+            "label": "Inference model",
+            "status": "WARN",
+            "detail": "not configured",
+            "source": "default",
+            "precedence": "default value in effect",
+        },
+        {
+            "label": "API key",
+            "status": "OK",
+            "detail": "configured",
+            "source": "env",
+            "precedence": "env override in effect",
+        },
+        {
+            "label": "Embeddings",
+            "status": "OK",
+            "detail": "litellm / azure/UDTEMBED3L",
+            "source": "derived",
+            "precedence": "derived from fast model",
+        },
+        {
+            "label": "TTS",
+            "status": "WARN",
+            "detail": "not configured",
+            "source": "default",
+            "precedence": "default value in effect",
+        },
         {
             "label": "Redis cache",
             "status": "WARN",
             "detail": "Redis caching disabled (no DSN configured).",
+            "source": "runtime",
         },
     ]
     assert diagnostics["next_steps"] == [
@@ -79,4 +118,6 @@ def test_build_config_diagnostics_items_marks_missing_fast_model_as_fail() -> No
         "label": "Fast model",
         "status": "FAIL",
         "detail": "missing",
+        "source": "default",
+        "precedence": "default value in effect",
     }

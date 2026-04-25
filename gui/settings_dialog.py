@@ -274,7 +274,8 @@ class SettingsDialog(QDialog):
             status = str(item.get("status") or "OK").upper()
             label = str(item.get("label") or "Item")
             detail = str(item.get("detail") or "n/a")
-            lines.append(f"{status} | {label}: {detail}")
+            source = str(item.get("source") or "unknown")
+            lines.append(f"{status} | {label}: {detail} ({source})")
         raw_next_steps = self._config_diagnostics.get("next_steps")
         next_steps = raw_next_steps if isinstance(raw_next_steps, list) else []
         if next_steps:

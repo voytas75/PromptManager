@@ -228,11 +228,14 @@ def test_main_print_settings_logs_and_exits(
 
     assert exit_code == 0
     captured = capsys.readouterr()
+    output = captured.out
     assert "Prompt Manager configuration summary" in captured.out
     assert "LiteLLM API key: not set" in captured.out
     assert "Drop params: max_tokens, temperature" in captured.out
-    assert "Fast model: not set" in captured.out
-    assert f"Model: {DEFAULT_EMBEDDING_MODEL} (default)" in captured.out
+    assert "Overall status: FAIL" in output
+    assert "FAIL | Fast model: missing [default; default value in effect]" in output
+    assert "FAIL | API key: missing [default; default value in effect]" in output
+    assert f"Model: {DEFAULT_EMBEDDING_MODEL} (default)" in output
     assert "Prompt execution: Fast (default)" in captured.out
     assert "Streaming enabled:" in captured.out
 
@@ -251,7 +254,7 @@ def test_main_print_settings_masks_api_key(
     assert exit_code == 0
     output = capsys.readouterr().out
     assert "LiteLLM API key: set (sk-1...abcd)" in output
-    assert "Fast model: azure/gpt-4o (explicit)" in output
+    assert "OK | Fast model: azure/gpt-4o [config]" in output
 
 
 def test_main_returns_error_when_settings_fail(
@@ -307,7 +310,10 @@ def test_main_returns_error_when_manager_init_fails(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setattr("sys.argv", ["prompt-manager"])
-    _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
+    settings = _DummySettings()
+    settings.litellm_model = "azure/gpt-4o-mini"
+    settings.litellm_api_key = "secret-key"
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
 
     def _boom(_: _DummySettings) -> None:
         raise RuntimeError("init failed")
@@ -320,11 +326,63 @@ def test_main_returns_error_when_manager_init_fails(
     assert "Failed to initialise services" in capsys.readouterr().out
 
 
+def test_main_blocks_default_startup_when_critical_runtime_state_is_invalid(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "--no-gui"])
+    settings = _DummySettings()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+
+    build_calls = {"count": 0}
+
+    def _should_not_run(_: _DummySettings) -> _DummyManager:
+        build_calls["count"] += 1
+        return _DummyManager()
+
+    _patch_main(monkeypatch, "build_prompt_manager", _should_not_run)
+
+    exit_code = main.main()
+
+    assert exit_code == 2
+    output = capsys.readouterr().out
+    assert "Blocking configuration issues:" in output
+    assert "- LiteLLM fast model is missing." in output
+    assert "- LiteLLM API key is missing." in output
+    assert build_calls["count"] == 0
+
+
+def test_main_allows_print_settings_even_when_runtime_state_is_blocking(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "--print-settings"])
+    settings = _DummySettings()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+
+    build_calls = {"count": 0}
+
+    def _should_not_run(_: _DummySettings) -> _DummyManager:
+        build_calls["count"] += 1
+        return _DummyManager()
+
+    _patch_main(monkeypatch, "build_prompt_manager", _should_not_run)
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "Prompt Manager configuration summary" in output
+    assert "Overall status: FAIL" in output
+    assert build_calls["count"] == 0
+
+
 def test_main_logs_ready_message_on_success(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setattr("sys.argv", ["prompt-manager", "--no-gui"])
-    _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
+    settings = _DummySettings()
+    settings.litellm_model = "azure/gpt-4o-mini"
+    settings.litellm_api_key = "secret-key"
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
     manager = _DummyManager()
     _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
 
@@ -340,7 +398,10 @@ def test_main_logs_ready_message_on_success(
 def test_main_launches_gui_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("sys.argv", ["prompt-manager"])
     dummy_manager = _DummyManager()
-    _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
+    settings = _DummySettings()
+    settings.litellm_model = "azure/gpt-4o-mini"
+    settings.litellm_api_key = "secret-key"
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
     _patch_main(monkeypatch, "build_prompt_manager", lambda settings: dummy_manager)
 
     called = {}
@@ -366,7 +427,10 @@ def test_main_returns_error_when_gui_dependency_missing(
 ) -> None:
     monkeypatch.setattr("sys.argv", ["prompt-manager", "--gui"])
     manager = _DummyManager()
-    _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
+    settings = _DummySettings()
+    settings.litellm_model = "azure/gpt-4o-mini"
+    settings.litellm_api_key = "secret-key"
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
     _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
 
     class _GuiError(RuntimeError):
@@ -607,7 +671,9 @@ def test_main_entrypoint_guard_executes(
     monkeypatch.setattr("sys.argv", ["prompt-manager"])
 
     config_stub = _mock_module("config")
-    config_stub.load_settings = lambda: _DummySettings()
+    config_stub.load_settings = lambda: (
+        lambda settings: (setattr(settings, "litellm_model", "azure/gpt-4o-mini"), setattr(settings, "litellm_api_key", "secret-key"), settings)[2]
+    )(_DummySettings())
     config_stub.PromptManagerSettings = type("PromptManagerSettings", (), {})
     config_stub.LITELLM_ROUTED_WORKFLOWS = {"prompt_execution": "Prompt execution"}
     config_stub.DEFAULT_EMBEDDING_BACKEND = DEFAULT_EMBEDDING_BACKEND

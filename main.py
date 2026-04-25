@@ -36,6 +36,7 @@ from cli.gui_launcher import run_default_mode
 from cli.parser import parse_args
 from cli.runtime import configure_litellm_logging, setup_logging as _runtime_setup_logging
 from cli.settings_summary import print_settings_summary
+from gui.runtime_settings_service import build_config_diagnostics_items
 from core import (
     build_analytics_snapshot as _core_build_analytics_snapshot,
     build_prompt_manager,
@@ -126,6 +127,33 @@ def _prompt_create_default_config(logger: logging.Logger) -> bool:
     return True
 
 
+def _blocking_runtime_issues(settings: PromptManagerSettings) -> list[str]:
+    """Return critical runtime issues that should block normal startup."""
+    diagnostics = build_config_diagnostics_items(
+        litellm_model=getattr(settings, "litellm_model", None),
+        litellm_inference_model=getattr(settings, "litellm_inference_model", None),
+        litellm_api_key=getattr(settings, "litellm_api_key", None),
+        embedding_backend=getattr(settings, "embedding_backend", None),
+        embedding_model=getattr(settings, "embedding_model", None),
+        litellm_tts_model=getattr(settings, "litellm_tts_model", None),
+        redis_status=None,
+    )
+    issues: list[str] = []
+    for raw_item in diagnostics.get("items", []):
+        if not isinstance(raw_item, dict):
+            continue
+        label = str(raw_item.get("label") or "").strip()
+        status = str(raw_item.get("status") or "").upper()
+        detail = str(raw_item.get("detail") or "").strip()
+        if status != "FAIL":
+            continue
+        if label == "Fast model" and detail == "missing":
+            issues.append("LiteLLM fast model is missing.")
+        elif label == "API key" and detail == "missing":
+            issues.append("LiteLLM API key is missing.")
+    return issues
+
+
 def main() -> int:
     """Entrypoint that wires settings, services, and CLI commands."""
     args = parse_args()
@@ -154,7 +182,15 @@ def main() -> int:
         print_settings_summary(settings)
         return 0
 
+    blocking_issues = _blocking_runtime_issues(settings)
     command = getattr(args, "command", None)
+    if blocking_issues and command is None:
+        print("Blocking configuration issues:")
+        for issue in blocking_issues:
+            print(f"- {issue}")
+        print("Run with --print-settings to inspect the effective configuration.")
+        return 2
+
     spec = COMMAND_SPECS.get(command)
 
     manager = None

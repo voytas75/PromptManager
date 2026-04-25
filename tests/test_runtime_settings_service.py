@@ -19,7 +19,7 @@ from core.web_search import (
     TavilyWebSearchProvider,
     WebSearchService,
 )
-from gui.runtime_settings_service import RuntimeSettingsService
+from gui.runtime_settings_service import RuntimeSettingsService, build_config_diagnostics_items
 
 if TYPE_CHECKING:
     from core import PromptManager
@@ -211,19 +211,101 @@ def test_build_initial_runtime_settings_includes_compact_diagnostics_summary() -
     assert diagnostics == {
         "summary_status": "WARN",
         "items": [
-            {"label": "Fast model", "status": "OK", "detail": "azure/gpt-4.1"},
-            {"label": "Inference model", "status": "OK", "detail": "azure/gpt-5.4"},
-            {"label": "API key", "status": "OK", "detail": "configured"},
-            {"label": "Embeddings", "status": "OK", "detail": "litellm / azure/UDTEMBED3L"},
-            {"label": "TTS", "status": "OK", "detail": "azure/tts-1"},
+            {"label": "Fast model", "status": "OK", "detail": "azure/gpt-4.1", "source": "config"},
+            {"label": "Inference model", "status": "OK", "detail": "azure/gpt-5.4", "source": "config"},
+            {"label": "API key", "status": "OK", "detail": "configured", "source": "config"},
+            {
+                "label": "Embeddings",
+                "status": "OK",
+                "detail": "litellm / azure/UDTEMBED3L",
+                "source": "config",
+            },
+            {"label": "TTS", "status": "OK", "detail": "azure/tts-1", "source": "config"},
             {
                 "label": "Redis cache",
                 "status": "WARN",
                 "detail": "Redis caching disabled (no DSN configured).",
+                "source": "config",
             },
         ],
         "next_steps": [
             "Optional: configure Redis only if you want shared caching or faster repeat lookups.",
         ],
         "redis_status": "Redis caching disabled (no DSN configured).",
+    }
+
+
+def test_build_config_diagnostics_items_explains_env_overrides_config_value() -> None:
+    """Diagnostics should explain when an environment value wins over config."""
+
+    diagnostics = build_config_diagnostics_items(
+        litellm_model="azure/gpt-4.1-env",
+        litellm_inference_model="azure/gpt-5.4",
+        litellm_api_key="secret-key",
+        embedding_backend="litellm",
+        embedding_model="text-embedding-3-large",
+        litellm_tts_model="azure/tts-1",
+        redis_status="Redis caching configured via redis://localhost:6379/0",
+        sources={
+            "litellm_model": "env",
+            "litellm_model_config": "azure/gpt-4.1-config",
+            "litellm_inference_model": "config",
+            "litellm_api_key": "env",
+            "litellm_api_key_config": "configured in config.json",
+            "embedding_model": "config",
+            "litellm_tts_model": "config",
+            "redis_dsn": "config",
+        },
+    )
+
+    assert diagnostics["items"][0] == {
+        "label": "Fast model",
+        "status": "OK",
+        "detail": "azure/gpt-4.1-env",
+        "source": "env",
+        "precedence": "env overrides config (azure/gpt-4.1-config)",
+    }
+    assert diagnostics["items"][2] == {
+        "label": "API key",
+        "status": "OK",
+        "detail": "configured",
+        "source": "env",
+        "precedence": "env overrides config (configured in config.json)",
+    }
+
+
+def test_build_config_diagnostics_items_marks_derived_values_without_override_text() -> None:
+    """Derived/default values should stay distinct from explicit override explanations."""
+
+    diagnostics = build_config_diagnostics_items(
+        litellm_model="azure/gpt-4.1",
+        litellm_inference_model=None,
+        litellm_api_key="secret-key",
+        embedding_backend="litellm",
+        embedding_model="azure/gpt-4.1",
+        litellm_tts_model=None,
+        redis_status="Redis caching disabled (no DSN configured).",
+        sources={
+            "litellm_model": "config",
+            "litellm_inference_model": "default",
+            "litellm_api_key": "config",
+            "embedding_model": "derived",
+            "litellm_tts_model": "default",
+            "redis_dsn": "runtime",
+        },
+    )
+
+    assert diagnostics["items"][3] == {
+        "label": "Embeddings",
+        "status": "OK",
+        "detail": "litellm / azure/gpt-4.1",
+        "source": "derived",
+        "precedence": "derived from fast model",
+    }
+    assert diagnostics["items"][1] == {
+        "label": "Inference model",
+        "status": "WARN",
+        "detail": "not configured",
+        "source": "default",
+        "precedence": "default value in effect",
     }

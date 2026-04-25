@@ -37,15 +37,21 @@ def test_settings_dialog_renders_compact_diagnostics_banner(qt_app: QApplication
         config_diagnostics={
             "summary_status": "WARN",
             "items": [
-                {"label": "Fast model", "status": "OK", "detail": "azure/gpt-4.1"},
-                {"label": "Inference model", "status": "WARN", "detail": "not configured"},
-                {"label": "API key", "status": "OK", "detail": "configured"},
+                {"label": "Fast model", "status": "OK", "detail": "azure/gpt-4.1", "source": "env"},
+                {
+                    "label": "Inference model",
+                    "status": "WARN",
+                    "detail": "not configured",
+                    "source": "default",
+                },
+                {"label": "API key", "status": "OK", "detail": "configured", "source": "env"},
                 {
                     "label": "Embeddings",
                     "status": "OK",
                     "detail": "litellm / azure/UDTEMBED3L",
+                    "source": "derived",
                 },
-                {"label": "TTS", "status": "WARN", "detail": "not configured"},
+                {"label": "TTS", "status": "WARN", "detail": "not configured", "source": "default"},
             ],
             "next_steps": [
                 "Optional: set an inference model before routing heavier workflows to inference.",
@@ -58,10 +64,10 @@ def test_settings_dialog_renders_compact_diagnostics_banner(qt_app: QApplication
     try:
         labels = [label.text() for label in dialog.findChildren(QLabel)]
         assert any("Configuration summary — WARN" in text for text in labels)
-        assert any("OK | Fast model: azure/gpt-4.1" in text for text in labels)
-        assert any("WARN | Inference model: not configured" in text for text in labels)
-        assert any("OK | Embeddings: litellm / azure/UDTEMBED3L" in text for text in labels)
-        assert any("WARN | TTS: not configured" in text for text in labels)
+        assert any("OK | Fast model: azure/gpt-4.1 (env)" in text for text in labels)
+        assert any("WARN | Inference model: not configured (default)" in text for text in labels)
+        assert any("OK | Embeddings: litellm / azure/UDTEMBED3L (derived)" in text for text in labels)
+        assert any("WARN | TTS: not configured (default)" in text for text in labels)
         assert any("Next steps:" in text for text in labels)
         assert any(
             "Optional: set an inference model before routing heavier workflows to inference."
