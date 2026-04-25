@@ -565,3 +565,40 @@ def test_workspace_history_controller_hides_last_run_summary_when_prompt_has_no_
 
     assert detail_widget.run_summary is None
     assert template_detail_widget.run_summary is None
+
+
+def test_workspace_history_controller_clears_next_action_summary_when_selection_becomes_empty(  # noqa: E501
+) -> None:
+    """Clearing selection should also clear the bounded next-action cue on both detail
+    surfaces.
+    """
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000239"),
+        name="Reusable prompt",
+        description="Description",
+        category="General",
+        context="Prompt body",
+    )
+    detail_widget = _PromptDetailWidgetStub()
+    template_detail_widget = _PromptDetailWidgetStub()
+    current_prompt: Prompt | None = prompt
+    controller = WorkspaceHistoryController(
+        manager=_as_prompt_manager(_ManagerStub()),
+        model=_as_prompt_list_model(_PromptListModelStub()),
+        detail_widget=_as_prompt_detail_widget(detail_widget),
+        list_view=_as_list_view(_ListViewStub()),
+        current_prompt_supplier=lambda: current_prompt,
+        template_detail_widget_supplier=_template_detail_supplier(template_detail_widget),
+        template_preview_controller_supplier=_template_preview_supplier(),
+        execution_controller_supplier=_execution_controller_supplier(),
+    )
+
+    controller.handle_selection_changed()
+    assert detail_widget.next_action_summary == "Reuse as-is"
+    assert template_detail_widget.next_action_summary == "Reuse as-is"
+
+    current_prompt = None
+    controller.handle_selection_changed()
+
+    assert detail_widget.next_action_summary is None
+    assert template_detail_widget.next_action_summary is None
