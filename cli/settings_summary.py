@@ -1,6 +1,7 @@
 """Printable summaries for Prompt Manager configuration.
 
 Updates:
+  v0.1.10 - 2026-04-25 - Add compact routing and embedding provenance summaries.
   v0.1.9 - 2026-04-12 - Surface LiteLLM drop params in CLI settings summaries.
   v0.1.8 - 2025-12-10 - Surface LiteLLM logging toggle in summaries.
   v0.1.7 - 2025-12-07 - Surface Google web search credentials in CLI summaries.
@@ -15,8 +16,6 @@ Updates:
 
 from typing import Literal, cast
 
-from gui.runtime_settings_service import build_config_diagnostics_items
-
 from config import (
     DEFAULT_EMBEDDING_BACKEND,
     DEFAULT_EMBEDDING_MODEL,
@@ -27,6 +26,7 @@ from config import (
     LITELLM_ROUTED_WORKFLOWS,
     PromptManagerSettings,
 )
+from gui.runtime_settings_service import build_config_diagnostics_items
 
 from .utils import describe_path, mask_secret
 
@@ -90,6 +90,44 @@ def _redis_runtime_status(redis_dsn: str | None) -> str:
     return "Redis caching disabled (no DSN configured)."
 
 
+def _routing_summary_state(
+    workflow_routes: dict[str, Literal["fast", "inference"]],
+) -> str:
+    """Render compact routing wording without overstating provenance."""
+    if not workflow_routes:
+        return "all workflows use the fast model [default]"
+
+    inference_workflows = [
+        LITELLM_ROUTED_WORKFLOWS.get(workflow_key, workflow_key.strip())
+        for workflow_key, route in workflow_routes.items()
+        if route == "inference"
+    ]
+    if inference_workflows:
+        return "inference for: " + ", ".join(sorted(inference_workflows)) + " [custom]"
+    return "all workflows use the fast model [custom]"
+
+
+def _embedding_summary_state(
+    embedding_model: str | None,
+    *,
+    embedding_backend: str | None,
+    litellm_model: str | None,
+) -> str:
+    """Render compact embedding wording without overstating provenance."""
+    backend = embedding_backend or DEFAULT_EMBEDDING_BACKEND
+    model = embedding_model.strip() if isinstance(embedding_model, str) else ""
+    fast_model = litellm_model.strip() if isinstance(litellm_model, str) else ""
+    if model:
+        if backend == "litellm" and fast_model and model == fast_model:
+            return f"{backend} / {model} [derived from fast model]"
+        return f"{backend} / {model} [custom]"
+    if backend == "litellm" and fast_model:
+        return f"{backend} / {fast_model} [derived from fast model]"
+    if backend == DEFAULT_EMBEDDING_BACKEND:
+        return f"{backend} / {DEFAULT_EMBEDDING_MODEL} [default]"
+    return f"{backend} / not set [custom]"
+
+
 def _format_cli_diagnostics_block(settings: PromptManagerSettings) -> list[str]:
     """Return CLI-ready diagnostics summary matching the GUI status model."""
     diagnostics_sources = cast(
@@ -110,9 +148,15 @@ def _format_cli_diagnostics_block(settings: PromptManagerSettings) -> list[str]:
             "litellm_inference_model": (
                 "config" if getattr(settings, "litellm_inference_model", None) else "default"
             ),
-            "litellm_api_key": "config" if getattr(settings, "litellm_api_key", None) else "default",
-            "embedding_model": "config" if getattr(settings, "embedding_model", None) else "derived",
-            "litellm_tts_model": "config" if getattr(settings, "litellm_tts_model", None) else "default",
+            "litellm_api_key": "config"
+            if getattr(settings, "litellm_api_key", None)
+            else "default",
+            "embedding_model": "config"
+            if getattr(settings, "embedding_model", None)
+            else "derived",
+            "litellm_tts_model": "config"
+            if getattr(settings, "litellm_tts_model", None)
+            else "default",
             "redis_dsn": "config" if getattr(settings, "redis_dsn", None) else "runtime",
         },
     )
@@ -122,23 +166,25 @@ def _format_cli_diagnostics_block(settings: PromptManagerSettings) -> list[str]:
         f"Overall status: {diagnostics.get('summary_status', 'OK')}",
     ]
     raw_items = diagnostics.get("items")
-    if isinstance(raw_items, list):
-        for item in raw_items:
-            if not isinstance(item, dict):
-                continue
-            status = str(item.get("status") or "OK").upper()
-            label = str(item.get("label") or "Item")
-            detail = str(item.get("detail") or "n/a")
-            source = str(item.get("source") or "unknown")
-            precedence = str(item.get("precedence") or "").strip()
-            suffix = f"[{source}; {precedence}]" if precedence else f"[{source}]"
-            lines.append(f"{status} | {label}: {detail} {suffix}")
+    items = cast("list[object]", raw_items) if isinstance(raw_items, list) else []
+    for raw_item in items:
+        if not isinstance(raw_item, dict):
+            continue
+        item = cast("dict[str, object]", raw_item)
+        status = str(item.get("status") or "OK").upper()
+        label = str(item.get("label") or "Item")
+        detail = str(item.get("detail") or "n/a")
+        source = str(item.get("source") or "unknown")
+        precedence = str(item.get("precedence") or "").strip()
+        suffix = f"[{source}; {precedence}]" if precedence else f"[{source}]"
+        lines.append(f"{status} | {label}: {detail} {suffix}")
     raw_next_steps = diagnostics.get("next_steps")
-    if isinstance(raw_next_steps, list) and raw_next_steps:
+    next_steps = cast("list[object]", raw_next_steps) if isinstance(raw_next_steps, list) else []
+    if next_steps:
         lines.append("Next steps:")
-        for step in raw_next_steps:
-            if isinstance(step, str) and step.strip():
-                lines.append(f"- {step.strip()}")
+        for raw_step in next_steps:
+            if isinstance(raw_step, str) and raw_step.strip():
+                lines.append(f"- {raw_step.strip()}")
     return lines
 
 
@@ -222,6 +268,11 @@ def print_settings_summary(settings: PromptManagerSettings) -> None:
             f"Drop params: {', '.join(litellm_drop_params) if litellm_drop_params else 'not set'}",
             f"Streaming enabled: {'yes' if litellm_stream else 'no'}",
             f"LiteLLM logging: {'enabled' if litellm_logging_enabled else 'disabled'}",
+        ]
+    )
+
+    lines.extend(
+        [
             "",
             "LiteLLM routing",
             "----------------",
@@ -232,17 +283,28 @@ def print_settings_summary(settings: PromptManagerSettings) -> None:
         tier = litellm_workflow_models.get(workflow_key, "fast")
         lines.append(f"{workflow_label}: {_route_state(tier)}")
 
+    lines.append(f"Routing summary: {_routing_summary_state(litellm_workflow_models)}")
+
     lines.extend(
         [
             "",
             "Embedding configuration",
             "-----------------------",
             f"Backend: {_embedding_backend_state(embedding_backend)}",
-            f"Model: {_embedding_model_state(
-                embedding_model,
-                embedding_backend=embedding_backend,
-                litellm_model=litellm_model,
-            )}",
+            f"Model: {
+                _embedding_model_state(
+                    embedding_model,
+                    embedding_backend=embedding_backend,
+                    litellm_model=litellm_model,
+                )
+            }",
+            f"Embeddings summary: {
+                _embedding_summary_state(
+                    embedding_model,
+                    embedding_backend=embedding_backend,
+                    litellm_model=litellm_model,
+                )
+            }",
         ]
     )
 

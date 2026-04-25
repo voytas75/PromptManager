@@ -84,6 +84,11 @@ def test_print_settings_summary_marks_default_and_explicit_states(
     assert f"Model: {DEFAULT_EMBEDDING_MODEL} (default)" in output
     assert "Scenario drafting: Inference (explicit)" in output
     assert "Prompt execution: Fast (default)" in output
+    assert "Routing summary: inference for: Scenario drafting [custom]" in output
+    assert (
+        f"Embeddings summary: {DEFAULT_EMBEDDING_BACKEND} / {DEFAULT_EMBEDDING_MODEL} [custom]"
+        in output
+    )
 
 
 def test_print_settings_summary_marks_derived_embedding_model(
@@ -96,6 +101,50 @@ def test_print_settings_summary_marks_derived_embedding_model(
     output = _render(settings, capsys)
 
     assert f"Model: {settings.litellm_model} (derived from fast model)" in output
+    assert (
+        f"Embeddings summary: {DEFAULT_EMBEDDING_BACKEND} / {settings.litellm_model} "
+        "[derived from fast model]" in output
+    )
+
+
+def test_print_settings_summary_uses_user_labels_in_routing_summary(
+    capsys: CaptureFixture[str],
+) -> None:
+    settings = _SummarySettings()
+    settings.litellm_workflow_models = {"scenario_generation": "inference"}
+
+    output = _render(settings, capsys)
+
+    assert "Routing summary: inference for: Scenario drafting [custom]" in output
+
+
+def test_print_settings_summary_marks_all_fast_routes_as_custom_when_explicitly_set(
+    capsys: CaptureFixture[str],
+) -> None:
+    settings = _SummarySettings()
+    settings.litellm_workflow_models = {
+        workflow_key: "fast" for workflow_key in ("scenario_generation", "prompt_execution")
+    }
+
+    output = _render(settings, capsys)
+
+    assert "Scenario drafting: Fast (default)" in output
+    assert "Prompt execution: Fast (default)" in output
+    assert "Routing summary: all workflows use the fast model [custom]" in output
+
+
+def test_print_settings_summary_marks_backend_only_embedding_summary_as_custom(
+    capsys: CaptureFixture[str],
+) -> None:
+    settings = _SummarySettings()
+    settings.embedding_backend = "sentence-transformers"
+    settings.embedding_model = None
+
+    output = _render(settings, capsys)
+
+    assert "Backend: sentence-transformers (explicit)" in output
+    assert "Model: not set" in output
+    assert "Embeddings summary: sentence-transformers / not set [custom]" in output
 
 
 def test_print_settings_summary_marks_explicit_embedding_backend_and_model(
@@ -150,8 +199,7 @@ def test_print_settings_summary_shows_precedence_explanation_for_env_override(
         in output
     )
     assert (
-        "OK | API key: configured [env; env overrides config (configured in config.json)]"
-        in output
+        "OK | API key: configured [env; env overrides config (configured in config.json)]" in output
     )
 
 
