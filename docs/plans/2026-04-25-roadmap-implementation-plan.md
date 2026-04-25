@@ -339,3 +339,4 @@ Introduce bounded blocking-state detection for critical paths such as missing fa
 - Implemented Task 8: bounded CLI/headless parity coverage for shared analytics snapshot rendering.
 - Verified Task 8 with targeted CLI analytics test: `1 passed`; related CLI/execution suite: `36 passed`.
 - Added Stage 5 planning note for the next bounded inspect/reuse slice: `Recommended next action` cues derived from existing decision + run evidence.
+- Landed post-Stage-5 micro-slices to harden inspect/detail cues: fallback mapping coverage, decision→action mapping centralization, clear-selection guard, and template-detail parity guards for run evidence.
