@@ -42,6 +42,7 @@ from config import (
     PromptManagerSettings,
     PromptTemplateOverrides,
 )
+from config.settings import LITELLM_ROUTED_WORKFLOWS
 from core.web_search import WebSearchService, resolve_web_search_provider
 
 from .appearance_controller import normalise_chat_palette, palette_differs_from_defaults
@@ -503,20 +504,24 @@ class RuntimeSettingsService:
 
         fast_model = _clean(runtime.get("litellm_model")) or "missing"
         inference_model = _clean(runtime.get("litellm_inference_model")) or "missing"
-        routing_value = runtime.get("litellm_workflow_models")
-        if not isinstance(routing_value, dict) or not routing_value:
-            routing_summary = "all workflows use the fast model [default]"
+        routing_map = runtime.get("litellm_workflow_models")
+        inference_workflows: list[str] = []
+        has_custom_routing = False
+        if isinstance(routing_map, dict):
+            for workflow, route in routing_map.items():
+                workflow_text = str(workflow).strip()
+                route_text = str(route).strip().lower()
+                if workflow_text:
+                    has_custom_routing = True
+                if route_text == "inference" and workflow_text:
+                    inference_workflows.append(
+                        LITELLM_ROUTED_WORKFLOWS.get(workflow_text, workflow_text)
+                    )
+        if inference_workflows:
+            routing_summary = f"inference for: {', '.join(inference_workflows)} [custom]"
         else:
-            inference_workflows = sorted(
-                key.strip() if isinstance(key, str) else str(key).strip()
-                for key, route in cast("dict[object, object]", routing_value).items()
-                if isinstance(route, str) and route.strip().lower() == "inference"
-            )
-            if inference_workflows:
-                routing_summary = "inference for: " + ", ".join(inference_workflows) + " [explicit]"
-            else:
-                routing_summary = "all workflows use the fast model [default]"
-
+            routing_source = "custom" if has_custom_routing else "default"
+            routing_summary = f"all workflows use the fast model [{routing_source}]"
         embedding_backend = _clean(runtime.get("embedding_backend")) or DEFAULT_EMBEDDING_BACKEND
         embedding_model = _clean(runtime.get("embedding_model"))
         if embedding_model is None:
@@ -528,12 +533,10 @@ class RuntimeSettingsService:
                 embedding_source = "default"
             else:
                 embedding_model = "missing"
-                embedding_source = "default"
+                embedding_source = "custom"
         else:
-            embedding_source = "explicit"
-        embedding_summary = (
-            f"{embedding_backend} / {embedding_model} [{embedding_source}]"
-        )
+            embedding_source = "default" if embedding_model == DEFAULT_EMBEDDING_MODEL else "custom"
+        embedding_summary = f"{embedding_backend} / {embedding_model} [{embedding_source}]"
         return (
             f"Fast model: {fast_model} | "
             f"Inference model: {inference_model} | "

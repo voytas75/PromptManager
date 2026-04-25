@@ -24,7 +24,7 @@ def test_settings_dialog_updates_live_routing_preview(qt_app: QApplication) -> N
     dialog = SettingsDialog(
         litellm_model="azure/gpt-4.1-mini",
         litellm_inference_model="azure/gpt-5.4",
-        litellm_workflow_models={"name_generation": "inference"},
+        litellm_workflow_models={"scenario_generation": "inference"},
         embedding_model="azure/text-embedding-3-large",
     )
 
@@ -33,8 +33,8 @@ def test_settings_dialog_updates_live_routing_preview(qt_app: QApplication) -> N
         assert preview is not None
         assert "Fast model: azure/gpt-4.1-mini" in preview.text()
         assert "Inference model: azure/gpt-5.4" in preview.text()
-        assert "Inference workflows: name_generation [explicit]" in preview.text()
-        assert "Embeddings: litellm / azure/text-embedding-3-large [explicit]" in preview.text()
+        assert "Inference workflows: Scenario drafting [custom]" in preview.text()
+        assert "Embeddings: litellm / azure/text-embedding-3-large [custom]" in preview.text()
         assert "🟢 Status: ready" in preview.text()
         assert "background-color: #eaf7ea" in preview.styleSheet()
         assert "color: #12351a" in preview.styleSheet()
@@ -60,9 +60,9 @@ def test_settings_dialog_updates_live_routing_preview(qt_app: QApplication) -> N
         qt_app.processEvents()
 
         assert "Inference workflows:" in preview.text()
-        assert "name_generation" in preview.text()
-        assert "description_generation" in preview.text()
-        assert "[explicit]" in preview.text()
+        assert "Scenario drafting" in preview.text()
+        assert "Prompt description synthesis" in preview.text()
+        assert "[custom]" in preview.text()
         assert "🟢 Status: ready" in preview.text()
 
         fast_input = dialog._model_input

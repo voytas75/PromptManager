@@ -212,7 +212,7 @@ def test_apply_updates_surfaces_routing_and_embedding_provenance_in_summary() ->
             "litellm_model": "azure/gpt-4.1-mini",
             "litellm_inference_model": "azure/gpt-5.4",
             "litellm_workflow_models": {
-                "prompt_generation": "inference",
+                "scenario_generation": "inference",
             },
             "embedding_backend": "litellm",
             "embedding_model": "azure/text-embedding-3-large",
@@ -220,8 +220,8 @@ def test_apply_updates_surfaces_routing_and_embedding_provenance_in_summary() ->
     )
 
     assert result.summary_message is not None
-    assert "Routing: inference for: prompt_generation [explicit]" in result.summary_message
-    assert "Embeddings: litellm / azure/text-embedding-3-large [explicit]" in result.summary_message
+    assert "Routing: inference for: Scenario drafting [custom]" in result.summary_message
+    assert "Embeddings: litellm / azure/text-embedding-3-large [custom]" in result.summary_message
 
 
 def test_build_initial_runtime_settings_includes_compact_diagnostics_summary() -> None:

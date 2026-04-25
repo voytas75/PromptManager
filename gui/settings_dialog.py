@@ -337,14 +337,17 @@ class SettingsDialog(QDialog):
             button = cast("QRadioButton", group.checkedButton())
             choice = str(button.property("routeChoice") or "").strip().lower()
             if choice == "inference":
-                inference_workflows.append(workflow_key)
+                inference_workflows.append(LITELLM_ROUTED_WORKFLOWS.get(workflow_key, workflow_key))
         inference_summary = ", ".join(inference_workflows) if inference_workflows else "none"
         if inference_workflows:
-            inference_summary = f"{inference_summary} [explicit]"
+            inference_summary = f"{inference_summary} [custom]"
         else:
-            inference_summary = "none [default]"
+            routing_map = self._workflow_models or {}
+            routing_source = "custom" if routing_map else "default"
+            inference_summary = f"none [{routing_source}]"
         if embedding_model:
-            embedding_summary = f"litellm / {embedding_model} [explicit]"
+            embedding_source = "default" if embedding_model == "text-embedding-3-large" else "custom"
+            embedding_summary = f"litellm / {embedding_model} [{embedding_source}]"
         elif fast_model:
             embedding_summary = f"litellm / {fast_model} [derived from fast model]"
         else:
