@@ -9,7 +9,9 @@ PromptManager is a local-first desktop app for **capturing, organizing, retrievi
 
 Its product center is simple: act as a **canonical home for prompt assets** so useful prompts and LLM queries do not stay scattered across chats, notes, scripts, markdown files, and ad-hoc experiments.
 
-It combines a PySide6 GUI, SQLite persistence, semantic search, prompt editing, and optional lightweight validation support, but the product center stays the prompt catalog itself rather than analytics, chains, or general AI-workstation behavior.
+It combines a PySide6 GUI, SQLite persistence, semantic search, prompt editing, and a subordinate operational layer for trustworthy runs, routing, and diagnostics — but the product center stays the prompt catalog itself rather than analytics, chains, or general AI-workstation behavior.
+
+Canonical product direction lives in [`docs/product-ssot.md`](docs/product-ssot.md).
 
 <p align="center">
   <img src="docs/images/main.png" alt="Prompt catalogue and workspace view" width="45%">
@@ -157,8 +159,8 @@ PromptManager is currently in **beta** and under active development.
 
 Current focus:
 - strengthening the core prompt asset loop
-- improving low-friction capture, promotion, retrieval, and reuse
-- making the product more trustworthy and local-first
+- improving low-friction capture, promotion, retrieval, inspection, reuse, and refinement
+- making settings, routing, and diagnostics trustworthy before broader automation expansion
 
 ## What PromptManager is not
 
