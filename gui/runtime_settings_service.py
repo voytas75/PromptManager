@@ -49,7 +49,97 @@ if TYPE_CHECKING:
 
 RuntimeSettings = dict[str, object | None]
 WorkflowRouting = dict[str, Literal["fast", "inference"]]
+DiagnosticsStatus = Literal["OK", "WARN", "FAIL"]
+DiagnosticsItem = dict[str, str]
 ConfigDiagnostics = dict[str, object | None]
+
+
+def summarise_diagnostics_severity(items: list[DiagnosticsItem]) -> DiagnosticsStatus:
+    """Collapse diagnostics items into a single overall severity."""
+    statuses = {item.get("status", "OK") for item in items}
+    if "FAIL" in statuses:
+        return "FAIL"
+    if "WARN" in statuses:
+        return "WARN"
+    return "OK"
+
+
+def build_config_diagnostics_items(
+    *,
+    litellm_model: object,
+    litellm_inference_model: object,
+    litellm_api_key: object,
+    embedding_backend: object,
+    embedding_model: object,
+    litellm_tts_model: object,
+    redis_status: str | None,
+) -> ConfigDiagnostics:
+    """Return compact OK/WARN/FAIL diagnostics for the settings surface."""
+
+    def _text(value: object, fallback: str = "n/a") -> str:
+        if isinstance(value, str):
+            text = value.strip()
+            if text:
+                return text
+        return fallback
+
+    fast_model_text = _text(litellm_model, "")
+    inference_model_text = _text(litellm_inference_model, "")
+    api_key_present = isinstance(litellm_api_key, str) and bool(litellm_api_key.strip())
+    tts_model_text = _text(litellm_tts_model, "")
+    embeddings_text = f"{_text(embedding_backend)} / {_text(embedding_model)}"
+    redis_text = (redis_status or "not configured").strip()
+
+    items: list[DiagnosticsItem] = [
+        {
+            "label": "Fast model",
+            "status": "OK" if fast_model_text else "FAIL",
+            "detail": fast_model_text or "missing",
+        },
+        {
+            "label": "Inference model",
+            "status": "OK" if inference_model_text else "WARN",
+            "detail": inference_model_text or "not configured",
+        },
+        {
+            "label": "API key",
+            "status": "OK" if api_key_present else "FAIL",
+            "detail": "configured" if api_key_present else "missing",
+        },
+        {
+            "label": "Embeddings",
+            "status": "OK",
+            "detail": embeddings_text,
+        },
+        {
+            "label": "TTS",
+            "status": "OK" if tts_model_text else "WARN",
+            "detail": tts_model_text or "not configured",
+        },
+        {
+            "label": "Redis cache",
+            "status": "WARN" if "disabled" in redis_text.lower() else "OK",
+            "detail": redis_text,
+        },
+    ]
+    summary_status = summarise_diagnostics_severity(items)
+    next_steps: list[str] = []
+    if not fast_model_text:
+        next_steps.append("Set a LiteLLM fast model to unlock chat, prompt runs, and derived defaults.")
+    if not api_key_present:
+        next_steps.append("Add a LiteLLM API key so model calls can authenticate successfully.")
+    if not inference_model_text:
+        next_steps.append("Optional: set an inference model before routing heavier workflows to inference.")
+    if not tts_model_text:
+        next_steps.append("Optional: configure a TTS model only if you plan to use voice output.")
+    if "disabled" in redis_text.lower():
+        next_steps.append("Optional: configure Redis only if you want shared caching or faster repeat lookups.")
+    return {
+        "summary_status": summary_status,
+        "items": items,
+        "next_steps": next_steps,
+        "redis_status": redis_status,
+    }
 
 
 @dataclass(slots=True)
@@ -72,27 +162,15 @@ class RuntimeSettingsService:
     def _build_config_diagnostics(self, redis_status: str | None) -> ConfigDiagnostics:
         """Return a compact user-facing configuration summary for the settings dialog."""
         settings = self._settings
-        litellm_model = getattr(settings, "litellm_model", None)
-        litellm_inference_model = getattr(settings, "litellm_inference_model", None)
-        litellm_api_key = getattr(settings, "litellm_api_key", None)
-        embedding_backend = getattr(settings, "embedding_backend", DEFAULT_EMBEDDING_BACKEND)
-        embedding_model = getattr(settings, "embedding_model", DEFAULT_EMBEDDING_MODEL)
-        litellm_tts_model = getattr(settings, "litellm_tts_model", None)
-        return {
-            "models_configured": bool(isinstance(litellm_model, str) and litellm_model.strip()),
-            "inference_model_configured": bool(
-                isinstance(litellm_inference_model, str) and litellm_inference_model.strip()
-            ),
-            "api_key_configured": bool(
-                isinstance(litellm_api_key, str) and litellm_api_key.strip()
-            ),
-            "embedding_backend": embedding_backend,
-            "embedding_model": embedding_model,
-            "tts_configured": bool(
-                isinstance(litellm_tts_model, str) and litellm_tts_model.strip()
-            ),
-            "redis_status": redis_status,
-        }
+        return build_config_diagnostics_items(
+            litellm_model=getattr(settings, "litellm_model", None),
+            litellm_inference_model=getattr(settings, "litellm_inference_model", None),
+            litellm_api_key=getattr(settings, "litellm_api_key", None),
+            embedding_backend=getattr(settings, "embedding_backend", DEFAULT_EMBEDDING_BACKEND),
+            embedding_model=getattr(settings, "embedding_model", DEFAULT_EMBEDDING_MODEL),
+            litellm_tts_model=getattr(settings, "litellm_tts_model", None),
+            redis_status=redis_status,
+        )
 
     def build_initial_runtime_settings(self) -> RuntimeSettings:
         """Load current settings snapshot from configuration and config files."""

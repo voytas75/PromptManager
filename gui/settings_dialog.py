@@ -264,28 +264,42 @@ class SettingsDialog(QDialog):
         """Build a compact configuration summary banner when diagnostics are available."""
         if not self._config_diagnostics:
             return None
-        models_configured = bool(self._config_diagnostics.get("models_configured"))
-        inference_configured = bool(self._config_diagnostics.get("inference_model_configured"))
-        api_key_configured = bool(self._config_diagnostics.get("api_key_configured"))
-        tts_configured = bool(self._config_diagnostics.get("tts_configured"))
-        embedding_backend = str(self._config_diagnostics.get("embedding_backend") or "n/a")
-        embedding_model = str(self._config_diagnostics.get("embedding_model") or "n/a")
-        lines = [
-            "Configuration summary",
-            f"Primary model: {'configured' if models_configured else 'missing'}",
-            f"Inference model: {'configured' if inference_configured else 'missing'}",
-            f"API key: {'configured' if api_key_configured else 'missing'}",
-            f"Embedding: {embedding_backend} / {embedding_model}",
-            f"TTS: {'configured' if tts_configured else 'missing'}",
-        ]
+        summary_status = str(self._config_diagnostics.get("summary_status") or "OK").upper()
+        raw_items = self._config_diagnostics.get("items")
+        items = raw_items if isinstance(raw_items, list) else []
+        lines = [f"Configuration summary — {summary_status}"]
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            status = str(item.get("status") or "OK").upper()
+            label = str(item.get("label") or "Item")
+            detail = str(item.get("detail") or "n/a")
+            lines.append(f"{status} | {label}: {detail}")
+        raw_next_steps = self._config_diagnostics.get("next_steps")
+        next_steps = raw_next_steps if isinstance(raw_next_steps, list) else []
+        if next_steps:
+            lines.append("")
+            lines.append("Next steps:")
+            for step in next_steps:
+                if isinstance(step, str) and step.strip():
+                    lines.append(f"• {step.strip()}")
         banner = QLabel("\n".join(lines), parent)
         banner.setWordWrap(True)
         banner.setObjectName("configDiagnosticsBanner")
+        palette_by_status = {
+            "OK": ("#eaf7ea", "#12351a", "#1f7a1f"),
+            "WARN": ("#fff6db", "#5f3b00", "#a15c00"),
+            "FAIL": ("#fdeaea", "#5a1616", "#a61b1b"),
+        }
+        background_color, foreground_color, border_color = palette_by_status.get(
+            summary_status,
+            ("#eaf4ff", "#12324a", "#5b89a6"),
+        )
         banner.setStyleSheet(
             self._build_banner_styles(
-                background_color="#eaf4ff",
-                foreground_color="#12324a",
-                border_color="#5b89a6",
+                background_color=background_color,
+                foreground_color=foreground_color,
+                border_color=border_color,
             )
         )
         return banner

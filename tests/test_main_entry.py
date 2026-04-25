@@ -231,6 +231,9 @@ def test_main_print_settings_logs_and_exits(
     assert "Prompt Manager configuration summary" in captured.out
     assert "LiteLLM API key: not set" in captured.out
     assert "Drop params: max_tokens, temperature" in captured.out
+    assert "Fast model: not set" in captured.out
+    assert f"Model: {DEFAULT_EMBEDDING_MODEL} (default)" in captured.out
+    assert "Prompt execution: Fast (default)" in captured.out
     assert "Streaming enabled:" in captured.out
 
 
@@ -248,7 +251,7 @@ def test_main_print_settings_masks_api_key(
     assert exit_code == 0
     output = capsys.readouterr().out
     assert "LiteLLM API key: set (sk-1...abcd)" in output
-    assert "Fast model: azure/gpt-4o" in output
+    assert "Fast model: azure/gpt-4o (explicit)" in output
 
 
 def test_main_returns_error_when_settings_fail(

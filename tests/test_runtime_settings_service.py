@@ -209,11 +209,21 @@ def test_build_initial_runtime_settings_includes_compact_diagnostics_summary() -
 
     diagnostics = runtime["config_diagnostics"]
     assert diagnostics == {
-        "models_configured": True,
-        "inference_model_configured": True,
-        "api_key_configured": True,
-        "embedding_backend": "litellm",
-        "embedding_model": "azure/UDTEMBED3L",
-        "tts_configured": True,
+        "summary_status": "WARN",
+        "items": [
+            {"label": "Fast model", "status": "OK", "detail": "azure/gpt-4.1"},
+            {"label": "Inference model", "status": "OK", "detail": "azure/gpt-5.4"},
+            {"label": "API key", "status": "OK", "detail": "configured"},
+            {"label": "Embeddings", "status": "OK", "detail": "litellm / azure/UDTEMBED3L"},
+            {"label": "TTS", "status": "OK", "detail": "azure/tts-1"},
+            {
+                "label": "Redis cache",
+                "status": "WARN",
+                "detail": "Redis caching disabled (no DSN configured).",
+            },
+        ],
+        "next_steps": [
+            "Optional: configure Redis only if you want shared caching or faster repeat lookups.",
+        ],
         "redis_status": "Redis caching disabled (no DSN configured).",
     }
