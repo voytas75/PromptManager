@@ -19,7 +19,7 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 try:
     from config import load_settings
@@ -139,12 +139,15 @@ def _blocking_runtime_issues(settings: PromptManagerSettings) -> list[str]:
         redis_status=None,
     )
     issues: list[str] = []
-    for raw_item in diagnostics.get("items", []):
+    raw_items = diagnostics.get("items")
+    items = cast("list[object]", raw_items) if isinstance(raw_items, list) else []
+    for raw_item in items:
         if not isinstance(raw_item, dict):
             continue
-        label = str(raw_item.get("label") or "").strip()
-        status = str(raw_item.get("status") or "").upper()
-        detail = str(raw_item.get("detail") or "").strip()
+        item = cast("dict[str, Any]", raw_item)
+        label = str(item.get("label") or "").strip()
+        status = str(item.get("status") or "").upper()
+        detail = str(item.get("detail") or "").strip()
         if status != "FAIL":
             continue
         if label == "Fast model" and detail == "missing":
