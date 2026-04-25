@@ -50,6 +50,9 @@ Po **każdej** implementacji wykonaj w tej kolejności:
 - [x] user-facing label parity across runtime/live preview surfaces
 - [x] bounded operator recommendation cue from existing evidence
 
+### Stage 5 — Selective expansion
+- [x] bounded next-action cues in inspect/detail from existing evidence
+
 ---
 
 ## Recommended execution order
@@ -335,3 +338,4 @@ Introduce bounded blocking-state detection for critical paths such as missing fa
 - Verified routing/embedding provenance slice with `tests/test_runtime_settings_service.py tests/test_settings_dialog_live_preview.py tests/test_settings_workflow_summary_toast.py tests/test_settings_summary.py -q` (`15 passed`).
 - Implemented Task 8: bounded CLI/headless parity coverage for shared analytics snapshot rendering.
 - Verified Task 8 with targeted CLI analytics test: `1 passed`; related CLI/execution suite: `36 passed`.
+- Added Stage 5 planning note for the next bounded inspect/reuse slice: `Recommended next action` cues derived from existing decision + run evidence.

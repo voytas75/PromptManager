@@ -86,6 +86,7 @@ class WorkspaceHistoryController:
             template_detail.display_prompt(prompt)
         self._update_prompt_lineage_summary(prompt)
         self._update_prompt_decision_summary(prompt)
+        self._update_prompt_next_action_summary(prompt)
         self._update_prompt_run_summary(prompt)
         self._update_template_preview(prompt)
 
@@ -152,6 +153,14 @@ class WorkspaceHistoryController:
         template_detail = self._template_detail_widget_supplier()
         if template_detail is not None:
             template_detail.update_decision_summary(decision_text)
+
+    def _update_prompt_next_action_summary(self, prompt: Prompt) -> None:
+        """Render one bounded operator-facing next action from existing decision evidence."""
+        next_action_text = self._build_next_action_summary(prompt)
+        self._detail_widget.update_next_action_summary(next_action_text)
+        template_detail = self._template_detail_widget_supplier()
+        if template_detail is not None:
+            template_detail.update_next_action_summary(next_action_text)
 
     def _update_prompt_run_summary(self, prompt: Prompt) -> None:
         """Render one bounded last-run evidence cue using existing execution history."""
@@ -248,6 +257,17 @@ class WorkspaceHistoryController:
             )
             if changed_fields:
                 return "Refine before reuse"
+            return "Fork before editing"
+        return "Reuse as-is"
+
+    def _build_next_action_summary(self, prompt: Prompt) -> str:
+        """Map the bounded decision cue to one compact recommended next action."""
+        decision_text = self._build_decision_summary(prompt)
+        if decision_text == "Safe to compare":
+            return "Compare before promoting"
+        if decision_text == "Refine before reuse":
+            return "Refine candidate"
+        if decision_text == "Fork before editing":
             return "Fork before editing"
         return "Reuse as-is"
 

@@ -104,11 +104,13 @@ class _PromptDetailWidgetStub:
     def __init__(self) -> None:
         self.lineage_summary: str | None = None
         self.decision_summary: str | None = None
+        self.next_action_summary: str | None = None
         self.run_summary: str | None = None
 
     def clear(self) -> None:
         self.lineage_summary = None
         self.decision_summary = None
+        self.next_action_summary = None
         self.run_summary = None
 
     def display_prompt(self, prompt: Prompt) -> None:  # noqa: ARG002
@@ -119,6 +121,9 @@ class _PromptDetailWidgetStub:
 
     def update_decision_summary(self, text: str | None) -> None:
         self.decision_summary = text
+
+    def update_next_action_summary(self, text: str | None) -> None:
+        self.next_action_summary = text
 
     def update_run_summary(self, text: str | None) -> None:
         self.run_summary = text
@@ -398,6 +403,59 @@ def test_workspace_history_controller_surfaces_safe_to_compare_recommendation_fo
 
     assert detail_widget.decision_summary == "Safe to compare"
     assert template_detail_widget.decision_summary == "Safe to compare"
+
+
+def test_workspace_history_controller_surfaces_compare_before_promoting_next_action_for_compatible_runs(  # noqa: E501
+) -> None:
+    """Inspect flow should surface one bounded next action when compatible comparison evidence
+    exists.
+    """
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000236"),
+        name="Reusable prompt",
+        description="Description",
+        category="General",
+        context="Prompt body",
+    )
+    detail_widget = _PromptDetailWidgetStub()
+    template_detail_widget = _PromptDetailWidgetStub()
+    manager = _ManagerStub(
+        execution_entries={
+            prompt.id: [
+                _ExecutionEntryStub(
+                    status="success",
+                    model="gpt-4o-mini",
+                    duration_ms=90,
+                    prompt_version=int(prompt.version) + 1,
+                    conversation_messages=3,
+                    rating=5.0,
+                ),
+                _ExecutionEntryStub(
+                    status="success",
+                    model="gpt-4o-mini",
+                    duration_ms=140,
+                    prompt_version=int(prompt.version),
+                    conversation_messages=3,
+                    rating=4.0,
+                ),
+            ]
+        }
+    )
+    controller = WorkspaceHistoryController(
+        manager=_as_prompt_manager(manager),
+        model=_as_prompt_list_model(_PromptListModelStub()),
+        detail_widget=_as_prompt_detail_widget(detail_widget),
+        list_view=_as_list_view(_ListViewStub()),
+        current_prompt_supplier=lambda: prompt,
+        template_detail_widget_supplier=_template_detail_supplier(template_detail_widget),
+        template_preview_controller_supplier=_template_preview_supplier(),
+        execution_controller_supplier=_execution_controller_supplier(),
+    )
+
+    controller.handle_selection_changed()
+
+    assert detail_widget.next_action_summary == "Compare before promoting"
+    assert template_detail_widget.next_action_summary == "Compare before promoting"
 
 
 def test_workspace_history_controller_skips_comparison_cue_without_two_compatible_runs() -> None:

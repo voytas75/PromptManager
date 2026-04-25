@@ -155,6 +155,11 @@ class PromptDetailWidget(QWidget):
         self._decision_label.setWordWrap(True)
         self._decision_label.setTextFormat(Qt.TextFormat.RichText)
         self._decision_label.setVisible(False)
+        self._next_action_label = QLabel("", content)
+        self._next_action_label.setObjectName("promptNextActionSummary")
+        self._next_action_label.setWordWrap(True)
+        self._next_action_label.setTextFormat(Qt.TextFormat.RichText)
+        self._next_action_label.setVisible(False)
         self._run_summary_label = QLabel("", content)
         self._run_summary_label.setObjectName("promptRunSummary")
         self._run_summary_label.setWordWrap(True)
@@ -190,6 +195,8 @@ class PromptDetailWidget(QWidget):
         content_layout.addWidget(self._lineage_label)
         content_layout.addSpacing(4)
         content_layout.addWidget(self._decision_label)
+        content_layout.addSpacing(4)
+        content_layout.addWidget(self._next_action_label)
         content_layout.addSpacing(4)
         content_layout.addWidget(self._run_summary_label)
         content_layout.addSpacing(4)
@@ -826,6 +833,7 @@ class PromptDetailWidget(QWidget):
             self._description,
             self._lineage_label,
             self._decision_label,
+            self._next_action_label,
             self._run_summary_label,
             self._context,
             self._scenarios,
@@ -888,6 +896,8 @@ class PromptDetailWidget(QWidget):
         self._lineage_label.setVisible(False)
         self._decision_label.clear()
         self._decision_label.setVisible(False)
+        self._next_action_label.clear()
+        self._next_action_label.setVisible(False)
         self._run_summary_label.clear()
         self._run_summary_label.setVisible(False)
 
@@ -956,6 +966,17 @@ class PromptDetailWidget(QWidget):
         else:
             self._decision_label.clear()
             self._decision_label.setVisible(False)
+
+    def update_next_action_summary(self, text: str | None) -> None:
+        """Display one compact operator-facing next action for the current prompt."""
+        if text:
+            self._next_action_label.setText(
+                self._format_label_value("Recommended next action", text, multiline=True)
+            )
+            self._next_action_label.setVisible(True)
+        else:
+            self._next_action_label.clear()
+            self._next_action_label.setVisible(False)
 
     def update_run_summary(self, text: str | None) -> None:
         """Display one compact last-run evidence cue for the current prompt."""

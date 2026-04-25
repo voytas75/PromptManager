@@ -90,6 +90,22 @@ def test_prompt_detail_widget_renders_decision_summary_label(
     assert "Refine before reuse" in decision_text
 
 
+def test_prompt_detail_widget_renders_next_action_summary_label(
+    qt_app: QApplication,
+) -> None:
+    """Detail view should render one compact next-action cue when the controller provides it."""
+    widget = PromptDetailWidget()
+
+    widget.show()
+    widget.update_next_action_summary("Compare before promoting")
+    qt_app.processEvents()
+
+    assert widget._next_action_label.isVisible()  # noqa: SLF001
+    next_action_text = widget._next_action_label.text()  # noqa: SLF001
+    assert "Recommended next action:" in next_action_text
+    assert "Compare before promoting" in next_action_text
+
+
 def test_prompt_detail_widget_applies_readable_default_font_sizes(
     qt_app: QApplication,
 ) -> None:
