@@ -63,6 +63,23 @@ def _render(settings: _SummarySettings, capsys: CaptureFixture[str]) -> str:
     return captured.out
 
 
+def test_print_settings_summary_starts_with_diagnostics_block(
+    capsys: CaptureFixture[str],
+) -> None:
+    settings = _SummarySettings()
+    settings.litellm_model = "azure/gpt-4.1"
+
+    output = _render(settings, capsys)
+    lines = output.splitlines()
+
+    assert lines[0] == "Prompt Manager configuration summary"
+    assert lines[1] == "------------------------------------"
+    assert lines[2] == "Diagnostics"
+    assert lines[3] == "-----------"
+    assert lines[4].startswith("Overall status: ")
+    assert output.index("Diagnostics\n-----------") < output.index("Database path:")
+
+
 def test_print_settings_summary_marks_default_and_explicit_states(
     capsys: CaptureFixture[str],
 ) -> None:

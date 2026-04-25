@@ -10,6 +10,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Changed
 
+- Reordered the CLI `--print-settings` summary into a trust-first layout so the `Diagnostics` block now appears before raw path and provider details, keeping `Overall status`, precedence/source labels, and next-step guidance visible at the top of the validation flow.
 - Tightened the top-level README positioning so PromptManager reads more clearly as a **local-first home for prompt assets**, with validation, history, analytics, chains, sharing, and other broader surfaces framed as supporting or secondary rather than co-equal product centers.
 
 ### Fixed

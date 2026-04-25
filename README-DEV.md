@@ -72,6 +72,8 @@ Inspect effective configuration:
 python -m main --no-gui --print-settings
 ```
 
+The CLI summary is trust-first: it starts with the `Diagnostics` block (`Overall status`, source/precedence labels, and `Next steps` when needed) before lower-level path and provider sections.
+
 Launch the GUI:
 
 ```bash

@@ -245,13 +245,18 @@ def print_settings_summary(settings: PromptManagerSettings) -> None:
     lines = [
         "Prompt Manager configuration summary",
         "------------------------------------",
-        f"Database path: {db_path_desc}",
-        f"Chroma directory: {chroma_path_desc}",
-        f"Redis DSN: {_stateful_value(redis_dsn)}",
-        f"Cache TTL (seconds): {getattr(settings, 'cache_ttl_seconds', 'n/a')}",
-        "",
     ]
     lines.extend(_format_cli_diagnostics_block(settings))
+    lines.extend(
+        [
+            "",
+            f"Database path: {db_path_desc}",
+            f"Chroma directory: {chroma_path_desc}",
+            f"Redis DSN: {_stateful_value(redis_dsn)}",
+            f"Cache TTL (seconds): {getattr(settings, 'cache_ttl_seconds', 'n/a')}",
+            "",
+        ]
+    )
     lines.extend(
         [
             "",

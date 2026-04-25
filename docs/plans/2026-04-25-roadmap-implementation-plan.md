@@ -34,6 +34,7 @@ Po **każdej** implementacji wykonaj w tej kolejności:
 - [x] canonical precedence visibility in diagnostics output
 - [x] fail-fast / blocking validation for critical runtime state
 - [x] explicit routing/embedding provenance in user-visible summaries
+- [x] trust-first CLI settings layout for `--print-settings`
 
 ### Stage 2 — Core prompt asset loop quality
 - [x] inspect view as decision-support surface
@@ -309,6 +310,7 @@ Introduce bounded blocking-state detection for critical paths such as missing fa
 **Implemented:**
 - Added bounded CLI analytics coverage that asserts the same shared analytics snapshot is rendered into headless diagnostics output, instead of introducing any parallel CLI-only model.
 - Extended `test_main_entry.py` to verify execution summary plus model-cost and benchmark sections from the canonical snapshot fixture.
+- Reordered the CLI `--print-settings` summary into a trust-first layout so `Diagnostics` now appears before raw path and provider sections.
 - Kept the slice intentionally narrow: no new API contract, no shadow serialization layer, no product-model fork.
 
 **Verified:**
@@ -316,6 +318,14 @@ Introduce bounded blocking-state detection for critical paths such as missing fa
 - result: `1 passed`
 - `.venv/bin/pytest tests/test_main_entry.py tests/test_prompt_manager_execution.py -q`
 - result: `36 passed`
+- `.venv/bin/pytest tests/test_settings_summary.py tests/test_main_entry.py -q`
+- result: `37 passed`
+- `.venv/bin/ruff check cli/settings_summary.py tests/test_settings_summary.py tests/test_main_entry.py`
+- result: `All checks passed!`
+- `.venv/bin/ruff format --check cli/settings_summary.py tests/test_settings_summary.py tests/test_main_entry.py`
+- result: `3 files already formatted`
+- `python -m main --no-gui --print-settings`
+- result: diagnostics block rendered before database/path/provider sections
 
 ## Update log
 
@@ -338,5 +348,7 @@ Introduce bounded blocking-state detection for critical paths such as missing fa
 - Verified routing/embedding provenance slice with `tests/test_runtime_settings_service.py tests/test_settings_dialog_live_preview.py tests/test_settings_workflow_summary_toast.py tests/test_settings_summary.py -q` (`15 passed`).
 - Implemented Task 8: bounded CLI/headless parity coverage for shared analytics snapshot rendering.
 - Verified Task 8 with targeted CLI analytics test: `1 passed`; related CLI/execution suite: `36 passed`.
+- Tightened the CLI `--print-settings` trust surface so the diagnostics block now renders before raw path/provider details.
+- Verified the trust-first CLI layout with `tests/test_settings_summary.py tests/test_main_entry.py -q` (`37 passed`), `ruff check`, `ruff format --check`, and a live `python -m main --no-gui --print-settings` run.
 - Added Stage 5 planning note for the next bounded inspect/reuse slice: `Recommended next action` cues derived from existing decision + run evidence.
 - Landed post-Stage-5 micro-slices to harden inspect/detail cues: fallback mapping coverage, decision→action mapping centralization, clear-selection guard, and template-detail parity guards for run evidence.

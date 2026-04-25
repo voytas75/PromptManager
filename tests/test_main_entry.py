@@ -230,6 +230,7 @@ def test_main_print_settings_logs_and_exits(
     captured = capsys.readouterr()
     output = captured.out
     assert "Prompt Manager configuration summary" in captured.out
+    assert output.index("Diagnostics\n-----------") < output.index("Database path:")
     assert "LiteLLM API key: not set" in captured.out
     assert "Drop params: max_tokens, temperature" in captured.out
     assert "Overall status: FAIL" in output
