@@ -84,6 +84,7 @@ class WorkspaceHistoryController:
         if template_detail is not None:
             template_detail.display_prompt(prompt)
         self._update_prompt_lineage_summary(prompt)
+        self._update_prompt_decision_summary(prompt)
         self._update_template_preview(prompt)
 
     def select_prompt(self, prompt_id: UUID) -> None:
@@ -134,6 +135,44 @@ class WorkspaceHistoryController:
         except PromptManagerError:
             return None
 
+        changed_fields = self._changed_fields_against_parent(
+            prompt=prompt,
+            parent_prompt=parent_prompt,
+        )
+        if not changed_fields:
+            return None
+        return f"Changed from parent: {', '.join(changed_fields)}"
+
+    def _update_prompt_decision_summary(self, prompt: Prompt) -> None:
+        """Render one bounded inspect recommendation using existing lineage state."""
+        decision_text = self._build_decision_summary(prompt)
+        self._detail_widget.update_decision_summary(decision_text)
+        template_detail = self._template_detail_widget_supplier()
+        if template_detail is not None:
+            template_detail.update_decision_summary(decision_text)
+
+    def _build_decision_summary(self, prompt: Prompt) -> str:
+        try:
+            parent_link = self._manager.get_prompt_parent_fork(prompt.id)
+        except PromptVersionError:
+            parent_link = None
+
+        if parent_link is not None:
+            try:
+                parent_prompt = self._manager.get_prompt(parent_link.source_prompt_id)
+            except PromptManagerError:
+                return "Fork before editing"
+            changed_fields = self._changed_fields_against_parent(
+                prompt=prompt,
+                parent_prompt=parent_prompt,
+            )
+            if changed_fields:
+                return "Refine before reuse"
+            return "Fork before editing"
+        return "Reuse as-is"
+
+    @staticmethod
+    def _changed_fields_against_parent(*, prompt: Prompt, parent_prompt: Prompt) -> list[str]:
         changed_fields: list[str] = []
         if (prompt.context or "") != (parent_prompt.context or ""):
             changed_fields.append("body")
@@ -143,9 +182,7 @@ class WorkspaceHistoryController:
             changed_fields.append("tags")
         if prompt.source != parent_prompt.source:
             changed_fields.append("source")
-        if not changed_fields:
-            return None
-        return f"Changed from parent: {', '.join(changed_fields)}"
+        return changed_fields
 
     def _resolve_prompt_name(self, prompt_id: UUID) -> str:
         """Return a human-readable prompt label for lineage summaries."""

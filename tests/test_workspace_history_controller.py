@@ -66,15 +66,20 @@ class _PromptListModelStub:
 class _PromptDetailWidgetStub:
     def __init__(self) -> None:
         self.lineage_summary: str | None = None
+        self.decision_summary: str | None = None
 
     def clear(self) -> None:
         self.lineage_summary = None
+        self.decision_summary = None
 
     def display_prompt(self, prompt: Prompt) -> None:  # noqa: ARG002
         return
 
     def update_lineage_summary(self, text: str | None) -> None:
         self.lineage_summary = text
+
+    def update_decision_summary(self, text: str | None) -> None:
+        self.decision_summary = text
 
 
 class _ListViewStub:
@@ -150,6 +155,8 @@ def test_workspace_history_controller_uses_parent_prompt_name_in_lineage_summary
 
     assert detail_widget.lineage_summary == "Forked from Source prompt"
     assert template_detail_widget.lineage_summary == "Forked from Source prompt"
+    assert detail_widget.decision_summary == "Fork before editing"
+    assert template_detail_widget.decision_summary == "Fork before editing"
 
 
 def test_workspace_history_controller_shows_bounded_parent_difference_cue() -> None:
@@ -197,6 +204,8 @@ def test_workspace_history_controller_shows_bounded_parent_difference_cue() -> N
     expected = "Forked from Source prompt | Changed from parent: body, tags"
     assert detail_widget.lineage_summary == expected
     assert template_detail_widget.lineage_summary == expected
+    assert detail_widget.decision_summary == "Refine before reuse"
+    assert template_detail_widget.decision_summary == "Refine before reuse"
 
 
 def test_workspace_history_controller_hides_difference_cue_without_parent_changes() -> None:
@@ -227,3 +236,5 @@ def test_workspace_history_controller_hides_difference_cue_without_parent_change
 
     assert detail_widget.lineage_summary == "No lineage data yet."
     assert template_detail_widget.lineage_summary == "No lineage data yet."
+    assert detail_widget.decision_summary == "Reuse as-is"
+    assert template_detail_widget.decision_summary == "Reuse as-is"

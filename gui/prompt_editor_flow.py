@@ -207,7 +207,10 @@ class PromptEditorFlow:
         if selected_existing_prompt_id is not None:
             self._load_prompts(self._current_search_text())
             self._select_prompt(selected_existing_prompt_id)
-            self._status_callback("Opened similar existing prompt.", 4000)
+            self._status_callback(
+                self._build_existing_match_opened_status(selected_existing_prompt_id, similar_prompts),
+                4000,
+            )
             return
         updated = dialog.result_prompt
         if updated is None:
@@ -341,6 +344,21 @@ class PromptEditorFlow:
         if stored is None:
             return
         dialog.update_source_prompt(stored)
+
+    @staticmethod
+    def _build_existing_match_opened_status(
+        selected_existing_prompt_id: UUID,
+        similar_prompts: Sequence[Prompt],
+    ) -> str:
+        """Return one bounded status message for opening an existing promote-time match."""
+        for candidate in similar_prompts:
+            if candidate.id != selected_existing_prompt_id:
+                continue
+            similarity = float(getattr(candidate, "similarity", 0.0) or 0.0)
+            if similarity >= 0.85:
+                return "Opened likely duplicate instead of promoting."
+            break
+        return "Opened similar existing prompt."
 
     def _persist_prompt_update(self, prompt: Prompt, owner: QWidget) -> Prompt | None:
         """Save an updated prompt through the shared update path and refresh selection."""

@@ -576,4 +576,4 @@ def test_promote_draft_passes_similar_matches_and_can_open_existing(monkeypatch)
     assert manager.updated_prompts == []
     assert load_calls == [""]
     assert selected_ids == [existing.id]
-    assert status_messages == [("Opened similar existing prompt.", 4000)]
+    assert status_messages == [("Opened likely duplicate instead of promoting.", 4000)]

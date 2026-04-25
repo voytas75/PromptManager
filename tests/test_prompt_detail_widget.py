@@ -43,6 +43,22 @@ def qt_app() -> QApplication:
     return cast("QApplication", app)
 
 
+def test_prompt_detail_widget_renders_decision_summary_label(
+    qt_app: QApplication,
+) -> None:
+    """Detail view should render one compact decision cue when the controller provides it."""
+    widget = PromptDetailWidget()
+
+    widget.show()
+    widget.update_decision_summary("Refine before reuse")
+    qt_app.processEvents()
+
+    assert widget._decision_label.isVisible()  # noqa: SLF001
+    decision_text = widget._decision_label.text()  # noqa: SLF001
+    assert "Decision:" in decision_text
+    assert "Refine before reuse" in decision_text
+
+
 def test_prompt_detail_widget_applies_readable_default_font_sizes(
     qt_app: QApplication,
 ) -> None:

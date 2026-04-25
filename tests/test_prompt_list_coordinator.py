@@ -1,6 +1,7 @@
 """Focused tests for bounded prompt-list filtering helpers.
 
 Updates:
+  v0.2.0 - 2026-04-25 - Distinguish search no-match vs search-error retrieval states.
   v0.1.0 - 2026-04-12 - Cover favorites-only filtering without widening list behavior.
 """
 
@@ -10,13 +11,32 @@ import uuid
 from datetime import UTC, datetime
 from typing import cast
 
+from core import PromptManagerError
 from gui.prompt_list_coordinator import PromptListCoordinator
 from models.prompt_model import Prompt
 
 
 class _ManagerStub:
+    def __init__(self) -> None:
+        self.repository = _RepositoryStub([])
+        self.search_results: list[Prompt] = []
+        self.search_error: Exception | None = None
+
     def list_categories(self) -> list[object]:
         return []
+
+    def search_prompts(self, query_text: str, limit: int = 50) -> list[Prompt]:
+        if self.search_error is not None:
+            raise self.search_error
+        return list(self.search_results[:limit])
+
+
+class _RepositoryStub:
+    def __init__(self, prompts: list[Prompt]) -> None:
+        self._prompts = list(prompts)
+
+    def list(self) -> list[Prompt]:
+        return list(self._prompts)
 
 
 class _FilterPanelStub:
@@ -57,6 +77,36 @@ def _prompt(name: str, *, is_favorite: bool) -> Prompt:
         created_at=datetime(2026, 4, 12, 12, 0, tzinfo=UTC),
         last_modified=datetime(2026, 4, 12, 12, 0, tzinfo=UTC),
     )
+
+
+def test_fetch_prompts_keeps_search_mode_for_no_match_results() -> None:
+    """Active search with zero matches should stay distinct from the default full-catalog state."""
+    manager = _ManagerStub()
+    manager.repository = _RepositoryStub([_prompt("Alpha", is_favorite=True)])
+    manager.search_results = []
+    coordinator = PromptListCoordinator(cast("object", manager))
+
+    result = coordinator.fetch_prompts("rollback")
+
+    assert [prompt.name for prompt in result.all_prompts] == ["Alpha"]
+    assert result.search_results == []
+    assert result.preserve_search_order is True
+    assert result.search_error is None
+
+
+def test_fetch_prompts_records_search_errors_without_faking_empty_results() -> None:
+    """Search failures should stay distinguishable from no-match search states."""
+    manager = _ManagerStub()
+    manager.repository = _RepositoryStub([_prompt("Alpha", is_favorite=True)])
+    manager.search_error = PromptManagerError("search backend down")
+    coordinator = PromptListCoordinator(cast("object", manager))
+
+    result = coordinator.fetch_prompts("rollback")
+
+    assert [prompt.name for prompt in result.all_prompts] == ["Alpha"]
+    assert result.search_results is None
+    assert result.preserve_search_order is False
+    assert result.search_error == "search backend down"
 
 
 def test_apply_filters_keeps_only_favorite_prompts_when_requested() -> None:

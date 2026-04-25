@@ -150,6 +150,11 @@ class PromptDetailWidget(QWidget):
         self._lineage_label.setStyleSheet("color: #4b5563;")
         self._lineage_label.setVisible(False)
         self._lineage_label.setTextFormat(Qt.TextFormat.RichText)
+        self._decision_label = QLabel("", content)
+        self._decision_label.setObjectName("promptDecisionSummary")
+        self._decision_label.setWordWrap(True)
+        self._decision_label.setTextFormat(Qt.TextFormat.RichText)
+        self._decision_label.setVisible(False)
 
         self._context = QLabel("", content)
         self._context.setWordWrap(True)
@@ -178,6 +183,8 @@ class PromptDetailWidget(QWidget):
         content_layout.addWidget(self._description)
         content_layout.addSpacing(4)
         content_layout.addWidget(self._lineage_label)
+        content_layout.addSpacing(4)
+        content_layout.addWidget(self._decision_label)
         content_layout.addSpacing(4)
         content_layout.addWidget(self._context)
         content_layout.addSpacing(4)
@@ -811,6 +818,7 @@ class PromptDetailWidget(QWidget):
             self._workspace_handoff_cue_label,
             self._description,
             self._lineage_label,
+            self._decision_label,
             self._context,
             self._scenarios,
             self._examples,
@@ -870,6 +878,8 @@ class PromptDetailWidget(QWidget):
         self._share_metadata_checkbox.setEnabled(False)
         self._lineage_label.clear()
         self._lineage_label.setVisible(False)
+        self._decision_label.clear()
+        self._decision_label.setVisible(False)
 
     def share_button(self) -> QPushButton:
         """Return the share button so callers can anchor menus."""
@@ -927,6 +937,15 @@ class PromptDetailWidget(QWidget):
         else:
             self._lineage_label.clear()
             self._lineage_label.setVisible(False)
+
+    def update_decision_summary(self, text: str | None) -> None:
+        """Display one compact next-step recommendation for the current prompt."""
+        if text:
+            self._decision_label.setText(self._format_label_value("Decision", text, multiline=True))
+            self._decision_label.setVisible(True)
+        else:
+            self._decision_label.clear()
+            self._decision_label.setVisible(False)
 
 
 __all__ = ["PromptDetailWidget"]
