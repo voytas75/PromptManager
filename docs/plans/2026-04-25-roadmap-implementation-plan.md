@@ -46,6 +46,9 @@ Po **każdej** implementacji wykonaj w tej kolejności:
 
 ### Stage 4 — Controlled automation surfaces
 - [x] CLI/API parity on inspection and status surfaces
+- [x] CLI/shared parity for run evidence and comparison cues
+- [x] user-facing label parity across runtime/live preview surfaces
+- [x] bounded operator recommendation cue from existing evidence
 
 ---
 

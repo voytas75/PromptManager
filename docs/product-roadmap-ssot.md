@@ -96,6 +96,8 @@ Focus:
 - scriptable bounded run flows
 - repeatable validation paths
 - automation that respects the same settings and diagnostics model
+- parity for bounded execution evidence across GUI and headless surfaces
+- short operator-facing cues derived from existing evidence
 
 Why fourth:
 - automation is valuable only after the core model is stable and legible
