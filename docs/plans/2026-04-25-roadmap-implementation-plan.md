@@ -33,7 +33,7 @@ Po **każdej** implementacji wykonaj w tej kolejności:
 - [x] effective config source-of-value visibility
 - [x] canonical precedence visibility in diagnostics output
 - [x] fail-fast / blocking validation for critical runtime state
-- [ ] explicit routing/embedding provenance in user-visible summaries
+- [x] explicit routing/embedding provenance in user-visible summaries
 
 ### Stage 2 — Core prompt asset loop quality
 - [x] inspect view as decision-support surface
@@ -42,7 +42,7 @@ Po **każdej** implementacji wykonaj w tej kolejności:
 
 ### Stage 3 — Trustworthy prompt operations
 - [x] structured runs v1 linked to prompt assets
-- [ ] baseline vs candidate comparison slice
+- [x] baseline vs candidate comparison slice
 
 ### Stage 4 — Controlled automation surfaces
 - [x] CLI/API parity on inspection and status surfaces
@@ -148,6 +148,9 @@ When green:
 **Verified:**
 - `.venv/bin/pytest tests/test_gui_diagnostics_status.py tests/test_runtime_settings_service.py tests/test_settings_dialog_diagnostics.py tests/test_settings_summary.py tests/test_main_entry.py -q`
 - result: `37 passed`
+- Extended compact user-visible provenance beyond diagnostics into runtime summaries, settings toasts, and live routing preview for routing + embeddings.
+- `.venv/bin/pytest tests/test_runtime_settings_service.py tests/test_settings_dialog_live_preview.py tests/test_settings_workflow_summary_toast.py tests/test_settings_summary.py -q`
+- result: `15 passed`
 
 ---
 
@@ -282,13 +285,14 @@ Introduce bounded blocking-state detection for critical paths such as missing fa
 **Implemented:**
 - Added persisted `run` provenance in execution context metadata for prompt executions: run kind, prompt id, prompt version, and conversation message count.
 - Surfaced a bounded `Last run` evidence cue in inspect/detail flow using existing execution history metadata instead of a new UI-side model.
+- Extended inspect/detail run evidence with a bounded `Candidate vs baseline` cue when two recent compatible runs expose rating + duration, so users can compare the latest candidate against the immediate baseline without opening a separate analytics flow.
 - Kept the slice compact and inspect-oriented: latest run summary now shows status, model, prompt version, conversation message count, and duration when available.
 
 **Verified:**
-- `.venv/bin/pytest tests/test_workspace_history_controller.py tests/test_prompt_detail_widget.py tests/test_canonical_operator_path_parity.py tests/test_history_tracker.py -q`
-- result: `37 passed`
-- `.venv/bin/pytest tests/test_prompt_manager_execution_history.py tests/test_history_tracker.py tests/test_workspace_history_controller.py tests/test_prompt_detail_widget.py -q`
-- result: `39 passed`
+- `.venv/bin/pytest tests/test_workspace_history_controller.py -q`
+- result: `6 passed`
+- `.venv/bin/pytest tests/test_main_window_bridges.py tests/test_template_preview_widget.py -q`
+- result: `12 passed`
 
 ### Task 8: CLI/API parity expansion
 
@@ -322,5 +326,9 @@ Introduce bounded blocking-state detection for critical paths such as missing fa
 - Verified Task 7 with targeted execution-history tests plus related tracker coverage: `10 passed`; pyright on touched files: `0 errors`.
 - Extended Task 7: surfaced bounded `Last run` evidence in inspect/detail from persisted execution history provenance.
 - Verified Task 7 evidence surface with targeted + nearby suites: `37 passed`, then `39 passed`.
+- Extended Task 7 again: added bounded `Candidate vs baseline` comparison cue in inspect/detail summaries when two compatible runs exist.
+- Verified bounded comparison cue with `tests/test_workspace_history_controller.py -q` (`6 passed`) and nearby UI smoke tests `tests/test_main_window_bridges.py tests/test_template_preview_widget.py -q` (`12 passed`).
+- Extended Stage 1 trust surfaces: added compact routing + embedding provenance in runtime summaries, settings toasts, and live routing preview.
+- Verified routing/embedding provenance slice with `tests/test_runtime_settings_service.py tests/test_settings_dialog_live_preview.py tests/test_settings_workflow_summary_toast.py tests/test_settings_summary.py -q` (`15 passed`).
 - Implemented Task 8: bounded CLI/headless parity coverage for shared analytics snapshot rendering.
 - Verified Task 8 with targeted CLI analytics test: `1 passed`; related CLI/execution suite: `36 passed`.
