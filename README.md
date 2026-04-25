@@ -41,19 +41,15 @@ Use PromptManager when you want to:
 
 If you are unsure where to start, use this sequence:
 
-1. **Quick Capture** a useful prompt or LLM query before it gets lost in chat, notes, or scratch files.
+1. **Quick Capture** a useful prompt or LLM query before it gets lost.
 2. **Promote Draft** once it is worth keeping as a reusable prompt asset.
 3. **Use Recent or search** to get back to it quickly.
-4. **Inspect the detail view** to confirm fit, context, provenance, and any lineage cues.
+4. **Inspect the detail view** to confirm fit and context.
 5. **Reuse with `Copy Prompt` or `Open in Workspace`** when you want the stored prompt body or lightweight validation.
 
 Short version:
 
 **`Quick Capture` → `Promote Draft` → `Recent` / search → inspect → `Copy Prompt` or `Open in Workspace`**
-
-This is the canonical PromptManager v1 flow. It keeps the catalog at the center and treats execution, analytics, chains, sharing, and other secondary surfaces as supporting tools rather than the default front door.
-
-For a slightly fuller operator-facing version, see [`docs/canonical-usage-path-v1.md`](docs/canonical-usage-path-v1.md).
 
 ## Core capabilities
 
@@ -140,22 +136,13 @@ PromptManager supports optional integrations for:
 - **Tavily / Exa / Serper / SerpApi / Google Programmable Search** for web search enrichment
 - **Redis** for caching
 
-Advanced environment variables and full configuration details are documented in:
-- [`docs/README-DEV.md`](docs/README-DEV.md)
-- [`docs/web_search_plan.md`](docs/web_search_plan.md)
-
+For developer-oriented setup and deeper configuration notes, see [`README-DEV.md`](README-DEV.md).
 The repository root also includes [`.env.example`](.env.example) as a safe starting point for local configuration.
 
 ## Why PromptManager
 
-Most prompt workflows start as some combination of:
-- Markdown files
-- text snippets
-- chat history
-- copied JSON payloads
-- half-reusable templates
-
-That works for a while, but it breaks down once you want repeatability, reuse, better retrieval, or proper versioning.
+Prompt workflows often start in Markdown files, text snippets, chat history, or ad-hoc templates.
+That works for a while, but it breaks down once you want repeatability, reuse, better retrieval, or versioning.
 
 PromptManager gives you a dedicated local-first home for prompt assets:
 - capture-oriented
@@ -168,66 +155,21 @@ PromptManager gives you a dedicated local-first home for prompt assets:
 
 PromptManager is currently in **beta** and under active development.
 
-The current focus is:
-- strengthening the core prompt asset loop: capture, organize, retrieve, inspect, and reuse
-- improving low-friction draft capture, promotion, and reuse workflows
-- refining template and validation ergonomics where they directly support prompt assets
-- keeping execution, analytics, chains, sharing, and voice as supporting surfaces rather than the product center
-- keeping the desktop experience responsive and local-first
+Current focus:
+- strengthening the core prompt asset loop
+- improving low-friction capture, promotion, retrieval, and reuse
+- making the product more trustworthy and local-first
 
 ## What PromptManager is not
 
 PromptManager is not primarily positioned today as:
 - a general desktop chatbot
 - an agent platform
-- an AI workbench for everything
-
-## Detailed features by product role
-
-### Core prompt asset workflow
-
-- Full PySide6 GUI with list/search/detail panes, in-place CRUD, fork/version history, quick action palette, and refined prompt editing workflows.
-- Quick Capture, Draft Promote, recent reopen, and inspection cues keep rough prompt/query material close to the catalog instead of leaving it scattered across chats, notes, and ad-hoc files.
-- Semantic search embeds prompt facets such as name, description, tags, and scenarios via LiteLLM or sentence-transformers and returns cosine-ranked matches from ChromaDB.
-- Live Jinja2 template preview renders prompts with JSON variables, includes custom filters (`truncate`, `slugify`, `json`), and validates payloads with optional JSON Schema or Pydantic feedback.
-- Prompt Parts provide reusable response styles, system instructions, redaction rules, and formatting presets so supporting prompt components can stay structured and reusable.
-
-### Supporting validation and local operations
-
-These capabilities support the prompt catalog when validation, maintenance, or automation becomes useful, but they are not the default front door:
-
-- an optional LiteLLM-backed workspace for lightweight validation or reuse
-- Prompt Template editing and template-preview support
-- typed configuration loading plus optional Redis-backed caching
-- maintenance tooling such as reset actions and snapshot export
-- CLI helpers such as `catalog-export`, `suggest`, `usage-report`, and `reembed`
-
-### Supporting history and light analytics
-
-These surfaces exist to help curation and troubleshooting, not to redefine the product:
-
-- persisted run history in SQLite, surfaced in the GUI History tab and related APIs
-- lightweight token, latency, and rating visibility
-- `history-analytics` and diagnostics helpers for bounded operator insight
-
-### Secondary surfaces
-
-Additional surfaces remain available for operators who need them, but they are intentionally secondary to the prompt asset workflow:
-
-- Prompt Workbench and guided authoring helpers
-- web search enrichment before execution
-- prompt chaining flows
-- prompt sharing helpers
-- voice/TTS playback
-- workspace appearance controls
-- benchmark tooling
-
-The core job remains the same: keep prompt assets captured, understandable, retrievable, reusable, and refinable.
+- a general AI workbench
 
 ## Developer
 
-See the full contributor guide in [`README-DEV.md`](docs/README-DEV.md) for development environment setup, environment variable matrix, testing/type-checking workflow, embedding and GUI deep dives, and maintenance procedures.
-The staged web search rollout plan (covering Exa, Tavily, Serper, SerpApi, and Google Programmable Search) lives in [`docs/web_search_plan.md`](docs/web_search_plan.md).
+See [`README-DEV.md`](README-DEV.md) for development environment setup, testing workflow, configuration details, maintenance notes, and deeper product/documentation links.
 
 ## Changelog
 
