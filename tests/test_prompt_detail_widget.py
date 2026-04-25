@@ -97,13 +97,13 @@ def test_prompt_detail_widget_renders_next_action_summary_label(
     widget = PromptDetailWidget()
 
     widget.show()
-    widget.update_next_action_summary("Compare runs before reuse")
+    widget.update_next_action_summary("Compare before validating reuse")
     qt_app.processEvents()
 
     assert widget._next_action_label.isVisible()  # noqa: SLF001
     next_action_text = widget._next_action_label.text()  # noqa: SLF001
     assert "Recommended next action:" in next_action_text
-    assert "Compare runs before reuse" in next_action_text
+    assert "Compare before validating reuse" in next_action_text
 
 
 def test_prompt_detail_widget_hides_next_action_summary_when_empty(
@@ -113,12 +113,30 @@ def test_prompt_detail_widget_hides_next_action_summary_when_empty(
     widget = PromptDetailWidget()
 
     widget.show()
-    widget.update_next_action_summary("Compare runs before reuse")
+    widget.update_next_action_summary("Compare before validating reuse")
     widget.update_next_action_summary(None)
     qt_app.processEvents()
 
     assert not widget._next_action_label.isVisible()  # noqa: SLF001
     assert widget._next_action_label.text() == ""  # noqa: SLF001
+
+
+def test_prompt_detail_widget_reveals_next_action_after_decision_clears(
+    qt_app: QApplication,
+) -> None:
+    """Hidden next-action cue should reappear once the duplicate decision cue is removed."""
+    widget = PromptDetailWidget()
+
+    widget.show()
+    widget.update_decision_summary("Refine before reuse")
+    widget.update_next_action_summary("Refine before reuse")
+    widget.update_decision_summary(None)
+    qt_app.processEvents()
+
+    assert widget._next_action_label.isVisible()  # noqa: SLF001
+    next_action_text = widget._next_action_label.text()  # noqa: SLF001
+    assert "Recommended next action:" in next_action_text
+    assert "Refine before reuse" in next_action_text
 
 
 def test_prompt_detail_widget_hides_redundant_next_action_when_same_as_decision(

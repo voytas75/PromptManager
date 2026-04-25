@@ -75,6 +75,7 @@ class PromptDetailWidget(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         """Build the scrollable layout and wire up prompt action signals."""
         super().__init__(parent)
+        self._hidden_duplicate_next_action_text: str | None = None
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
@@ -896,6 +897,7 @@ class PromptDetailWidget(QWidget):
         self._lineage_label.setVisible(False)
         self._decision_label.clear()
         self._decision_label.setVisible(False)
+        self._hidden_duplicate_next_action_text = None
         self._next_action_label.clear()
         self._next_action_label.setVisible(False)
         self._run_summary_label.clear()
@@ -969,16 +971,23 @@ class PromptDetailWidget(QWidget):
 
         next_action_text = self._extract_label_value_text(self._next_action_label.text())
         if text and next_action_text == text:
+            self._hidden_duplicate_next_action_text = text
             self._next_action_label.clear()
             self._next_action_label.setVisible(False)
+        elif text is None and self._hidden_duplicate_next_action_text:
+            hidden_text = self._hidden_duplicate_next_action_text
+            self._hidden_duplicate_next_action_text = None
+            self.update_next_action_summary(hidden_text)
 
     def update_next_action_summary(self, text: str | None) -> None:
         """Display one compact operator-facing next action for the current prompt."""
         decision_text = self._extract_label_value_text(self._decision_label.text())
         if text and decision_text == text:
+            self._hidden_duplicate_next_action_text = text
             self._next_action_label.clear()
             self._next_action_label.setVisible(False)
             return
+        self._hidden_duplicate_next_action_text = None
         if text:
             self._next_action_label.setText(
                 self._format_label_value("Recommended next action", text, multiline=True)
