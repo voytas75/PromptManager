@@ -106,6 +106,21 @@ def test_prompt_detail_widget_renders_next_action_summary_label(
     assert "Compare before promoting" in next_action_text
 
 
+def test_prompt_detail_widget_hides_next_action_summary_when_empty(
+    qt_app: QApplication,
+) -> None:
+    """Detail view should clear the next-action cue when the controller removes it."""
+    widget = PromptDetailWidget()
+
+    widget.show()
+    widget.update_next_action_summary("Compare before promoting")
+    widget.update_next_action_summary(None)
+    qt_app.processEvents()
+
+    assert not widget._next_action_label.isVisible()  # noqa: SLF001
+    assert widget._next_action_label.text() == ""  # noqa: SLF001
+
+
 def test_prompt_detail_widget_applies_readable_default_font_sizes(
     qt_app: QApplication,
 ) -> None:

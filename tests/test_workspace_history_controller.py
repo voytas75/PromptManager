@@ -204,6 +204,8 @@ def test_workspace_history_controller_uses_parent_prompt_name_in_lineage_summary
     assert template_detail_widget.lineage_summary == "Forked from Source prompt"
     assert detail_widget.decision_summary == "Fork before editing"
     assert template_detail_widget.decision_summary == "Fork before editing"
+    assert detail_widget.next_action_summary == "Fork before editing"
+    assert template_detail_widget.next_action_summary == "Fork before editing"
 
 
 def test_workspace_history_controller_shows_bounded_parent_difference_cue() -> None:
@@ -253,6 +255,8 @@ def test_workspace_history_controller_shows_bounded_parent_difference_cue() -> N
     assert template_detail_widget.lineage_summary == expected
     assert detail_widget.decision_summary == "Refine before reuse"
     assert template_detail_widget.decision_summary == "Refine before reuse"
+    assert detail_widget.next_action_summary == "Refine candidate"
+    assert template_detail_widget.next_action_summary == "Refine candidate"
 
 
 def test_workspace_history_controller_surfaces_last_run_summary_for_prompt() -> None:
@@ -498,6 +502,36 @@ def test_workspace_history_controller_skips_comparison_cue_without_two_compatibl
 
     assert detail_widget.run_summary is not None
     assert "Candidate vs baseline:" not in detail_widget.run_summary
+
+
+def test_workspace_history_controller_maps_default_next_action_to_reuse_as_is() -> None:
+    """Inspect flow should keep the default next action aligned with the default decision cue."""
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000238"),
+        name="Reusable prompt",
+        description="Description",
+        category="General",
+        context="Prompt body",
+    )
+    detail_widget = _PromptDetailWidgetStub()
+    template_detail_widget = _PromptDetailWidgetStub()
+    controller = WorkspaceHistoryController(
+        manager=_as_prompt_manager(_ManagerStub()),
+        model=_as_prompt_list_model(_PromptListModelStub()),
+        detail_widget=_as_prompt_detail_widget(detail_widget),
+        list_view=_as_list_view(_ListViewStub()),
+        current_prompt_supplier=lambda: prompt,
+        template_detail_widget_supplier=_template_detail_supplier(template_detail_widget),
+        template_preview_controller_supplier=_template_preview_supplier(),
+        execution_controller_supplier=_execution_controller_supplier(),
+    )
+
+    controller.handle_selection_changed()
+
+    assert detail_widget.decision_summary == "Reuse as-is"
+    assert template_detail_widget.decision_summary == "Reuse as-is"
+    assert detail_widget.next_action_summary == "Reuse as-is"
+    assert template_detail_widget.next_action_summary == "Reuse as-is"
 
 
 def test_workspace_history_controller_hides_last_run_summary_when_prompt_has_no_history() -> None:
