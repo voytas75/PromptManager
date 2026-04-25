@@ -83,7 +83,12 @@ class _ManagerStub:
         assert prompt_id == self._parent_prompt.id
         return self._parent_prompt
 
-    def list_execution_history(self, prompt_id: uuid.UUID, *, limit: int = 20) -> list[_ExecutionEntryStub]:
+    def list_execution_history(
+        self,
+        prompt_id: uuid.UUID,
+        *,
+        limit: int = 20,
+    ) -> list[_ExecutionEntryStub]:
         return list(self._execution_entries.get(prompt_id, [])[:limit])
 
 
@@ -344,7 +349,8 @@ def test_workspace_history_controller_surfaces_candidate_vs_baseline_comparison_
     assert "90 ms vs 140 ms" in detail_widget.run_summary
 
 
-def test_workspace_history_controller_surfaces_safe_to_compare_recommendation_for_two_compatible_runs() -> None:
+def test_workspace_history_controller_surfaces_safe_to_compare_recommendation_for_two_compatible_runs(  # noqa: E501
+) -> None:
     """Inspect flow should add one bounded recommendation cue when comparison evidence is ready."""
     prompt = Prompt(
         id=uuid.UUID("00000000-0000-0000-0000-000000000235"),

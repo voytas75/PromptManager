@@ -133,62 +133,78 @@ def build_config_diagnostics_items(
     tts_source = _source("litellm_tts_model", "unknown" if tts_model_text else "default")
     redis_source = _source("redis_dsn", "runtime")
 
+    fast_model_precedence = _precedence("litellm_model", fast_model_source)
+    inference_model_precedence = _precedence(
+        "litellm_inference_model",
+        inference_model_source,
+    )
+    api_key_precedence = _precedence("litellm_api_key", api_key_source)
+    embeddings_precedence = _precedence("embedding_model", embeddings_source)
+    tts_precedence = _precedence("litellm_tts_model", tts_source)
+    redis_precedence = _precedence("redis_dsn", redis_source)
+
     items: list[DiagnosticsItem] = [
         {
             "label": "Fast model",
             "status": "OK" if fast_model_text else "FAIL",
             "detail": fast_model_text or "missing",
             "source": fast_model_source,
-            **({"precedence": value} if (value := _precedence("litellm_model", fast_model_source)) else {}),
+            **({"precedence": fast_model_precedence} if fast_model_precedence else {}),
         },
         {
             "label": "Inference model",
             "status": "OK" if inference_model_text else "WARN",
             "detail": inference_model_text or "not configured",
             "source": inference_model_source,
-            **({"precedence": value} if (value := _precedence("litellm_inference_model", inference_model_source)) else {}),
+            **({"precedence": inference_model_precedence} if inference_model_precedence else {}),
         },
         {
             "label": "API key",
             "status": "OK" if api_key_present else "FAIL",
             "detail": "configured" if api_key_present else "missing",
             "source": api_key_source,
-            **({"precedence": value} if (value := _precedence("litellm_api_key", api_key_source)) else {}),
+            **({"precedence": api_key_precedence} if api_key_precedence else {}),
         },
         {
             "label": "Embeddings",
             "status": "OK",
             "detail": embeddings_text,
             "source": embeddings_source,
-            **({"precedence": value} if (value := _precedence("embedding_model", embeddings_source)) else {}),
+            **({"precedence": embeddings_precedence} if embeddings_precedence else {}),
         },
         {
             "label": "TTS",
             "status": "OK" if tts_model_text else "WARN",
             "detail": tts_model_text or "not configured",
             "source": tts_source,
-            **({"precedence": value} if (value := _precedence("litellm_tts_model", tts_source)) else {}),
+            **({"precedence": tts_precedence} if tts_precedence else {}),
         },
         {
             "label": "Redis cache",
             "status": "WARN" if "disabled" in redis_text.lower() else "OK",
             "detail": redis_text,
             "source": redis_source,
-            **({"precedence": value} if (value := _precedence("redis_dsn", redis_source)) else {}),
+            **({"precedence": redis_precedence} if redis_precedence else {}),
         },
     ]
     summary_status = summarise_diagnostics_severity(items)
     next_steps: list[str] = []
     if not fast_model_text:
-        next_steps.append("Set a LiteLLM fast model to unlock chat, prompt runs, and derived defaults.")
+        next_steps.append(
+            "Set a LiteLLM fast model to unlock chat, prompt runs, and derived defaults."
+        )
     if not api_key_present:
         next_steps.append("Add a LiteLLM API key so model calls can authenticate successfully.")
     if not inference_model_text:
-        next_steps.append("Optional: set an inference model before routing heavier workflows to inference.")
+        next_steps.append(
+            "Optional: set an inference model before routing heavier workflows to inference."
+        )
     if not tts_model_text:
         next_steps.append("Optional: configure a TTS model only if you plan to use voice output.")
     if "disabled" in redis_text.lower():
-        next_steps.append("Optional: configure Redis only if you want shared caching or faster repeat lookups.")
+        next_steps.append(
+            "Optional: configure Redis only if you want shared caching or faster repeat lookups."
+        )
     return {
         "summary_status": summary_status,
         "items": items,

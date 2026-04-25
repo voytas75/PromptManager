@@ -346,7 +346,9 @@ class SettingsDialog(QDialog):
             routing_source = "custom" if routing_map else "default"
             inference_summary = f"none [{routing_source}]"
         if embedding_model:
-            embedding_source = "default" if embedding_model == "text-embedding-3-large" else "custom"
+            embedding_source = (
+                "default" if embedding_model == "text-embedding-3-large" else "custom"
+            )
             embedding_summary = f"litellm / {embedding_model} [{embedding_source}]"
         elif fast_model:
             embedding_summary = f"litellm / {fast_model} [derived from fast model]"

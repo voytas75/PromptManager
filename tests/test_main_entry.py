@@ -263,13 +263,25 @@ def test_main_diagnostics_analytics_uses_shared_snapshot_sections(
     """Analytics diagnostics CLI should surface the shared snapshot sections for operator parity."""
     monkeypatch.setattr(
         "sys.argv",
-        ["prompt-manager", "diagnostics", "analytics", "--window-days", "14", "--prompt-limit", "3"],
+        [
+            "prompt-manager",
+            "diagnostics",
+            "analytics",
+            "--window-days",
+            "14",
+            "--prompt-limit",
+            "3",
+        ],
     )
     settings = _DummySettings()
     manager = _DummyManager()
     _patch_main(monkeypatch, "load_settings", lambda: settings)
     _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
-    _patch_main(monkeypatch, "build_analytics_snapshot", lambda *args, **kwargs: _build_dummy_snapshot())
+    _patch_main(
+        monkeypatch,
+        "build_analytics_snapshot",
+        lambda *args, **kwargs: _build_dummy_snapshot(),
+    )
 
     exit_code = main.main()
 
@@ -712,7 +724,11 @@ def test_main_entrypoint_guard_executes(
 
     config_stub = _mock_module("config")
     config_stub.load_settings = lambda: (
-        lambda settings: (setattr(settings, "litellm_model", "azure/gpt-4o-mini"), setattr(settings, "litellm_api_key", "secret-key"), settings)[2]
+        lambda settings: (
+            setattr(settings, "litellm_model", "azure/gpt-4o-mini"),
+            setattr(settings, "litellm_api_key", "secret-key"),
+            settings,
+        )[2]
     )(_DummySettings())
     config_stub.PromptManagerSettings = type("PromptManagerSettings", (), {})
     config_stub.LITELLM_ROUTED_WORKFLOWS = {"prompt_execution": "Prompt execution"}
