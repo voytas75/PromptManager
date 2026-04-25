@@ -257,6 +257,32 @@ def test_main_print_settings_masks_api_key(
     assert "OK | Fast model: azure/gpt-4o [config]" in output
 
 
+def test_main_diagnostics_analytics_uses_shared_snapshot_sections(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Analytics diagnostics CLI should surface the shared snapshot sections for operator parity."""
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "diagnostics", "analytics", "--window-days", "14", "--prompt-limit", "3"],
+    )
+    settings = _DummySettings()
+    manager = _DummyManager()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
+    _patch_main(monkeypatch, "build_analytics_snapshot", lambda *args, **kwargs: _build_dummy_snapshot())
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "Analytics dashboard" in output
+    assert "Execution summary (last 14 days)" in output
+    assert "Model cost breakdown (tokens):" in output
+    assert "Benchmark success by model:" in output
+    assert "Intent workspace execution success:" in output
+    assert "Embedding diagnostics summary:" in output
+
+
 def test_main_returns_error_when_settings_fail(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
