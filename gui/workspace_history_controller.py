@@ -229,6 +229,9 @@ class WorkspaceHistoryController:
         return entries
 
     def _build_decision_summary(self, prompt: Prompt) -> str:
+        run_recommendation = self._build_run_recommendation_summary(prompt)
+        if run_recommendation is not None:
+            return run_recommendation
         try:
             parent_link = self._manager.get_prompt_parent_fork(prompt.id)
         except PromptVersionError:
@@ -247,6 +250,22 @@ class WorkspaceHistoryController:
                 return "Refine before reuse"
             return "Fork before editing"
         return "Reuse as-is"
+
+    def _build_run_recommendation_summary(self, prompt: Prompt) -> str | None:
+        entries = self._list_execution_history(prompt, limit=2)
+        if len(entries) < 2:
+            return None
+        latest = entries[0]
+        baseline = entries[1]
+        latest_rating = getattr(latest, "rating", None)
+        baseline_rating = getattr(baseline, "rating", None)
+        latest_duration = getattr(latest, "duration_ms", None)
+        baseline_duration = getattr(baseline, "duration_ms", None)
+        if latest_rating is None or baseline_rating is None:
+            return None
+        if latest_duration is None or baseline_duration is None:
+            return None
+        return "Safe to compare"
 
     @staticmethod
     def _changed_fields_against_parent(*, prompt: Prompt, parent_prompt: Prompt) -> list[str]:

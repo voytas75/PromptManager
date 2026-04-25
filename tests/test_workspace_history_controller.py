@@ -344,6 +344,56 @@ def test_workspace_history_controller_surfaces_candidate_vs_baseline_comparison_
     assert "90 ms vs 140 ms" in detail_widget.run_summary
 
 
+def test_workspace_history_controller_surfaces_safe_to_compare_recommendation_for_two_compatible_runs() -> None:
+    """Inspect flow should add one bounded recommendation cue when comparison evidence is ready."""
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000235"),
+        name="Reusable prompt",
+        description="Description",
+        category="General",
+        context="Prompt body",
+    )
+    detail_widget = _PromptDetailWidgetStub()
+    template_detail_widget = _PromptDetailWidgetStub()
+    manager = _ManagerStub(
+        execution_entries={
+            prompt.id: [
+                _ExecutionEntryStub(
+                    status="success",
+                    model="gpt-4o-mini",
+                    duration_ms=90,
+                    prompt_version=int(prompt.version) + 1,
+                    conversation_messages=3,
+                    rating=5.0,
+                ),
+                _ExecutionEntryStub(
+                    status="success",
+                    model="gpt-4o-mini",
+                    duration_ms=140,
+                    prompt_version=int(prompt.version),
+                    conversation_messages=3,
+                    rating=4.0,
+                ),
+            ]
+        }
+    )
+    controller = WorkspaceHistoryController(
+        manager=_as_prompt_manager(manager),
+        model=_as_prompt_list_model(_PromptListModelStub()),
+        detail_widget=_as_prompt_detail_widget(detail_widget),
+        list_view=_as_list_view(_ListViewStub()),
+        current_prompt_supplier=lambda: prompt,
+        template_detail_widget_supplier=_template_detail_supplier(template_detail_widget),
+        template_preview_controller_supplier=_template_preview_supplier(),
+        execution_controller_supplier=_execution_controller_supplier(),
+    )
+
+    controller.handle_selection_changed()
+
+    assert detail_widget.decision_summary == "Safe to compare"
+    assert template_detail_widget.decision_summary == "Safe to compare"
+
+
 def test_workspace_history_controller_skips_comparison_cue_without_two_compatible_runs() -> None:
     """Comparison cue should stay absent when only one rated run is available."""
     prompt = Prompt(
