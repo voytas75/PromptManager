@@ -1,7 +1,8 @@
 # PromptManager — Product Direction SSOT
 
-Status: active
-Updated: 2026-04-22
+Status: superseded
+Updated: 2026-04-25
+Canonical file: `docs/product-ssot.md`
 
 ## Cel
 Ten dokument jest krótkim SSOT kierunku produktu PromptManager.
@@ -16,7 +17,7 @@ Ma trzymać jedną jasną odpowiedź na pytania:
 ---
 
 ## Jednozdaniowa definicja produktu
-**PromptManager to local-first system do przechwytywania, porządkowania, wyszukiwania i ponownego używania prompt assets.**
+**PromptManager to local-first system do przechwytywania, porządkowania, wyszukiwania i ponownego używania prompt assets, z operacyjną warstwą uruchomień i routingu rozwijaną jako wsparcie tego rdzenia.**
 
 ---
 
@@ -75,23 +76,26 @@ Do tej warstwy należą:
 - sharing,
 - workspace helpers,
 - historia wykonań,
+- model routing i diagnostics,
 - bardziej rozbudowane operacje na prompt chains.
 
 Te funkcje są wartościowe, ale powinny być prezentowane jako:
 - advanced,
 - optional,
 - wspierające główną pętlę katalogu i reuse.
+- rozwijane dopiero wtedy, gdy nie osłabiają czytelności warstwy core.
 
 ---
 
 ## Kierunek strategiczny
 Docelowy kierunek produktu to:
 
-**catalog-first, ops-second**
+**catalog-first, ops-second, automation-third**
 
 To znaczy:
 - PromptManager ma być najpierw najlepszym domem dla prompt assets,
-- dopiero potem warstwą operacyjną do ich testowania, uruchamiania i porównywania.
+- potem czytelną warstwą operacyjną do ich testowania, uruchamiania i porównywania,
+- a dopiero później kontrolowaną warstwą automatyzacji opartą na tym samym modelu produktu.
 
 Jeżeli pojawia się konflikt priorytetów między:
 - kolejną funkcją workbench/ops,
@@ -131,6 +135,8 @@ Najwyższy produktowy ROI mają:
 - mocniejsze sygnały podobieństwa i duplikatów,
 - wygodniejsze search/recent/reuse,
 - lepszy inspect view dla prompt assetów,
+- deterministyczne settings, routing i embedding resolution,
+- czytelna warstwa diagnostics i effective config,
 - uporządkowanie informacji architektonicznej w GUI między core a advanced.
 
 ---
@@ -140,6 +146,8 @@ Po dopracowaniu rdzenia warto rozwijać:
 - execution jako warstwę wspierającą reuse,
 - benchmarki i scenariusze jako warstwę walidacji promptów,
 - analytics jako warstwę informacji zwrotnej o użyciu i skuteczności,
+- historia wykonań i porównania runów,
+- CLI/API automation surfaces bez rozbijania local-first charakteru,
 - sharing i collaboration surfaces bez rozbijania local-first charakteru.
 
 ---
@@ -152,7 +160,8 @@ README, roadmapa i komunikacja produktu powinny najpierw sprzedawać:
 - reuse,
 - local-first ownership.
 
-Funkcje execution/benchmark/analytics powinny być opisywane jako rozszerzenia lub warstwa zaawansowana.
+Funkcje execution/benchmark/analytics/routing/diagnostics powinny być opisywane jako rozszerzenia lub warstwa zaawansowana.
+Automation surfaces powinny być komunikowane dopiero jako kolejna warstwa, a nie nowa tożsamość produktu.
 
 ---
 

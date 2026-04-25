@@ -1,7 +1,8 @@
 # PromptManager — Product Backlog SSOT
 
-Status: active
+Status: superseded
 Owner: Wojtek / Prompt Manager Team
+Canonical file: `docs/product-ssot.md`
 
 ## Purpose
 

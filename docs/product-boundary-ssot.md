@@ -1,8 +1,9 @@
 # PromptManager — Product Boundary SSOT
 
-Status: active
+Status: superseded
 Owner: Wojtek / Prompt Manager Team
-Last updated: 2026-04-04
+Last updated: 2026-04-25
+Canonical file: `docs/product-ssot.md`
 
 ## Purpose
 
@@ -179,7 +180,7 @@ They become wrong when they degrade focus on the core prompt asset loop.
 
 Recommended positioning:
 
-> PromptManager is a local-first prompt catalog and reuse workspace.
+> PromptManager is a local-first prompt catalog and reuse workspace, with an operational layer for trustworthy runs kept subordinate to prompt asset management.
 
 Short version:
 
@@ -230,6 +231,8 @@ PromptManager should not try to be, right now:
 3. Prefer clearer prompt objects over more feature surfaces.
 4. Prefer reuse speed over feature breadth.
 5. Treat execution as support for the catalog, not as the main identity.
+6. Treat settings, routing, and diagnostics as trust infrastructure required before broader ops expansion.
+7. Treat automation as a later extension of the same product model, not as a separate track.
 
 ## Suggested near-term evaluation checklist
 
