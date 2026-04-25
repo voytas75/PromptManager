@@ -378,3 +378,4 @@ Introduce bounded blocking-state detection for critical paths such as missing fa
 - Verified the trust-first CLI layout with `tests/test_settings_summary.py tests/test_main_entry.py -q` (`37 passed`), `ruff check`, `ruff format --check`, and a live `python -m main --no-gui --print-settings` run.
 - Added Stage 5 planning note for the next bounded inspect/reuse slice: `Recommended next action` cues derived from existing decision + run evidence.
 - Landed post-Stage-5 micro-slices to harden inspect/detail cues: fallback mapping coverage, decision→action mapping centralization, clear-selection guard, and template-detail parity guards for run evidence.
+- Added a negative structured-runs parity guard so the single-run path now proves both detail surfaces keep `Reuse as-is` / next-action fallback while `Candidate vs baseline` stays absent.

@@ -518,6 +518,10 @@ def test_workspace_history_controller_skips_comparison_cue_without_two_compatibl
     assert "Candidate vs baseline:" not in detail_widget.run_summary
     assert template_detail_widget.run_summary is not None
     assert "Candidate vs baseline:" not in template_detail_widget.run_summary
+    assert detail_widget.decision_summary == "Reuse as-is"
+    assert template_detail_widget.decision_summary == "Reuse as-is"
+    assert detail_widget.next_action_summary == "Reuse as-is"
+    assert template_detail_widget.next_action_summary == "Reuse as-is"
 
 
 def test_workspace_history_controller_maps_default_next_action_to_reuse_as_is() -> None:
