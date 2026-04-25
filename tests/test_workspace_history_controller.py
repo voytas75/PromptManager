@@ -305,7 +305,9 @@ def test_workspace_history_controller_surfaces_last_run_summary_for_prompt() -> 
     assert str(prompt.version) in detail_widget.run_summary
     assert str(prompt.version) in template_detail_widget.run_summary
     assert "3 messages" in detail_widget.run_summary
+    assert "3 messages" in template_detail_widget.run_summary
     assert "120 ms" in detail_widget.run_summary
+    assert "120 ms" in template_detail_widget.run_summary
 
 
 def test_workspace_history_controller_surfaces_candidate_vs_baseline_comparison_cue() -> None:
@@ -359,6 +361,11 @@ def test_workspace_history_controller_surfaces_candidate_vs_baseline_comparison_
     assert "improved" in detail_widget.run_summary
     assert "rating 5.0 vs 4.0" in detail_widget.run_summary
     assert "90 ms vs 140 ms" in detail_widget.run_summary
+    assert template_detail_widget.run_summary is not None
+    assert "Candidate vs baseline:" in template_detail_widget.run_summary
+    assert "improved" in template_detail_widget.run_summary
+    assert "rating 5.0 vs 4.0" in template_detail_widget.run_summary
+    assert "90 ms vs 140 ms" in template_detail_widget.run_summary
 
 
 def test_workspace_history_controller_surfaces_safe_to_compare_recommendation_for_two_compatible_runs(  # noqa: E501
