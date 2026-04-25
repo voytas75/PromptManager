@@ -240,3 +240,24 @@ def test_print_settings_summary_shows_default_and_derived_precedence_labels(
 
     assert "WARN | Inference model: not configured [default; default value in effect]" in output
     assert "OK | Embeddings: litellm / azure/gpt-4.1 [derived; derived from fast model]" in output
+
+
+def test_print_settings_summary_keeps_next_steps_inside_diagnostics_block(
+    capsys: CaptureFixture[str],
+) -> None:
+    settings = _SummarySettings()
+
+    output = _render(settings, capsys)
+
+    diagnostics_start = output.index("Diagnostics\n-----------")
+    next_steps_start = output.index("Next steps:\n")
+    database_start = output.index("Database path:")
+
+    fast_model_step = (
+        "- Set a LiteLLM fast model to unlock chat, prompt runs, and derived defaults."
+    )
+    api_key_step = "- Add a LiteLLM API key so model calls can authenticate successfully."
+
+    assert diagnostics_start < next_steps_start < database_start
+    assert output.index(fast_model_step) < database_start
+    assert output.index(api_key_step) < database_start

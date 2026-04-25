@@ -217,12 +217,17 @@ Introduce bounded blocking-state detection for critical paths such as missing fa
 - Normal startup now fails fast when core runtime execution prerequisites are missing: LiteLLM fast model or LiteLLM API key.
 - Blocking validation applies only to default app startup; `--print-settings` and explicit CLI commands remain available for inspection and remediation workflows.
 - Startup now prints a compact `Blocking configuration issues:` section plus a pointer to `--print-settings`.
+- Added focused regression coverage that locks the `--print-settings` trust-first remediation flow: `Next steps` stay inside the top diagnostics block and remain visible before low-level config sections.
 
 **Verified:**
 - `.venv/bin/pytest tests/test_main_entry.py::test_main_blocks_default_startup_when_critical_runtime_state_is_invalid tests/test_main_entry.py::test_main_allows_print_settings_even_when_runtime_state_is_blocking -q`
 - result: `2 passed`
 - `.venv/bin/pytest tests/test_gui_diagnostics_status.py tests/test_runtime_settings_service.py tests/test_settings_dialog_diagnostics.py tests/test_settings_summary.py tests/test_main_entry.py -q`
 - result: `43 passed`
+- `.venv/bin/pytest tests/test_settings_summary.py tests/test_main_entry.py tests/test_runtime_settings_service.py -q`
+- result: `45 passed`
+- `.venv/bin/ruff check tests/test_settings_summary.py tests/test_main_entry.py`
+- result: `All checks passed`
 
 ---
 

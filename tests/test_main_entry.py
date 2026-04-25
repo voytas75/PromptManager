@@ -230,12 +230,17 @@ def test_main_print_settings_logs_and_exits(
     captured = capsys.readouterr()
     output = captured.out
     assert "Prompt Manager configuration summary" in captured.out
-    assert output.index("Diagnostics\n-----------") < output.index("Database path:")
+    diagnostics_start = output.index("Diagnostics\n-----------")
+    next_steps_start = output.index("Next steps:\n")
+    database_start = output.index("Database path:")
+    assert diagnostics_start < next_steps_start < database_start
     assert "LiteLLM API key: not set" in captured.out
     assert "Drop params: max_tokens, temperature" in captured.out
     assert "Overall status: FAIL" in output
     assert "FAIL | Fast model: missing [default; default value in effect]" in output
     assert "FAIL | API key: missing [default; default value in effect]" in output
+    assert "- Set a LiteLLM fast model to unlock chat, prompt runs, and derived defaults." in output
+    assert "- Add a LiteLLM API key so model calls can authenticate successfully." in output
     assert f"Model: {DEFAULT_EMBEDDING_MODEL} (default)" in output
     assert "Prompt execution: Fast (default)" in captured.out
     assert "Streaming enabled:" in captured.out
