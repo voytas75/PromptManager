@@ -4,9 +4,17 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added one bounded **Recommended Next Action Cue v1** in the shared inspect/detail flow so prompts now surface a compact `Recommended next action:` cue derived only from existing lineage and run evidence, helping operators decide whether to reuse, refine, fork, or compare without adding new persistence, screens, or workflow branches.
+
 ### Changed
 
 - Tightened the top-level README positioning so PromptManager reads more clearly as a **local-first home for prompt assets**, with validation, history, analytics, chains, sharing, and other broader surfaces framed as supporting or secondary rather than co-equal product centers.
+
+### Fixed
+
+- Hardened inspect/detail next-action and run-evidence parity across the shared and template detail surfaces by centralizing the bounded decision-to-action mapping, preserving clean state when selection clears, and extending focused regression guards for fallback mappings, template-detail parity, and negative parity paths.
 
 ## [0.22.23] - 2026-04-12
 
