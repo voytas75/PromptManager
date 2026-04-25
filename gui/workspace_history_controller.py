@@ -1,6 +1,7 @@
 """Coordinate prompt selection, lineage, and template preview updates.
 
 Updates:
+  v0.15.85 - 2026-04-10 - Add bounded candidate-vs-baseline comparison cues to run summaries.
   v0.15.84 - 2026-04-10 - Add a bounded changed-from-parent lineage cue for forked prompts.
   v0.15.83 - 2026-04-10 - Resolve parent lineage summaries to human-readable prompt names.
   v0.15.82 - 2025-12-01 - Extract selection + lineage handling from gui.main_window.
@@ -161,7 +162,7 @@ class WorkspaceHistoryController:
             template_detail.update_run_summary(run_summary)
 
     def _build_run_summary(self, prompt: Prompt) -> str | None:
-        entries = self._list_execution_history(prompt)
+        entries = self._list_execution_history(prompt, limit=5)
         if not entries:
             return None
         latest = entries[0]
@@ -186,14 +187,41 @@ class WorkspaceHistoryController:
             parts.append(f"{conversation_messages} {message_label}")
         if duration_ms is not None:
             parts.append(f"{duration_ms} ms")
+
+        comparison_summary = self._build_run_comparison_summary(entries)
+        if comparison_summary is not None:
+            parts.append(comparison_summary)
         return " · ".join(parts)
 
-    def _list_execution_history(self, prompt: Prompt) -> list[object]:
+    def _build_run_comparison_summary(self, entries: list[object]) -> str | None:
+        if len(entries) < 2:
+            return None
+        latest = entries[0]
+        baseline = entries[1]
+        latest_rating = getattr(latest, "rating", None)
+        baseline_rating = getattr(baseline, "rating", None)
+        latest_duration = getattr(latest, "duration_ms", None)
+        baseline_duration = getattr(baseline, "duration_ms", None)
+        if latest_rating is None or baseline_rating is None:
+            return None
+        if latest_duration is None or baseline_duration is None:
+            return None
+
+        outcome = "improved" if float(latest_rating) > float(baseline_rating) else "regressed"
+        if float(latest_rating) == float(baseline_rating):
+            outcome = "matched"
+        return (
+            "Candidate vs baseline: "
+            f"{outcome} (rating {latest_rating:.1f} vs {baseline_rating:.1f}; "
+            f"{latest_duration} ms vs {baseline_duration} ms)"
+        )
+
+    def _list_execution_history(self, prompt: Prompt, *, limit: int = 1) -> list[object]:
         list_history = getattr(self._manager, "list_execution_history", None)
         if not callable(list_history):
             return []
         try:
-            entries = list_history(prompt.id, limit=1)
+            entries = list_history(prompt.id, limit=limit)
         except PromptManagerError:
             return []
         if not isinstance(entries, list):
