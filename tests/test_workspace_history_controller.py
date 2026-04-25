@@ -299,8 +299,11 @@ def test_workspace_history_controller_surfaces_last_run_summary_for_prompt() -> 
     assert detail_widget.run_summary is not None
     assert template_detail_widget.run_summary is not None
     assert "Last run" in detail_widget.run_summary
+    assert "Last run" in template_detail_widget.run_summary
     assert "gpt-4o-mini" in detail_widget.run_summary
+    assert "gpt-4o-mini" in template_detail_widget.run_summary
     assert str(prompt.version) in detail_widget.run_summary
+    assert str(prompt.version) in template_detail_widget.run_summary
     assert "3 messages" in detail_widget.run_summary
     assert "120 ms" in detail_widget.run_summary
 
@@ -407,6 +410,10 @@ def test_workspace_history_controller_surfaces_safe_to_compare_recommendation_fo
 
     assert detail_widget.decision_summary == "Safe to compare"
     assert template_detail_widget.decision_summary == "Safe to compare"
+    assert detail_widget.run_summary is not None
+    assert template_detail_widget.run_summary is not None
+    assert "Candidate vs baseline:" in detail_widget.run_summary
+    assert "Candidate vs baseline:" in template_detail_widget.run_summary
 
 
 def test_workspace_history_controller_surfaces_compare_before_promoting_next_action_for_compatible_runs(  # noqa: E501
