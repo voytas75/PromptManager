@@ -270,7 +270,7 @@ class WorkspaceHistoryController:
     def _map_decision_to_next_action(decision_text: str) -> str:
         """Translate bounded decision wording into one compact operator-facing action."""
         if decision_text == "Safe to compare":
-            return "Compare before promoting"
+            return "Compare runs before reuse"
         if decision_text == "Refine before reuse":
             return "Refine before reuse"
         if decision_text == "Fork before editing":

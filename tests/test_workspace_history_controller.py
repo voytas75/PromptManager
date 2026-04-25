@@ -472,8 +472,8 @@ def test_workspace_history_controller_surfaces_compare_before_promoting_next_act
 
     controller.handle_selection_changed()
 
-    assert detail_widget.next_action_summary == "Compare before promoting"
-    assert template_detail_widget.next_action_summary == "Compare before promoting"
+    assert detail_widget.next_action_summary == "Compare runs before reuse"
+    assert template_detail_widget.next_action_summary == "Compare runs before reuse"
 
 
 def test_workspace_history_controller_skips_comparison_cue_without_two_compatible_runs() -> None:
@@ -542,7 +542,7 @@ def test_workspace_history_controller_maps_default_next_action_to_reuse_as_is() 
         execution_controller_supplier=_execution_controller_supplier(),
     )
 
-    assert controller._map_decision_to_next_action("Safe to compare") == "Compare before promoting"  # noqa: SLF001
+    assert controller._map_decision_to_next_action("Safe to compare") == "Compare runs before reuse"  # noqa: SLF001
     assert controller._map_decision_to_next_action("Refine before reuse") == "Refine before reuse"  # noqa: SLF001
     assert controller._map_decision_to_next_action("Fork before editing") == "Fork before editing"  # noqa: SLF001
     assert controller._map_decision_to_next_action("Anything else") == "Reuse as-is"  # noqa: SLF001

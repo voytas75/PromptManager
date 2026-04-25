@@ -97,13 +97,13 @@ def test_prompt_detail_widget_renders_next_action_summary_label(
     widget = PromptDetailWidget()
 
     widget.show()
-    widget.update_next_action_summary("Compare before promoting")
+    widget.update_next_action_summary("Compare runs before reuse")
     qt_app.processEvents()
 
     assert widget._next_action_label.isVisible()  # noqa: SLF001
     next_action_text = widget._next_action_label.text()  # noqa: SLF001
     assert "Recommended next action:" in next_action_text
-    assert "Compare before promoting" in next_action_text
+    assert "Compare runs before reuse" in next_action_text
 
 
 def test_prompt_detail_widget_hides_next_action_summary_when_empty(
@@ -113,7 +113,7 @@ def test_prompt_detail_widget_hides_next_action_summary_when_empty(
     widget = PromptDetailWidget()
 
     widget.show()
-    widget.update_next_action_summary("Compare before promoting")
+    widget.update_next_action_summary("Compare runs before reuse")
     widget.update_next_action_summary(None)
     qt_app.processEvents()
 

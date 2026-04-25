@@ -342,6 +342,7 @@ Introduce bounded blocking-state detection for critical paths such as missing fa
 - Added a bounded `Recommended next action` cue in inspect/detail derived from existing decision + run evidence.
 - Centralized the decision-to-next-action mapping so shared and template detail surfaces stay aligned.
 - Tightened the operator wording so the refine path now reuses the same user-visible phrase as the decision cue (`Refine before reuse`) instead of the more technical `Refine candidate` label.
+- Tightened the compare-path wording so run-evidence recommendations now say `Compare runs before reuse`, keeping inspect/detail cues aligned with reuse decisions instead of draft-promotion wording.
 - Kept the slice bounded to existing evidence and wording only: no new actions, no new persistence, no new compare flow.
 
 **Verified:**
