@@ -36,13 +36,13 @@ from cli.gui_launcher import run_default_mode
 from cli.parser import parse_args
 from cli.runtime import configure_litellm_logging, setup_logging as _runtime_setup_logging
 from cli.settings_summary import print_settings_summary
-from gui.runtime_settings_service import build_config_diagnostics_items
 from core import (
     build_analytics_snapshot as _core_build_analytics_snapshot,
     build_prompt_manager,
     export_prompt_catalog as _core_export_prompt_catalog,
     snapshot_dataset_rows as _core_snapshot_dataset_rows,
 )
+from gui.runtime_settings_service import build_config_diagnostics_items
 
 # Backwards-compatible re-exports for tests/legacy entry points.
 build_analytics_snapshot = _core_build_analytics_snapshot

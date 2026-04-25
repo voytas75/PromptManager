@@ -66,7 +66,9 @@ def test_settings_dialog_renders_compact_diagnostics_banner(qt_app: QApplication
         assert any("Configuration summary — WARN" in text for text in labels)
         assert any("OK | Fast model: azure/gpt-4.1 (env)" in text for text in labels)
         assert any("WARN | Inference model: not configured (default)" in text for text in labels)
-        assert any("OK | Embeddings: litellm / azure/UDTEMBED3L (derived)" in text for text in labels)
+        assert any(
+            "OK | Embeddings: litellm / azure/UDTEMBED3L (derived)" in text for text in labels
+        )
         assert any("WARN | TTS: not configured (default)" in text for text in labels)
         assert any("Next steps:" in text for text in labels)
         assert any(

@@ -207,10 +207,11 @@ class PromptEditorFlow:
         if selected_existing_prompt_id is not None:
             self._load_prompts(self._current_search_text())
             self._select_prompt(selected_existing_prompt_id)
-            self._status_callback(
-                self._build_existing_match_opened_status(selected_existing_prompt_id, similar_prompts),
-                4000,
+            opened_status = self._build_existing_match_opened_status(
+                selected_existing_prompt_id,
+                similar_prompts,
             )
+            self._status_callback(opened_status, 4000)
             return
         updated = dialog.result_prompt
         if updated is None:
