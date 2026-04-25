@@ -599,10 +599,12 @@ def test_workspace_history_controller_maps_default_next_action_to_reuse_as_is() 
         execution_controller_supplier=_execution_controller_supplier(),
     )
 
-    assert controller._map_decision_to_next_action("Safe to compare") == "Compare before validating reuse"  # noqa: SLF001
+    assert controller._map_decision_to_next_action("Compare improved run") == "Validate improved run before reuse"  # noqa: SLF001
+    assert controller._map_decision_to_next_action("Compare regressed run") == "Validate baseline before reuse"  # noqa: SLF001
     assert controller._map_decision_to_next_action("Matched baseline") == "Validate before reuse"  # noqa: SLF001
     assert controller._map_decision_to_next_action("Refine before reuse") == "Refine before reuse"  # noqa: SLF001
     assert controller._map_decision_to_next_action("Fork before editing") == "Fork before editing"  # noqa: SLF001
+    assert controller._map_decision_to_next_action("Safe to compare") == "Reuse as-is"  # noqa: SLF001
     assert controller._map_decision_to_next_action("Anything else") == "Reuse as-is"  # noqa: SLF001
 
     controller.handle_selection_changed()

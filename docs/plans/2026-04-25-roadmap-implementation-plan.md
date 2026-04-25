@@ -58,6 +58,7 @@ Po **każdej** implementacji wykonaj w tej kolejności:
 - [x] hidden duplicate next-action cue restored when decision cue clears
 - [x] matched-baseline decision cue distinguishes equal runs from compare-needed runs
 - [x] compare recommendation cue distinguishes improved vs regressed candidates
+- [x] removed legacy `Safe to compare` next-action mapping after compare cue split
 
 ---
 
@@ -386,3 +387,4 @@ Introduce bounded blocking-state detection for critical paths such as missing fa
 - Added a negative structured-runs parity guard so the single-run path now proves both detail surfaces keep `Reuse as-is` / next-action fallback while `Candidate vs baseline` stays absent.
 - Added one bounded matched-baseline inspect cue so equal latest/baseline runs now produce `Matched baseline` with `Validate before reuse`, while higher-signal compare-needed pairs keep the existing compare path.
 - Refined the remaining compare-needed inspect cue so compatible unequal runs now distinguish `Compare improved run` vs `Compare regressed run`, with next actions steering reuse toward validating the improved candidate or falling back to the baseline.
+- Removed the now-dead `Safe to compare` next-action mapping path after the compare cue split, and locked that fallback with a focused controller assertion so legacy wording now degrades safely to `Reuse as-is` instead of reviving stale guidance.

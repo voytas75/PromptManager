@@ -273,8 +273,6 @@ class WorkspaceHistoryController:
             return "Validate improved run before reuse"
         if decision_text == "Compare regressed run":
             return "Validate baseline before reuse"
-        if decision_text == "Safe to compare":
-            return "Compare before validating reuse"
         if decision_text == "Matched baseline":
             return "Validate before reuse"
         if decision_text == "Refine before reuse":
