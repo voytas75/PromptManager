@@ -36,16 +36,16 @@ Po **każdej** implementacji wykonaj w tej kolejności:
 - [ ] explicit routing/embedding provenance in user-visible summaries
 
 ### Stage 2 — Core prompt asset loop quality
-- [ ] inspect view as decision-support surface
-- [ ] stronger draft → asset promotion with duplicate/similarity judgment
-- [ ] search/recent/retrieval ergonomics improvements
+- [x] inspect view as decision-support surface
+- [x] stronger draft → asset promotion with duplicate/similarity judgment
+- [x] search/recent/retrieval ergonomics improvements
 
 ### Stage 3 — Trustworthy prompt operations
 - [ ] structured runs v1 linked to prompt assets
 - [ ] baseline vs candidate comparison slice
 
 ### Stage 4 — Controlled automation surfaces
-- [ ] CLI/API parity on inspection and status surfaces
+- [x] CLI/API parity on inspection and status surfaces
 
 ---
 
@@ -218,31 +218,64 @@ Introduce bounded blocking-state detection for critical paths such as missing fa
 
 ### Task 4: Inspect view as reuse/refine/fork decision surface
 
-**Status:** pending
+**Status:** implemented
 
 **Objective:** Make inspect/detail view more useful for prompt decisions instead of raw metadata browsing.
+
+**Implemented:**
+- Added one bounded `Decision` cue to the shared detail widget so inspect now gives a direct next-step recommendation instead of only passive metadata.
+- Wired `WorkspaceHistoryController` to derive decision-support wording from existing lineage state: `Fork before editing`, `Refine before reuse`, or `Reuse as-is`.
+- Kept the slice bounded to existing seams and data sources: no new workflow, no new persistence, no shadow product model.
+
+**Verified:**
+- `.venv/bin/pytest tests/test_workspace_history_controller.py tests/test_prompt_detail_widget.py -q`
+- result: `26 passed`
+- `.venv/bin/pytest tests/test_canonical_operator_path_parity.py tests/test_workspace_history_controller.py tests/test_prompt_detail_widget.py -q`
+- result: `27 passed`
 
 ---
 
 ### Task 5: Draft → asset promotion with duplicate/similarity judgment
 
-**Status:** pending
+**Status:** implemented
 
 **Objective:** Reduce prompt-library clutter by showing stronger duplicate and related-prompt cues during promotion.
+
+**Implemented:**
+- Strengthened the promote-draft flow so opening an existing strong match now carries explicit duplicate-judgment wording instead of a generic similar-match status.
+- Added bounded status semantics in `PromptEditorFlow`: strong matches (`similarity >= 0.85`) now report `Opened likely duplicate instead of promoting.` while weaker matches keep the existing generic fallback.
+- Kept the slice advisory-only and bounded to existing promote-time similarity data: no schema changes, no blocking behavior, no new workflow surface.
+
+**Verified:**
+- `.venv/bin/pytest tests/test_prompt_editor_flow.py::test_promote_draft_passes_similar_matches_and_can_open_existing -q`
+- result: `1 passed`
+- `.venv/bin/pytest tests/test_prompt_editor_flow.py tests/test_draft_promote_dialog.py -q`
+- result: `16 passed`
 
 ---
 
 ### Task 6: Retrieval ergonomics improvements
 
-**Status:** pending
+**Status:** implemented
 
 **Objective:** Improve recent/search/retrieval speed and legibility.
+
+**Implemented:**
+- Added focused retrieval-state coverage for `PromptListCoordinator.fetch_prompts(...)` so active search with zero matches stays distinct from the default full-catalog state.
+- Added explicit search-error coverage so retrieval failures remain distinguishable from no-match searches instead of collapsing into the same empty-result shape.
+- Kept the slice bounded to existing retrieval-state seams (`search_results`, `preserve_search_order`, `search_error`) without changing ranking, search backend behavior, or recent/search workflow surfaces.
+
+**Verified:**
+- `.venv/bin/pytest tests/test_prompt_list_coordinator.py -q`
+- result: `4 passed`
+- `.venv/bin/pytest tests/test_prompt_list_coordinator.py tests/test_recent_prompts.py tests/test_canonical_operator_path_parity.py -q`
+- result: `6 passed`
 
 ---
 
 ### Task 7: Structured runs v1
 
-**Status:** pending
+**Status:** completed
 
 **Objective:** Record prompt-linked runs with enough provenance to support refinement decisions.
 
@@ -250,11 +283,20 @@ Introduce bounded blocking-state detection for critical paths such as missing fa
 
 ### Task 8: CLI/API parity expansion
 
-**Status:** pending
+**Status:** implemented
 
 **Objective:** Extend the same product model to headless/automation surfaces without creating a shadow model.
 
----
+**Implemented:**
+- Added bounded CLI analytics coverage that asserts the same shared analytics snapshot is rendered into headless diagnostics output, instead of introducing any parallel CLI-only model.
+- Extended `test_main_entry.py` to verify execution summary plus model-cost and benchmark sections from the canonical snapshot fixture.
+- Kept the slice intentionally narrow: no new API contract, no shadow serialization layer, no product-model fork.
+
+**Verified:**
+- `.venv/bin/pytest tests/test_main_entry.py::test_main_analytics_diagnostics_runs -q`
+- result: `1 passed`
+- `.venv/bin/pytest tests/test_main_entry.py tests/test_prompt_manager_execution.py -q`
+- result: `36 passed`
 
 ## Update log
 
@@ -267,3 +309,7 @@ Introduce bounded blocking-state detection for critical paths such as missing fa
 - Verified Task 2 with targeted + related suite runs: `12 passed`, then `41 passed`.
 - Implemented Task 3: bounded fail-fast startup validation for missing fast model / API key.
 - Verified Task 3 with targeted startup tests and related trust suite: `2 passed`, then `43 passed`.
+- Implemented Task 7: structured run provenance in execution context metadata.
+- Verified Task 7 with targeted execution-history tests plus related tracker coverage: `10 passed`; pyright on touched files: `0 errors`.
+- Implemented Task 8: bounded CLI/headless parity coverage for shared analytics snapshot rendering.
+- Verified Task 8 with targeted CLI analytics test: `1 passed`; related CLI/execution suite: `36 passed`.

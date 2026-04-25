@@ -395,6 +395,12 @@ def test_main_logs_ready_message_on_success(
     assert manager.closed is True
 
 
+def test_main_reexports_core_headless_surfaces_for_cli_parity() -> None:
+    assert main.export_prompt_catalog is main._core_export_prompt_catalog
+    assert main.build_analytics_snapshot is main._core_build_analytics_snapshot
+    assert main.snapshot_dataset_rows is main._core_snapshot_dataset_rows
+
+
 def test_main_launches_gui_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("sys.argv", ["prompt-manager"])
     dummy_manager = _DummyManager()
@@ -501,7 +507,7 @@ def test_main_embedding_diagnostics_returns_failure_on_issue(
     assert manager.closed is True
 
 
-def test_main_runs_analytics_diagnostics(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+def test_main_analytics_diagnostics_runs(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
     monkeypatch.setattr(
         "sys.argv",
         [
@@ -543,6 +549,14 @@ def test_main_runs_analytics_diagnostics(monkeypatch: pytest.MonkeyPatch, capsys
     assert "Analytics dashboard" in output
     assert captured_args["window_days"] == 14
     assert captured_args["prompt_limit"] == 7
+    assert "Execution summary" in output
+    assert "runs: 5" in output
+    assert "Top prompt trends:" in output
+    assert "Prompt Alpha" in output
+    assert "Model cost breakdown (tokens):" in output
+    assert "gpt-fast: runs=2, prompt=10, completion=8, total=18" in output
+    assert "Benchmark success by model:" in output
+    assert "gpt-bench: runs=1, success=100.0%, duration=110 ms, tokens=25" in output
     assert manager.closed is True
 
 
