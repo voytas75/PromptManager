@@ -1,6 +1,7 @@
 """Runtime settings helpers for Prompt Manager GUI.
 
 Updates:
+  v0.1.11 - 2026-04-25 - Add compact routing/embedding provenance to runtime summaries.
   v0.1.10 - 2025-12-11 - Track prompt/chat font colour preferences in runtime snapshots.
   v0.1.9 - 2025-12-11 - Track prompt/chat font preferences in runtime snapshots.
   v0.1.8 - 2025-12-09 - Surface Redis cache availability in settings snapshots.
@@ -504,7 +505,7 @@ class RuntimeSettingsService:
         inference_model = _clean(runtime.get("litellm_inference_model")) or "missing"
         routing_value = runtime.get("litellm_workflow_models")
         if not isinstance(routing_value, dict) or not routing_value:
-            routing_summary = "all workflows use the fast model"
+            routing_summary = "all workflows use the fast model [default]"
         else:
             inference_workflows = sorted(
                 key.strip() if isinstance(key, str) else str(key).strip()
@@ -512,13 +513,32 @@ class RuntimeSettingsService:
                 if isinstance(route, str) and route.strip().lower() == "inference"
             )
             if inference_workflows:
-                routing_summary = "inference for: " + ", ".join(inference_workflows)
+                routing_summary = "inference for: " + ", ".join(inference_workflows) + " [explicit]"
             else:
-                routing_summary = "all workflows use the fast model"
+                routing_summary = "all workflows use the fast model [default]"
+
+        embedding_backend = _clean(runtime.get("embedding_backend")) or DEFAULT_EMBEDDING_BACKEND
+        embedding_model = _clean(runtime.get("embedding_model"))
+        if embedding_model is None:
+            if embedding_backend == "litellm" and fast_model != "missing":
+                embedding_model = fast_model
+                embedding_source = "derived from fast model"
+            elif embedding_backend == DEFAULT_EMBEDDING_BACKEND:
+                embedding_model = DEFAULT_EMBEDDING_MODEL
+                embedding_source = "default"
+            else:
+                embedding_model = "missing"
+                embedding_source = "default"
+        else:
+            embedding_source = "explicit"
+        embedding_summary = (
+            f"{embedding_backend} / {embedding_model} [{embedding_source}]"
+        )
         return (
             f"Fast model: {fast_model} | "
             f"Inference model: {inference_model} | "
-            f"Routing: {routing_summary}"
+            f"Routing: {routing_summary} | "
+            f"Embeddings: {embedding_summary}"
         )
 
     def apply_updates(

@@ -331,6 +331,7 @@ class SettingsDialog(QDialog):
         """Return a compact live summary of model + routing selections."""
         fast_model = self._model_input.text().strip()
         inference_model = self._inference_model_input.text().strip()
+        embedding_model = self._embedding_model_input.text().strip()
         inference_workflows: list[str] = []
         for workflow_key, group in self._workflow_groups.items():
             button = cast("QRadioButton", group.checkedButton())
@@ -338,6 +339,16 @@ class SettingsDialog(QDialog):
             if choice == "inference":
                 inference_workflows.append(workflow_key)
         inference_summary = ", ".join(inference_workflows) if inference_workflows else "none"
+        if inference_workflows:
+            inference_summary = f"{inference_summary} [explicit]"
+        else:
+            inference_summary = "none [default]"
+        if embedding_model:
+            embedding_summary = f"litellm / {embedding_model} [explicit]"
+        elif fast_model:
+            embedding_summary = f"litellm / {fast_model} [derived from fast model]"
+        else:
+            embedding_summary = "litellm / missing [default]"
         status_label, _, _, _ = self._build_routing_preview_state()
         return "\n".join(
             [
@@ -345,6 +356,7 @@ class SettingsDialog(QDialog):
                 f"Fast model: {fast_model or 'missing'}",
                 f"Inference model: {inference_model or 'missing'}",
                 f"Inference workflows: {inference_summary}",
+                f"Embeddings: {embedding_summary}",
             ]
         )
 

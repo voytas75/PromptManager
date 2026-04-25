@@ -199,6 +199,31 @@ def test_apply_updates_returns_user_facing_model_routing_summary() -> None:
     assert "Routing: inference for: prompt_generation" in result.summary_message
 
 
+
+def test_apply_updates_surfaces_routing_and_embedding_provenance_in_summary() -> None:
+    """Toast summary should include compact provenance for routing and embeddings."""
+    runtime = _base_runtime_settings()
+    manager = _DummyPromptManager()
+    service = RuntimeSettingsService(cast("PromptManager", manager), None)
+
+    result = service.apply_updates(
+        runtime,
+        {
+            "litellm_model": "azure/gpt-4.1-mini",
+            "litellm_inference_model": "azure/gpt-5.4",
+            "litellm_workflow_models": {
+                "prompt_generation": "inference",
+            },
+            "embedding_backend": "litellm",
+            "embedding_model": "azure/text-embedding-3-large",
+        },
+    )
+
+    assert result.summary_message is not None
+    assert "Routing: inference for: prompt_generation [explicit]" in result.summary_message
+    assert "Embeddings: litellm / azure/text-embedding-3-large [explicit]" in result.summary_message
+
+
 def test_build_initial_runtime_settings_includes_compact_diagnostics_summary() -> None:
     """Initial runtime snapshot should expose a compact user-facing diagnostics summary."""
     manager = _DummyPromptManager()
