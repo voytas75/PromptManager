@@ -121,6 +121,21 @@ def test_prompt_detail_widget_hides_next_action_summary_when_empty(
     assert widget._next_action_label.text() == ""  # noqa: SLF001
 
 
+def test_prompt_detail_widget_hides_redundant_next_action_when_same_as_decision(
+    qt_app: QApplication,
+) -> None:
+    """Hide duplicate next-action cue when it adds no new information."""
+    widget = PromptDetailWidget()
+
+    widget.show()
+    widget.update_decision_summary("Refine before reuse")
+    widget.update_next_action_summary("Refine before reuse")
+    qt_app.processEvents()
+
+    assert widget._decision_label.isVisible()  # noqa: SLF001
+    assert widget._next_action_label.text() == ""  # noqa: SLF001
+
+
 def test_prompt_detail_widget_applies_readable_default_font_sizes(
     qt_app: QApplication,
 ) -> None:

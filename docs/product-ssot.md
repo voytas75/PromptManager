@@ -396,6 +396,7 @@ Work that improves:
 - inspect-to-run handoff
 - run-result-to-revision decision flow
 - clear reuse vs refine vs fork judgment
+- compact inspect/detail cues that avoid repeating the same recommendation twice
 
 ### Priority 5 — Automation surfaces
 Work that improves:

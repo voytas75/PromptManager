@@ -967,8 +967,18 @@ class PromptDetailWidget(QWidget):
             self._decision_label.clear()
             self._decision_label.setVisible(False)
 
+        next_action_text = self._extract_label_value_text(self._next_action_label.text())
+        if text and next_action_text == text:
+            self._next_action_label.clear()
+            self._next_action_label.setVisible(False)
+
     def update_next_action_summary(self, text: str | None) -> None:
         """Display one compact operator-facing next action for the current prompt."""
+        decision_text = self._extract_label_value_text(self._decision_label.text())
+        if text and decision_text == text:
+            self._next_action_label.clear()
+            self._next_action_label.setVisible(False)
+            return
         if text:
             self._next_action_label.setText(
                 self._format_label_value("Recommended next action", text, multiline=True)
@@ -977,6 +987,16 @@ class PromptDetailWidget(QWidget):
         else:
             self._next_action_label.clear()
             self._next_action_label.setVisible(False)
+
+    @staticmethod
+    def _extract_label_value_text(text: str) -> str:
+        """Return the plain value portion from a formatted rich-text label."""
+        if not text:
+            return ""
+        plain_text = re.sub(r"<[^>]+>", "", text)
+        if ": " in plain_text:
+            return plain_text.split(": ", 1)[1].strip()
+        return plain_text.strip()
 
     def update_run_summary(self, text: str | None) -> None:
         """Display one compact last-run evidence cue for the current prompt."""
