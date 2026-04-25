@@ -53,6 +53,7 @@ Po **każdej** implementacji wykonaj w tej kolejności:
 
 ### Stage 5 — Selective expansion
 - [x] bounded next-action cues in inspect/detail from existing evidence
+- [x] bounded workspace handoff validation cue after non-executing prompt open
 
 ---
 

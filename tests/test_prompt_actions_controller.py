@@ -207,7 +207,9 @@ def test_open_prompt_in_workspace_seeds_text_without_running(qt_app: QApplicatio
 
     assert query_input.toPlainText() == "Prompt body to reuse"
     assert execution_calls == 0
-    assert status_messages == []
+    assert status_messages == [
+        ("Prompt ready in workspace. Run current prompt to validate before refining.", 3000)
+    ]
     assert toast_messages == [("Opened 'Reusable prompt' in the workspace.", 2500)]
 
 

@@ -17,6 +17,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Fixed
 
+- Hardened inspect/detail workspace handoff guidance so opening a prompt in the workspace now also shows one bounded status hint (`Prompt ready in workspace. Run current prompt to validate before refining.`), keeping the non-executing reuse flow intact while making the expected next validation step explicit.
 - Hardened inspect/detail next-action and run-evidence parity across the shared and template detail surfaces by centralizing the bounded decision-to-action mapping, preserving clean state when selection clears, and extending focused regression guards for fallback mappings, template-detail parity, and negative parity paths.
 - Tightened CLI trust-first validation coverage so `--print-settings` now has focused regression guards proving `Next steps` stays inside the top `Diagnostics` block and ahead of raw config sections during remediation flows.
 

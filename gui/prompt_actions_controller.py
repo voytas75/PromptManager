@@ -173,6 +173,10 @@ class PromptActionsController:
             self._status_callback("Selected prompt does not include a body to open.", 3000)
             return
         self._seed_workspace(payload, focus=True)
+        self._status_callback(
+            "Prompt ready in workspace. Run current prompt to validate before refining.",
+            3000,
+        )
         self._toast_callback(f"Opened '{prompt.name}' in the workspace.", 2500)
 
     def execute_prompt_as_context(
