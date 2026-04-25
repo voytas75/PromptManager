@@ -269,6 +269,10 @@ class WorkspaceHistoryController:
     @staticmethod
     def _map_decision_to_next_action(decision_text: str) -> str:
         """Translate bounded decision wording into one compact operator-facing action."""
+        if decision_text == "Compare improved run":
+            return "Validate improved run before reuse"
+        if decision_text == "Compare regressed run":
+            return "Validate baseline before reuse"
         if decision_text == "Safe to compare":
             return "Compare before validating reuse"
         if decision_text == "Matched baseline":
@@ -293,9 +297,15 @@ class WorkspaceHistoryController:
             return None
         if latest_duration is None or baseline_duration is None:
             return None
-        if float(latest_rating) == float(baseline_rating) and int(latest_duration) == int(baseline_duration):
+        latest_rating_value = float(latest_rating)
+        baseline_rating_value = float(baseline_rating)
+        latest_duration_value = int(latest_duration)
+        baseline_duration_value = int(baseline_duration)
+        if latest_rating_value == baseline_rating_value and latest_duration_value == baseline_duration_value:
             return "Matched baseline"
-        return "Safe to compare"
+        if latest_rating_value > baseline_rating_value:
+            return "Compare improved run"
+        return "Compare regressed run"
 
     @staticmethod
     def _changed_fields_against_parent(*, prompt: Prompt, parent_prompt: Prompt) -> list[str]:

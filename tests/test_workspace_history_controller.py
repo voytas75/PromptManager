@@ -368,11 +368,10 @@ def test_workspace_history_controller_surfaces_candidate_vs_baseline_comparison_
     assert "90 ms vs 140 ms" in template_detail_widget.run_summary
 
 
-def test_workspace_history_controller_surfaces_safe_to_compare_recommendation_for_two_compatible_runs(  # noqa: E501
-) -> None:
-    """Inspect flow should add one bounded recommendation cue when comparison evidence is ready."""
+def test_workspace_history_controller_surfaces_comparison_recommendation_for_compatible_runs() -> None:
+    """Inspect flow should show whether the latest run improved over the previous baseline."""
     prompt = Prompt(
-        id=uuid.UUID("00000000-0000-0000-0000-000000000235"),
+        id=uuid.UUID("00000000-0000-0000-0000-000000000233"),
         name="Reusable prompt",
         description="Description",
         category="General",
@@ -415,8 +414,8 @@ def test_workspace_history_controller_surfaces_safe_to_compare_recommendation_fo
 
     controller.handle_selection_changed()
 
-    assert detail_widget.decision_summary == "Safe to compare"
-    assert template_detail_widget.decision_summary == "Safe to compare"
+    assert detail_widget.decision_summary == "Compare improved run"
+    assert template_detail_widget.decision_summary == "Compare improved run"
     assert detail_widget.run_summary is not None
     assert template_detail_widget.run_summary is not None
     assert "Candidate vs baseline:" in detail_widget.run_summary
@@ -472,8 +471,62 @@ def test_workspace_history_controller_surfaces_compare_before_promoting_next_act
 
     controller.handle_selection_changed()
 
-    assert detail_widget.next_action_summary == "Compare before validating reuse"
-    assert template_detail_widget.next_action_summary == "Compare before validating reuse"
+    assert detail_widget.next_action_summary == "Validate improved run before reuse"
+    assert template_detail_widget.next_action_summary == "Validate improved run before reuse"
+
+
+def test_workspace_history_controller_surfaces_regressed_run_guidance_for_worse_candidate() -> None:
+    """Inspect flow should surface a stricter validation cue when the latest run regresses."""
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000241"),
+        name="Risky candidate",
+        description="Description",
+        category="General",
+        context="Prompt body",
+    )
+    detail_widget = _PromptDetailWidgetStub()
+    template_detail_widget = _PromptDetailWidgetStub()
+    manager = _ManagerStub(
+        execution_entries={
+            prompt.id: [
+                _ExecutionEntryStub(
+                    status="success",
+                    model="gpt-4o-mini",
+                    duration_ms=160,
+                    prompt_version=int(prompt.version),
+                    conversation_messages=3,
+                    rating=3.0,
+                ),
+                _ExecutionEntryStub(
+                    status="success",
+                    model="gpt-4o-mini",
+                    duration_ms=120,
+                    prompt_version=int(prompt.version) - 1,
+                    conversation_messages=3,
+                    rating=4.0,
+                ),
+            ]
+        }
+    )
+    controller = WorkspaceHistoryController(
+        manager=_as_prompt_manager(manager),
+        model=_as_prompt_list_model(_PromptListModelStub()),
+        detail_widget=_as_prompt_detail_widget(detail_widget),
+        list_view=_as_list_view(_ListViewStub()),
+        current_prompt_supplier=lambda: prompt,
+        template_detail_widget_supplier=_template_detail_supplier(template_detail_widget),
+        template_preview_controller_supplier=_template_preview_supplier(),
+        execution_controller_supplier=_execution_controller_supplier(),
+    )
+
+    controller.handle_selection_changed()
+
+    assert "Candidate vs baseline: regressed" in detail_widget.run_summary
+    assert "Candidate vs baseline: regressed" in template_detail_widget.run_summary
+    assert detail_widget.decision_summary == "Compare regressed run"
+    assert template_detail_widget.decision_summary == "Compare regressed run"
+    assert detail_widget.next_action_summary == "Validate baseline before reuse"
+    assert template_detail_widget.next_action_summary == "Validate baseline before reuse"
 
 
 def test_workspace_history_controller_skips_comparison_cue_without_two_compatible_runs() -> None:
