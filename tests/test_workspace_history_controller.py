@@ -547,6 +547,7 @@ def test_workspace_history_controller_maps_default_next_action_to_reuse_as_is() 
     )
 
     assert controller._map_decision_to_next_action("Safe to compare") == "Compare before validating reuse"  # noqa: SLF001
+    assert controller._map_decision_to_next_action("Matched baseline") == "Validate before reuse"  # noqa: SLF001
     assert controller._map_decision_to_next_action("Refine before reuse") == "Refine before reuse"  # noqa: SLF001
     assert controller._map_decision_to_next_action("Fork before editing") == "Fork before editing"  # noqa: SLF001
     assert controller._map_decision_to_next_action("Anything else") == "Reuse as-is"  # noqa: SLF001
@@ -557,6 +558,60 @@ def test_workspace_history_controller_maps_default_next_action_to_reuse_as_is() 
     assert template_detail_widget.decision_summary == "Reuse as-is"
     assert detail_widget.next_action_summary == "Reuse as-is"
     assert template_detail_widget.next_action_summary == "Reuse as-is"
+
+
+def test_workspace_history_controller_uses_matched_baseline_cue_when_two_runs_match() -> None:
+    """Equal rating and duration should produce a validation-first matched-baseline cue."""
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000240"),
+        name="Stable candidate",
+        description="Description",
+        category="General",
+        context="Prompt body",
+    )
+    detail_widget = _PromptDetailWidgetStub()
+    template_detail_widget = _PromptDetailWidgetStub()
+    manager = _ManagerStub(
+        execution_entries={
+            prompt.id: [
+                _ExecutionEntryStub(
+                    status="success",
+                    model="gpt-4o-mini",
+                    duration_ms=120,
+                    prompt_version=int(prompt.version),
+                    conversation_messages=3,
+                    rating=4.0,
+                ),
+                _ExecutionEntryStub(
+                    status="success",
+                    model="gpt-4o-mini",
+                    duration_ms=120,
+                    prompt_version=int(prompt.version) - 1,
+                    conversation_messages=3,
+                    rating=4.0,
+                ),
+            ]
+        }
+    )
+    controller = WorkspaceHistoryController(
+        manager=_as_prompt_manager(manager),
+        model=_as_prompt_list_model(_PromptListModelStub()),
+        detail_widget=_as_prompt_detail_widget(detail_widget),
+        list_view=_as_list_view(_ListViewStub()),
+        current_prompt_supplier=lambda: prompt,
+        template_detail_widget_supplier=_template_detail_supplier(template_detail_widget),
+        template_preview_controller_supplier=_template_preview_supplier(),
+        execution_controller_supplier=_execution_controller_supplier(),
+    )
+
+    controller.handle_selection_changed()
+
+    assert "Candidate vs baseline: matched" in detail_widget.run_summary
+    assert "Candidate vs baseline: matched" in template_detail_widget.run_summary
+    assert detail_widget.decision_summary == "Matched baseline"
+    assert template_detail_widget.decision_summary == "Matched baseline"
+    assert detail_widget.next_action_summary == "Validate before reuse"
+    assert template_detail_widget.next_action_summary == "Validate before reuse"
 
 
 def test_workspace_history_controller_hides_last_run_summary_when_prompt_has_no_history() -> None:

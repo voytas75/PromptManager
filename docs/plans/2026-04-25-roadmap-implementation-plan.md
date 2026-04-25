@@ -56,6 +56,7 @@ Po **każdej** implementacji wykonaj w tej kolejności:
 - [x] bounded workspace handoff validation cue after non-executing prompt open
 - [x] compare-path wording aligned with validation-first reuse guidance
 - [x] hidden duplicate next-action cue restored when decision cue clears
+- [x] matched-baseline decision cue distinguishes equal runs from compare-needed runs
 
 ---
 
@@ -382,3 +383,4 @@ Introduce bounded blocking-state detection for critical paths such as missing fa
 - Added Stage 5 planning note for the next bounded inspect/reuse slice: `Recommended next action` cues derived from existing decision + run evidence.
 - Landed post-Stage-5 micro-slices to harden inspect/detail cues: fallback mapping coverage, decision→action mapping centralization, clear-selection guard, and template-detail parity guards for run evidence.
 - Added a negative structured-runs parity guard so the single-run path now proves both detail surfaces keep `Reuse as-is` / next-action fallback while `Candidate vs baseline` stays absent.
+- Added one bounded matched-baseline inspect cue so equal latest/baseline runs now produce `Matched baseline` with `Validate before reuse`, while higher-signal compare-needed pairs keep the existing `Safe to compare` path.

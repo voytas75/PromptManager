@@ -271,6 +271,8 @@ class WorkspaceHistoryController:
         """Translate bounded decision wording into one compact operator-facing action."""
         if decision_text == "Safe to compare":
             return "Compare before validating reuse"
+        if decision_text == "Matched baseline":
+            return "Validate before reuse"
         if decision_text == "Refine before reuse":
             return "Refine before reuse"
         if decision_text == "Fork before editing":
@@ -291,6 +293,8 @@ class WorkspaceHistoryController:
             return None
         if latest_duration is None or baseline_duration is None:
             return None
+        if float(latest_rating) == float(baseline_rating) and int(latest_duration) == int(baseline_duration):
+            return "Matched baseline"
         return "Safe to compare"
 
     @staticmethod

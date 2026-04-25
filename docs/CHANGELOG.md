@@ -18,6 +18,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Fixed
 
+- Added one bounded matched-baseline inspect cue so equal latest/baseline runs now surface `Matched baseline` with a validation-first `Validate before reuse` recommendation, while non-equal compatible runs keep the existing compare-first guidance.
 - Hardened inspect/detail workspace handoff guidance so opening a prompt in the workspace now also shows one bounded status hint (`Prompt ready in workspace. Run current prompt to validate before refining.`), keeping the non-executing reuse flow intact while making the expected next validation step explicit.
 - Hardened shared inspect/detail cue recovery so a hidden duplicate `Recommended next action` now reappears if the matching `Decision` cue is later cleared, keeping bounded guidance visible after state transitions without adding new surfaces or persistence.
 - Hardened inspect/detail next-action and run-evidence parity across the shared and template detail surfaces by centralizing the bounded decision-to-action mapping, preserving clean state when selection clears, and extending focused regression guards for fallback mappings, template-detail parity, and negative parity paths.
