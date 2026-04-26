@@ -72,6 +72,11 @@ class _LayoutStateStub:
         return None
 
 
+@dataclass
+class _ExecutionHistoryEntryStub:
+    executed_at: datetime | None = None
+
+
 class _DummyClipboard:
     def __init__(self) -> None:
         self.text: str | None = None
@@ -151,6 +156,7 @@ def _build_controller(
     status_messages: list[tuple[str, int]],
     toast_messages: list[tuple[str, int]],
     execution_supplier: Callable[[], None],
+    execution_history_supplier: Callable[[Prompt], list[_ExecutionHistoryEntryStub]] | None = None,
 ) -> PromptActionsController:
     """Create a prompt-actions controller with bounded test doubles."""
     return PromptActionsController(
@@ -161,6 +167,7 @@ def _build_controller(
         layout_state=cast("WindowStateManager", _LayoutStateStub()),
         workspace_view=workspace_view,
         execution_controller_supplier=execution_supplier,
+        execution_history_supplier=execution_history_supplier,
         current_prompt_supplier=lambda: None,
         edit_callback=lambda: None,
         duplicate_callback=lambda _prompt: None,
@@ -171,6 +178,53 @@ def _build_controller(
         toast_callback=lambda message, duration: toast_messages.append((message, duration)),
         usage_logger=IntentUsageLogger(enabled=False),
     )
+
+
+def test_open_prompt_in_workspace_surfaces_stale_validation_handoff_hint(
+    qt_app: QApplication,
+) -> None:
+    """Workspace handoff should strengthen the hint for stale validation evidence."""
+    query_input = QPlainTextEdit()
+    workspace_view = WorkspaceViewController(
+        query_input,
+        QTabWidget(),
+        QLabel(),
+        status_callback=lambda *_: None,
+        execution_controller_supplier=lambda: None,
+        quick_action_controller_supplier=lambda: None,
+    )
+    status_messages: list[tuple[str, int]] = []
+    toast_messages: list[tuple[str, int]] = []
+    execution_calls = 0
+
+    def _execution_supplier() -> None:
+        nonlocal execution_calls
+        execution_calls += 1
+        return None
+
+    controller = _build_controller(
+        query_input=query_input,
+        workspace_view=workspace_view,
+        status_messages=status_messages,
+        toast_messages=toast_messages,
+        execution_supplier=_execution_supplier,
+        execution_history_supplier=lambda _prompt: [
+            _ExecutionHistoryEntryStub(executed_at=datetime(2026, 4, 7, 9, 0, tzinfo=UTC))
+        ],
+    )
+    prompt = _build_prompt(context="Prompt body to reuse", description="Fallback description")
+
+    controller.open_prompt_in_workspace(prompt)
+    qt_app.processEvents()
+
+    assert query_input.toPlainText() == "Prompt body to reuse"
+    assert execution_calls == 0
+    stale_hint = (
+        "Prompt ready in workspace. Latest validation is stale — "
+        "run current prompt before refining."
+    )
+    assert status_messages == [(stale_hint, 3000)]
+    assert toast_messages == [("Opened 'Reusable prompt' in the workspace.", 2500)]
 
 
 def test_open_prompt_in_workspace_seeds_text_without_running(qt_app: QApplication) -> None:

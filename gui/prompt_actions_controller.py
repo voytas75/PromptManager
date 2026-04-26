@@ -18,6 +18,7 @@ from PySide6.QtGui import QGuiApplication, QTextCursor
 from PySide6.QtWidgets import QDialog, QListView, QMenu, QMessageBox, QPlainTextEdit, QWidget
 
 from .execute_context_dialog import ExecuteContextDialog
+from .workspace_history_controller import WorkspaceHistoryController
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -44,6 +45,7 @@ class PromptActionsController:
         layout_state: WindowStateManager,
         workspace_view: WorkspaceViewController | None,
         execution_controller_supplier: Callable[[], ExecutionController | None],
+        execution_history_supplier: Callable[[Prompt], list[object]] | None = None,
         current_prompt_supplier: Callable[[], Prompt | None],
         edit_callback: Callable[[], None],
         duplicate_callback: Callable[[Prompt], None],
@@ -62,6 +64,7 @@ class PromptActionsController:
         self._layout_state = layout_state
         self._workspace_view = workspace_view
         self._execution_controller_supplier = execution_controller_supplier
+        self._execution_history_supplier = execution_history_supplier
         self._current_prompt_supplier = current_prompt_supplier
         self._edit_callback = edit_callback
         self._duplicate_callback = duplicate_callback
@@ -173,10 +176,8 @@ class PromptActionsController:
             self._status_callback("Selected prompt does not include a body to open.", 3000)
             return
         self._seed_workspace(payload, focus=True)
-        self._status_callback(
-            "Prompt ready in workspace. Run current prompt to validate before refining.",
-            3000,
-        )
+        status_message = self._workspace_handoff_status_message(prompt)
+        self._status_callback(status_message, 3000)
         self._toast_callback(f"Opened '{prompt.name}' in the workspace.", 2500)
 
     def execute_prompt_as_context(
@@ -254,6 +255,25 @@ class PromptActionsController:
         if not payload:
             return None
         return payload
+
+    def _workspace_handoff_status_message(self, prompt: Prompt) -> str:
+        """Return the bounded workspace handoff hint.
+
+        Tighten it only when the latest validation evidence is stale.
+        """
+        history_supplier = self._execution_history_supplier
+        if callable(history_supplier):
+            entries = history_supplier(prompt)
+            if entries:
+                freshness = WorkspaceHistoryController._build_validation_freshness_summary(
+                    entries[0]
+                )
+                if freshness == "Validation freshness: stale":
+                    return (
+                        "Prompt ready in workspace. Latest validation is stale — "
+                        "run current prompt before refining."
+                    )
+        return "Prompt ready in workspace. Run current prompt to validate before refining."
 
     def _seed_workspace(self, text: str, *, focus: bool) -> None:
         """Populate the workspace editor using the existing view helper when available."""

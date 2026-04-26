@@ -290,6 +290,26 @@ Poniżej jest lista preferowanych mikro-slice na ten cykl. To nie znaczy, że ws
 - `.venv/bin/pytest tests/test_workspace_history_controller.py tests/test_prompt_detail_widget.py tests/test_main_entry.py -q`
 - `.venv/bin/ruff check gui/workspace_history_controller.py tests/test_workspace_history_controller.py tests/test_prompt_detail_widget.py tests/test_main_entry.py cli/commands.py core/history_tracker.py`
 
+### Slice A2 — Stale-validation-aware workspace handoff hint
+
+**Status:** implemented
+
+**Intent:** Doprecyzować handoff z inspect/detail do workspace, gdy ostatnie validation evidence jest już stare, bez zmiany semantyki `Open in Workspace` i bez auto-run.
+
+**Good shape:**
+- reuse existing `PromptActionsController.open_prompt_in_workspace()` seam,
+- keep the existing non-executing workspace handoff,
+- strengthen only the operator-facing next-step hint when latest validation freshness is stale.
+
+**Implemented:**
+- Reused the existing workspace handoff status channel instead of adding a new banner, panel, or execution side effect.
+- `Open in Workspace` now checks the latest available execution-history entry through the existing controller seam and upgrades the status hint to `Prompt ready in workspace. Latest validation is stale — run current prompt before refining.` when freshness is stale.
+- Kept the existing workspace seeding behavior and `Opened '...' in the workspace.` toast unchanged, so the slice only tightens the validation-first guidance.
+
+**Verified:**
+- `.venv/bin/pytest tests/test_prompt_actions_controller.py tests/test_workspace_history_controller.py tests/test_prompt_detail_widget.py -q`
+- `.venv/bin/ruff check gui/prompt_actions_controller.py tests/test_prompt_actions_controller.py tests/test_workspace_history_controller.py tests/test_prompt_detail_widget.py`
+
 ---
 
 ## Selection rules for the first implementation slice
