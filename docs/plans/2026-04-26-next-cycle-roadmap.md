@@ -334,6 +334,8 @@ SSOT ma pozostać stabilny; roadmap ma być żywym ledgerem wykonania.
 
 ## Definition of done for the cycle
 
+Ten cykl można uznać za wykonany w swoim planowanym zakresie. Kolejny execution boundary jest prowadzony w `docs/plans/2026-04-26-next-cycle-closure-and-next-plan.md`, żeby nie doklejać dalszych asset-to-run-to-refine slices do zamkniętego ledgeru evaluation/governance.
+
 Ten cykl będzie można uznać za dobrze domknięty, gdy PromptManager będzie już nie tylko pokazywał bounded compare cues, ale też:
 - lepiej komunikuje, czy evidence jest wystarczające,
 - pokazuje bardziej czytelny governance/review posture,

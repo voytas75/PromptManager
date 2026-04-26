@@ -15,6 +15,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 - Tightened inspect/detail `Recommended next action` wording so the compare path now uses `Compare before validating reuse` instead of the older `Compare runs before reuse`, making the operator guidance align better with the validation-first reuse posture.
 - Tightened inspect/detail `Recommended next action` wording so the refine path now uses the same operator-facing phrase as the decision cue (`Refine before reuse`) instead of the more technical `Refine candidate` label.
 - Tightened inspect/detail `Recommended next action` rendering so the cue now stays hidden when it would duplicate the visible `Decision` recommendation, preserving the bounded decision-support posture without adding new state, labels, or workflow branches.
+- Tightened inspect/detail stale single-run guidance so prompts with only older validation evidence now keep the safe `Reuse as-is` decision while upgrading the next step to `Validate before reuse`.
 
 ### Fixed
 

@@ -696,6 +696,7 @@ def test_workspace_history_controller_surfaces_missing_evidence_reason_for_singl
                     prompt_version=int(prompt.version),
                     conversation_messages=3,
                     rating=5.0,
+                    executed_at=datetime.now(UTC) - timedelta(days=5),
                 )
             ]
         }
@@ -715,8 +716,12 @@ def test_workspace_history_controller_surfaces_missing_evidence_reason_for_singl
 
     assert detail_widget.decision_summary == "Reuse as-is"
     assert template_detail_widget.decision_summary == "Reuse as-is"
-    assert detail_widget.next_action_summary == "Evidence: only one run available"
-    assert template_detail_widget.next_action_summary == "Evidence: only one run available"
+    assert detail_widget.run_summary is not None
+    assert template_detail_widget.run_summary is not None
+    assert "Validation freshness: stale" in detail_widget.run_summary
+    assert "Validation freshness: stale" in template_detail_widget.run_summary
+    assert detail_widget.next_action_summary == "Validate before reuse"
+    assert template_detail_widget.next_action_summary == "Validate before reuse"
 
 
 def test_workspace_history_controller_surfaces_missing_evidence_reason_for_non_comparable_baseline(

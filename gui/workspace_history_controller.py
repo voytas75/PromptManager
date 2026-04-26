@@ -308,6 +308,9 @@ class WorkspaceHistoryController:
 
     def _build_next_action_summary(self, prompt: Prompt) -> str:
         """Map bounded decision and evidence gaps to one compact operator-facing action."""
+        stale_validation_action = self._build_stale_validation_next_action(prompt)
+        if stale_validation_action is not None:
+            return stale_validation_action
         missing_evidence_reason = self._build_missing_evidence_reason(prompt)
         if missing_evidence_reason is not None:
             return missing_evidence_reason
@@ -330,6 +333,17 @@ class WorkspaceHistoryController:
         if decision_text == "Fork before editing":
             return "Fork before editing"
         return "Reuse as-is"
+
+    def _build_stale_validation_next_action(self, prompt: Prompt) -> str | None:
+        """Prefer a validation-first next step when only stale single-run evidence exists."""
+        entries = self._list_execution_history(prompt, limit=2)
+        if len(entries) != 1:
+            return None
+        if self._build_validation_freshness_summary(entries[0]) != "Validation freshness: stale":
+            return None
+        if self._build_decision_summary(prompt) != "Reuse as-is":
+            return None
+        return "Validate before reuse"
 
     def _build_run_recommendation_summary(self, prompt: Prompt) -> str | None:
         entries = self._list_execution_history(prompt, limit=2)
