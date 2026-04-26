@@ -151,7 +151,23 @@ These are ordered by preference.
 
 ### Slice A4 — Headless parity guard for the next handoff cue
 
+**Status:** CLI unchanged by design
+
 **Intent:** After one GUI/shared wording refinement lands, decide whether the same bounded semantic belongs in `history-analytics`.
+
+**Decision:**
+- The A2 wording is emitted only as a post-click workspace handoff status in `PromptActionsController.open_prompt_in_workspace()`.
+- Current headless parity surfaces only shared analytics fields (`decision_summary`, `next_action_summary`, `freshness_summary`) through `PromptExecutionAnalytics` and `cli/commands.py`.
+- Because the stale workspace handoff hint is action-local and does not travel through the shared analytics payload, CLI parity would create a shadow semantics path instead of exposing existing product truth.
+
+**Deliberate no-op:**
+- Keep `history-analytics` and shared analytics payloads unchanged.
+- Revisit only if a future slice promotes this cue onto an existing shared field rather than a workspace-local status channel.
+
+**Verified:**
+- inspected `tests/test_main_entry.py` `history-analytics` expectations
+- inspected `core/history_tracker.py` shared analytics fields
+- inspected `cli/commands.py` `history-analytics` rendering path
 
 **Rule:**
 - If the new wording comes from already-shared fields, extend CLI parity with tests.
