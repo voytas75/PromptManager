@@ -107,6 +107,8 @@ These are ordered by preference.
 
 ### Slice A2 — Workspace handoff coherence after stale evidence
 
+**Status:** implemented
+
 **Intent:** Make the path from stale latest evidence to workspace validation more legible when the user opens a prompt in workspace.
 
 **Good shape:**
@@ -115,16 +117,20 @@ These are ordered by preference.
 - do not auto-run anything,
 - do not create a separate review flow.
 
-**Candidate behavior:**
-- generic handoff remains for prompts without stale-evidence context,
-- stale-evidence prompts strengthen the existing validation hint instead of branching into a new workflow.
+**Implemented:**
+- Reused the existing `PromptActionsController.open_prompt_in_workspace()` seam instead of adding a new warning surface or changing action semantics.
+- Prompts whose latest execution-history entry already resolves to `Validation freshness: stale` now strengthen the workspace handoff hint to `Prompt ready in workspace. Latest validation is stale — run current prompt before refining.`
+- Kept workspace seeding non-executing and preserved the existing `Opened '...' in the workspace.` toast, so the slice only tightens the validation-first operator cue.
 
-**Primary files:**
-- existing prompt-actions/workspace handoff controller seam
-- related handoff tests
-- `docs/CHANGELOG.md`
+**Verified:**
+- `.venv/bin/pytest tests/test_prompt_actions_controller.py tests/test_workspace_history_controller.py tests/test_prompt_detail_widget.py -q`
+- result: `58 passed`
+- `.venv/bin/ruff check gui/prompt_actions_controller.py tests/test_prompt_actions_controller.py tests/test_workspace_history_controller.py tests/test_prompt_detail_widget.py`
+- result: `All checks passed!`
 
 ### Slice A3 — Result-to-next-step wording refinement for one-run prompts
+
+**Status:** covered by existing behavior
 
 **Intent:** Improve operator coherence for the common path where only one run exists and the system already knows evidence is thin.
 
@@ -134,14 +140,14 @@ These are ordered by preference.
 - make the next action more directly tied to validation/refinement,
 - keep `Decision` conservative.
 
-**Candidate behavior:**
-- `Decision` remains `Reuse as-is` or other existing safe fallback,
-- `Recommended next action` becomes slightly more operationally explicit than a pure evidence statement if and only if that improves the handoff.
+**Probe result:**
+- The planned stale single-run refinement is already delivered by the existing `WorkspaceHistoryController` seam.
+- Current behavior already keeps `Decision == Reuse as-is`, surfaces `Validation freshness: stale`, and tightens `Recommended next action` to `Validate before reuse` for the single-run stale-evidence path.
+- No additional runtime change is warranted here; treat further work in this area as guard coverage only unless a genuinely failing case appears.
 
-**Primary files:**
-- `gui/workspace_history_controller.py`
-- `tests/test_workspace_history_controller.py`
-- `tests/test_prompt_detail_widget.py`
+**Verified:**
+- `.venv/bin/pytest tests/test_workspace_history_controller.py::test_workspace_history_controller_surfaces_missing_evidence_reason_for_single_run -q`
+- result: `1 passed`
 
 ### Slice A4 — Headless parity guard for the next handoff cue
 
