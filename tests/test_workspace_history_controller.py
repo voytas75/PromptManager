@@ -714,14 +714,20 @@ def test_workspace_history_controller_surfaces_missing_evidence_reason_for_singl
 
     controller.handle_selection_changed()
 
-    assert detail_widget.decision_summary == "Reuse as-is"
-    assert template_detail_widget.decision_summary == "Reuse as-is"
+    expected_decision = "Reuse as-is"
+    expected_provenance = "Decision based on limited run evidence"
+    expected_next_action = "Validate before reuse"
+
+    assert detail_widget.decision_summary == expected_decision
+    assert template_detail_widget.decision_summary == expected_decision
+    assert detail_widget.decision_provenance_summary == expected_provenance
+    assert template_detail_widget.decision_provenance_summary == expected_provenance
     assert detail_widget.run_summary is not None
     assert template_detail_widget.run_summary is not None
     assert "Validation freshness: stale" in detail_widget.run_summary
     assert "Validation freshness: stale" in template_detail_widget.run_summary
-    assert detail_widget.next_action_summary == "Validate before reuse"
-    assert template_detail_widget.next_action_summary == "Validate before reuse"
+    assert detail_widget.next_action_summary == expected_next_action
+    assert template_detail_widget.next_action_summary == expected_next_action
 
 
 def test_workspace_history_controller_surfaces_missing_evidence_reason_for_non_comparable_baseline(
@@ -1139,3 +1145,69 @@ def test_workspace_history_controller_clears_next_action_summary_when_selection_
 
     assert detail_widget.next_action_summary is None
     assert template_detail_widget.next_action_summary is None
+
+
+def test_workspace_history_controller_clears_selection_reset_cues_on_both_detail_surfaces() -> None:
+    """Clearing the current prompt should drop limited/stale inspect cues on both detail surfaces."""
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000250"),
+        name="Stale single run prompt",
+        description="Description",
+        category="General",
+        context="Prompt body",
+    )
+    detail_widget = _PromptDetailWidgetStub()
+    template_detail_widget = _PromptDetailWidgetStub()
+    manager = _ManagerStub(
+        execution_entries={
+            prompt.id: [
+                _ExecutionEntryStub(
+                    status="success",
+                    model="gpt-4o-mini",
+                    duration_ms=90,
+                    prompt_version=int(prompt.version),
+                    conversation_messages=3,
+                    rating=5.0,
+                    executed_at=datetime.now(UTC) - timedelta(days=5),
+                )
+            ]
+        }
+    )
+    current_prompt: Prompt | None = prompt
+    controller = WorkspaceHistoryController(
+        manager=_as_prompt_manager(manager),
+        model=_as_prompt_list_model(_PromptListModelStub()),
+        detail_widget=_as_prompt_detail_widget(detail_widget),
+        list_view=_as_list_view(_ListViewStub()),
+        current_prompt_supplier=lambda: current_prompt,
+        template_detail_widget_supplier=_template_detail_supplier(template_detail_widget),
+        template_preview_controller_supplier=_template_preview_supplier(),
+        execution_controller_supplier=_execution_controller_supplier(),
+    )
+
+    controller.handle_selection_changed()
+
+    assert detail_widget.decision_summary == "Reuse as-is"
+    assert template_detail_widget.decision_summary == "Reuse as-is"
+    assert detail_widget.decision_provenance_summary == "Decision based on limited run evidence"
+    assert template_detail_widget.decision_provenance_summary == (
+        "Decision based on limited run evidence"
+    )
+    assert detail_widget.next_action_summary == "Validate before reuse"
+    assert template_detail_widget.next_action_summary == "Validate before reuse"
+    assert detail_widget.run_summary is not None
+    assert template_detail_widget.run_summary is not None
+    assert "Validation freshness: stale" in detail_widget.run_summary
+    assert "Validation freshness: stale" in template_detail_widget.run_summary
+
+    current_prompt = None
+    controller.handle_selection_changed()
+
+    assert detail_widget.decision_summary is None
+    assert template_detail_widget.decision_summary is None
+    assert detail_widget.decision_provenance_summary is None
+    assert template_detail_widget.decision_provenance_summary is None
+    assert detail_widget.next_action_summary is None
+    assert template_detail_widget.next_action_summary is None
+    assert detail_widget.run_summary is None
+    assert template_detail_widget.run_summary is None

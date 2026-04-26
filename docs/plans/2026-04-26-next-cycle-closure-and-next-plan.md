@@ -153,6 +153,52 @@ These are ordered by preference.
 
 **Status:** CLI unchanged by design
 
+### Slice A5 — Selection-clear/reset guard for limited/stale inspect cues
+
+**Status:** covered by existing behavior
+
+**Intent:** Lock the `selection -> clear()` path so limited-evidence provenance, stale-validation run evidence, and bounded next-step guidance disappear cleanly on both detail surfaces when the current prompt is cleared.
+
+**Good shape:**
+- test-only guard on the existing `WorkspaceHistoryController.handle_selection_changed()` seam,
+- probe the realistic stale single-run path that already shows limited-evidence provenance,
+- assert clean reset on both shared and template detail widgets,
+- no runtime refactor unless a real stale state leak appears.
+
+**Probe result:**
+- Added a focused controller regression test that first selects a prompt with `Decision based on limited run evidence`, `Recommended next action == Validate before reuse`, and `Validation freshness: stale` on both detail surfaces.
+- Clearing `current_prompt_supplier()` to `None` already resets `decision_summary`, `decision_provenance_summary`, `next_action_summary`, and `run_summary` to `None` on both the primary detail widget and the template detail widget.
+- No production change was required; the existing clear path already behaves correctly for this bounded limited/stale evidence branch.
+
+**Verified:**
+- `.venv/bin/pytest tests/test_workspace_history_controller.py::test_workspace_history_controller_clears_selection_reset_cues_on_both_detail_surfaces -q`
+- result: `1 passed`
+- `.venv/bin/pytest tests/test_prompt_detail_widget.py tests/test_workspace_history_controller.py tests/test_main_window_bridges.py tests/test_template_preview_widget.py -q`
+- result: `66 passed`
+
+### Slice A6 — Template-detail parity guard for stale/limited single-run path
+
+**Status:** covered by existing behavior
+
+**Intent:** Lock one compact stale single-run scenario so both detail surfaces are asserted together for the full bounded cue set instead of only partial field-by-field parity.
+
+**Good shape:**
+- test-only guard on the existing `WorkspaceHistoryController` inspect seam,
+- one realistic stale single-run path,
+- assert parity for `Decision`, limited-evidence provenance, stale freshness, and validation-first next step,
+- no runtime refactor unless the parity probe finds divergence.
+
+**Probe result:**
+- Tightened the existing stale single-run controller test into one compact parity guard that now asserts the same `Decision`, `Decision based on limited run evidence`, `Validation freshness: stale`, and `Validate before reuse` cues on both the shared detail widget and the template detail widget.
+- The existing runtime already mirrored the bounded cue set correctly across both surfaces, so the probe stayed test-only.
+- No production code changes were required.
+
+**Verified:**
+- `.venv/bin/pytest tests/test_workspace_history_controller.py::test_workspace_history_controller_surfaces_missing_evidence_reason_for_single_run -q`
+- result: `1 passed`
+- `.venv/bin/pytest tests/test_prompt_detail_widget.py tests/test_workspace_history_controller.py tests/test_main_window_bridges.py tests/test_template_preview_widget.py -q`
+- result: `66 passed`
+
 **Intent:** After one GUI/shared wording refinement lands, decide whether the same bounded semantic belongs in `history-analytics`.
 
 **Decision:**
