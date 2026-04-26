@@ -52,6 +52,9 @@ class PromptExecutionAnalytics:
     prompt_tokens: int
     completion_tokens: int
     total_tokens: int
+    decision_summary: str | None = None
+    next_action_summary: str | None = None
+    freshness_summary: str | None = None
 
 
 @dataclass(slots=True)

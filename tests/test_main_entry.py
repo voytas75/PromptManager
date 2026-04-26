@@ -145,6 +145,9 @@ def _build_execution_analytics(total_runs: int = 5) -> ExecutionAnalytics:
         prompt_tokens=25,
         completion_tokens=50,
         total_tokens=75,
+        decision_summary="Keep baseline",
+        next_action_summary="Prefer baseline before reuse",
+        freshness_summary="Validation freshness: recent",
     )
     return ExecutionAnalytics(
         total_runs=total_runs,
@@ -909,6 +912,9 @@ def test_history_analytics_command_renders_summary(
     output = capsys.readouterr().out
     assert "Execution analytics" in output
     assert "Prompt Alpha" in output
+    assert "decision: Keep baseline" in output
+    assert "next: Prefer baseline before reuse" in output
+    assert "freshness: Validation freshness: recent" in output
     assert "Tokens (window): prompt=25 completion=50 total=75" in output
     assert manager.closed is True
 

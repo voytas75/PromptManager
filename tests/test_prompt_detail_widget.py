@@ -50,13 +50,17 @@ def test_prompt_detail_widget_renders_last_run_summary_label(
     widget = PromptDetailWidget()
 
     widget.show()
-    widget.update_run_summary("Last run: success via gpt-4o-mini · v1 · 3 messages · 120 ms")
+    widget.update_run_summary(
+        "Last run: success via gpt-4o-mini · v1 · 3 messages · 120 ms"
+        " · Validation freshness: recent"
+    )
     qt_app.processEvents()
 
     assert widget._run_summary_label.isVisible()  # noqa: SLF001
     summary_text = widget._run_summary_label.text()  # noqa: SLF001
     assert "Last run:" in summary_text
     assert "gpt-4o-mini" in summary_text
+    assert "Validation freshness: recent" in summary_text
 
 
 def test_prompt_detail_widget_hides_last_run_summary_when_empty(
@@ -104,6 +108,75 @@ def test_prompt_detail_widget_renders_next_action_summary_label(
     next_action_text = widget._next_action_label.text()  # noqa: SLF001
     assert "Recommended next action:" in next_action_text
     assert "Compare before validating reuse" in next_action_text
+
+
+def test_prompt_detail_widget_renders_missing_evidence_next_action_label(
+    qt_app: QApplication,
+) -> None:
+    """Detail view should keep missing-evidence guidance on the next-action surface."""
+    widget = PromptDetailWidget()
+
+    widget.show()
+    widget.update_decision_summary("Reuse as-is")
+    widget.update_next_action_summary("Evidence: only one run available")
+    qt_app.processEvents()
+
+    assert widget._decision_label.isVisible()  # noqa: SLF001
+    assert widget._next_action_label.isVisible()  # noqa: SLF001
+    next_action_text = widget._next_action_label.text()  # noqa: SLF001
+    assert "Recommended next action:" in next_action_text
+    assert "Evidence: only one run available" in next_action_text
+
+
+def test_prompt_detail_widget_renders_keep_baseline_decision_and_next_action(
+    qt_app: QApplication,
+) -> None:
+    """Detail view should render replace-path guidance as bounded baseline-first wording."""
+    widget = PromptDetailWidget()
+
+    widget.show()
+    widget.update_decision_summary("Keep baseline")
+    widget.update_next_action_summary("Prefer baseline before reuse")
+    qt_app.processEvents()
+
+    assert widget._decision_label.isVisible()  # noqa: SLF001
+    assert widget._next_action_label.isVisible()  # noqa: SLF001
+    decision_text = widget._decision_label.text()  # noqa: SLF001
+    next_action_text = widget._next_action_label.text()  # noqa: SLF001
+    assert "Decision:" in decision_text
+    assert "Keep baseline" in decision_text
+    assert "Recommended next action:" in next_action_text
+    assert "Prefer baseline before reuse" in next_action_text
+
+
+def test_prompt_detail_widget_renders_decision_provenance_label(
+    qt_app: QApplication,
+) -> None:
+    """Detail view should render one compact provenance cue for the current decision."""
+    widget = PromptDetailWidget()
+
+    widget.show()
+    widget.update_decision_provenance_summary("Decision based on latest 2 comparable runs")
+    qt_app.processEvents()
+
+    assert widget._decision_provenance_label.isVisible()  # noqa: SLF001
+    provenance_text = widget._decision_provenance_label.text()  # noqa: SLF001
+    assert "Decision based on latest 2 comparable runs" in provenance_text
+
+
+def test_prompt_detail_widget_renders_limited_evidence_provenance_label(
+    qt_app: QApplication,
+) -> None:
+    """Detail view should render a bounded provenance cue when only thin run evidence exists."""
+    widget = PromptDetailWidget()
+
+    widget.show()
+    widget.update_decision_provenance_summary("Decision based on limited run evidence")
+    qt_app.processEvents()
+
+    assert widget._decision_provenance_label.isVisible()  # noqa: SLF001
+    provenance_text = widget._decision_provenance_label.text()  # noqa: SLF001
+    assert "Decision based on limited run evidence" in provenance_text
 
 
 def test_prompt_detail_widget_hides_next_action_summary_when_empty(

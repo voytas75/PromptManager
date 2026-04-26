@@ -156,6 +156,11 @@ class PromptDetailWidget(QWidget):
         self._decision_label.setWordWrap(True)
         self._decision_label.setTextFormat(Qt.TextFormat.RichText)
         self._decision_label.setVisible(False)
+        self._decision_provenance_label = QLabel("", content)
+        self._decision_provenance_label.setObjectName("promptDecisionProvenanceSummary")
+        self._decision_provenance_label.setWordWrap(True)
+        self._decision_provenance_label.setTextFormat(Qt.TextFormat.RichText)
+        self._decision_provenance_label.setVisible(False)
         self._next_action_label = QLabel("", content)
         self._next_action_label.setObjectName("promptNextActionSummary")
         self._next_action_label.setWordWrap(True)
@@ -196,6 +201,8 @@ class PromptDetailWidget(QWidget):
         content_layout.addWidget(self._lineage_label)
         content_layout.addSpacing(4)
         content_layout.addWidget(self._decision_label)
+        content_layout.addSpacing(4)
+        content_layout.addWidget(self._decision_provenance_label)
         content_layout.addSpacing(4)
         content_layout.addWidget(self._next_action_label)
         content_layout.addSpacing(4)
@@ -897,6 +904,8 @@ class PromptDetailWidget(QWidget):
         self._lineage_label.setVisible(False)
         self._decision_label.clear()
         self._decision_label.setVisible(False)
+        self._decision_provenance_label.clear()
+        self._decision_provenance_label.setVisible(False)
         self._hidden_duplicate_next_action_text = None
         self._next_action_label.clear()
         self._next_action_label.setVisible(False)
@@ -978,6 +987,15 @@ class PromptDetailWidget(QWidget):
             hidden_text = self._hidden_duplicate_next_action_text
             self._hidden_duplicate_next_action_text = None
             self.update_next_action_summary(hidden_text)
+
+    def update_decision_provenance_summary(self, text: str | None) -> None:
+        """Display one compact provenance cue that explains the current decision basis."""
+        if text:
+            self._decision_provenance_label.setText(text)
+            self._decision_provenance_label.setVisible(True)
+        else:
+            self._decision_provenance_label.clear()
+            self._decision_provenance_label.setVisible(False)
 
     def update_next_action_summary(self, text: str | None) -> None:
         """Display one compact operator-facing next action for the current prompt."""

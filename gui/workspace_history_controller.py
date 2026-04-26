@@ -1,15 +1,17 @@
 """Coordinate prompt selection, lineage, and template preview updates.
 
 Updates:
+  v0.15.87 - 2026-04-26 - Add bounded validation freshness cues to inspect run summaries.
   v0.15.86 - 2026-04-25 - Centralize bounded decision -> next-action mapping for inspect cues.
   v0.15.85 - 2026-04-10 - Add bounded candidate-vs-baseline comparison cues to run summaries.
   v0.15.84 - 2026-04-10 - Add bounded changed-from-parent lineage cue for forked prompts.
   v0.15.83 - 2026-04-10 - Resolve parent lineage summaries to human-readable prompt names.
-  v0.15.82 - 2025-12-01 - Extract selection + lineage handling from gui.main_window.
 """
+
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from core import PromptManager, PromptManagerError, PromptVersionError
@@ -154,6 +156,10 @@ class WorkspaceHistoryController:
         template_detail = self._template_detail_widget_supplier()
         if template_detail is not None:
             template_detail.update_decision_summary(decision_text)
+        provenance_text = self._build_decision_provenance_summary(prompt)
+        self._detail_widget.update_decision_provenance_summary(provenance_text)
+        if template_detail is not None:
+            template_detail.update_decision_provenance_summary(provenance_text)
 
     def _update_prompt_next_action_summary(self, prompt: Prompt) -> None:
         """Render one bounded operator-facing next action from existing decision evidence."""
@@ -198,6 +204,10 @@ class WorkspaceHistoryController:
         if duration_ms is not None:
             parts.append(f"{duration_ms} ms")
 
+        freshness_summary = self._build_validation_freshness_summary(latest)
+        if freshness_summary is not None:
+            parts.append(freshness_summary)
+
         comparison_summary = self._build_run_comparison_summary(entries)
         if comparison_summary is not None:
             parts.append(comparison_summary)
@@ -208,6 +218,12 @@ class WorkspaceHistoryController:
             return None
         latest = entries[0]
         baseline = entries[1]
+        latest_prompt_version = self._extract_prompt_version(latest)
+        baseline_prompt_version = self._extract_prompt_version(baseline)
+        if latest_prompt_version is None or baseline_prompt_version is None:
+            return None
+        if latest_prompt_version == baseline_prompt_version:
+            return None
         latest_rating = getattr(latest, "rating", None)
         baseline_rating = getattr(baseline, "rating", None)
         latest_duration = getattr(latest, "duration_ms", None)
@@ -225,6 +241,21 @@ class WorkspaceHistoryController:
             f"{outcome} (rating {latest_rating:.1f} vs {baseline_rating:.1f}; "
             f"{latest_duration} ms vs {baseline_duration} ms)"
         )
+
+    @staticmethod
+    def _build_validation_freshness_summary(entry: object) -> str | None:
+        """Return one compact freshness cue from the latest execution timestamp when available."""
+        executed_at = getattr(entry, "executed_at", None)
+        if not isinstance(executed_at, datetime):
+            return None
+        if executed_at.tzinfo is None:
+            return None
+        freshness_window_seconds = 3 * 24 * 60 * 60
+        age_seconds = (datetime.now(UTC) - executed_at.astimezone(UTC)).total_seconds()
+        if age_seconds < 0:
+            return None
+        freshness = "recent" if age_seconds <= freshness_window_seconds else "stale"
+        return f"Validation freshness: {freshness}"
 
     def _list_execution_history(self, prompt: Prompt, *, limit: int = 1) -> list[object]:
         list_history = getattr(self._manager, "list_execution_history", None)
@@ -261,8 +292,25 @@ class WorkspaceHistoryController:
             return "Fork before editing"
         return "Reuse as-is"
 
+    def _build_decision_provenance_summary(self, prompt: Prompt) -> str | None:
+        """Describe the bounded evidence source behind the current decision when it helps."""
+        if self._build_run_recommendation_summary(prompt) is not None:
+            return "Decision based on latest 2 comparable runs"
+        if self._build_missing_evidence_reason(prompt) is not None:
+            return "Decision based on limited run evidence"
+        try:
+            parent_link = self._manager.get_prompt_parent_fork(prompt.id)
+        except PromptVersionError:
+            parent_link = None
+        if parent_link is not None:
+            return "Decision based on fork lineage only"
+        return None
+
     def _build_next_action_summary(self, prompt: Prompt) -> str:
-        """Map the bounded decision cue to one compact recommended next action."""
+        """Map bounded decision and evidence gaps to one compact operator-facing action."""
+        missing_evidence_reason = self._build_missing_evidence_reason(prompt)
+        if missing_evidence_reason is not None:
+            return missing_evidence_reason
         decision_text = self._build_decision_summary(prompt)
         return self._map_decision_to_next_action(decision_text)
 
@@ -273,6 +321,8 @@ class WorkspaceHistoryController:
             return "Validate improved run before reuse"
         if decision_text == "Compare regressed run":
             return "Validate baseline before reuse"
+        if decision_text == "Keep baseline":
+            return "Prefer baseline before reuse"
         if decision_text == "Matched baseline":
             return "Validate before reuse"
         if decision_text == "Refine before reuse":
@@ -287,6 +337,12 @@ class WorkspaceHistoryController:
             return None
         latest = entries[0]
         baseline = entries[1]
+        latest_prompt_version = self._extract_prompt_version(latest)
+        baseline_prompt_version = self._extract_prompt_version(baseline)
+        if latest_prompt_version is None or baseline_prompt_version is None:
+            return None
+        if latest_prompt_version == baseline_prompt_version:
+            return None
         latest_rating = getattr(latest, "rating", None)
         baseline_rating = getattr(baseline, "rating", None)
         latest_duration = getattr(latest, "duration_ms", None)
@@ -299,11 +355,79 @@ class WorkspaceHistoryController:
         baseline_rating_value = float(baseline_rating)
         latest_duration_value = int(latest_duration)
         baseline_duration_value = int(baseline_duration)
-        if latest_rating_value == baseline_rating_value and latest_duration_value == baseline_duration_value:
+        if (
+            latest_rating_value == baseline_rating_value
+            and latest_duration_value == baseline_duration_value
+        ):
             return "Matched baseline"
         if latest_rating_value > baseline_rating_value:
             return "Compare improved run"
+        if (
+            latest_rating_value <= baseline_rating_value - 2.0
+            and latest_duration_value >= baseline_duration_value + 100
+        ):
+            return "Keep baseline"
         return "Compare regressed run"
+
+    def _build_missing_evidence_reason(self, prompt: Prompt) -> str | None:
+        """Explain why bounded reuse evidence is too weak when comparison cues cannot be trusted."""
+        entries = self._list_execution_history(prompt, limit=2)
+        if not entries:
+            return None
+        if len(entries) < 2:
+            return "Evidence: only one run available"
+        latest = entries[0]
+        baseline = entries[1]
+        latest_prompt_version = self._extract_prompt_version(latest)
+        baseline_prompt_version = self._extract_prompt_version(baseline)
+        if latest_prompt_version is None or baseline_prompt_version is None:
+            return "Evidence: no comparable baseline yet"
+        if latest_prompt_version == baseline_prompt_version:
+            return "Evidence: no comparable baseline yet"
+        latest_rating = getattr(latest, "rating", None)
+        baseline_rating = getattr(baseline, "rating", None)
+        if latest_rating is None or baseline_rating is None:
+            return "Evidence: missing rating for comparison"
+        latest_duration = getattr(latest, "duration_ms", None)
+        baseline_duration = getattr(baseline, "duration_ms", None)
+        if latest_duration is None or baseline_duration is None:
+            return "Evidence: missing duration for comparison"
+        return None
+
+    @staticmethod
+    def _runs_form_comparable_pair(latest: object, baseline: object) -> bool:
+        """Return whether two runs are meaningfully comparable as baseline/candidate evidence."""
+        latest_duration = getattr(latest, "duration_ms", None)
+        baseline_duration = getattr(baseline, "duration_ms", None)
+        latest_rating = getattr(latest, "rating", None)
+        baseline_rating = getattr(baseline, "rating", None)
+        if latest_duration is None or baseline_duration is None:
+            return False
+        if latest_rating is None or baseline_rating is None:
+            return False
+        return int(latest_duration) != int(baseline_duration) or float(latest_rating) != float(
+            baseline_rating
+        )
+
+    @staticmethod
+    def _extract_prompt_version(entry: object) -> int | None:
+        """Return the recorded prompt version from execution metadata when available."""
+        metadata = getattr(entry, "metadata", None) or {}
+        if not isinstance(metadata, dict):
+            return None
+        context = metadata.get("context", {})
+        if not isinstance(context, dict):
+            return None
+        run = context.get("run", {})
+        if not isinstance(run, dict):
+            return None
+        prompt_version = run.get("prompt_version")
+        if prompt_version is None:
+            return None
+        try:
+            return int(prompt_version)
+        except (TypeError, ValueError):
+            return None
 
     @staticmethod
     def _changed_fields_against_parent(*, prompt: Prompt, parent_prompt: Prompt) -> list[str]:

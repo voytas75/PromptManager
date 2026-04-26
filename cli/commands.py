@@ -786,6 +786,12 @@ def run_history_analytics(
                 f"avg_rating:{avg_rating} trend:{trend} latency:{latency} "
                 f"last:{last_run} tokens:{stats.total_tokens}"
             )
+            if stats.decision_summary:
+                lines.append(f"   decision: {stats.decision_summary}")
+            if stats.next_action_summary:
+                lines.append(f"   next: {stats.next_action_summary}")
+            if stats.freshness_summary:
+                lines.append(f"   freshness: {stats.freshness_summary}")
 
     print("\n".join(lines))
     return 0
