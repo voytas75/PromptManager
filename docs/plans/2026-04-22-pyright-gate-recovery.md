@@ -297,7 +297,7 @@ gh run view --repo voytas75/PromptManager <run_id>
 - [x] `.github/workflows/quality-gates.yml` używa zawężonego scope Pyrighta
 - [x] lokalnie potwierdzono bieżące `./.venv/bin/pyright main.py config` na tym checkoutcie
 - [x] potwierdzono aktualny GH run dla commitów po rozszerzeniu gate
-- [ ] istnieje trwały test regresyjny dla `PROMPT_MANAGER_ENV_FILE` / dotenv precedence
+- [x] istnieje trwały test regresyjny dla `PROMPT_MANAGER_ENV_FILE` / dotenv precedence (`tests/test_settings.py::test_load_settings_reads_embedding_model_from_dotenv_when_config_path_comes_from_dotenv`)
 - [x] istnieje zapisany plan dalszego rozszerzania strict-checka
 
 ---

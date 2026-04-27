@@ -196,17 +196,29 @@ Constraint:
 
 ### Slice 3 — Headless parity for shared run-evidence wording
 
-**Status:** pending
+**Status:** CLI unchanged by design
 
 **Intent:** Jeśli Slice 1 albo 2 zmienia shared execution-summary meaning, `history-analytics` musi to odzwierciedlić.
 
-**Decision rule:**
-- shared field change -> add CLI parity tests and rendering,
-- widget-local formatting only -> CLI unchanged by design and documented.
+**Decision:**
+- Slice 1 changed only widget-local run-summary ordering/legibility and already documented that CLI parity remained unchanged by design.
+- Slice 2 added `Comparison readiness: ...` only on the inspect/detail `run_summary` seam in `WorkspaceHistoryController`; it did not promote that wording into shared analytics fields such as `decision_summary`, `next_action_summary`, or `freshness_summary`.
+- The existing `history-analytics` CLI path still correctly renders only shared execution-summary semantics, so adding `Comparison readiness` there would create a shadow headless model instead of exposing shared product truth.
+
+**Deliberate no-op:**
+- keep `core/history_tracker.py` unchanged,
+- keep `cli/commands.py` unchanged,
+- keep `tests/test_main_entry.py` unchanged.
+
+**Verified:**
+- inspected `core/history_tracker.py` shared analytics payload and confirmed it still exposes only `decision_summary`, `next_action_summary`, and `freshness_summary`
+- inspected `cli/commands.py` `history-analytics` rendering and confirmed it still prints only those shared fields
+- inspected `tests/test_main_entry.py::test_history_analytics_command_renders_summary` and confirmed the CLI expectation remains aligned with shared semantics only
+- result: `CLI unchanged by design`
 
 ### Slice 4 — Evidence-reading guard pack
 
-**Status:** pending
+**Status:** implemented
 
 **Intent:** Domknąć ten cykl lekkimi guardami na wording drift i parity drift.
 
@@ -215,6 +227,19 @@ Constraint:
 - CLI parity or deliberate no-op,
 - ordering regression guard,
 - no new production logic unless RED exposes a real bug.
+
+**Implemented:**
+- The cycle already landed the expected guard shape across the delivered slices instead of as one separate runtime change.
+- Slice 1 locked the operator-facing `Last run: ...` ordering on the existing inspect/detail seam.
+- Slice 2 added explicit shared/template parity coverage for `Comparison readiness: no baseline yet` and `Comparison readiness: limited` on both detail surfaces.
+- Slice 3 closed the headless branch as a deliberate no-op, keeping CLI parity restricted to shared analytics semantics only.
+- No further production logic was required because the remaining drift risk was already covered by the shipped controller/widget tests and the documented CLI no-op rule.
+
+**Verified:**
+- `tests/test_workspace_history_controller.py` asserts shared/template parity for both `Comparison readiness: no baseline yet` and `Comparison readiness: limited`
+- `tests/test_prompt_detail_widget.py::test_prompt_detail_widget_renders_last_run_summary_label` locks the compact last-run wording, including freshness and limited-readiness rendering
+- `docs/plans/2026-04-26-asset-to-run-to-refine-coherence-v3-roadmap.md` carries forward the same shared-vs-local CLI rule for later slices
+- result: `implemented via earlier slices and guard coverage`
 
 ---
 
