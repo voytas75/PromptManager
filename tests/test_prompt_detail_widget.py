@@ -53,6 +53,7 @@ def test_prompt_detail_widget_renders_last_run_summary_label(
     widget.update_run_summary(
         "Last run: success via gpt-4o-mini · v1 · 3 messages · 120 ms"
         " · Validation freshness: recent"
+        " · Comparison readiness: limited"
     )
     qt_app.processEvents()
 
@@ -61,6 +62,7 @@ def test_prompt_detail_widget_renders_last_run_summary_label(
     assert "Last run:" in summary_text
     assert "gpt-4o-mini" in summary_text
     assert "Validation freshness: recent" in summary_text
+    assert "Comparison readiness: limited" in summary_text
 
 
 def test_prompt_detail_widget_hides_last_run_summary_when_empty(

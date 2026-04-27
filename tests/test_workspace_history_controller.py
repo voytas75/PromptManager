@@ -354,6 +354,71 @@ def test_workspace_history_controller_surfaces_stale_validation_cue_for_old_run(
     assert "Validation freshness: stale" in template_detail_widget.run_summary
 
 
+def test_workspace_history_controller_places_candidate_vs_baseline_after_last_run_facts(
+) -> None:
+    """Run summary should keep last-run facts first, then append comparison evidence."""
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000252"),
+        name="Comparison ordering prompt",
+        description="Description",
+        category="General",
+        context="Prompt body",
+    )
+    detail_widget = _PromptDetailWidgetStub()
+    template_detail_widget = _PromptDetailWidgetStub()
+    manager = _ManagerStub(
+        execution_entries={
+            prompt.id: [
+                _ExecutionEntryStub(
+                    status="success",
+                    model="gpt-4o-mini",
+                    duration_ms=90,
+                    prompt_version=int(prompt.version) + 1,
+                    conversation_messages=3,
+                    rating=5.0,
+                    executed_at=datetime.now(UTC) - timedelta(hours=4),
+                ),
+                _ExecutionEntryStub(
+                    status="success",
+                    model="gpt-4o-mini",
+                    duration_ms=140,
+                    prompt_version=int(prompt.version),
+                    conversation_messages=3,
+                    rating=4.0,
+                    executed_at=datetime.now(UTC) - timedelta(days=2),
+                ),
+            ]
+        }
+    )
+    controller = WorkspaceHistoryController(
+        manager=_as_prompt_manager(manager),
+        model=_as_prompt_list_model(_PromptListModelStub()),
+        detail_widget=_as_prompt_detail_widget(detail_widget),
+        list_view=_as_list_view(_ListViewStub()),
+        current_prompt_supplier=lambda: prompt,
+        template_detail_widget_supplier=_template_detail_supplier(template_detail_widget),
+        template_preview_controller_supplier=_template_preview_supplier(),
+        execution_controller_supplier=_execution_controller_supplier(),
+    )
+
+    controller.handle_selection_changed()
+
+    assert detail_widget.run_summary is not None
+    assert template_detail_widget.run_summary is not None
+    expected_prefix = (
+        "Last run: success via gpt-4o-mini · v2 · 3 messages · 90 ms"
+        " · Validation freshness: recent"
+    )
+    assert detail_widget.run_summary.startswith(expected_prefix)
+    assert template_detail_widget.run_summary.startswith(expected_prefix)
+    assert detail_widget.run_summary.endswith(
+        "Candidate vs baseline: improved (rating 5.0 vs 4.0; 90 ms vs 140 ms)"
+    )
+    assert template_detail_widget.run_summary.endswith(
+        "Candidate vs baseline: improved (rating 5.0 vs 4.0; 90 ms vs 140 ms)"
+    )
+
+
 def test_workspace_history_controller_skips_freshness_cue_for_naive_timestamp() -> None:
     """Naive execution timestamps should not crash inspect/detail freshness rendering."""
     prompt = Prompt(
@@ -676,7 +741,7 @@ def test_workspace_history_controller_skips_comparison_cue_without_two_compatibl
 
 
 def test_workspace_history_controller_surfaces_missing_evidence_reason_for_single_run() -> None:
-    """Inspect flow should explain thin evidence without inventing a comparison cue."""
+    """Inspect flow should keep stale single-run cues aligned across both detail surfaces."""
     prompt = Prompt(
         id=uuid.UUID("00000000-0000-0000-0000-000000000242"),
         name="Single run prompt",
@@ -730,6 +795,62 @@ def test_workspace_history_controller_surfaces_missing_evidence_reason_for_singl
     assert template_detail_widget.next_action_summary == expected_next_action
 
 
+def test_workspace_history_controller_keeps_fresh_single_run_cues_aligned_across_detail_surfaces(
+) -> None:
+    """Fresh single-run inspect cues should stay aligned across both detail surfaces."""
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000252"),
+        name="Fresh single run prompt",
+        description="Description",
+        category="General",
+        context="Prompt body",
+    )
+    detail_widget = _PromptDetailWidgetStub()
+    template_detail_widget = _PromptDetailWidgetStub()
+    manager = _ManagerStub(
+        execution_entries={
+            prompt.id: [
+                _ExecutionEntryStub(
+                    status="success",
+                    model="gpt-4o-mini",
+                    duration_ms=95,
+                    prompt_version=int(prompt.version),
+                    conversation_messages=2,
+                    rating=5.0,
+                    executed_at=datetime.now(UTC) - timedelta(hours=6),
+                )
+            ]
+        }
+    )
+    controller = WorkspaceHistoryController(
+        manager=_as_prompt_manager(manager),
+        model=_as_prompt_list_model(_PromptListModelStub()),
+        detail_widget=_as_prompt_detail_widget(detail_widget),
+        list_view=_as_list_view(_ListViewStub()),
+        current_prompt_supplier=lambda: prompt,
+        template_detail_widget_supplier=_template_detail_supplier(template_detail_widget),
+        template_preview_controller_supplier=_template_preview_supplier(),
+        execution_controller_supplier=_execution_controller_supplier(),
+    )
+
+    controller.handle_selection_changed()
+
+    expected_decision = "Reuse as-is"
+    expected_provenance = "Decision based on limited run evidence"
+    expected_next_action = "Evidence: only one run available"
+
+    assert detail_widget.decision_summary == expected_decision
+    assert template_detail_widget.decision_summary == expected_decision
+    assert detail_widget.decision_provenance_summary == expected_provenance
+    assert template_detail_widget.decision_provenance_summary == expected_provenance
+    assert detail_widget.run_summary is not None
+    assert template_detail_widget.run_summary is not None
+    assert "Validation freshness: recent" in detail_widget.run_summary
+    assert "Validation freshness: recent" in template_detail_widget.run_summary
+    assert detail_widget.next_action_summary == expected_next_action
+    assert template_detail_widget.next_action_summary == expected_next_action
+
+
 def test_workspace_history_controller_surfaces_missing_evidence_reason_for_non_comparable_baseline(
 ) -> None:
     """Inspect flow should explain when two runs exist but no comparable baseline can be trusted."""
@@ -778,7 +899,11 @@ def test_workspace_history_controller_surfaces_missing_evidence_reason_for_non_c
     controller.handle_selection_changed()
 
     assert detail_widget.run_summary is not None
+    assert template_detail_widget.run_summary is not None
     assert "Candidate vs baseline:" not in detail_widget.run_summary
+    assert "Candidate vs baseline:" not in template_detail_widget.run_summary
+    assert "Comparison readiness: no baseline yet" in detail_widget.run_summary
+    assert "Comparison readiness: no baseline yet" in template_detail_widget.run_summary
     assert detail_widget.next_action_summary == "Evidence: no comparable baseline yet"
     assert template_detail_widget.next_action_summary == "Evidence: no comparable baseline yet"
 
@@ -927,6 +1052,9 @@ def test_workspace_history_controller_surfaces_missing_evidence_reason_for_missi
 
     assert detail_widget.run_summary is not None
     assert "Candidate vs baseline:" not in detail_widget.run_summary
+    assert "Comparison readiness: limited" in detail_widget.run_summary
+    assert template_detail_widget.run_summary is not None
+    assert "Comparison readiness: limited" in template_detail_widget.run_summary
     assert detail_widget.next_action_summary == "Evidence: missing rating for comparison"
     assert template_detail_widget.next_action_summary == "Evidence: missing rating for comparison"
 
@@ -1148,7 +1276,9 @@ def test_workspace_history_controller_clears_next_action_summary_when_selection_
 
 
 def test_workspace_history_controller_clears_selection_reset_cues_on_both_detail_surfaces() -> None:
-    """Clearing the current prompt should drop limited/stale inspect cues on both detail surfaces."""
+    """Clearing the current prompt should drop limited/stale inspect cues on both detail
+    surfaces.
+    """
     prompt = Prompt(
         id=uuid.UUID("00000000-0000-0000-0000-000000000250"),
         name="Stale single run prompt",

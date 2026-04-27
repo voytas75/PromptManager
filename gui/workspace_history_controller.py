@@ -195,7 +195,7 @@ class WorkspaceHistoryController:
 
         parts = [f"Last run: {status_value}"]
         if model:
-            parts.append(f"via {model}")
+            parts[0] = f"{parts[0]} via {model}"
         if prompt_version is not None:
             parts.append(f"v{prompt_version}")
         if conversation_messages is not None:
@@ -208,10 +208,39 @@ class WorkspaceHistoryController:
         if freshness_summary is not None:
             parts.append(freshness_summary)
 
+        comparison_readiness_summary = self._build_comparison_readiness_summary(entries)
+        if comparison_readiness_summary is not None:
+            parts.append(comparison_readiness_summary)
+
         comparison_summary = self._build_run_comparison_summary(entries)
         if comparison_summary is not None:
             parts.append(comparison_summary)
         return " · ".join(parts)
+
+    def _build_comparison_readiness_summary(self, entries: list[object]) -> str | None:
+        if len(entries) < 2:
+            return None
+        latest = entries[0]
+        baseline = entries[1]
+        latest_prompt_version = self._extract_prompt_version(latest)
+        baseline_prompt_version = self._extract_prompt_version(baseline)
+        if latest_prompt_version is None or baseline_prompt_version is None:
+            return None
+        if latest_prompt_version == baseline_prompt_version:
+            return "Comparison readiness: no baseline yet"
+
+        latest_rating = getattr(latest, "rating", None)
+        baseline_rating = getattr(baseline, "rating", None)
+        latest_duration = getattr(latest, "duration_ms", None)
+        baseline_duration = getattr(baseline, "duration_ms", None)
+        if (
+            latest_rating is None
+            or baseline_rating is None
+            or latest_duration is None
+            or baseline_duration is None
+        ):
+            return "Comparison readiness: limited"
+        return None
 
     def _build_run_comparison_summary(self, entries: list[object]) -> str | None:
         if len(entries) < 2:
