@@ -1,6 +1,7 @@
 """Coordinate prompt selection, lineage, and template preview updates.
 
 Updates:
+  v0.15.89 - 2026-04-27 - Shorten inspect decision-provenance wording on the existing cue seam.
   v0.15.88 - 2026-04-27 - Align limited-evidence next actions to action-oriented inspect wording.
   v0.15.87 - 2026-04-26 - Add bounded validation freshness cues to inspect run summaries.
   v0.15.86 - 2026-04-25 - Centralize bounded decision -> next-action mapping for inspect cues.
@@ -325,15 +326,15 @@ class WorkspaceHistoryController:
     def _build_decision_provenance_summary(self, prompt: Prompt) -> str | None:
         """Describe the bounded evidence source behind the current decision when it helps."""
         if self._build_run_recommendation_summary(prompt) is not None:
-            return "Decision based on latest 2 comparable runs"
+            return "Based on latest 2 comparable runs"
         if self._build_missing_evidence_reason(prompt) is not None:
-            return "Decision based on limited run evidence"
+            return "Based on limited run evidence"
         try:
             parent_link = self._manager.get_prompt_parent_fork(prompt.id)
         except PromptVersionError:
             parent_link = None
         if parent_link is not None:
-            return "Decision based on fork lineage only"
+            return "Based on fork lineage only"
         return None
 
     def _build_next_action_summary(self, prompt: Prompt) -> str:

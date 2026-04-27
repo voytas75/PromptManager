@@ -682,9 +682,9 @@ def test_workspace_history_controller_surfaces_keep_baseline_cue_for_clearly_reg
     assert template_detail_widget.decision_summary == "Keep baseline"
     assert detail_widget.next_action_summary == "Prefer baseline before reuse"
     assert template_detail_widget.next_action_summary == "Prefer baseline before reuse"
-    assert detail_widget.decision_provenance_summary == "Decision based on latest 2 comparable runs"
+    assert detail_widget.decision_provenance_summary == "Based on latest 2 comparable runs"
     assert template_detail_widget.decision_provenance_summary == (
-        "Decision based on latest 2 comparable runs"
+        "Based on latest 2 comparable runs"
     )
 
 
@@ -732,9 +732,9 @@ def test_workspace_history_controller_skips_comparison_cue_without_two_compatibl
     assert "Candidate vs baseline:" not in template_detail_widget.run_summary
     assert detail_widget.decision_summary == "Reuse as-is"
     assert template_detail_widget.decision_summary == "Reuse as-is"
-    assert detail_widget.decision_provenance_summary == "Decision based on limited run evidence"
+    assert detail_widget.decision_provenance_summary == "Based on limited run evidence"
     assert template_detail_widget.decision_provenance_summary == (
-        "Decision based on limited run evidence"
+        "Based on limited run evidence"
     )
     assert detail_widget.next_action_summary == "Validate before reuse"
     assert template_detail_widget.next_action_summary == "Validate before reuse"
@@ -780,7 +780,7 @@ def test_workspace_history_controller_surfaces_missing_evidence_reason_for_singl
     controller.handle_selection_changed()
 
     expected_decision = "Reuse as-is"
-    expected_provenance = "Decision based on limited run evidence"
+    expected_provenance = "Based on limited run evidence"
     expected_next_action = "Validate before reuse"
 
     assert detail_widget.decision_summary == expected_decision
@@ -836,7 +836,7 @@ def test_workspace_history_controller_keeps_fresh_single_run_cues_aligned_across
     controller.handle_selection_changed()
 
     expected_decision = "Reuse as-is"
-    expected_provenance = "Decision based on limited run evidence"
+    expected_provenance = "Based on limited run evidence"
     expected_next_action = "Validate before reuse"
 
     assert detail_widget.decision_summary == expected_decision
@@ -955,9 +955,9 @@ def test_workspace_history_controller_surfaces_run_based_decision_provenance() -
     controller.handle_selection_changed()
 
     assert detail_widget.decision_summary == "Compare improved run"
-    assert detail_widget.decision_provenance_summary == "Decision based on latest 2 comparable runs"
+    assert detail_widget.decision_provenance_summary == "Based on latest 2 comparable runs"
     assert template_detail_widget.decision_provenance_summary == (
-        "Decision based on latest 2 comparable runs"
+        "Based on latest 2 comparable runs"
     )
 
 
@@ -998,9 +998,9 @@ def test_workspace_history_controller_surfaces_lineage_based_decision_provenance
     controller.handle_selection_changed()
 
     assert detail_widget.decision_summary == "Fork before editing"
-    assert detail_widget.decision_provenance_summary == "Decision based on fork lineage only"
+    assert detail_widget.decision_provenance_summary == "Based on fork lineage only"
     assert template_detail_widget.decision_provenance_summary == (
-        "Decision based on fork lineage only"
+        "Based on fork lineage only"
     )
 
 
@@ -1319,9 +1319,9 @@ def test_workspace_history_controller_clears_selection_reset_cues_on_both_detail
 
     assert detail_widget.decision_summary == "Reuse as-is"
     assert template_detail_widget.decision_summary == "Reuse as-is"
-    assert detail_widget.decision_provenance_summary == "Decision based on limited run evidence"
+    assert detail_widget.decision_provenance_summary == "Based on limited run evidence"
     assert template_detail_widget.decision_provenance_summary == (
-        "Decision based on limited run evidence"
+        "Based on limited run evidence"
     )
     assert detail_widget.next_action_summary == "Validate before reuse"
     assert template_detail_widget.next_action_summary == "Validate before reuse"

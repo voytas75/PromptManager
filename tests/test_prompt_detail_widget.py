@@ -1,6 +1,7 @@
 """Focused tests for prompt detail inspection cues.
 
 Updates:
+  v0.1.15 - 2026-04-27 - Expect shortened decision-provenance wording on inspect cues.
   v0.1.14 - 2026-04-27 - Expect action-oriented limited-evidence next-action wording.
   v0.1.13 - 2026-04-12 - Keep `Add Favorite` before `Promote Draft` in the
              shared draft detail action row.
@@ -159,12 +160,12 @@ def test_prompt_detail_widget_renders_decision_provenance_label(
     widget = PromptDetailWidget()
 
     widget.show()
-    widget.update_decision_provenance_summary("Decision based on latest 2 comparable runs")
+    widget.update_decision_provenance_summary("Based on latest 2 comparable runs")
     qt_app.processEvents()
 
     assert widget._decision_provenance_label.isVisible()  # noqa: SLF001
     provenance_text = widget._decision_provenance_label.text()  # noqa: SLF001
-    assert "Decision based on latest 2 comparable runs" in provenance_text
+    assert "Based on latest 2 comparable runs" in provenance_text
 
 
 def test_prompt_detail_widget_renders_limited_evidence_provenance_label(
@@ -174,12 +175,12 @@ def test_prompt_detail_widget_renders_limited_evidence_provenance_label(
     widget = PromptDetailWidget()
 
     widget.show()
-    widget.update_decision_provenance_summary("Decision based on limited run evidence")
+    widget.update_decision_provenance_summary("Based on limited run evidence")
     qt_app.processEvents()
 
     assert widget._decision_provenance_label.isVisible()  # noqa: SLF001
     provenance_text = widget._decision_provenance_label.text()  # noqa: SLF001
-    assert "Decision based on limited run evidence" in provenance_text
+    assert "Based on limited run evidence" in provenance_text
 
 
 def test_prompt_detail_widget_hides_next_action_summary_when_empty(
