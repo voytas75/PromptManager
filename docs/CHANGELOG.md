@@ -19,6 +19,8 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Fixed
 
+- Tightened inspect/detail last-run evidence wording so the shared/template run summary now keeps `via <model>` attached to the leading `Last run: <status>` fact instead of splitting it into a detached fragment, making the summary read in a cleaner operator-first order while keeping comparison evidence and validation freshness on the existing seam only.
+- Added one focused regression guard for the shared detail duplicate-suppression path so a previously hidden `Recommended next action` cue now stays suppressed again when the same `Decision` text returns after a temporary clear, without changing runtime behavior or adding new UI state.
 - Added one bounded limited-evidence provenance cue so inspect/detail fallback decisions can now surface `Decision based on limited run evidence` when history exists but comparable run evidence is still too thin, keeping the explanation on the existing decision-support seam without adding persistence, review workflow, or a new panel.
 - Added one bounded template-detail parity guard for the stale single-run inspect path so both detail surfaces are now explicitly locked to show the same `Reuse as-is`, `Decision based on limited run evidence`, `Validation freshness: stale`, and `Validate before reuse` cues without adding any new runtime seam or workflow.
 - Added one bounded selection-clear regression guard on the existing workspace-history inspect seam so clearing the current prompt now stays explicitly locked to remove stale limited-evidence provenance, `Validate before reuse`, and `Validation freshness: stale` cues from both shared detail surfaces without adding any new runtime state or workflow.

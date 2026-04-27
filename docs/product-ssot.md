@@ -2,7 +2,7 @@
 
 Status: active
 Owner: Wojtek / Prompt Manager Team
-Updated: 2026-04-25
+Updated: 2026-04-26
 Supersedes:
 - `docs/product-direction-ssot.md`
 - `docs/product-boundary-ssot.md`
@@ -322,9 +322,13 @@ The next direction is to improve the handoff between:
 
 This should improve operator coherence, not create a larger orchestration framework.
 
+Current emphasis inside this stage:
+- keep inspect/detail run evidence easier to read than to over-interpret,
+- prefer wording/order fixes on existing summary seams before adding new cues,
+- treat run-evidence legibility as a bounded continuation of the same asset-to-run-to-refine loop.
+
 ### 6. Open automation surfaces deliberately
 After the product is trustworthy for human operators, expose the same model through CLI/API automation.
-
 Principle:
 - GUI for interactive operation
 - CLI/API for repeatable automation
