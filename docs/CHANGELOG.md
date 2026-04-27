@@ -8,7 +8,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 - Tightened inspect/detail no-history fallback so prompts with no recorded runs now keep the calm `Reuse as-is` decision while explicitly surfacing `Validate before reuse` as the next step, without adding synthetic evidence, new panels, or separate empty-state UI.
 - Shortened inspect/detail `Decision` provenance wording so the existing cue now reads `Based on latest 2 comparable runs`, `Based on limited run evidence`, or `Based on fork lineage only`, keeping the same provenance logic and surface while making the source cue easier to scan.
-- Tightened inspect/detail limited-evidence `Recommended next action` wording so thin-evidence paths now stay action-oriented (`Validate before reuse`, `Run another version before comparing`, `Add ratings before comparing`, `Run again before comparing`) while `Decision based on limited run evidence` and the existing run-summary evidence remain on their current seams.
+- Tightened inspect/detail limited-evidence `Recommended next action` wording so thin-evidence paths now stay better aligned to evidence strength: fresh single-run prompts keep the neutral `Evidence: only one run available`, while stale/no-history and comparison-gap paths continue to use action-oriented guidance such as `Validate before reuse`, `Run another version before comparing`, `Add ratings before comparing`, and `Run again before comparing`.
 
 ## [0.22.24] - 2026-04-27
 

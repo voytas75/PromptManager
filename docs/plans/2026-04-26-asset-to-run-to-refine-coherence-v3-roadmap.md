@@ -197,7 +197,7 @@ Constraint:
 
 ### Slice 3 — Reuse-vs-refine wording refinement after recent evidence
 
-**Status:** covered by existing behavior
+**Status:** implemented
 
 **Intent:** Jeżeli prompt ma świeże, ale nadal ograniczone evidence, operator powinien dostać bardziej czytelny bounded next step niż obecne neutralne fallback wording.
 
@@ -206,14 +206,18 @@ Constraint:
 - refine only next-action wording,
 - no extra workflow branch.
 
-**Probe result:**
-- The current inspect/detail seam already keeps the recent thin-evidence path intentionally conservative: fresh single-run prompts stay on `Decision == Reuse as-is` with `Recommended next action == Evidence: only one run available`.
-- The paired fresh/stale probes do not show an ambiguous reuse-vs-refine branch that needs another wording layer; the stale path already tightens to `Validate before reuse`, while the recent path avoids overconfident guidance.
-- No runtime wording change is warranted for this slice right now; treat further work here as a future product-choice question, not an implementation gap.
+**Implemented:**
+- Tightened the fresh single-run inspect/detail path so recent thin-evidence prompts no longer reuse the stale/no-history validation-first wording.
+- Fresh single-run prompts now keep `Decision == Reuse as-is` and `Based on limited run evidence`, but the bounded next step stays neutral as `Evidence: only one run available` while stale single-run prompts still tighten to `Validate before reuse`.
+- Kept the change inside the existing `WorkspaceHistoryController` next-action seam without adding new state, panels, or workflow branches.
 
 **Verified:**
-- `.venv/bin/pytest tests/test_workspace_history_controller.py::test_workspace_history_controller_keeps_fresh_single_run_cues_aligned_across_detail_surfaces tests/test_workspace_history_controller.py::test_workspace_history_controller_surfaces_missing_evidence_reason_for_single_run -q`
-- result: `2 passed`
+- `.venv/bin/pytest tests/test_workspace_history_controller.py::test_workspace_history_controller_keeps_fresh_single_run_cues_aligned_across_detail_surfaces -q`
+- result: `1 passed`
+- `.venv/bin/pytest tests/test_workspace_history_controller.py tests/test_prompt_detail_widget.py -q`
+- result: `57 passed`
+- `.venv/bin/ruff check gui/workspace_history_controller.py tests/test_workspace_history_controller.py`
+- result: `All checks passed`
 
 ### Slice 4 — Workspace handoff coherence for fresh evidence
 

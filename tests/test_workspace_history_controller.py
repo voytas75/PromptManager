@@ -740,7 +740,8 @@ def test_workspace_history_controller_skips_comparison_cue_without_two_compatibl
     assert template_detail_widget.next_action_summary == "Validate before reuse"
 
 
-def test_workspace_history_controller_surfaces_validation_first_next_action_for_no_history_prompt() -> None:
+def test_workspace_history_controller_surfaces_validation_first_next_action_for_no_history(
+) -> None:
     """No-history prompts should stay calm but still suggest a validation-first next step."""
     prompt = Prompt(
         id=uuid.UUID("00000000-0000-0000-0000-000000000253"),
@@ -871,7 +872,7 @@ def test_workspace_history_controller_keeps_fresh_single_run_cues_aligned_across
 
     expected_decision = "Reuse as-is"
     expected_provenance = "Based on limited run evidence"
-    expected_next_action = "Validate before reuse"
+    expected_next_action = "Evidence: only one run available"
 
     assert detail_widget.decision_summary == expected_decision
     assert template_detail_widget.decision_summary == expected_decision
