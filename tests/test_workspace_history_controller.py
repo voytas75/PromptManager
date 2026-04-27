@@ -740,6 +740,40 @@ def test_workspace_history_controller_skips_comparison_cue_without_two_compatibl
     assert template_detail_widget.next_action_summary == "Validate before reuse"
 
 
+def test_workspace_history_controller_surfaces_validation_first_next_action_for_no_history_prompt() -> None:
+    """No-history prompts should stay calm but still suggest a validation-first next step."""
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000253"),
+        name="No history prompt",
+        description="Description",
+        category="General",
+        context="Prompt body",
+    )
+    detail_widget = _PromptDetailWidgetStub()
+    template_detail_widget = _PromptDetailWidgetStub()
+    controller = WorkspaceHistoryController(
+        manager=_as_prompt_manager(_ManagerStub()),
+        model=_as_prompt_list_model(_PromptListModelStub()),
+        detail_widget=_as_prompt_detail_widget(detail_widget),
+        list_view=_as_list_view(_ListViewStub()),
+        current_prompt_supplier=lambda: prompt,
+        template_detail_widget_supplier=_template_detail_supplier(template_detail_widget),
+        template_preview_controller_supplier=_template_preview_supplier(),
+        execution_controller_supplier=_execution_controller_supplier(),
+    )
+
+    controller.handle_selection_changed()
+
+    assert detail_widget.decision_summary == "Reuse as-is"
+    assert template_detail_widget.decision_summary == "Reuse as-is"
+    assert detail_widget.decision_provenance_summary is None
+    assert template_detail_widget.decision_provenance_summary is None
+    assert detail_widget.run_summary is None
+    assert template_detail_widget.run_summary is None
+    assert detail_widget.next_action_summary == "Validate before reuse"
+    assert template_detail_widget.next_action_summary == "Validate before reuse"
+
+
 def test_workspace_history_controller_surfaces_missing_evidence_reason_for_single_run() -> None:
     """Inspect flow should keep stale single-run cues aligned across both detail surfaces."""
     prompt = Prompt(
@@ -1152,8 +1186,8 @@ def test_workspace_history_controller_maps_default_next_action_to_reuse_as_is() 
 
     assert detail_widget.decision_summary == "Reuse as-is"
     assert template_detail_widget.decision_summary == "Reuse as-is"
-    assert detail_widget.next_action_summary == "Reuse as-is"
-    assert template_detail_widget.next_action_summary == "Reuse as-is"
+    assert detail_widget.next_action_summary == "Validate before reuse"
+    assert template_detail_widget.next_action_summary == "Validate before reuse"
 
 
 def test_workspace_history_controller_uses_matched_baseline_cue_when_two_runs_match() -> None:
@@ -1265,8 +1299,8 @@ def test_workspace_history_controller_clears_next_action_summary_when_selection_
     )
 
     controller.handle_selection_changed()
-    assert detail_widget.next_action_summary == "Reuse as-is"
-    assert template_detail_widget.next_action_summary == "Reuse as-is"
+    assert detail_widget.next_action_summary == "Validate before reuse"
+    assert template_detail_widget.next_action_summary == "Validate before reuse"
 
     current_prompt = None
     controller.handle_selection_changed()

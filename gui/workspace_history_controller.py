@@ -1,6 +1,7 @@
 """Coordinate prompt selection, lineage, and template preview updates.
 
 Updates:
+  v0.15.90 - 2026-04-27 - Make no-history inspect fallback explicit with a validation-first next step.
   v0.15.89 - 2026-04-27 - Shorten inspect decision-provenance wording on the existing cue seam.
   v0.15.88 - 2026-04-27 - Align limited-evidence next actions to action-oriented inspect wording.
   v0.15.87 - 2026-04-26 - Add bounded validation freshness cues to inspect run summaries.
@@ -339,6 +340,11 @@ class WorkspaceHistoryController:
 
     def _build_next_action_summary(self, prompt: Prompt) -> str:
         """Map bounded decision and evidence gaps to one compact operator-facing action."""
+        if not self._list_execution_history(prompt, limit=1):
+            decision_text = self._build_decision_summary(prompt)
+            if decision_text == "Reuse as-is":
+                return "Validate before reuse"
+            return self._map_decision_to_next_action(decision_text)
         stale_validation_action = self._build_stale_validation_next_action(prompt)
         if stale_validation_action is not None:
             return stale_validation_action
