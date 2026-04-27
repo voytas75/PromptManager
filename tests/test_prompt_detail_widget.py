@@ -1,6 +1,7 @@
 """Focused tests for prompt detail inspection cues.
 
 Updates:
+  v0.1.14 - 2026-04-27 - Expect action-oriented limited-evidence next-action wording.
   v0.1.13 - 2026-04-12 - Keep `Add Favorite` before `Promote Draft` in the
              shared draft detail action row.
   v0.1.12 - 2026-04-12 - Cover bounded usage-confidence cue rendering from usage counts.
@@ -120,14 +121,14 @@ def test_prompt_detail_widget_renders_missing_evidence_next_action_label(
 
     widget.show()
     widget.update_decision_summary("Reuse as-is")
-    widget.update_next_action_summary("Evidence: only one run available")
+    widget.update_next_action_summary("Validate before reuse")
     qt_app.processEvents()
 
     assert widget._decision_label.isVisible()  # noqa: SLF001
     assert widget._next_action_label.isVisible()  # noqa: SLF001
     next_action_text = widget._next_action_label.text()  # noqa: SLF001
     assert "Recommended next action:" in next_action_text
-    assert "Evidence: only one run available" in next_action_text
+    assert "Validate before reuse" in next_action_text
 
 
 def test_prompt_detail_widget_renders_keep_baseline_decision_and_next_action(

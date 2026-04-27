@@ -4,6 +4,10 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Tightened inspect/detail limited-evidence `Recommended next action` wording so thin-evidence paths now stay action-oriented (`Validate before reuse`, `Run another version before comparing`, `Add ratings before comparing`, `Run again before comparing`) while `Decision based on limited run evidence` and the existing run-summary evidence remain on their current seams.
+
 ## [0.22.24] - 2026-04-27
 
 ### Added

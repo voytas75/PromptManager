@@ -1,6 +1,7 @@
 """Coordinate prompt selection, lineage, and template preview updates.
 
 Updates:
+  v0.15.88 - 2026-04-27 - Align limited-evidence next actions to action-oriented inspect wording.
   v0.15.87 - 2026-04-26 - Add bounded validation freshness cues to inspect run summaries.
   v0.15.86 - 2026-04-25 - Centralize bounded decision -> next-action mapping for inspect cues.
   v0.15.85 - 2026-04-10 - Add bounded candidate-vs-baseline comparison cues to run summaries.
@@ -340,9 +341,9 @@ class WorkspaceHistoryController:
         stale_validation_action = self._build_stale_validation_next_action(prompt)
         if stale_validation_action is not None:
             return stale_validation_action
-        missing_evidence_reason = self._build_missing_evidence_reason(prompt)
-        if missing_evidence_reason is not None:
-            return missing_evidence_reason
+        missing_evidence_action = self._build_missing_evidence_next_action(prompt)
+        if missing_evidence_action is not None:
+            return missing_evidence_action
         decision_text = self._build_decision_summary(prompt)
         return self._map_decision_to_next_action(decision_text)
 
@@ -373,6 +374,19 @@ class WorkspaceHistoryController:
         if self._build_decision_summary(prompt) != "Reuse as-is":
             return None
         return "Validate before reuse"
+
+    def _build_missing_evidence_next_action(self, prompt: Prompt) -> str | None:
+        """Translate limited-evidence inspect gaps into one compact operator-facing action."""
+        missing_evidence_reason = self._build_missing_evidence_reason(prompt)
+        if missing_evidence_reason == "Evidence: only one run available":
+            return "Validate before reuse"
+        if missing_evidence_reason == "Evidence: no comparable baseline yet":
+            return "Run another version before comparing"
+        if missing_evidence_reason == "Evidence: missing rating for comparison":
+            return "Add ratings before comparing"
+        if missing_evidence_reason == "Evidence: missing duration for comparison":
+            return "Run again before comparing"
+        return None
 
     def _build_run_recommendation_summary(self, prompt: Prompt) -> str | None:
         entries = self._list_execution_history(prompt, limit=2)
