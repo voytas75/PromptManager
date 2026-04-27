@@ -4,7 +4,11 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ## [Unreleased]
 
+## [0.22.24] - 2026-04-27
+
 ### Added
+
+- Closed the current PromptManager delivery cycle as release `0.22.24`, consolidating the recent bounded inspect/detail, run-evidence, workspace-handoff, CLI-parity, and roadmap/SSOT sync work into one shipped version.
 
 - Added one bounded **Recommended Next Action Cue v1** in the shared inspect/detail flow so prompts now surface a compact `Recommended next action:` cue derived only from existing lineage and run evidence, helping operators decide whether to reuse, refine, fork, or compare without adding new persistence, screens, or workflow branches.
 
