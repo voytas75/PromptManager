@@ -102,6 +102,7 @@ class PromptActionsController:
         )
         fork_action.setToolTip("Create a fork linked to this prompt and open it for editing.")
         similar_action.setToolTip("Show recommendation results for prompts similar to this one.")
+        execute_action.setToolTip("Run this prompt immediately using its stored text.")
 
         if prompt is None:
             for action in (

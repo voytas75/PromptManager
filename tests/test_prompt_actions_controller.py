@@ -557,6 +557,49 @@ def test_show_context_menu_explains_duplicate_prompt_action(
     )
 
 
+def test_show_context_menu_explains_execute_prompt_action(
+    qt_app: QApplication,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Context menu should explain that Execute Prompt runs the selected prompt immediately."""
+    _MenuStub.instances.clear()
+    monkeypatch.setattr("gui.prompt_actions_controller.QMenu", _MenuStub)
+    query_input = QPlainTextEdit()
+    list_view = QListView()
+    status_messages: list[tuple[str, int]] = []
+    toast_messages: list[tuple[str, int]] = []
+    prompt = _build_prompt(context="Prompt body to reuse", description="Fallback description")
+
+    controller = PromptActionsController(
+        parent=QWidget(),
+        model=cast("PromptListModel", object()),
+        list_view=list_view,
+        query_input=query_input,
+        layout_state=cast("WindowStateManager", _LayoutStateStub()),
+        workspace_view=None,
+        execution_controller_supplier=lambda: object(),
+        current_prompt_supplier=lambda: prompt,
+        edit_callback=lambda: None,
+        duplicate_callback=lambda _prompt: None,
+        fork_callback=lambda _prompt: None,
+        similar_callback=lambda _prompt: None,
+        status_callback=lambda message, duration: status_messages.append((message, duration)),
+        error_callback=lambda _title, _message: None,
+        toast_callback=lambda message, duration: toast_messages.append((message, duration)),
+        usage_logger=IntentUsageLogger(enabled=False),
+    )
+
+    controller.show_context_menu(list_view.viewport().rect().center())
+    qt_app.processEvents()
+
+    assert len(_MenuStub.instances) == 1
+    actions = {action.text: action for action in _MenuStub.instances[0].actions}
+    assert actions["Execute Prompt"].enabled is True
+    assert actions["Execute Prompt"].tooltip == (
+        "Run this prompt immediately using its stored text."
+    )
+
+
 def test_show_context_menu_uses_shared_copy_prompt_label(
     qt_app: QApplication,
     monkeypatch: pytest.MonkeyPatch,
