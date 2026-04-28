@@ -119,10 +119,32 @@ def test_prompt_list_model_prefers_matching_scenario_over_non_matching_descripti
     )
 
     assert preview == "Use after rollback review for release readiness decisions."
+    assert index.data(PromptListModel.MatchReasonRole) == "Matched in scenario"
     assert [preview[start : start + length].lower() for start, length in preview_spans] == [
         "rollback",
         "review",
     ]
+
+
+def test_prompt_list_model_reports_title_match_reason_when_title_is_visible_match(
+    qt_app: QApplication,
+) -> None:
+    """A title-only active search should expose one bounded title match reason cue."""
+    prompt = _build_prompt(
+        description="Reusable incident handoff prompt for routine operator transitions.",
+        scenarios=["Use after on-call handoff cleanup."],
+        source="ops notebook",
+    )
+    model = PromptListModel([prompt])
+    model.set_active_search_text("incident")
+
+    index = model.index(0, 0)
+
+    assert index.data(Qt.ItemDataRole.DisplayRole) == "Incident triage (Ops)"
+    assert index.data(PromptListModel.PreviewRole) == (
+        "Reusable incident handoff prompt for routine operator transitions."
+    )
+    assert index.data(PromptListModel.MatchReasonRole) == "Matched in title"
 
 
 def test_prompt_list_model_keeps_matching_description_over_matching_scenario_for_active_search(

@@ -6,6 +6,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Added
 
+- Added one bounded retrieval/discovery confidence pass on the existing prompt-list model seam so active-search rows can now expose `Matched in scenario` for promoted matching scenario previews and `Matched in title` for visible title-only match paths, while preserving the earlier `Matched in source` cue and keeping ranking, persistence, and CLI/headless behavior unchanged by design.
 - Added one focused retrieval/discovery ledger closure for the prompt-list guard pack by reconciling the stale roadmap `pending` marker to the current tested reality: the intended reset-on-clear, inactive-search no-op, prompt-list cue/preview parity, and state-specific negative guards are already covered by the existing prompt-list model/coordinator regression set, so no extra runtime seam or CLI/headless expansion was introduced.
 - Added one bounded retrieval/discovery reason cue on the existing prompt-list model seam so active-search rows that promote a credible source preview can now expose `Matched in source` via `PromptListModel.MatchReasonRole`, improving search-result legibility without changing ranking, persistence, or widening into a new retrieval workflow.
 

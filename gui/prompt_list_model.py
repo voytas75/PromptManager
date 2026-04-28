@@ -15,7 +15,14 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QAbstractListModel, QModelIndex, QPersistentModelIndex, Qt
 
-from .prompt_preview import PREVIEW_MAX_LENGTH, build_prompt_preview
+from .prompt_preview import (
+    PREVIEW_MAX_LENGTH,
+    build_prompt_preview,
+    build_prompt_source_cue,
+    flatten_preview_text,
+    is_credible_preview_text,
+    truncate_preview_text,
+)
 
 if TYPE_CHECKING:  # pragma: no cover - typing helper
     from collections.abc import Iterable, Sequence
@@ -117,9 +124,29 @@ class PromptListModel(QAbstractListModel):
         preview = self._preview_text(prompt)
         if not preview:
             return None
-        if preview.startswith("Source: "):
+        if preview == build_prompt_source_cue(prompt.source):
             return "Matched in source"
+        if preview in self._matching_scenario_previews(prompt):
+            return "Matched in scenario"
+        if self._match_ranges(self._display_text(prompt)):
+            return "Matched in title"
         return None
+
+    def _matching_scenario_previews(self, prompt: Prompt) -> tuple[str, ...]:
+        """Return truncated scenario previews that match the active search terms."""
+        if not self._active_search_terms:
+            return ()
+
+        previews: list[str] = []
+        for scenario in prompt.scenarios:
+            normalized = flatten_preview_text(str(scenario))
+            if not normalized or not is_credible_preview_text(normalized):
+                continue
+            lowered = normalized.casefold()
+            if not any(term in lowered for term in self._active_search_terms):
+                continue
+            previews.append(truncate_preview_text(normalized))
+        return tuple(previews)
 
     @staticmethod
     def _display_text(prompt: Prompt) -> str:
