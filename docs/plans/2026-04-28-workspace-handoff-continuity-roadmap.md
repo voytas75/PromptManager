@@ -1,6 +1,6 @@
 # Workspace Handoff Continuity Roadmap
 
-Status: active
+Status: done
 Owner: Wojtek / Prompt Manager Team
 Updated: 2026-04-28
 
