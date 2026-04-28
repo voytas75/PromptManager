@@ -97,6 +97,7 @@ class PromptActionsController:
         execute_context_action = menu.addAction("Execute as Context…")
         copy_action = menu.addAction("Copy Prompt")
         description_action = menu.addAction("Show Description")
+        fork_action.setToolTip("Create a fork linked to this prompt and open it for editing.")
 
         if prompt is None:
             for action in (
