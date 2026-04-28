@@ -93,6 +93,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 - Added focused regression coverage for active-search scenario-priority preview behavior, including matching-scenario promotion over a non-matching description, unchanged source-match precedence, matching-description retention, and preview highlight spans on the chosen scenario line.
 - Added focused regression coverage for Favorites v1 across prompt-model serialization, repository persistence, shared detail toggle wiring, and favorites-only list filtering while keeping the slice local to prompt storage, detail action, and list filtering.
+- Added one bounded **Favorites-only visibility v1** refinement on the existing filter-panel seam so `Favorites only` now keeps an always-visible helper cue (`Favorites filter: all prompts` / `Favorites filter: favorites only`) without changing favorites filtering semantics, ranking, or persistence.
 - Added focused regression coverage for Single-Turn User Prefix Strip v1, including stripped inline/multiline `User:` cases and unchanged bare, transcript-like, `Assistant:`, and `System:` inputs.
 - Added focused regression coverage for Body-Lead Preview Fallback v1, including body-fallback rendering when metadata is weak, unchanged stronger preview-priority paths, weak-body silence, and similar-match row reuse through the shared preview helper.
 - Added focused regression coverage for template-preview variable state styling, including missing, schema-invalid, and corrected-neutral transitions at the existing widget seam.

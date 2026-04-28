@@ -143,3 +143,15 @@ def test_tag_filter_panel_active_search_disables_sort_with_visible_continuity_cu
     assert "Sort locked during search" in visible_labels
     assert presenter.refresh_calls == 0
     assert layout_controller.persist_calls == 0
+
+
+def test_favorites_filter_panel_shows_active_visibility_cue(qt_app) -> None:
+    """Favorites-only mode should expose a visible active-state cue on the filter seam."""
+    panel = _build_panel()
+
+    panel.set_favorites_only(True)
+    QApplication.processEvents()
+
+    visible_labels = [label.text() for label in panel.findChildren(QLabel)]
+
+    assert "Favorites filter: favorites only" in visible_labels

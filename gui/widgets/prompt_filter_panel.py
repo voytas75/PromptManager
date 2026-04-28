@@ -75,8 +75,12 @@ class PromptFilterPanel(QWidget):
         self._sort_visibility_label.setObjectName("sortFilterVisibilityLabel")
 
         self._favorites_only_checkbox = QCheckBox("Favorites only", self)
-        self._favorites_only_checkbox.toggled.connect(self.filters_changed)  # type: ignore[arg-type]
+        self._favorites_only_checkbox.toggled.connect(self._handle_favorites_toggled)  # type: ignore[arg-type]
         layout.addWidget(self._favorites_only_checkbox)
+
+        self._favorites_visibility_label = QLabel("Favorites filter: all prompts", self)
+        self._favorites_visibility_label.setObjectName("favoritesFilterVisibilityLabel")
+        layout.addWidget(self._favorites_visibility_label)
 
         layout.addWidget(QLabel("Quality ≥", self))
         self._quality_spin = QDoubleSpinBox(self)
@@ -161,6 +165,7 @@ class PromptFilterPanel(QWidget):
             self._favorites_only_checkbox.setChecked(bool(value))
         finally:
             self._favorites_only_checkbox.blockSignals(previous)
+        self._update_favorites_visibility_label()
 
     def min_quality(self) -> float:
         """Return the minimum quality threshold."""
@@ -196,12 +201,22 @@ class PromptFilterPanel(QWidget):
         self._update_tag_visibility_label()
         self.filters_changed.emit()
 
+    def _handle_favorites_toggled(self) -> None:
+        self._update_favorites_visibility_label()
+        self.filters_changed.emit()
+
     def _update_tag_visibility_label(self) -> None:
         active_tag = self.tag_value()
         if active_tag is None:
             self._tag_visibility_label.setText("Tag filter: all tags")
             return
         self._tag_visibility_label.setText(f"Tag filter: {active_tag}")
+
+    def _update_favorites_visibility_label(self) -> None:
+        if self.favorites_only():
+            self._favorites_visibility_label.setText("Favorites filter: favorites only")
+            return
+        self._favorites_visibility_label.setText("Favorites filter: all prompts")
 
     def _update_sort_visibility_label(self) -> None:
         if self.is_sort_enabled():
