@@ -186,7 +186,7 @@ Constraint:
 
 ### Slice 2 — Favorite toggle continuity hint probe
 
-**Status:** proposed
+**Status:** implemented
 
 **Intent:** Sprawdzić, czy favorite toggle w detail view potrzebuje jednego małego continuity hintu pomagającego operatorowi zrozumieć wpływ na późniejszy retrieval/list filtering, ale bez rozbudowy w nowy workflow.
 
@@ -201,6 +201,18 @@ Constraint:
 - Maybe modify: `gui/main_window_handlers.py`
 - Modify: nearest favorites-related tests under `tests/`
 - Maybe modify: `docs/CHANGELOG.md`
+
+**Implemented notes:**
+- refined the existing detail-view favorite tooltip to make the retrieval/list impact explicit,
+- add-state wording now points to later discovery through `Favorites only`,
+- kept favorite persistence, button behavior, and status semantics unchanged.
+
+**Verified:**
+- RED: `QT_QPA_PLATFORM=offscreen .venv/bin/pytest tests/test_prompt_detail_widget.py::test_prompt_detail_widget_toggles_favorite_action_from_detail_flow -q` -> failed as expected before implementation,
+- GREEN: same targeted test -> `1 passed`,
+- smoke: `QT_QPA_PLATFORM=offscreen .venv/bin/pytest tests/test_prompt_detail_widget.py tests/test_prompt_filter_panel.py -q` -> `39 passed`,
+- lint: `.venv/bin/ruff check gui/widgets/prompt_detail_widget.py tests/test_prompt_detail_widget.py` -> `All checks passed!`,
+- syntax: `python -m py_compile gui/widgets/prompt_detail_widget.py tests/test_prompt_detail_widget.py` -> OK.
 
 ### Slice 3 — Favorites reset/default clarity guard
 

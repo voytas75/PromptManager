@@ -347,7 +347,7 @@ def test_prompt_detail_widget_toggles_favorite_action_from_detail_flow(
     assert widget._favorite_button.text() == "Add Favorite"  # noqa: SLF001
     assert (
         widget._favorite_button.toolTip()
-        == "Add this prompt to favorites for faster retrieval later."
+        == "Add this prompt to favorites so it stays easy to find later with Favorites only."
     )  # noqa: SLF001
 
     widget._favorite_button.click()  # noqa: SLF001

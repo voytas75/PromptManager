@@ -502,7 +502,9 @@ class PromptDetailWidget(QWidget):
         self._favorite_button.setToolTip(
             "Remove this prompt from favorites."
             if prompt.is_favorite
-            else "Add this prompt to favorites for faster retrieval later."
+            else (
+                "Add this prompt to favorites so it stays easy to find later with Favorites only."
+            )
         )
         self._apply_reuse_tooltips(prompt)
         workspace_handoff_cue = self._resolve_workspace_handoff_cue(prompt)
