@@ -110,7 +110,7 @@ python -m main --no-gui --print-settings
 uv run python -m main --no-gui --print-settings
 ```
 
-### 4. Add a prompt from JSON, inline fields, or stdin (optional)
+### 4. Add a prompt from JSON, inline fields, stdin, or an input file (optional)
 
 If you want to seed the local catalog from a JSON file or a directory of JSON files:
 
@@ -125,6 +125,12 @@ If you already have one prompt payload as a JSON string:
 python -m main --no-gui prompt-add \
   --json '{"name":"JSON Diagnostics Helper","description":"Guide a calm first-pass diagnosis.","context":"Summarise symptoms, likely causes, and next checks."}' \
   --dry-run
+```
+
+If you already wrote the single-prompt payload to a file and want an explicit non-positional alias:
+
+```bash
+python -m main --no-gui prompt-add --input-file examples/prompt-import-example.json --dry-run
 ```
 
 If you want to pipe a JSON payload from another command or file:

@@ -878,6 +878,89 @@ def test_catalog_export_command(
     assert exported
 
 
+def test_prompt_add_command_accepts_json_file_alias(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    payload_path = tmp_path / "prompt-payload.json"
+    payload_path.write_text(
+        json.dumps(
+            {
+                "name": "JSON File Diagnostics Helper",
+                "description": "Guide a calm first-pass diagnosis.",
+                "context": "Summarise symptoms, likely causes, and next checks.",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "prompt-manager",
+            "prompt-add",
+            "--input-file",
+            str(payload_path),
+            "--dry-run",
+        ],
+    )
+    manager = _DummyManager()
+    _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
+    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "Catalog import preview" in output
+    assert "added=1" in output
+    assert manager.closed is True
+
+
+
+def test_prompt_add_command_rejects_path_and_input_file_mix(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    catalog_path = tmp_path / "prompt.json"
+    catalog_path.write_text(
+        json.dumps(
+            {
+                "name": "Diagnostics Helper",
+                "description": "Assist with debugging failing CI jobs.",
+            }
+        ),
+        encoding="utf-8",
+    )
+    alias_path = tmp_path / "prompt-payload.json"
+    alias_path.write_text(
+        json.dumps(
+            {
+                "name": "JSON File Diagnostics Helper",
+                "description": "Guide a calm first-pass diagnosis.",
+                "context": "Summarise symptoms, likely causes, and next checks.",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "prompt-manager",
+            "prompt-add",
+            str(catalog_path),
+            "--input-file",
+            str(alias_path),
+        ],
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        main.main()
+
+    assert excinfo.value.code == 2
+
+
+
 def test_prompt_add_command_accepts_json_string(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

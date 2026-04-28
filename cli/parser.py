@@ -79,11 +79,13 @@ def _normalise_prompt_add_args(args: argparse.Namespace, parser: argparse.Argume
     has_inline = any(value not in (None, "") for value in inline_fields)
     path_value = getattr(args, "path", None)
     json_value = getattr(args, "json_payload", None)
+    input_file_value = getattr(args, "input_file", None)
     use_stdin = bool(getattr(args, "from_stdin", False))
     sources = [
         ("path", path_value is not None),
         ("inline", has_inline),
         ("json", json_value not in (None, "")),
+        ("input-file", input_file_value is not None),
         ("stdin", use_stdin),
     ]
     selected_sources = [name for name, enabled in sources if enabled]
@@ -91,12 +93,12 @@ def _normalise_prompt_add_args(args: argparse.Namespace, parser: argparse.Argume
     if len(selected_sources) == 0:
         parser.error(
             "prompt-add requires exactly one input source: PATH, inline fields, "
-            "--json, or --from-stdin."
+            "--json, --input-file, or --from-stdin."
         )
     if len(selected_sources) > 1:
         parser.error(
             "prompt-add accepts exactly one input source: PATH, inline fields, "
-            "--json, or --from-stdin."
+            "--json, --input-file, or --from-stdin."
         )
     if has_inline:
         if not getattr(args, "name", None):
@@ -112,6 +114,9 @@ def _normalise_prompt_add_args(args: argparse.Namespace, parser: argparse.Argume
     if json_value not in (None, ""):
         payload = _parse_json_string_payload(str(json_value), parser)
         args.path = _write_temp_prompt_payload(payload)
+        return
+    if input_file_value is not None:
+        args.path = Path(input_file_value).expanduser()
         return
     if use_stdin:
         payload = _read_stdin_json_payload(parser)
@@ -243,6 +248,12 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default=None,
         help="Prompt JSON payload passed directly on the command line.",
+    )
+    prompt_add_parser.add_argument(
+        "--input-file",
+        type=Path,
+        default=None,
+        help="Read a prompt JSON payload from a file path without using positional PATH.",
     )
     prompt_add_parser.add_argument(
         "--from-stdin",
