@@ -228,9 +228,22 @@ Constraint:
 
 ### Slice 4 — Filter cue locality / guard closure
 
-**Status:** proposed
+**Status:** implemented
 
 **Intent:** Domknąć filter-clarity cycle guardami reset/locality i jasno oznaczyć, czy filter cues pozostają GUI-local by design.
+
+**Implemented:**
+- extended the existing GUI-local parity guard suite in `tests/test_retrieval_cues_parity.py` so the filter-panel helper cues now have an explicit locality test beside the earlier prompt-list retrieval cue guard,
+- confirmed `Tag filter: ...` and `Sort locked during search` remain widget-local labels on `PromptFilterPanel`,
+- confirmed these filter cues do not surface as shared analytics/headless fields like `decision_summary`, `next_action_summary`, or `freshness_summary`,
+- kept the slice test-only because the runtime seam already behaved correctly and no CLI/headless churn was justified.
+
+**Verification:**
+- RED probe first: `QT_QPA_PLATFORM=offscreen .venv/bin/pytest tests/test_retrieval_cues_parity.py -q` -> initial error (`fixture 'qtbot' not found`), then the focused guard was rewritten to use a local `QApplication` fixture and became a valid locality probe,
+- targeted locality suite: `QT_QPA_PLATFORM=offscreen .venv/bin/pytest tests/test_retrieval_cues_parity.py -q` -> `2 passed`,
+- nearby smoke: `QT_QPA_PLATFORM=offscreen .venv/bin/pytest tests/test_prompt_filter_panel.py tests/test_prompt_list_model.py tests/test_retrieval_cues_parity.py -q` -> `23 passed`,
+- lint/format: `ruff check tests/test_retrieval_cues_parity.py && ruff format tests/test_retrieval_cues_parity.py --check` -> `All checks passed!`,
+- syntax: `python -m py_compile tests/test_retrieval_cues_parity.py gui/widgets/prompt_filter_panel.py` -> `OK`.
 
 **Good shape:**
 - verify the cues stay inside the GUI filter-panel seam,
