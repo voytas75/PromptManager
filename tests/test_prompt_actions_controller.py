@@ -378,8 +378,7 @@ def test_show_prompt_description_surfaces_guidance_when_description_is_missing(
     _, title, message = captured_calls[0]
     assert title == "No description available"
     assert (
-        message
-        == "The selected prompt does not have a description yet. "
+        message == "The selected prompt does not have a description yet. "
         "Inspect the prompt body or add a short description for faster reuse."
     )
 
