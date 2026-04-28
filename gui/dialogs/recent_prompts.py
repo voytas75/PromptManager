@@ -84,6 +84,9 @@ class RecentPromptsDialog(QDialog):
             item = QListWidgetItem(prompt.name, self._list_widget)
             item.setData(Qt.ItemDataRole.UserRole, str(prompt.id))
             item.setToolTip(self._build_tooltip(prompt))
+            row_widget = self._build_row_widget(prompt)
+            item.setSizeHint(row_widget.sizeHint())
+            self._list_widget.setItemWidget(item, row_widget)
 
         if self._prompts:
             self._list_widget.setCurrentRow(0)
@@ -114,6 +117,26 @@ class RecentPromptsDialog(QDialog):
             return
         self._selected_prompt_id = self._prompts[row].id
         self.accept()
+
+    @staticmethod
+    def _build_row_widget(prompt: Prompt) -> QWidget:
+        """Return a compact two-line widget for one recent prompt row."""
+        row_widget = QWidget()
+        layout = QVBoxLayout(row_widget)
+        layout.setContentsMargins(8, 6, 8, 6)
+        layout.setSpacing(2)
+
+        title = QLabel(prompt.name, row_widget)
+        metadata = QLabel(
+            f"Modified {RecentPromptsDialog._format_timestamp(prompt.last_modified)} • Category: "
+            f"{prompt.category.strip() or 'Uncategorised'}",
+            row_widget,
+        )
+        metadata.setObjectName("recentPromptMetadata")
+
+        layout.addWidget(title)
+        layout.addWidget(metadata)
+        return row_widget
 
     @staticmethod
     def _build_tooltip(prompt: Prompt) -> str:
