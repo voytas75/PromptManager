@@ -89,10 +89,15 @@ class _MenuAction:
     def __init__(self, text: str) -> None:
         self.text = text
         self.enabled = True
+        self.tooltip = ""
 
     def setEnabled(self, enabled: bool) -> None:
         """Store enabled state like a Qt action."""
         self.enabled = enabled
+
+    def setToolTip(self, text: str) -> None:  # noqa: N802 - Qt style API
+        """Store tooltip text like a Qt action."""
+        self.tooltip = text
 
 
 class _MenuStub:
@@ -376,6 +381,50 @@ def test_show_prompt_description_surfaces_guidance_when_description_is_missing(
         message
         == "The selected prompt does not have a description yet. "
         "Inspect the prompt body or add a short description for faster reuse."
+    )
+
+
+def test_show_context_menu_explains_disabled_execute_as_context_without_body(
+    qt_app: QApplication,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Context menu should explain why Execute as Context is disabled for bodyless prompts."""
+    _MenuStub.instances.clear()
+    monkeypatch.setattr("gui.prompt_actions_controller.QMenu", _MenuStub)
+    query_input = QPlainTextEdit()
+    list_view = QListView()
+    status_messages: list[tuple[str, int]] = []
+    toast_messages: list[tuple[str, int]] = []
+    prompt = _build_prompt(context="   ", description="Description fallback")
+
+    controller = PromptActionsController(
+        parent=QWidget(),
+        model=cast("PromptListModel", object()),
+        list_view=list_view,
+        query_input=query_input,
+        layout_state=cast("WindowStateManager", _LayoutStateStub()),
+        workspace_view=None,
+        execution_controller_supplier=lambda: object(),
+        current_prompt_supplier=lambda: prompt,
+        edit_callback=lambda: None,
+        duplicate_callback=lambda _prompt: None,
+        fork_callback=lambda _prompt: None,
+        similar_callback=None,
+        status_callback=lambda message, duration: status_messages.append((message, duration)),
+        error_callback=lambda _title, _message: None,
+        toast_callback=lambda message, duration: toast_messages.append((message, duration)),
+        usage_logger=IntentUsageLogger(enabled=False),
+    )
+
+    controller.show_context_menu(list_view.viewport().rect().center())
+    qt_app.processEvents()
+
+    assert len(_MenuStub.instances) == 1
+    actions = {action.text: action for action in _MenuStub.instances[0].actions}
+    assert actions["Execute as Context…"].enabled is False
+    assert actions["Execute as Context…"].tooltip == (
+        "Execute as Context requires a stored prompt body. "
+        "Add prompt text before using this action."
     )
 
 

@@ -116,6 +116,15 @@ class PromptActionsController:
             execute_action.setEnabled(can_execute)
             has_context_body = bool((prompt.context or "").strip())
             execute_context_action.setEnabled(bool(controller) and has_context_body)
+            if not has_context_body:
+                execute_context_action.setToolTip(
+                    "Execute as Context requires a stored prompt body. "
+                    "Add prompt text before using this action."
+                )
+            else:
+                execute_context_action.setToolTip(
+                    "Run the stored prompt body as context for an ad-hoc task."
+                )
             if not (prompt.context or prompt.description):
                 copy_action.setEnabled(False)
             if not (prompt.description and prompt.description.strip()):
