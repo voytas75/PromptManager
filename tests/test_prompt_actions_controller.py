@@ -233,7 +233,7 @@ def test_open_prompt_in_workspace_surfaces_stale_validation_handoff_hint(
 
 
 def test_open_prompt_in_workspace_seeds_text_without_running(qt_app: QApplication) -> None:
-    """Workspace handoff should populate the editor and avoid execution."""
+    """Workspace handoff should populate the editor and keep one bounded generic next step."""
     query_input = QPlainTextEdit()
     workspace_view = WorkspaceViewController(
         query_input,
@@ -264,12 +264,16 @@ def test_open_prompt_in_workspace_seeds_text_without_running(qt_app: QApplicatio
     controller.open_prompt_in_workspace(prompt)
     qt_app.processEvents()
 
+    generic_hint = "Prompt ready in workspace. Run current prompt to validate before refining."
+
     assert query_input.toPlainText() == "Prompt body to reuse"
     assert execution_calls == 0
-    assert status_messages == [
-        ("Prompt ready in workspace. Run current prompt to validate before refining.", 3000)
-    ]
+    assert status_messages == [(generic_hint, 3000)]
     assert toast_messages == [("Opened 'Reusable prompt' in the workspace.", 2500)]
+    assert "workspace" in generic_hint.lower()
+    assert "validate" in generic_hint.lower()
+    assert "refining" in generic_hint.lower()
+    assert "stale" not in generic_hint.lower()
 
 
 def test_copy_prompt_to_clipboard_copies_the_prompt_body(
