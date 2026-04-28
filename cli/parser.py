@@ -57,6 +57,26 @@ def parse_args() -> argparse.Namespace:
         help="Include inactive prompts in the export payload.",
     )
 
+    import_parser = subparsers.add_parser(
+        "catalog-import",
+        help="Create or update prompts from a JSON catalogue file or directory.",
+    )
+    import_parser.add_argument(
+        "path",
+        type=Path,
+        help="Source catalogue path (.json file or directory of JSON files).",
+    )
+    import_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview the import summary without writing any changes.",
+    )
+    import_parser.add_argument(
+        "--no-overwrite",
+        action="store_true",
+        help="Skip updates when a prompt with the same name already exists.",
+    )
+
     suggest_parser = subparsers.add_parser(
         "suggest",
         help="Run semantic suggestions for a given query using the configured embedding backend.",

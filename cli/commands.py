@@ -29,7 +29,9 @@ from core import (
     PromptManagerError,
     TokenUsageTotals,
     build_analytics_snapshot,
+    diff_prompt_catalog,
     export_prompt_catalog,
+    import_prompt_catalog,
     snapshot_dataset_rows,
 )
 from models.prompt_chain_model import chain_from_payload
@@ -124,6 +126,49 @@ def run_catalog_export(
     message = f"Prompt catalogue exported to {resolved} ({fmt})"
     print_and_log(logger, logging.INFO, message)
     return 0
+
+
+def run_catalog_import(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    if manager is None:
+        raise ValueError("Prompt Manager is required for catalog import.")
+    input_path = Path(args.path).expanduser()
+    overwrite = not bool(getattr(args, "no_overwrite", False))
+    if getattr(args, "dry_run", False):
+        diff_fn = _get_main_callable("diff_prompt_catalog", diff_prompt_catalog)
+        try:
+            diff = diff_fn(manager, input_path, overwrite=overwrite)
+        except Exception as exc:  # pragma: no cover - surfaced to CLI
+            message = f"Failed to preview catalogue import: {exc}"
+            print_and_log(logger, logging.ERROR, message)
+            return 6
+        print_and_log(
+            logger,
+            logging.INFO,
+            "Catalog import preview: "
+            f"added={diff.added} updated={diff.updated} "
+            f"skipped={diff.skipped} unchanged={diff.unchanged}",
+        )
+        return 0
+
+    import_fn = _get_main_callable("import_prompt_catalog", import_prompt_catalog)
+    try:
+        result = import_fn(manager, input_path, overwrite=overwrite)
+    except Exception as exc:  # pragma: no cover - surfaced to CLI
+        message = f"Failed to import catalogue: {exc}"
+        print_and_log(logger, logging.ERROR, message)
+        return 6
+    print_and_log(
+        logger,
+        logging.INFO,
+        "Catalog import applied: "
+        f"added={result.added} updated={result.updated} "
+        f"skipped={result.skipped} errors={result.errors}",
+    )
+    return 0 if result.errors == 0 else 6
 
 
 def run_usage_report(
@@ -868,6 +913,7 @@ def run_suggest(
 
 COMMAND_SPECS: dict[str | None, CommandSpec] = {
     "catalog-export": CommandSpec(run_catalog_export),
+    "catalog-import": CommandSpec(run_catalog_import),
     "suggest": CommandSpec(run_suggest),
     "usage-report": CommandSpec(run_usage_report),
     "history-analytics": CommandSpec(run_history_analytics),

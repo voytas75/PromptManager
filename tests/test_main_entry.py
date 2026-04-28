@@ -36,6 +36,7 @@ from core.history_tracker import (
 )
 from core.intent_classifier import IntentLabel, IntentPrediction
 from core.prompt_manager import PromptManagerError
+from models.prompt_model import Prompt
 
 
 def _patch_main(monkeypatch: pytest.MonkeyPatch, name: str, value: object) -> None:
@@ -67,9 +68,19 @@ class _DummySettings(SimpleNamespace):
         )
 
 
+class _DummyRepository:
+    def __init__(self) -> None:
+        self._store: list[object] = []
+
+    def list(self, limit: int | None = None) -> list[object]:
+        values = list(self._store)
+        return values if limit is None else values[:limit]
+
+
 class _DummyManager:
     def __init__(self) -> None:
         self.closed = False
+        self.repository = _DummyRepository()
         self.suggestion_response: object | None = None
         self.reembed_result: tuple[int, int] = (0, 0)
         self.reembed_error: Exception | None = None
@@ -129,6 +140,17 @@ class _DummyManager:
         if since is None:
             return self.token_usage_totals_all
         return self.token_usage_totals_window
+
+    def create_prompt(self, prompt: object, embedding=None) -> object:
+        self.repository._store.append(prompt)
+        return prompt
+
+    def update_prompt(self, prompt: object, embedding=None) -> object:
+        for index, existing in enumerate(self.repository._store):
+            if getattr(existing, "id", None) == getattr(prompt, "id", None):
+                self.repository._store[index] = prompt
+                return prompt
+        raise KeyError(getattr(prompt, "id", None))
 
 
 def _build_execution_analytics(total_runs: int = 5) -> ExecutionAnalytics:
@@ -747,6 +769,18 @@ def test_main_entrypoint_guard_executes(
     dummy_manager = _DummyManager()
     core_stub.build_prompt_manager = lambda settings: dummy_manager
     core_stub.export_prompt_catalog = lambda *args, **kwargs: Path("export.json")
+    core_stub.diff_prompt_catalog = lambda *args, **kwargs: SimpleNamespace(
+        added=0,
+        updated=0,
+        skipped=0,
+        unchanged=0,
+    )
+    core_stub.import_prompt_catalog = lambda *args, **kwargs: SimpleNamespace(
+        added=0,
+        updated=0,
+        skipped=0,
+        errors=0,
+    )
     core_stub.PromptManagerError = RuntimeError
     core_stub.build_analytics_snapshot = lambda *args, **kwargs: SimpleNamespace()
     core_stub.snapshot_dataset_rows = lambda *args, **kwargs: []
@@ -842,6 +876,150 @@ def test_catalog_export_command(
     assert "exported" in output
     assert manager.closed is True
     assert exported
+
+
+def test_catalog_import_command_dry_run(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    catalog_path = tmp_path / "prompt.json"
+    catalog_path.write_text(
+        json.dumps(
+            {
+                "name": "Diagnostics Helper",
+                "description": "Assist with debugging failing CI jobs.",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "catalog-import", str(catalog_path), "--dry-run"],
+    )
+    manager = _DummyManager()
+    _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
+    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "Catalog import preview" in output
+    assert "added=1" in output
+    assert manager.closed is True
+
+
+def test_catalog_import_command_applies_changes(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    catalog_path = tmp_path / "prompt.json"
+    catalog_path.write_text(
+        json.dumps(
+            {
+                "name": "Diagnostics Helper",
+                "description": "Assist with debugging failing CI jobs.",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "catalog-import", str(catalog_path)],
+    )
+    manager = _DummyManager()
+    _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
+    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "Catalog import applied" in output
+    assert "added=1" in output
+    assert manager.closed is True
+
+
+def test_catalog_import_command_no_overwrite_skips_existing(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    catalog_path = tmp_path / "prompt.json"
+    catalog_path.write_text(
+        json.dumps(
+            {
+                "name": "Diagnostics Helper",
+                "description": "Incoming replacement",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "catalog-import", str(catalog_path), "--no-overwrite"],
+    )
+    manager = _DummyManager()
+    manager.create_prompt(
+        Prompt(
+            id=uuid.uuid4(),
+            name="Diagnostics Helper",
+            description="Existing prompt",
+            category="General",
+            tags=[],
+        )
+    )
+    _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
+    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "Catalog import applied" in output
+    assert "skipped=1" in output
+    stored = manager.repository.list()[0]
+    assert stored.description == "Existing prompt"
+    assert manager.closed is True
+
+
+def test_catalog_import_command_returns_error_when_importer_reports_failures(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    catalog_path = tmp_path / "prompt.json"
+    catalog_path.write_text(
+        json.dumps(
+            {
+                "name": "Diagnostics Helper",
+                "description": "Assist with debugging failing CI jobs.",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "catalog-import", str(catalog_path)],
+    )
+    manager = _DummyManager()
+    _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
+    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
+
+    def _import_stub(*args: object, **kwargs: object):
+        return SimpleNamespace(added=0, updated=0, skipped=0, errors=1)
+
+    _patch_main(monkeypatch, "import_prompt_catalog", _import_stub)
+
+    exit_code = main.main()
+
+    assert exit_code == 6
+    output = capsys.readouterr().out
+    assert "Catalog import applied" in output
+    assert "errors=1" in output
+    assert manager.closed is True
 
 
 def test_reembed_command_succeeds(

@@ -110,7 +110,18 @@ python -m main --no-gui --print-settings
 uv run python -m main --no-gui --print-settings
 ```
 
-### 4. Launch the app
+### 4. Import prompts from JSON (optional)
+
+If you want to seed the local catalog from a JSON file or a directory of JSON files:
+
+```bash
+python -m main --no-gui catalog-import path/to/prompt.json --dry-run
+python -m main --no-gui catalog-import path/to/prompt.json
+```
+
+`catalog-import` reuses the existing catalogue import flow, so a single JSON object can create one prompt and repeated imports update prompts with the same name by default. Use `--no-overwrite` if you want existing prompts to be kept unchanged.
+
+### 5. Launch the app
 
 ```bash
 python -m main
