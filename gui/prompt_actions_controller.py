@@ -98,6 +98,7 @@ class PromptActionsController:
         copy_action = menu.addAction("Copy Prompt")
         description_action = menu.addAction("Show Description")
         fork_action.setToolTip("Create a fork linked to this prompt and open it for editing.")
+        similar_action.setToolTip("Show recommendation results for prompts similar to this one.")
 
         if prompt is None:
             for action in (
