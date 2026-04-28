@@ -15,6 +15,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 - Added one bounded execute-as-context empty-state clarity pass on the existing `Execute as Context…` action so prompts without a stored body now keep that action disabled but expose a compact tooltip explaining the requirement (`Execute as Context requires a stored prompt body. Add prompt text before using this action.`), improving reuse legibility without changing execution behavior, storage, or workflow structure.
 - Added one bounded fork-action clarity pass on the existing `Fork Prompt` action so the prompt context menu now exposes a compact tooltip (`Create a fork linked to this prompt and open it for editing.`), making the lineage-preserving reuse path easier to distinguish from plain duplication without changing fork behavior, storage, or editor flow.
 - Added one bounded similar-prompts action clarity pass on the existing `Similar Prompts` action so the prompt context menu now exposes a compact tooltip (`Show recommendation results for prompts similar to this one.`), making the recommendation path easier to distinguish from ordinary search without changing callback behavior, ranking, or presenter flow.
+- Added one bounded duplicate-prompt action clarity pass on the existing `Duplicate Prompt` action so the prompt context menu now exposes a compact tooltip (`Create an editable copy of this prompt without fork lineage.`), making plain duplication easier to distinguish from forking without changing callback behavior, editor flow, or storage.
 
 ### Changed
 
