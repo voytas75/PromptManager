@@ -283,6 +283,80 @@ def test_open_prompt_in_workspace_seeds_text_without_running(qt_app: QApplicatio
     assert "stale" not in generic_hint.lower()
 
 
+def test_open_prompt_in_workspace_keeps_handoff_cues_action_local(
+    qt_app: QApplication,
+) -> None:
+    """Workspace handoff cues should stay action-local and avoid analytics side effects."""
+    query_input = QPlainTextEdit()
+    workspace_view = WorkspaceViewController(
+        query_input,
+        QTabWidget(),
+        QLabel(),
+        status_callback=lambda *_: None,
+        execution_controller_supplier=lambda: None,
+        quick_action_controller_supplier=lambda: None,
+    )
+    status_messages: list[tuple[str, int]] = []
+    toast_messages: list[tuple[str, int]] = []
+    execution_calls = 0
+
+    class _UsageLoggerSpy:
+        def __init__(self) -> None:
+            self.copy_calls: list[tuple[str, bool]] = []
+            self.execute_calls: list[tuple[str, bool]] = []
+            self.detect_calls: list[str] = []
+
+        def log_copy(self, *, prompt_name: str, prompt_has_body: bool) -> None:
+            self.copy_calls.append((prompt_name, prompt_has_body))
+
+        def log_execute(self, *, prompt_name: str, prompt_has_body: bool) -> None:
+            self.execute_calls.append((prompt_name, prompt_has_body))
+
+        def log_detect(self, *, prediction: object, query_text: str) -> None:
+            self.detect_calls.append(query_text)
+
+    usage_logger = _UsageLoggerSpy()
+
+    def _execution_supplier() -> None:
+        nonlocal execution_calls
+        execution_calls += 1
+        return None
+
+    controller = PromptActionsController(
+        parent=QWidget(),
+        model=cast("PromptListModel", object()),
+        list_view=QListView(),
+        query_input=query_input,
+        layout_state=cast("WindowStateManager", _LayoutStateStub()),
+        workspace_view=workspace_view,
+        execution_controller_supplier=_execution_supplier,
+        execution_history_supplier=None,
+        current_prompt_supplier=lambda: None,
+        edit_callback=lambda: None,
+        duplicate_callback=lambda _prompt: None,
+        fork_callback=lambda _prompt: None,
+        similar_callback=None,
+        status_callback=lambda message, duration: status_messages.append((message, duration)),
+        error_callback=lambda _title, _message: None,
+        toast_callback=lambda message, duration: toast_messages.append((message, duration)),
+        usage_logger=cast("IntentUsageLogger", usage_logger),
+    )
+    prompt = _build_prompt(context="Prompt body to reuse", description="Fallback description")
+
+    controller.open_prompt_in_workspace(prompt)
+    qt_app.processEvents()
+
+    assert query_input.toPlainText() == "Prompt body to reuse"
+    assert execution_calls == 0
+    assert status_messages == [
+        ("Prompt ready in workspace. Run current prompt to validate before refining.", 3000)
+    ]
+    assert toast_messages == [("Opened 'Reusable prompt' in the workspace.", 2500)]
+    assert usage_logger.copy_calls == []
+    assert usage_logger.execute_calls == []
+    assert usage_logger.detect_calls == []
+
+
 def test_copy_prompt_to_clipboard_copies_the_prompt_body(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

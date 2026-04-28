@@ -99,9 +99,25 @@ Non-goals:
 - the stale variant remains the stronger operator cue.
 
 ### Slice 3 — Workspace handoff cue locality / action-local parity guard
-**Status:** proposed
+**Status:** done (guard-only)
 
 **Intent:** Reconfirm the handoff status remains action-local and does not drift into shared analytics or unrelated CLI surfaces.
+
+**Seam used:**
+- `gui/prompt_actions_controller.py` (`open_prompt_in_workspace()`)
+- `tests/test_prompt_actions_controller.py`
+
+**Outcome:**
+- runtime already kept the handoff cue local to the open-in-workspace action,
+- no execution side effect was introduced,
+- no usage-logger side effects were triggered by the handoff cue path,
+- the slice landed as an action-local guard only.
+
+**Locked by test:**
+- workspace seeding still happens,
+- no execution is triggered,
+- status/toast stay on the handoff action path,
+- copy / execute / detect analytics remain untouched by open-in-workspace.
 
 ---
 
