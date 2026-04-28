@@ -155,3 +155,25 @@ def test_favorites_filter_panel_shows_active_visibility_cue(qt_app) -> None:
     visible_labels = [label.text() for label in panel.findChildren(QLabel)]
 
     assert "Favorites filter: favorites only" in visible_labels
+
+
+def test_favorites_filter_panel_reset_restores_default_visibility_cue(qt_app) -> None:
+    """Leaving favorites-only mode should restore the calm default cue exactly once."""
+    panel = _build_panel()
+    emissions: list[str] = []
+
+    def _record_emission() -> None:
+        label = panel.findChild(QLabel, "favoritesFilterVisibilityLabel")
+        assert label is not None
+        emissions.append(label.text())
+
+    panel.set_favorites_only(True)
+    panel.filters_changed.connect(_record_emission)
+
+    panel._favorites_only_checkbox.setChecked(False)  # noqa: SLF001
+    QApplication.processEvents()
+
+    label = panel.findChild(QLabel, "favoritesFilterVisibilityLabel")
+    assert label is not None
+    assert label.text() == "Favorites filter: all prompts"
+    assert emissions == ["Favorites filter: all prompts"]

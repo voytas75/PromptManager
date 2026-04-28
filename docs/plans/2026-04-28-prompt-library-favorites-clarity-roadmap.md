@@ -216,7 +216,7 @@ Constraint:
 
 ### Slice 3 — Favorites reset/default clarity guard
 
-**Status:** proposed
+**Status:** implemented
 
 **Intent:** Sprawdzić, czy przejście z `Favorites only` back to neutral library state pozostaje wystarczająco czytelne i deterministyczne po interakcji użytkownika oraz programmatic changes, bez dokładania nowej logiki filtrów.
 
@@ -229,6 +229,18 @@ Constraint:
 - Modify: `tests/test_prompt_filter_panel.py`
 - Maybe modify: `gui/widgets/prompt_filter_panel.py`
 - Maybe modify: `docs/CHANGELOG.md` only if user-visible behavior changes
+
+**Implemented notes:**
+- added one focused guard covering `favorites only -> off` reset on the existing filter-panel seam,
+- confirmed the calm default cue returns as `Favorites filter: all prompts`,
+- confirmed the interactive reset still emits exactly one `filters_changed` event carrying the restored default cue,
+- runtime remained unchanged because the seam already behaved correctly.
+
+**Verified:**
+- probe: `QT_QPA_PLATFORM=offscreen .venv/bin/pytest tests/test_prompt_filter_panel.py::test_favorites_filter_panel_reset_restores_default_visibility_cue -q` -> `1 passed` immediately,
+- smoke: `QT_QPA_PLATFORM=offscreen .venv/bin/pytest tests/test_prompt_filter_panel.py tests/test_prompt_detail_widget.py -q` -> `40 passed`,
+- lint: `.venv/bin/ruff check tests/test_prompt_filter_panel.py` -> `All checks passed!`,
+- syntax: `python -m py_compile tests/test_prompt_filter_panel.py` -> OK.
 
 ### Slice 4 — Favorites cue locality / guard closure
 
