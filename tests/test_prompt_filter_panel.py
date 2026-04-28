@@ -67,3 +67,25 @@ def test_tag_filter_panel_user_selection_updates_cue_and_emits_filters_changed(q
     assert label is not None
     assert label.text() == "Tag filter: ops"
     assert emissions == ["Tag filter: ops"]
+
+
+def test_tag_filter_panel_reset_restores_all_tags_visibility_cue(qt_app) -> None:
+    """Returning to the neutral tag state should restore the calm all-tags cue."""
+    panel = _build_panel()
+    panel.set_tags(["docs", "ops"], selected_tag="ops")
+    emissions: list[str] = []
+
+    def _record_emission() -> None:
+        label = panel.findChild(QLabel, "tagFilterVisibilityLabel")
+        assert label is not None
+        emissions.append(label.text())
+
+    panel.filters_changed.connect(_record_emission)
+
+    panel._tag_combo.setCurrentIndex(0)  # noqa: SLF001
+    QApplication.processEvents()
+
+    label = panel.findChild(QLabel, "tagFilterVisibilityLabel")
+    assert label is not None
+    assert label.text() == "Tag filter: all tags"
+    assert emissions == ["Tag filter: all tags"]
