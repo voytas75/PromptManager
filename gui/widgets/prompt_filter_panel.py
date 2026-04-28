@@ -71,6 +71,9 @@ class PromptFilterPanel(QWidget):
         self._tag_visibility_label.setObjectName("tagFilterVisibilityLabel")
         layout.addWidget(self._tag_visibility_label)
 
+        self._sort_visibility_label = QLabel("Sort: manual", self)
+        self._sort_visibility_label.setObjectName("sortFilterVisibilityLabel")
+
         self._favorites_only_checkbox = QCheckBox("Favorites only", self)
         self._favorites_only_checkbox.toggled.connect(self.filters_changed)  # type: ignore[arg-type]
         layout.addWidget(self._favorites_only_checkbox)
@@ -94,6 +97,7 @@ class PromptFilterPanel(QWidget):
             self._sort_combo.addItem(label, value)
         self._sort_combo.currentIndexChanged.connect(self._emit_sort_changed)  # type: ignore[arg-type]
         layout.addWidget(self._sort_combo)
+        layout.addWidget(self._sort_visibility_label)
 
         layout.addStretch(1)
 
@@ -176,6 +180,7 @@ class PromptFilterPanel(QWidget):
     def set_sort_enabled(self, enabled: bool) -> None:
         """Enable or disable manual sort selection."""
         self._sort_combo.setEnabled(enabled)
+        self._update_sort_visibility_label()
 
     def is_sort_enabled(self) -> bool:
         """Return True when the sort combo box accepts user input."""
@@ -197,6 +202,12 @@ class PromptFilterPanel(QWidget):
             self._tag_visibility_label.setText("Tag filter: all tags")
             return
         self._tag_visibility_label.setText(f"Tag filter: {active_tag}")
+
+    def _update_sort_visibility_label(self) -> None:
+        if self.is_sort_enabled():
+            self._sort_visibility_label.setText("Sort: manual")
+            return
+        self._sort_visibility_label.setText("Sort locked during search")
 
     @staticmethod
     def _clean_text(value: object) -> str | None:

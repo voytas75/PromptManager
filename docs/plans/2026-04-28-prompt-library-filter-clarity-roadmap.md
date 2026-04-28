@@ -200,13 +200,26 @@ Constraint:
 
 ### Slice 3 — Nearby filter-state continuity probe
 
-**Status:** proposed
+**Status:** implemented
 
 **Intent:** Zobaczyć, czy najbliższy istniejący filter-panel seam potrzebuje jeszcze jednego małego continuity cue wspierającego czytanie listy promptów, ale bez tworzenia drugiego systemu statusów.
+
+**Implemented:**
+- added one bounded continuity cue on the existing `PromptFilterPanel` seam so active search now surfaces `Sort locked during search` beside the sort control,
+- kept the cue subordinate to the existing search behavior: the sort combo still disables during active search exactly as before,
+- kept the slice local to the filter-panel + search-controller seam, without presenter/coordinator rewrite, persistence changes, or new retrieval status layers.
 
 **Decision rule:**
 - only proceed if repo recon finds one explicit existing UI seam and one real legibility gap,
 - if the first candidate RED test passes immediately, close as `covered by existing behavior` and do not force runtime churn.
+
+**Verification:**
+- RED confirmed first with `QT_QPA_PLATFORM=offscreen .venv/bin/pytest tests/test_prompt_filter_panel.py::test_tag_filter_panel_active_search_disables_sort_with_visible_continuity_cue -q` -> `1 failed` because the sort lock had no visible continuity cue,
+- GREEN after the minimal panel-only change with the same targeted pytest command -> `1 passed`,
+- targeted suite: `QT_QPA_PLATFORM=offscreen .venv/bin/pytest tests/test_prompt_filter_panel.py -q` -> `5 passed`,
+- nearby smoke: `QT_QPA_PLATFORM=offscreen .venv/bin/pytest tests/test_prompt_filter_panel.py tests/test_prompt_list_model.py -q` -> `21 passed`,
+- lint: `.venv/bin/ruff check gui/widgets/prompt_filter_panel.py tests/test_prompt_filter_panel.py` -> `All checks passed!`,
+- syntax: `python -m py_compile gui/widgets/prompt_filter_panel.py tests/test_prompt_filter_panel.py` -> `OK`.
 
 **Possible shape:**
 - one compact helper text refinement near existing filter controls,
