@@ -7,7 +7,75 @@ Updates:
 from __future__ import annotations
 
 import argparse
+import json
+import tempfile
 from pathlib import Path
+
+
+def _build_inline_prompt_payload(args: argparse.Namespace) -> dict[str, object]:
+    tags_raw = getattr(args, "tags", None)
+    tags = []
+    if tags_raw:
+        tags = [item.strip() for item in str(tags_raw).split(",") if item.strip()]
+
+    payload: dict[str, object] = {
+        "name": args.name,
+        "description": args.description,
+        "context": args.prompt_text,
+        "category": args.category or "General",
+        "tags": tags,
+    }
+    if getattr(args, "language", None):
+        payload["language"] = args.language
+    if getattr(args, "scenario", None):
+        payload["ext5"] = args.scenario
+    return payload
+
+
+def _normalise_prompt_add_args(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    if getattr(args, "command", None) != "prompt-add":
+        return
+
+    inline_fields = [
+        getattr(args, "name", None),
+        getattr(args, "description", None),
+        getattr(args, "prompt_text", None),
+        getattr(args, "category", None),
+        getattr(args, "tags", None),
+        getattr(args, "language", None),
+        getattr(args, "scenario", None),
+    ]
+    has_inline = any(value not in (None, "") for value in inline_fields)
+    has_path = getattr(args, "path", None) is not None
+
+    if has_path and has_inline:
+        parser.error("prompt-add accepts either PATH or inline fields, not both.")
+    if not has_path and not has_inline:
+        parser.error(
+            "prompt-add requires a PATH or inline fields such as "
+            "--name and --prompt-text."
+        )
+    if has_inline:
+        if not getattr(args, "name", None):
+            parser.error("prompt-add inline mode requires --name.")
+        if not getattr(args, "description", None):
+            parser.error("prompt-add inline mode requires --description.")
+        if not getattr(args, "prompt_text", None):
+            parser.error("prompt-add inline mode requires --prompt-text.")
+
+        payload = _build_inline_prompt_payload(args)
+        handle = tempfile.NamedTemporaryFile(
+            mode="w",
+            suffix=".json",
+            prefix="prompt-add-inline-",
+            delete=False,
+            encoding="utf-8",
+        )
+        temp_path = Path(handle.name)
+        with handle:
+            json.dump(payload, handle, ensure_ascii=False, indent=2)
+            handle.write("\n")
+        args.path = temp_path
 
 
 def parse_args() -> argparse.Namespace:
@@ -84,7 +152,50 @@ def parse_args() -> argparse.Namespace:
     prompt_add_parser.add_argument(
         "path",
         type=Path,
+        nargs="?",
         help="Source prompt path (.json file or directory of JSON files).",
+    )
+    prompt_add_parser.add_argument(
+        "--name",
+        type=str,
+        default=None,
+        help="Prompt name when adding a single prompt inline.",
+    )
+    prompt_add_parser.add_argument(
+        "--description",
+        type=str,
+        default=None,
+        help="Prompt description when adding a single prompt inline.",
+    )
+    prompt_add_parser.add_argument(
+        "--prompt-text",
+        type=str,
+        default=None,
+        help="Main prompt body/context when adding a single prompt inline.",
+    )
+    prompt_add_parser.add_argument(
+        "--category",
+        type=str,
+        default=None,
+        help="Optional category label for inline prompt creation.",
+    )
+    prompt_add_parser.add_argument(
+        "--tags",
+        type=str,
+        default=None,
+        help="Comma-separated tags for inline prompt creation.",
+    )
+    prompt_add_parser.add_argument(
+        "--language",
+        type=str,
+        default=None,
+        help="Optional language code for inline prompt creation.",
+    )
+    prompt_add_parser.add_argument(
+        "--scenario",
+        type=str,
+        default=None,
+        help="Optional scenario note for inline prompt creation.",
     )
     prompt_add_parser.add_argument(
         "--dry-run",
@@ -326,4 +437,6 @@ def parse_args() -> argparse.Namespace:
         help="Disable live web search enrichment for prompt chain runs.",
     )
 
-    return parser.parse_args()
+    args = parser.parse_args()
+    _normalise_prompt_add_args(args, parser)
+    return args

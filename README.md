@@ -110,13 +110,24 @@ python -m main --no-gui --print-settings
 uv run python -m main --no-gui --print-settings
 ```
 
-### 4. Add a prompt from JSON (optional)
+### 4. Add a prompt from JSON or inline fields (optional)
 
 If you want to seed the local catalog from a JSON file or a directory of JSON files:
 
 ```bash
 python -m main --no-gui prompt-add examples/prompt-import-example.json --dry-run
 python -m main --no-gui prompt-add examples/prompt-import-example.json
+```
+
+If you want to create one prompt directly from CLI flags without preparing JSON first:
+
+```bash
+python -m main --no-gui prompt-add \
+  --name "Inline Diagnostics Helper" \
+  --description "Guide a calm first-pass diagnosis." \
+  --prompt-text "Summarise symptoms, likely causes, and next checks." \
+  --category Operations \
+  --tags diagnostics,incident,triage
 ```
 
 You can still use the lower-level `catalog-import` command, but `prompt-add` is the friendlier operator-facing alias for adding or updating normal prompts from CLI.

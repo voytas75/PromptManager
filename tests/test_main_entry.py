@@ -878,6 +878,108 @@ def test_catalog_export_command(
     assert exported
 
 
+def test_prompt_add_command_accepts_inline_fields(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "prompt-manager",
+            "prompt-add",
+            "--name",
+            "Inline Diagnostics Helper",
+            "--description",
+            "Guide a calm first-pass diagnosis.",
+            "--prompt-text",
+            "Summarise symptoms, likely causes, and next checks.",
+            "--category",
+            "Operations",
+            "--tags",
+            "diagnostics,incident,triage",
+            "--dry-run",
+        ],
+    )
+    manager = _DummyManager()
+    _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
+    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "Catalog import preview" in output
+    assert "added=1" in output
+    assert manager.closed is True
+
+
+def test_prompt_add_command_rejects_missing_input_source(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-add"])
+
+    with pytest.raises(SystemExit) as excinfo:
+        main.main()
+
+    assert excinfo.value.code == 2
+
+
+def test_prompt_add_command_rejects_path_and_inline_mix(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    catalog_path = tmp_path / "prompt.json"
+    catalog_path.write_text(
+        json.dumps(
+            {
+                "name": "Diagnostics Helper",
+                "description": "Assist with debugging failing CI jobs.",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "prompt-manager",
+            "prompt-add",
+            str(catalog_path),
+            "--name",
+            "Inline Diagnostics Helper",
+            "--description",
+            "Guide a calm first-pass diagnosis.",
+            "--prompt-text",
+            "Summarise symptoms, likely causes, and next checks.",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        main.main()
+
+    assert excinfo.value.code == 2
+
+
+def test_prompt_add_command_requires_description_for_inline_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "prompt-manager",
+            "prompt-add",
+            "--name",
+            "Inline Diagnostics Helper",
+            "--prompt-text",
+            "Summarise symptoms, likely causes, and next checks.",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        main.main()
+
+    assert excinfo.value.code == 2
+
+
 def test_prompt_add_command_dry_run(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
