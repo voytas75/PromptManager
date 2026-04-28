@@ -48,12 +48,47 @@ def _write_temp_prompt_payload(payload: object) -> Path:
     return temp_path
 
 
+def _validate_prompt_payload(payload: object, parser: argparse.ArgumentParser) -> object:
+    entries: list[object]
+    if isinstance(payload, dict):
+        prompts_value = payload.get("prompts")
+        if prompts_value is not None:
+            if not isinstance(prompts_value, list):
+                parser.error(
+                    "prompt-add payload field 'prompts' must be a JSON list "
+                    "of prompt objects."
+                )
+            entries = list(prompts_value)
+        else:
+            entries = [payload]
+    elif isinstance(payload, list):
+        entries = list(payload)
+    else:
+        parser.error("prompt-add payload must be a JSON object or a list of prompt objects.")
+
+    if not entries:
+        parser.error("prompt-add payload must contain at least one prompt object.")
+
+    missing_messages: list[str] = []
+    for index, entry in enumerate(entries, start=1):
+        if not isinstance(entry, dict):
+            parser.error(f"prompt-add entry #{index} must be a JSON object.")
+        missing_fields = [field for field in ("name", "description") if not entry.get(field)]
+        if missing_fields:
+            missing_messages.append(
+                f"entry #{index} is missing required field(s): {', '.join(missing_fields)}"
+            )
+    if missing_messages:
+        parser.error("prompt-add payload validation failed: " + "; ".join(missing_messages))
+    return payload
+
+
 def _parse_json_string_payload(raw_json: str, parser: argparse.ArgumentParser) -> object:
     try:
         payload = json.loads(raw_json)
     except json.JSONDecodeError as exc:
         parser.error(f"prompt-add received invalid JSON: {exc}")
-    return payload
+    return _validate_prompt_payload(payload, parser)
 
 
 def _read_stdin_json_payload(parser: argparse.ArgumentParser) -> object:

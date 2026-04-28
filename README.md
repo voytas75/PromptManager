@@ -127,6 +127,8 @@ python -m main --no-gui prompt-add \
   --dry-run
 ```
 
+Malformed payloads now fail early with explicit validation errors (for example missing `name` or `description`) before the importer runs.
+
 If you already wrote the single-prompt payload to a file and want an explicit non-positional alias:
 
 ```bash

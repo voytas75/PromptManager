@@ -961,6 +961,63 @@ def test_prompt_add_command_rejects_path_and_input_file_mix(
 
 
 
+def test_prompt_add_command_rejects_json_string_missing_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = json.dumps(
+        {
+            "description": "Guide a calm first-pass diagnosis.",
+            "context": "Summarise symptoms, likely causes, and next checks.",
+        }
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-add", "--json", payload, "--dry-run"],
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        main.main()
+
+    assert excinfo.value.code == 2
+
+
+
+def test_prompt_add_command_rejects_json_string_missing_description(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = json.dumps(
+        {
+            "name": "JSON Diagnostics Helper",
+            "context": "Summarise symptoms, likely causes, and next checks.",
+        }
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-add", "--json", payload, "--dry-run"],
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        main.main()
+
+    assert excinfo.value.code == 2
+
+
+
+def test_prompt_add_command_rejects_json_string_with_non_object_entries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-add", "--json", '["not-an-object"]', "--dry-run"],
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        main.main()
+
+    assert excinfo.value.code == 2
+
+
+
 def test_prompt_add_command_accepts_json_string(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
