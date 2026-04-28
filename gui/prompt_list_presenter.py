@@ -266,7 +266,10 @@ class PromptListPresenter:
             self._detail_widget.clear()
         self._callbacks.update_intent_hint(filtered)
         self._callbacks.show_status(
-            f"Showing prompts similar to '{prompt.name}'.",
+            (
+                f"Showing similar prompts for '{prompt.name}'. Recommendation results only — "
+                "inspect a prompt for reuse details."
+            ),
             4000,
         )
 

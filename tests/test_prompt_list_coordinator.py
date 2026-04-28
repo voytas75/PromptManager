@@ -109,6 +109,41 @@ def test_fetch_prompts_records_search_errors_without_faking_empty_results() -> N
     assert result.search_error == "search backend down"
 
 
+def test_fetch_prompts_exposes_operator_state_for_no_match_search() -> None:
+    """No-match search state should stay explicit instead of falling back to catalog wording."""
+    manager = _ManagerStub()
+    manager.repository = _RepositoryStub([_prompt("Alpha", is_favorite=True)])
+    manager.search_results = []
+    coordinator = PromptListCoordinator(cast("object", manager))
+
+    result = coordinator.fetch_prompts("rollback")
+
+    assert result.operator_state_label == "No matches for search"
+
+
+def test_fetch_prompts_exposes_operator_state_for_search_errors() -> None:
+    """Search backend failures should surface an explicit search-error trust cue."""
+    manager = _ManagerStub()
+    manager.repository = _RepositoryStub([_prompt("Alpha", is_favorite=True)])
+    manager.search_error = PromptManagerError("search backend down")
+    coordinator = PromptListCoordinator(cast("object", manager))
+
+    result = coordinator.fetch_prompts("rollback")
+
+    assert result.operator_state_label == "Search unavailable"
+
+
+def test_fetch_prompts_exposes_operator_state_for_default_catalog() -> None:
+    """Blank search should expose the ordinary catalog posture instead of a search-state cue."""
+    manager = _ManagerStub()
+    manager.repository = _RepositoryStub([_prompt("Alpha", is_favorite=True)])
+    coordinator = PromptListCoordinator(cast("object", manager))
+
+    result = coordinator.fetch_prompts("")
+
+    assert result.operator_state_label == "Browsing all prompts"
+
+
 def test_apply_filters_keeps_only_favorite_prompts_when_requested() -> None:
     """Favorites-only filtering should exclude non-favorite prompts from the list."""
     coordinator = PromptListCoordinator(cast("object", _ManagerStub()))

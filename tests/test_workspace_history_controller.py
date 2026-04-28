@@ -354,8 +354,7 @@ def test_workspace_history_controller_surfaces_stale_validation_cue_for_old_run(
     assert "Validation freshness: stale" in template_detail_widget.run_summary
 
 
-def test_workspace_history_controller_places_candidate_vs_baseline_after_last_run_facts(
-) -> None:
+def test_workspace_history_controller_places_candidate_vs_baseline_after_last_run_facts() -> None:
     """Run summary should keep last-run facts first, then append comparison evidence."""
     prompt = Prompt(
         id=uuid.UUID("00000000-0000-0000-0000-000000000252"),
@@ -406,8 +405,7 @@ def test_workspace_history_controller_places_candidate_vs_baseline_after_last_ru
     assert detail_widget.run_summary is not None
     assert template_detail_widget.run_summary is not None
     expected_prefix = (
-        "Last run: success via gpt-4o-mini · v2 · 3 messages · 90 ms"
-        " · Validation freshness: recent"
+        "Last run: success via gpt-4o-mini · v2 · 3 messages · 90 ms · Validation freshness: recent"
     )
     assert detail_widget.run_summary.startswith(expected_prefix)
     assert template_detail_widget.run_summary.startswith(expected_prefix)
@@ -521,8 +519,9 @@ def test_workspace_history_controller_surfaces_candidate_vs_baseline_comparison_
     assert "90 ms vs 140 ms" in template_detail_widget.run_summary
 
 
-def test_workspace_history_controller_surfaces_comparison_recommendation_for_compatible_runs(
-) -> None:
+def test_workspace_history_controller_surfaces_comparison_recommendation_for_compatible_runs() -> (
+    None
+):
     """Inspect flow should show whether the latest run improved over the previous baseline."""
     prompt = Prompt(
         id=uuid.UUID("00000000-0000-0000-0000-000000000233"),
@@ -629,7 +628,7 @@ def test_workspace_history_controller_surfaces_compare_before_promoting_next_act
     assert template_detail_widget.next_action_summary == "Validate improved run before reuse"
 
 
-def test_workspace_history_controller_surfaces_keep_baseline_cue_for_clearly_regressed_candidate(
+def test_workspace_history_controller_surfaces_keep_baseline_cue_for_clearly_regressed_candidate(  # noqa: E501
 ) -> None:
     """Strong regressed evidence should switch compare posture to keep-baseline guidance."""
     prompt = Prompt(
@@ -733,15 +732,14 @@ def test_workspace_history_controller_skips_comparison_cue_without_two_compatibl
     assert detail_widget.decision_summary == "Reuse as-is"
     assert template_detail_widget.decision_summary == "Reuse as-is"
     assert detail_widget.decision_provenance_summary == "Based on limited run evidence"
-    assert template_detail_widget.decision_provenance_summary == (
-        "Based on limited run evidence"
-    )
+    assert template_detail_widget.decision_provenance_summary == ("Based on limited run evidence")
     assert detail_widget.next_action_summary == "Validate before reuse"
     assert template_detail_widget.next_action_summary == "Validate before reuse"
 
 
-def test_workspace_history_controller_surfaces_validation_first_next_action_for_no_history(
-) -> None:
+def test_workspace_history_controller_surfaces_validation_first_next_action_for_no_history() -> (
+    None
+):
     """No-history prompts should stay calm but still suggest a validation-first next step."""
     prompt = Prompt(
         id=uuid.UUID("00000000-0000-0000-0000-000000000253"),
@@ -830,7 +828,7 @@ def test_workspace_history_controller_surfaces_missing_evidence_reason_for_singl
     assert template_detail_widget.next_action_summary == expected_next_action
 
 
-def test_workspace_history_controller_keeps_fresh_single_run_cues_aligned_across_detail_surfaces(
+def test_workspace_history_controller_keeps_fresh_single_run_cues_aligned_across_detail_surfaces(  # noqa: E501
 ) -> None:
     """Fresh single-run inspect cues should stay aligned across both detail surfaces."""
     prompt = Prompt(
@@ -886,7 +884,7 @@ def test_workspace_history_controller_keeps_fresh_single_run_cues_aligned_across
     assert template_detail_widget.next_action_summary == expected_next_action
 
 
-def test_workspace_history_controller_surfaces_missing_evidence_reason_for_non_comparable_baseline(
+def test_workspace_history_controller_surfaces_missing_evidence_reason_for_non_comparable_baseline(  # noqa: E501
 ) -> None:
     """Inspect flow should explain when two runs exist but no comparable baseline can be trusted."""
     prompt = Prompt(
@@ -1034,9 +1032,7 @@ def test_workspace_history_controller_surfaces_lineage_based_decision_provenance
 
     assert detail_widget.decision_summary == "Fork before editing"
     assert detail_widget.decision_provenance_summary == "Based on fork lineage only"
-    assert template_detail_widget.decision_provenance_summary == (
-        "Based on fork lineage only"
-    )
+    assert template_detail_widget.decision_provenance_summary == ("Based on fork lineage only")
 
 
 def test_workspace_history_controller_surfaces_missing_evidence_reason_for_missing_rating() -> None:
@@ -1094,8 +1090,9 @@ def test_workspace_history_controller_surfaces_missing_evidence_reason_for_missi
     assert template_detail_widget.next_action_summary == "Add ratings before comparing"
 
 
-def test_workspace_history_controller_surfaces_missing_evidence_reason_for_missing_duration(
-) -> None:
+def test_workspace_history_controller_surfaces_missing_evidence_reason_for_missing_duration() -> (
+    None
+):
     """Inspect flow should explain when comparison evidence is blocked by missing duration."""
     prompt = Prompt(
         id=uuid.UUID("00000000-0000-0000-0000-000000000244"),
@@ -1355,9 +1352,7 @@ def test_workspace_history_controller_clears_selection_reset_cues_on_both_detail
     assert detail_widget.decision_summary == "Reuse as-is"
     assert template_detail_widget.decision_summary == "Reuse as-is"
     assert detail_widget.decision_provenance_summary == "Based on limited run evidence"
-    assert template_detail_widget.decision_provenance_summary == (
-        "Based on limited run evidence"
-    )
+    assert template_detail_widget.decision_provenance_summary == ("Based on limited run evidence")
     assert detail_widget.next_action_summary == "Validate before reuse"
     assert template_detail_widget.next_action_summary == "Validate before reuse"
     assert detail_widget.run_summary is not None

@@ -1,0 +1,185 @@
+"""Focused tests for bounded prompt-list presenter retrieval cues.
+
+Updates:
+  v0.1.0 - 2026-04-27 - Cover similar-result path meaning cues without widening presenter workflow.
+"""
+
+from __future__ import annotations
+
+import uuid
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import cast
+
+from gui.prompt_list_coordinator import PromptListCoordinator
+from gui.prompt_list_model import PromptListModel
+from gui.prompt_list_presenter import PromptListCallbacks, PromptListPresenter
+from models.prompt_model import Prompt
+
+
+class _RepositoryStub:
+    def __init__(self, prompts: list[Prompt]) -> None:
+        self._prompts = list(prompts)
+
+    def list(self) -> list[Prompt]:
+        return list(self._prompts)
+
+
+class _ManagerStub:
+    def __init__(self, prompts: list[Prompt], similar_results: list[Prompt]) -> None:
+        self.repository = _RepositoryStub(prompts)
+        self._similar_results = list(similar_results)
+
+    def list_categories(self) -> list[object]:
+        return []
+
+    def search_prompts(
+        self,
+        query_text: str,
+        limit: int = 50,
+        embedding: list[float] | None = None,
+    ) -> list[Prompt]:
+        return list(self._similar_results[:limit])
+
+
+class _DetailWidgetStub:
+    def __init__(self) -> None:
+        self.cleared = False
+
+    def clear(self) -> None:
+        self.cleared = True
+
+    def display_prompt(self, prompt: Prompt) -> None:
+        self.displayed_prompt = prompt
+
+
+class _ListViewStub:
+    def __init__(self) -> None:
+        self.clear_selection_calls = 0
+
+    def clearSelection(self) -> None:
+        self.clear_selection_calls += 1
+
+    def currentIndex(self):  # pragma: no cover - not used in these tests
+        return _InvalidIndex()
+
+
+class _InvalidIndex:
+    def isValid(self) -> bool:
+        return False
+
+
+@dataclass
+class _CallbackRecorder:
+    statuses: list[tuple[str, int]]
+    selected_ids: list[uuid.UUID]
+    intent_counts: list[int]
+
+    @classmethod
+    def create(cls) -> _CallbackRecorder:
+        return cls(statuses=[], selected_ids=[], intent_counts=[])
+
+    def build(self) -> PromptListCallbacks:
+        return PromptListCallbacks(
+            update_intent_hint=lambda prompts: self.intent_counts.append(len(prompts)),
+            select_prompt=lambda prompt_id: self.selected_ids.append(prompt_id),
+            show_error=lambda *_: None,
+            show_status=lambda message, timeout: self.statuses.append((message, timeout)),
+            show_toast=lambda *_: None,
+        )
+
+
+class _ParentStub:
+    pass
+
+
+class _FilterPanelStub:
+    def category_slug(self) -> str | None:
+        return None
+
+    def tag_value(self) -> str | None:
+        return None
+
+    def favorites_only(self) -> bool:
+        return False
+
+    def min_quality(self) -> float:
+        return 0.0
+
+    def set_categories(self, *_args) -> None:
+        return
+
+    def set_tags(self, *_args) -> None:
+        return
+
+
+def _prompt(name: str, *, ext4: list[float] | None = None) -> Prompt:
+    return Prompt(
+        id=uuid.uuid4(),
+        name=name,
+        description=f"{name} description",
+        category="General",
+        context=f"{name} body",
+        ext4=ext4,
+        created_at=datetime(2026, 4, 27, 12, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 27, 12, 0, tzinfo=UTC),
+    )
+
+
+def _build_presenter(
+    *,
+    source_prompt: Prompt,
+    similar_results: list[Prompt],
+) -> tuple[PromptListPresenter, _CallbackRecorder]:
+    manager = _ManagerStub([source_prompt, *similar_results], [source_prompt, *similar_results])
+    coordinator = PromptListCoordinator(cast("object", manager))
+    model = PromptListModel()
+    detail_widget = _DetailWidgetStub()
+    list_view = _ListViewStub()
+    callbacks = _CallbackRecorder.create()
+    presenter = PromptListPresenter(
+        manager=cast("object", manager),
+        coordinator=coordinator,
+        model=model,
+        detail_widget=cast("object", detail_widget),
+        list_view=cast("object", list_view),
+        filter_panel=cast("object", _FilterPanelStub()),
+        toolbar=None,
+        callbacks=callbacks.build(),
+        parent=cast("object", _ParentStub()),
+    )
+    return presenter, callbacks
+
+
+def test_show_similar_prompts_surfaces_recommendation_state_cue() -> None:
+    """Similar-result lists should read as recommendations, not ordinary search results."""
+    source_prompt = _prompt("Alpha", ext4=[0.1, 0.2])
+    similar_prompt = _prompt("Beta", ext4=[0.3, 0.4])
+    presenter, callbacks = _build_presenter(
+        source_prompt=source_prompt,
+        similar_results=[similar_prompt],
+    )
+
+    presenter.show_similar_prompts(source_prompt)
+
+    assert callbacks.statuses[-1] == (
+        (
+            "Showing similar prompts for 'Alpha'. Recommendation results only — "
+            "inspect a prompt for reuse details."
+        ),
+        4000,
+    )
+
+
+def test_show_similar_prompts_adds_bounded_inspect_handoff_cue() -> None:
+    """Recommendation-mode status should also hint that inspect is the next safe action."""
+    source_prompt = _prompt("Alpha", ext4=[0.1, 0.2])
+    similar_prompt = _prompt("Beta", ext4=[0.3, 0.4])
+    presenter, callbacks = _build_presenter(
+        source_prompt=source_prompt,
+        similar_results=[similar_prompt],
+    )
+
+    presenter.show_similar_prompts(source_prompt)
+
+    assert "inspect a prompt for reuse details" in callbacks.statuses[-1][0]

@@ -160,6 +160,7 @@ PromptManager is currently in **beta** and under active development.
 Current focus:
 - strengthening the core prompt asset loop
 - improving low-friction capture, promotion, retrieval, inspection, reuse, and refinement
+- sharpening retrieval/discovery clarity so search results are easier to trust and act on
 - making settings, routing, and diagnostics trustworthy before broader automation expansion
 
 ## What PromptManager is not

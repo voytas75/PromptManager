@@ -93,6 +93,7 @@ def test_prompt_list_model_prefers_matching_source_preview_for_active_search(
     index = model.index(0, 0)
 
     assert index.data(PromptListModel.PreviewRole) == "Source: PagerDuty ops notebook"
+    assert index.data(PromptListModel.MatchReasonRole) == "Matched in source"
 
 
 def test_prompt_list_model_prefers_matching_scenario_over_non_matching_description(

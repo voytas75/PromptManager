@@ -30,6 +30,7 @@ class PromptListModel(QAbstractListModel):
     PreviewRole = int(Qt.ItemDataRole.UserRole) + 1
     TitleMatchRole = int(Qt.ItemDataRole.UserRole) + 2
     PreviewMatchRole = int(Qt.ItemDataRole.UserRole) + 3
+    MatchReasonRole = int(Qt.ItemDataRole.UserRole) + 4
     PreviewMaxLength = PREVIEW_MAX_LENGTH
 
     def __init__(self, prompts: Sequence[Prompt] | None = None, parent=None) -> None:
@@ -63,6 +64,8 @@ class PromptListModel(QAbstractListModel):
             return prompt
         if role == self.PreviewRole:
             return self._preview_text(prompt)
+        if role == self.MatchReasonRole:
+            return self._match_reason_text(prompt)
         if role == self.TitleMatchRole:
             return self._match_ranges(self._display_text(prompt))
         if role == self.PreviewMatchRole:
@@ -105,6 +108,18 @@ class PromptListModel(QAbstractListModel):
     def _preview_text(self, prompt: Prompt) -> str | None:
         """Return the current bounded preview text for *prompt*."""
         return build_prompt_preview(prompt, active_search_terms=self._active_search_terms)
+
+    def _match_reason_text(self, prompt: Prompt) -> str | None:
+        """Return one compact active-search reason cue for the current visible preview path."""
+        if not self._active_search_terms:
+            return None
+
+        preview = self._preview_text(prompt)
+        if not preview:
+            return None
+        if preview.startswith("Source: "):
+            return "Matched in source"
+        return None
 
     @staticmethod
     def _display_text(prompt: Prompt) -> str:

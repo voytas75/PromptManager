@@ -11,7 +11,6 @@ Updates:
   v0.15.83 - 2026-04-10 - Resolve parent lineage summaries to human-readable prompt names.
 """
 
-
 from __future__ import annotations
 
 from datetime import UTC, datetime

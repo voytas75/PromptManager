@@ -29,6 +29,7 @@ class PromptLoadResult:
     search_results: list[Prompt] | None
     preserve_search_order: bool
     search_error: str | None
+    operator_state_label: str
 
 
 class PromptSortOrder(Enum):
@@ -58,20 +59,26 @@ class PromptListCoordinator:
         search_results: list[Prompt] | None = None
         search_error: str | None = None
         preserve_order = False
+        operator_state_label = "Browsing all prompts"
 
         if stripped:
             try:
                 search_results = list(self._manager.search_prompts(stripped, limit=50))
             except PromptManagerError as exc:
                 search_error = str(exc)
+                operator_state_label = "Search unavailable"
             else:
                 preserve_order = True
+                operator_state_label = (
+                    "No matches for search" if not search_results else "Showing search results"
+                )
 
         return PromptLoadResult(
             all_prompts=all_prompts,
             search_results=search_results,
             preserve_search_order=preserve_order,
             search_error=search_error,
+            operator_state_label=operator_state_label,
         )
 
     def populate_filters(

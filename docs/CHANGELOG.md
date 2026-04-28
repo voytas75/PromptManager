@@ -4,8 +4,15 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added one focused retrieval/discovery ledger closure for the prompt-list guard pack by reconciling the stale roadmap `pending` marker to the current tested reality: the intended reset-on-clear, inactive-search no-op, prompt-list cue/preview parity, and state-specific negative guards are already covered by the existing prompt-list model/coordinator regression set, so no extra runtime seam or CLI/headless expansion was introduced.
+- Added one bounded retrieval/discovery reason cue on the existing prompt-list model seam so active-search rows that promote a credible source preview can now expose `Matched in source` via `PromptListModel.MatchReasonRole`, improving search-result legibility without changing ranking, persistence, or widening into a new retrieval workflow.
+
 ### Changed
 
+- Tightened the similar-result list status cue so `show_similar_prompts()` now explicitly says `Showing similar prompts for '<name>'. Recommendation results only — inspect a prompt for reuse details.`, making recommendation-mode retrieval easier to distinguish from ordinary text search while also giving one bounded handoff hint toward inspect, without changing ranking, persistence, or adding a new results screen.
+- Added one bounded retrieval/discovery trust-state cue on the existing prompt-list coordinator seam so prompt loading now exposes compact operator posture labels — `Browsing all prompts`, `Showing search results`, `No matches for search`, and `Search unavailable` — without changing ranking, persistence, presenter workflow, or widening into a new retrieval surface.
 - Tightened inspect/detail no-history fallback so prompts with no recorded runs now keep the calm `Reuse as-is` decision while explicitly surfacing `Validate before reuse` as the next step, without adding synthetic evidence, new panels, or separate empty-state UI.
 - Shortened inspect/detail `Decision` provenance wording so the existing cue now reads `Based on latest 2 comparable runs`, `Based on limited run evidence`, or `Based on fork lineage only`, keeping the same provenance logic and surface while making the source cue easier to scan.
 - Tightened inspect/detail limited-evidence `Recommended next action` wording so thin-evidence paths now stay better aligned to evidence strength: fresh single-run prompts keep the neutral `Evidence: only one run available`, while stale/no-history and comparison-gap paths continue to use action-oriented guidance such as `Validate before reuse`, `Run another version before comparing`, `Add ratings before comparing`, and `Run again before comparing`.

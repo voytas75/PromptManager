@@ -368,7 +368,7 @@ Work that improves:
 - draft-to-asset promotion clarity
 - duplicate and similarity judgment at ingest
 - rough-input cleanup on the way to usable draft
-- stronger search/recent/reuse ergonomics
+- stronger retrieval/discovery ergonomics, especially search-result legibility and faster reuse
 - better inspect/detail decision support
 - version/fork clarity
 
