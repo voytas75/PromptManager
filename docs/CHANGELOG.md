@@ -10,6 +10,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 - Added one focused retrieval/discovery ledger closure for the prompt-list guard pack by reconciling the stale roadmap `pending` marker to the current tested reality: the intended reset-on-clear, inactive-search no-op, prompt-list cue/preview parity, and state-specific negative guards are already covered by the existing prompt-list model/coordinator regression set, so no extra runtime seam or CLI/headless expansion was introduced.
 - Added one bounded retrieval/discovery reason cue on the existing prompt-list model seam so active-search rows that promote a credible source preview can now expose `Matched in source` via `PromptListModel.MatchReasonRole`, improving search-result legibility without changing ranking, persistence, or widening into a new retrieval workflow.
 - Added one bounded Recent-row metadata visibility pass in the existing `Recent Prompts` dialog so each recent entry now shows a visible second line with compact `Modified ... • Category: ...` context, improving reopen choice clarity without new persistence, ranking, or workflow changes.
+- Added one bounded tag-filter visibility pass in the existing prompt-library filter panel so the active tag state now stays visible as a compact `Tag filter: ...` cue, improving retrieval clarity without changing filter semantics, persistence, or widening into a filter redesign.
 
 ### Changed
 

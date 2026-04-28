@@ -64,8 +64,12 @@ class PromptFilterPanel(QWidget):
         layout.addWidget(QLabel("Tag:", self))
         self._tag_combo = QComboBox(self)
         self._tag_combo.addItem("All tags", None)
-        self._tag_combo.currentIndexChanged.connect(self.filters_changed)  # type: ignore[arg-type]
+        self._tag_combo.currentIndexChanged.connect(self._handle_tag_changed)  # type: ignore[arg-type]
         layout.addWidget(self._tag_combo)
+
+        self._tag_visibility_label = QLabel("Tag filter: all tags", self)
+        self._tag_visibility_label.setObjectName("tagFilterVisibilityLabel")
+        layout.addWidget(self._tag_visibility_label)
 
         self._favorites_only_checkbox = QCheckBox("Favorites only", self)
         self._favorites_only_checkbox.toggled.connect(self.filters_changed)  # type: ignore[arg-type]
@@ -124,6 +128,7 @@ class PromptFilterPanel(QWidget):
             self._tag_combo.setCurrentIndex(index if index != -1 else 0)
         finally:
             self._tag_combo.blockSignals(False)
+        self._update_tag_visibility_label()
 
     def set_min_quality(self, value: float) -> None:
         """Set the numeric quality threshold without emitting signals."""
@@ -181,6 +186,17 @@ class PromptFilterPanel(QWidget):
         if value is None:
             return
         self.sort_changed.emit(value)
+
+    def _handle_tag_changed(self) -> None:
+        self._update_tag_visibility_label()
+        self.filters_changed.emit()
+
+    def _update_tag_visibility_label(self) -> None:
+        active_tag = self.tag_value()
+        if active_tag is None:
+            self._tag_visibility_label.setText("Tag filter: all tags")
+            return
+        self._tag_visibility_label.setText(f"Tag filter: {active_tag}")
 
     @staticmethod
     def _clean_text(value: object) -> str | None:
