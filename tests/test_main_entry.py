@@ -878,6 +878,119 @@ def test_catalog_export_command(
     assert exported
 
 
+def test_prompt_add_command_accepts_json_string(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    payload = json.dumps(
+        {
+            "name": "JSON Diagnostics Helper",
+            "description": "Guide a calm first-pass diagnosis.",
+            "context": "Summarise symptoms, likely causes, and next checks.",
+        }
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-add", "--json", payload, "--dry-run"],
+    )
+    manager = _DummyManager()
+    _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
+    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "Catalog import preview" in output
+    assert "added=1" in output
+    assert manager.closed is True
+
+
+
+def test_prompt_add_command_accepts_stdin_json(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    payload = json.dumps(
+        {
+            "name": "STDIN Diagnostics Helper",
+            "description": "Guide a calm first-pass diagnosis.",
+            "context": "Summarise symptoms, likely causes, and next checks.",
+        }
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-add", "--from-stdin", "--dry-run"],
+    )
+    monkeypatch.setattr(main.sys, "stdin", SimpleNamespace(read=lambda: payload))
+    manager = _DummyManager()
+    _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
+    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "Catalog import preview" in output
+    assert "added=1" in output
+    assert manager.closed is True
+
+
+
+def test_prompt_add_command_rejects_json_and_stdin_mix(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = json.dumps(
+        {
+            "name": "JSON Diagnostics Helper",
+            "description": "Guide a calm first-pass diagnosis.",
+            "context": "Summarise symptoms, likely causes, and next checks.",
+        }
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-add", "--json", payload, "--from-stdin"],
+    )
+    monkeypatch.setattr(main.sys, "stdin", SimpleNamespace(read=lambda: payload))
+
+    with pytest.raises(SystemExit) as excinfo:
+        main.main()
+
+    assert excinfo.value.code == 2
+
+
+
+def test_prompt_add_command_rejects_invalid_json_string(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-add", "--json", "{not-valid-json}", "--dry-run"],
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        main.main()
+
+    assert excinfo.value.code == 2
+
+
+
+def test_prompt_add_command_rejects_blank_stdin_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-add", "--from-stdin", "--dry-run"],
+    )
+    monkeypatch.setattr(main.sys, "stdin", SimpleNamespace(read=lambda: "   \n  "))
+
+    with pytest.raises(SystemExit) as excinfo:
+        main.main()
+
+    assert excinfo.value.code == 2
+
+
+
 def test_prompt_add_command_accepts_inline_fields(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

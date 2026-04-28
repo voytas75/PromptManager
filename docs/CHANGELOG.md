@@ -8,6 +8,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 - Added a new operator-facing `prompt-add` CLI command as a friendly alias for adding or updating prompts from JSON on the command line. It supports the same `--dry-run` preview and `--no-overwrite` safety controls as `catalog-import` while making the single-prompt workflow more obvious.
 - Extended `prompt-add` so operators can also create one prompt directly from inline CLI flags like `--name`, `--description`, and `--prompt-text`, without preparing a JSON file first.
+- Extended `prompt-add` again with `--json` and `--from-stdin` so a single prompt payload can be passed directly as a JSON string or piped from standard input while still using the same catalog-import backend.
 - Added a checked-in sample payload at `examples/prompt-import-example.json` so operators have a ready-to-run JSON template for CLI prompt creation.
 - Added a new `catalog-import` CLI command so operators can add normal prompts to the local catalog from JSON without using the GUI. The command supports non-destructive `--dry-run` previews, imports a single JSON prompt object or a directory of JSON files through the existing catalogue importer, and updates same-name prompts by default unless `--no-overwrite` is supplied.
 - Documented the new JSON import path in `README.md` as the recommended CLI-first way to seed the prompt catalog.

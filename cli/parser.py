@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import tempfile
 from pathlib import Path
 
@@ -32,6 +33,36 @@ def _build_inline_prompt_payload(args: argparse.Namespace) -> dict[str, object]:
     return payload
 
 
+def _write_temp_prompt_payload(payload: object) -> Path:
+    handle = tempfile.NamedTemporaryFile(
+        mode="w",
+        suffix=".json",
+        prefix="prompt-add-inline-",
+        delete=False,
+        encoding="utf-8",
+    )
+    temp_path = Path(handle.name)
+    with handle:
+        json.dump(payload, handle, ensure_ascii=False, indent=2)
+        handle.write("\n")
+    return temp_path
+
+
+def _parse_json_string_payload(raw_json: str, parser: argparse.ArgumentParser) -> object:
+    try:
+        payload = json.loads(raw_json)
+    except json.JSONDecodeError as exc:
+        parser.error(f"prompt-add received invalid JSON: {exc}")
+    return payload
+
+
+def _read_stdin_json_payload(parser: argparse.ArgumentParser) -> object:
+    raw_stdin = sys.stdin.read()
+    if not raw_stdin.strip():
+        parser.error("prompt-add --from-stdin requires a non-empty JSON payload on stdin.")
+    return _parse_json_string_payload(raw_stdin, parser)
+
+
 def _normalise_prompt_add_args(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     if getattr(args, "command", None) != "prompt-add":
         return
@@ -46,14 +77,26 @@ def _normalise_prompt_add_args(args: argparse.Namespace, parser: argparse.Argume
         getattr(args, "scenario", None),
     ]
     has_inline = any(value not in (None, "") for value in inline_fields)
-    has_path = getattr(args, "path", None) is not None
+    path_value = getattr(args, "path", None)
+    json_value = getattr(args, "json_payload", None)
+    use_stdin = bool(getattr(args, "from_stdin", False))
+    sources = [
+        ("path", path_value is not None),
+        ("inline", has_inline),
+        ("json", json_value not in (None, "")),
+        ("stdin", use_stdin),
+    ]
+    selected_sources = [name for name, enabled in sources if enabled]
 
-    if has_path and has_inline:
-        parser.error("prompt-add accepts either PATH or inline fields, not both.")
-    if not has_path and not has_inline:
+    if len(selected_sources) == 0:
         parser.error(
-            "prompt-add requires a PATH or inline fields such as "
-            "--name and --prompt-text."
+            "prompt-add requires exactly one input source: PATH, inline fields, "
+            "--json, or --from-stdin."
+        )
+    if len(selected_sources) > 1:
+        parser.error(
+            "prompt-add accepts exactly one input source: PATH, inline fields, "
+            "--json, or --from-stdin."
         )
     if has_inline:
         if not getattr(args, "name", None):
@@ -64,18 +107,15 @@ def _normalise_prompt_add_args(args: argparse.Namespace, parser: argparse.Argume
             parser.error("prompt-add inline mode requires --prompt-text.")
 
         payload = _build_inline_prompt_payload(args)
-        handle = tempfile.NamedTemporaryFile(
-            mode="w",
-            suffix=".json",
-            prefix="prompt-add-inline-",
-            delete=False,
-            encoding="utf-8",
-        )
-        temp_path = Path(handle.name)
-        with handle:
-            json.dump(payload, handle, ensure_ascii=False, indent=2)
-            handle.write("\n")
-        args.path = temp_path
+        args.path = _write_temp_prompt_payload(payload)
+        return
+    if json_value not in (None, ""):
+        payload = _parse_json_string_payload(str(json_value), parser)
+        args.path = _write_temp_prompt_payload(payload)
+        return
+    if use_stdin:
+        payload = _read_stdin_json_payload(parser)
+        args.path = _write_temp_prompt_payload(payload)
 
 
 def parse_args() -> argparse.Namespace:
@@ -196,6 +236,18 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default=None,
         help="Optional scenario note for inline prompt creation.",
+    )
+    prompt_add_parser.add_argument(
+        "--json",
+        dest="json_payload",
+        type=str,
+        default=None,
+        help="Prompt JSON payload passed directly on the command line.",
+    )
+    prompt_add_parser.add_argument(
+        "--from-stdin",
+        action="store_true",
+        help="Read a prompt JSON payload from standard input.",
     )
     prompt_add_parser.add_argument(
         "--dry-run",
