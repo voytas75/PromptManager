@@ -183,3 +183,20 @@ def test_show_similar_prompts_adds_bounded_inspect_handoff_cue() -> None:
     presenter.show_similar_prompts(source_prompt)
 
     assert "inspect a prompt for reuse details" in callbacks.statuses[-1][0]
+
+
+def test_load_prompts_keeps_ordinary_search_status_calm_and_inspect_oriented() -> None:
+    """Ordinary search results should hint inspect without becoming a second layer."""
+    source_prompt = _prompt("Alpha", ext4=[0.1, 0.2])
+    similar_prompt = _prompt("Beta", ext4=[0.3, 0.4])
+    presenter, callbacks = _build_presenter(
+        source_prompt=source_prompt,
+        similar_results=[similar_prompt],
+    )
+
+    presenter.load_prompts("beta")
+
+    assert callbacks.statuses[-1] == (
+        "Showing search results — inspect a prompt for reuse details.",
+        4000,
+    )

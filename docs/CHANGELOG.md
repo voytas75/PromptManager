@@ -12,6 +12,8 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Changed
 
+- Tightened the prompt-list search-state trust wording so zero-result active search now says `No matches for search — refine keywords`, while keeping the existing four-state contract (`Browsing all prompts`, `Showing search results`, `Search unavailable`) unchanged and local to the coordinator/list surface.
+- Tightened the ordinary prompt-list search status so active text-search matches now surface `Showing search results — inspect a prompt for reuse details.`, giving one bounded handoff hint toward inspect without changing ranking, persistence, or turning ordinary search into a second recommendation layer.
 - Tightened the similar-result list status cue so `show_similar_prompts()` now explicitly says `Showing similar prompts for '<name>'. Recommendation results only — inspect a prompt for reuse details.`, making recommendation-mode retrieval easier to distinguish from ordinary text search while also giving one bounded handoff hint toward inspect, without changing ranking, persistence, or adding a new results screen.
 - Added one bounded retrieval/discovery trust-state cue on the existing prompt-list coordinator seam so prompt loading now exposes compact operator posture labels — `Browsing all prompts`, `Showing search results`, `No matches for search`, and `Search unavailable` — without changing ranking, persistence, presenter workflow, or widening into a new retrieval surface.
 - Tightened inspect/detail no-history fallback so prompts with no recorded runs now keep the calm `Reuse as-is` decision while explicitly surfacing `Validate before reuse` as the next step, without adding synthetic evidence, new panels, or separate empty-state UI.

@@ -192,9 +192,15 @@ Constraint:
 
 ### Slice 2 — Search-state confidence wording polish
 
-**Status:** pending after Slice 1
+**Status:** implemented
 
 **Intent:** Sprawdzić, czy obecne state labels są już wystarczające, czy potrzebują jednego bounded wording pass, żeby active search / no-match posture brzmiały trochę bardziej action-oriented i trustable.
+
+**Implemented:**
+- kept the existing four-state contract unchanged,
+- tightened only the no-match search wording from `No matches for search` to `No matches for search — refine keywords`,
+- preserved `Browsing all prompts`, `Showing search results`, and `Search unavailable` without widening the state model,
+- kept the slice coordinator-local and GUI-local; no presenter, ranking, persistence, or CLI/headless expansion was introduced.
 
 **Good shape:**
 - keep the current four-state contract,
@@ -209,11 +215,24 @@ Constraint:
 **Decision rule:**
 - if the first RED test passes immediately and current wording already feels sufficiently explicit, close this slice as `covered by existing behavior`.
 
+**Verification:**
+- RED confirmed first with `.venv/bin/pytest tests/test_prompt_list_coordinator.py::test_fetch_prompts_exposes_operator_state_for_no_match_search -q` -> `1 failed` on the old generic no-match wording,
+- GREEN after the minimal coordinator wording change with the same targeted pytest command -> `1 passed`,
+- targeted suite: `.venv/bin/pytest tests/test_prompt_list_coordinator.py -q` -> `7 passed`,
+- nearby smoke: `.venv/bin/pytest tests/test_prompt_list_model.py tests/test_prompt_list_coordinator.py -q` -> `23 passed`,
+- lint: `.venv/bin/ruff check gui/prompt_list_coordinator.py tests/test_prompt_list_coordinator.py` -> `All checks passed!`.
+
 ### Slice 3 — Search-to-inspect continuity polish
 
-**Status:** pending after Slice 2
+**Status:** implemented
 
 **Intent:** Zobaczyć, czy ordinary search path — nie tylko similar-result mode — potrzebuje jednego bounded inspect handoff hint, żeby przejście z search do detail było bardziej oczywiste.
+
+**Implemented:**
+- kept the slice wording-only on the existing presenter status seam,
+- ordinary text-search results now surface `Showing search results — inspect a prompt for reuse details.` when active search returns visible matches,
+- no-match and error states keep the coordinator-owned wording unchanged, so the presenter does not create a competing second status contract,
+- similar-result recommendation wording remains separate and stronger, preserving the distinction between ordinary search and recommendation mode.
 
 **Good shape:**
 - wording-only first,
@@ -227,11 +246,24 @@ Constraint:
 **Decision rule:**
 - only land this if a compact wording seam exists and stays calmer than a second recommendation layer.
 
+**Verification:**
+- RED confirmed first with `.venv/bin/pytest tests/test_prompt_list_presenter.py::test_load_prompts_keeps_ordinary_search_status_calm_and_inspect_oriented -q` -> `1 failed` because ordinary search emitted no status cue,
+- GREEN after the minimal presenter-only change with the same targeted pytest command -> `1 passed`,
+- targeted suite: `.venv/bin/pytest tests/test_prompt_list_presenter.py -q` -> `3 passed`,
+- nearby smoke: `.venv/bin/pytest tests/test_prompt_list_presenter.py tests/test_main_window_bridges.py tests/test_template_preview_widget.py -q` -> `15 passed`,
+- lint: `.venv/bin/ruff check gui/prompt_list_presenter.py tests/test_prompt_list_presenter.py` -> `All checks passed!`.
+
 ### Slice 4 — Confidence-cue locality/parity guard pack
 
-**Status:** pending after runtime slices
+**Status:** implemented
 
 **Intent:** Domknąć nowy confidence layer lekkimi testami i decyzją shared-vs-local.
+
+**Implemented:**
+- reconfirmed that the retrieval confidence cues remain confined to prompt-list seams: `PromptListModel.MatchReasonRole`, `PromptLoadResult.operator_state_label`, and presenter-only status wording,
+- no cue from this cycle entered shared analytics fields such as `decision_summary`, `next_action_summary`, or `freshness_summary`,
+- existing `tests/test_retrieval_cues_parity.py` already proved the GUI-local contract on the shared/headless boundary, so no runtime or CLI/headless change was needed,
+- closed the stage as a guard/locality verdict rather than manufacturing extra parity churn.
 
 **Good shape:**
 - add guard coverage for no-search / weak-preview / reset cases,
@@ -242,6 +274,11 @@ Constraint:
 - Modify: `tests/test_prompt_list_model.py`
 - Maybe modify: `tests/test_retrieval_cues_parity.py`
 - Maybe modify: roadmap docs only
+
+**Verification:**
+- inspected the active retrieval confidence seams in `gui/prompt_list_model.py`, `gui/prompt_list_coordinator.py`, and `gui/prompt_list_presenter.py`,
+- inspected `tests/test_retrieval_cues_parity.py` and confirmed the shared/headless boundary still treats prompt-list retrieval cues as GUI-local only,
+- decision: `CLI unchanged by design` for the whole confidence cycle because no new cue escaped prompt-list surfaces into shared analytics.
 
 ---
 

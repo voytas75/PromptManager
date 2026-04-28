@@ -110,7 +110,7 @@ def test_fetch_prompts_records_search_errors_without_faking_empty_results() -> N
 
 
 def test_fetch_prompts_exposes_operator_state_for_no_match_search() -> None:
-    """No-match search state should stay explicit instead of falling back to catalog wording."""
+    """No-match search state should keep a calm next-step hint."""
     manager = _ManagerStub()
     manager.repository = _RepositoryStub([_prompt("Alpha", is_favorite=True)])
     manager.search_results = []
@@ -118,7 +118,7 @@ def test_fetch_prompts_exposes_operator_state_for_no_match_search() -> None:
 
     result = coordinator.fetch_prompts("rollback")
 
-    assert result.operator_state_label == "No matches for search"
+    assert result.operator_state_label == "No matches for search — refine keywords"
 
 
 def test_fetch_prompts_exposes_operator_state_for_search_errors() -> None:

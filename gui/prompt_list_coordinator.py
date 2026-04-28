@@ -70,7 +70,9 @@ class PromptListCoordinator:
             else:
                 preserve_order = True
                 operator_state_label = (
-                    "No matches for search" if not search_results else "Showing search results"
+                    "No matches for search — refine keywords"
+                    if not search_results
+                    else "Showing search results"
                 )
 
         return PromptLoadResult(
