@@ -470,11 +470,13 @@ def test_show_context_menu_explains_fork_prompt_action(
     )
 
 
-def test_show_context_menu_explains_similar_prompts_action(
+def test_show_context_menu_keeps_similar_prompts_wording_distinct_from_search_and_execution(
     qt_app: QApplication,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Context menu should explain that Similar Prompts opens recommendation results."""
+    """Context menu should keep Similar Prompts wording distinct
+    from direct execution and ordinary search.
+    """
     _MenuStub.instances.clear()
     monkeypatch.setattr("gui.prompt_actions_controller.QMenu", _MenuStub)
     query_input = QPlainTextEdit()
@@ -507,17 +509,22 @@ def test_show_context_menu_explains_similar_prompts_action(
 
     assert len(_MenuStub.instances) == 1
     actions = {action.text: action for action in _MenuStub.instances[0].actions}
+    similar_tooltip = actions["Similar Prompts"].tooltip
+    execute_tooltip = actions["Execute Prompt"].tooltip
+
     assert actions["Similar Prompts"].enabled is True
-    assert actions["Similar Prompts"].tooltip == (
-        "Show recommendation results for prompts similar to this one."
-    )
+    assert similar_tooltip == "Show recommendation results for prompts similar to this one."
+    assert similar_tooltip != execute_tooltip
+    assert "recommendation results" in similar_tooltip
+    assert "Run this prompt immediately" not in similar_tooltip
+    assert "search" not in similar_tooltip.lower()
 
 
-def test_show_context_menu_explains_duplicate_prompt_action(
+def test_show_context_menu_keeps_duplicate_and_fork_wording_explicit_and_distinct(
     qt_app: QApplication,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Context menu should explain that Duplicate Prompt creates a plain editable copy."""
+    """Context menu should keep duplicate plain-copy wording distinct from fork lineage wording."""
     _MenuStub.instances.clear()
     monkeypatch.setattr("gui.prompt_actions_controller.QMenu", _MenuStub)
     query_input = QPlainTextEdit()
@@ -550,17 +557,23 @@ def test_show_context_menu_explains_duplicate_prompt_action(
 
     assert len(_MenuStub.instances) == 1
     actions = {action.text: action for action in _MenuStub.instances[0].actions}
+    duplicate_tooltip = actions["Duplicate Prompt"].tooltip
+    fork_tooltip = actions["Fork Prompt"].tooltip
+
     assert actions["Duplicate Prompt"].enabled is True
-    assert actions["Duplicate Prompt"].tooltip == (
-        "Create an editable copy of this prompt without fork lineage."
-    )
+    assert actions["Fork Prompt"].enabled is True
+    assert duplicate_tooltip == "Create an editable copy of this prompt without fork lineage."
+    assert fork_tooltip == "Create a fork linked to this prompt and open it for editing."
+    assert duplicate_tooltip != fork_tooltip
+    assert "without fork lineage" in duplicate_tooltip
+    assert "linked to this prompt" in fork_tooltip
 
 
-def test_show_context_menu_explains_execute_prompt_action(
+def test_show_context_menu_keeps_execute_actions_bounded_and_distinct(
     qt_app: QApplication,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Context menu should explain that Execute Prompt runs the selected prompt immediately."""
+    """Context menu should keep Execute actions local, bounded, and distinct."""
     _MenuStub.instances.clear()
     monkeypatch.setattr("gui.prompt_actions_controller.QMenu", _MenuStub)
     query_input = QPlainTextEdit()
@@ -593,10 +606,18 @@ def test_show_context_menu_explains_execute_prompt_action(
 
     assert len(_MenuStub.instances) == 1
     actions = {action.text: action for action in _MenuStub.instances[0].actions}
+    execute_tooltip = actions["Execute Prompt"].tooltip
+    execute_context_tooltip = actions["Execute as Context…"].tooltip
+
     assert actions["Execute Prompt"].enabled is True
-    assert actions["Execute Prompt"].tooltip == (
-        "Run this prompt immediately using its stored text."
-    )
+    assert actions["Execute as Context…"].enabled is True
+    assert execute_tooltip == "Run this prompt immediately using its stored text."
+    assert execute_context_tooltip == ("Run the stored prompt body as context for an ad-hoc task.")
+    assert execute_tooltip != execute_context_tooltip
+    assert "stored text" in execute_tooltip
+    assert "as context" in execute_context_tooltip
+    assert "workflow" not in execute_tooltip.lower()
+    assert "workflow" not in execute_context_tooltip.lower()
 
 
 def test_show_context_menu_uses_shared_copy_prompt_label(
