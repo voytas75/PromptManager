@@ -1,5 +1,7 @@
 # Pyright Gate Recovery Plan
 
+Status: done
+
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
 
 **Goal:** Utrzymać zielony quality gate na GitHubie, urealnić plan względem stanu repo i przygotować bezpieczny następny etap rozszerzania typed coverage bez rozwalania CI.
@@ -79,6 +81,8 @@
 ---
 
 ## Reframed plan
+
+**Closeout:** The recovery phase itself is closed. The enforced and remotely verified baseline is now `pyright main.py config models`; further typing work should continue in `docs/plans/pyright-strict-expansion-roadmap.md` as controlled scope expansion, not as gate recovery.
 
 ### Done already
 

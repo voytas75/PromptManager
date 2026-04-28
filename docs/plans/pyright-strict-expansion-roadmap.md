@@ -4,9 +4,13 @@
 - `pyright main.py config models`
 
 ## Verified baseline
-- local verification on 2026-04-23: `pyright main.py config models` → `0 errors, 0 warnings, 0 informations`
-- GitHub Actions verification on 2026-04-23 is still only confirmed for the previous scope (`pyright main.py config`), run `24848111847` (`Quality Gates`) on commit `c05d771`
-- current local gate candidate is ready to widen, but still needs push + green GitHub run before treating the expanded scope as remotely enforced
+- local verification on 2026-04-28: `pyright main.py config models` → `0 errors, 0 warnings, 0 informations`
+- GitHub Actions verification for the enforced scope is already confirmed:
+  - workflow: `.github/workflows/quality-gates.yml`
+  - run `24857102545` (`Quality Gates`) on commit `5d36d07`
+  - status: `success`
+- `docs/README-DEV.md` is aligned with the enforced CI scope
+- the next roadmap should treat `main.py config models` as the stable remotely verified baseline, not as a pending local-only candidate
 
 ## Next candidate scope
 - `pyright main.py config models core`
