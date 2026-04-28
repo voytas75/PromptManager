@@ -11,6 +11,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 - Added one bounded retrieval/discovery reason cue on the existing prompt-list model seam so active-search rows that promote a credible source preview can now expose `Matched in source` via `PromptListModel.MatchReasonRole`, improving search-result legibility without changing ranking, persistence, or widening into a new retrieval workflow.
 - Added one bounded Recent-row metadata visibility pass in the existing `Recent Prompts` dialog so each recent entry now shows a visible second line with compact `Modified ... • Category: ...` context, improving reopen choice clarity without new persistence, ranking, or workflow changes.
 - Added one bounded tag-filter visibility pass in the existing prompt-library filter panel so the active tag state now stays visible as a compact `Tag filter: ...` cue, improving retrieval clarity without changing filter semantics, persistence, or widening into a filter redesign.
+- Added one bounded description-availability clarity pass on the existing `Show Description` action so prompts with no saved description now keep the current dialog title while adding one compact next-step hint (`Inspect the prompt body or add a short description for faster reuse.`), improving inspect/reuse readiness without changing metadata, storage, or detail-flow structure.
 
 ### Changed
 

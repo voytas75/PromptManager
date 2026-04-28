@@ -337,6 +337,48 @@ def test_execute_prompt_as_context_delegates_task_and_context(
     assert toast_messages == []
 
 
+def test_show_prompt_description_surfaces_guidance_when_description_is_missing(
+    qt_app: QApplication,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Show Description should keep the dialog but add a bounded next-step hint when empty."""
+    captured_calls: list[tuple[QWidget, str, str]] = []
+
+    def _capture_information(parent: QWidget, title: str, message: str) -> None:
+        captured_calls.append((parent, title, message))
+        return None
+
+    monkeypatch.setattr(
+        prompt_actions_controller_module.QMessageBox,
+        "information",
+        _capture_information,
+    )
+    status_messages: list[tuple[str, int]] = []
+    toast_messages: list[tuple[str, int]] = []
+    controller = _build_controller(
+        query_input=QPlainTextEdit(),
+        workspace_view=None,
+        status_messages=status_messages,
+        toast_messages=toast_messages,
+        execution_supplier=lambda: None,
+    )
+    prompt = _build_prompt(context="Prompt body to inspect", description="   ")
+
+    controller.show_prompt_description(prompt)
+    qt_app.processEvents()
+
+    assert status_messages == []
+    assert toast_messages == []
+    assert len(captured_calls) == 1
+    _, title, message = captured_calls[0]
+    assert title == "No description available"
+    assert (
+        message
+        == "The selected prompt does not have a description yet. "
+        "Inspect the prompt body or add a short description for faster reuse."
+    )
+
+
 def test_show_context_menu_uses_shared_copy_prompt_label(
     qt_app: QApplication,
     monkeypatch: pytest.MonkeyPatch,

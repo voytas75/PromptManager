@@ -294,7 +294,8 @@ class PromptActionsController:
             QMessageBox.information(
                 self._parent,
                 "No description available",
-                "The selected prompt does not have a description yet.",
+                "The selected prompt does not have a description yet. "
+                "Inspect the prompt body or add a short description for faster reuse.",
             )
             return
         QMessageBox.information(
