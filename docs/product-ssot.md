@@ -2,7 +2,7 @@
 
 Status: active
 Owner: Wojtek / Prompt Manager Team
-Updated: 2026-04-26
+Updated: 2026-04-28
 Supersedes:
 - `docs/product-direction-ssot.md`
 - `docs/product-boundary-ssot.md`
@@ -369,6 +369,7 @@ Work that improves:
 - duplicate and similarity judgment at ingest
 - rough-input cleanup on the way to usable draft
 - stronger retrieval/discovery ergonomics, especially search-result legibility and faster reuse
+- lower-friction CLI and import ergonomics for getting prompt assets into the catalog
 - better inspect/detail decision support
 - version/fork clarity
 
