@@ -188,7 +188,7 @@ def _build_controller(
 def test_open_prompt_in_workspace_surfaces_stale_validation_handoff_hint(
     qt_app: QApplication,
 ) -> None:
-    """Workspace handoff should strengthen the hint for stale validation evidence."""
+    """Workspace handoff should keep the stale-validation hint stronger than the generic one."""
     query_input = QPlainTextEdit()
     workspace_view = WorkspaceViewController(
         query_input,
@@ -222,14 +222,21 @@ def test_open_prompt_in_workspace_surfaces_stale_validation_handoff_hint(
     controller.open_prompt_in_workspace(prompt)
     qt_app.processEvents()
 
-    assert query_input.toPlainText() == "Prompt body to reuse"
-    assert execution_calls == 0
     stale_hint = (
         "Prompt ready in workspace. Latest validation is stale — "
         "run current prompt before refining."
     )
+    generic_hint = "Prompt ready in workspace. Run current prompt to validate before refining."
+
+    assert query_input.toPlainText() == "Prompt body to reuse"
+    assert execution_calls == 0
     assert status_messages == [(stale_hint, 3000)]
     assert toast_messages == [("Opened 'Reusable prompt' in the workspace.", 2500)]
+    assert "workspace" in stale_hint.lower()
+    assert "stale" in stale_hint.lower()
+    assert "latest validation" in stale_hint.lower()
+    assert "validate before refining" not in stale_hint.lower()
+    assert stale_hint != generic_hint
 
 
 def test_open_prompt_in_workspace_seeds_text_without_running(qt_app: QApplication) -> None:

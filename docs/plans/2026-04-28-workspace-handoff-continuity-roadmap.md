@@ -78,9 +78,25 @@ Non-goals:
 - the generic hint stays distinct from the stale-validation variant.
 
 ### Slice 2 — Stale-validation handoff continuity parity guard
-**Status:** proposed
+**Status:** done (guard-only)
 
 **Intent:** Reconfirm the stale-validation variant stays stronger than the generic handoff hint while preserving the same non-executing workspace behavior.
+
+**Seam used:**
+- `gui/prompt_actions_controller.py` (`open_prompt_in_workspace()` / `_workspace_handoff_status_message()`)
+- `tests/test_prompt_actions_controller.py`
+
+**Outcome:**
+- runtime already kept the stale-validation path stronger than the generic handoff hint,
+- non-executing workspace seeding stayed unchanged,
+- toast continuity stayed unchanged,
+- the slice landed as a stronger parity guard only.
+
+**Locked by test:**
+- stale-validation handoff still seeds the workspace without execution,
+- the stale hint still names the latest validation as stale,
+- the stale hint stays distinct from the generic validate/refine wording,
+- the stale variant remains the stronger operator cue.
 
 ### Slice 3 — Workspace handoff cue locality / action-local parity guard
 **Status:** proposed
