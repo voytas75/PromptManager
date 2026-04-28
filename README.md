@@ -110,16 +110,35 @@ python -m main --no-gui --print-settings
 uv run python -m main --no-gui --print-settings
 ```
 
-### 4. Import prompts from JSON (optional)
+### 4. Add a prompt from JSON (optional)
 
 If you want to seed the local catalog from a JSON file or a directory of JSON files:
 
 ```bash
-python -m main --no-gui catalog-import path/to/prompt.json --dry-run
-python -m main --no-gui catalog-import path/to/prompt.json
+python -m main --no-gui prompt-add examples/prompt-import-example.json --dry-run
+python -m main --no-gui prompt-add examples/prompt-import-example.json
 ```
 
-`catalog-import` reuses the existing catalogue import flow, so a single JSON object can create one prompt and repeated imports update prompts with the same name by default. Use `--no-overwrite` if you want existing prompts to be kept unchanged.
+You can still use the lower-level `catalog-import` command, but `prompt-add` is the friendlier operator-facing alias for adding or updating normal prompts from CLI.
+
+Example JSON payload:
+
+```json
+{
+  "name": "Diagnostics Helper",
+  "description": "Guide a quick, evidence-first diagnosis of a failing workflow or service.",
+  "prompt_text": "You are diagnosing a failing workflow. Summarise the observed symptoms, identify the most likely failure points, list the next verification steps, and end with a short recovery recommendation.",
+  "category": "Operations",
+  "tags": ["diagnostics", "incident", "triage"],
+  "scenario": "Use when a CI job, background worker, or local service starts failing and you want a calm first-pass triage prompt.",
+  "version": 1,
+  "is_active": true
+}
+```
+
+`prompt-add` and `catalog-import` both reuse the existing catalogue import flow, so a single JSON object can create one prompt and repeated imports update prompts with the same name by default. Use `--no-overwrite` if you want existing prompts to be kept unchanged.
+
+A ready-to-run sample file is included at `examples/prompt-import-example.json`.
 
 ### 5. Launch the app
 

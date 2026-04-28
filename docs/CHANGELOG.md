@@ -6,6 +6,8 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Added
 
+- Added a new operator-facing `prompt-add` CLI command as a friendly alias for adding or updating prompts from JSON on the command line. It supports the same `--dry-run` preview and `--no-overwrite` safety controls as `catalog-import` while making the single-prompt workflow more obvious.
+- Added a checked-in sample payload at `examples/prompt-import-example.json` so operators have a ready-to-run JSON template for CLI prompt creation.
 - Added a new `catalog-import` CLI command so operators can add normal prompts to the local catalog from JSON without using the GUI. The command supports non-destructive `--dry-run` previews, imports a single JSON prompt object or a directory of JSON files through the existing catalogue importer, and updates same-name prompts by default unless `--no-overwrite` is supplied.
 - Documented the new JSON import path in `README.md` as the recommended CLI-first way to seed the prompt catalog.
 - Closed the bounded `Workspace Handoff Continuity` cycle on the existing `PromptActionsController.open_prompt_in_workspace()` seam by landing three guard-only slices that verify the already-shipped operator cues without changing runtime behavior, storage, analytics flow, or workflow semantics: the generic workspace handoff still seeds the prompt body without executing and keeps one explicit validate/refine next step, the stale-validation variant remains intentionally stronger than the generic handoff hint, and the handoff status/toast path stays action-local without leaking into copy / execute / detect analytics side effects.

@@ -77,6 +77,26 @@ def parse_args() -> argparse.Namespace:
         help="Skip updates when a prompt with the same name already exists.",
     )
 
+    prompt_add_parser = subparsers.add_parser(
+        "prompt-add",
+        help="Add or update a prompt from a JSON file or directory of JSON files.",
+    )
+    prompt_add_parser.add_argument(
+        "path",
+        type=Path,
+        help="Source prompt path (.json file or directory of JSON files).",
+    )
+    prompt_add_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview the add/update summary without writing any changes.",
+    )
+    prompt_add_parser.add_argument(
+        "--no-overwrite",
+        action="store_true",
+        help="Skip updates when a prompt with the same name already exists.",
+    )
+
     suggest_parser = subparsers.add_parser(
         "suggest",
         help="Run semantic suggestions for a given query using the configured embedding backend.",

@@ -878,7 +878,7 @@ def test_catalog_export_command(
     assert exported
 
 
-def test_catalog_import_command_dry_run(
+def test_prompt_add_command_dry_run(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
@@ -895,7 +895,7 @@ def test_catalog_import_command_dry_run(
     )
     monkeypatch.setattr(
         "sys.argv",
-        ["prompt-manager", "catalog-import", str(catalog_path), "--dry-run"],
+        ["prompt-manager", "prompt-add", str(catalog_path), "--dry-run"],
     )
     manager = _DummyManager()
     _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
@@ -910,7 +910,7 @@ def test_catalog_import_command_dry_run(
     assert manager.closed is True
 
 
-def test_catalog_import_command_applies_changes(
+def test_prompt_add_command_applies_changes(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
@@ -927,7 +927,7 @@ def test_catalog_import_command_applies_changes(
     )
     monkeypatch.setattr(
         "sys.argv",
-        ["prompt-manager", "catalog-import", str(catalog_path)],
+        ["prompt-manager", "prompt-add", str(catalog_path)],
     )
     manager = _DummyManager()
     _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
@@ -942,7 +942,7 @@ def test_catalog_import_command_applies_changes(
     assert manager.closed is True
 
 
-def test_catalog_import_command_no_overwrite_skips_existing(
+def test_prompt_add_command_no_overwrite_skips_existing(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
@@ -959,7 +959,7 @@ def test_catalog_import_command_no_overwrite_skips_existing(
     )
     monkeypatch.setattr(
         "sys.argv",
-        ["prompt-manager", "catalog-import", str(catalog_path), "--no-overwrite"],
+        ["prompt-manager", "prompt-add", str(catalog_path), "--no-overwrite"],
     )
     manager = _DummyManager()
     manager.create_prompt(
@@ -985,7 +985,7 @@ def test_catalog_import_command_no_overwrite_skips_existing(
     assert manager.closed is True
 
 
-def test_catalog_import_command_returns_error_when_importer_reports_failures(
+def test_prompt_add_command_returns_error_when_importer_reports_failures(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
@@ -1002,7 +1002,7 @@ def test_catalog_import_command_returns_error_when_importer_reports_failures(
     )
     monkeypatch.setattr(
         "sys.argv",
-        ["prompt-manager", "catalog-import", str(catalog_path)],
+        ["prompt-manager", "prompt-add", str(catalog_path)],
     )
     manager = _DummyManager()
     _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
