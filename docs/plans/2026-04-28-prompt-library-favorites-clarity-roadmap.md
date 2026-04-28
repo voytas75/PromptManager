@@ -244,7 +244,7 @@ Constraint:
 
 ### Slice 4 — Favorites cue locality / guard closure
 
-**Status:** proposed
+**Status:** implemented
 
 **Intent:** Domknąć favorites-clarity cycle guardami reset/locality i jasno oznaczyć, czy favorites cues pozostają GUI-local by design.
 
@@ -252,6 +252,18 @@ Constraint:
 - verify the cues stay inside the GUI filter/detail seam,
 - add no-op or parity guards only where a real regression risk exists,
 - avoid CLI/headless churn unless the cue enters shared analytics/product truth.
+
+**Implemented notes:**
+- extended the existing GUI-local parity guard to cover the favorites helper cue on the same `PromptFilterPanel` seam,
+- confirmed `Favorites filter: favorites only` remains widget-local alongside `Tag filter: ...` and `Sort locked during search`,
+- confirmed no shared/headless analytics fields (`decision_summary`, `next_action_summary`, `freshness_summary`) were introduced for these favorites cues,
+- runtime remained unchanged because the favorites cue was already local by design.
+
+**Verified:**
+- probe: `QT_QPA_PLATFORM=offscreen .venv/bin/pytest tests/test_retrieval_cues_parity.py::test_prompt_filter_panel_cues_remain_local_widget_state -q` -> `1 passed` immediately,
+- smoke: `QT_QPA_PLATFORM=offscreen .venv/bin/pytest tests/test_retrieval_cues_parity.py tests/test_prompt_filter_panel.py tests/test_prompt_list_model.py -q` -> `25 passed`,
+- lint: `.venv/bin/ruff check tests/test_retrieval_cues_parity.py` -> `All checks passed!`,
+- syntax: `python -m py_compile tests/test_retrieval_cues_parity.py` -> OK.
 
 ---
 

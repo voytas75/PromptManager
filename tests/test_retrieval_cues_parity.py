@@ -50,14 +50,18 @@ def test_prompt_filter_panel_cues_remain_local_widget_state(qt_app) -> None:
     panel = PromptFilterPanel(sort_options=[("Last modified", "last_modified")])
     panel.set_tags(["docs", "ops"], selected_tag="ops")
     panel.set_sort_enabled(False)
+    panel.set_favorites_only(True)
 
     tag_label = panel.findChild(QLabel, "tagFilterVisibilityLabel")
     sort_label = panel.findChild(QLabel, "sortFilterVisibilityLabel")
+    favorites_label = panel.findChild(QLabel, "favoritesFilterVisibilityLabel")
 
     assert tag_label is not None
     assert tag_label.text() == "Tag filter: ops"
     assert sort_label is not None
     assert sort_label.text() == "Sort locked during search"
+    assert favorites_label is not None
+    assert favorites_label.text() == "Favorites filter: favorites only"
     assert not hasattr(panel, "decision_summary")
     assert not hasattr(panel, "next_action_summary")
     assert not hasattr(panel, "freshness_summary")
