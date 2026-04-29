@@ -204,6 +204,19 @@ Constraint:
 - This slice stays CLI-first and reuses `repository.list()` without adding a new core search seam.
 - It is intentionally lightweight and complements `prompt-show` rather than replacing semantic `suggest`.
 
+### Slice 3 — Prompt show JSON output v1
+
+**Status:** done (2026-04-29)
+
+**Delivered:**
+- added `prompt-show --json` for structured single-prompt reads,
+- JSON payload reuses `prompt.to_record()` to preserve canonical prompt fields,
+- output is pretty-printed and deterministic for console/agent consumption.
+
+**Notes:**
+- This slice stays CLI-first and does not introduce a new internal API helper.
+- It extends the existing `prompt-show` seam rather than creating a separate export command.
+
 **Why this first:**
 - to najbliższa brakująca funkcja względem „konsolowego dostępu do danych”,
 - import/add już istnieje, ale odczyt jednego prompta nadal nie jest tak prosty jak powinien,

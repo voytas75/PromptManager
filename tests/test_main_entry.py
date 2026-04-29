@@ -832,6 +832,45 @@ def test_prompt_find_command_lists_matching_prompts(
     assert manager.closed is True
 
 
+
+def test_prompt_show_command_outputs_json_payload(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    prompt_id = uuid.uuid4()
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-show", str(prompt_id), "--json"],
+    )
+    settings = _DummySettings()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    manager = _DummyManager()
+    manager.repository._store.append(
+        Prompt(
+            id=prompt_id,
+            name="CI Failure Triage",
+            description="Summarise the first-pass diagnosis for a failing workflow.",
+            category="Debugging",
+            tags=["ci", "triage"],
+            context="Inspect logs, isolate the first failing step, and propose next checks.",
+            is_active=True,
+            source="catalog",
+        )
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", lambda _: manager)
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["id"] == str(prompt_id)
+    assert output["name"] == "CI Failure Triage"
+    assert output["tags"] == ["ci", "triage"]
+    assert output["source"] == "catalog"
+    assert output["is_active"] is True
+    assert manager.closed is True
+
+
 def test_setup_logging_basic_config_fallback(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:

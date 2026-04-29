@@ -1,6 +1,7 @@
 """CLI command handlers for Prompt Manager.
 
 Updates:
+  v0.33.4 - 2026-04-29 - Add prompt-show JSON output for structured console reads.
   v0.33.3 - 2026-04-29 - Add prompt-find CLI command for deterministic prompt listing.
   v0.33.2 - 2026-04-29 - Add prompt-show CLI command for deterministic single-prompt reads.
   v0.33.1 - 2025-12-08 - Surface token usage totals in history analytics output.
@@ -957,6 +958,10 @@ def run_prompt_show(
         missing_ref = prompt_id if prompt_id is not None else raw_prompt_id
         print_and_log(logger, logging.ERROR, f"Prompt not found: {missing_ref}")
         return 4
+
+    if bool(getattr(args, "json", False)):
+        print(json.dumps(prompt.to_record(), ensure_ascii=False, indent=2))
+        return 0
 
     tags = ", ".join(prompt.tags) if prompt.tags else "-"
     context = prompt.context.strip() if isinstance(prompt.context, str) else ""

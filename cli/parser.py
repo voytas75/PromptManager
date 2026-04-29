@@ -316,6 +316,12 @@ def parse_args() -> argparse.Namespace:
         help="Prompt UUID to display.",
     )
 
+    prompt_show_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Render the prompt as structured JSON.",
+    )
+
     prompt_find_parser = subparsers.add_parser(
         "prompt-find",
         help="List prompts matching a text query.",

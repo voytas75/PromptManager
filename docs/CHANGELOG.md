@@ -6,6 +6,8 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Added
 
+- Added one bounded **prompt-show JSON output v1** slice so operators and local AI assistants can now read one prompt as structured JSON with `prompt-show <prompt_id-or-name> --json`, reusing the canonical `prompt.to_record()` payload for deterministic console consumption.
+
 - Added one bounded **prompt-find CLI seam v1** so operators and local AI assistants can now list prompts from the console with `prompt-find <query>`, using case-insensitive matching over `name`, `description`, `category`, and `tags`, a default `--limit 10`, and a compact deterministic output format `id | name | [category] | tags`.
 
 - Expanded the bounded **prompt-show CLI seam v1** so operators and local AI assistants can now read one prompt asset from the console by UUID or exact prompt name via `prompt-show <prompt_id-or-name>`, while keeping the same deterministic text output for `id`, `name`, `description`, `category`, `tags`, `source`, `active`, and `context` when present, and returning exit code `4` when no exact UUID or name match is found.
