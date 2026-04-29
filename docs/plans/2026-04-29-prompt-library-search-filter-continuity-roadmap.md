@@ -1,5 +1,7 @@
 # PromptManager Prompt-Library Search / Filter Continuity Roadmap
 
+Status: done
+
 > **For Hermes:** Use subagent-driven-development skill to implement this roadmap one bounded slice at a time.
 
 **Goal:** Strengthen prompt-library retrieval trust by making active search and filter narrowing more explicit at the existing filter-panel seam, so operators immediately understand when the visible library is narrowed and why.
