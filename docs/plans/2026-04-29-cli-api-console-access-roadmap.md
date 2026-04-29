@@ -309,6 +309,21 @@ Constraint:
 
 ---
 
+### Slice 9 — Prompt history status/window filters v1
+
+**Status:** done (2026-04-29)
+
+**Delivered:**
+- added `prompt-history --status <success|failed>` for exact execution-state filtering,
+- added `prompt-history --window-days <n>` for bounded recent-history review,
+- both filters compose with the existing prompt lookup, `--limit`, and `--json` output.
+
+**Notes:**
+- This slice stays CLI-first and extends the existing `prompt-history` seam.
+- It keeps filtering local to the CLI read path and avoids introducing a new API/helper layer.
+
+---
+
 ## Success criteria for the whole roadmap
 
 This cycle is successful if, by the end:

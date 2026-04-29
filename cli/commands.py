@@ -27,6 +27,7 @@ import uuid
 from collections import Counter
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -1075,6 +1076,21 @@ def run_prompt_history(
         raise ValueError("Prompt Manager is required for prompt history.")
     raw_prompt_id = str(getattr(args, "prompt_id", "") or "").strip()
     limit = max(1, int(getattr(args, "limit", 5) or 5))
+    status_raw = str(getattr(args, "status", "") or "").strip().lower()
+    status_filter: str | None = None
+    if status_raw:
+        if status_raw in {"success", "successful", "ok"}:
+            status_filter = "success"
+        elif status_raw in {"failed", "failure", "error"}:
+            status_filter = "failed"
+        else:
+            print_and_log(
+                logger,
+                logging.ERROR,
+                f"Invalid --status value: {getattr(args, 'status', '')}. Use success or failed.",
+            )
+            return 5
+    window_days = max(0, int(getattr(args, "window_days", 0) or 0))
     prompt = None
 
     try:
@@ -1119,6 +1135,13 @@ def run_prompt_history(
     except Exception as exc:  # pragma: no cover - surfaced to CLI
         print_and_log(logger, logging.ERROR, f"Unable to load prompt history: {exc}")
         return 7
+
+    if status_filter is not None:
+        executions = [execution for execution in executions if execution.status.value == status_filter]
+    if window_days > 0:
+        cutoff = datetime.now(UTC) - timedelta(days=window_days)
+        executions = [execution for execution in executions if execution.executed_at >= cutoff]
+    executions = executions[:limit]
 
     def _format_metric(value: float | int | None, *, suffix: str = "") -> str:
         if value is None:

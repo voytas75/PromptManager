@@ -383,6 +383,18 @@ def parse_args() -> argparse.Namespace:
         help="Maximum number of recent executions to display (default: 5).",
     )
     prompt_history_parser.add_argument(
+        "--status",
+        type=str,
+        default=None,
+        help="Filter executions by status (success or failed).",
+    )
+    prompt_history_parser.add_argument(
+        "--window-days",
+        type=int,
+        default=0,
+        help="Look-back window in days for recent executions (0 keeps full history).",
+    )
+    prompt_history_parser.add_argument(
         "--json",
         action="store_true",
         help="Render prompt history as structured JSON.",

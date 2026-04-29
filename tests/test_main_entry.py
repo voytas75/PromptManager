@@ -1191,6 +1191,103 @@ def test_prompt_history_command_outputs_json_payload(
 
 
 
+def test_prompt_history_command_filters_by_status_and_window_days(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    prompt_id = uuid.uuid4()
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "prompt-manager",
+            "prompt-history",
+            str(prompt_id),
+            "--limit",
+            "5",
+            "--status",
+            "failed",
+            "--window-days",
+            "1",
+        ],
+    )
+    settings = _DummySettings()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    manager = _DummyManager()
+    recent_cutoff = datetime(2026, 4, 28, 12, 0, tzinfo=UTC)
+    manager.repository._store.append(
+        Prompt(
+            id=prompt_id,
+            name="CI Failure Triage",
+            description="Summarise the first-pass diagnosis for a failing workflow.",
+            category="Debugging",
+            tags=["ci", "triage"],
+            context="Inspect logs, isolate the first failing step, and propose next checks.",
+            is_active=True,
+            source="catalog",
+        )
+    )
+    manager.prompt_executions = [
+        PromptExecution(
+            id=uuid.uuid4(),
+            prompt_id=prompt_id,
+            request_text="Old failed request",
+            response_text=None,
+            status=ExecutionStatus.FAILED,
+            error_message="Old timeout",
+            duration_ms=901,
+            executed_at=datetime(2026, 4, 27, 9, 0, tzinfo=UTC),
+            metadata={"model": "gpt-reasoning", "total_tokens": 18},
+        ),
+        PromptExecution(
+            id=uuid.uuid4(),
+            prompt_id=prompt_id,
+            request_text="Recent failed request",
+            response_text=None,
+            status=ExecutionStatus.FAILED,
+            error_message="Recent timeout",
+            duration_ms=321,
+            executed_at=datetime(2026, 4, 29, 10, 0, tzinfo=UTC),
+            metadata={"model": "gpt-fast", "total_tokens": 12},
+        ),
+        PromptExecution(
+            id=uuid.uuid4(),
+            prompt_id=prompt_id,
+            request_text="Recent success request",
+            response_text="Recovered response",
+            status=ExecutionStatus.SUCCESS,
+            duration_ms=210,
+            executed_at=datetime(2026, 4, 29, 10, 30, tzinfo=UTC),
+            metadata={"model": "gpt-fast", "total_tokens": 20},
+        ),
+    ]
+    manager.prompt_execution_analytics = PromptExecutionAnalytics(
+        prompt_id=prompt_id,
+        name="CI Failure Triage",
+        total_runs=3,
+        success_rate=1 / 3,
+        average_duration_ms=477.3,
+        average_rating=None,
+        rating_trend=0.0,
+        last_executed_at=datetime(2026, 4, 29, 10, 30, tzinfo=UTC),
+        prompt_tokens=22,
+        completion_tokens=28,
+        total_tokens=50,
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", lambda _: manager)
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "Recent failed request" in output
+    assert "Recent timeout" in output
+    assert recent_cutoff.isoformat(timespec="seconds") not in output
+    assert "Old failed request" not in output
+    assert "Recent success request" not in output
+    assert manager.closed is True
+
+
+
 def test_prompt_show_command_outputs_json_payload(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
