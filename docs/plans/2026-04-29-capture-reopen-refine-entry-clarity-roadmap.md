@@ -210,9 +210,14 @@ Constraint:
 
 ### Slice 3 — Promote Draft advisory entry wording probe
 
-**Status:** proposed
+**Status:** implemented
 
 **Intent:** Sprawdzić, czy `Promote Draft` potrzebuje jednego małego entry-level wording refinementu lub guardu na summary/button seamie, żeby advisory path był czytelniejszy bez ruszania similarity semantics.
+
+**Implemented:**
+- tightened the generic similar-match advisory summary so it now says `Review an existing match or continue promoting this draft as a new prompt.`,
+- kept the change local to the existing summary-label seam and left likely-duplicate / very-close summaries, button semantics, selection flow, and similarity scoring unchanged,
+- kept the slice bounded to entry-level promote posture clarity without adding compare screens, duplicate-management branches, or new controls.
 
 **Good shape:**
 - one compact summary/button copy refinement or a guard that locks the existing good behavior,
@@ -224,6 +229,12 @@ Constraint:
 - Maybe modify: `gui/dialogs/draft_promote.py`
 - Modify: `tests/test_draft_promote_dialog.py`
 - Maybe modify: `docs/CHANGELOG.md`
+
+**Verified:**
+- RED: `QT_QPA_PLATFORM=offscreen .venv/bin/pytest tests/test_draft_promote_dialog.py::test_draft_promote_dialog_summary_mentions_review_or_continue_posture -q` -> `1 failed` because the generic advisory summary still said `Review one ...`,
+- GREEN: same targeted test -> `1 passed`,
+- targeted suite: `QT_QPA_PLATFORM=offscreen .venv/bin/pytest tests/test_draft_promote_dialog.py -q` -> `12 passed`,
+- quality: `.venv/bin/ruff check gui/dialogs/draft_promote.py tests/test_draft_promote_dialog.py && python -m py_compile gui/dialogs/draft_promote.py tests/test_draft_promote_dialog.py` -> `All checks passed!`.
 
 ### Slice 4 — Entry-cue locality / guard closure
 

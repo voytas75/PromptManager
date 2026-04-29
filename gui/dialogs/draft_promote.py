@@ -323,7 +323,7 @@ class DraftPromoteDialog(QDialog):
         else:
             base = (
                 "Similar prompts already exist. "
-                "Review one or continue promoting this draft as a new prompt."
+                "Review an existing match or continue promoting this draft as a new prompt."
             )
 
         if selected_prompt is None:

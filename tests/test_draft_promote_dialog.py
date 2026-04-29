@@ -60,6 +60,38 @@ def test_draft_promote_dialog_hides_similar_section_when_no_matches(qt_app: QApp
     assert dialog.selected_existing_prompt_id is None
 
 
+def test_draft_promote_dialog_summary_mentions_review_or_continue_posture(
+    qt_app: QApplication,
+) -> None:
+    """Promote entry summary should explain the bounded review-or-continue posture."""
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000550"),
+        name="Captured draft",
+        description="Quick capture draft.",
+        category="General",
+        context="Draft body",
+        ext2={"capture_state": "draft", "capture_method": "quick_capture"},
+    )
+    similar = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000551"),
+        name="Existing reusable prompt",
+        description="Already curated.",
+        category="Operations",
+        context="Existing body",
+        last_modified=datetime(2026, 4, 4, 18, 0, tzinfo=UTC),
+    )
+    similar.similarity = 0.72
+
+    dialog = DraftPromoteDialog(prompt, categories=["General"], similar_prompts=[similar])
+    dialog.show()
+    qt_app.processEvents()
+
+    assert (
+        "Review an existing match or continue promoting this draft as a new prompt."
+        in dialog._similarity_summary.text()
+    )  # noqa: SLF001
+
+
 def test_draft_promote_dialog_shows_likely_duplicate_cue_and_opens_selection(
     qt_app: QApplication,
 ) -> None:
