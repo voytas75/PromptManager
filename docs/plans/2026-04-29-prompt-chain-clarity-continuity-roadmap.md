@@ -151,13 +151,13 @@ If the first probe already passes, do **not** force a runtime/UI change just to 
 
 ## Recommended first slice
 
-Start with **Slice 1 — Prompt chain run handoff clarity v1**.
+Start with **Slice 2 — Prompt chain final-output emphasis v1**.
 
-Why this first:
-- it is the most directly user-facing continuity gap in the current chain experience,
-- it improves trust without expanding chain power,
-- it creates a cleaner base for later final-output emphasis or reset guards,
-- it can likely stay on an existing dialog/backend presentation seam with focused tests.
+Why this next:
+- Slice 1 is now complete and gives a clearer per-step handoff baseline,
+- the next most valuable ambiguity is helping operators distinguish the chain’s terminal result from intermediate step output,
+- this should remain a bounded presentation/readability pass on existing result surfaces,
+- it can likely stay GUI-first unless recon shows a tiny CLI formatting follow-up is justified.
 
 ---
 
