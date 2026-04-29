@@ -164,6 +164,26 @@ def test_filter_panel_shows_active_narrowing_summary_for_combined_search_and_fil
     )
 
 
+def test_filter_panel_search_summary_uses_live_query_text_and_resets_when_search_clears(
+    qt_app,
+) -> None:
+    """Search continuity cue should reflect the live query and disappear when search clears."""
+    panel = _build_panel()
+    controller, _presenter, _layout_controller = _build_search_controller(panel)
+
+    controller.search_requested("outage triage", use_indicator=False)
+    QApplication.processEvents()
+
+    summary = panel.findChild(QLabel, "activeNarrowingSummaryLabel")
+    assert summary is not None
+    assert summary.text() == "Showing prompts narrowed by search: outage triage"
+
+    controller.search_changed("")
+    QApplication.processEvents()
+
+    assert summary.text() == "Showing all prompts"
+
+
 def test_favorites_filter_panel_shows_active_visibility_cue(qt_app) -> None:
     """Favorites-only mode should expose a visible active-state cue on the filter seam."""
     panel = _build_panel()

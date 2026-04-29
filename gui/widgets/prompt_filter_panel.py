@@ -74,6 +74,7 @@ class PromptFilterPanel(QWidget):
         self._active_narrowing_summary_label = QLabel("Showing all prompts", self)
         self._active_narrowing_summary_label.setObjectName("activeNarrowingSummaryLabel")
         layout.addWidget(self._active_narrowing_summary_label)
+        self._active_search_text: str = ""
 
         self._sort_visibility_label = QLabel("Sort: manual", self)
         self._sort_visibility_label.setObjectName("sortFilterVisibilityLabel")
@@ -191,7 +192,14 @@ class PromptFilterPanel(QWidget):
     def set_sort_enabled(self, enabled: bool) -> None:
         """Enable or disable manual sort selection."""
         self._sort_combo.setEnabled(enabled)
+        if enabled:
+            self._active_search_text = ""
         self._update_sort_visibility_label()
+        self._update_active_narrowing_summary_label()
+
+    def set_active_search_text(self, text: str | None) -> None:
+        """Store the current active search text for continuity cues."""
+        self._active_search_text = str(text or "").strip()
         self._update_active_narrowing_summary_label()
 
     def is_sort_enabled(self) -> bool:
@@ -229,8 +237,8 @@ class PromptFilterPanel(QWidget):
 
     def _update_active_narrowing_summary_label(self) -> None:
         parts: list[str] = []
-        if not self.is_sort_enabled():
-            parts.append("search: incident")
+        if self._active_search_text:
+            parts.append(f"search: {self._active_search_text}")
         active_tag = self.tag_value()
         if active_tag is not None:
             parts.append(f"tag: {active_tag}")

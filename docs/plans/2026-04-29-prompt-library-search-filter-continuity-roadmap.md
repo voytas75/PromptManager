@@ -101,22 +101,16 @@ If the first probe already passes, do **not** force a runtime change just to jus
 
 ### Slice 2 — Search-query continuity cue v1
 
-**Status:** proposed
+**Status:** done (2026-04-29)
 
-**Intent:**
-- improve visibility of the active text-search constraint at the existing library seam,
-- help the operator connect the typed query to the narrowed result set without relying on memory of the search field contents alone.
+**Delivered:**
+- active narrowing summary now uses the live search query text instead of a generic search-active placeholder,
+- clearing search cleanly restores the neutral summary (`Showing all prompts`),
+- implementation stays on the existing `PromptSearchController` + `PromptFilterPanel` seam without changing ranking, persistence, or CLI/headless behavior.
 
-**Good shape:**
-- one compact visible cue tied to the active search term,
-- cue disappears cleanly when search is cleared,
-- remains local to the filter/search surface.
-
-**Anti-scope:**
-- no highlighting redesign,
-- no search history,
-- no ranking rewrite,
-- no CLI parity work by default.
+**Notes:**
+- Query continuity is intentionally bounded to the local filter/search seam.
+- The summary remains calm and deterministic: live query when search is active, no search fragment when cleared.
 
 ### Slice 3 — Neutral reset-state guard pack v1
 

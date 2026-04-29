@@ -8,6 +8,8 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 - Added one bounded **active narrowing summary cue v1** on the existing prompt-library filter-panel seam so operators now see one always-visible summary that stays calm in the broad state (`Showing all prompts`) and flips to a compact combined narrowing cue when search/filter constraints are active, without changing ranking, persistence, or broader prompt-list semantics.
 
+- Added one bounded **search-query continuity cue v1** on the existing prompt-library filter/search seam so the active narrowing summary now reflects the live search text and resets cleanly to `Showing all prompts` when search is cleared, without changing ranking, persistence, or CLI/headless behavior.
+
 - Added one bounded **prompt-history status/window filters v1** slice so operators and local AI assistants can now narrow `prompt-history <prompt_id-or-name>` with `--status <success|failed>` and `--window-days <n>`, keeping console evidence review focused on exact execution outcomes and bounded recent windows while composing with the existing `--limit` and `--json` output.
 
 - Closed the bounded **CLI / API Console Access** cycle by marking `docs/plans/2026-04-29-cli-api-console-access-roadmap.md` done after shipping the full read-first console surface set: `prompt-show`, `prompt-find`, deterministic JSON output for both reads, and `prompt-history` with structured output plus bounded status/window filters, all kept on the existing product model without adding a separate API/backend layer.

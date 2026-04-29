@@ -135,6 +135,8 @@ class PromptSearchController:
         if text.strip():
             return
         panel = self._filter_panel_supplier()
+        if panel is not None:
+            panel.set_active_search_text("")
         if not self._search_active and (panel is None or panel.is_sort_enabled()):
             return
 
@@ -154,6 +156,7 @@ class PromptSearchController:
 
         panel = self._filter_panel_supplier()
         if panel is not None:
+            panel.set_active_search_text(stripped)
             panel.set_sort_enabled(not self._search_active)
 
         if text and len(stripped) < 2:
