@@ -1,6 +1,7 @@
 """CLI command handlers for Prompt Manager.
 
 Updates:
+  v0.33.8 - 2026-04-29 - Add prompt-history CLI command for per-prompt execution evidence.
   v0.33.7 - 2026-04-29 - Add prompt-find source and active filters for deterministic console discovery.
   v0.33.6 - 2026-04-29 - Add prompt-find category and tag filters for deterministic prompt discovery.
   v0.33.5 - 2026-04-29 - Add prompt-find JSON output for structured console lists.
@@ -1063,12 +1064,132 @@ def run_prompt_find(
     return 0
 
 
+
+def run_prompt_history(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    if manager is None:
+        raise ValueError("Prompt Manager is required for prompt history.")
+    raw_prompt_id = str(getattr(args, "prompt_id", "") or "").strip()
+    limit = max(1, int(getattr(args, "limit", 5) or 5))
+    prompt = None
+
+    try:
+        prompt_id = uuid.UUID(raw_prompt_id)
+    except (ValueError, TypeError):
+        prompt_id = None
+    if prompt_id is not None:
+        try:
+            prompt = manager.repository.get(prompt_id)
+        except RepositoryNotFoundError:
+            prompt = None
+        except KeyError:
+            prompt = None
+        except Exception as exc:  # pragma: no cover - surfaced to CLI
+            print_and_log(logger, logging.ERROR, f"Failed to load prompt: {exc}")
+            return 6
+
+    if prompt is None and raw_prompt_id:
+        try:
+            for candidate in manager.repository.list():
+                if candidate.name == raw_prompt_id:
+                    prompt = candidate
+                    break
+        except Exception as exc:  # pragma: no cover - surfaced to CLI
+            print_and_log(logger, logging.ERROR, f"Failed to search prompt by name: {exc}")
+            return 6
+
+    if prompt is None:
+        missing_ref = prompt_id if prompt_id is not None else raw_prompt_id
+        print_and_log(logger, logging.ERROR, f"Prompt not found: {missing_ref}")
+        return 4
+
+    analytics = None
+    try:
+        get_prompt_execution_analytics = getattr(manager, "get_prompt_execution_analytics", None)
+        if callable(get_prompt_execution_analytics):
+            analytics = get_prompt_execution_analytics(prompt.id)
+        executions = manager.list_executions_for_prompt(prompt.id, limit=limit)
+    except PromptHistoryError as exc:
+        print_and_log(logger, logging.ERROR, f"Unable to load prompt history: {exc}")
+        return 7
+    except Exception as exc:  # pragma: no cover - surfaced to CLI
+        print_and_log(logger, logging.ERROR, f"Unable to load prompt history: {exc}")
+        return 7
+
+    def _format_metric(value: float | int | None, *, suffix: str = "") -> str:
+        if value is None:
+            return "n/a"
+        if isinstance(value, int):
+            return f"{value}{suffix}"
+        return f"{value:.1f}{suffix}"
+
+    lines = [
+        f"id: {prompt.id}",
+        f"name: {prompt.name}",
+    ]
+    if analytics is not None:
+        last_run = (
+            analytics.last_executed_at.isoformat(timespec="seconds")
+            if analytics.last_executed_at is not None
+            else "n/a"
+        )
+        lines.extend(
+            [
+                f"runs: {analytics.total_runs}",
+                f"success: {analytics.success_rate * 100:.1f}%",
+                f"avg_rating: {_format_metric(analytics.average_rating)}",
+                f"avg_latency: {_format_metric(analytics.average_duration_ms, suffix=' ms')}",
+                f"last_run: {last_run}",
+                f"tokens: {analytics.total_tokens}",
+            ]
+        )
+        if analytics.decision_summary:
+            lines.append(f"decision: {analytics.decision_summary}")
+        if analytics.next_action_summary:
+            lines.append(f"next: {analytics.next_action_summary}")
+        if analytics.freshness_summary:
+            lines.append(f"freshness: {analytics.freshness_summary}")
+    else:
+        lines.append("runs: 0")
+
+    lines.append("")
+    lines.append("recent executions:")
+    if not executions:
+        lines.append("(none)")
+    else:
+        for index, execution in enumerate(executions, start=1):
+            metadata = execution.metadata if isinstance(execution.metadata, dict) else {}
+            model = metadata.get("model") or "n/a"
+            total_tokens = metadata.get("total_tokens")
+            token_label = total_tokens if total_tokens not in (None, "") else "n/a"
+            duration = f"{execution.duration_ms} ms" if execution.duration_ms is not None else "n/a"
+            rating = _format_metric(execution.rating)
+            executed_at = execution.executed_at.isoformat(timespec="seconds")
+            lines.append(
+                f"[{index}] {executed_at} | {execution.status.value} | {duration} | "
+                f"rating: {rating} | model: {model} | tokens: {token_label}"
+            )
+            lines.append(f"request: {execution.request_text}")
+            if execution.response_text:
+                lines.append(f"response: {execution.response_text}")
+            if execution.error_message:
+                lines.append(f"error: {execution.error_message}")
+
+    print("\n".join(lines))
+    return 0
+
+
+
 COMMAND_SPECS: dict[str | None, CommandSpec] = {
     "catalog-export": CommandSpec(run_catalog_export),
     "catalog-import": CommandSpec(run_catalog_import),
     "prompt-add": CommandSpec(run_catalog_import),
     "prompt-show": CommandSpec(run_prompt_show),
     "prompt-find": CommandSpec(run_prompt_find),
+    "prompt-history": CommandSpec(run_prompt_history),
     "suggest": CommandSpec(run_suggest),
     "usage-report": CommandSpec(run_usage_report),
     "history-analytics": CommandSpec(run_history_analytics),

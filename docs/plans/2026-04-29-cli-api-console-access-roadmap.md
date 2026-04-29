@@ -256,6 +256,19 @@ Constraint:
 - This slice stays CLI-first and reuses the existing repository-list seam.
 - It extends console discovery without adding a new API/helper seam.
 
+### Slice 7 — Prompt history CLI seam v1
+
+**Status:** done (2026-04-29)
+
+**Delivered:**
+- added `prompt-history <prompt_id-or-name>` for read-only per-prompt execution review,
+- output includes prompt-level aggregate metrics when available plus recent execution entries,
+- recent rows surface status, duration, rating, model, token totals, request text, response preview, and error details when present.
+
+**Notes:**
+- This slice stays CLI-first and reuses the existing prompt lookup plus execution-history seams.
+- It adds decision-support visibility without introducing a new API surface or write path.
+
 **Why this first:**
 - to najbliższa brakująca funkcja względem „konsolowego dostępu do danych”,
 - import/add już istnieje, ale odczyt jednego prompta nadal nie jest tak prosty jak powinien,

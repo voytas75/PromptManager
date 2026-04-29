@@ -367,6 +367,22 @@ def parse_args() -> argparse.Namespace:
         help="Render matching prompts as structured JSON.",
     )
 
+    prompt_history_parser = subparsers.add_parser(
+        "prompt-history",
+        help="Display read-only execution history for a specific prompt.",
+    )
+    prompt_history_parser.add_argument(
+        "prompt_id",
+        type=str,
+        help="Prompt UUID or exact prompt name to inspect.",
+    )
+    prompt_history_parser.add_argument(
+        "--limit",
+        type=int,
+        default=5,
+        help="Maximum number of recent executions to display (default: 5).",
+    )
+
     suggest_parser = subparsers.add_parser(
         "suggest",
         help="Run semantic suggestions for a given query using the configured embedding backend.",

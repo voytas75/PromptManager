@@ -36,7 +36,7 @@ from core.history_tracker import (
 )
 from core.intent_classifier import IntentLabel, IntentPrediction
 from core.prompt_manager import PromptManagerError
-from models.prompt_model import Prompt
+from models.prompt_model import ExecutionStatus, Prompt, PromptExecution
 
 
 def _patch_main(monkeypatch: pytest.MonkeyPatch, name: str, value: object) -> None:
@@ -110,6 +110,8 @@ class _DummyManager:
         self.diagnostics_sample_text: str | None = None
         self.token_usage_totals_window = TokenUsageTotals(25, 50, 75)
         self.token_usage_totals_all = TokenUsageTotals(125, 250, 375)
+        self.prompt_execution_analytics: PromptExecutionAnalytics | None = None
+        self.prompt_executions: list[PromptExecution] = []
 
     def close(self) -> None:
         self.closed = True
@@ -137,6 +139,25 @@ class _DummyManager:
         trend_window: int = 5,
     ) -> ExecutionAnalytics | None:
         return self.execution_analytics
+
+    def get_prompt_execution_analytics(
+        self,
+        prompt_id: uuid.UUID,
+        *,
+        window_days: int | None = None,
+        trend_window: int = 5,
+    ) -> PromptExecutionAnalytics | None:
+        del prompt_id, window_days, trend_window
+        return self.prompt_execution_analytics
+
+    def list_executions_for_prompt(
+        self,
+        prompt_id: uuid.UUID,
+        *,
+        limit: int = 20,
+    ) -> list[PromptExecution]:
+        del prompt_id
+        return list(self.prompt_executions[:limit])
 
     def diagnose_embeddings(self, *, sample_text: str = "Prompt Manager diagnostics probe"):
         self.diagnostics_sample_text = sample_text
@@ -1012,6 +1033,90 @@ def test_prompt_find_command_filters_by_source_and_active_state(
     assert f"{matching_id} | Catalog Active Prompt | [Debugging] | triage" in output
     assert "Catalog Inactive Prompt" not in output
     assert "User Active Prompt" not in output
+    assert manager.closed is True
+
+
+
+def test_prompt_history_command_outputs_recent_execution_summary(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    prompt_id = uuid.uuid4()
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-history", str(prompt_id), "--limit", "2"])
+    settings = _DummySettings()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    manager = _DummyManager()
+    manager.repository._store.append(
+        Prompt(
+            id=prompt_id,
+            name="CI Failure Triage",
+            description="Summarise the first-pass diagnosis for a failing workflow.",
+            category="Debugging",
+            tags=["ci", "triage"],
+            context="Inspect logs, isolate the first failing step, and propose next checks.",
+            is_active=True,
+            source="catalog",
+        )
+    )
+    manager.prompt_executions = [
+        PromptExecution(
+            id=uuid.uuid4(),
+            prompt_id=prompt_id,
+            request_text="First request payload",
+            response_text="First response payload",
+            status=ExecutionStatus.SUCCESS,
+            duration_ms=210,
+            executed_at=datetime(2026, 4, 29, 10, 30, tzinfo=UTC),
+            rating=4.5,
+            metadata={"model": "gpt-fast", "total_tokens": 42},
+        ),
+        PromptExecution(
+            id=uuid.uuid4(),
+            prompt_id=prompt_id,
+            request_text="Second request payload",
+            response_text=None,
+            status=ExecutionStatus.FAILED,
+            error_message="Timeout while calling model",
+            duration_ms=900,
+            executed_at=datetime(2026, 4, 29, 9, 15, tzinfo=UTC),
+            rating=None,
+            metadata={"model": "gpt-reasoning", "total_tokens": 17},
+        ),
+    ]
+    manager.prompt_execution_analytics = PromptExecutionAnalytics(
+        prompt_id=prompt_id,
+        name="CI Failure Triage",
+        total_runs=2,
+        success_rate=0.5,
+        average_duration_ms=555.0,
+        average_rating=4.5,
+        rating_trend=0.0,
+        last_executed_at=datetime(2026, 4, 29, 10, 30, tzinfo=UTC),
+        prompt_tokens=20,
+        completion_tokens=39,
+        total_tokens=59,
+        decision_summary="Keep prompt but inspect unstable model responses.",
+        next_action_summary="Retry with the fast model for baseline checks.",
+        freshness_summary="Validation freshness: recent",
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", lambda _: manager)
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert f"id: {prompt_id}" in output
+    assert "name: CI Failure Triage" in output
+    assert "runs: 2" in output
+    assert "success: 50.0%" in output
+    assert "avg_rating: 4.5" in output
+    assert "decision: Keep prompt but inspect unstable model responses." in output
+    assert "recent executions:" in output
+    assert "[1] 2026-04-29T10:30:00+00:00 | success | 210 ms | rating: 4.5 | model: gpt-fast | tokens: 42" in output
+    assert "request: First request payload" in output
+    assert "response: First response payload" in output
+    assert "[2] 2026-04-29T09:15:00+00:00 | failed | 900 ms | rating: n/a | model: gpt-reasoning | tokens: 17" in output
+    assert "error: Timeout while calling model" in output
     assert manager.closed is True
 
 
