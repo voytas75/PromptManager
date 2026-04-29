@@ -1,6 +1,7 @@
 """CLI command handlers for Prompt Manager.
 
 Updates:
+  v0.33.9 - 2026-04-29 - Add prompt-history JSON output for structured execution evidence reads.
   v0.33.8 - 2026-04-29 - Add prompt-history CLI command for per-prompt execution evidence.
   v0.33.7 - 2026-04-29 - Add prompt-find source and active filters for deterministic console discovery.
   v0.33.6 - 2026-04-29 - Add prompt-find category and tag filters for deterministic prompt discovery.
@@ -1125,6 +1126,34 @@ def run_prompt_history(
         if isinstance(value, int):
             return f"{value}{suffix}"
         return f"{value:.1f}{suffix}"
+
+    if bool(getattr(args, "json", False)):
+        payload = {
+            "prompt": prompt.to_record(),
+            "analytics": {
+                "prompt_id": str(analytics.prompt_id),
+                "name": analytics.name,
+                "total_runs": analytics.total_runs,
+                "success_rate": analytics.success_rate,
+                "average_duration_ms": analytics.average_duration_ms,
+                "average_rating": analytics.average_rating,
+                "rating_trend": analytics.rating_trend,
+                "last_executed_at": (
+                    analytics.last_executed_at.isoformat() if analytics.last_executed_at is not None else None
+                ),
+                "prompt_tokens": analytics.prompt_tokens,
+                "completion_tokens": analytics.completion_tokens,
+                "total_tokens": analytics.total_tokens,
+                "decision_summary": analytics.decision_summary,
+                "next_action_summary": analytics.next_action_summary,
+                "freshness_summary": analytics.freshness_summary,
+            }
+            if analytics is not None
+            else None,
+            "executions": [execution.to_record() for execution in executions],
+        }
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
 
     lines = [
         f"id: {prompt.id}",

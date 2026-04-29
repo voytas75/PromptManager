@@ -6,6 +6,8 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Added
 
+- Added one bounded **prompt-history JSON output v1** slice so operators and local AI assistants can now inspect read-only per-prompt execution evidence as structured JSON with `prompt-history <prompt_id-or-name> --json`, including canonical prompt fields, prompt-level analytics when available, and recent execution records in a deterministic pretty-printed payload.
+
 - Added one bounded **prompt-history CLI seam v1** slice so operators and local AI assistants can now inspect read-only per-prompt execution evidence with `prompt-history <prompt_id-or-name>`, including aggregate execution metrics when available plus recent execution rows with status, duration, rating, model, token totals, request text, response preview, and error details.
 
 - Added one bounded **prompt-find source/active filters v1** slice so operators and local AI assistants can now narrow `prompt-find <query>` results with `--source <value>` and `--active <true|false>`, using exact case-insensitive source matching plus deterministic active-state filtering that composes with the existing text query, `--limit`, `--json`, and category/tag filters.

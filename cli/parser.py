@@ -382,6 +382,11 @@ def parse_args() -> argparse.Namespace:
         default=5,
         help="Maximum number of recent executions to display (default: 5).",
     )
+    prompt_history_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Render prompt history as structured JSON.",
+    )
 
     suggest_parser = subparsers.add_parser(
         "suggest",

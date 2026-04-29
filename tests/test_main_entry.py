@@ -1121,6 +1121,76 @@ def test_prompt_history_command_outputs_recent_execution_summary(
 
 
 
+def test_prompt_history_command_outputs_json_payload(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    prompt_id = uuid.uuid4()
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-history", str(prompt_id), "--limit", "2", "--json"],
+    )
+    settings = _DummySettings()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    manager = _DummyManager()
+    manager.repository._store.append(
+        Prompt(
+            id=prompt_id,
+            name="CI Failure Triage",
+            description="Summarise the first-pass diagnosis for a failing workflow.",
+            category="Debugging",
+            tags=["ci", "triage"],
+            context="Inspect logs, isolate the first failing step, and propose next checks.",
+            is_active=True,
+            source="catalog",
+        )
+    )
+    manager.prompt_executions = [
+        PromptExecution(
+            id=uuid.uuid4(),
+            prompt_id=prompt_id,
+            request_text="First request payload",
+            response_text="First response payload",
+            status=ExecutionStatus.SUCCESS,
+            duration_ms=210,
+            executed_at=datetime(2026, 4, 29, 10, 30, tzinfo=UTC),
+            rating=4.5,
+            metadata={"model": "gpt-fast", "total_tokens": 42},
+        )
+    ]
+    manager.prompt_execution_analytics = PromptExecutionAnalytics(
+        prompt_id=prompt_id,
+        name="CI Failure Triage",
+        total_runs=1,
+        success_rate=1.0,
+        average_duration_ms=210.0,
+        average_rating=4.5,
+        rating_trend=0.2,
+        last_executed_at=datetime(2026, 4, 29, 10, 30, tzinfo=UTC),
+        prompt_tokens=20,
+        completion_tokens=22,
+        total_tokens=42,
+        decision_summary="Keep prompt for baseline incident triage.",
+        next_action_summary="Reuse for first-pass diagnostics.",
+        freshness_summary="Validation freshness: recent",
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", lambda _: manager)
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["prompt"]["id"] == str(prompt_id)
+    assert output["prompt"]["name"] == "CI Failure Triage"
+    assert output["analytics"]["total_runs"] == 1
+    assert output["analytics"]["decision_summary"] == "Keep prompt for baseline incident triage."
+    assert len(output["executions"]) == 1
+    assert output["executions"][0]["status"] == "success"
+    assert output["executions"][0]["metadata"]["model"] == "gpt-fast"
+    assert manager.closed is True
+
+
+
 def test_prompt_show_command_outputs_json_payload(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

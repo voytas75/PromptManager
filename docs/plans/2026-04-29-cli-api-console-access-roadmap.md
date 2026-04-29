@@ -269,6 +269,19 @@ Constraint:
 - This slice stays CLI-first and reuses the existing prompt lookup plus execution-history seams.
 - It adds decision-support visibility without introducing a new API surface or write path.
 
+### Slice 8 — Prompt history JSON output v1
+
+**Status:** done (2026-04-29)
+
+**Delivered:**
+- added `prompt-history --json` for structured per-prompt execution review,
+- payload includes canonical prompt fields, prompt-level analytics when available, and recent execution records,
+- output is pretty-printed and deterministic for agent/console consumption.
+
+**Notes:**
+- This slice stays CLI-first and extends the existing `prompt-history` seam.
+- It avoids a new API/helper layer by reusing existing prompt and execution record payloads.
+
 **Why this first:**
 - to najbliższa brakująca funkcja względem „konsolowego dostępu do danych”,
 - import/add już istnieje, ale odczyt jednego prompta nadal nie jest tak prosty jak powinien,
