@@ -8,6 +8,8 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 - Added one bounded **prompt-history status/window filters v1** slice so operators and local AI assistants can now narrow `prompt-history <prompt_id-or-name>` with `--status <success|failed>` and `--window-days <n>`, keeping console evidence review focused on exact execution outcomes and bounded recent windows while composing with the existing `--limit` and `--json` output.
 
+- Closed the bounded **CLI / API Console Access** cycle by marking `docs/plans/2026-04-29-cli-api-console-access-roadmap.md` done after shipping the full read-first console surface set: `prompt-show`, `prompt-find`, deterministic JSON output for both reads, and `prompt-history` with structured output plus bounded status/window filters, all kept on the existing product model without adding a separate API/backend layer.
+
 - Added one bounded **prompt-history JSON output v1** slice so operators and local AI assistants can now inspect read-only per-prompt execution evidence as structured JSON with `prompt-history <prompt_id-or-name> --json`, including canonical prompt fields, prompt-level analytics when available, and recent execution records in a deterministic pretty-printed payload.
 
 - Added one bounded **prompt-history CLI seam v1** slice so operators and local AI assistants can now inspect read-only per-prompt execution evidence with `prompt-history <prompt_id-or-name>`, including aggregate execution metrics when available plus recent execution rows with status, duration, rating, model, token totals, request text, response preview, and error details.

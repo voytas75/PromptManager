@@ -1,6 +1,6 @@
 # PromptManager CLI / API Console Access Roadmap
 
-Status: proposed
+Status: done
 
 > **For Hermes:** Use subagent-driven-development skill to implement this roadmap one bounded slice at a time.
 
