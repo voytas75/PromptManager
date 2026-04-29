@@ -238,14 +238,24 @@ Constraint:
 
 ### Slice 4 — Entry-cue locality / guard closure
 
-**Status:** proposed
+**Status:** implemented
 
 **Intent:** Domknąć cycle lekkimi guardami i jasno oznaczyć, które cues pozostają local to dialog seams zamiast becoming shared product truth.
+
+**Implemented:**
+- added a focused locality guard in `tests/test_retrieval_cues_parity.py` that locks the shipped `Quick Capture`, `Recent Prompts`, and `Promote Draft` entry-clarity cues on their dialog seams,
+- verified those cues remain widget/dialog-local text and do not become shared analytics fields like `decision_summary`, `next_action_summary`, or `freshness_summary`,
+- kept runtime unchanged by design because the current entry dialogs already behave correctly and no CLI/headless widening was needed.
 
 **Good shape:**
 - keep guard-only if runtime already behaves correctly,
 - no CLI/headless widening,
 - update the roadmap ledger with explicit locality decisions.
+
+**Verified:**
+- probe: `QT_QPA_PLATFORM=offscreen .venv/bin/pytest tests/test_retrieval_cues_parity.py::test_entry_dialog_clarity_cues_remain_local_widget_text -q` -> `1 passed` immediately, confirming a guard-only closure,
+- nearby smoke: `QT_QPA_PLATFORM=offscreen .venv/bin/pytest tests/test_retrieval_cues_parity.py tests/test_quick_capture_dialog.py tests/test_recent_prompts.py tests/test_draft_promote_dialog.py -q` -> `48 passed`,
+- quality: `.venv/bin/ruff check tests/test_retrieval_cues_parity.py && python -m py_compile tests/test_retrieval_cues_parity.py` -> `All checks passed!`.
 
 ---
 

@@ -65,3 +65,71 @@ def test_prompt_filter_panel_cues_remain_local_widget_state(qt_app) -> None:
     assert not hasattr(panel, "decision_summary")
     assert not hasattr(panel, "next_action_summary")
     assert not hasattr(panel, "freshness_summary")
+
+
+def test_entry_dialog_clarity_cues_remain_local_widget_text(qt_app) -> None:
+    """Entry-dialog clarity cues should stay dialog-local instead of shared analytics fields."""
+    from datetime import UTC, datetime
+    from uuid import UUID
+
+    from gui.dialogs.draft_promote import DraftPromoteDialog
+    from gui.dialogs.quick_capture import QuickCaptureDialog
+    from gui.dialogs.recent_prompts import RecentPromptsDialog
+    from models.prompt_model import Prompt
+
+    quick_capture = QuickCaptureDialog()
+    assert quick_capture._entry_guidance_label.text() == (  # noqa: SLF001
+        "Paste a raw prompt or query. PromptManager only cleans obvious outer wrappers "
+        "before saving the draft."
+    )
+    assert not hasattr(quick_capture, "decision_summary")
+    assert not hasattr(quick_capture, "next_action_summary")
+    assert not hasattr(quick_capture, "freshness_summary")
+
+    recent_prompt = Prompt(
+        id=UUID("00000000-0000-0000-0000-000000000601"),
+        name="Recent Prompt",
+        description="Recent prompt description",
+        category="General",
+        context="Recent prompt body",
+        created_at=datetime(2026, 4, 28, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 29, 9, 0, tzinfo=UTC),
+    )
+    recent = RecentPromptsDialog([recent_prompt])
+    recent_summary = recent.findChildren(QLabel)[0]
+    assert recent_summary.text() == (
+        "Reopen one of the prompts you touched most recently to continue refining it."
+    )
+    assert not hasattr(recent, "decision_summary")
+    assert not hasattr(recent, "next_action_summary")
+    assert not hasattr(recent, "freshness_summary")
+
+    draft_prompt = Prompt(
+        id=UUID("00000000-0000-0000-0000-000000000602"),
+        name="Captured draft",
+        description="Quick capture draft.",
+        category="General",
+        context="Draft body",
+        ext2={"capture_state": "draft", "capture_method": "quick_capture"},
+    )
+    similar_prompt = Prompt(
+        id=UUID("00000000-0000-0000-0000-000000000603"),
+        name="Existing reusable prompt",
+        description="Already curated.",
+        category="Operations",
+        context="Existing body",
+        last_modified=datetime(2026, 4, 4, 18, 0, tzinfo=UTC),
+    )
+    similar_prompt.similarity = 0.72
+    promote = DraftPromoteDialog(
+        draft_prompt,
+        categories=["General"],
+        similar_prompts=[similar_prompt],
+    )
+    assert promote._similarity_summary.text() == (  # noqa: SLF001
+        "Similar prompts already exist. Review an existing match or continue promoting "
+        "this draft as a new prompt."
+    )
+    assert not hasattr(promote, "decision_summary")
+    assert not hasattr(promote, "next_action_summary")
+    assert not hasattr(promote, "freshness_summary")
