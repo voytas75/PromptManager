@@ -72,7 +72,10 @@ class RecentPromptsDialog(QDialog):
         """Create the compact recent prompt picker."""
         layout = QVBoxLayout(self)
 
-        summary = QLabel("Reopen one of the prompts you touched most recently.", self)
+        summary = QLabel(
+            "Reopen one of the prompts you touched most recently to continue refining it.",
+            self,
+        )
         summary.setWordWrap(True)
         layout.addWidget(summary)
 

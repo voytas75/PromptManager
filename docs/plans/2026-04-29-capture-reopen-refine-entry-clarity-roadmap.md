@@ -183,9 +183,14 @@ Constraint:
 
 ### Slice 2 — Recent reopen intent cue probe
 
-**Status:** proposed
+**Status:** implemented
 
 **Intent:** Sprawdzić, czy `Recent Prompts` potrzebuje jeszcze jednego małego cue pomagającego operatorowi szybciej zrozumieć reopen posture, ponad już dostarczone `Modified ... • Category: ...`, ale nadal bez rozbudowy w history browser.
+
+**Implemented:**
+- tightened the existing dialog summary wording so `Recent Prompts` now says `Reopen one of the prompts you touched most recently to continue refining it.`,
+- kept the change local to the summary label seam and left row metadata, ordering, selection flow, and persistence unchanged,
+- kept the slice bounded to reopen posture clarity without introducing a history browser or extra list controls.
 
 **Good shape:**
 - one compact visible line or wording refinement on the existing row/summary seam,
@@ -196,6 +201,12 @@ Constraint:
 - Maybe modify: `gui/dialogs/recent_prompts.py`
 - Modify: `tests/test_recent_prompts.py`
 - Maybe modify: `docs/CHANGELOG.md`
+
+**Verified:**
+- RED: `QT_QPA_PLATFORM=offscreen .venv/bin/pytest tests/test_recent_prompts.py::test_recent_prompts_dialog_summary_mentions_reopen_for_further_work -q` -> `1 failed` because the summary still ended at `most recently.`,
+- GREEN: same targeted test -> `1 passed`,
+- targeted suite: `QT_QPA_PLATFORM=offscreen .venv/bin/pytest tests/test_recent_prompts.py -q` -> `4 passed`,
+- quality: `.venv/bin/ruff check gui/dialogs/recent_prompts.py tests/test_recent_prompts.py && python -m py_compile gui/dialogs/recent_prompts.py tests/test_recent_prompts.py` -> `All checks passed!`.
 
 ### Slice 3 — Promote Draft advisory entry wording probe
 

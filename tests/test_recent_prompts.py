@@ -99,6 +99,22 @@ class _RecentPromptsDialogFactoryStub:
         return self.dialog
 
 
+def test_recent_prompts_dialog_summary_mentions_reopen_for_further_work(qt_app) -> None:
+    """Recent dialog summary should make the reopen-and-continue posture explicit."""
+    prompt = _build_prompt(
+        prompt_id=uuid.UUID("00000000-0000-0000-0000-0000000000ac"),
+        name="Reopen Intent Prompt",
+        modified_at=datetime(2026, 4, 28, 10, 0, tzinfo=UTC),
+    )
+
+    dialog = RecentPromptsDialog([prompt])
+    summary = dialog.findChildren(QLabel)[0]
+
+    assert summary.text() == (
+        "Reopen one of the prompts you touched most recently to continue refining it."
+    )
+
+
 def test_open_recent_prompts_orders_by_last_modified_and_selects_prompt() -> None:
     """Recent prompt flow should sort deterministically and reuse the selection path."""
     newest = _build_prompt(
