@@ -6,6 +6,8 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Added
 
+- Added one bounded **prompt-show CLI seam v1** so operators and local AI assistants can now read one prompt asset from the console by UUID via `prompt-show <prompt_id>`, with deterministic text output covering `id`, `name`, `description`, `category`, `tags`, `source`, `active`, and `context` when present, plus explicit exit codes for invalid identifiers (`5`) and missing prompts (`4`).
+
 - Closed the bounded **Capture / Reopen / Refine Entry Clarity** cycle by marking `docs/plans/2026-04-29-capture-reopen-refine-entry-clarity-roadmap.md` done after shipping the four planned slices: a raw-input posture cue for `Quick Capture`, a reopen continuity cue for `Recent Prompts`, a calmer advisory-entry summary for `Promote Draft`, and a guard proving those entry cues remain dialog-local by design.
 - Added one bounded **entry-clarity locality guard** in `tests/test_retrieval_cues_parity.py` so the shipped `Quick Capture`, `Recent Prompts`, and `Promote Draft` entry cues are now explicitly locked as dialog-local wording and kept out of shared analytics fields like `decision_summary`, `next_action_summary`, and `freshness_summary`, without changing runtime behavior or widening into CLI/headless parity.
 - Added one bounded **Promote Draft advisory entry wording v1** refinement in the existing `Promote Draft` dialog so the generic similar-match summary now explicitly says `Review an existing match or continue promoting this draft as a new prompt.`, improving entry-point clarity without changing similarity scoring, button semantics, or introducing a duplicate-management workflow.

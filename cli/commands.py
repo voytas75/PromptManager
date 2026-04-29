@@ -1,6 +1,7 @@
 """CLI command handlers for Prompt Manager.
 
 Updates:
+  v0.33.2 - 2026-04-29 - Add prompt-show CLI command for deterministic single-prompt reads.
   v0.33.1 - 2025-12-08 - Surface token usage totals in history analytics output.
   v0.33.0 - 2025-12-06 - Switch prompt chain CLI to plain-text inputs.
   v0.32.2 - 2025-12-05 - Add prompt chain web search toggle wiring for CLI runs.
@@ -27,6 +28,7 @@ from core import (
     PromptChainExecutionError,
     PromptHistoryError,
     PromptManagerError,
+    RepositoryNotFoundError,
     TokenUsageTotals,
     build_analytics_snapshot,
     diff_prompt_catalog,
@@ -911,10 +913,57 @@ def run_suggest(
     return 0
 
 
+
+def run_prompt_show(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    if manager is None:
+        raise ValueError("Prompt Manager is required for prompt display.")
+    raw_prompt_id = getattr(args, "prompt_id", "") or ""
+    try:
+        prompt_id = uuid.UUID(str(raw_prompt_id))
+    except (ValueError, TypeError) as exc:
+        logger.error("Invalid prompt identifier: %s", exc)
+        return 5
+
+    try:
+        prompt = manager.repository.get(prompt_id)
+    except RepositoryNotFoundError:
+        print_and_log(logger, logging.ERROR, f"Prompt not found: {prompt_id}")
+        return 4
+    except KeyError:
+        print_and_log(logger, logging.ERROR, f"Prompt not found: {prompt_id}")
+        return 4
+    except Exception as exc:  # pragma: no cover - surfaced to CLI
+        print_and_log(logger, logging.ERROR, f"Failed to load prompt: {exc}")
+        return 6
+
+    tags = ", ".join(prompt.tags) if prompt.tags else "-"
+    context = prompt.context.strip() if isinstance(prompt.context, str) else ""
+    lines = [
+        f"id: {prompt.id}",
+        f"name: {prompt.name}",
+        f"description: {prompt.description}",
+        f"category: {prompt.category}",
+        f"tags: {tags}",
+        f"source: {prompt.source}",
+        f"active: {'yes' if prompt.is_active else 'no'}",
+    ]
+    if context:
+        lines.append("context:")
+        lines.append(context)
+
+    print("\n".join(lines))
+    return 0
+
+
 COMMAND_SPECS: dict[str | None, CommandSpec] = {
     "catalog-export": CommandSpec(run_catalog_export),
     "catalog-import": CommandSpec(run_catalog_import),
     "prompt-add": CommandSpec(run_catalog_import),
+    "prompt-show": CommandSpec(run_prompt_show),
     "suggest": CommandSpec(run_suggest),
     "usage-report": CommandSpec(run_usage_report),
     "history-analytics": CommandSpec(run_history_analytics),

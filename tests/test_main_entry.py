@@ -76,6 +76,12 @@ class _DummyRepository:
         values = list(self._store)
         return values if limit is None else values[:limit]
 
+    def get(self, prompt_id: uuid.UUID) -> object:
+        for prompt in self._store:
+            if getattr(prompt, "id", None) == prompt_id:
+                return prompt
+        raise KeyError(prompt_id)
+
 
 class _DummyManager:
     def __init__(self) -> None:
@@ -706,6 +712,45 @@ def test_suggest_command_outputs_results(
     output = capsys.readouterr().out
     assert "Top 1 suggestions" in output
     assert "Debug Sentinel" in output
+    assert manager.closed is True
+
+
+
+def test_prompt_show_command_outputs_prompt_details(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    prompt_id = uuid.uuid4()
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-show", str(prompt_id)])
+    settings = _DummySettings()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    manager = _DummyManager()
+    manager.repository._store.append(
+        Prompt(
+            id=prompt_id,
+            name="CI Failure Triage",
+            description="Summarise the first-pass diagnosis for a failing workflow.",
+            category="Debugging",
+            tags=["ci", "triage"],
+            context="Inspect logs, isolate the first failing step, and propose next checks.",
+            is_active=True,
+            source="catalog",
+        )
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", lambda _: manager)
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert f"id: {prompt_id}" in output
+    assert "name: CI Failure Triage" in output
+    assert "description: Summarise the first-pass diagnosis for a failing workflow." in output
+    assert "category: Debugging" in output
+    assert "tags: ci, triage" in output
+    assert "source: catalog" in output
+    assert "active: yes" in output
+    assert "context:\nInspect logs, isolate the first failing step, and propose next checks." in output
     assert manager.closed is True
 
 

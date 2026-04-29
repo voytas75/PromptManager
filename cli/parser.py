@@ -306,6 +306,16 @@ def parse_args() -> argparse.Namespace:
         help="Skip updates when a prompt with the same name already exists.",
     )
 
+    prompt_show_parser = subparsers.add_parser(
+        "prompt-show",
+        help="Display a prompt by UUID.",
+    )
+    prompt_show_parser.add_argument(
+        "prompt_id",
+        type=str,
+        help="Prompt UUID to display.",
+    )
+
     suggest_parser = subparsers.add_parser(
         "suggest",
         help="Run semantic suggestions for a given query using the configured embedding backend.",
