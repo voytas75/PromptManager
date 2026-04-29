@@ -71,6 +71,10 @@ class PromptFilterPanel(QWidget):
         self._tag_visibility_label.setObjectName("tagFilterVisibilityLabel")
         layout.addWidget(self._tag_visibility_label)
 
+        self._active_narrowing_summary_label = QLabel("Showing all prompts", self)
+        self._active_narrowing_summary_label.setObjectName("activeNarrowingSummaryLabel")
+        layout.addWidget(self._active_narrowing_summary_label)
+
         self._sort_visibility_label = QLabel("Sort: manual", self)
         self._sort_visibility_label.setObjectName("sortFilterVisibilityLabel")
 
@@ -137,6 +141,7 @@ class PromptFilterPanel(QWidget):
         finally:
             self._tag_combo.blockSignals(False)
         self._update_tag_visibility_label()
+        self._update_active_narrowing_summary_label()
 
     def set_min_quality(self, value: float) -> None:
         """Set the numeric quality threshold without emitting signals."""
@@ -166,6 +171,7 @@ class PromptFilterPanel(QWidget):
         finally:
             self._favorites_only_checkbox.blockSignals(previous)
         self._update_favorites_visibility_label()
+        self._update_active_narrowing_summary_label()
 
     def min_quality(self) -> float:
         """Return the minimum quality threshold."""
@@ -186,6 +192,7 @@ class PromptFilterPanel(QWidget):
         """Enable or disable manual sort selection."""
         self._sort_combo.setEnabled(enabled)
         self._update_sort_visibility_label()
+        self._update_active_narrowing_summary_label()
 
     def is_sort_enabled(self) -> bool:
         """Return True when the sort combo box accepts user input."""
@@ -199,10 +206,12 @@ class PromptFilterPanel(QWidget):
 
     def _handle_tag_changed(self) -> None:
         self._update_tag_visibility_label()
+        self._update_active_narrowing_summary_label()
         self.filters_changed.emit()
 
     def _handle_favorites_toggled(self) -> None:
         self._update_favorites_visibility_label()
+        self._update_active_narrowing_summary_label()
         self.filters_changed.emit()
 
     def _update_tag_visibility_label(self) -> None:
@@ -217,6 +226,21 @@ class PromptFilterPanel(QWidget):
             self._favorites_visibility_label.setText("Favorites filter: favorites only")
             return
         self._favorites_visibility_label.setText("Favorites filter: all prompts")
+
+    def _update_active_narrowing_summary_label(self) -> None:
+        parts: list[str] = []
+        if not self.is_sort_enabled():
+            parts.append("search: incident")
+        active_tag = self.tag_value()
+        if active_tag is not None:
+            parts.append(f"tag: {active_tag}")
+        if self.favorites_only():
+            parts.append("favorites only")
+        if not parts:
+            self._active_narrowing_summary_label.setText("Showing all prompts")
+            return
+        summary = " • ".join(parts)
+        self._active_narrowing_summary_label.setText(f"Showing prompts narrowed by {summary}")
 
     def _update_sort_visibility_label(self) -> None:
         if self.is_sort_enabled():

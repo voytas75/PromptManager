@@ -88,23 +88,16 @@ If the first probe already passes, do **not** force a runtime change just to jus
 
 ### Slice 1 — Active narrowing summary cue v1
 
-**Status:** proposed
+**Status:** done (2026-04-29)
 
-**Intent:**
-- add or refine one compact always-visible summary in the existing filter-panel seam so combined narrowing state is easier to read at a glance,
-- make it obvious when the library is narrowed by search plus one or more local filters,
-- keep the slice local to the filter-panel / nearest prompt-list seam.
+**Delivered:**
+- added one always-visible `activeNarrowingSummaryLabel` on the existing `PromptFilterPanel` seam,
+- summary now flips from `Showing all prompts` to a compact combined narrowing cue when search/filter constraints are active,
+- first v1 coverage locks the combined search + tag + favorites case without changing ranking, persistence, or broader prompt-list semantics.
 
-**Good shape:**
-- one calm summary line such as a compact `Showing all prompts` vs narrowed-state variant,
-- composes with existing tag / favorites / search lock cues instead of replacing them,
-- no ranking, persistence, or list-model changes.
-
-**Anti-scope:**
-- no advanced filter builder,
-- no saved views,
-- no new query grammar,
-- no second status banner elsewhere in the UI.
+**Notes:**
+- This slice stays entirely on the filter-panel seam.
+- Search wording is currently driven by the existing sort-lock/search-active state and remains deliberately bounded for v1.
 
 ### Slice 2 — Search-query continuity cue v1
 
