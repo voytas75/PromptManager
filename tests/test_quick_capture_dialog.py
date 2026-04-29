@@ -40,6 +40,16 @@ def qt_app() -> QApplication:
     return cast("QApplication", app)
 
 
+def test_quick_capture_dialog_shows_raw_input_entry_guidance(qt_app: QApplication) -> None:
+    """Quick Capture should expose one compact visible cue about raw input and bounded cleanup."""
+    dialog = QuickCaptureDialog()
+
+    assert dialog._entry_guidance_label.text() == (  # noqa: SLF001
+        "Paste a raw prompt or query. PromptManager only cleans obvious outer wrappers "
+        "before saving the draft."
+    )
+
+
 def test_quick_capture_dialog_builds_source_provenance_draft(qt_app: QApplication) -> None:
     """Quick capture should accept a simple source/provenance value from the form."""
     dialog = QuickCaptureDialog()

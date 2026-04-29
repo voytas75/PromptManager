@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QLabel,
     QLineEdit,
     QMessageBox,
     QPlainTextEdit,
@@ -217,6 +218,14 @@ class QuickCaptureDialog(QDialog):
         form = QFormLayout()
         form.setContentsMargins(16, 16, 16, 8)
         form.setSpacing(10)
+
+        self._entry_guidance_label = QLabel(
+            "Paste a raw prompt or query. PromptManager only cleans obvious outer wrappers "
+            "before saving the draft.",
+            self,
+        )
+        self._entry_guidance_label.setWordWrap(True)
+        layout.addWidget(self._entry_guidance_label)
 
         self._title_input = QLineEdit(self)
         self._title_input.setPlaceholderText(

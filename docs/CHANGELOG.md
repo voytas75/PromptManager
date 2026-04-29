@@ -6,6 +6,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Added
 
+- Added one bounded **Quick Capture entry clarity v1** cue in the existing `Quick Capture` dialog so operators now see a compact always-visible reminder that the dialog accepts a raw prompt/query and only performs bounded cleanup of obvious outer wrappers before saving the draft, without changing capture semantics, storage, or introducing a richer preprocessing workflow.
 - Added a new operator-facing `prompt-add` CLI command as a friendly alias for adding or updating prompts from JSON on the command line. It supports the same `--dry-run` preview and `--no-overwrite` safety controls as `catalog-import` while making the single-prompt workflow more obvious.
 - Extended `prompt-add` so operators can also create one prompt directly from inline CLI flags like `--name`, `--description`, and `--prompt-text`, without preparing a JSON file first.
 - Extended `prompt-add` again with `--json` and `--from-stdin` so a single prompt payload can be passed directly as a JSON string or piped from standard input while still using the same catalog-import backend.
