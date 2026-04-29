@@ -6,6 +6,8 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Added
 
+- Expanded the bounded **prompt-show CLI seam v1** so operators and local AI assistants can now read one prompt asset from the console by UUID or exact prompt name via `prompt-show <prompt_id-or-name>`, while keeping the same deterministic text output for `id`, `name`, `description`, `category`, `tags`, `source`, `active`, and `context` when present, and returning exit code `4` when no exact UUID or name match is found.
+
 - Added one bounded **prompt-show CLI seam v1** so operators and local AI assistants can now read one prompt asset from the console by UUID via `prompt-show <prompt_id>`, with deterministic text output covering `id`, `name`, `description`, `category`, `tags`, `source`, `active`, and `context` when present, plus explicit exit codes for invalid identifiers (`5`) and missing prompts (`4`).
 
 - Closed the bounded **Capture / Reopen / Refine Entry Clarity** cycle by marking `docs/plans/2026-04-29-capture-reopen-refine-entry-clarity-roadmap.md` done after shipping the four planned slices: a raw-input posture cue for `Quick Capture`, a reopen continuity cue for `Recent Prompts`, a calmer advisory-entry summary for `Promote Draft`, and a guard proving those entry cues remain dialog-local by design.

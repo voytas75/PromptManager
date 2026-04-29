@@ -178,18 +178,17 @@ Constraint:
 
 ### Slice 1 — Prompt show/read CLI seam v1
 
-**Status:** done (2026-04-29)
+**Status:** done (expanded 2026-04-29)
 
 **Delivered:**
-- added `prompt-show <prompt_id>` as a deterministic read-only CLI surface,
-- current v1 lookup is UUID-only,
+- added `prompt-show <prompt_id-or-name>` as a deterministic read-only CLI surface,
+- lookup now supports UUID first and exact-name fallback,
 - output includes: `id`, `name`, `description`, `category`, `tags`, `source`, `active`, and `context` when present,
-- invalid UUID returns exit code `5`,
 - missing prompt returns exit code `4`.
 
 **Notes:**
-- This lands the CLI-first single-prompt read seam without introducing JSON mode, name fallback, or new internal API helpers.
-- Exact-name fallback remains a sensible follow-up slice if console usage proves it is needed.
+- This lands the CLI-first single-prompt read seam without introducing JSON mode or new internal API helpers.
+- Exact-name fallback is now included in the same bounded slice because it remained thin and reused the existing repository list seam.
 
 **Why this first:**
 - to najbliższa brakująca funkcja względem „konsolowego dostępu do danych”,

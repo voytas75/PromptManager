@@ -921,24 +921,41 @@ def run_prompt_show(
 ) -> int:
     if manager is None:
         raise ValueError("Prompt Manager is required for prompt display.")
-    raw_prompt_id = getattr(args, "prompt_id", "") or ""
-    try:
-        prompt_id = uuid.UUID(str(raw_prompt_id))
-    except (ValueError, TypeError) as exc:
-        logger.error("Invalid prompt identifier: %s", exc)
-        return 5
+    raw_prompt_id = str(getattr(args, "prompt_id", "") or "").strip()
+    prompt = None
 
     try:
-        prompt = manager.repository.get(prompt_id)
-    except RepositoryNotFoundError:
-        print_and_log(logger, logging.ERROR, f"Prompt not found: {prompt_id}")
+        prompt_id = uuid.UUID(raw_prompt_id)
+    except (ValueError, TypeError):
+        prompt_id = None
+    if prompt_id is not None:
+        try:
+            prompt = manager.repository.get(prompt_id)
+        except RepositoryNotFoundError:
+            prompt = None
+        except KeyError:
+            prompt = None
+        except Exception as exc:  # pragma: no cover - surfaced to CLI
+            print_and_log(logger, logging.ERROR, f"Failed to load prompt: {exc}")
+            return 6
+
+    if prompt is None and raw_prompt_id:
+        try:
+            for candidate in manager.repository.list():
+                if candidate.name == raw_prompt_id:
+                    prompt = candidate
+                    break
+        except Exception as exc:  # pragma: no cover - surfaced to CLI
+            print_and_log(logger, logging.ERROR, f"Failed to search prompt by name: {exc}")
+            return 6
+
+    if prompt is None:
+        if prompt_id is None and raw_prompt_id:
+            print_and_log(logger, logging.ERROR, f"Prompt not found: {raw_prompt_id}")
+            return 4
+        missing_ref = prompt_id if prompt_id is not None else raw_prompt_id
+        print_and_log(logger, logging.ERROR, f"Prompt not found: {missing_ref}")
         return 4
-    except KeyError:
-        print_and_log(logger, logging.ERROR, f"Prompt not found: {prompt_id}")
-        return 4
-    except Exception as exc:  # pragma: no cover - surfaced to CLI
-        print_and_log(logger, logging.ERROR, f"Failed to load prompt: {exc}")
-        return 6
 
     tags = ", ".join(prompt.tags) if prompt.tags else "-"
     context = prompt.context.strip() if isinstance(prompt.context, str) else ""
