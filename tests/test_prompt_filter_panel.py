@@ -184,6 +184,32 @@ def test_filter_panel_search_summary_uses_live_query_text_and_resets_when_search
     assert summary.text() == "Showing all prompts"
 
 
+def test_filter_panel_reset_restores_neutral_summary_after_search_and_filters_clear(
+    qt_app,
+) -> None:
+    """Combined narrowing state should leave no stale summary after a full reset."""
+    panel = _build_panel()
+    panel.set_tags(["docs", "ops"], selected_tag="ops")
+    panel.set_favorites_only(True)
+    controller, _presenter, _layout_controller = _build_search_controller(panel)
+
+    controller.search_requested("outage triage", use_indicator=False)
+    QApplication.processEvents()
+
+    summary = panel.findChild(QLabel, "activeNarrowingSummaryLabel")
+    assert summary is not None
+    assert summary.text() == (
+        "Showing prompts narrowed by search: outage triage • tag: ops • favorites only"
+    )
+
+    controller.search_changed("")
+    panel._tag_combo.setCurrentIndex(0)  # noqa: SLF001
+    panel._favorites_only_checkbox.setChecked(False)  # noqa: SLF001
+    QApplication.processEvents()
+
+    assert summary.text() == "Showing all prompts"
+
+
 def test_favorites_filter_panel_shows_active_visibility_cue(qt_app) -> None:
     """Favorites-only mode should expose a visible active-state cue on the filter seam."""
     panel = _build_panel()

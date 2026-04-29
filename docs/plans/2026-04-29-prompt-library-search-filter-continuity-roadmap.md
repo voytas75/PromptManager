@@ -114,21 +114,16 @@ If the first probe already passes, do **not** force a runtime change just to jus
 
 ### Slice 3 — Neutral reset-state guard pack v1
 
-**Status:** proposed
+**Status:** implemented (2026-04-29, guard-only)
 
-**Intent:**
-- prove the prompt-library surface cleanly returns to a broad neutral state after search/filter reset,
-- strengthen regression coverage so future micro-cues do not leave stale narrowing language behind.
+**Delivered:**
+- added one focused regression guard proving the active narrowing summary returns to `Showing all prompts` after search, tag, and favorites constraints are fully cleared,
+- verified the existing runtime seam already resets cleanly, so no production-code change was required,
+- kept the slice local to `tests/test_prompt_filter_panel.py` without widening into presenter/list logic or persistence.
 
-**Good shape:**
-- focused tests for clearing search + filters,
-- runtime change only if the first RED test proves a real stale-state bug,
-- otherwise guard-only closeout.
-
-**Anti-scope:**
-- no runtime churn without a failing regression,
-- no broad presenter/list rewrite,
-- no persistence semantics.
+**Notes:**
+- This slice intentionally closes as guard-only because the first probe passed immediately.
+- Neutral reset behavior is now explicitly locked for the combined search + filters path.
 
 ---
 
