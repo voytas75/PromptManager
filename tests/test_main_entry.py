@@ -833,6 +833,55 @@ def test_prompt_find_command_lists_matching_prompts(
 
 
 
+def test_prompt_find_command_outputs_json_payload(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-find", "triage", "--json"])
+    settings = _DummySettings()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    manager = _DummyManager()
+    matching_id = uuid.uuid4()
+    manager.repository._store.extend(
+        [
+            Prompt(
+                id=matching_id,
+                name="CI Failure Triage",
+                description="Summarise the first-pass diagnosis for a failing workflow.",
+                category="Debugging",
+                tags=["ci", "triage"],
+                context="Inspect logs, isolate the first failing step, and propose next checks.",
+                is_active=True,
+                source="catalog",
+            ),
+            Prompt(
+                id=uuid.uuid4(),
+                name="Release Notes Writer",
+                description="Draft release notes from merged pull requests.",
+                category="Writing",
+                tags=["release"],
+                context="Summarise user-visible changes only.",
+                is_active=True,
+                source="catalog",
+            ),
+        ]
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", lambda _: manager)
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = json.loads(capsys.readouterr().out)
+    assert isinstance(output, list)
+    assert len(output) == 1
+    assert output[0]["id"] == str(matching_id)
+    assert output[0]["name"] == "CI Failure Triage"
+    assert output[0]["tags"] == ["ci", "triage"]
+    assert output[0]["source"] == "catalog"
+    assert manager.closed is True
+
+
+
 def test_prompt_show_command_outputs_json_payload(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

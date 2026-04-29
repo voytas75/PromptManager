@@ -1,6 +1,7 @@
 """CLI command handlers for Prompt Manager.
 
 Updates:
+  v0.33.5 - 2026-04-29 - Add prompt-find JSON output for structured console lists.
   v0.33.4 - 2026-04-29 - Add prompt-show JSON output for structured console reads.
   v0.33.3 - 2026-04-29 - Add prompt-find CLI command for deterministic prompt listing.
   v0.33.2 - 2026-04-29 - Add prompt-show CLI command for deterministic single-prompt reads.
@@ -1017,6 +1018,11 @@ def run_prompt_find(
 
     if not matches:
         print(f"No prompts matched: {getattr(args, 'query', '')}")
+        return 0
+
+    if bool(getattr(args, "json", False)):
+        payload = [prompt.to_record() for prompt in matches]
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
 
     lines = []

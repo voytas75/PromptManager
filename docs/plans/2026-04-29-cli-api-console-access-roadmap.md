@@ -217,6 +217,19 @@ Constraint:
 - This slice stays CLI-first and does not introduce a new internal API helper.
 - It extends the existing `prompt-show` seam rather than creating a separate export command.
 
+### Slice 4 — Prompt find JSON output v1
+
+**Status:** done (2026-04-29)
+
+**Delivered:**
+- added `prompt-find --json` for structured multi-prompt reads,
+- JSON payload is a deterministic pretty-printed list of `prompt.to_record()` entries,
+- existing query semantics and `--limit` behavior stay unchanged.
+
+**Notes:**
+- This slice stays CLI-first and reuses the existing `prompt-find` seam.
+- It gives local operators/agents a machine-readable list surface without introducing a new API helper.
+
 **Why this first:**
 - to najbliższa brakująca funkcja względem „konsolowego dostępu do danych”,
 - import/add już istnieje, ale odczyt jednego prompta nadal nie jest tak prosty jak powinien,

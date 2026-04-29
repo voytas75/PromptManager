@@ -337,6 +337,11 @@ def parse_args() -> argparse.Namespace:
         default=10,
         help="Maximum number of matching prompts to display (default: 10).",
     )
+    prompt_find_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Render matching prompts as structured JSON.",
+    )
 
     suggest_parser = subparsers.add_parser(
         "suggest",
