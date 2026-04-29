@@ -243,6 +243,19 @@ Constraint:
 - This slice stays CLI-first and keeps filtering inside the existing repository-list seam.
 - It extends the existing prompt discovery surface without adding a new API or search subsystem.
 
+### Slice 6 — Prompt find source/active filters v1
+
+**Status:** done (2026-04-29)
+
+**Delivered:**
+- added `prompt-find --source <value>` for exact case-insensitive source filtering,
+- added `prompt-find --active <true|false>` for deterministic active-state filtering,
+- both filters compose with the existing text query, `--limit`, `--json`, and category/tag filters.
+
+**Notes:**
+- This slice stays CLI-first and reuses the existing repository-list seam.
+- It extends console discovery without adding a new API/helper seam.
+
 **Why this first:**
 - to najbliższa brakująca funkcja względem „konsolowego dostępu do danych”,
 - import/add już istnieje, ale odczyt jednego prompta nadal nie jest tak prosty jak powinien,

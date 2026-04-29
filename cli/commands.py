@@ -1,6 +1,7 @@
 """CLI command handlers for Prompt Manager.
 
 Updates:
+  v0.33.7 - 2026-04-29 - Add prompt-find source and active filters for deterministic console discovery.
   v0.33.6 - 2026-04-29 - Add prompt-find category and tag filters for deterministic prompt discovery.
   v0.33.5 - 2026-04-29 - Add prompt-find JSON output for structured console lists.
   v0.33.4 - 2026-04-29 - Add prompt-show JSON output for structured console reads.
@@ -999,6 +1000,21 @@ def run_prompt_find(
     limit = max(1, int(getattr(args, "limit", 10) or 10))
     category_filter = str(getattr(args, "category", "") or "").strip().lower()
     tag_filter = str(getattr(args, "tag", "") or "").strip().lower()
+    source_filter = str(getattr(args, "source", "") or "").strip().lower()
+    active_raw = str(getattr(args, "active", "") or "").strip().lower()
+    active_filter: bool | None = None
+    if active_raw:
+        if active_raw in {"1", "true", "yes", "y", "active"}:
+            active_filter = True
+        elif active_raw in {"0", "false", "no", "n", "inactive"}:
+            active_filter = False
+        else:
+            print_and_log(
+                logger,
+                logging.ERROR,
+                f"Invalid --active value: {getattr(args, 'active', '')}. Use true/false.",
+            )
+            return 5
 
     try:
         prompts = manager.repository.list()
@@ -1021,6 +1037,10 @@ def run_prompt_find(
         if tag_filter and tag_filter not in {
             str(tag).strip().lower() for tag in (prompt.tags or []) if str(tag).strip()
         }:
+            continue
+        if source_filter and source_filter != str(prompt.source or "").strip().lower():
+            continue
+        if active_filter is not None and bool(prompt.is_active) is not active_filter:
             continue
         matches.append(prompt)
         if len(matches) >= limit:

@@ -949,6 +949,73 @@ def test_prompt_find_command_filters_by_category_and_tag(
 
 
 
+def test_prompt_find_command_filters_by_source_and_active_state(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "prompt-manager",
+            "prompt-find",
+            "prompt",
+            "--source",
+            "catalog",
+            "--active",
+            "true",
+        ],
+    )
+    settings = _DummySettings()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    manager = _DummyManager()
+    matching_id = uuid.uuid4()
+    manager.repository._store.extend(
+        [
+            Prompt(
+                id=matching_id,
+                name="Catalog Active Prompt",
+                description="Prompt from the catalog.",
+                category="Debugging",
+                tags=["triage"],
+                context="Inspect the active catalog entry.",
+                is_active=True,
+                source="catalog",
+            ),
+            Prompt(
+                id=uuid.uuid4(),
+                name="Catalog Inactive Prompt",
+                description="Inactive catalog entry.",
+                category="Debugging",
+                tags=["triage"],
+                context="Should be filtered out by active state.",
+                is_active=False,
+                source="catalog",
+            ),
+            Prompt(
+                id=uuid.uuid4(),
+                name="User Active Prompt",
+                description="User-created active entry.",
+                category="Debugging",
+                tags=["triage"],
+                context="Should be filtered out by source.",
+                is_active=True,
+                source="user",
+            ),
+        ]
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", lambda _: manager)
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert f"{matching_id} | Catalog Active Prompt | [Debugging] | triage" in output
+    assert "Catalog Inactive Prompt" not in output
+    assert "User Active Prompt" not in output
+    assert manager.closed is True
+
+
+
 def test_prompt_show_command_outputs_json_payload(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

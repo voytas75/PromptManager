@@ -350,6 +350,18 @@ def parse_args() -> argparse.Namespace:
         help="Require a matching tag (case-insensitive).",
     )
     prompt_find_parser.add_argument(
+        "--source",
+        type=str,
+        default=None,
+        help="Require an exact source match (case-insensitive).",
+    )
+    prompt_find_parser.add_argument(
+        "--active",
+        type=str,
+        default=None,
+        help="Require active state: true/false/yes/no/1/0.",
+    )
+    prompt_find_parser.add_argument(
         "--json",
         action="store_true",
         help="Render matching prompts as structured JSON.",
