@@ -1,6 +1,7 @@
 """CLI command handlers for Prompt Manager.
 
 Updates:
+  v0.33.6 - 2026-04-29 - Add prompt-find category and tag filters for deterministic prompt discovery.
   v0.33.5 - 2026-04-29 - Add prompt-find JSON output for structured console lists.
   v0.33.4 - 2026-04-29 - Add prompt-show JSON output for structured console reads.
   v0.33.3 - 2026-04-29 - Add prompt-find CLI command for deterministic prompt listing.
@@ -996,6 +997,8 @@ def run_prompt_find(
         logger.error("Prompt search query must be provided.")
         return 5
     limit = max(1, int(getattr(args, "limit", 10) or 10))
+    category_filter = str(getattr(args, "category", "") or "").strip().lower()
+    tag_filter = str(getattr(args, "tag", "") or "").strip().lower()
 
     try:
         prompts = manager.repository.list()
@@ -1011,8 +1014,15 @@ def run_prompt_find(
             prompt.category,
             " ".join(prompt.tags or []),
         ]
-        if any(query in str(value).lower() for value in haystacks if value):
-            matches.append(prompt)
+        if not any(query in str(value).lower() for value in haystacks if value):
+            continue
+        if category_filter and category_filter != str(prompt.category or "").strip().lower():
+            continue
+        if tag_filter and tag_filter not in {
+            str(tag).strip().lower() for tag in (prompt.tags or []) if str(tag).strip()
+        }:
+            continue
+        matches.append(prompt)
         if len(matches) >= limit:
             break
 

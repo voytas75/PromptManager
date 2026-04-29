@@ -230,6 +230,19 @@ Constraint:
 - This slice stays CLI-first and reuses the existing `prompt-find` seam.
 - It gives local operators/agents a machine-readable list surface without introducing a new API helper.
 
+### Slice 5 — Prompt find category/tag filters v1
+
+**Status:** done (2026-04-29)
+
+**Delivered:**
+- added `prompt-find --category <value>` for exact case-insensitive category filtering,
+- added `prompt-find --tag <value>` for case-insensitive exact tag filtering,
+- both filters compose with the existing text query, `--limit`, and `--json` output.
+
+**Notes:**
+- This slice stays CLI-first and keeps filtering inside the existing repository-list seam.
+- It extends the existing prompt discovery surface without adding a new API or search subsystem.
+
 **Why this first:**
 - to najbliższa brakująca funkcja względem „konsolowego dostępu do danych”,
 - import/add już istnieje, ale odczyt jednego prompta nadal nie jest tak prosty jak powinien,

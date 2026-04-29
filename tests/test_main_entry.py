@@ -882,6 +882,73 @@ def test_prompt_find_command_outputs_json_payload(
 
 
 
+def test_prompt_find_command_filters_by_category_and_tag(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "prompt-manager",
+            "prompt-find",
+            "prompt",
+            "--category",
+            "Debugging",
+            "--tag",
+            "triage",
+        ],
+    )
+    settings = _DummySettings()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    manager = _DummyManager()
+    matching_id = uuid.uuid4()
+    manager.repository._store.extend(
+        [
+            Prompt(
+                id=matching_id,
+                name="CI Failure Triage Prompt",
+                description="Summarise the first-pass diagnosis for a failing workflow.",
+                category="Debugging",
+                tags=["ci", "triage"],
+                context="Inspect logs, isolate the first failing step, and propose next checks.",
+                is_active=True,
+                source="catalog",
+            ),
+            Prompt(
+                id=uuid.uuid4(),
+                name="CI Failure Prompt Without Triage",
+                description="Another debugging helper.",
+                category="Debugging",
+                tags=["ci"],
+                context="Focus on failed jobs only.",
+                is_active=True,
+                source="catalog",
+            ),
+            Prompt(
+                id=uuid.uuid4(),
+                name="Writing Prompt With Triage Tag",
+                description="Draft comms for incidents.",
+                category="Writing",
+                tags=["triage"],
+                context="Write a short update.",
+                is_active=True,
+                source="catalog",
+            ),
+        ]
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", lambda _: manager)
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert f"{matching_id} | CI Failure Triage Prompt | [Debugging] | ci, triage" in output
+    assert "CI Failure Prompt Without Triage" not in output
+    assert "Writing Prompt With Triage Tag" not in output
+    assert manager.closed is True
+
+
+
 def test_prompt_show_command_outputs_json_payload(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

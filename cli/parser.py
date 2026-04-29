@@ -338,6 +338,18 @@ def parse_args() -> argparse.Namespace:
         help="Maximum number of matching prompts to display (default: 10).",
     )
     prompt_find_parser.add_argument(
+        "--category",
+        type=str,
+        default=None,
+        help="Require an exact category match (case-insensitive).",
+    )
+    prompt_find_parser.add_argument(
+        "--tag",
+        type=str,
+        default=None,
+        help="Require a matching tag (case-insensitive).",
+    )
+    prompt_find_parser.add_argument(
         "--json",
         action="store_true",
         help="Render matching prompts as structured JSON.",
