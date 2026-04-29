@@ -787,6 +787,51 @@ def test_prompt_show_command_falls_back_to_exact_name(
     assert manager.closed is True
 
 
+
+def test_prompt_find_command_lists_matching_prompts(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-find", "triage"])
+    settings = _DummySettings()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    manager = _DummyManager()
+    matching_id = uuid.uuid4()
+    manager.repository._store.extend(
+        [
+            Prompt(
+                id=matching_id,
+                name="CI Failure Triage",
+                description="Summarise the first-pass diagnosis for a failing workflow.",
+                category="Debugging",
+                tags=["ci", "triage"],
+                context="Inspect logs, isolate the first failing step, and propose next checks.",
+                is_active=True,
+                source="catalog",
+            ),
+            Prompt(
+                id=uuid.uuid4(),
+                name="Release Notes Writer",
+                description="Draft release notes from merged pull requests.",
+                category="Writing",
+                tags=["release"],
+                context="Summarise user-visible changes only.",
+                is_active=True,
+                source="catalog",
+            ),
+        ]
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", lambda _: manager)
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert f"{matching_id} | CI Failure Triage | [Debugging] | ci, triage" in output
+    assert "Release Notes Writer" not in output
+    assert manager.closed is True
+
+
 def test_setup_logging_basic_config_fallback(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:

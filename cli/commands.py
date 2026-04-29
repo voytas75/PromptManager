@@ -1,6 +1,7 @@
 """CLI command handlers for Prompt Manager.
 
 Updates:
+  v0.33.3 - 2026-04-29 - Add prompt-find CLI command for deterministic prompt listing.
   v0.33.2 - 2026-04-29 - Add prompt-show CLI command for deterministic single-prompt reads.
   v0.33.1 - 2025-12-08 - Surface token usage totals in history analytics output.
   v0.33.0 - 2025-12-06 - Switch prompt chain CLI to plain-text inputs.
@@ -976,11 +977,57 @@ def run_prompt_show(
     return 0
 
 
+
+def run_prompt_find(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    if manager is None:
+        raise ValueError("Prompt Manager is required for prompt search.")
+    query = str(getattr(args, "query", "") or "").strip().lower()
+    if not query:
+        logger.error("Prompt search query must be provided.")
+        return 5
+    limit = max(1, int(getattr(args, "limit", 10) or 10))
+
+    try:
+        prompts = manager.repository.list()
+    except Exception as exc:  # pragma: no cover - surfaced to CLI
+        print_and_log(logger, logging.ERROR, f"Failed to list prompts: {exc}")
+        return 6
+
+    matches = []
+    for prompt in prompts:
+        haystacks = [
+            prompt.name,
+            prompt.description,
+            prompt.category,
+            " ".join(prompt.tags or []),
+        ]
+        if any(query in str(value).lower() for value in haystacks if value):
+            matches.append(prompt)
+        if len(matches) >= limit:
+            break
+
+    if not matches:
+        print(f"No prompts matched: {getattr(args, 'query', '')}")
+        return 0
+
+    lines = []
+    for prompt in matches:
+        tags = ", ".join(prompt.tags) if prompt.tags else "-"
+        lines.append(f"{prompt.id} | {prompt.name} | [{prompt.category}] | {tags}")
+    print("\n".join(lines))
+    return 0
+
+
 COMMAND_SPECS: dict[str | None, CommandSpec] = {
     "catalog-export": CommandSpec(run_catalog_export),
     "catalog-import": CommandSpec(run_catalog_import),
     "prompt-add": CommandSpec(run_catalog_import),
     "prompt-show": CommandSpec(run_prompt_show),
+    "prompt-find": CommandSpec(run_prompt_find),
     "suggest": CommandSpec(run_suggest),
     "usage-report": CommandSpec(run_usage_report),
     "history-analytics": CommandSpec(run_history_analytics),

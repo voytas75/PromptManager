@@ -316,6 +316,22 @@ def parse_args() -> argparse.Namespace:
         help="Prompt UUID to display.",
     )
 
+    prompt_find_parser = subparsers.add_parser(
+        "prompt-find",
+        help="List prompts matching a text query.",
+    )
+    prompt_find_parser.add_argument(
+        "query",
+        type=str,
+        help="Case-insensitive text query matched against prompt fields.",
+    )
+    prompt_find_parser.add_argument(
+        "--limit",
+        type=int,
+        default=10,
+        help="Maximum number of matching prompts to display (default: 10).",
+    )
+
     suggest_parser = subparsers.add_parser(
         "suggest",
         help="Run semantic suggestions for a given query using the configured embedding backend.",

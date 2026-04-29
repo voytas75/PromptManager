@@ -190,6 +190,20 @@ Constraint:
 - This lands the CLI-first single-prompt read seam without introducing JSON mode or new internal API helpers.
 - Exact-name fallback is now included in the same bounded slice because it remained thin and reused the existing repository list seam.
 
+### Slice 2 — Prompt find/list CLI seam v1
+
+**Status:** done (2026-04-29)
+
+**Delivered:**
+- added `prompt-find <query>` as a deterministic read-only CLI surface,
+- case-insensitive matching currently scans `name`, `description`, `category`, and `tags`,
+- added `--limit` with default `10`,
+- compact output format is `id | name | [category] | tags`.
+
+**Notes:**
+- This slice stays CLI-first and reuses `repository.list()` without adding a new core search seam.
+- It is intentionally lightweight and complements `prompt-show` rather than replacing semantic `suggest`.
+
 **Why this first:**
 - to najbliższa brakująca funkcja względem „konsolowego dostępu do danych”,
 - import/add już istnieje, ale odczyt jednego prompta nadal nie jest tak prosty jak powinien,
