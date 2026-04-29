@@ -1,5 +1,7 @@
 # PromptManager Capture / Reopen / Refine Entry Clarity Roadmap
 
+Status: done
+
 > **For Hermes:** Use subagent-driven-development skill to implement this roadmap one bounded slice at a time.
 
 **Goal:** Otworzyć kolejny bounded execution cycle w Stage 2 tak, aby istniejące entry points do pracy z prompt assetami — `Quick Capture`, `Recent Prompts`, i `Promote Draft` — były spokojniejsze operacyjnie i lepiej wspierały przejście capture -> reopen -> refine bez zmiany storage, rankingu, promote semantics ani dodawania nowego workflow.
