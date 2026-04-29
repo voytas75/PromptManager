@@ -574,6 +574,60 @@ def test_prompt_chain_dialog_only_last_step_has_reasoning_summary(
         dialog.deleteLater()
 
 
+def test_prompt_chain_dialog_shows_later_step_handoff_input(qt_app: QApplication) -> None:
+    """Later successful steps should explicitly show the input received from the previous step."""
+
+    manager = _ManagerStub()
+    dialog, panel, manager = _build_dialog(manager)
+    try:
+        base_chain = _make_chain()
+        step_one = base_chain.steps[0]
+        step_two = PromptChainStep(
+            id=uuid.uuid4(),
+            chain_id=base_chain.id,
+            prompt_id=uuid.uuid4(),
+            order_index=2,
+            input_template="",
+            output_variable="final",
+        )
+        base_chain.steps = [step_one, step_two]
+        result = PromptChainRunResult(
+            chain=base_chain,
+            chain_input="Initial text",
+            outputs={"final": "Second response"},
+            steps=[
+                PromptChainStepRun(
+                    step=step_one,
+                    status="success",
+                    outcome=_make_outcome(
+                        request_text="Initial text",
+                        response_text="First response",
+                    ),
+                ),
+                PromptChainStepRun(
+                    step=step_two,
+                    status="success",
+                    outcome=_make_outcome(
+                        request_text="First response",
+                        response_text="Second response",
+                    ),
+                ),
+            ],
+            summary="Demo summary",
+        )
+        panel._display_run_result(result)  # noqa: SLF001
+        plain = panel._result_plaintext  # noqa: SLF001
+        assert plain.count("Input to step:") == 1
+        assert plain.count("Input from previous step output:") == 1
+        assert "First response" in plain
+        rich = panel._result_richtext  # noqa: SLF001
+        assert "Input from previous step output" in rich
+        assert "First response" in rich
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
 def test_prompt_chain_step_markdown_renders_without_code_fences(qt_app: QApplication) -> None:
     """Step inputs/outputs should render markdown content directly."""
 

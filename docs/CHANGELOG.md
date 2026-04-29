@@ -12,6 +12,8 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 - Added one bounded **neutral reset-state guard pack v1** on the existing prompt-library filter seam so regression coverage now explicitly proves the combined search + tag + favorites narrowing summary returns to `Showing all prompts` after the full reset path, while leaving runtime behavior unchanged because the seam already reset cleanly.
 
+- Added one bounded **prompt chain run handoff clarity v1** on the existing Chain run-result seam so later successful steps now explicitly show `Input from previous step output`, making the linear step-to-step flow easier to read without changing chain execution logic, storage, or branching behavior.
+
 - Closed the bounded **Prompt-Library Search / Filter Continuity** cycle by marking `docs/plans/2026-04-29-prompt-library-search-filter-continuity-roadmap.md` done after shipping one small operator-facing summary cue cycle: combined narrowing visibility, live search-query continuity, and a guard-only neutral reset proof, all kept on the existing filter/search seam without changing ranking, persistence, or broader retrieval architecture.
 
 - Added one bounded **prompt-history status/window filters v1** slice so operators and local AI assistants can now narrow `prompt-history <prompt_id-or-name>` with `--status <success|failed>` and `--window-days <n>`, keeping console evidence review focused on exact execution outcomes and bounded recent windows while composing with the existing `--limit` and `--json` output.

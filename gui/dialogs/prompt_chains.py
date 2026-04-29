@@ -805,14 +805,18 @@ class PromptChainManagerPanel(QWidget):
                 and index == last_success_index
                 and outcome is not None
             )
-            include_step_input = index == 0
+            include_step_input = True
             is_last_step = index == total_steps - 1
             show_response_block = True
+            step_input_label = (
+                "Input to step:" if index == 0 else "Input from previous step output:"
+            )
+            step_input_title = step_input_label.rstrip(":")
             if outcome:
                 request_text = outcome.result.request_text.strip()
                 response_text = outcome.result.response_text.strip()
                 if include_step_input:
-                    plain_sections.append("  Input to step:")
+                    plain_sections.append(f"  {step_input_label}")
                     plain_sections.extend(_indent_lines(request_text or "(empty input)"))
                 show_response_block = not (is_last_step and should_render_reasoning)
                 if show_response_block:
@@ -831,6 +835,7 @@ class PromptChainManagerPanel(QWidget):
                     reasoning_text,
                     include_step_input,
                     show_response_block,
+                    request_title=step_input_title,
                 )
             )
             plain_sections.append("")
@@ -926,6 +931,7 @@ class PromptChainManagerPanel(QWidget):
         reasoning_text: str | None,
         show_request_block: bool,
         show_response_block: bool,
+        request_title: str = "Input to step",
     ) -> str:
         """Return styled HTML for a single step entry."""
         step = step_run.step
@@ -948,7 +954,7 @@ class PromptChainManagerPanel(QWidget):
         if request_text and show_request_block:
             parts.append(
                 self._format_colored_block_html(
-                    "Input to step",
+                    request_title,
                     request_text or "(empty input)",
                     color=None,
                     class_name="chain-step-detail chain-step-input",
