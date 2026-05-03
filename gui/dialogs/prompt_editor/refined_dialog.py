@@ -7,7 +7,6 @@ Updates:
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -61,26 +60,7 @@ class PromptRefinedDialog(QDialog):
 
     def _apply_initial_size(self) -> None:
         """Resize the dialog to fit comfortably under the active screen size."""
-        screen = QGuiApplication.primaryScreen()
-        if screen is None:
-            self.resize(720, 480)
-            return
-
-        geometry = screen.availableGeometry()
-        screen_height = geometry.height()
-        screen_width = geometry.width()
-
-        height_buffer = 60
-        max_height = max(screen_height - height_buffer, int(screen_height * 0.8))
-        preferred_height = max(320, int(screen_height * 0.6))
-        height = min(preferred_height, max_height)
-
-        width_buffer = 120
-        max_width = max(screen_width - width_buffer, int(screen_width * 0.7))
-        preferred_width = max(560, int(screen_width * 0.45))
-        width = min(preferred_width, max_width)
-
-        self.resize(width, height)
+        self.resize(720, 480)
 
 
 __all__ = ["PromptRefinedDialog"]

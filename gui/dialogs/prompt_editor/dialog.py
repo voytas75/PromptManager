@@ -35,9 +35,9 @@ from models.prompt_model import Prompt
 from ..base import CollapsibleTextSection, strip_scenarios_metadata
 from ..draft_promote import is_prompt_draft
 from .mixins import (
-    _PromptDialogCategoryMixin,
-    _PromptDialogRefinementMixin,
-    _PromptDialogScenarioMixin,
+    PromptDialogCategoryMixin,
+    PromptDialogRefinementMixin,
+    PromptDialogScenarioMixin,
 )
 
 if TYPE_CHECKING:
@@ -50,10 +50,10 @@ else:  # pragma: no cover - runtime fallbacks for postponed annotations
 
 
 class PromptDialog(
-    _PromptDialogScenarioMixin,
-    _PromptDialogCategoryMixin,
-    _PromptDialogRefinementMixin,
     QDialog,
+    PromptDialogScenarioMixin,
+    PromptDialogCategoryMixin,
+    PromptDialogRefinementMixin,
 ):
     """Modal dialog used for creating or editing prompt records."""
 
@@ -469,7 +469,7 @@ class PromptDialog(
                 description = generated_description
                 self._description_input.setPlainText(generated_description)
 
-        category = self._current_category_value()
+        category = self.current_category_value()
         author = self._author_input.text().strip() or None
         if not name or not description:
             QMessageBox.warning(self, "Missing fields", "Name and description are required.")

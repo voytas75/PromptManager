@@ -99,8 +99,7 @@ class RecentPromptsDialog(QDialog):
             self,
         )
         self._open_button = buttons.button(QDialogButtonBox.StandardButton.Ok)
-        if self._open_button is not None:
-            self._open_button.setText("Open Prompt")
+        self._open_button.setText("Open Prompt")
         self._sync_open_button()
         buttons.accepted.connect(self._accept_selected_prompt)  # type: ignore[arg-type]
         buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
@@ -109,8 +108,6 @@ class RecentPromptsDialog(QDialog):
 
     def _sync_open_button(self) -> None:
         """Enable the accept action only when a prompt is selected."""
-        if self._open_button is None:
-            return
         self._open_button.setEnabled(self._list_widget.currentRow() >= 0)
 
     def _accept_selected_prompt(self) -> None:

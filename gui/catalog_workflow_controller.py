@@ -7,9 +7,8 @@ Updates:
 
 from __future__ import annotations
 
-from collections import abc
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 from PySide6.QtWidgets import QDialog, QFileDialog, QMessageBox, QWidget
@@ -24,7 +23,11 @@ from core import (
 from .dialogs import CatalogPreviewDialog, PromptMaintenanceDialog
 
 if TYPE_CHECKING:
+    from collections import abc
+
     from models.prompt_model import Prompt
+else:
+    from collections import abc
 
 
 class CatalogWorkflowController:
@@ -46,16 +49,32 @@ class CatalogWorkflowController:
         """Store shared callbacks and dependencies for catalogue workflows."""
         self._parent = parent
         self._manager = manager
-        self._load_prompts = self._ensure_callable(load_prompts, "load_prompts")
-        self._current_search_text = self._ensure_callable(
-            current_search_text,
-            "current_search_text",
+        self._load_prompts = cast(
+            "abc.Callable[[str], None]",
+            self._ensure_callable(load_prompts, "load_prompts"),
         )
-        self._select_prompt = self._ensure_callable(select_prompt, "select_prompt")
-        self._current_prompt = self._ensure_callable(current_prompt, "current_prompt")
-        self._show_status = self._ensure_callable(show_status, "show_status")
-        self._generate_category = self._ensure_callable(generate_category, "generate_category")
-        self._generate_tags = self._ensure_callable(generate_tags, "generate_tags")
+        self._current_search_text = cast(
+            "abc.Callable[[], str]",
+            self._ensure_callable(current_search_text, "current_search_text"),
+        )
+        self._select_prompt = cast(
+            "abc.Callable[[UUID], None]", self._ensure_callable(select_prompt, "select_prompt")
+        )
+        self._current_prompt = cast(
+            "abc.Callable[[], Prompt | None]",
+            self._ensure_callable(current_prompt, "current_prompt"),
+        )
+        self._show_status = cast(
+            "abc.Callable[[str, int], None]", self._ensure_callable(show_status, "show_status")
+        )
+        self._generate_category = cast(
+            "abc.Callable[[str], str]",
+            self._ensure_callable(generate_category, "generate_category"),
+        )
+        self._generate_tags = cast(
+            "abc.Callable[[str], list[str]]",
+            self._ensure_callable(generate_tags, "generate_tags"),
+        )
 
     def open_import_dialog(self) -> None:
         """Preview catalogue diff and optionally apply updates."""
@@ -164,7 +183,7 @@ class CatalogWorkflowController:
         """Ensure the provided callback is callable before storing it."""
         if not isinstance(callback, abc.Callable):
             raise TypeError(f"{name} callback must be callable")
-        return callback
+        return cast("abc.Callable[..., Any]", callback)
 
 
 __all__ = ["CatalogWorkflowController"]

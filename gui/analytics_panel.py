@@ -195,9 +195,8 @@ class AnalyticsDashboardPanel(QWidget):
 
         try:
             if show_indicator:
-                snapshot = ProcessingIndicator(self, message, title="Updating Analytics").run(
-                    _build_snapshot
-                )
+                indicator = ProcessingIndicator(self, message, title="Updating Analytics")
+                snapshot = indicator.run(_build_snapshot)
             else:
                 snapshot = _build_snapshot()
         except Exception as exc:  # pragma: no cover - GUI feedback only

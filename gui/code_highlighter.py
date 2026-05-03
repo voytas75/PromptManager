@@ -11,7 +11,7 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from PySide6.QtGui import QColor, QFont, QSyntaxHighlighter, QTextCharFormat
+from PySide6.QtGui import QColor, QFont, QSyntaxHighlighter, QTextCharFormat, QTextDocument
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -137,7 +137,7 @@ _RULE_BUILDERS = {
 class CodeHighlighter(QSyntaxHighlighter):
     """Keyword-based syntax highlighter for the free-form query input."""
 
-    def __init__(self, document) -> None:  # type: ignore[override]
+    def __init__(self, document: QTextDocument) -> None:
         """Prepare the highlighter with a target QTextDocument."""
         super().__init__(document)
         self._language = "plain"

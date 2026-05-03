@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QPushButton,
     QVBoxLayout,
+    QWidget,
 )
 
 if TYPE_CHECKING:
@@ -94,7 +95,7 @@ def rank_prompts_for_action(prompts: Iterable[Prompt], action: QuickAction) -> l
 class CommandPaletteDialog(QDialog):
     """Simple command palette enabling keyboard navigation across quick actions."""
 
-    def __init__(self, actions: Sequence[QuickAction], parent=None) -> None:
+    def __init__(self, actions: Sequence[QuickAction], parent: QWidget | None = None) -> None:
         """Configure dialog widgets and preload the quick action list."""
         super().__init__(parent)
         self.setWindowTitle("Command Palette")

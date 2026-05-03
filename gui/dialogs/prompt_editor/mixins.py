@@ -61,10 +61,10 @@ _TaskResult = TypeVar("_TaskResult")
 
 
 @runtime_checkable
-class _CategoryAware(Protocol):
+class CategoryAware(Protocol):
     """Protocol describing mixins that expose category helpers."""
 
-    def _current_category_value(self) -> str:  # pragma: no cover - typing helper
+    def current_category_value(self) -> str:  # pragma: no cover - typing helper
         """Return the canonical category value."""
         ...
 
@@ -99,8 +99,7 @@ class _PromptDialogAssistMixin:
     ) -> _TaskResult:
         """Execute ``func`` within a background task while showing a busy UI."""
         indicator = cast("Any", ProcessingIndicator(self._widget_parent(), message))
-        result = indicator.run(func, *args, **kwargs)
-        return cast("_TaskResult", result)
+        return cast("_TaskResult", indicator.run(func, *args, **kwargs))
 
     def _on_generate_name_clicked(self) -> None:
         """Generate a prompt name from the context field."""
@@ -185,7 +184,7 @@ class _PromptDialogAssistMixin:
             return fallback_generate_description(context)
 
 
-class _PromptDialogScenarioMixin(_PromptDialogAssistMixin):
+class PromptDialogScenarioMixin(_PromptDialogAssistMixin):
     """Manage scenario collection and generation helpers."""
 
     _scenario_generator: _ScenarioGenerator | None
@@ -272,7 +271,7 @@ class _PromptDialogScenarioMixin(_PromptDialogAssistMixin):
         self._set_scenarios(scenarios)
 
 
-class _PromptDialogCategoryMixin(_PromptDialogAssistMixin):
+class PromptDialogCategoryMixin(_PromptDialogAssistMixin):
     """Handle category registry interactions and metadata suggestions."""
 
     _category_provider: _CategoryProvider | None
@@ -320,7 +319,7 @@ class _PromptDialogCategoryMixin(_PromptDialogAssistMixin):
             return
         self._category_input.setEditText(resolved)
 
-    def _current_category_value(self) -> str:
+    def current_category_value(self) -> str:
         """Return the canonical category text from the selector."""
         text = self._category_input.currentText().strip()
         if not text:
@@ -398,7 +397,7 @@ class _PromptDialogCategoryMixin(_PromptDialogAssistMixin):
             )
 
 
-class _PromptDialogRefinementMixin(_PromptDialogAssistMixin):
+class PromptDialogRefinementMixin(_PromptDialogAssistMixin):
     """Handle general/structure-specific prompt refinement workflows."""
 
     _prompt_engineer: Callable[..., PromptRefinement] | None
@@ -451,7 +450,7 @@ class _PromptDialogRefinementMixin(_PromptDialogAssistMixin):
 
         name = self._name_input.text().strip() or None
         description = self._description_input.toPlainText().strip() or None
-        category = self._current_category_value() if isinstance(self, _CategoryAware) else None
+        category = self.current_category_value() if isinstance(self, CategoryAware) else None
         tags: list[str] = []
         if hasattr(self, "_tags_input"):
             tags = [tag.strip() for tag in self._tags_input.text().split(",") if tag.strip()]
@@ -503,8 +502,8 @@ class _PromptDialogRefinementMixin(_PromptDialogAssistMixin):
 
 
 __all__ = [
-    "_PromptDialogAssistMixin",
-    "_PromptDialogCategoryMixin",
-    "_PromptDialogRefinementMixin",
-    "_PromptDialogScenarioMixin",
+    "CategoryAware",
+    "PromptDialogCategoryMixin",
+    "PromptDialogRefinementMixin",
+    "PromptDialogScenarioMixin",
 ]

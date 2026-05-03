@@ -23,6 +23,8 @@ from PySide6.QtWidgets import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from PySide6.QtWidgets import QWidget
+
 
 class ExecuteContextDialog(QDialog):
     """Collect a task description and expose quick history selection."""
@@ -32,7 +34,7 @@ class ExecuteContextDialog(QDialog):
         *,
         last_task: str = "",
         history: Sequence[str] | None = None,
-        parent=None,
+        parent: QWidget | None = None,
     ) -> None:
         """Initialise the dialog with optional history and last-task defaults."""
         super().__init__(parent)

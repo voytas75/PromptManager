@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import threading
 from contextlib import AbstractContextManager
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, ParamSpec, TypeVar
 
 from PySide6.QtCore import QEventLoop, Qt
 from PySide6.QtGui import QGuiApplication
@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from types import TracebackType
 
+_P = ParamSpec("_P")
 _T = TypeVar("_T")
 
 
@@ -48,12 +49,12 @@ class ProcessingIndicator(AbstractContextManager["ProcessingIndicator"]):
         self._dialog.deleteLater()
         return False
 
-    def run(self, func: Callable[..., _T], *args, **kwargs) -> _T:
+    def run(self, func: Callable[_P, _T], *args: _P.args, **kwargs: _P.kwargs) -> _T:
         """Execute *func* on a worker thread while keeping the UI responsive."""
         with self:
             return self._run_in_thread(func, *args, **kwargs)
 
-    def _run_in_thread(self, func: Callable[..., _T], *args, **kwargs) -> _T:
+    def _run_in_thread(self, func: Callable[_P, _T], *args: _P.args, **kwargs: _P.kwargs) -> _T:
         event = threading.Event()
         result: dict[str, _T] = {}
         error: list[BaseException] = []

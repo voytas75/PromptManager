@@ -6,7 +6,6 @@ Updates:
 
 from __future__ import annotations
 
-from collections import abc
 from typing import TYPE_CHECKING, cast
 
 from PySide6.QtCore import Qt
@@ -20,6 +19,8 @@ from config import (
 )
 
 if TYPE_CHECKING:
+    from collections import abc
+
     from PySide6.QtWidgets import QMainWindow, QWidget
 
 _CHAT_PALETTE_KEYS = {"user", "assistant"}
@@ -39,7 +40,7 @@ def normalise_chat_palette(palette: abc.Mapping[str, object] | None) -> dict[str
     Hex codes are normalised to lowercase ``#rrggbb`` strings for consistency.
     """
     cleaned: dict[str, str] = {}
-    if not palette or not isinstance(palette, abc.Mapping):
+    if not palette:
         return cleaned
     for role, value in palette.items():
         if role not in _CHAT_PALETTE_KEYS:
@@ -55,7 +56,7 @@ def normalise_chat_palette(palette: abc.Mapping[str, object] | None) -> dict[str
 
 def palette_differs_from_defaults(palette: abc.Mapping[str, str] | None) -> bool:
     """Return True when the provided palette differs from default chat colours."""
-    if not palette or not isinstance(palette, abc.Mapping):
+    if not palette:
         return False
     defaults = _default_chat_palette()
     for role, default_hex in defaults.items():

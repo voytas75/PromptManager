@@ -260,8 +260,7 @@ class QuickCaptureDialog(QDialog):
             self,
         )
         save_button = buttons.button(QDialogButtonBox.StandardButton.Ok)
-        if save_button is not None:
-            save_button.setText("Save Draft")
+        save_button.setText("Save Draft")
         buttons.accepted.connect(self._on_accept)  # type: ignore[arg-type]
         buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(buttons)

@@ -194,8 +194,6 @@ class PromptVersionHistoryDialog(QDialog):
 
     def _selected_version(self) -> PromptVersion | None:
         selection = self._table.selectionModel()
-        if selection is None:
-            return None
         indexes = selection.selectedRows()
         if not indexes:
             return None
