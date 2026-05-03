@@ -55,8 +55,7 @@ def _validate_prompt_payload(payload: object, parser: argparse.ArgumentParser) -
         if prompts_value is not None:
             if not isinstance(prompts_value, list):
                 parser.error(
-                    "prompt-add payload field 'prompts' must be a JSON list "
-                    "of prompt objects."
+                    "prompt-add payload field 'prompts' must be a JSON list of prompt objects."
                 )
             entries = list(prompts_value)
         else:

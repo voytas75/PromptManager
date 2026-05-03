@@ -3,8 +3,10 @@
 Updates:
   v0.33.9 - 2026-04-29 - Add prompt-history JSON output for structured execution evidence reads.
   v0.33.8 - 2026-04-29 - Add prompt-history CLI command for per-prompt execution evidence.
-  v0.33.7 - 2026-04-29 - Add prompt-find source and active filters for deterministic console discovery.
-  v0.33.6 - 2026-04-29 - Add prompt-find category and tag filters for deterministic prompt discovery.
+  v0.33.7 - 2026-04-29 - Add prompt-find source and active filters
+    for deterministic console discovery.
+  v0.33.6 - 2026-04-29 - Add prompt-find category and tag filters
+    for deterministic prompt discovery.
   v0.33.5 - 2026-04-29 - Add prompt-find JSON output for structured console lists.
   v0.33.4 - 2026-04-29 - Add prompt-show JSON output for structured console reads.
   v0.33.3 - 2026-04-29 - Add prompt-find CLI command for deterministic prompt listing.
@@ -921,7 +923,6 @@ def run_suggest(
     return 0
 
 
-
 def run_prompt_show(
     manager: PromptManager | None,
     args: argparse.Namespace,
@@ -986,7 +987,6 @@ def run_prompt_show(
 
     print("\n".join(lines))
     return 0
-
 
 
 def run_prompt_find(
@@ -1066,7 +1066,6 @@ def run_prompt_find(
     return 0
 
 
-
 def run_prompt_history(
     manager: PromptManager | None,
     args: argparse.Namespace,
@@ -1137,7 +1136,9 @@ def run_prompt_history(
         return 7
 
     if status_filter is not None:
-        executions = [execution for execution in executions if execution.status.value == status_filter]
+        executions = [
+            execution for execution in executions if execution.status.value == status_filter
+        ]
     if window_days > 0:
         cutoff = datetime.now(UTC) - timedelta(days=window_days)
         executions = [execution for execution in executions if execution.executed_at >= cutoff]
@@ -1162,7 +1163,9 @@ def run_prompt_history(
                 "average_rating": analytics.average_rating,
                 "rating_trend": analytics.rating_trend,
                 "last_executed_at": (
-                    analytics.last_executed_at.isoformat() if analytics.last_executed_at is not None else None
+                    analytics.last_executed_at.isoformat()
+                    if analytics.last_executed_at is not None
+                    else None
                 ),
                 "prompt_tokens": analytics.prompt_tokens,
                 "completion_tokens": analytics.completion_tokens,
@@ -1232,7 +1235,6 @@ def run_prompt_history(
 
     print("\n".join(lines))
     return 0
-
 
 
 COMMAND_SPECS: dict[str | None, CommandSpec] = {

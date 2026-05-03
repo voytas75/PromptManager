@@ -19,7 +19,7 @@ import logging
 import sys
 import types
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -736,7 +736,6 @@ def test_suggest_command_outputs_results(
     assert manager.closed is True
 
 
-
 def test_prompt_show_command_outputs_prompt_details(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -771,9 +770,10 @@ def test_prompt_show_command_outputs_prompt_details(
     assert "tags: ci, triage" in output
     assert "source: catalog" in output
     assert "active: yes" in output
-    assert "context:\nInspect logs, isolate the first failing step, and propose next checks." in output
+    assert (
+        "context:\nInspect logs, isolate the first failing step, and propose next checks." in output
+    )
     assert manager.closed is True
-
 
 
 def test_prompt_show_command_falls_back_to_exact_name(
@@ -806,7 +806,6 @@ def test_prompt_show_command_falls_back_to_exact_name(
     assert f"id: {prompt_id}" in output
     assert "name: CI Failure Triage" in output
     assert manager.closed is True
-
 
 
 def test_prompt_find_command_lists_matching_prompts(
@@ -851,7 +850,6 @@ def test_prompt_find_command_lists_matching_prompts(
     assert f"{matching_id} | CI Failure Triage | [Debugging] | ci, triage" in output
     assert "Release Notes Writer" not in output
     assert manager.closed is True
-
 
 
 def test_prompt_find_command_outputs_json_payload(
@@ -900,7 +898,6 @@ def test_prompt_find_command_outputs_json_payload(
     assert output[0]["tags"] == ["ci", "triage"]
     assert output[0]["source"] == "catalog"
     assert manager.closed is True
-
 
 
 def test_prompt_find_command_filters_by_category_and_tag(
@@ -969,7 +966,6 @@ def test_prompt_find_command_filters_by_category_and_tag(
     assert manager.closed is True
 
 
-
 def test_prompt_find_command_filters_by_source_and_active_state(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -1036,13 +1032,15 @@ def test_prompt_find_command_filters_by_source_and_active_state(
     assert manager.closed is True
 
 
-
 def test_prompt_history_command_outputs_recent_execution_summary(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     prompt_id = uuid.uuid4()
-    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-history", str(prompt_id), "--limit", "2"])
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-history", str(prompt_id), "--limit", "2"],
+    )
     settings = _DummySettings()
     _patch_main(monkeypatch, "load_settings", lambda: settings)
     manager = _DummyManager()
@@ -1112,13 +1110,18 @@ def test_prompt_history_command_outputs_recent_execution_summary(
     assert "avg_rating: 4.5" in output
     assert "decision: Keep prompt but inspect unstable model responses." in output
     assert "recent executions:" in output
-    assert "[1] 2026-04-29T10:30:00+00:00 | success | 210 ms | rating: 4.5 | model: gpt-fast | tokens: 42" in output
+    assert (
+        "[1] 2026-04-29T10:30:00+00:00 | success | 210 ms | rating: 4.5 | "
+        "model: gpt-fast | tokens: 42" in output
+    )
     assert "request: First request payload" in output
     assert "response: First response payload" in output
-    assert "[2] 2026-04-29T09:15:00+00:00 | failed | 900 ms | rating: n/a | model: gpt-reasoning | tokens: 17" in output
+    assert (
+        "[2] 2026-04-29T09:15:00+00:00 | failed | 900 ms | rating: n/a | "
+        "model: gpt-reasoning | tokens: 17" in output
+    )
     assert "error: Timeout while calling model" in output
     assert manager.closed is True
-
 
 
 def test_prompt_history_command_outputs_json_payload(
@@ -1190,12 +1193,12 @@ def test_prompt_history_command_outputs_json_payload(
     assert manager.closed is True
 
 
-
 def test_prompt_history_command_filters_by_status_and_window_days(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     prompt_id = uuid.uuid4()
+    now = datetime.now(UTC)
     monkeypatch.setattr(
         "sys.argv",
         [
@@ -1213,7 +1216,9 @@ def test_prompt_history_command_filters_by_status_and_window_days(
     settings = _DummySettings()
     _patch_main(monkeypatch, "load_settings", lambda: settings)
     manager = _DummyManager()
-    recent_cutoff = datetime(2026, 4, 28, 12, 0, tzinfo=UTC)
+    old_execution_at = now - timedelta(days=2)
+    recent_failed_at = now - timedelta(hours=2)
+    recent_success_at = now - timedelta(minutes=90)
     manager.repository._store.append(
         Prompt(
             id=prompt_id,
@@ -1235,7 +1240,7 @@ def test_prompt_history_command_filters_by_status_and_window_days(
             status=ExecutionStatus.FAILED,
             error_message="Old timeout",
             duration_ms=901,
-            executed_at=datetime(2026, 4, 27, 9, 0, tzinfo=UTC),
+            executed_at=old_execution_at,
             metadata={"model": "gpt-reasoning", "total_tokens": 18},
         ),
         PromptExecution(
@@ -1246,7 +1251,7 @@ def test_prompt_history_command_filters_by_status_and_window_days(
             status=ExecutionStatus.FAILED,
             error_message="Recent timeout",
             duration_ms=321,
-            executed_at=datetime(2026, 4, 29, 10, 0, tzinfo=UTC),
+            executed_at=recent_failed_at,
             metadata={"model": "gpt-fast", "total_tokens": 12},
         ),
         PromptExecution(
@@ -1256,7 +1261,7 @@ def test_prompt_history_command_filters_by_status_and_window_days(
             response_text="Recovered response",
             status=ExecutionStatus.SUCCESS,
             duration_ms=210,
-            executed_at=datetime(2026, 4, 29, 10, 30, tzinfo=UTC),
+            executed_at=recent_success_at,
             metadata={"model": "gpt-fast", "total_tokens": 20},
         ),
     ]
@@ -1268,7 +1273,7 @@ def test_prompt_history_command_filters_by_status_and_window_days(
         average_duration_ms=477.3,
         average_rating=None,
         rating_trend=0.0,
-        last_executed_at=datetime(2026, 4, 29, 10, 30, tzinfo=UTC),
+        last_executed_at=recent_success_at,
         prompt_tokens=22,
         completion_tokens=28,
         total_tokens=50,
@@ -1281,11 +1286,10 @@ def test_prompt_history_command_filters_by_status_and_window_days(
     output = capsys.readouterr().out
     assert "Recent failed request" in output
     assert "Recent timeout" in output
-    assert recent_cutoff.isoformat(timespec="seconds") not in output
+    assert old_execution_at.isoformat(timespec="seconds") not in output
     assert "Old failed request" not in output
     assert "Recent success request" not in output
     assert manager.closed is True
-
 
 
 def test_prompt_show_command_outputs_json_payload(
@@ -1534,7 +1538,6 @@ def test_prompt_add_command_accepts_json_file_alias(
     assert manager.closed is True
 
 
-
 def test_prompt_add_command_rejects_path_and_input_file_mix(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -1577,7 +1580,6 @@ def test_prompt_add_command_rejects_path_and_input_file_mix(
     assert excinfo.value.code == 2
 
 
-
 def test_prompt_add_command_rejects_json_string_missing_name(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1596,7 +1598,6 @@ def test_prompt_add_command_rejects_json_string_missing_name(
         main.main()
 
     assert excinfo.value.code == 2
-
 
 
 def test_prompt_add_command_rejects_json_string_missing_description(
@@ -1619,7 +1620,6 @@ def test_prompt_add_command_rejects_json_string_missing_description(
     assert excinfo.value.code == 2
 
 
-
 def test_prompt_add_command_rejects_json_string_with_non_object_entries(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1632,7 +1632,6 @@ def test_prompt_add_command_rejects_json_string_with_non_object_entries(
         main.main()
 
     assert excinfo.value.code == 2
-
 
 
 def test_prompt_add_command_accepts_json_string(
@@ -1661,7 +1660,6 @@ def test_prompt_add_command_accepts_json_string(
     assert "Catalog import preview" in output
     assert "added=1" in output
     assert manager.closed is True
-
 
 
 def test_prompt_add_command_accepts_stdin_json(
@@ -1693,7 +1691,6 @@ def test_prompt_add_command_accepts_stdin_json(
     assert manager.closed is True
 
 
-
 def test_prompt_add_command_rejects_json_and_stdin_mix(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1716,7 +1713,6 @@ def test_prompt_add_command_rejects_json_and_stdin_mix(
     assert excinfo.value.code == 2
 
 
-
 def test_prompt_add_command_rejects_invalid_json_string(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1729,7 +1725,6 @@ def test_prompt_add_command_rejects_invalid_json_string(
         main.main()
 
     assert excinfo.value.code == 2
-
 
 
 def test_prompt_add_command_rejects_blank_stdin_payload(
@@ -1745,7 +1740,6 @@ def test_prompt_add_command_rejects_blank_stdin_payload(
         main.main()
 
     assert excinfo.value.code == 2
-
 
 
 def test_prompt_add_command_accepts_inline_fields(
