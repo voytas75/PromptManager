@@ -10,11 +10,15 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from config.settings import DEFAULT_CHAT_ASSISTANT_BUBBLE_COLOR, DEFAULT_CHAT_USER_BUBBLE_COLOR
 
+if TYPE_CHECKING:
+    import pytest
 
-def test_persist_settings_to_config(tmp_path, monkeypatch):
+
+def test_persist_settings_to_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Persist configured settings overrides to config.json."""
     monkeypatch.chdir(tmp_path)
 
@@ -37,7 +41,9 @@ def test_persist_settings_to_config(tmp_path, monkeypatch):
     assert data["litellm_tts_stream"] is False
 
 
-def test_persist_settings_to_config_handles_litellm_logging(tmp_path, monkeypatch):
+def test_persist_settings_to_config_handles_litellm_logging(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Write LiteLLM logging flag when enabling logs."""
     monkeypatch.chdir(tmp_path)
 
@@ -53,7 +59,9 @@ def test_persist_settings_to_config_handles_litellm_logging(tmp_path, monkeypatc
     assert "litellm_logging_enabled" not in data
 
 
-def test_persist_settings_to_config_persists_chat_palette_override(tmp_path, monkeypatch):
+def test_persist_settings_to_config_persists_chat_palette_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Write non-default chat palette overrides to the config file."""
     monkeypatch.chdir(tmp_path)
 
@@ -71,7 +79,9 @@ def test_persist_settings_to_config_persists_chat_palette_override(tmp_path, mon
     assert data["chat_colors"] == {"assistant": "#123456"}
 
 
-def test_persist_settings_to_config_ignores_default_palette(tmp_path, monkeypatch):
+def test_persist_settings_to_config_ignores_default_palette(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Avoid writing chat colors when they match the defaults."""
     monkeypatch.chdir(tmp_path)
 
@@ -90,7 +100,9 @@ def test_persist_settings_to_config_ignores_default_palette(tmp_path, monkeypatc
     assert "chat_colors" not in data
 
 
-def test_persist_settings_to_config_omits_exa_api_key(tmp_path, monkeypatch):
+def test_persist_settings_to_config_omits_exa_api_key(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Never persist Exa API credentials but keep provider selection."""
     monkeypatch.chdir(tmp_path)
 
@@ -108,7 +120,9 @@ def test_persist_settings_to_config_omits_exa_api_key(tmp_path, monkeypatch):
     assert data["web_search_provider"] == "exa"
 
 
-def test_persist_settings_to_config_omits_tavily_api_key(tmp_path, monkeypatch):
+def test_persist_settings_to_config_omits_tavily_api_key(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Never persist Tavily API credentials but keep provider selection."""
     monkeypatch.chdir(tmp_path)
 
@@ -126,7 +140,9 @@ def test_persist_settings_to_config_omits_tavily_api_key(tmp_path, monkeypatch):
     assert data["web_search_provider"] == "tavily"
 
 
-def test_persist_settings_to_config_omits_serper_api_key(tmp_path, monkeypatch):
+def test_persist_settings_to_config_omits_serper_api_key(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Never persist Serper API credentials but keep provider selection."""
     monkeypatch.chdir(tmp_path)
 
@@ -144,7 +160,9 @@ def test_persist_settings_to_config_omits_serper_api_key(tmp_path, monkeypatch):
     assert data["web_search_provider"] == "serper"
 
 
-def test_persist_settings_to_config_omits_serpapi_api_key(tmp_path, monkeypatch):
+def test_persist_settings_to_config_omits_serpapi_api_key(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Never persist SerpApi API credentials but keep provider selection."""
     monkeypatch.chdir(tmp_path)
 
@@ -162,7 +180,9 @@ def test_persist_settings_to_config_omits_serpapi_api_key(tmp_path, monkeypatch)
     assert data["web_search_provider"] == "serpapi"
 
 
-def test_persist_settings_to_config_omits_google_credentials(tmp_path, monkeypatch):
+def test_persist_settings_to_config_omits_google_credentials(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Never persist Google API key or CSE ID but keep provider selection."""
     monkeypatch.chdir(tmp_path)
 
@@ -182,7 +202,9 @@ def test_persist_settings_to_config_omits_google_credentials(tmp_path, monkeypat
     assert data["web_search_provider"] == "google"
 
 
-def test_persist_settings_to_config_auto_open_flag(tmp_path, monkeypatch):
+def test_persist_settings_to_config_auto_open_flag(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Write the share auto-open flag only when disabled."""
 
     monkeypatch.chdir(tmp_path)

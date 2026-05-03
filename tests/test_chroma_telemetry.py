@@ -1,6 +1,7 @@
 """Chroma client initialisation tests.
 
 Updates:
+  v0.1.2 - 2025-12-10 - Type fixture path explicitly for strict Pyright.
   v0.1.1 - 2025-12-08 - Cast recording client to ClientAPI for Pyright compliance.
   v0.1.0 - 2025-11-03 - Ensure Chroma anonymized telemetry is disabled by default.
 """
@@ -12,6 +13,8 @@ from typing import TYPE_CHECKING, Any, cast
 from core.prompt_manager import PromptManager
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
+    from pathlib import Path
+
     from chromadb.api import ClientAPI
 else:  # pragma: no cover - runtime fallback for typing
     ClientAPI = Any
@@ -44,7 +47,7 @@ class _RecordingClient:
         return object()
 
 
-def test_chroma_initializes_with_telemetry_disabled_by_default(tmp_path) -> None:
+def test_chroma_initializes_with_telemetry_disabled_by_default(tmp_path: Path) -> None:
     """PromptManager should construct a Chroma client with telemetry off by default.
 
     We inject a recording client to avoid importing/initialising the real Chroma

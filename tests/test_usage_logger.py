@@ -10,21 +10,39 @@ import importlib.util
 import json
 from pathlib import Path
 from types import SimpleNamespace
+from typing import TYPE_CHECKING, Protocol, cast
 
 from core.intent_classifier import IntentLabel, IntentPrediction
 
+if TYPE_CHECKING:
 
-def _load_usage_logger():
+    class _IntentUsageLoggerType(Protocol):
+        def __init__(self, path: Path | str | None = None, *, enabled: bool = True) -> None: ...
+        def log_detect(self, *, prediction: IntentPrediction, query_text: str) -> None: ...
+        def log_suggest(
+            self,
+            *,
+            prediction: IntentPrediction,
+            query_text: str,
+            prompts: list[SimpleNamespace],
+            fallback_used: bool,
+        ) -> None: ...
+        def log_copy(self, *, prompt_name: str, prompt_has_body: bool) -> None: ...
+
+
+def _load_usage_logger() -> type[_IntentUsageLoggerType]:
     module_path = Path(__file__).resolve().parents[1] / "gui" / "usage_logger.py"
     spec = importlib.util.spec_from_file_location("usage_logger", module_path)
     if spec is None or spec.loader is None:
         raise AssertionError("Unable to load usage_logger module")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module.IntentUsageLogger
+    if not hasattr(module, "IntentUsageLogger"):
+        raise AssertionError("usage_logger module missing IntentUsageLogger")
+    return cast("type[_IntentUsageLoggerType]", module.IntentUsageLogger)
 
 
-def test_usage_logger_writes_jsonl(tmp_path) -> None:
+def test_usage_logger_writes_jsonl(tmp_path: Path) -> None:
     """Ensure usage logger writes detect/suggest/copy events to JSONL."""
     IntentUsageLogger = _load_usage_logger()
     path = tmp_path / "intent_usage.jsonl"
