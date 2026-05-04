@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import cast
 
 import pytest
 
 pytest.importorskip("PySide6")
-from PySide6.QtWidgets import QApplication, QLabel
+from PySide6.QtWidgets import QApplication, QLabel, QLineEdit, QRadioButton
 
 from gui.settings_dialog import SettingsDialog
 
@@ -40,7 +40,7 @@ def test_settings_dialog_updates_live_routing_preview(qt_app: QApplication) -> N
         assert "color: #12351a" in preview.styleSheet()
         assert "#1f7a1f" in preview.styleSheet()
 
-        inference_input = dialog._inference_model_input
+        inference_input = dialog.findChild(QLineEdit, "settingsInferenceModelInput")
         assert inference_input is not None
         inference_input.setText("")
         qt_app.processEvents()
@@ -53,10 +53,12 @@ def test_settings_dialog_updates_live_routing_preview(qt_app: QApplication) -> N
         qt_app.processEvents()
         assert "🟢 Status: ready" in preview.text()
 
-        workflow_groups = cast("dict[str, object]", dialog._workflow_groups)
-        workflow_group = cast("Any", workflow_groups["description_generation"])
-        chat_title_inference = cast("object", workflow_group.buttons()[1])
-        cast("Any", chat_title_inference).click()
+        workflow_button = dialog.findChild(
+            QRadioButton,
+            "routingChoice_description_generation_inference",
+        )
+        assert workflow_button is not None
+        workflow_button.click()
         qt_app.processEvents()
 
         assert "Inference workflows:" in preview.text()
@@ -65,7 +67,7 @@ def test_settings_dialog_updates_live_routing_preview(qt_app: QApplication) -> N
         assert "[custom]" in preview.text()
         assert "🟢 Status: ready" in preview.text()
 
-        fast_input = dialog._model_input
+        fast_input = dialog.findChild(QLineEdit, "settingsFastModelInput")
         assert fast_input is not None
         fast_input.setText("")
         qt_app.processEvents()

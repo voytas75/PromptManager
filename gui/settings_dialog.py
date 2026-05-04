@@ -430,10 +430,12 @@ class SettingsDialog(QDialog):
         litellm_form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
 
         self._model_input = QLineEdit(self._litellm_model, litellm_tab)
+        self._model_input.setObjectName("settingsFastModelInput")
         self._model_input.textChanged.connect(self._refresh_routing_preview)  # type: ignore[arg-type]
         litellm_form.addRow("LiteLLM fast model", self._model_input)
 
         self._inference_model_input = QLineEdit(self._litellm_inference_model, litellm_tab)
+        self._inference_model_input.setObjectName("settingsInferenceModelInput")
         self._inference_model_input.textChanged.connect(self._refresh_routing_preview)  # type: ignore[arg-type]
         litellm_form.addRow("LiteLLM inference model", self._inference_model_input)
 
@@ -520,8 +522,10 @@ class SettingsDialog(QDialog):
             matrix_layout.addWidget(label, row_index, 0)
 
             fast_button = QRadioButton("Fast", routing_tab)
+            fast_button.setObjectName(f"routingChoice_{workflow_key}_fast")
             fast_button.setProperty("routeChoice", "fast")
             inference_button = QRadioButton("Inference", routing_tab)
+            inference_button.setObjectName(f"routingChoice_{workflow_key}_inference")
             inference_button.setProperty("routeChoice", "inference")
 
             group = QButtonGroup(self)
