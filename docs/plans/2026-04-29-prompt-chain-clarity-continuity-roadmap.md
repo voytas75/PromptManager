@@ -1,6 +1,6 @@
 # PromptManager Prompt Chain Clarity / Continuity Roadmap
 
-Status: proposed
+Status: completed (2026-05-04)
 
 > **For Hermes:** Use subagent-driven-development skill to implement this roadmap one bounded slice at a time.
 
@@ -166,15 +166,27 @@ If the first probe already passes, do **not** force a runtime/UI change just to 
 
 ---
 
-## Recommended first slice
+## Roadmap closure
 
-Start with **Slice 2 — Prompt chain final-output emphasis v1**.
+This roadmap is complete.
 
-Why this next:
-- Slice 1 is now complete and gives a clearer per-step handoff baseline,
-- the next most valuable ambiguity is helping operators distinguish the chain’s terminal result from intermediate step output,
-- this should remain a bounded presentation/readability pass on existing result surfaces,
-- it can likely stay GUI-first unless recon shows a tiny CLI formatting follow-up is justified.
+Closure summary:
+- Slice 1 delivered explicit per-step handoff continuity in the GUI run result view.
+- Slice 2 delivered clearer terminal-result wording via `Final chain result`.
+- Slice 3 closed as a guard-only reset/empty-state proof on the existing result seam.
+- Slice 4 delivered calmer CLI readability cues for `prompt-chain-show` and `prompt-chain-run`.
+
+The cycle stayed bounded to existing prompt-chain presentation seams in the GUI and CLI. No chain engine expansion, persistence redesign, branching workflow semantics, or chain-first product repositioning was introduced.
+
+---
+
+## Historical recommended first slice
+
+At roadmap creation time, the recommended starting point was:
+
+- **Slice 2 — Prompt chain final-output emphasis v1**
+
+That recommendation is now historical only because all slices in this roadmap are complete.
 
 ---
 
