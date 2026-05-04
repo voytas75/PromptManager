@@ -27,12 +27,22 @@ from core.embedding import (
 from models.prompt_model import Prompt
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Callable, Mapping, Sequence
+
+    type EmbeddingRequest = Mapping[str, object]
+    type EmbeddingPayload = dict[str, list[dict[str, list[float]]]]
+    type EmbeddingCallable = Callable[..., EmbeddingPayload]
+    type EmbeddingFactoryResult = tuple[EmbeddingCallable, type[Exception]]
 else:  # pragma: no cover - runtime placeholders
     from typing import Any as _Any
 
+    Callable = _Any
     Mapping = _Any
     Sequence = _Any
+    EmbeddingRequest = dict[str, object]
+    EmbeddingPayload = dict[str, list[dict[str, list[float]]]]
+    EmbeddingCallable = _Any
+    EmbeddingFactoryResult = tuple[object, type[Exception]]
 
 
 def _make_prompt(name: str = "Embedding Test") -> Prompt:
@@ -55,7 +65,7 @@ def test_embedding_provider_returns_deterministic_vector() -> None:
 def test_embedding_provider_retries_before_success() -> None:
     calls = {"count": 0}
 
-    def _flaky(texts):
+    def _flaky(texts: Sequence[str]) -> list[list[float]]:
         calls["count"] += 1
         if calls["count"] == 1:
             raise RuntimeError("temporary failure")
@@ -209,12 +219,12 @@ def test_litellm_embedding_function_exposes_name(monkeypatch: pytest.MonkeyPatch
 def test_litellm_embedding_function_uses_adapter(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, object] = {}
 
-    def _fake_get_embedding():
+    def _fake_get_embedding() -> EmbeddingFactoryResult:
         class _FakeException(Exception):
             pass
 
-        def _fake_embedding(**kwargs):
-            captured["request"] = kwargs
+        def _fake_embedding(**kwargs: object) -> EmbeddingPayload:
+            captured["request"] = cast("EmbeddingRequest", kwargs)
             return {"data": [{"embedding": [0.1, 0.2, 0.3]}]}
 
         return _fake_embedding, _FakeException
@@ -237,15 +247,23 @@ def test_litellm_embedding_function_uses_adapter(monkeypatch: pytest.MonkeyPatch
 
 def test_sentence_transformers_embedding_function_encodes(monkeypatch: pytest.MonkeyPatch) -> None:
     class _FakeModel:
-        def encode(self, inputs, convert_to_numpy: bool, normalize_embeddings: bool):
+        def encode(
+            self,
+            inputs: Sequence[str],
+            convert_to_numpy: bool,
+            normalize_embeddings: bool,
+        ) -> list[list[float]]:
             assert convert_to_numpy is True
             assert normalize_embeddings is False
             return [[float(len(text))] for text in inputs]
 
+    def _load_fake_model(_: object) -> object:
+        return _FakeModel()
+
     monkeypatch.setattr(
         SentenceTransformersEmbeddingFunction,
         "_load_model",
-        lambda self: _FakeModel(),
+        _load_fake_model,
         raising=False,
     )
     func = create_embedding_function(
