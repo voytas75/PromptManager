@@ -1099,11 +1099,8 @@ class PromptManagerSettings(BaseSettings):
                 )
                 if removed_secret_count:
                     logger.warning(
-                        "Ignoring %d secret configuration entr%s in configuration file %s; "
-                        "set credentials via environment variables instead.",
-                        removed_secret_count,
-                        "y" if removed_secret_count == 1 else "ies",
-                        path,
+                        "Ignoring unsupported credential entries in configuration file; "
+                        "set credentials via environment variables instead."
                     )
 
                 for key in (
