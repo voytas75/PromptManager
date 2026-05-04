@@ -8,11 +8,13 @@ Updates:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from gui.main_window_bridges import PromptActionsBridge
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
+    from collections.abc import Callable
+
     from gui.main_window_handlers import PromptActionsHandler
 else:  # pragma: no cover - runtime placeholders
     from typing import Any as _Any
@@ -35,11 +37,15 @@ class _HandlerStub:
 def test_prompt_actions_bridge_defers_handler_lookup_when_prebound() -> None:
     """Callbacks captured before handler initialisation should execute later."""
     handler_box: dict[str, _HandlerStub | None] = {"handler": None}
+
+    def _noop_close_fallback() -> None:
+        return None
+
     bridge = PromptActionsBridge(
         lambda: cast("PromptActionsHandler | None", handler_box["handler"]),
-        close_fallback=lambda: None,
+        close_fallback=_noop_close_fallback,
     )
-    delete_callback = bridge.delete_current_prompt
+    delete_callback = cast("Callable[[], None]", cast("Any", bridge).delete_current_prompt)
 
     handler_box["handler"] = _HandlerStub()
     delete_callback()
@@ -60,7 +66,7 @@ def test_prompt_actions_bridge_close_application_falls_back_until_ready() -> Non
         lambda: cast("PromptActionsHandler | None", handler_box["handler"]),
         close_fallback=_fallback,
     )
-    close_callback = bridge.close_application
+    close_callback = cast("Callable[[], None]", cast("Any", bridge).close_application)
 
     close_callback()
     assert fallback_called == [True]
