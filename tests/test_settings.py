@@ -196,7 +196,7 @@ def test_json_with_litellm_api_key_is_ignored(
     assert settings.litellm_api_base == "https://azure.example.com"
     assert settings.litellm_drop_params is None
     assert settings.litellm_tts_model is None
-    assert "Ignoring secret key" in caplog.text
+    assert "Ignoring 1 secret configuration entry" in caplog.text
 
 
 def test_json_with_exa_api_key_is_ignored(
@@ -221,7 +221,7 @@ def test_json_with_exa_api_key_is_ignored(
 
     assert settings.web_search_provider == "exa"
     assert settings.exa_api_key is None
-    assert "Ignoring secret key" in caplog.text
+    assert "Ignoring 1 secret configuration entry" in caplog.text
 
 
 def test_json_with_tavily_api_key_is_ignored(
@@ -246,7 +246,7 @@ def test_json_with_tavily_api_key_is_ignored(
 
     assert settings.web_search_provider == "tavily"
     assert settings.tavily_api_key is None
-    assert "Ignoring secret key" in caplog.text
+    assert "Ignoring 1 secret configuration entry" in caplog.text
 
 
 def test_json_with_serper_api_key_is_ignored(
@@ -271,7 +271,7 @@ def test_json_with_serper_api_key_is_ignored(
 
     assert settings.web_search_provider == "serper"
     assert settings.serper_api_key is None
-    assert "Ignoring secret key" in caplog.text
+    assert "Ignoring 1 secret configuration entry" in caplog.text
 
 
 def test_json_with_serpapi_api_key_is_ignored(
@@ -324,8 +324,7 @@ def test_json_with_google_credentials_is_ignored(
     assert settings.web_search_provider == "google"
     assert settings.google_api_key is None
     assert settings.google_cse_id is None
-    assert "Ignoring secret key" in caplog.text
-    assert "Ignoring secret key" in caplog.text
+    assert "Ignoring 2 secret configuration entries" in caplog.text
 
 
 def test_litellm_settings_from_env(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:

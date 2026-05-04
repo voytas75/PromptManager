@@ -1092,16 +1092,17 @@ class PromptManagerSettings(BaseSettings):
                     "google_cse_id",
                     "GOOGLE_CSE_ID",
                 }
-                removed_secrets = [
-                    key
+                removed_secret_count = sum(
+                    1
                     for key in disallowed_secret_keys
                     if key in data_dict and data_dict.pop(key, None) is not None
-                ]
-                if removed_secrets:
+                )
+                if removed_secret_count:
                     logger.warning(
-                        "Ignoring secret key(s) %s in configuration file %s; "
+                        "Ignoring %d secret configuration entr%s in configuration file %s; "
                         "set credentials via environment variables instead.",
-                        ", ".join(sorted(removed_secrets)),
+                        removed_secret_count,
+                        "y" if removed_secret_count == 1 else "ies",
                         path,
                     )
 
