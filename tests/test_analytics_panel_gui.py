@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -26,16 +26,21 @@ if TYPE_CHECKING:  # pragma: no cover - typing helper
 
 
 class _StubRepository:
-    def list(self):  # noqa: D401 - lightweight stub
+    def list(self) -> list[object]:  # noqa: D401 - lightweight stub
         return []
 
-    def get_prompt_execution_statistics(self, *_args, **_kwargs):
+    def get_prompt_execution_statistics(self, *args: object, **kwargs: object) -> dict[str, Any]:
+        del args, kwargs
         return {}
 
-    def get_model_usage_breakdown(self, *_args, **_kwargs):
+    def get_model_usage_breakdown(self, *args: object, **kwargs: object) -> list[dict[str, Any]]:
+        del args, kwargs
         return []
 
-    def get_benchmark_execution_stats(self, *_args, **_kwargs):
+    def get_benchmark_execution_stats(
+        self, *args: object, **kwargs: object
+    ) -> list[dict[str, Any]]:
+        del args, kwargs
         return []
 
 
@@ -44,13 +49,15 @@ class _StubManager:
         self.repository = _StubRepository()
         self.token_usage_totals = TokenUsageTotals(0, 0, 0)
 
-    def get_execution_analytics(self, *_args, **_kwargs):
+    def get_execution_analytics(self, *args: object, **kwargs: object) -> None:
+        del args, kwargs
         return None
 
-    def diagnose_embeddings(self):
+    def diagnose_embeddings(self) -> None:
         return None
 
-    def get_token_usage_totals(self, *_args, **_kwargs) -> TokenUsageTotals:
+    def get_token_usage_totals(self, *args: object, **kwargs: object) -> TokenUsageTotals:
+        del args, kwargs
         return self.token_usage_totals
 
 

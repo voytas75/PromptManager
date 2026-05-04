@@ -1,8 +1,9 @@
 # PromptManager — Next tests Pyright slice plan
 
-Status: proposed
+Status: implemented
 Date: 2026-05-03
-Source of truth: this note records the next selected bounded slice only; no implementation is included.
+Updated: 2026-05-04
+Source of truth: this note records the selected bounded slice and its verified implementation status.
 
 ## Goal
 
@@ -124,12 +125,28 @@ Optional follow-up metric after the slice lands:
 - whether a local protocol/helper alias is needed to avoid partial unknown cascades
 - whether file-level green leaves any hidden import-time dependency edge into another test helper
 
+## Implemented result
+
+The selected slice was implemented as a narrow test-only strict-typing cleanup in:
+
+- `tests/test_analytics_panel_gui.py`
+
+Delivered changes:
+- annotated stub repository/container return types so empty containers are no longer partially unknown,
+- annotated variadic stub parameters as `object` and consumed them locally to satisfy strict typing,
+- annotated manager helper methods used by the analytics panel seam while keeping runtime behavior unchanged,
+- kept the slice entirely inside test code with no production/runtime changes.
+
+Verified on 2026-05-04:
+- `uv run pyright tests/test_analytics_panel_gui.py` -> `0 errors`
+- `uv run pytest -q tests/test_analytics_panel_gui.py` -> `1 passed`
+- `uv run ruff check tests/test_analytics_panel_gui.py` -> `All checks passed!`
+- `uv run ruff format --check tests/test_analytics_panel_gui.py` -> `1 file already formatted`
+
 ## Decision
 
-The next slice is intentionally **not** a broad `private-usage` cleanup.
+This slice is now complete.
 
-The next slice to implement later should be:
+The work remained intentionally **not** a broad `private-usage` cleanup.
 
-> `tests/test_analytics_panel_gui.py` strict typing cleanup
-
-This note is SSOT for the selected next bounded tests slice until superseded by a newer plan.
+This note stays as SSOT for the now-implemented bounded tests slice until superseded by a newer plan.
