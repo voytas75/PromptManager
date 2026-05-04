@@ -7,8 +7,12 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from core.repository import PromptRepository, RepositoryNotFoundError
 from models.response_style import ResponseStyle
@@ -47,7 +51,7 @@ def test_response_style_roundtrip() -> None:
     assert loaded.prompt_part == style.prompt_part
 
 
-def test_repository_crud(tmp_path) -> None:
+def test_repository_crud(tmp_path: Path) -> None:
     """Persist response styles and verify CRUD operations."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     style = _make_response_style()
@@ -73,7 +77,7 @@ def test_repository_crud(tmp_path) -> None:
         repo.get_response_style(style.id)
 
 
-def test_repository_filters_and_search(tmp_path) -> None:
+def test_repository_filters_and_search(tmp_path: Path) -> None:
     """List response styles with inactive and search filters."""
     repo = PromptRepository(str(tmp_path / "repo.db"))
     active = _make_response_style("Active Style")

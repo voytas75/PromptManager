@@ -13,8 +13,13 @@ Updates:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import httpx
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 from core.exceptions import WebSearchProviderError, WebSearchUnavailable
 from core.web_search import (
@@ -80,7 +85,8 @@ async def test_exa_provider_parses_results() -> None:
     assert isinstance(doc, WebSearchDocument)
     assert doc.title == "Example Article"
     assert doc.highlights == ["Highlight line"]
-    assert doc.score == pytest.approx(0.9)
+    assert doc.score is not None
+    assert abs(doc.score - 0.9) < 1e-9
     assert doc.published_at is not None
 
 
@@ -156,7 +162,8 @@ async def test_tavily_provider_parses_results() -> None:
     assert len(result.documents) == 1
     doc = result.documents[0]
     assert doc.summary == "Key snippet"
-    assert doc.score == pytest.approx(0.77)
+    assert doc.score is not None
+    assert abs(doc.score - 0.77) < 1e-9
     assert doc.highlights == []
 
 
@@ -282,7 +289,8 @@ async def test_serpapi_provider_parses_results() -> None:
     doc = result.documents[0]
     assert doc.summary == "SerpApi snippet"
     assert doc.highlights == ["SerpApi snippet"]
-    assert doc.score == pytest.approx(1.0)
+    assert doc.score is not None
+    assert abs(doc.score - 1.0) < 1e-9
     assert doc.author == "Example Source"
 
 
@@ -339,7 +347,8 @@ async def test_google_provider_parses_results() -> None:
     assert doc.summary == "Snippet summary"
     assert doc.highlights == ["Snippet summary"]
     assert doc.author == "example.com"
-    assert doc.score == pytest.approx(1.0)
+    assert doc.score is not None
+    assert abs(doc.score - 1.0) < 1e-9
     assert doc.published_at is not None
 
 
@@ -406,7 +415,11 @@ async def test_random_provider_delegates_to_selected_provider(
 
     providers = [DummyProvider("exa"), DummyProvider("tavily")]
     random_provider = RandomWebSearchProvider(providers)
-    monkeypatch.setattr("core.web_search.providers.random.choice", lambda seq: seq[1])
+
+    def _pick_second(seq: Sequence[DummyProvider]) -> DummyProvider:
+        return seq[1]
+
+    monkeypatch.setattr("core.web_search.providers.random.choice", _pick_second)
 
     result = await random_provider.search("topic", limit=3)
 

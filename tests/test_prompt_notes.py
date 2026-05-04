@@ -7,8 +7,12 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from core.repository import PromptRepository, RepositoryNotFoundError
 from models.prompt_note import PromptNote
@@ -28,7 +32,7 @@ def test_prompt_note_roundtrip() -> None:
     assert loaded.note == note.note
 
 
-def test_repository_crud(tmp_path) -> None:
+def test_repository_crud(tmp_path: Path) -> None:
     """Exercise CRUD operations for prompt notes in the repository."""
     repo = PromptRepository(str(tmp_path / "notes.db"))
     note = _make_note("Ship release notes")

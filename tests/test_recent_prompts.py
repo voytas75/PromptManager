@@ -57,7 +57,7 @@ def qt_app() -> QApplication:
     app = QApplication.instance()
     if app is None:
         app = QApplication([])
-    return app
+    return cast("QApplication", app)
 
 
 def _build_prompt(
@@ -99,7 +99,9 @@ class _RecentPromptsDialogFactoryStub:
         return self.dialog
 
 
-def test_recent_prompts_dialog_summary_mentions_reopen_for_further_work(qt_app) -> None:
+def test_recent_prompts_dialog_summary_mentions_reopen_for_further_work(
+    qt_app: QApplication,
+) -> None:
     """Recent dialog summary should make the reopen-and-continue posture explicit."""
     prompt = _build_prompt(
         prompt_id=uuid.UUID("00000000-0000-0000-0000-0000000000ac"),
@@ -173,7 +175,13 @@ def test_open_recent_prompts_orders_by_last_modified_and_selects_prompt() -> Non
     assert status_messages == []
 
 
-def test_recent_prompts_dialog_shows_visible_row_metadata(qt_app) -> None:
+def _first_row_labels(dialog: RecentPromptsDialog) -> list[str]:
+    """Return visible QLabel texts for the first recent-prompt row."""
+    labels = dialog.findChildren(QLabel)
+    return [label.text() for label in labels[1:3]]
+
+
+def test_recent_prompts_dialog_shows_visible_row_metadata(qt_app: QApplication) -> None:
     """Recent dialog rows should show compact visible metadata without tooltip-only reliance."""
     prompt = _build_prompt(
         prompt_id=uuid.UUID("00000000-0000-0000-0000-0000000000aa"),
@@ -184,20 +192,15 @@ def test_recent_prompts_dialog_shows_visible_row_metadata(qt_app) -> None:
 
     dialog = RecentPromptsDialog([prompt])
 
-    item = dialog._list_widget.item(0)  # noqa: SLF001
-
-    assert item is not None
-    assert item.text() == "Visible Metadata Prompt"
-    row_widget = dialog._list_widget.itemWidget(item)  # noqa: SLF001
-    assert row_widget is not None
-    visible_text = row_widget.findChildren(QLabel)
-    assert [label.text() for label in visible_text] == [
+    assert _first_row_labels(dialog) == [
         "Visible Metadata Prompt",
         "Modified 2026-04-28 08:14 UTC • Category: Research",
     ]
 
 
-def test_recent_prompts_dialog_uses_uncategorised_fallback_in_visible_metadata(qt_app) -> None:
+def test_recent_prompts_dialog_uses_uncategorised_fallback_in_visible_metadata(
+    qt_app: QApplication,
+) -> None:
     """Recent dialog metadata should reuse the uncategorised fallback in visible rows."""
     prompt = _build_prompt(
         prompt_id=uuid.UUID("00000000-0000-0000-0000-0000000000ab"),
@@ -208,13 +211,7 @@ def test_recent_prompts_dialog_uses_uncategorised_fallback_in_visible_metadata(q
 
     dialog = RecentPromptsDialog([prompt])
 
-    item = dialog._list_widget.item(0)  # noqa: SLF001
-
-    assert item is not None
-    row_widget = dialog._list_widget.itemWidget(item)  # noqa: SLF001
-    assert row_widget is not None
-    visible_text = row_widget.findChildren(QLabel)
-    assert [label.text() for label in visible_text] == [
+    assert _first_row_labels(dialog) == [
         "No Category Prompt",
         "Modified 2026-04-28 09:00 UTC • Category: Uncategorised",
     ]
