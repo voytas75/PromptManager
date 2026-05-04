@@ -126,6 +126,13 @@ else:  # pragma: no cover - runtime placeholders for type-only imports
     WorkbenchWindow = _Any
 
 
+def match_category_label(
+    value: str | None, categories: Sequence[PromptCategory]
+) -> str | None:
+    """Return the canonical category label matching *value* via exact, slug, or fuzzy match."""
+    return _match_category_label(value, categories)
+
+
 def _match_category_label(  # pyright: ignore[reportUnusedFunction]
     value: str | None, categories: Sequence[PromptCategory]
 ) -> str | None:
@@ -783,4 +790,4 @@ class MainWindow(QMainWindow):
         show_toast(self, message, duration_ms)
 
 
-__all__ = ["MainWindow"]
+__all__ = ["MainWindow", "match_category_label"]

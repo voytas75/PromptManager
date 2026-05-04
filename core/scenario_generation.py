@@ -29,6 +29,11 @@ from .litellm_adapter import (
 )
 
 
+def normalise_scenarios(candidates: Sequence[str], limit: int) -> list[str]:
+    """Return up to *limit* distinct, trimmed scenario strings."""
+    return _normalise_scenarios(candidates, limit)
+
+
 def _normalise_scenarios(candidates: Sequence[str], limit: int) -> list[str]:
     """Return up to *limit* distinct, trimmed scenario strings."""
     cleaned: list[str] = []
@@ -61,6 +66,11 @@ def _strip_code_fences(response_text: str) -> str:
     while lines and lines[-1].strip().startswith("```"):
         lines.pop()
     return "\n".join(lines).strip()
+
+
+def extract_candidates(response_text: str) -> list[str]:
+    """Parse LiteLLM output into a list of candidate scenario strings."""
+    return _extract_candidates(response_text)
 
 
 def _extract_candidates(response_text: str) -> list[str]:
@@ -202,5 +212,10 @@ class LiteLLMScenarioGenerator:
         return (self.system_prompt or SCENARIO_GENERATION_PROMPT).strip()
 
 
-__all__ = ["LiteLLMScenarioGenerator", "ScenarioGenerationError"]
+__all__ = [
+    "LiteLLMScenarioGenerator",
+    "ScenarioGenerationError",
+    "extract_candidates",
+    "normalise_scenarios",
+]
 logger = logging.getLogger(__name__)

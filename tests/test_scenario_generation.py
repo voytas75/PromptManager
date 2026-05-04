@@ -14,8 +14,8 @@ import pytest
 from core.scenario_generation import (
     LiteLLMScenarioGenerator,
     ScenarioGenerationError,
-    _extract_candidates,
-    _normalise_scenarios,
+    extract_candidates,
+    normalise_scenarios,
 )
 
 if TYPE_CHECKING:
@@ -31,7 +31,7 @@ def test_normalise_scenarios_trims_and_limits() -> None:
         "",
         " Summarise logs ",
     ]
-    assert _normalise_scenarios(candidates, limit=2) == [
+    assert normalise_scenarios(candidates, limit=2) == [
         "Investigate outages",
         "Draft release notes",
     ]
@@ -43,9 +43,9 @@ def test_extract_candidates_supports_multiple_payload_shapes() -> None:
     dict_json = '{"first": "One", "second": "Two"}'
     plain_text = "First line\n\nSecond line"
 
-    assert _extract_candidates(array_json) == ["A", "B"]
-    assert _extract_candidates(dict_json) == ["One", "Two"]
-    assert _extract_candidates(plain_text) == ["First line", "Second line"]
+    assert extract_candidates(array_json) == ["A", "B"]
+    assert extract_candidates(dict_json) == ["One", "Two"]
+    assert extract_candidates(plain_text) == ["First line", "Second line"]
 
 
 def test_extract_candidates_strips_markdown_code_fences() -> None:
@@ -57,7 +57,7 @@ def test_extract_candidates_strips_markdown_code_fences() -> None:
         "```"
     )
 
-    assert _extract_candidates(fenced) == [
+    assert extract_candidates(fenced) == [
         "Initiate collaborative prompt refinement.",
         "Guide multi-role experts to iterate on drafts.",
     ]
@@ -73,7 +73,7 @@ def test_extract_candidates_handles_partial_json_arrays() -> None:
         "]\n"
     )
 
-    assert _extract_candidates(response) == [
+    assert extract_candidates(response) == [
         "Draft detailed, stepwise chronicles for fictional world-building "
         "or simulation-based technical processes.",
         "Summarise tactical response options across distributed operations.",

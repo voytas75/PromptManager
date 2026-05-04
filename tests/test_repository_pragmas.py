@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from core.repository import _connect
+from core.repository.base import connect
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 def test_connect_configures_sqlite_pragmas(tmp_path: Path) -> None:
     """Verify SQLite pragmas are set when establishing repository connections."""
     db_path = tmp_path / "pragmas.db"
-    with _connect(db_path) as conn:
+    with connect(db_path) as conn:
         foreign_keys = conn.execute("PRAGMA foreign_keys;").fetchone()[0]
         journal_mode = conn.execute("PRAGMA journal_mode;").fetchone()[0]
         synchronous = conn.execute("PRAGMA synchronous;").fetchone()[0]
