@@ -60,11 +60,13 @@ class _StubManager:
         self.created: list[Prompt] = []
         self.updated: list[Prompt] = []
 
-    def create_prompt(self, prompt: Prompt, embedding=None) -> Prompt:  # noqa: D401
+    def create_prompt(self, prompt: Prompt, embedding: object | None = None) -> Prompt:  # noqa: D401
+        del embedding
         self.created.append(prompt)
         return self.repository.add(prompt)
 
-    def update_prompt(self, prompt: Prompt, embedding=None) -> Prompt:  # noqa: D401
+    def update_prompt(self, prompt: Prompt, embedding: object | None = None) -> Prompt:  # noqa: D401
+        del embedding
         self.updated.append(prompt)
         return self.repository.update(prompt)
 
@@ -120,7 +122,8 @@ def test_import_prompt_catalog_adds_and_updates(tmp_path: Path) -> None:
     assert second_result.preview is not None
     assert manager.updated
     refreshed_prompt = manager.repository.list()[0]
-    assert refreshed_prompt.quality_score == pytest.approx(9.1)
+    assert refreshed_prompt.quality_score is not None
+    assert abs(refreshed_prompt.quality_score - 9.1) < 1e-9
     assert "logs" in refreshed_prompt.tags
 
 
