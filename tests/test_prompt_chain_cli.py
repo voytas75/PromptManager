@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse
 import logging
 import uuid
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from cli.commands import run_prompt_chain_run, run_prompt_chain_show
 from core.execution import CodexExecutionResult
@@ -98,7 +98,11 @@ def test_prompt_chain_show_lists_step_labels_with_failure_behavior(
     logger = logging.getLogger("test_prompt_chain_show")
     args = argparse.Namespace(chain_id=str(manager.chain.id))
 
-    exit_code = run_prompt_chain_show(manager, args, logger)
+    exit_code = run_prompt_chain_show(
+        cast("Any", manager),
+        args,
+        logger,
+    )
 
     assert exit_code == 0
     output = capsys.readouterr().out
@@ -124,7 +128,11 @@ def test_prompt_chain_run_surfaces_final_chain_result_label(
         no_web_search=False,
     )
 
-    exit_code = run_prompt_chain_run(manager, args, logger)
+    exit_code = run_prompt_chain_run(
+        cast("Any", manager),
+        args,
+        logger,
+    )
 
     assert exit_code == 0
     output = capsys.readouterr().out
