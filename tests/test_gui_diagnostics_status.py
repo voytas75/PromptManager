@@ -6,11 +6,18 @@ Updates:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any, cast
+
 from gui.runtime_settings_service import (
     DiagnosticsItem,
     build_config_diagnostics_items,
     summarise_diagnostics_severity,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+else:
+    Mapping = Any
 
 
 def test_summarise_diagnostics_severity_prefers_fail() -> None:
@@ -114,7 +121,8 @@ def test_build_config_diagnostics_items_marks_missing_fast_model_as_fail() -> No
     )
 
     assert diagnostics["summary_status"] == "FAIL"
-    assert diagnostics["items"][0] == {
+    items = cast("list[Mapping[str, object]]", diagnostics["items"])
+    assert items[0] == {
         "label": "Fast model",
         "status": "FAIL",
         "detail": "missing",
