@@ -107,45 +107,62 @@ If the first probe already passes, do **not** force a runtime/UI change just to 
 
 ### Slice 2 — Prompt chain final-output emphasis v1
 
-**Status:** proposed
+**Status:** done (2026-05-04)
 
-**Intent:**
-- make the terminal result of a chain easier to distinguish from intermediate step output,
-- reduce ambiguity about which text is the chain’s end result,
-- keep the change limited to labels, grouping, or rendering cues on existing result surfaces.
+**Delivered:**
+- the prompt chain run summary block now renders as `Final chain result` instead of `Chain summary`,
+- the final summary remains on the existing result seam in `gui/dialogs/prompt_chains.py`,
+- focused dialog coverage now asserts the final-result wording so operators can distinguish the terminal result from intermediate step output more quickly.
+
+**Verification:**
+- `uv run pytest -q tests/test_prompt_chain_dialog.py -k chain_summary` → `1 passed`
 
 **Boundaries:**
 - no analytics expansion,
 - no export workflow redesign,
-- no extra persistence.
+- no extra persistence,
+- no chain engine or CLI behavior changes.
 
 ### Slice 3 — Prompt chain neutral empty-state / reset guard pack v1
 
-**Status:** proposed
+**Status:** done (2026-05-04)
 
-**Intent:**
-- verify that clearing or re-running chain inputs does not leave stale summary/result cues behind,
-- ensure chain run surfaces return to a neutral, understandable state after reset paths,
-- allow this slice to close as guard-only if the current runtime already behaves correctly.
+**Delivered:**
+- focused dialog coverage now proves clearing the chain results pane resets it to a neutral empty state,
+- focused dialog coverage also proves a second chain run replaces prior result cues instead of appending stale run text,
+- the slice closed as guard-only because the existing runtime already reset the result seam correctly.
+
+**Verification:**
+- `uv run pytest -q tests/test_prompt_chain_dialog.py -k 'clear_results or second_run_replaces_previous_result_cues'` → `2 passed`
+- `uv run pytest -q tests/test_prompt_chain_dialog.py -k 'chain_summary or clear_results or second_run_replaces_previous_result_cues'` → `3 passed`
+- `uv run ruff check tests/test_prompt_chain_dialog.py` → `All checks passed!`
 
 **Boundaries:**
 - no new run-history model,
 - no lifecycle redesign,
-- no hidden state store.
+- no hidden state store,
+- no GUI runtime behavior changes.
 
 ### Slice 4 — Prompt chain CLI output legibility v1
 
-**Status:** proposed
+**Status:** done (2026-05-04)
 
-**Intent:**
-- tighten `prompt-chain-show` and/or `prompt-chain-run` output so console operators can read the chain structure and result flow with less ambiguity,
-- keep the work read-first and deterministic,
-- prefer formatting clarity over feature breadth.
+**Delivered:**
+- `prompt-chain-show` now renders each step as a calmer structure block with the visible step label plus explicit `Prompt:` and `Failure:` lines,
+- `prompt-chain-run` now uses `Input to chain:`, `Final chain result:`, and `Chain outputs:` headings so terminal operators can distinguish the starting input, terminal result, and structured outputs more quickly,
+- focused CLI coverage now locks those read-first output cues without widening into a new export/API surface.
+
+**Verification:**
+- `uv run pytest -q tests/test_prompt_chain_cli.py` → `2 passed`
+- `uv run ruff check cli/commands.py tests/test_prompt_chain_cli.py` → `All checks passed!`
+- `uv run ruff format --check cli/commands.py tests/test_prompt_chain_cli.py` → do weryfikacji
+- `uv run pyright cli/commands.py tests/test_prompt_chain_cli.py` → do weryfikacji (pre-existing broad typing debt outside this slice)
 
 **Boundaries:**
 - no new API layer,
-- no machine-contract redesign unless a tiny existing output tweak clearly justifies it,
-- no separate export subsystem.
+- no machine-contract redesign,
+- no separate export subsystem,
+- no chain engine behavior changes.
 
 ---
 

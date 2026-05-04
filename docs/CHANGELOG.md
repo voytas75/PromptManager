@@ -6,6 +6,12 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Added
 
+- Added one bounded **prompt chain CLI output legibility v1** on the existing prompt-chain show/run console seam so `prompt-chain-show` now renders calmer step structure lines (`Prompt:` / `Failure:`) and `prompt-chain-run` now distinguishes `Input to chain`, `Final chain result`, and `Chain outputs`, improving terminal readability without changing chain execution logic or introducing a new API/export surface.
+
+- Added one bounded **prompt chain neutral empty-state / reset guard pack v1** on the existing Chain run-result seam so focused dialog coverage now proves clearing results returns the pane to a neutral empty state and a second run replaces prior result cues instead of appending stale text, while leaving runtime behavior unchanged because the seam already reset correctly.
+
+- Added one bounded **prompt chain final-output emphasis v1** on the existing Chain run-result seam so the terminal summary block now renders as `Final chain result` instead of `Chain summary`, making the end result easier to distinguish from intermediate step output without changing chain execution logic, persistence, or CLI behavior.
+
 - Added one bounded **active narrowing summary cue v1** on the existing prompt-library filter-panel seam so operators now see one always-visible summary that stays calm in the broad state (`Showing all prompts`) and flips to a compact combined narrowing cue when search/filter constraints are active, without changing ranking, persistence, or broader prompt-list semantics.
 
 - Added one bounded **search-query continuity cue v1** on the existing prompt-library filter/search seam so the active narrowing summary now reflects the live search text and resets cleanly to `Showing all prompts` when search is cleared, without changing ranking, persistence, or CLI/headless behavior.

@@ -352,8 +352,9 @@ def test_prompt_chain_dialog_renders_chain_summary(qt_app: QApplication) -> None
         panel._chain_input_edit.setPlainText("Summary input")  # noqa: SLF001
         panel._run_selected_chain()  # noqa: SLF001
         text = panel._result_view.toPlainText()  # noqa: SLF001
-        assert "Chain summary" in text
+        assert "Final chain result" in text
         assert "Demo summary" in text
+        assert "Chain summary" not in text
     finally:
         dialog.close()
         dialog.deleteLater()
@@ -475,6 +476,52 @@ def test_prompt_chain_results_use_colored_sections(qt_app: QApplication) -> None
         assert "chain-block--input" in rich
         assert "chain-block--summary" in rich
         assert "#66bb6a" in rich  # light green text
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
+def test_prompt_chain_dialog_clear_results_resets_to_neutral_state(qt_app: QApplication) -> None:
+    """Clearing results should remove stale run cues and leave an empty results pane."""
+
+    manager = _ManagerStub()
+    dialog, panel, manager = _build_dialog(manager)
+    try:
+        panel._chain_input_edit.setPlainText("First run")  # noqa: SLF001
+        panel._run_selected_chain()  # noqa: SLF001
+        assert "Input to chain" in panel._result_view.toPlainText()  # noqa: SLF001
+
+        panel._handle_clear_results()  # noqa: SLF001
+
+        assert panel._result_view.toPlainText() == ""  # noqa: SLF001
+        assert panel._result_plaintext == ""  # noqa: SLF001
+        assert panel._result_richtext == ""  # noqa: SLF001
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
+def test_prompt_chain_dialog_second_run_replaces_previous_result_cues(qt_app: QApplication) -> None:
+    """Running a chain again should replace prior result text instead of appending stale cues."""
+
+    manager = _ManagerStub(step_response_text="First response")
+    dialog, panel, manager = _build_dialog(manager)
+    try:
+        panel._chain_input_edit.setPlainText("First input")  # noqa: SLF001
+        panel._run_selected_chain()  # noqa: SLF001
+        first_plain = panel._result_view.toPlainText()  # noqa: SLF001
+        assert "First input" in first_plain
+        assert "Final chain result" in first_plain
+
+        manager._step_response_text = "Second response"
+        panel._chain_input_edit.setPlainText("Second input")  # noqa: SLF001
+        panel._run_selected_chain()  # noqa: SLF001
+
+        second_plain = panel._result_view.toPlainText()  # noqa: SLF001
+        assert "Second input" in second_plain
+        assert second_plain.count("Input to chain") == 1
+        assert second_plain.count("Final chain result") == 1
+        assert "First input" not in second_plain
     finally:
         dialog.close()
         dialog.deleteLater()
@@ -643,7 +690,8 @@ def test_prompt_chain_step_markdown_renders_without_code_fences(qt_app: QApplica
         assert "chain-block--outputs" in rich
         assert "```" not in rich
         plain = panel._result_plaintext  # noqa: SLF001
-        assert "Chain summary" in plain
+        assert "Final chain result" in plain
+        assert "Chain summary" not in plain
         assert "### Step output" not in plain
     finally:
         dialog.close()

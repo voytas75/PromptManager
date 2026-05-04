@@ -843,12 +843,12 @@ class PromptChainManagerPanel(QWidget):
             html_sections.extend(step_html_sections)
             html_sections.append("</div>")
         if summary_text:
-            plain_sections.append("Chain summary")
+            plain_sections.append("Final chain result")
             plain_sections.extend(_indent_lines(summary_text))
             plain_sections.append("")
             html_sections.append(
                 self._format_colored_block_html(
-                    "Chain summary",
+                    "Final chain result",
                     summary_text,
                     color=_CHAIN_SUMMARY_COLOR,
                     class_name="chain-block--summary",

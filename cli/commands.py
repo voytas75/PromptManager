@@ -657,8 +657,11 @@ def run_prompt_chain_show(
         return 0
     print("\nSteps:")
     for step in chain.steps:
-        continuation = "stops on failure" if step.stop_on_failure else "continues on failure"
-        print(f"  {step.order_index}. prompt={step.prompt_id} ({continuation})")
+        step_label = step.output_variable or str(step.prompt_id)
+        failure_label = "Stop chain on failure" if step.stop_on_failure else "Continue on failure"
+        print(f"  {step.order_index}. {step_label}")
+        print(f"     Prompt: {step.prompt_id}")
+        print(f"     Failure: {failure_label}")
     return 0
 
 
@@ -728,10 +731,13 @@ def run_prompt_chain_run(
         logger.error("Unable to execute prompt chain: %s", exc)
         return 5
     print(f"\nChain '{result.chain.name}'")
-    print("Input:")
+    print("Input to chain:")
     chain_input_text = result.chain_input or ""
     print(textwrap.indent(chain_input_text or "(empty input)", "  "))
-    print("\nOutputs:")
+    if result.summary:
+        print("\nFinal chain result:")
+        print(textwrap.indent(result.summary, "  "))
+    print("\nChain outputs:")
     if not result.outputs:
         print("  (no outputs captured)")
     else:
