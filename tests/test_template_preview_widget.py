@@ -22,9 +22,7 @@ from core.templating import SchemaValidator, TemplateRenderResult
 
 def _load_template_preview_module() -> types.ModuleType:
     """Import template preview module, falling back to PySide6 stubs when absent."""
-    try:
-        import PySide6  # noqa: F401  # pragma: no cover - import guard only
-    except ImportError:
+    if importlib.util.find_spec("PySide6") is None:
         return _load_with_qt_stubs()
     return importlib.import_module("gui.template_preview")
 
@@ -195,7 +193,17 @@ def _make_preview() -> TemplatePreviewWidget:
     widget._preview_ready = False
     widget._current_prompt_id = None
     widget._suspend_persist = False
-    widget._state_store = types.SimpleNamespace(value=lambda *_: None, setValue=lambda *_: None)
+
+    def _load_state_value(*_: object) -> None:
+        return None
+
+    def _store_state_value(*_: object) -> None:
+        return None
+
+    widget._state_store = types.SimpleNamespace(
+        value=_load_state_value,
+        setValue=_store_state_value,
+    )
 
     class _DummyToggle:
         def __init__(self) -> None:
