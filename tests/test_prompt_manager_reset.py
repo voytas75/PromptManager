@@ -61,7 +61,7 @@ class _StubChromaClient:
     def __init__(self, collection: _StubCollection) -> None:
         self.collection = collection
         self.deleted = False
-        self._create_calls = 0
+        self.create_calls = 0
 
     def get_or_create_collection(
         self,
@@ -70,7 +70,7 @@ class _StubChromaClient:
         metadata: dict[str, Any] | None = None,
         embedding_function: Any | None = None,
     ) -> _StubCollection:
-        self._create_calls += 1
+        self.create_calls += 1
         return self.collection
 
     def delete_collection(self, *, name: str) -> None:
@@ -80,7 +80,7 @@ class _StubChromaClient:
 class _StubChromaClientNoDelete:
     def __init__(self, collection: _StubCollection) -> None:
         self.collection = collection
-        self._create_calls = 0
+        self.create_calls = 0
 
     def get_or_create_collection(
         self,
@@ -89,7 +89,7 @@ class _StubChromaClientNoDelete:
         metadata: dict[str, Any] | None = None,
         embedding_function: Any | None = None,
     ) -> _StubCollection:
-        self._create_calls += 1
+        self.create_calls += 1
         return self.collection
 
 
@@ -146,7 +146,7 @@ def test_prompt_manager_reset_application_data(tmp_path: Path) -> None:
     assert repo.list() == []
     assert repo.list_executions() == []
     assert client.deleted is True
-    assert client._create_calls >= 2  # initial + reset
+    assert client.create_calls >= 2  # initial + reset
     assert manager.user_profile is not None
     assert manager.user_profile.username == "default"
     assert not any(manager.logs_path.iterdir())
@@ -171,7 +171,7 @@ def test_reset_vector_store_without_client_delete(tmp_path: Path) -> None:
     manager.reset_vector_store()
 
     assert collection.deleted_where is not None
-    assert client._create_calls >= 1
+    assert client.create_calls >= 1
 
 
 def test_clear_usage_logs_handles_missing_directory(tmp_path: Path) -> None:
