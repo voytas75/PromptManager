@@ -22,9 +22,12 @@ from core.web_search import (
 from gui.runtime_settings_service import RuntimeSettingsService, build_config_diagnostics_items
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from core import PromptManager
 else:  # pragma: no cover - runtime fallback for typing-only import
     PromptManager = Any
+    Mapping = Any
 
 
 class _DummyPromptManager:
@@ -286,15 +289,16 @@ def test_build_config_diagnostics_items_explains_env_overrides_config_value() ->
             "redis_dsn": "config",
         },
     )
+    items = cast("list[Mapping[str, object]]", diagnostics["items"])
 
-    assert diagnostics["items"][0] == {
+    assert items[0] == {
         "label": "Fast model",
         "status": "OK",
         "detail": "azure/gpt-4.1-env",
         "source": "env",
         "precedence": "env overrides config (azure/gpt-4.1-config)",
     }
-    assert diagnostics["items"][2] == {
+    assert items[2] == {
         "label": "API key",
         "status": "OK",
         "detail": "configured",
@@ -323,15 +327,16 @@ def test_build_config_diagnostics_items_marks_derived_values_without_override_te
             "redis_dsn": "runtime",
         },
     )
+    items = cast("list[Mapping[str, object]]", diagnostics["items"])
 
-    assert diagnostics["items"][3] == {
+    assert items[3] == {
         "label": "Embeddings",
         "status": "OK",
         "detail": "litellm / azure/gpt-4.1",
         "source": "derived",
         "precedence": "derived from fast model",
     }
-    assert diagnostics["items"][1] == {
+    assert items[1] == {
         "label": "Inference model",
         "status": "WARN",
         "detail": "not configured",
