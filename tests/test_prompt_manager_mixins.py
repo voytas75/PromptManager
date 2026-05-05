@@ -275,10 +275,26 @@ def test_litellm_mixin_uses_supplied_intent_classifier() -> None:
 
 
 class _StateHarness(UserStateMixin):
-    def __init__(self, repository: object) -> None:
-        self._repository = cast("PromptRepository", repository)
+    def __init__(self, repo: _UserRepoStub) -> None:
+        self._repository = cast("PromptRepository", repo)
         self._history_tracker: HistoryTracker | None = None
         self._user_profile: UserProfile | None = None
+
+    @property
+    def history_tracker(self) -> HistoryTracker | None:
+        return self._history_tracker
+
+    @property
+    def user_profile(self) -> UserProfile | None:
+        return self._user_profile
+
+    def initialise_user_state(
+        self,
+        *,
+        history_tracker: HistoryTracker | None,
+        user_profile: UserProfile | None,
+    ) -> None:
+        self._initialise_user_state(history_tracker=history_tracker, user_profile=user_profile)
 
 
 class _UserRepoStub:
@@ -301,10 +317,10 @@ def test_user_state_mixin_prefers_explicit_profile() -> None:
     tracker = cast("HistoryTracker", object())
     profile = UserProfile(id=uuid.uuid4(), username="explicit")
 
-    harness._initialise_user_state(history_tracker=tracker, user_profile=profile)
+    harness.initialise_user_state(history_tracker=tracker, user_profile=profile)
 
-    assert harness._history_tracker is tracker
-    assert harness._user_profile == profile
+    assert harness.history_tracker is tracker
+    assert harness.user_profile == profile
     assert repo.calls == 0
 
 
@@ -312,16 +328,16 @@ def test_user_state_mixin_loads_repository_profile_and_handles_errors() -> None:
     repo = _UserRepoStub(profile=UserProfile(id=uuid.uuid4(), username="repo"))
     harness = _StateHarness(repo)
 
-    harness._initialise_user_state(history_tracker=None, user_profile=None)
+    harness.initialise_user_state(history_tracker=None, user_profile=None)
 
-    assert harness._user_profile == repo.profile
+    assert harness.user_profile == repo.profile
     assert repo.calls == 1
 
     failing_repo = _UserRepoStub(raise_error=True)
     failing_harness = _StateHarness(failing_repo)
-    failing_harness._initialise_user_state(history_tracker=None, user_profile=None)
+    failing_harness.initialise_user_state(history_tracker=None, user_profile=None)
 
-    assert failing_harness._user_profile is None
+    assert failing_harness.user_profile is None
     assert failing_repo.calls == 1
 
 

@@ -1,6 +1,7 @@
 """Prompt version history dialog tests.
 
 Updates:
+  v0.2.0 - 2026-05-04 - Resolve private-usage checks via public widget lookup.
   v0.1.3 - 2026-04-06 - Lock body-only history copy controls to the shared Copy Prompt wording.
   v0.1.2 - 2025-12-08 - Cast manager/prompt stubs to match dialog signatures for Pyright.
   v0.1.1 - 2025-11-29 - Wrap tab title comprehension for Ruff line length.
@@ -15,7 +16,7 @@ from typing import TYPE_CHECKING, cast
 import pytest
 
 pytest.importorskip("PySide6")
-from PySide6.QtWidgets import QApplication, QPushButton
+from PySide6.QtWidgets import QApplication, QPlainTextEdit, QPushButton, QTabWidget
 
 from gui.dialogs import PromptVersionHistoryDialog
 from models.prompt_model import Prompt
@@ -26,6 +27,9 @@ else:  # pragma: no cover - runtime placeholders
     from typing import Any as _Any
 
     PromptManager = _Any
+
+_BODY_PLACEHOLDER = "Select a version to view the prompt body."
+_NO_VERSIONS_MESSAGE = "No versions have been recorded for this prompt yet."
 
 
 @pytest.fixture(scope="module")
@@ -59,15 +63,24 @@ def test_version_history_dialog_defaults_to_body_tab(qt_app: QApplication) -> No
     """Ensure the prompt body tab is selected by default when opened."""
     dialog = PromptVersionHistoryDialog(_as_prompt_manager(_ManagerStub()), _prompt_stub())
     try:
-        tab_titles = [
-            dialog._tab_widget.tabText(index) for index in range(dialog._tab_widget.count())
-        ]
+        tab_widget = dialog.findChild(QTabWidget, "promptVersionHistoryTabs")
+        body_view = dialog.findChild(QPlainTextEdit, "promptVersionHistoryBodyView")
+        current_diff_view = dialog.findChild(
+            QPlainTextEdit,
+            "promptVersionHistoryCurrentDiffView",
+        )
+
+        assert tab_widget is not None
+        assert body_view is not None
+        assert current_diff_view is not None
+
+        tab_titles = [tab_widget.tabText(index) for index in range(tab_widget.count())]
         assert tab_titles[0] == "Prompt body"
         assert tab_titles[1] == "Diff vs previous"
         assert tab_titles[2] == "Diff vs current"
-        assert dialog._tab_widget.currentIndex() == 0
-        assert dialog._body_view.toPlainText() == PromptVersionHistoryDialog._BODY_PLACEHOLDER
-        assert "No versions" in dialog._current_diff_view.toPlainText()
+        assert tab_widget.currentIndex() == 0
+        assert body_view.toPlainText() == _BODY_PLACEHOLDER
+        assert _NO_VERSIONS_MESSAGE in current_diff_view.toPlainText()
     finally:
         dialog.close()
         dialog.deleteLater()

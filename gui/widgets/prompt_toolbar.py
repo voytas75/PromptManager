@@ -68,11 +68,13 @@ class PromptToolbar(QWidget):
         layout.addWidget(self._refresh_button)
 
         self._recent_button = QPushButton("Recent", self)
+        self._recent_button.setObjectName("promptToolbarRecentButton")
         self._recent_button.setToolTip("Reopen one of the prompts you touched most recently.")
         self._recent_button.clicked.connect(self.recent_requested)  # type: ignore[arg-type]
         layout.addWidget(self._recent_button)
 
         self._new_button = QToolButton(self)
+        self._new_button.setObjectName("promptToolbarQuickCaptureButton")
         self._new_button.setText("Quick Capture")
         self._new_button.setToolTip(
             "Paste raw prompt text into a draft record, or open the full prompt/workbench flows."

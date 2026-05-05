@@ -3,22 +3,19 @@
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import sys
 import types
 
 
 def _install_qt_stubs() -> None:
-    try:
-        import PySide6  # noqa: F401
-
+    if importlib.util.find_spec("PySide6") is not None:
         return
-    except ImportError:
-        pass
 
     qt_widgets = types.ModuleType("PySide6.QtWidgets")
 
     class _Widget:
-        def __init__(self, *args, **kwargs) -> None:
+        def __init__(self, *_: object, **__: object) -> None:
             return
 
         def resize(self, *_: object, **__: object) -> None:  # pragma: no cover - stub only
@@ -37,7 +34,6 @@ def _install_qt_stubs() -> None:
                 return
 
         def __init__(self, *_: object, **__: object) -> None:
-            super().__init__()
             self.accepted = self._Signal()
             self.rejected = self._Signal()
 
@@ -111,9 +107,13 @@ def _install_qt_stubs() -> None:
         AA_UseHighDpiPixmaps = 2
         Horizontal = 0
 
+    class _SignalType:
+        def __init__(self, *_: object, **__: object) -> None:
+            return
+
     qt_core.Qt = _Qt  # type: ignore[attr-defined]
     qt_core.QEvent = type("QEvent", (), {})  # type: ignore[attr-defined]
-    qt_core.Signal = type("Signal", (), {"__init__": lambda self, *args, **kwargs: None})  # type: ignore[attr-defined]
+    qt_core.Signal = _SignalType  # type: ignore[attr-defined]
 
     sys.modules.setdefault("PySide6", types.ModuleType("PySide6"))
     sys.modules["PySide6.QtWidgets"] = qt_widgets

@@ -149,6 +149,7 @@ class DraftPromoteDialog(QDialog):
         layout.setSpacing(10)
 
         self._similarity_summary = QLabel(self)
+        self._similarity_summary.setObjectName("draftPromoteSimilaritySummaryLabel")
         self._similarity_summary.setWordWrap(True)
         layout.addWidget(self._similarity_summary)
 

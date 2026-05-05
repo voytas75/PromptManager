@@ -1,6 +1,7 @@
 """Guard tests proving prompt-library filter cues stay GUI-local by design.
 
 Updates:
+  v0.2.0 - 2026-05-04 - Resolve retrieval-cue parity checks through public widget lookup.
   v0.1.1 - 2026-04-28 - Cover filter-panel locality guard alongside
     prompt-list cue parity.
   v0.1.0 - 2026-04-27 - Lock retrieval cues as GUI-local by design
@@ -8,6 +9,8 @@ Updates:
 """
 
 from __future__ import annotations
+
+from typing import cast
 
 import pytest
 
@@ -25,7 +28,7 @@ def qt_app() -> QApplication:
     app = QApplication.instance()
     if app is None:
         app = QApplication([])
-    return app
+    return cast("QApplication", app)
 
 
 def test_retrieval_prompt_list_cues_remain_gui_local_by_design() -> None:
@@ -45,7 +48,7 @@ def test_retrieval_prompt_list_cues_remain_gui_local_by_design() -> None:
     assert not hasattr(result, "freshness_summary")
 
 
-def test_prompt_filter_panel_cues_remain_local_widget_state(qt_app) -> None:
+def test_prompt_filter_panel_cues_remain_local_widget_state(qt_app: QApplication) -> None:
     """Filter-panel helper cues should stay on the widget seam, not shared analytics."""
     panel = PromptFilterPanel(sort_options=[("Last modified", "last_modified")])
     panel.set_tags(["docs", "ops"], selected_tag="ops")
@@ -67,7 +70,7 @@ def test_prompt_filter_panel_cues_remain_local_widget_state(qt_app) -> None:
     assert not hasattr(panel, "freshness_summary")
 
 
-def test_entry_dialog_clarity_cues_remain_local_widget_text(qt_app) -> None:
+def test_entry_dialog_clarity_cues_remain_local_widget_text(qt_app: QApplication) -> None:
     """Entry-dialog clarity cues should stay dialog-local instead of shared analytics fields."""
     from datetime import UTC, datetime
     from uuid import UUID
@@ -78,7 +81,9 @@ def test_entry_dialog_clarity_cues_remain_local_widget_text(qt_app) -> None:
     from models.prompt_model import Prompt
 
     quick_capture = QuickCaptureDialog()
-    assert quick_capture._entry_guidance_label.text() == (  # noqa: SLF001
+    quick_capture_guidance = quick_capture.findChild(QLabel, "quickCaptureEntryGuidanceLabel")
+    assert quick_capture_guidance is not None
+    assert quick_capture_guidance.text() == (
         "Paste a raw prompt or query. PromptManager only cleans obvious outer wrappers "
         "before saving the draft."
     )
@@ -126,7 +131,9 @@ def test_entry_dialog_clarity_cues_remain_local_widget_text(qt_app) -> None:
         categories=["General"],
         similar_prompts=[similar_prompt],
     )
-    assert promote._similarity_summary.text() == (  # noqa: SLF001
+    similarity_summary = promote.findChild(QLabel, "draftPromoteSimilaritySummaryLabel")
+    assert similarity_summary is not None
+    assert similarity_summary.text() == (
         "Similar prompts already exist. Review an existing match or continue promoting "
         "this draft as a new prompt."
     )

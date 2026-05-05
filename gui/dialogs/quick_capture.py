@@ -224,6 +224,7 @@ class QuickCaptureDialog(QDialog):
             "before saving the draft.",
             self,
         )
+        self._entry_guidance_label.setObjectName("quickCaptureEntryGuidanceLabel")
         self._entry_guidance_label.setWordWrap(True)
         layout.addWidget(self._entry_guidance_label)
 

@@ -24,11 +24,13 @@ from core.repository import (
     PromptRepository,
     RepositoryError,
     RepositoryNotFoundError,
-    _json_dumps,
-    _json_loads_dict,
-    _json_loads_list,
-    _json_loads_optional,
-    _parse_optional_datetime,
+)
+from core.repository.base import (
+    json_dumps,
+    json_loads_dict,
+    json_loads_list,
+    json_loads_optional,
+    parse_optional_datetime,
 )
 from models.category_model import PromptCategory
 from models.prompt_model import ExecutionStatus, Prompt, PromptExecution
@@ -72,22 +74,22 @@ def _make_prompt_note(text: str = "Remember to review logs") -> PromptNote:
 
 def test_json_helpers_cover_edge_cases() -> None:
     """Validate JSON helper fallbacks for malformed or null data."""
-    assert _json_dumps(None) is None
-    dumped = _json_dumps(["a"])
+    assert json_dumps(None) is None
+    dumped = json_dumps(["a"])
     assert dumped is not None and dumped.startswith("[")
 
-    assert _json_loads_list(None) == []
-    assert _json_loads_list("null") == []
-    assert _json_loads_list('["x",1]') == ["x", "1"]
-    assert _json_loads_list("not-json") == ["not-json"]
+    assert json_loads_list(None) == []
+    assert json_loads_list("null") == []
+    assert json_loads_list('["x",1]') == ["x", "1"]
+    assert json_loads_list("not-json") == ["not-json"]
 
-    assert _json_loads_optional(None) is None
-    assert _json_loads_optional("null") is None
-    assert _json_loads_optional('{"a": 1}') == {"a": 1}
-    assert _json_loads_optional("{invalid") == "{invalid"
-    assert _json_loads_dict(None) == {}
-    assert _json_loads_dict("not-json") == {}
-    assert _json_loads_dict('{"a": 1}') == {"a": 1}
+    assert json_loads_optional(None) is None
+    assert json_loads_optional("null") is None
+    assert json_loads_optional('{"a": 1}') == {"a": 1}
+    assert json_loads_optional("{invalid") == "{invalid"
+    assert json_loads_dict(None) == {}
+    assert json_loads_dict("not-json") == {}
+    assert json_loads_dict('{"a": 1}') == {"a": 1}
 
 
 def test_repository_add_duplicate_raises_error(tmp_path: Path) -> None:
@@ -149,11 +151,13 @@ def test_repository_execution_roundtrip(tmp_path: Path) -> None:
     assert loaded.request_text is not None and loaded.request_text.startswith("print")
     assert loaded.metadata is not None
     assert loaded.metadata["usage"]["prompt_tokens"] == 10
-    assert loaded.rating == pytest.approx(6.0)
+    assert loaded.rating is not None
+    assert abs(loaded.rating - 6.0) < 1e-9
 
     by_prompt = repo.list_executions_for_prompt(prompt.id)
     assert [entry.id for entry in by_prompt] == [execution.id]
-    assert by_prompt[0].rating == pytest.approx(6.0)
+    assert by_prompt[0].rating is not None
+    assert abs(by_prompt[0].rating - 6.0) < 1e-9
 
     recent = repo.list_executions(limit=1)
     assert recent[0].id == execution.id
@@ -401,7 +405,7 @@ def test_prompt_catalogue_stats_cover_edge_cases(tmp_path: Path) -> None:
     assert stats.distinct_categories == 1
     assert stats.distinct_tags == 1
     assert stats.stale_prompts == 1
-    assert stats.average_tags_per_prompt == pytest.approx(0.5)
+    assert abs(stats.average_tags_per_prompt - 0.5) < 1e-9
     assert isinstance(stats.last_modified_at, datetime)
 
 
@@ -624,13 +628,13 @@ def test_prompt_note_errors(tmp_path: Path) -> None:
 def test_parse_optional_datetime_variants() -> None:
     """Support multiple datetime input shapes in helper parser."""
     naive = datetime(2024, 1, 1, 12, 0, 0)
-    parsed_naive = _parse_optional_datetime(naive)
+    parsed_naive = parse_optional_datetime(naive)
     assert parsed_naive is not None and parsed_naive.tzinfo is not None
     iso_text = "2024-01-02T03:04:05"
-    parsed_text = _parse_optional_datetime(iso_text)
+    parsed_text = parse_optional_datetime(iso_text)
     assert parsed_text is not None and parsed_text.tzinfo is not None
-    assert _parse_optional_datetime("") is None
-    assert _parse_optional_datetime("not-a-date") is None
+    assert parse_optional_datetime("") is None
+    assert parse_optional_datetime("not-a-date") is None
 
 
 def test_sync_category_definitions_and_get_category(tmp_path: Path) -> None:
