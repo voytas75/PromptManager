@@ -19,6 +19,16 @@ PromptManager is a PySide6 desktop application for managing reusable AI prompts 
 - **Automation**: `nox -s format lint typecheck test` runs the current CI-equivalent release gate. Keep parity with AGENTS.md quality gates and with the actually enforced workflow scope rather than aspirational full-repo strict coverage.
 - **Security & Resilience**: wrap external I/O in timeouts, provide custom exception hierarchy, never use bare `except`, and include actionable context plus retries with exponential backoff where transient failures may occur.
 
+### What moved out of AGENTS.md
+
+The repository-level `AGENTS.md` is intentionally short and operational. Keep long-form project policy here instead of growing `AGENTS.md` back into a handbook.
+
+High-value conventions that still apply:
+- preserve existing docstring and file-history conventions when editing files that already use them,
+- keep release-gate language aligned with the *actually enforced* CI scope,
+- prefer bounded slice verification over pretending that every change must solve all historical debt,
+- keep product/UI policy and deep workflow notes in `docs/` rather than in the repo-level agent contract.
+
 ### Quality policy: release gate vs slice verification vs debt scans
 
 Treat quality checks as three separate layers:
