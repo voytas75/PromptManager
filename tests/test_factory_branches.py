@@ -9,6 +9,7 @@ Updates:
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import pytest
@@ -20,10 +21,10 @@ from config.settings import (
 )
 from core.factory import (
     PromptCacheError,
-    _determine_embedding_status,
-    _determine_llm_status,
-    _resolve_redis_client,
     build_prompt_manager,
+    determine_embedding_status,
+    determine_llm_status,
+    resolve_redis_client,
 )
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
@@ -35,29 +36,38 @@ ClientAPI = Any  # type: ignore[assignment]
 Redis = Any  # type: ignore[assignment]
 
 
+def _return_existing_redis_client(dsn: str | None, client: object) -> Redis | None:
+    del dsn
+    return cast("Redis | None", client)
+
+
+def _return_manager_label(**kwargs: object) -> str:
+    del kwargs
+    return "manager"
+
+
 class _RedisStub:
     def __init__(self, label: str = "redis") -> None:
         self.label = label
 
 
 def _make_settings(**overrides: object) -> PromptManagerSettings:
-    defaults = {
-        "chroma_path": "/tmp/chroma",
-        "db_path": "/tmp/db.sqlite",
-        "cache_ttl_seconds": 60,
-        "redis_dsn": "redis://localhost:6379/0",
-        "litellm_model": None,
-        "litellm_api_key": None,
-        "litellm_api_base": None,
-        "litellm_drop_params": None,
-        "litellm_reasoning_effort": None,
-        "litellm_stream": False,
-        "embedding_backend": DEFAULT_EMBEDDING_BACKEND,
-        "embedding_model": DEFAULT_EMBEDDING_MODEL,
-        "embedding_device": None,
-    }
-    defaults.update(overrides)
-    return PromptManagerSettings(**defaults)
+    settings = PromptManagerSettings(
+        chroma_path=Path("/tmp/chroma"),
+        db_path=Path("/tmp/db.sqlite"),
+        cache_ttl_seconds=60,
+        redis_dsn="redis://localhost:6379/0",
+        litellm_model=None,
+        litellm_api_key=None,
+        litellm_api_base=None,
+        litellm_drop_params=None,
+        litellm_reasoning_effort=None,
+        litellm_stream=False,
+        embedding_backend=DEFAULT_EMBEDDING_BACKEND,
+        embedding_model=DEFAULT_EMBEDDING_MODEL,
+        embedding_device=None,
+    )
+    return settings.model_copy(update=overrides)
 
 
 def _as_redis(value: object) -> Redis:
@@ -74,13 +84,13 @@ def _as_client(value: object) -> ClientAPI:
 
 def test_resolve_redis_client_returns_existing_instance() -> None:
     existing = _as_redis(_RedisStub())
-    assert _resolve_redis_client("redis://localhost", existing) is existing
+    assert resolve_redis_client("redis://localhost", existing) is existing
 
 
 def test_resolve_redis_client_requires_redis_module(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("core.factory.redis", None)
     with pytest.raises(PromptCacheError):
-        _resolve_redis_client("redis://localhost", None)
+        resolve_redis_client("redis://localhost", None)
 
 
 def test_resolve_redis_client_invokes_from_url(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -93,7 +103,7 @@ def test_resolve_redis_client_invokes_from_url(monkeypatch: pytest.MonkeyPatch) 
 
     monkeypatch.setattr("core.factory.redis", _RedisModule())
 
-    result = _resolve_redis_client("redis://cache", None)
+    result = resolve_redis_client("redis://cache", None)
     assert isinstance(result, _RedisStub)
     assert result.label == "redis://cache"
     assert calls == ["redis://cache"]
@@ -102,6 +112,10 @@ def test_resolve_redis_client_invokes_from_url(monkeypatch: pytest.MonkeyPatch) 
 def test_build_prompt_manager_forwards_dependencies(monkeypatch: pytest.MonkeyPatch) -> None:
     sentinel_redis = _as_redis(_RedisStub("sentinel"))
     sentinel_repo = object()
+
+    def _return_bound_sentinel_redis(dsn: str | None, client: object) -> Redis:
+        del dsn, client
+        return sentinel_redis
 
     class _PromptManager:
         def __init__(
@@ -144,7 +158,7 @@ def test_build_prompt_manager_forwards_dependencies(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr("core.factory.PromptManager", _PromptManager)
     monkeypatch.setattr(
         "core.factory._resolve_redis_client",
-        lambda dsn, client: sentinel_redis,
+        _return_bound_sentinel_redis,
     )
 
     settings = _make_settings()
@@ -168,9 +182,9 @@ def test_build_prompt_manager_uses_passthrough_redis_client(
 ) -> None:
     monkeypatch.setattr(
         "core.factory._resolve_redis_client",
-        lambda dsn, client: client,
+        _return_existing_redis_client,
     )
-    monkeypatch.setattr("core.factory.PromptManager", lambda **_: "manager")
+    monkeypatch.setattr("core.factory.PromptManager", _return_manager_label)
 
     settings = _make_settings(redis_dsn=None)
     sentinel = _as_redis(_RedisStub("passthrough"))
@@ -185,7 +199,7 @@ def test_build_prompt_manager_bubbles_embedding_errors(monkeypatch: pytest.Monke
         raise ValueError("no backend")
 
     monkeypatch.setattr("core.factory.create_embedding_function", _raise_embedding)
-    monkeypatch.setattr("core.factory.PromptManager", lambda **_: "manager")
+    monkeypatch.setattr("core.factory.PromptManager", _return_manager_label)
 
     with pytest.raises(RuntimeError) as excinfo:
         build_prompt_manager(settings)
@@ -199,7 +213,7 @@ def test_determine_llm_status_requires_models_and_keys() -> None:
         litellm_api_key=None,
     )
 
-    ready, reason = _determine_llm_status(settings)
+    ready, reason = determine_llm_status(settings)
 
     assert ready is False
     assert reason is not None
@@ -215,7 +229,7 @@ def test_determine_llm_status_requires_azure_base_and_version() -> None:
         litellm_api_version=None,
     )
 
-    ready, reason = _determine_llm_status(settings)
+    ready, reason = determine_llm_status(settings)
 
     assert ready is False
     assert reason is not None
@@ -232,7 +246,7 @@ def test_determine_embedding_status_marks_azure_missing_base() -> None:
         litellm_api_version=None,
     )
 
-    ready, reason = _determine_embedding_status(settings)
+    ready, reason = determine_embedding_status(settings)
 
     assert ready is False
     assert reason is not None
@@ -246,7 +260,7 @@ def test_determine_embedding_status_accepts_deterministic_backend() -> None:
         embedding_model="hash",
     )
 
-    ready, reason = _determine_embedding_status(settings)
+    ready, reason = determine_embedding_status(settings)
 
     assert ready is True
     assert reason is None

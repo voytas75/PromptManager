@@ -24,10 +24,28 @@ from typing import cast
 import pytest
 
 pytest.importorskip("PySide6")
-from PySide6.QtWidgets import QApplication, QPushButton
+from PySide6.QtWidgets import QApplication, QLabel, QLineEdit, QListWidget, QPushButton
 
 from gui.dialogs.draft_promote import DraftPromoteDialog, build_promoted_prompt
 from models.prompt_model import Prompt
+
+
+def _similarity_summary_label(dialog: DraftPromoteDialog) -> QLabel:
+    label = dialog.findChild(QLabel, "draftPromoteSimilaritySummaryLabel")
+    assert label is not None
+    return label
+
+
+def _similar_prompts_list_widget(dialog: DraftPromoteDialog) -> QListWidget:
+    widget = dialog.findChild(QListWidget, "draftPromoteSimilarPromptsList")
+    assert widget is not None
+    return widget
+
+
+def _title_input_widget(dialog: DraftPromoteDialog) -> QLineEdit:
+    widget = dialog.findChild(QLineEdit, "draftPromoteTitleInput")
+    assert widget is not None
+    return widget
 
 
 @pytest.fixture(scope="module")
@@ -54,9 +72,9 @@ def test_draft_promote_dialog_hides_similar_section_when_no_matches(qt_app: QApp
     dialog.show()
     qt_app.processEvents()
 
-    assert "No similar prompts found" in dialog._similarity_summary.text()  # noqa: SLF001
-    assert "promote this draft as a new prompt" in dialog._similarity_summary.text()  # noqa: SLF001
-    assert dialog._similar_prompts_list.isHidden()  # noqa: SLF001
+    assert "No similar prompts found" in _similarity_summary_label(dialog).text()
+    assert "promote this draft as a new prompt" in _similarity_summary_label(dialog).text()
+    assert _similar_prompts_list_widget(dialog).isHidden()
     assert dialog.selected_existing_prompt_id is None
 
 
@@ -88,8 +106,8 @@ def test_draft_promote_dialog_summary_mentions_review_or_continue_posture(
 
     assert (
         "Review an existing match or continue promoting this draft as a new prompt."
-        in dialog._similarity_summary.text()
-    )  # noqa: SLF001
+        in _similarity_summary_label(dialog).text()
+    )
 
 
 def test_draft_promote_dialog_shows_likely_duplicate_cue_and_opens_selection(
@@ -119,11 +137,11 @@ def test_draft_promote_dialog_shows_likely_duplicate_cue_and_opens_selection(
     dialog.show()
     qt_app.processEvents()
 
-    assert "A likely duplicate may already exist" in dialog._similarity_summary.text()  # noqa: SLF001
-    assert "Reason: Same normalized body." in dialog._similarity_summary.text()  # noqa: SLF001
-    assert not dialog._similar_prompts_list.isHidden()  # noqa: SLF001
-    assert dialog._similar_prompts_list.count() == 1  # noqa: SLF001
-    item = dialog._similar_prompts_list.item(0)  # noqa: SLF001
+    assert "A likely duplicate may already exist" in _similarity_summary_label(dialog).text()
+    assert "Reason: Same normalized body." in _similarity_summary_label(dialog).text()
+    assert not _similar_prompts_list_widget(dialog).isHidden()
+    assert _similar_prompts_list_widget(dialog).count() == 1
+    item = _similar_prompts_list_widget(dialog).item(0)
     assert item.text() == (
         "Existing reusable prompt — Operations · Likely duplicate · Already curated."
     )
@@ -136,8 +154,8 @@ def test_draft_promote_dialog_shows_likely_duplicate_cue_and_opens_selection(
     )
     assert open_button.isEnabled()
 
-    dialog._similar_prompts_list.setCurrentRow(0)  # noqa: SLF001
-    dialog._open_selected_existing_prompt()  # noqa: SLF001
+    _similar_prompts_list_widget(dialog).setCurrentRow(0)
+    dialog.open_selected_existing_prompt()
     qt_app.processEvents()
 
     assert dialog.selected_existing_prompt_id == similar.id
@@ -171,7 +189,7 @@ def test_draft_promote_dialog_keeps_clean_label_for_weak_signal_match(
     dialog.show()
     qt_app.processEvents()
 
-    item = dialog._similar_prompts_list.item(0)  # noqa: SLF001
+    item = _similar_prompts_list_widget(dialog).item(0)
 
     assert item.text() == "Existing reusable prompt — Operations"
 
@@ -202,7 +220,7 @@ def test_draft_promote_dialog_uses_body_lead_preview_when_metadata_is_absent(
     dialog.show()
     qt_app.processEvents()
 
-    item = dialog._similar_prompts_list.item(0)  # noqa: SLF001
+    item = _similar_prompts_list_widget(dialog).item(0)
 
     assert item.text() == (
         "Existing reusable prompt — Operations · "
@@ -236,12 +254,12 @@ def test_draft_promote_dialog_hides_visible_strength_cue_for_non_close_match(
     dialog.show()
     qt_app.processEvents()
 
-    item = dialog._similar_prompts_list.item(0)  # noqa: SLF001
+    item = _similar_prompts_list_widget(dialog).item(0)
 
     assert item.text() == "Existing reusable prompt — Operations · Already curated."
     assert "Similarity: 0.72" in item.toolTip()
-    assert "Similar prompts already exist" in dialog._similarity_summary.text()  # noqa: SLF001
-    assert "Reason:" not in dialog._similarity_summary.text()  # noqa: SLF001
+    assert "Similar prompts already exist" in _similarity_summary_label(dialog).text()
+    assert "Reason:" not in _similarity_summary_label(dialog).text()
     open_button = next(
         button
         for button in dialog.findChildren(QPushButton)
@@ -274,13 +292,15 @@ def test_draft_promote_dialog_shows_strength_cue_at_threshold(qt_app: QApplicati
     dialog.show()
     qt_app.processEvents()
 
-    item = dialog._similar_prompts_list.item(0)  # noqa: SLF001
+    item = _similar_prompts_list_widget(dialog).item(0)
 
     assert (
         item.text() == "Existing reusable prompt — Operations · Very close match · Already curated."
     )
-    assert "A very close existing match may already exist" in dialog._similarity_summary.text()  # noqa: SLF001
-    assert "Reason: Very similar prompt body." in dialog._similarity_summary.text()  # noqa: SLF001
+    assert (
+        "A very close existing match may already exist" in _similarity_summary_label(dialog).text()
+    )
+    assert "Reason: Very similar prompt body." in _similarity_summary_label(dialog).text()
     open_button = next(
         button
         for button in dialog.findChildren(QPushButton)
@@ -315,11 +335,11 @@ def test_draft_promote_dialog_prefers_likely_duplicate_cue_over_very_close_match
     dialog.show()
     qt_app.processEvents()
 
-    item = dialog._similar_prompts_list.item(0)  # noqa: SLF001
+    item = _similar_prompts_list_widget(dialog).item(0)
 
     assert "Likely duplicate" in item.text()
     assert "Very close match" not in item.text()
-    assert "Reason: Same normalized body." in dialog._similarity_summary.text()  # noqa: SLF001
+    assert "Reason: Same normalized body." in _similarity_summary_label(dialog).text()
     open_button = next(
         button
         for button in dialog.findChildren(QPushButton)
@@ -363,15 +383,15 @@ def test_draft_promote_dialog_keeps_reason_cue_limited_to_selected_match(
     dialog.show()
     qt_app.processEvents()
 
-    assert "Reason: Same normalized body." in dialog._similarity_summary.text()  # noqa: SLF001
+    assert "Reason: Same normalized body." in _similarity_summary_label(dialog).text()
 
-    dialog._similar_prompts_list.setCurrentRow(1)  # noqa: SLF001
+    _similar_prompts_list_widget(dialog).setCurrentRow(1)
     qt_app.processEvents()
 
-    assert "A likely duplicate may already exist" in dialog._similarity_summary.text()  # noqa: SLF001
-    assert "Reason:" not in dialog._similarity_summary.text()  # noqa: SLF001
-    assert dialog._similar_prompts_list.item(0).text().count("Reason:") == 0  # noqa: SLF001
-    assert dialog._similar_prompts_list.item(1).text().count("Reason:") == 0  # noqa: SLF001
+    assert "A likely duplicate may already exist" in _similarity_summary_label(dialog).text()
+    assert "Reason:" not in _similarity_summary_label(dialog).text()
+    assert _similar_prompts_list_widget(dialog).item(0).text().count("Reason:") == 0
+    assert _similar_prompts_list_widget(dialog).item(1).text().count("Reason:") == 0
 
 
 def test_draft_promote_dialog_promote_as_new_keeps_existing_target_clear(
@@ -402,7 +422,7 @@ def test_draft_promote_dialog_promote_as_new_keeps_existing_target_clear(
     dialog.show()
     qt_app.processEvents()
 
-    dialog._title_input.setText("Curated title")  # noqa: SLF001
+    _title_input_widget(dialog).setText("Curated title")
     promote_button = next(
         button for button in dialog.findChildren(QPushButton) if button.text() == "Promote as New"
     )
@@ -430,7 +450,7 @@ def test_draft_promote_dialog_prefills_improved_title_for_placeholder_draft(
 
     dialog = DraftPromoteDialog(prompt, categories=["General"])
 
-    assert dialog._title_input.text() == "Weekly deployment checklist"  # noqa: SLF001
+    assert _title_input_widget(dialog).text() == "Weekly deployment checklist"
 
 
 def test_build_promoted_prompt_improves_untouched_placeholder_title_only() -> None:

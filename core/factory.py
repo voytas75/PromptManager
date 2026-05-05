@@ -93,6 +93,14 @@ def _resolve_redis_client(
     return client
 
 
+def resolve_redis_client(
+    redis_dsn: str | None,
+    redis_client: Redis | None,
+) -> Redis | None:
+    """Public facade for Redis client resolution used by tests and callers."""
+    return _resolve_redis_client(redis_dsn, redis_client)
+
+
 def _resolve_embedding_components(
     settings: PromptManagerSettings,
     embedding_function: Any | None,
@@ -172,6 +180,11 @@ def _determine_llm_status(settings: PromptManagerSettings) -> tuple[bool, str | 
     return False, reason
 
 
+def determine_llm_status(settings: PromptManagerSettings) -> tuple[bool, str | None]:
+    """Public facade for evaluating LiteLLM readiness."""
+    return _determine_llm_status(settings)
+
+
 def _determine_embedding_status(settings: PromptManagerSettings) -> tuple[bool, str | None]:
     """Return embedding readiness plus optional offline reason."""
     backend = (getattr(settings, "embedding_backend", "") or "deterministic").strip().lower()
@@ -200,6 +213,11 @@ def _determine_embedding_status(settings: PromptManagerSettings) -> tuple[bool, 
             )
             return False, reason
     return True, None
+
+
+def determine_embedding_status(settings: PromptManagerSettings) -> tuple[bool, str | None]:
+    """Public facade for evaluating embedding backend readiness."""
+    return _determine_embedding_status(settings)
 
 
 def build_web_search_service(settings: PromptManagerSettings) -> WebSearchService:
@@ -409,4 +427,11 @@ def build_prompt_manager(
     return manager
 
 
-__all__ = ["build_prompt_manager", "build_web_search_service", "PromptCacheError"]
+__all__ = [
+    "build_prompt_manager",
+    "build_web_search_service",
+    "PromptCacheError",
+    "resolve_redis_client",
+    "determine_llm_status",
+    "determine_embedding_status",
+]

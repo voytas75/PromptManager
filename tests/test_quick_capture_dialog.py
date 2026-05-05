@@ -17,7 +17,7 @@ from typing import cast
 import pytest
 
 pytest.importorskip("PySide6")
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QLabel, QLineEdit, QPlainTextEdit
 
 from gui.dialogs.quick_capture import (
     QuickCaptureDialog,
@@ -43,8 +43,10 @@ def qt_app() -> QApplication:
 def test_quick_capture_dialog_shows_raw_input_entry_guidance(qt_app: QApplication) -> None:
     """Quick Capture should expose one compact visible cue about raw input and bounded cleanup."""
     dialog = QuickCaptureDialog()
+    guidance_label = dialog.findChild(QLabel, "quickCaptureEntryGuidanceLabel")
 
-    assert dialog._entry_guidance_label.text() == (  # noqa: SLF001
+    assert guidance_label is not None
+    assert guidance_label.text() == (
         "Paste a raw prompt or query. PromptManager only cleans obvious outer wrappers "
         "before saving the draft."
     )
@@ -53,12 +55,24 @@ def test_quick_capture_dialog_shows_raw_input_entry_guidance(qt_app: QApplicatio
 def test_quick_capture_dialog_builds_source_provenance_draft(qt_app: QApplication) -> None:
     """Quick capture should accept a simple source/provenance value from the form."""
     dialog = QuickCaptureDialog()
-    dialog._title_input.setText("Incident summary")  # noqa: SLF001
-    dialog._source_input.setText("ChatGPT thread / ops notes")  # noqa: SLF001
-    dialog._tags_input.setText("incident, ops")  # noqa: SLF001
-    dialog._body_input.setPlainText("Summarize the incident and highlight risk.")  # noqa: SLF001
+    title_input = dialog.findChild(QLineEdit, "quickCaptureTitleInput")
+    source_input = dialog.findChild(QLineEdit, "quickCaptureSourceInput")
+    tags_input = dialog.findChild(QLineEdit, "quickCaptureTagsInput")
+    body_input = dialog.findChild(QPlainTextEdit, "quickCaptureBodyInput")
 
-    draft = dialog._build_draft()  # noqa: SLF001
+    assert title_input is not None
+    assert source_input is not None
+    assert tags_input is not None
+    assert body_input is not None
+
+    title_input.setText("Incident summary")
+    source_input.setText("ChatGPT thread / ops notes")
+    tags_input.setText("incident, ops")
+    body_input.setPlainText("Summarize the incident and highlight risk.")
+
+    draft = dialog.result_draft
+    if draft is None:
+        draft = dialog.build_draft()
 
     assert draft is not None
     assert draft.source_label == "ChatGPT thread / ops notes"
@@ -208,11 +222,14 @@ def test_quick_capture_dialog_uses_shared_title_quality_heuristic_when_title_mis
 ) -> None:
     """Saving without a manual title should reuse the shared draft-title heuristic."""
     dialog = QuickCaptureDialog()
-    dialog._body_input.setPlainText(  # noqa: SLF001
-        "Title:\n> Weekly deployment checklist\nList the risky steps first."
-    )
+    body_input = dialog.findChild(QPlainTextEdit, "quickCaptureBodyInput")
 
-    draft = dialog._build_draft()  # noqa: SLF001
+    assert body_input is not None
+    body_input.setPlainText("Title:\n> Weekly deployment checklist\nList the risky steps first.")
+
+    draft = dialog.result_draft
+    if draft is None:
+        draft = dialog.build_draft()
 
     assert draft is not None
     prompt = draft.to_prompt()

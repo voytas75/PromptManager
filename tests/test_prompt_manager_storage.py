@@ -28,6 +28,7 @@ from models.response_style import ResponseStyle
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
+    from pathlib import Path
 
     from chromadb.api import ClientAPI  # type: ignore[reportMissingTypeArgument]
 
@@ -379,7 +380,7 @@ class _StubRedis:
         self.closed = True
 
 
-def test_repository_roundtrip(tmp_path) -> None:
+def test_repository_roundtrip(tmp_path: Path) -> None:
     """Ensure the repository supports CRUD operations."""
     repo_path = tmp_path / "prompt_manager.db"
     repository = PromptRepository(str(repo_path))
@@ -406,7 +407,7 @@ def test_repository_roundtrip(tmp_path) -> None:
         repository.get(prompt.id)
 
 
-def test_prompt_manager_coordinates_sqlite_and_chromadb(tmp_path) -> None:
+def test_prompt_manager_coordinates_sqlite_and_chromadb(tmp_path: Path) -> None:
     """Validate manager persistence across SQLite, ChromaDB, and cache facade."""
     chroma_dir = tmp_path / "chroma"
     db_path = tmp_path / "prompt_manager.db"
@@ -445,7 +446,7 @@ def test_prompt_manager_coordinates_sqlite_and_chromadb(tmp_path) -> None:
     manager.close()
 
 
-def test_prompt_manager_response_style_workflow(tmp_path) -> None:
+def test_prompt_manager_response_style_workflow(tmp_path: Path) -> None:
     """Ensure response style CRUD is wired through the manager."""
     chroma_dir = tmp_path / "chroma"
     db_path = tmp_path / "prompt_manager.db"
@@ -474,7 +475,7 @@ def test_prompt_manager_response_style_workflow(tmp_path) -> None:
     manager.close()
 
 
-def test_prompt_manager_prompt_note_workflow(tmp_path) -> None:
+def test_prompt_manager_prompt_note_workflow(tmp_path: Path) -> None:
     """Ensure prompt note CRUD is exposed via the manager."""
     chroma_dir = tmp_path / "chroma"
     db_path = tmp_path / "prompt_manager.db"
@@ -564,7 +565,7 @@ def test_search_prompts_returns_chroma_records_when_sqlite_missing() -> None:
     manager.close()
 
 
-def test_prompt_manager_close_shuts_down_workers_and_clients(tmp_path) -> None:
+def test_prompt_manager_close_shuts_down_workers_and_clients(tmp_path: Path) -> None:
     """Ensure PromptManager.close() safely disposes resources."""
     collection = _FakeCollection()
     chroma_client = _FakeChromaClient(collection)

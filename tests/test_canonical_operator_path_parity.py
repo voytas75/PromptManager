@@ -15,7 +15,7 @@ from typing import cast
 import pytest
 
 pytest.importorskip("PySide6")
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QPushButton, QToolButton
 
 from gui.dialogs.recent_prompts import recent_prompts
 from gui.widgets import PromptDetailWidget
@@ -26,6 +26,12 @@ CANONICAL_OPERATOR_PATH = (
     "`Quick Capture` → `Promote Draft` → `Recent` / search → inspect → "
     "`Copy Prompt` or `Open in Workspace`"
 )
+
+TOOLBAR_QUICK_CAPTURE_BUTTON = "promptToolbarQuickCaptureButton"
+TOOLBAR_RECENT_BUTTON = "promptToolbarRecentButton"
+DETAIL_PROMOTE_DRAFT_BUTTON = "promoteDraftButton"
+DETAIL_COPY_PROMPT_BUTTON = "copyPromptBodyButton"
+DETAIL_OPEN_IN_WORKSPACE_BUTTON = "openInWorkspaceButton"
 
 
 @pytest.fixture(scope="module")
@@ -40,6 +46,22 @@ def qt_app() -> QApplication:
 def _project_file(relative_path: str) -> Path:
     """Return an absolute path inside the repository root."""
     return Path(__file__).resolve().parents[1] / relative_path
+
+
+def _required_tool_button(widget: PromptToolbar, object_name: str) -> QToolButton:
+    """Return a toolbar tool button by its public object name."""
+    button = widget.findChild(QToolButton, object_name)
+    assert button is not None
+    return button
+
+
+def _required_push_button(
+    widget: PromptToolbar | PromptDetailWidget, object_name: str
+) -> QPushButton:
+    """Return a push button by its public object name."""
+    button = widget.findChild(QPushButton, object_name)
+    assert button is not None
+    return button
 
 
 def _build_prompt(
@@ -80,8 +102,11 @@ def test_canonical_operator_path_docs_and_live_ui_stay_in_parity(
     toolbar.show()
     qt_app.processEvents()
 
-    assert toolbar._new_button.text() == "Quick Capture"  # noqa: SLF001
-    assert toolbar._recent_button.text() == "Recent"  # noqa: SLF001
+    quick_capture_button = _required_tool_button(toolbar, TOOLBAR_QUICK_CAPTURE_BUTTON)
+    recent_button = _required_push_button(toolbar, TOOLBAR_RECENT_BUTTON)
+
+    assert quick_capture_button.text() == "Quick Capture"
+    assert recent_button.text() == "Recent"
 
     detail_widget = PromptDetailWidget()
     detail_widget.show()
@@ -96,13 +121,17 @@ def test_canonical_operator_path_docs_and_live_ui_stay_in_parity(
     detail_widget.display_prompt(draft_prompt)
     qt_app.processEvents()
 
-    assert detail_widget._promote_draft_button.text() == "Promote Draft"  # noqa: SLF001
-    assert detail_widget._promote_draft_button.isVisible()  # noqa: SLF001
-    assert detail_widget._promote_draft_button.isEnabled()  # noqa: SLF001
-    assert detail_widget._copy_prompt_body_button.text() == "Copy Prompt"  # noqa: SLF001
-    assert detail_widget._copy_prompt_body_button.isEnabled()  # noqa: SLF001
-    assert detail_widget._open_in_workspace_button.text() == "Open in Workspace"  # noqa: SLF001
-    assert detail_widget._open_in_workspace_button.isEnabled()  # noqa: SLF001
+    promote_button = _required_push_button(detail_widget, DETAIL_PROMOTE_DRAFT_BUTTON)
+    copy_button = _required_push_button(detail_widget, DETAIL_COPY_PROMPT_BUTTON)
+    open_button = _required_push_button(detail_widget, DETAIL_OPEN_IN_WORKSPACE_BUTTON)
+
+    assert promote_button.text() == "Promote Draft"
+    assert promote_button.isVisible()
+    assert promote_button.isEnabled()
+    assert copy_button.text() == "Copy Prompt"
+    assert copy_button.isEnabled()
+    assert open_button.text() == "Open in Workspace"
+    assert open_button.isEnabled()
 
     reusable_prompt = _build_prompt(
         prompt_id="00000000-0000-0000-0000-000000000202",
@@ -113,9 +142,9 @@ def test_canonical_operator_path_docs_and_live_ui_stay_in_parity(
     detail_widget.display_prompt(reusable_prompt)
     qt_app.processEvents()
 
-    assert not detail_widget._promote_draft_button.isVisible()  # noqa: SLF001
-    assert detail_widget._copy_prompt_body_button.isEnabled()  # noqa: SLF001
-    assert detail_widget._open_in_workspace_button.isEnabled()  # noqa: SLF001
+    assert not promote_button.isVisible()
+    assert copy_button.isEnabled()
+    assert open_button.isEnabled()
 
     description_only_prompt = _build_prompt(
         prompt_id="00000000-0000-0000-0000-000000000203",
@@ -127,9 +156,9 @@ def test_canonical_operator_path_docs_and_live_ui_stay_in_parity(
     detail_widget.display_prompt(description_only_prompt)
     qt_app.processEvents()
 
-    assert not detail_widget._promote_draft_button.isVisible()  # noqa: SLF001
-    assert not detail_widget._copy_prompt_body_button.isEnabled()  # noqa: SLF001
-    assert detail_widget._open_in_workspace_button.isEnabled()  # noqa: SLF001
+    assert not promote_button.isVisible()
+    assert not copy_button.isEnabled()
+    assert open_button.isEnabled()
 
     beta = _build_prompt(
         prompt_id="00000000-0000-0000-0000-000000000205",

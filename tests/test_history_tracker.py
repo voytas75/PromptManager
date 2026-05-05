@@ -9,12 +9,14 @@ Updates:
 from __future__ import annotations
 
 import uuid
-
-import pytest
+from typing import TYPE_CHECKING
 
 from core.history_tracker import ExecutionAnalytics, HistoryTracker
 from core.repository import PromptRepository
 from models.prompt_model import Prompt
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _make_prompt(name: str = "Execution Test") -> Prompt:
@@ -27,7 +29,7 @@ def _make_prompt(name: str = "Execution Test") -> Prompt:
     )
 
 
-def test_history_tracker_records_success_and_failure(tmp_path) -> None:
+def test_history_tracker_records_success_and_failure(tmp_path: Path) -> None:
     repo = PromptRepository(str(tmp_path / "repo.db"))
     prompt = _make_prompt()
     repo.add(prompt)
@@ -74,7 +76,7 @@ def test_history_tracker_records_success_and_failure(tmp_path) -> None:
     assert {entry.id for entry in by_prompt} == {success.id, failure.id}
 
 
-def test_history_tracker_updates_note(tmp_path) -> None:
+def test_history_tracker_updates_note(tmp_path: Path) -> None:
     repo = PromptRepository(str(tmp_path / "repo.db"))
     prompt = _make_prompt()
     repo.add(prompt)
@@ -92,7 +94,7 @@ def test_history_tracker_updates_note(tmp_path) -> None:
     assert not (cleared.metadata or {}).get("note")
 
 
-def test_history_tracker_summarize_returns_metrics(tmp_path) -> None:
+def test_history_tracker_summarize_returns_metrics(tmp_path: Path) -> None:
     repo = PromptRepository(str(tmp_path / "repo.db"))
     prompt = _make_prompt()
     repo.add(prompt)
@@ -123,11 +125,11 @@ def test_history_tracker_summarize_returns_metrics(tmp_path) -> None:
     analytics = tracker.summarize(window_days=None, prompt_limit=3, trend_window=2)
     assert isinstance(analytics, ExecutionAnalytics)
     assert analytics.total_runs == 3
-    assert pytest.approx(analytics.success_rate, rel=1e-3) == 2 / 3
+    assert abs(analytics.success_rate - (2 / 3)) < 1e-3
     assert analytics.prompt_breakdown, "Expected per-prompt breakdown"
     stats = analytics.prompt_breakdown[0]
     assert stats.total_runs == 3
-    assert pytest.approx(stats.success_rate, rel=1e-3) == 2 / 3
+    assert abs(stats.success_rate - (2 / 3)) < 1e-3
     assert stats.rating_trend is not None
     assert stats.average_duration_ms and stats.average_duration_ms >= 50
     assert analytics.prompt_tokens == 15
@@ -138,7 +140,7 @@ def test_history_tracker_summarize_returns_metrics(tmp_path) -> None:
     assert stats.total_tokens == 41
 
 
-def test_history_tracker_summarize_handles_empty_history(tmp_path) -> None:
+def test_history_tracker_summarize_handles_empty_history(tmp_path: Path) -> None:
     repo = PromptRepository(str(tmp_path / "repo.db"))
     tracker = HistoryTracker(repo)
 
@@ -148,7 +150,7 @@ def test_history_tracker_summarize_handles_empty_history(tmp_path) -> None:
     assert analytics.prompt_breakdown == []
 
 
-def test_history_tracker_summarize_prompt_returns_metrics(tmp_path) -> None:
+def test_history_tracker_summarize_prompt_returns_metrics(tmp_path: Path) -> None:
     repo = PromptRepository(str(tmp_path / "repo.db"))
     prompt = _make_prompt()
     repo.add(prompt)
@@ -172,9 +174,11 @@ def test_history_tracker_summarize_prompt_returns_metrics(tmp_path) -> None:
     assert stats is not None
     assert stats.prompt_id == prompt.id
     assert stats.total_runs == 2
-    assert stats.success_rate == pytest.approx(0.5)
-    assert stats.average_duration_ms == pytest.approx(80.0)
-    assert stats.average_rating == pytest.approx(4.5)
+    assert abs(stats.success_rate - 0.5) < 1e-9
+    assert stats.average_duration_ms is not None
+    assert abs(stats.average_duration_ms - 80.0) < 1e-9
+    assert stats.average_rating is not None
+    assert abs(stats.average_rating - 4.5) < 1e-9
     assert stats.rating_trend is not None
     assert stats.prompt_tokens == 4
     assert stats.completion_tokens == 5
@@ -184,7 +188,7 @@ def test_history_tracker_summarize_prompt_returns_metrics(tmp_path) -> None:
     assert missing is None
 
 
-def test_history_tracker_token_usage_totals(tmp_path) -> None:
+def test_history_tracker_token_usage_totals(tmp_path: Path) -> None:
     repo = PromptRepository(str(tmp_path / "repo.db"))
     prompt = _make_prompt()
     repo.add(prompt)
@@ -203,7 +207,7 @@ def test_history_tracker_token_usage_totals(tmp_path) -> None:
     assert totals.total_tokens == 5
 
 
-def test_history_tracker_token_usage_for_session(tmp_path) -> None:
+def test_history_tracker_token_usage_for_session(tmp_path: Path) -> None:
     repo = PromptRepository(str(tmp_path / "repo.db"))
     prompt = _make_prompt()
     repo.add(prompt)

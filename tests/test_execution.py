@@ -4,23 +4,28 @@ from __future__ import annotations
 
 import sys
 import uuid
-from typing import TYPE_CHECKING, Any
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
 from core.execution import (
     CodexExecutor,
     ExecutionError,
-    _extract_completion_text,
-    _extract_stream_text,
-    _extract_stream_usage,
-    _serialise_chunk,
-    _supports_reasoning,
+    extract_completion_text,
+    extract_stream_text,
+    extract_stream_usage,
+    serialise_chunk,
+    supports_reasoning,
 )
 from models.prompt_model import Prompt
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Mapping, Sequence
+    from collections.abc import Iterable, Mapping, Sequence
+
+
+CompletionCallable = Callable[..., Any]
+CompletionProvider = tuple[CompletionCallable, type[Exception]]
 
 
 def _make_prompt() -> Prompt:
@@ -33,7 +38,7 @@ def _make_prompt() -> Prompt:
     )
 
 
-def test_codex_executor_collects_streaming_chunks(monkeypatch) -> None:
+def test_codex_executor_collects_streaming_chunks(monkeypatch: pytest.MonkeyPatch) -> None:
     prompt = _make_prompt()
     executor = CodexExecutor(model="gpt-test")
     chunks: list[str] = []
@@ -50,8 +55,8 @@ def test_codex_executor_collects_streaming_chunks(monkeypatch) -> None:
         assert request.get("stream") is True
         return iter(streaming_payload)
 
-    def fake_get_completion() -> tuple[Callable[..., Any], type[Exception]]:
-        return fake_completion, RuntimeError
+    def fake_get_completion() -> CompletionProvider:
+        return cast("CompletionCallable", fake_completion), RuntimeError
 
     monkeypatch.setattr("core.execution.get_completion", fake_get_completion)
 
@@ -75,7 +80,7 @@ def test_codex_executor_collects_streaming_chunks(monkeypatch) -> None:
     assert choices[0]["message"]["content"] == "Hello world"
 
 
-def test_codex_executor_stream_requires_iterable(monkeypatch) -> None:
+def test_codex_executor_stream_requires_iterable(monkeypatch: pytest.MonkeyPatch) -> None:
     prompt = _make_prompt()
     executor = CodexExecutor(model="gpt-test")
 
@@ -83,8 +88,8 @@ def test_codex_executor_stream_requires_iterable(monkeypatch) -> None:
         assert request.get("stream") is True
         return 42
 
-    def fake_get_completion() -> tuple[Callable[..., Any], type[Exception]]:
-        return fake_completion, RuntimeError
+    def fake_get_completion() -> CompletionProvider:
+        return cast("CompletionCallable", fake_completion), RuntimeError
 
     monkeypatch.setattr("core.execution.get_completion", fake_get_completion)
 
@@ -108,8 +113,11 @@ def test_codex_executor_non_stream_request_builds_payload(monkeypatch: pytest.Mo
     )
     captured_request: dict[str, Any] = {}
 
-    def fake_get_completion() -> tuple[Callable[..., Any], type[Exception]]:
-        return (lambda **_: {"choices": []}), RuntimeError
+    def fake_get_completion() -> CompletionProvider:
+        def _completion(**_: Any) -> dict[str, list[Any]]:
+            return {"choices": []}
+
+        return cast("CompletionCallable", _completion), RuntimeError
 
     def fake_call_completion(
         request: Mapping[str, Any],
@@ -153,8 +161,11 @@ def test_codex_executor_validates_conversation(monkeypatch: pytest.MonkeyPatch) 
     prompt = _make_prompt()
     executor = CodexExecutor(model="gpt-test")
 
-    def fake_get_completion() -> tuple[Callable[..., Any], type[Exception]]:
-        return (lambda **_: None), RuntimeError
+    def fake_get_completion() -> CompletionProvider:
+        def _completion(**_: Any) -> None:
+            return None
+
+        return cast("CompletionCallable", _completion), RuntimeError
 
     monkeypatch.setattr("core.execution.get_completion", fake_get_completion)
 
@@ -169,10 +180,10 @@ def test_codex_executor_validates_conversation(monkeypatch: pytest.MonkeyPatch) 
 
 
 def test_supports_reasoning_marks_reasoning_models() -> None:
-    assert _supports_reasoning("gpt-5.4") is True
-    assert _supports_reasoning("o1-mini") is True
-    assert _supports_reasoning("gpt-4.1") is False
-    assert _supports_reasoning("gpt-3.5") is False
+    assert supports_reasoning("gpt-5.4") is True
+    assert supports_reasoning("o1-mini") is True
+    assert supports_reasoning("gpt-4.1") is False
+    assert supports_reasoning("gpt-3.5") is False
 
 
 def test_codex_executor_skips_reasoning_for_gpt41(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -183,8 +194,11 @@ def test_codex_executor_skips_reasoning_for_gpt41(monkeypatch: pytest.MonkeyPatc
     )
     captured_request: dict[str, Any] = {}
 
-    def fake_get_completion() -> tuple[Callable[..., Any], type[Exception]]:
-        return (lambda **_: {"choices": []}), RuntimeError
+    def fake_get_completion() -> CompletionProvider:
+        def _completion(**_: Any) -> dict[str, list[Any]]:
+            return {"choices": []}
+
+        return cast("CompletionCallable", _completion), RuntimeError
 
     def fake_call_completion(
         request: Mapping[str, Any],
@@ -227,8 +241,11 @@ def test_codex_executor_normalises_usage_objects(monkeypatch: pytest.MonkeyPatch
 
     usage = _Usage()
 
-    def fake_get_completion() -> tuple[Callable[..., Any], type[Exception]]:
-        return (lambda **_: None), RuntimeError
+    def fake_get_completion() -> CompletionProvider:
+        def _completion(**_: Any) -> None:
+            return None
+
+        return cast("CompletionCallable", _completion), RuntimeError
 
     def fake_call_completion(
         request: Mapping[str, Any],
@@ -255,8 +272,11 @@ def test_codex_executor_estimates_usage_when_missing(monkeypatch: pytest.MonkeyP
     prompt = _make_prompt()
     executor = CodexExecutor(model="gpt-test")
 
-    def fake_get_completion() -> tuple[Callable[..., Any], type[Exception]]:
-        return (lambda **_: {"choices": [{"message": {"content": "Hi"}}]}), RuntimeError
+    def fake_get_completion() -> CompletionProvider:
+        def _completion(**_: Any) -> dict[str, list[dict[str, dict[str, str]]]]:
+            return {"choices": [{"message": {"content": "Hi"}}]}
+
+        return cast("CompletionCallable", _completion), RuntimeError
 
     def fake_call_completion(
         request: Mapping[str, Any],
@@ -269,7 +289,13 @@ def test_codex_executor_estimates_usage_when_missing(monkeypatch: pytest.MonkeyP
         return completion()
 
     class _TokenCounter:
-        def __call__(self, *, model: str, messages: Sequence[Mapping[str, str]], text: str) -> dict:
+        def __call__(
+            self,
+            *,
+            model: str,
+            messages: Sequence[Mapping[str, str]],
+            text: str,
+        ) -> dict[str, int]:
             assert model == "gpt-test"
             assert messages[-1]["content"] == "Estimate please"
             assert text == "Hi"
@@ -295,18 +321,18 @@ def test_codex_executor_estimates_usage_when_values_are_null(
     prompt = _make_prompt()
     executor = CodexExecutor(model="gpt-test")
 
-    def fake_get_completion() -> tuple[Callable[..., Any], type[Exception]]:
-        return (
-            lambda **_: {
+    def fake_get_completion() -> CompletionProvider:
+        def _completion(**_: Any) -> dict[str, Any]:
+            return {
                 "choices": [{"message": {"content": "Hi"}}],
                 "usage": {
                     "prompt_tokens": None,
                     "completion_tokens": None,
                     "total_tokens": None,
                 },
-            },
-            RuntimeError,
-        )
+            }
+
+        return cast("CompletionCallable", _completion), RuntimeError
 
     def fake_call_completion(
         request: Mapping[str, Any],
@@ -319,7 +345,13 @@ def test_codex_executor_estimates_usage_when_values_are_null(
         return completion()
 
     class _TokenCounter:
-        def __call__(self, *, model: str, messages: Sequence[Mapping[str, str]], text: str) -> dict:
+        def __call__(
+            self,
+            *,
+            model: str,
+            messages: Sequence[Mapping[str, str]],
+            text: str,
+        ) -> dict[str, int]:
             assert model == "gpt-test"
             assert messages[-1]["content"] == "Estimate with null usage"
             assert text == "Hi"
@@ -345,8 +377,11 @@ def test_codex_executor_estimates_usage_when_token_counter_missing(
     prompt = _make_prompt()
     executor = CodexExecutor(model="gpt-test")
 
-    def fake_get_completion() -> tuple[Callable[..., Any], type[Exception]]:
-        return (lambda **_: {"choices": [{"message": {"content": "Hi there"}}]}), RuntimeError
+    def fake_get_completion() -> CompletionProvider:
+        def _completion(**_: Any) -> dict[str, list[dict[str, dict[str, str]]]]:
+            return {"choices": [{"message": {"content": "Hi there"}}]}
+
+        return cast("CompletionCallable", _completion), RuntimeError
 
     def fake_call_completion(
         request: Mapping[str, Any],
@@ -373,12 +408,12 @@ def test_extract_completion_text_handles_multiple_shapes() -> None:
     delta_payload = {"choices": [{"delta": {"content": "From delta"}}]}
     text_payload = {"choices": [{"text": "From text"}]}
 
-    assert _extract_completion_text(message_payload) == "From message"
-    assert _extract_completion_text(delta_payload) == "From delta"
-    assert _extract_completion_text(text_payload) == "From text"
+    assert extract_completion_text(message_payload) == "From message"
+    assert extract_completion_text(delta_payload) == "From delta"
+    assert extract_completion_text(text_payload) == "From text"
 
     with pytest.raises(ExecutionError):
-        _extract_completion_text({"choices": []})
+        extract_completion_text({"choices": []})
 
 
 def test_serialise_chunk_prefers_model_dump_and_dict() -> None:
@@ -390,7 +425,7 @@ def test_serialise_chunk_prefers_model_dump_and_dict() -> None:
             return self._payload
 
     chunk = _Chunk({"choices": []})
-    assert _serialise_chunk(chunk) == {"choices": []}
+    assert serialise_chunk(chunk) == {"choices": []}
 
     class _FallbackChunk:
         def __init__(self) -> None:
@@ -404,7 +439,7 @@ def test_serialise_chunk_prefers_model_dump_and_dict() -> None:
             return {"state": "ok"}
 
     fallback = _FallbackChunk()
-    assert _serialise_chunk(fallback) == {"state": "ok"}
+    assert serialise_chunk(fallback) == {"state": "ok"}
 
 
 def test_extract_stream_helpers_return_text_and_usage() -> None:
@@ -412,9 +447,9 @@ def test_extract_stream_helpers_return_text_and_usage() -> None:
         "choices": [{"delta": {"content": " piece "}}],
         "usage": {"prompt_tokens": 1},
     }
-    assert _extract_stream_text(payload) == " piece "
-    assert _extract_stream_usage(payload) == {"prompt_tokens": 1}
+    assert extract_stream_text(payload) == " piece "
+    assert extract_stream_usage(payload) == {"prompt_tokens": 1}
 
     empty_payload: Mapping[str, Any] = {}
-    assert _extract_stream_text(empty_payload) == ""
-    assert _extract_stream_usage(empty_payload) == {}
+    assert extract_stream_text(empty_payload) == ""
+    assert extract_stream_usage(empty_payload) == {}

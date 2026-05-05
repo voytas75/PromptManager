@@ -212,6 +212,10 @@ class QuickCaptureDialog(QDialog):
         """Return the captured payload once the dialog is accepted."""
         return self._result_draft
 
+    def build_draft(self) -> QuickCaptureDraft | None:
+        """Return a validated draft payload from the current form state."""
+        return self._build_draft()
+
     def _build_ui(self) -> None:
         """Construct the form controls and dialog buttons."""
         layout = QVBoxLayout(self)
@@ -229,27 +233,32 @@ class QuickCaptureDialog(QDialog):
         layout.addWidget(self._entry_guidance_label)
 
         self._title_input = QLineEdit(self)
+        self._title_input.setObjectName("quickCaptureTitleInput")
         self._title_input.setPlaceholderText(
             "Optional title; defaults to the first meaningful line"
         )
         form.addRow("Title", self._title_input)
 
         self._source_input = QLineEdit(self)
+        self._source_input.setObjectName("quickCaptureSourceInput")
         self._source_input.setPlaceholderText(
             "Optional source or provenance, e.g. chat thread, notes, or script"
         )
         form.addRow("Source / Provenance", self._source_input)
 
         self._tags_input = QLineEdit(self)
+        self._tags_input.setObjectName("quickCaptureTagsInput")
         self._tags_input.setPlaceholderText("Optional tags, comma-separated")
         form.addRow("Tags", self._tags_input)
 
         self._description_input = QPlainTextEdit(self)
+        self._description_input.setObjectName("quickCaptureDescriptionInput")
         self._description_input.setPlaceholderText("Optional short note or description")
         self._description_input.setFixedHeight(80)
         form.addRow("Note", self._description_input)
 
         self._body_input = QPlainTextEdit(self)
+        self._body_input.setObjectName("quickCaptureBodyInput")
         self._body_input.setPlaceholderText("Paste the raw prompt or LLM query here…")
         self._body_input.setMinimumHeight(320)
         form.addRow("Prompt Body", self._body_input)

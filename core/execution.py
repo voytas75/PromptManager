@@ -47,6 +47,11 @@ def _supports_reasoning(model: str) -> bool:
     return any(marker in lowered for marker in reasoning_markers)
 
 
+def supports_reasoning(model: str) -> bool:
+    """Public wrapper exposing reasoning-model detection."""
+    return _supports_reasoning(model)
+
+
 @dataclass(slots=True)
 class CodexExecutionResult:
     """Container for prompt execution responses."""
@@ -248,7 +253,16 @@ class CodexExecutor:
         return result
 
 
-__all__ = ["CodexExecutor", "CodexExecutionResult", "ExecutionError"]
+__all__ = [
+    "CodexExecutor",
+    "CodexExecutionResult",
+    "ExecutionError",
+    "extract_completion_text",
+    "extract_stream_text",
+    "extract_stream_usage",
+    "serialise_chunk",
+    "supports_reasoning",
+]
 
 
 def _extract_completion_text(payload: Mapping[str, Any]) -> str:
@@ -277,6 +291,11 @@ def _extract_completion_text(payload: Mapping[str, Any]) -> str:
     if text is not None:
         return str(text)
     raise ExecutionError("LiteLLM response is missing assistant content.")
+
+
+def extract_completion_text(payload: Mapping[str, Any]) -> str:
+    """Public wrapper exposing completion-text extraction for tests and integrations."""
+    return _extract_completion_text(payload)
 
 
 def _consume_streaming_response(
@@ -340,6 +359,11 @@ def _serialise_chunk(chunk: Any) -> Any:
     return chunk
 
 
+def serialise_chunk(chunk: Any) -> Any:
+    """Public wrapper exposing chunk serialisation for tests and integrations."""
+    return _serialise_chunk(chunk)
+
+
 def _extract_stream_text(payload: Any) -> str:
     """Return textual delta from a LiteLLM streaming payload when available."""
     if not isinstance(payload, Mapping):
@@ -371,12 +395,22 @@ def _extract_stream_text(payload: Any) -> str:
     return ""
 
 
+def extract_stream_text(payload: Any) -> str:
+    """Public wrapper exposing stream-text extraction for tests and integrations."""
+    return _extract_stream_text(payload)
+
+
 def _extract_stream_usage(payload: Any) -> dict[str, Any]:
     """Return usage metadata from a streaming payload if present."""
     if not isinstance(payload, Mapping):
         return {}
     usage_value = cast("Mapping[str, Any]", payload).get("usage")
     return _normalise_usage(usage_value)
+
+
+def extract_stream_usage(payload: Any) -> dict[str, Any]:
+    """Public wrapper exposing stream-usage extraction for tests and integrations."""
+    return _extract_stream_usage(payload)
 
 
 def _normalise_usage(usage_value: object | None) -> dict[str, Any]:

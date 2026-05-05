@@ -33,6 +33,13 @@ _FILTER_TAG_KEY = "filterTag"
 _FILTER_QUALITY_KEY = "filterQuality"
 _FILTER_SORT_KEY = "filterSortOrder"
 
+EXECUTE_CONTEXT_TASK_KEY = _EXECUTE_CONTEXT_TASK_KEY
+EXECUTE_CONTEXT_HISTORY_KEY = _EXECUTE_CONTEXT_HISTORY_KEY
+FILTER_CATEGORY_KEY = _FILTER_CATEGORY_KEY
+FILTER_TAG_KEY = _FILTER_TAG_KEY
+FILTER_QUALITY_KEY = _FILTER_QUALITY_KEY
+FILTER_SORT_KEY = _FILTER_SORT_KEY
+
 
 def _load_last_execute_context_task(settings: QSettings) -> str:
     """Return the persisted execute-context task text."""
@@ -42,6 +49,11 @@ def _load_last_execute_context_task(settings: QSettings) -> str:
     return str(raw_value).strip()
 
 
+def load_last_execute_context_task(settings: QSettings) -> str:
+    """Public facade for loading the last recorded execute-context task."""
+    return _load_last_execute_context_task(settings)
+
+
 def _store_last_execute_context_task(settings: QSettings, value: str) -> None:
     """Persist the execute-context task text for future sessions."""
     settings.setValue(_EXECUTE_CONTEXT_TASK_KEY, value)
@@ -49,6 +61,11 @@ def _store_last_execute_context_task(settings: QSettings, value: str) -> None:
         settings.sync()
     except Exception:  # pragma: no cover - platform specific
         logger.warning("Unable to sync execute-context history", exc_info=True)
+
+
+def store_last_execute_context_task(settings: QSettings, value: str) -> None:
+    """Public facade for persisting the last execute-context task."""
+    _store_last_execute_context_task(settings, value)
 
 
 def _load_execute_context_history(
@@ -81,6 +98,15 @@ def _load_execute_context_history(
     return entries
 
 
+def load_execute_context_history(
+    settings: QSettings,
+    *,
+    limit: int = _EXECUTE_CONTEXT_HISTORY_LIMIT,
+) -> list[str]:
+    """Public facade for loading execute-context history."""
+    return _load_execute_context_history(settings, limit=limit)
+
+
 def _store_execute_context_history(settings: QSettings, history: Sequence[str]) -> None:
     """Persist execute-context descriptions as a JSON-encoded list."""
     entries: list[str] = []
@@ -96,6 +122,11 @@ def _store_execute_context_history(settings: QSettings, history: Sequence[str]) 
         settings.sync()
     except Exception:  # pragma: no cover - platform specific
         logger.warning("Unable to sync execute-context history list", exc_info=True)
+
+
+def store_execute_context_history(settings: QSettings, history: Sequence[str]) -> None:
+    """Public facade for persisting execute-context history."""
+    _store_execute_context_history(settings, history)
 
 
 def _load_filter_preferences(
@@ -123,6 +154,13 @@ def _load_filter_preferences(
     return category, tag, quality, sort_value
 
 
+def load_filter_preferences(
+    settings: QSettings,
+) -> tuple[str | None, str | None, float | None, str | None]:
+    """Public facade for loading filter preferences."""
+    return _load_filter_preferences(settings)
+
+
 def _store_filter_preferences(
     settings: QSettings,
     *,
@@ -140,6 +178,22 @@ def _store_filter_preferences(
         logger.warning("Unable to sync filter preferences", exc_info=True)
 
 
+def store_filter_preferences(
+    settings: QSettings,
+    *,
+    category_slug: str | None,
+    tag: str | None,
+    min_quality: float,
+) -> None:
+    """Public facade for persisting filter preferences."""
+    _store_filter_preferences(
+        settings,
+        category_slug=category_slug,
+        tag=tag,
+        min_quality=min_quality,
+    )
+
+
 def _store_sort_preference(settings: QSettings, sort_value: Enum | str) -> None:
     """Persist the selected prompt sort order."""
     if isinstance(sort_value, Enum):
@@ -151,6 +205,11 @@ def _store_sort_preference(settings: QSettings, sort_value: Enum | str) -> None:
         settings.sync()
     except Exception:  # pragma: no cover
         logger.warning("Unable to sync sort preference", exc_info=True)
+
+
+def store_sort_preference(settings: QSettings, sort_value: Enum | str) -> None:
+    """Public facade for persisting the selected sort order."""
+    _store_sort_preference(settings, sort_value)
 
 
 @dataclass(slots=True)

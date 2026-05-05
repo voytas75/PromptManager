@@ -154,6 +154,7 @@ class DraftPromoteDialog(QDialog):
         layout.addWidget(self._similarity_summary)
 
         self._similar_prompts_list = QListWidget(self)
+        self._similar_prompts_list.setObjectName("draftPromoteSimilarPromptsList")
         self._similar_prompts_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
         self._similar_prompts_list.itemDoubleClicked.connect(self._open_selected_existing_prompt)  # type: ignore[arg-type]
         self._similar_prompts_list.itemSelectionChanged.connect(self._sync_open_existing_button)  # type: ignore[arg-type]
@@ -164,6 +165,7 @@ class DraftPromoteDialog(QDialog):
         form.setSpacing(10)
 
         self._title_input = QLineEdit(self)
+        self._title_input.setObjectName("draftPromoteTitleInput")
         form.addRow("Title", self._title_input)
 
         self._category_input = QComboBox(self)
@@ -271,6 +273,10 @@ class DraftPromoteDialog(QDialog):
         self._selected_existing_prompt_id = self._similar_prompts[row].id
         self._result_prompt = None
         self.accept()
+
+    def open_selected_existing_prompt(self) -> None:
+        """Public wrapper for opening the currently selected existing prompt."""
+        self._open_selected_existing_prompt()
 
     def _on_accept(self) -> None:
         """Validate the bounded fields and keep the promoted prompt for callers."""

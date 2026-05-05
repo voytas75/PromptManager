@@ -370,3 +370,7 @@ class PromptSearchMixin:
 
         scored.sort(key=lambda item: (-item[0], item[1]))
         return [prompt for _, _, prompt in scored]
+
+    def personalize_ranked_prompts(self, prompts: Sequence[Prompt]) -> list[Prompt]:
+        """Public wrapper for preference-based prompt ranking used by tests and callers."""
+        return self._personalize_ranked_prompts(prompts)
