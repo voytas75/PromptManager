@@ -147,9 +147,14 @@ class PromptChainRunResult:
     final_output_text: str | None = None
     final_summary_text: str | None = None
     step_aliases: dict[str, str] | None = None
+    run_status: str = "success"
     final_step_id: uuid.UUID | None = None
     final_step_output_key: str | None = None
     final_step_label: str | None = None
+    terminal_step_id: uuid.UUID | None = None
+    terminal_step_output_key: str | None = None
+    terminal_step_label: str | None = None
+    terminal_step_status: str | None = None
 
 
 class PromptChainMixin:
@@ -158,6 +163,7 @@ class PromptChainMixin:
     _repository: PromptRepository
     _notification_center: NotificationCenter
     _chain_run_history_limit = 20
+    _chain_run_history_records: list[dict[str, str | None]]
 
     def list_prompt_chains(self, include_inactive: bool = False) -> list[PromptChain]:
         """Return stored prompt chain definitions."""
@@ -321,6 +327,22 @@ class PromptChainMixin:
         final_step_id = None
         final_step_output_key = None
         final_step_label = None
+        terminal_step_id = None
+        terminal_step_output_key = None
+        terminal_step_label = None
+        terminal_step_status = None
+        terminal_step_run = step_runs[-1] if step_runs else None
+        if terminal_step_run is not None:
+            terminal_step_id = terminal_step_run.step.id
+            terminal_step_output_key = (
+                terminal_step_run.step_output_key or f"step_{terminal_step_run.step.order_index}"
+            )
+            terminal_step_label = (
+                terminal_step_run.step_label
+                or terminal_step_run.step.output_variable
+                or terminal_step_output_key
+            )
+            terminal_step_status = terminal_step_run.status
         for index in range(len(step_runs) - 1, -1, -1):
             candidate = step_runs[index]
             if candidate.status != "success" or candidate.outcome is None:
@@ -334,6 +356,7 @@ class PromptChainMixin:
                 candidate.step_label or candidate.step.output_variable or final_step_output_key
             )
             break
+        run_status = self._compute_chain_run_status(step_runs, final_output_text)
         result = PromptChainRunResult(
             chain=chain,
             chain_input=raw_input,
@@ -342,23 +365,44 @@ class PromptChainMixin:
             final_output_text=final_output_text,
             final_summary_text=summary_text,
             step_aliases=step_aliases or None,
+            run_status=run_status,
             final_step_id=final_step_id,
             final_step_output_key=final_step_output_key,
             final_step_label=final_step_label,
+            terminal_step_id=terminal_step_id,
+            terminal_step_output_key=terminal_step_output_key,
+            terminal_step_label=terminal_step_label,
+            terminal_step_status=terminal_step_status,
         )
         self._record_chain_run_history(result)
         return result
+
+    def _compute_chain_run_status(
+        self,
+        step_runs: Sequence[PromptChainStepRun],
+        final_output_text: str | None,
+    ) -> str:
+        """Return one backend-owned aggregate status for a prompt-chain run."""
+        if not step_runs:
+            return "failed"
+        has_failed = any(step_run.status == "failed" for step_run in step_runs)
+        has_skipped = any(step_run.status == "skipped" for step_run in step_runs)
+        has_success = any(step_run.status == "success" for step_run in step_runs)
+        has_final_output = bool((final_output_text or "").strip())
+        if has_failed and (has_success or has_final_output):
+            return "partial_success"
+        if has_failed:
+            return "failed"
+        if has_skipped and (has_success or has_final_output):
+            return "partial_success"
+        if has_skipped:
+            return "skipped"
+        return "success"
 
     def _build_chain_history_record(
         self,
         result: PromptChainRunResult,
     ) -> dict[str, str | None]:
-        final_status = "success"
-        if any(step_run.status == "failed" for step_run in result.steps):
-            final_status = "failed"
-        elif any(step_run.status == "skipped" for step_run in result.steps):
-            final_status = "skipped"
-
         def _preview(text: str | None, limit: int = 160) -> str:
             value = (text or "").strip()
             if len(value) <= limit:
@@ -369,7 +413,7 @@ class PromptChainMixin:
             "chain_id": str(result.chain.id),
             "chain_name": result.chain.name,
             "run_timestamp": datetime.now(UTC).isoformat(),
-            "status": final_status,
+            "status": result.run_status,
             "input_preview": _preview(result.chain_input),
             "final_output_preview": _preview(result.final_output_text),
             "final_step_output_key": result.final_step_output_key,

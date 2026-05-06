@@ -275,6 +275,74 @@ def test_prompt_chain_run_result_exposes_canonical_machine_outputs_and_final_ste
     assert run_result.final_step_label == "final"
 
 
+def test_prompt_chain_run_result_exposes_run_status_and_terminal_step_fields() -> None:
+    chain_id = uuid.uuid4()
+    success_step = PromptChainStep(
+        id=uuid.uuid4(),
+        chain_id=chain_id,
+        prompt_id=uuid.uuid4(),
+        order_index=1,
+        input_template="",
+        output_variable="draft",
+    )
+    terminal_step = PromptChainStep(
+        id=uuid.uuid4(),
+        chain_id=chain_id,
+        prompt_id=uuid.uuid4(),
+        order_index=2,
+        input_template="",
+        output_variable="final",
+    )
+    chain = PromptChain(
+        id=chain_id,
+        name="Run Status Chain",
+        description="",
+        steps=[success_step, terminal_step],
+    )
+    step_runs = [
+        PromptChainStepRun(
+            step=success_step,
+            status="success",
+            outcome=None,
+            step_label="draft",
+            step_output_key="step_1",
+        ),
+        PromptChainStepRun(
+            step=terminal_step,
+            status="failed",
+            outcome=None,
+            step_label="final",
+            step_output_key="step_2",
+            error="boom",
+        ),
+    ]
+
+    run_result = PromptChainRunResult(
+        chain=chain,
+        chain_input="Seed input",
+        step_outputs={"step_1": "Draft"},
+        steps=step_runs,
+        final_output_text="Draft",
+        final_summary_text=None,
+        run_status="partial_success",
+        final_step_id=success_step.id,
+        final_step_output_key="step_1",
+        final_step_label="draft",
+        terminal_step_id=terminal_step.id,
+        terminal_step_output_key="step_2",
+        terminal_step_label="final",
+        terminal_step_status="failed",
+    )
+
+    assert run_result.run_status == "partial_success"
+    assert run_result.final_step_id == success_step.id
+    assert run_result.final_step_output_key == "step_1"
+    assert run_result.terminal_step_id == terminal_step.id
+    assert run_result.terminal_step_output_key == "step_2"
+    assert run_result.terminal_step_label == "final"
+    assert run_result.terminal_step_status == "failed"
+
+
 class _ChainHistoryHarness(PromptChainMixin):
     def __init__(self) -> None:
         self._chain_run_history_records: list[dict[str, str | None]] = []
@@ -322,6 +390,55 @@ def test_build_chain_history_record_returns_minimum_bounded_evidence() -> None:
     assert "step_outputs" not in record
     assert "request_text" not in record
     assert "response_text" not in record
+
+
+def test_build_chain_history_record_prefers_backend_run_status() -> None:
+    harness = _ChainHistoryHarness()
+    chain = PromptChain(
+        id=uuid.uuid4(),
+        name="Partial Chain",
+        description="",
+        steps=[],
+    )
+    result = PromptChainRunResult(
+        chain=chain,
+        chain_input="input",
+        step_outputs={"step_1": "Draft"},
+        steps=[],
+        final_output_text="Draft",
+        run_status="partial_success",
+        final_step_output_key="step_1",
+    )
+
+    record = harness._build_chain_history_record(result)
+
+    assert record["status"] == "partial_success"
+
+
+def test_list_recent_prompt_chain_runs_normalizes_zero_limit_to_one() -> None:
+    harness = _ChainHistoryHarness()
+    for index in range(3):
+        chain = PromptChain(
+            id=uuid.uuid4(),
+            name=f"Chain {index}",
+            description="",
+            steps=[],
+        )
+        result = PromptChainRunResult(
+            chain=chain,
+            chain_input=f"input {index}",
+            step_outputs={f"step_{index}": f"output {index}"},
+            steps=[],
+            final_output_text=f"output {index}",
+            run_status="success",
+            final_step_output_key=f"step_{index}",
+        )
+        harness._record_chain_run_history(result)
+
+    recent = harness.list_recent_prompt_chain_runs(limit=0)
+
+    assert len(recent) == 3
+    assert recent[0]["chain_name"] == "Chain 2"
 
 
 def test_record_chain_run_history_stores_newest_first_and_bounded_retention() -> None:

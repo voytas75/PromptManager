@@ -2,11 +2,13 @@
 
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
 
-**Goal:** Domknąć prompt chains jako bounded, czytelny i przewidywalny linear runner: bez workflow-engine drift, z lepszą walidacją, wygodniejszą konsumpcją wyników i lekką trwałą historią uruchomień.
+**Goal:** Domknąć prompt chains jako bounded, czytelny i przewidywalny linear runner: bez workflow-engine drift, z lepszą walidacją, spójną semantyką runów, wygodniejszą konsumpcją wyników i lekką historią uruchomień.
 
 **Architecture:** Utrzymaj obecny model liniowego uruchamiania i nie poszerzaj semantyki silnika. Najpierw oczyść kontrakt i narrację modelu, potem dołóż małe operator-facing seams w CLI/GUI, a na końcu lekką trwałą historię opartą o bounded evidence. Każdy slice ma być mały, testowalny i zgodny z SSOT `docs/plans/2026-05-06-prompt-chain-ssot.md`.
 
 **Tech Stack:** Python 3.13+, PromptManager core/CLI/GUI, pytest, Ruff, Pyright strict, istniejące docs/SSOT pod `docs/plans/`.
+
+**Companion bounded execution plan:** `docs/plans/2026-05-06-prompt-chain-semantic-slices-plan.md`
 
 ---
 
@@ -19,6 +21,7 @@ Ten plan może poprawiać tylko:
 - editor ergonomics bez workflow-canvas,
 - lightweight persisted history,
 - minimal docs sync między SSOT a aktywnym ledgerem.
+- run-semantics alignment między backend, CLI, GUI i history seams.
 
 Ten plan nie może dodawać:
 - branchingu,
@@ -50,7 +53,42 @@ Traktuj jako już dostarczone:
 - GUI copy/save result actions,
 - GUI session-only recent run history.
 
+Potwierdzona luka po ostatnim review:
+- `final_step_*` nie są jeszcze semantycznie domknięte względem terminalnego kroku wykonania,
+- aggregate run status nie jest jeszcze jednym backend-owned contract konsumowanym wszędzie.
+
 Nie planuj tych rzeczy ponownie jako nowych feature’ów.
+
+---
+
+## Phase 0 — Run semantics alignment
+
+### Task 0: Sync semantic slices plan into active docs
+
+**Status:** done
+
+**Objective:** Ujawnić w SSOT i rollout ledgerze, że kolejnym aktywnym bounded workstreamem jest semantic cleanup dla run status i final-vs-terminal step.
+
+**Files:**
+- Modify: `docs/plans/2026-05-06-prompt-chain-ssot.md`
+- Modify: `docs/plans/2026-05-06-prompt-chain-rollout-plan.md`
+- Reference: `docs/plans/2026-05-06-prompt-chain-semantic-slices-plan.md`
+
+### Task 0A: Define run-status and final/terminal-step semantics
+
+**Status:** planned
+
+**Objective:** Ustalić jeden backend-owned contract dla `run_status`, `final_step_*` i `terminal_step_*`.
+
+**Execution note:** Szczegółowy plan wykonawczy jest w `docs/plans/2026-05-06-prompt-chain-semantic-slices-plan.md` (Slice A).
+
+### Task 0B: Align CLI and history consumers with backend run semantics
+
+**Status:** planned
+
+**Objective:** Usunąć lokalne heurystyki statusu/finalności z CLI i history surfaces.
+
+**Execution note:** Szczegółowy plan wykonawczy jest w `docs/plans/2026-05-06-prompt-chain-semantic-slices-plan.md` (Slice A + Slice B).
 
 ---
 

@@ -46,7 +46,9 @@ from core import (
     import_prompt_catalog,
     snapshot_dataset_rows,
 )
-from models.prompt_chain_model import chain_from_payload
+from models.prompt_chain_model import (
+    chain_from_payload,
+)
 
 from .utils import (
     format_metric,
@@ -631,6 +633,46 @@ def run_prompt_chain_list(
     return 0
 
 
+def _format_chain_legacy_semantics(chain: Any) -> dict[str, Any]:
+    metadata = _coerce_mapping(getattr(chain, "metadata", None)) or {}
+    legacy = metadata.get("legacy_chain_fields")
+    if isinstance(legacy, Mapping):
+        return {
+            str(key): dict(value)
+            for key, value in legacy.items()
+            if isinstance(value, Mapping)
+        }
+    return {}
+
+
+def _format_step_legacy_semantics(step: Any) -> dict[str, Any]:
+    metadata = _coerce_mapping(getattr(step, "metadata", None)) or {}
+    legacy_fields = metadata.get("legacy_runtime_fields")
+    if not isinstance(legacy_fields, Mapping):
+        return {}
+    compatibility_note = "Compatibility-only field preserved for import/export boundaries."
+    semantics: dict[str, Any] = {}
+    if "input_template" in legacy_fields:
+        semantics["input_template"] = {
+            "status": "inactive",
+            "note": compatibility_note,
+        }
+    if "condition" in legacy_fields:
+        semantics["condition"] = {
+            "status": "inactive",
+            "note": compatibility_note,
+        }
+    if "output_variable" in legacy_fields:
+        semantics["output_variable"] = {
+            "status": "inactive_alias",
+            "note": (
+                "Legacy alias field preserved for import/export boundaries; "
+                "active runtime uses canonical step_output_key."
+            ),
+        }
+    return semantics
+
+
 def run_prompt_chain_show(
     manager: PromptManager | None,
     args: argparse.Namespace,
@@ -649,9 +691,37 @@ def run_prompt_chain_show(
         logger.error("Unable to load prompt chain: %s", exc)
         return 5
     status = "active" if chain.is_active else "inactive"
+    chain_legacy_semantics = _format_chain_legacy_semantics(chain)
+    if bool(getattr(args, "json", False)):
+        payload = {
+            "id": str(chain.id),
+            "name": chain.name,
+            "description": chain.description,
+            "status": status,
+            "is_active": chain.is_active,
+            "summarize_last_response": bool(chain.summarize_last_response),
+            "legacy_semantics": chain_legacy_semantics,
+            "steps": [
+                {
+                    "id": str(step.id),
+                    "order_index": step.order_index,
+                    "prompt_id": str(step.prompt_id),
+                    "step_label": step.output_variable or f"step_{step.order_index}",
+                    "stop_on_failure": bool(step.stop_on_failure),
+                    "legacy_semantics": _format_step_legacy_semantics(step),
+                }
+                for step in chain.steps
+            ],
+        }
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
     print(f"\nChain: {chain.name} ({chain.id}) [{status}]")
     if chain.description:
         print(f"Description: {chain.description}")
+    if chain_legacy_semantics:
+        print("Legacy semantics:")
+        for field_name, _details in chain_legacy_semantics.items():
+            print(f"  - {field_name}: inactive compatibility-only field")
     if not chain.steps:
         print("Steps: (none)")
         return 0
@@ -662,6 +732,142 @@ def run_prompt_chain_show(
         print(f"  {step.order_index}. {step_label}")
         print(f"     Prompt: {step.prompt_id}")
         print(f"     Failure: {failure_label}")
+        step_legacy_semantics = _format_step_legacy_semantics(step)
+        if step_legacy_semantics:
+            print(
+                "     Legacy fields: input_template, output_variable, condition "
+                "(inactive semantics)"
+            )
+    return 0
+
+
+def run_prompt_chain_export(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    if manager is None:
+        raise ValueError("Prompt Manager is required for prompt chain export.")
+    try:
+        chain_id = uuid.UUID(str(args.chain_id))
+    except (TypeError, ValueError) as exc:
+        logger.error("Invalid chain id: %s", exc)
+        return 5
+    try:
+        chain = manager.get_prompt_chain(chain_id)
+    except PromptChainError as exc:
+        logger.error("Unable to load prompt chain: %s", exc)
+        return 5
+    payload = {
+        "id": str(chain.id),
+        "name": chain.name,
+        "description": chain.description,
+        "is_active": bool(chain.is_active),
+        "summarize_last_response": bool(chain.summarize_last_response),
+        "steps": [
+            {
+                "id": str(step.id),
+                "prompt_id": str(step.prompt_id),
+                "order_index": step.order_index,
+                "stop_on_failure": bool(step.stop_on_failure),
+            }
+            for step in chain.steps
+        ],
+    }
+    path = Path(args.path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"Exported prompt chain '{chain.name}' ({chain.id}) to {path}.")
+    return 0
+
+
+def _validate_prompt_chain_payload(path: Path) -> tuple[dict[str, Any], Any]:
+    payload = _load_json_file(path)
+    if not isinstance(payload, Mapping):
+        raise ValueError("Chain definition must be a JSON object.")
+    materialized_payload = dict(payload)
+    chain = chain_from_payload(materialized_payload)
+    if not chain.steps:
+        raise ValueError("Prompt chain definition must include at least one step.")
+    return materialized_payload, chain
+
+
+def _build_prompt_chain_validate_report(
+    payload: Mapping[str, Any],
+    chain: Any,
+) -> dict[str, Any]:
+    warnings: list[str] = []
+    chain_legacy_fields: list[str] = []
+    steps_legacy_fields: dict[str, list[str]] = {}
+
+    if payload.get("variables_schema") is not None:
+        chain_legacy_fields.append("variables_schema")
+        warnings.append("Chain uses compatibility-only legacy field: variables_schema")
+
+    for step in getattr(chain, "steps", []):
+        step_metadata = _coerce_mapping(getattr(step, "metadata", None)) or {}
+        legacy_runtime_fields = step_metadata.get("legacy_runtime_fields")
+        if not isinstance(legacy_runtime_fields, Mapping):
+            continue
+        step_fields: list[str] = []
+        if legacy_runtime_fields.get("input_template") not in (None, ""):
+            step_fields.append("input_template")
+            warnings.append(f"Step {step.order_index} uses inactive legacy field: input_template")
+        if legacy_runtime_fields.get("output_variable") not in (None, ""):
+            step_fields.append("output_variable")
+            warnings.append(
+                f"Step {step.order_index} uses inactive legacy alias field: output_variable"
+            )
+        if legacy_runtime_fields.get("condition") not in (None, ""):
+            step_fields.append("condition")
+            warnings.append(f"Step {step.order_index} uses inactive legacy field: condition")
+        if step_fields:
+            steps_legacy_fields[str(step.order_index)] = step_fields
+
+    return {
+        "valid": True,
+        "warnings": warnings,
+        "step_count": len(getattr(chain, "steps", [])),
+        "legacy_fields_detected": {
+            "chain": chain_legacy_fields,
+            "steps": steps_legacy_fields,
+        },
+    }
+
+
+def run_prompt_chain_validate(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    del manager
+    path: Path = args.path
+    json_output = bool(getattr(args, "json", False))
+    try:
+        payload, chain = _validate_prompt_chain_payload(path)
+    except ValueError as exc:
+        if json_output:
+            report = {
+                "valid": False,
+                "warnings": [],
+                "step_count": 0,
+                "legacy_fields_detected": {"chain": [], "steps": {}},
+                "error": str(exc),
+            }
+            print(json.dumps(report, ensure_ascii=False, indent=2))
+        else:
+            logger.error("Invalid chain definition: %s", exc)
+        return 5
+    if json_output:
+        report = _build_prompt_chain_validate_report(payload, chain)
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 0
+    is_update = bool(payload.get("id"))
+    mode = "update" if is_update else "create"
+    print(
+        "Valid prompt chain definition: "
+        f"{path} -> mode={mode} name='{chain.name}' steps={len(chain.steps)}"
+    )
     return 0
 
 
@@ -674,19 +880,24 @@ def run_prompt_chain_apply(
         raise ValueError("Prompt Manager is required for prompt chain apply.")
     path: Path = args.path
     try:
-        payload = _load_json_file(path)
-    except ValueError as exc:
-        logger.error(str(exc))
-        return 5
-    if not isinstance(payload, Mapping):
-        logger.error("Chain definition must be a JSON object.")
-        return 5
-    is_update = bool(payload.get("id"))
-    try:
-        chain = chain_from_payload(payload)
+        payload, chain = _validate_prompt_chain_payload(path)
     except ValueError as exc:
         logger.error("Invalid chain definition: %s", exc)
         return 5
+    is_update = bool(payload.get("id"))
+    if bool(getattr(args, "dry_run", False)):
+        report = _build_prompt_chain_validate_report(payload, chain)
+        preview = {
+            "dry_run": True,
+            "valid": True,
+            "mode": "update" if is_update else "create",
+            "name": chain.name,
+            "step_count": report["step_count"],
+            "warnings": report["warnings"],
+            "legacy_fields_detected": report["legacy_fields_detected"],
+        }
+        print(json.dumps(preview, ensure_ascii=False, indent=2))
+        return 0
     try:
         saved = manager.save_prompt_chain(chain)
     except PromptChainError as exc:
@@ -695,6 +906,133 @@ def run_prompt_chain_apply(
     action = "Updated" if is_update else "Created"
     print(f"{action} prompt chain '{saved.name}' ({saved.id}) with {len(saved.steps)} steps.")
     return 0
+
+
+def _build_prompt_chain_run_json_payload(result: Any) -> dict[str, Any]:
+    return {
+        "chain": {
+            "id": str(result.chain.id),
+            "name": result.chain.name,
+        },
+        "chain_input": result.chain_input,
+        "final_output_text": result.final_output_text,
+        "final_summary_text": result.final_summary_text,
+        "run_status": result.run_status,
+        "final_step_id": str(result.final_step_id) if result.final_step_id is not None else None,
+        "final_step_output_key": result.final_step_output_key,
+        "final_step_label": result.final_step_label,
+        "terminal_step_id": (
+            str(result.terminal_step_id) if result.terminal_step_id is not None else None
+        ),
+        "terminal_step_output_key": result.terminal_step_output_key,
+        "terminal_step_label": result.terminal_step_label,
+        "terminal_step_status": result.terminal_step_status,
+        "step_aliases": result.step_aliases or {},
+        "step_outputs": result.step_outputs,
+        "steps": [
+            {
+                "step_id": str(step_run.step.id),
+                "order_index": step_run.step.order_index,
+                "prompt_id": str(step_run.step.prompt_id),
+                "step_label": step_run.step_label
+                or step_run.step.output_variable
+                or f"step_{step_run.step.order_index}",
+                "step_output_key": step_run.step_output_key or f"step_{step_run.step.order_index}",
+                "output_variable": step_run.step.output_variable,
+                "prompt_name": step_run.prompt_name,
+                "status": step_run.status,
+                "duration_ms": step_run.duration_ms,
+                "error": step_run.error,
+                "request_text": step_run.request_text,
+                "response_text": step_run.response_text,
+                "web_search_requested": step_run.web_search_requested,
+                "web_search_applied": step_run.web_search_applied,
+                "skip_reason": step_run.skip_reason,
+            }
+            for step_run in result.steps
+        ],
+    }
+
+
+def _build_prompt_chain_run_text_output(result: Any, final_status: str) -> str:
+    text_lines = [
+        f"\nChain '{result.chain.name}'",
+        "Input to chain:",
+    ]
+    chain_input_text = result.chain_input or ""
+    text_lines.append(textwrap.indent(chain_input_text or "(empty input)", "  "))
+    if result.final_output_text:
+        text_lines.extend(
+            [
+                "\nFinal output:",
+                textwrap.indent(result.final_output_text, "  "),
+            ]
+        )
+    if result.final_summary_text:
+        text_lines.extend(
+            [
+                "\nFinal summary:",
+                textwrap.indent(result.final_summary_text, "  "),
+            ]
+        )
+    text_lines.append("\nStep outputs:")
+    if not result.step_outputs:
+        text_lines.append("  (no step outputs captured)")
+    else:
+        for key, value in result.step_outputs.items():
+            text_lines.append(f"  {key}: {value}")
+    text_lines.append("\nStep summary:")
+    for step_run in result.steps:
+        step_label = (
+            step_run.step_label
+            or step_run.step.output_variable
+            or f"step_{step_run.step.order_index}"
+        )
+        step_output_key = (
+            step_run.step_output_key or f"step_{step_run.step.order_index}"
+        )
+        text_lines.append(
+            f"  Step {step_run.step.order_index} "
+            f"({step_label} | output key: {step_output_key}): {step_run.status}"
+        )
+        if step_run.prompt_name:
+            text_lines.append(f"    Prompt: {step_run.prompt_name}")
+        if step_run.duration_ms is not None:
+            text_lines.append(f"    Duration: {step_run.duration_ms} ms")
+        text_lines.append(
+            "    Web search: "
+            f"requested={'yes' if step_run.web_search_requested else 'no'}, "
+            f"applied={'yes' if step_run.web_search_applied else 'no'}"
+        )
+        if step_run.skip_reason:
+            text_lines.append(f"    Skip reason: {step_run.skip_reason}")
+        if step_run.error:
+            text_lines.append(f"    Error: {step_run.error}")
+        if step_run.request_text:
+            text_lines.extend(
+                [
+                    "    Request text:",
+                    textwrap.indent(step_run.request_text, "      "),
+                ]
+            )
+        if step_run.response_text:
+            text_lines.extend(
+                [
+                    "    Response text:",
+                    textwrap.indent(step_run.response_text, "      "),
+                ]
+            )
+    return "\n".join(text_lines)
+
+
+def _build_prompt_chain_compact_output(result: Any, final_status: str) -> str:
+    lines = [
+        f"Chain: {result.chain.name}",
+        f"Status: {result.run_status or final_status}",
+        f"Final output preview: {result.final_output_text or '(empty)'}",
+        f"Summary preview: {result.final_summary_text or '(empty)'}",
+    ]
+    return "\n".join(lines)
 
 
 def run_prompt_chain_run(
@@ -730,31 +1068,96 @@ def run_prompt_chain_run(
     except PromptChainError as exc:
         logger.error("Unable to execute prompt chain: %s", exc)
         return 5
-    print(f"\nChain '{result.chain.name}'")
-    print("Input to chain:")
-    chain_input_text = result.chain_input or ""
-    print(textwrap.indent(chain_input_text or "(empty input)", "  "))
-    if result.summary:
-        print("\nFinal chain result:")
-        print(textwrap.indent(result.summary, "  "))
-    print("\nChain outputs:")
-    if not result.outputs:
-        print("  (no outputs captured)")
-    else:
-        for key, value in result.outputs.items():
-            print(f"  {key}: {value}")
-    print("\nStep summary:")
-    for step_run in result.steps:
-        label = f"Step {step_run.step.order_index}"
-        if step_run.status == "success":
-            preview = step_run.outcome.result.response_text if step_run.outcome else ""
-            if preview and len(preview) > 80:
-                preview = preview[:77].rstrip() + "..."
-            print(f"  [OK] {label} -> {preview or '(empty response)'}")
-        elif step_run.status == "skipped":
-            print(f"  [SKIP] {label}")
-        else:
-            print(f"  [ERR] {label}: {step_run.error}")
+    final_status = result.run_status or "success"
+
+    selective_flags_enabled = sum(
+        1
+        for enabled in (
+            bool(getattr(args, "json", False)),
+            bool(getattr(args, "final_output_only", False)),
+            bool(getattr(args, "summary_only", False)),
+            bool(getattr(args, "status_only", False)),
+            bool(getattr(args, "step_output", None)),
+            bool(getattr(args, "step_alias", None)),
+            bool(getattr(args, "final_step_meta", False)),
+            bool(getattr(args, "compact", False)),
+        )
+        if enabled
+    )
+    if selective_flags_enabled > 1:
+        logger.error(
+            "Conflicting output modes: choose only one of --json, --final-output-only, "
+            "--summary-only, --status-only, --step-output, --step-alias, "
+            "--final-step-meta, or --compact."
+        )
+        return 5
+
+    if bool(getattr(args, "json", False)):
+        payload_text = json.dumps(
+            _build_prompt_chain_run_json_payload(result),
+            indent=2,
+            ensure_ascii=False,
+        )
+        output_file = getattr(args, "output_file", None)
+        if output_file is not None:
+            output_path = Path(output_file)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(payload_text + "\n", encoding="utf-8")
+            print(f"Saved prompt chain run artifact to {output_path}.")
+            return 0
+        print(payload_text)
+        return 0
+
+    text_output = _build_prompt_chain_run_text_output(result, final_status)
+    if bool(getattr(args, "final_output_only", False)):
+        text_output = result.final_output_text or ""
+    elif bool(getattr(args, "summary_only", False)):
+        text_output = result.final_summary_text or ""
+    elif bool(getattr(args, "status_only", False)):
+        text_output = final_status
+    elif getattr(args, "step_output", None):
+        requested_key = str(args.step_output)
+        if requested_key not in result.step_outputs:
+            logger.error("Unknown step output key: %s", requested_key)
+            return 5
+        text_output = result.step_outputs[requested_key] or ""
+    elif getattr(args, "step_alias", None):
+        requested_alias = str(args.step_alias)
+        step_aliases = result.step_aliases or {}
+        resolved_key = step_aliases.get(requested_alias)
+        if not resolved_key:
+            logger.error("Unknown step alias: %s", requested_alias)
+            return 5
+        text_output = result.step_outputs.get(resolved_key, "") or ""
+    elif bool(getattr(args, "final_step_meta", False)):
+        text_output = json.dumps(
+            {
+                "final_step_id": (
+                    str(result.final_step_id) if result.final_step_id is not None else None
+                ),
+                "final_step_output_key": result.final_step_output_key,
+                "final_step_label": result.final_step_label,
+                "terminal_step_id": (
+                    str(result.terminal_step_id) if result.terminal_step_id is not None else None
+                ),
+                "terminal_step_output_key": result.terminal_step_output_key,
+                "terminal_step_label": result.terminal_step_label,
+                "terminal_step_status": result.terminal_step_status,
+                "run_status": result.run_status,
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
+    elif bool(getattr(args, "compact", False)):
+        text_output = _build_prompt_chain_compact_output(result, final_status)
+    output_file = getattr(args, "output_file", None)
+    if output_file is not None:
+        output_path = Path(output_file)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(text_output + "\n", encoding="utf-8")
+        print(f"Saved prompt chain run artifact to {output_path}.")
+        return 0
+    print(text_output)
     return 0
 
 
@@ -1259,6 +1662,8 @@ COMMAND_SPECS: dict[str | None, CommandSpec] = {
     "diagnostics": CommandSpec(run_diagnostics),
     "prompt-chain-list": CommandSpec(run_prompt_chain_list),
     "prompt-chain-show": CommandSpec(run_prompt_chain_show),
+    "prompt-chain-export": CommandSpec(run_prompt_chain_export),
+    "prompt-chain-validate": CommandSpec(run_prompt_chain_validate, requires_manager=False),
     "prompt-chain-apply": CommandSpec(run_prompt_chain_apply),
     "prompt-chain-run": CommandSpec(run_prompt_chain_run),
 }
