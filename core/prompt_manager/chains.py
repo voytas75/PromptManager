@@ -19,6 +19,7 @@ import logging
 import re
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 
 from prompt_templates import get_default_prompt
@@ -124,6 +125,15 @@ class PromptChainStepRun:
     status: str
     outcome: ExecutionOutcome | None
     error: str | None = None
+    prompt_name: str | None = None
+    request_text: str | None = None
+    response_text: str | None = None
+    duration_ms: int | None = None
+    web_search_requested: bool = False
+    web_search_applied: bool = False
+    skip_reason: str | None = None
+    step_label: str | None = None
+    step_output_key: str | None = None
 
 
 @dataclass(slots=True)
@@ -132,9 +142,14 @@ class PromptChainRunResult:
 
     chain: PromptChain
     chain_input: str
-    outputs: dict[str, str]
+    step_outputs: dict[str, str]
     steps: list[PromptChainStepRun]
-    summary: str | None = None
+    final_output_text: str | None = None
+    final_summary_text: str | None = None
+    step_aliases: dict[str, str] | None = None
+    final_step_id: uuid.UUID | None = None
+    final_step_output_key: str | None = None
+    final_step_label: str | None = None
 
 
 class PromptChainMixin:
@@ -142,6 +157,7 @@ class PromptChainMixin:
 
     _repository: PromptRepository
     _notification_center: NotificationCenter
+    _chain_run_history_limit = 20
 
     def list_prompt_chains(self, include_inactive: bool = False) -> list[PromptChain]:
         """Return stored prompt chain definitions."""
@@ -210,6 +226,7 @@ class PromptChainMixin:
 
         previous_response = raw_input
         outputs: dict[str, str] = {}
+        step_aliases: dict[str, str] = {}
         step_runs: list[PromptChainStepRun] = []
         task_id = f"prompt-chain:{chain.id}:{uuid.uuid4()}"
         web_search_enabled = bool(use_web_search)
@@ -231,12 +248,15 @@ class PromptChainMixin:
                         f"Step {step.order_index} in '{chain.name}' received empty input."
                     )
                 prompt = host.get_prompt(step.prompt_id)
+                step_output_key = f"step_{step.order_index}"
+                step_label = step.output_variable or step_output_key
                 request_text = self._maybe_enrich_with_web_search(
                     prompt,
                     request_text,
                     use_web_search=web_search_enabled,
                     web_search_limit=safe_search_limit,
                 )
+                web_search_applied = request_text != previous_response
                 try:
                     outcome = self._execute_chain_step(
                         chain,
@@ -248,12 +268,28 @@ class PromptChainMixin:
                     status = "success"
                     response_text = outcome.result.response_text or ""
                     previous_response = response_text
-                    outputs[f"step_{step.order_index}"] = response_text
+                    outputs[step_output_key] = response_text
+                    if step.output_variable:
+                        step_aliases[step.output_variable] = step_output_key
                 except PromptExecutionError as exc:
                     status = "failed"
                     error = str(exc)
                     step_runs.append(
-                        PromptChainStepRun(step=step, status=status, outcome=None, error=error)
+                        PromptChainStepRun(
+                            step=step,
+                            status=status,
+                            outcome=None,
+                            error=error,
+                            prompt_name=prompt.name,
+                            request_text=request_text,
+                            response_text=None,
+                            duration_ms=None,
+                            web_search_requested=web_search_enabled,
+                            web_search_applied=web_search_applied,
+                            skip_reason=None,
+                            step_label=step_label,
+                            step_output_key=step_output_key,
+                        )
                     )
                     if step.stop_on_failure:
                         message = (
@@ -262,17 +298,101 @@ class PromptChainMixin:
                         )
                         raise PromptChainExecutionError(message) from exc
                     continue
-                step_runs.append(PromptChainStepRun(step=step, status=status, outcome=outcome))
+                step_runs.append(
+                    PromptChainStepRun(
+                        step=step,
+                        status=status,
+                        outcome=outcome,
+                        prompt_name=getattr(prompt, "name", None),
+                        request_text=request_text,
+                        response_text=response_text,
+                        duration_ms=outcome.result.duration_ms,
+                        web_search_requested=web_search_enabled,
+                        web_search_applied=web_search_applied,
+                        skip_reason=None,
+                        step_label=step_label,
+                        step_output_key=step_output_key,
+                    )
+                )
         summary_text = (
             self._build_chain_summary(step_runs) if chain.summarize_last_response else None
         )
-        return PromptChainRunResult(
+        final_output_text = None
+        final_step_id = None
+        final_step_output_key = None
+        final_step_label = None
+        for index in range(len(step_runs) - 1, -1, -1):
+            candidate = step_runs[index]
+            if candidate.status != "success" or candidate.outcome is None:
+                continue
+            final_output_text = (candidate.outcome.result.response_text or "").strip() or None
+            final_step_id = candidate.step.id
+            final_step_output_key = (
+                candidate.step_output_key or f"step_{candidate.step.order_index}"
+            )
+            final_step_label = (
+                candidate.step_label or candidate.step.output_variable or final_step_output_key
+            )
+            break
+        result = PromptChainRunResult(
             chain=chain,
             chain_input=raw_input,
-            outputs=outputs,
+            step_outputs=outputs,
             steps=step_runs,
-            summary=summary_text,
+            final_output_text=final_output_text,
+            final_summary_text=summary_text,
+            step_aliases=step_aliases or None,
+            final_step_id=final_step_id,
+            final_step_output_key=final_step_output_key,
+            final_step_label=final_step_label,
         )
+        self._record_chain_run_history(result)
+        return result
+
+    def _build_chain_history_record(
+        self,
+        result: PromptChainRunResult,
+    ) -> dict[str, str | None]:
+        final_status = "success"
+        if any(step_run.status == "failed" for step_run in result.steps):
+            final_status = "failed"
+        elif any(step_run.status == "skipped" for step_run in result.steps):
+            final_status = "skipped"
+
+        def _preview(text: str | None, limit: int = 160) -> str:
+            value = (text or "").strip()
+            if len(value) <= limit:
+                return value
+            return value[: limit - 1].rstrip() + "…"
+
+        record: dict[str, str | None] = {
+            "chain_id": str(result.chain.id),
+            "chain_name": result.chain.name,
+            "run_timestamp": datetime.now(UTC).isoformat(),
+            "status": final_status,
+            "input_preview": _preview(result.chain_input),
+            "final_output_preview": _preview(result.final_output_text),
+            "final_step_output_key": result.final_step_output_key,
+        }
+        if result.final_step_id is not None:
+            record["final_step_id"] = str(result.final_step_id)
+        if result.final_step_label is not None:
+            record["final_step_label"] = result.final_step_label
+        return record
+
+    def _record_chain_run_history(self, result: PromptChainRunResult) -> None:
+        records = getattr(self, "_chain_run_history_records", None)
+        if records is None:
+            self._chain_run_history_records = []
+            records = self._chain_run_history_records
+        records.insert(0, self._build_chain_history_record(result))
+        del records[self._chain_run_history_limit :]
+
+    def list_recent_prompt_chain_runs(self, *, limit: int = 20) -> list[dict[str, str | None]]:
+        """Return bounded recent prompt-chain run records in newest-first order."""
+        records = getattr(self, "_chain_run_history_records", [])
+        safe_limit = max(1, int(limit or self._chain_run_history_limit))
+        return list(records[:safe_limit])
 
     # Internal helpers ------------------------------------------------- #
 

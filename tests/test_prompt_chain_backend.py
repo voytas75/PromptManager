@@ -13,9 +13,9 @@ from typing import TYPE_CHECKING
 
 from core.execution import CodexExecutionResult
 from core.litellm_adapter import LiteLLMNotInstalledError
-from core.prompt_manager.chains import PromptChainMixin, PromptChainStepRun
+from core.prompt_manager.chains import PromptChainMixin, PromptChainRunResult, PromptChainStepRun
 from core.prompt_manager.execution_history import ExecutionOutcome
-from models.prompt_chain_model import PromptChainStep
+from models.prompt_chain_model import PromptChain, PromptChainStep
 
 if TYPE_CHECKING:
     import pytest
@@ -147,3 +147,249 @@ def test_chain_summary_returns_none_without_successful_steps() -> None:
     summary = harness._build_chain_summary([failed])
 
     assert summary is None
+
+
+def test_prompt_chain_step_run_exposes_execution_metadata() -> None:
+    chain_id = uuid.uuid4()
+    step = PromptChainStep(
+        id=uuid.uuid4(),
+        chain_id=chain_id,
+        prompt_id=uuid.uuid4(),
+        order_index=1,
+        input_template="{{ body }}",
+        output_variable="draft",
+    )
+    result = CodexExecutionResult(
+        prompt_id=step.prompt_id,
+        request_text="raw request",
+        response_text="raw response",
+        duration_ms=42,
+        usage={},
+        raw_response={},
+    )
+    outcome = ExecutionOutcome(result=result, history_entry=None, conversation=[])
+
+    step_run = PromptChainStepRun(
+        step=step,
+        status="success",
+        outcome=outcome,
+        prompt_name="Draft Prompt",
+        request_text="enriched request",
+        response_text="raw response",
+        duration_ms=42,
+        web_search_requested=True,
+        web_search_applied=True,
+        skip_reason=None,
+    )
+
+    assert step_run.prompt_name == "Draft Prompt"
+    assert step_run.request_text == "enriched request"
+    assert step_run.response_text == "raw response"
+    assert step_run.duration_ms == 42
+    assert step_run.web_search_requested is True
+    assert step_run.web_search_applied is True
+    assert step_run.skip_reason is None
+
+
+def test_prompt_chain_step_run_exposes_human_and_machine_step_identity() -> None:
+    chain_id = uuid.uuid4()
+    step = PromptChainStep(
+        id=uuid.uuid4(),
+        chain_id=chain_id,
+        prompt_id=uuid.uuid4(),
+        order_index=2,
+        input_template="{{ body }}",
+        output_variable="final_draft",
+    )
+
+    step_run = PromptChainStepRun(
+        step=step,
+        status="success",
+        outcome=None,
+        step_label="final_draft",
+        step_output_key="step_2",
+    )
+
+    assert step_run.step_label == "final_draft"
+    assert step_run.step_output_key == "step_2"
+
+
+def test_prompt_chain_run_result_exposes_canonical_machine_outputs_and_final_step_fields() -> None:
+    chain_id = uuid.uuid4()
+    first_step = PromptChainStep(
+        id=uuid.uuid4(),
+        chain_id=chain_id,
+        prompt_id=uuid.uuid4(),
+        order_index=1,
+        input_template="",
+        output_variable="draft",
+    )
+    second_step = PromptChainStep(
+        id=uuid.uuid4(),
+        chain_id=chain_id,
+        prompt_id=uuid.uuid4(),
+        order_index=2,
+        input_template="",
+        output_variable="final",
+    )
+    chain = PromptChain(
+        id=chain_id,
+        name="Contract Chain",
+        description="",
+        steps=[first_step, second_step],
+    )
+    step_runs = [
+        PromptChainStepRun(
+            step=first_step,
+            status="success",
+            outcome=None,
+            step_label="draft",
+            step_output_key="step_1",
+        ),
+        PromptChainStepRun(
+            step=second_step,
+            status="success",
+            outcome=None,
+            step_label="final",
+            step_output_key="step_2",
+        ),
+    ]
+
+    run_result = PromptChainRunResult(
+        chain=chain,
+        chain_input="Seed input",
+        step_outputs={"step_1": "Draft", "step_2": "Final"},
+        steps=step_runs,
+        final_output_text="Final",
+        final_summary_text="Summary",
+        step_aliases={"draft": "step_1", "final": "step_2"},
+        final_step_id=second_step.id,
+        final_step_output_key="step_2",
+        final_step_label="final",
+    )
+
+    assert run_result.step_outputs == {"step_1": "Draft", "step_2": "Final"}
+    assert run_result.step_aliases == {"draft": "step_1", "final": "step_2"}
+    assert run_result.final_step_id == second_step.id
+    assert run_result.final_step_output_key == "step_2"
+    assert run_result.final_step_label == "final"
+
+
+class _ChainHistoryHarness(PromptChainMixin):
+    def __init__(self) -> None:
+        self._chain_run_history_records: list[dict[str, str | None]] = []
+
+    def _record_chain_run_history(self, result: PromptChainRunResult) -> None:
+        super()._record_chain_run_history(result)
+
+    def list_recent_prompt_chain_runs(self, *, limit: int = 20) -> list[dict[str, str | None]]:
+        return super().list_recent_prompt_chain_runs(limit=limit)
+
+
+def test_build_chain_history_record_returns_minimum_bounded_evidence() -> None:
+    harness = _ChainHistoryHarness()
+    chain_id = uuid.uuid4()
+    final_step_id = uuid.uuid4()
+    chain = PromptChain(
+        id=chain_id,
+        name="History Chain",
+        description="",
+        steps=[],
+    )
+    result = PromptChainRunResult(
+        chain=chain,
+        chain_input="Input that should be trimmed into a bounded preview.",
+        step_outputs={"step_1": "Final response that should also be trimmed."},
+        steps=[],
+        final_output_text="Final response that should also be trimmed.",
+        final_step_id=final_step_id,
+        final_step_output_key="step_1",
+        final_step_label="final",
+    )
+
+    record = harness._build_chain_history_record(result)
+
+    assert record["chain_id"] == str(chain_id)
+    assert record["chain_name"] == "History Chain"
+    assert record["status"] == "success"
+    assert record["final_step_output_key"] == "step_1"
+    assert record["final_step_id"] == str(final_step_id)
+    assert record["final_step_label"] == "final"
+    assert isinstance(record["run_timestamp"], str)
+    assert "Input that should be trimmed" in str(record["input_preview"])
+    assert "Final response that should also be trimmed" in str(record["final_output_preview"])
+    assert "steps" not in record
+    assert "step_outputs" not in record
+    assert "request_text" not in record
+    assert "response_text" not in record
+
+
+def test_record_chain_run_history_stores_newest_first_and_bounded_retention() -> None:
+    harness = _ChainHistoryHarness()
+    for index in range(25):
+        chain = PromptChain(
+            id=uuid.uuid4(),
+            name=f"Chain {index}",
+            description="",
+            steps=[],
+        )
+        result = PromptChainRunResult(
+            chain=chain,
+            chain_input=f"input {index}",
+            step_outputs={f"step_{index}": f"output {index}"},
+            steps=[],
+            final_output_text=f"output {index}",
+            final_step_output_key=f"step_{index}",
+        )
+        harness._record_chain_run_history(result)
+
+    recent = harness.list_recent_prompt_chain_runs(limit=20)
+
+    assert len(recent) == 20
+    assert recent[0]["chain_name"] == "Chain 24"
+    assert recent[-1]["chain_name"] == "Chain 5"
+
+
+def test_prompt_chain_run_result_exposes_step_metadata_in_order() -> None:
+    chain_id = uuid.uuid4()
+    step = PromptChainStep(
+        id=uuid.uuid4(),
+        chain_id=chain_id,
+        prompt_id=uuid.uuid4(),
+        order_index=1,
+        input_template="{{ body }}",
+        output_variable="draft",
+    )
+    chain = PromptChain(
+        id=chain_id,
+        name="Metadata Chain",
+        description="",
+        steps=[step],
+    )
+    step_run = PromptChainStepRun(
+        step=step,
+        status="failed",
+        outcome=None,
+        error="boom",
+        prompt_name="Draft Prompt",
+        request_text="attempted request",
+        response_text=None,
+        duration_ms=None,
+        web_search_requested=True,
+        web_search_applied=False,
+        skip_reason="Web search unavailable",
+    )
+
+    run_result = PromptChainRunResult(
+        chain=chain,
+        chain_input="input",
+        step_outputs={},
+        steps=[step_run],
+        final_output_text=None,
+        final_summary_text=None,
+    )
+
+    assert run_result.steps[0].prompt_name == "Draft Prompt"
+    assert run_result.steps[0].web_search_requested is True
+    assert run_result.steps[0].web_search_applied is False
+    assert run_result.steps[0].skip_reason == "Web search unavailable"
