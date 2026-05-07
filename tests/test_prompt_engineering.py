@@ -3,31 +3,51 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
 from core.prompt_engineering import PromptEngineer, PromptEngineeringError
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+
+type _CompletionPayload = dict[str, object]
+type _CompletionResponse = dict[str, list[dict[str, dict[str, str]]]]
+
+
+def _get_completion_factory(
+    completion: Callable[..., object],
+) -> Callable[[], tuple[Callable[..., object], type[Exception]]]:
+    def _factory() -> tuple[Callable[..., object], type[Exception]]:
+        return completion, Exception
+
+    return _factory
+
+
+def _completion_response(payload: _CompletionPayload) -> _CompletionResponse:
+    return {"choices": [{"message": {"content": json.dumps(payload)}}]}
+
 
 def test_prompt_engineer_refine_returns_result(monkeypatch: pytest.MonkeyPatch) -> None:
     captured_request: dict[str, Any] = {}
 
-    def _fake_completion(**kwargs):
+    def _fake_completion(**kwargs: object) -> _CompletionResponse:
         nonlocal captured_request
-        captured_request = kwargs
-        payload = {
+        captured_request = dict(kwargs)
+        payload: _CompletionPayload = {
             "analysis": "Prompt rewritten for clarity.",
             "improved_prompt": "Improved prompt text",
             "checklist": ["Clarity ensured"],
             "warnings": ["Provide API key"],
             "confidence": 0.8,
         }
-        return {"choices": [{"message": {"content": json.dumps(payload)}}]}
+        return _completion_response(payload)
 
     monkeypatch.setattr(
         "core.prompt_engineering.get_completion",
-        lambda: (_fake_completion, Exception),
+        _get_completion_factory(_fake_completion),
     )
 
     engineer = PromptEngineer(model="gpt-4o-mini", temperature=0.1)
@@ -45,16 +65,18 @@ def test_prompt_engineer_refine_returns_result(monkeypatch: pytest.MonkeyPatch) 
     assert result.warnings == ["Provide API key"]
     assert 0.79 < result.confidence < 0.81
     assert captured_request["model"] == "gpt-4o-mini"
-    assert captured_request["top_p"] == pytest.approx(0.9)
+    top_p = captured_request["top_p"]
+    assert isinstance(top_p, float)
+    assert abs(top_p - 0.9) < 1e-9
 
 
 def test_prompt_engineer_raises_on_invalid_json(monkeypatch: pytest.MonkeyPatch) -> None:
-    def _fake_completion(**kwargs):  # noqa: ARG001
+    def _fake_completion(**kwargs: object) -> _CompletionResponse:  # noqa: ARG001
         return {"choices": [{"message": {"content": "not-json"}}]}
 
     monkeypatch.setattr(
         "core.prompt_engineering.get_completion",
-        lambda: (_fake_completion, Exception),
+        _get_completion_factory(_fake_completion),
     )
 
     engineer = PromptEngineer(model="gpt-4o-mini")
@@ -63,7 +85,7 @@ def test_prompt_engineer_raises_on_invalid_json(monkeypatch: pytest.MonkeyPatch)
 
 
 def test_prompt_engineer_handles_code_fence(monkeypatch: pytest.MonkeyPatch) -> None:
-    payload = {
+    payload: _CompletionPayload = {
         "analysis": "All good",
         "improved_prompt": "Improved",
         "checklist": [],
@@ -71,13 +93,13 @@ def test_prompt_engineer_handles_code_fence(monkeypatch: pytest.MonkeyPatch) -> 
         "confidence": 0.5,
     }
 
-    def _fake_completion(**kwargs):  # noqa: ARG001
+    def _fake_completion(**kwargs: object) -> _CompletionResponse:  # noqa: ARG001
         content = "```json\n" + json.dumps(payload) + "\n```"
         return {"choices": [{"message": {"content": content}}]}
 
     monkeypatch.setattr(
         "core.prompt_engineering.get_completion",
-        lambda: (_fake_completion, Exception),
+        _get_completion_factory(_fake_completion),
     )
 
     engineer = PromptEngineer(model="gpt-4o-mini")
@@ -87,7 +109,7 @@ def test_prompt_engineer_handles_code_fence(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def test_prompt_engineer_supports_object_choices(monkeypatch: pytest.MonkeyPatch) -> None:
-    payload = {
+    payload: _CompletionPayload = {
         "analysis": "ok",
         "improved_prompt": "Improved prompt",
         "checklist": [],
@@ -103,12 +125,12 @@ def test_prompt_engineer_supports_object_choices(monkeypatch: pytest.MonkeyPatch
         def __init__(self, content: str) -> None:
             self.choices = [_Choice(content)]
 
-    def _fake_completion(**kwargs):  # noqa: ARG001
+    def _fake_completion(**kwargs: object) -> _Response:  # noqa: ARG001
         return _Response(json.dumps(payload))
 
     monkeypatch.setattr(
         "core.prompt_engineering.get_completion",
-        lambda: (_fake_completion, Exception),
+        _get_completion_factory(_fake_completion),
     )
 
     engineer = PromptEngineer(model="gpt-4o-mini")
@@ -120,7 +142,7 @@ def test_prompt_engineer_supports_object_choices(monkeypatch: pytest.MonkeyPatch
 def test_prompt_engineer_supports_structured_message_content(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    payload = {
+    payload: _CompletionPayload = {
         "analysis": "analysis",
         "improved_prompt": "Improved structured",
         "checklist": ["clarity"],
@@ -145,14 +167,14 @@ def test_prompt_engineer_supports_structured_message_content(
         def __init__(self, choice: _Choice) -> None:
             self.choices = [choice]
 
-    def _fake_completion(**kwargs):  # noqa: ARG001
+    def _fake_completion(**kwargs: object) -> _Response:  # noqa: ARG001
         part = _ContentPart(json.dumps(payload))
         message = _Message([part])
         return _Response(_Choice(message))
 
     monkeypatch.setattr(
         "core.prompt_engineering.get_completion",
-        lambda: (_fake_completion, Exception),
+        _get_completion_factory(_fake_completion),
     )
 
     engineer = PromptEngineer(model="gpt-4o-mini")
@@ -162,7 +184,7 @@ def test_prompt_engineer_supports_structured_message_content(
 
 
 def test_prompt_engineer_parses_json_with_preamble(monkeypatch: pytest.MonkeyPatch) -> None:
-    payload = {
+    payload: _CompletionPayload = {
         "analysis": "analysis",
         "improved_prompt": "Improved after notes",
         "checklist": ["clarity"],
@@ -174,12 +196,12 @@ def test_prompt_engineer_parses_json_with_preamble(monkeypatch: pytest.MonkeyPat
         f"Notes:\n- Ensure coverage\n\nRefined payload follows:\n{json.dumps(payload)}\nThanks!"
     )
 
-    def _fake_completion(**kwargs):  # noqa: ARG001
+    def _fake_completion(**kwargs: object) -> _CompletionResponse:  # noqa: ARG001
         return {"choices": [{"message": {"content": response_text}}]}
 
     monkeypatch.setattr(
         "core.prompt_engineering.get_completion",
-        lambda: (_fake_completion, Exception),
+        _get_completion_factory(_fake_completion),
     )
 
     engineer = PromptEngineer(model="gpt-4o-mini")
@@ -194,12 +216,12 @@ def test_prompt_engineer_error_includes_payload(monkeypatch: pytest.MonkeyPatch)
         def __init__(self) -> None:
             self.data = "no choices"
 
-    def _fake_completion(**kwargs):  # noqa: ARG001
+    def _fake_completion(**kwargs: object) -> _Response:  # noqa: ARG001
         return _Response()
 
     monkeypatch.setattr(
         "core.prompt_engineering.get_completion",
-        lambda: (_fake_completion, Exception),
+        _get_completion_factory(_fake_completion),
     )
 
     engineer = PromptEngineer(model="gpt-4o-mini")
