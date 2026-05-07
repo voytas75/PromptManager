@@ -1,13 +1,12 @@
 """Tests for prompt sharing helpers.
 
 Updates:
+  v0.1.4 - 2026-05-07 - Tighten PrivateBin sharing test typing.
   v0.1.3 - 2025-12-12 - Cover retry behaviour for transient share provider failures.
   v0.1.2 - 2025-12-10 - Cover prompt formatting helper and PrivateBin URL validation.
   v0.1.1 - 2025-12-07 - Cover PrivateBin provider payload construction and error handling.
   v0.1.0 - 2025-12-07 - Cover shared footer helper for prompts and results.
 """
-
-from __future__ import annotations
 
 import json
 
@@ -19,7 +18,6 @@ from core.exceptions import ShareProviderError
 from core.sharing import (
     PrivateBinProvider,
     RentryProvider,
-    _normalise_privatebin_base_url,
     append_share_footer,
     format_prompt_for_share,
 )
@@ -34,6 +32,39 @@ class _DummyHttpxResponse:
 
     def json(self) -> dict[str, object]:
         return self._data
+
+
+class _ErrorResponse:
+    def raise_for_status(self) -> None:
+        return None
+
+    def json(self) -> dict[str, object]:
+        return {"status": 1, "message": "rate limited"}
+
+
+class _RetryResponse:
+    def __init__(self, status_code: int, payload: dict[str, object] | None = None) -> None:
+        self._status_code = status_code
+        self._payload = payload or {}
+
+    def raise_for_status(self) -> None:
+        if self._status_code < 400:
+            return None
+        request = httpx.Request("POST", "https://bin.example/secure/")
+        response = httpx.Response(self._status_code, request=request)
+        raise httpx.HTTPStatusError("error", request=request, response=response)
+
+    def json(self) -> dict[str, object]:
+        return self._payload
+
+
+class _StaticBytes:
+    def __call__(self, size: int) -> bytes:
+        return bytes([size]) * size
+
+
+def _base58_encoded(_: bytes) -> str:
+    return "encoded-key"
 
 
 def test_append_share_footer_appends_metadata_block(monkeypatch: MonkeyPatch) -> None:
@@ -91,8 +122,8 @@ def test_privatebin_provider_uploads_payload(monkeypatch: MonkeyPatch) -> None:
         return _DummyResponse()
 
     monkeypatch.setattr("core.sharing.httpx.post", fake_post)
-    monkeypatch.setattr("core.sharing.secrets.token_bytes", lambda size: bytes([size]) * size)
-    monkeypatch.setattr("core.sharing._base58_encode", lambda _: "encoded-key")
+    monkeypatch.setattr("core.sharing.secrets.token_bytes", _StaticBytes())
+    monkeypatch.setattr("core.sharing._base58_encode", _base58_encoded)
 
     provider = PrivateBinProvider(
         base_url="https://bin.example/secure/",
@@ -121,17 +152,15 @@ def test_privatebin_provider_uploads_payload(monkeypatch: MonkeyPatch) -> None:
     assert headers["X-Requested-With"] == "JSONHttpRequest"
 
 
+def _post_error(*_args: object, **_kwargs: object) -> _ErrorResponse:
+    del _args, _kwargs
+    return _ErrorResponse()
+
+
 def test_privatebin_provider_handles_error(monkeypatch: MonkeyPatch) -> None:
     """Raise a ShareProviderError when PrivateBin rejects the request."""
 
-    class _ErrorResponse:
-        def raise_for_status(self) -> None:
-            return None
-
-        def json(self) -> dict[str, object]:
-            return {"status": 1, "message": "rate limited"}
-
-    monkeypatch.setattr("core.sharing.httpx.post", lambda *_, **__: _ErrorResponse())
+    monkeypatch.setattr("core.sharing.httpx.post", _post_error)
 
     provider = PrivateBinProvider()
 
@@ -141,35 +170,25 @@ def test_privatebin_provider_handles_error(monkeypatch: MonkeyPatch) -> None:
     assert "rate limited" in str(excinfo.value)
 
 
+def _no_sleep(_seconds: float) -> None:
+    return None
+
+
 def test_privatebin_provider_retries_transient_http_failures(monkeypatch: MonkeyPatch) -> None:
     """Retry transient HTTP failures when posting to PrivateBin."""
     calls: list[int] = []
 
-    class _DummyResponse:
-        def __init__(self, status_code: int, payload: dict[str, object] | None = None) -> None:
-            self._status_code = status_code
-            self._payload = payload or {}
-
-        def raise_for_status(self) -> None:
-            if self._status_code < 400:
-                return None
-            request = httpx.Request("POST", "https://bin.example/secure/")
-            response = httpx.Response(self._status_code, request=request)
-            raise httpx.HTTPStatusError("error", request=request, response=response)
-
-        def json(self) -> dict[str, object]:
-            return self._payload
-
-    def fake_post(*_: object, **__: object) -> _DummyResponse:
+    def fake_post(*_args: object, **_kwargs: object) -> _RetryResponse:
+        del _args, _kwargs
         calls.append(1)
         if len(calls) == 1:
-            return _DummyResponse(503)
-        return _DummyResponse(200, {"status": 0, "id": "abc123", "deletetoken": "del-token"})
+            return _RetryResponse(503)
+        return _RetryResponse(200, {"status": 0, "id": "abc123", "deletetoken": "del-token"})
 
-    monkeypatch.setattr("core.retry.time.sleep", lambda _: None)
+    monkeypatch.setattr("core.retry.time.sleep", _no_sleep)
     monkeypatch.setattr("core.sharing.httpx.post", fake_post)
-    monkeypatch.setattr("core.sharing.secrets.token_bytes", lambda size: bytes([size]) * size)
-    monkeypatch.setattr("core.sharing._base58_encode", lambda _: "encoded-key")
+    monkeypatch.setattr("core.sharing.secrets.token_bytes", _StaticBytes())
+    monkeypatch.setattr("core.sharing._base58_encode", _base58_encoded)
 
     provider = PrivateBinProvider(
         base_url="https://bin.example/secure/",
@@ -196,7 +215,7 @@ def test_rentry_provider_creates_entry(monkeypatch: MonkeyPatch) -> None:
             self.cookies = httpx.Cookies()
             self._csrf_seeded = False
 
-        def __enter__(self) -> _DummyClient:
+        def __enter__(self) -> "_DummyClient":
             return self
 
         def __exit__(self, *_: object) -> None:
@@ -244,7 +263,7 @@ def test_rentry_provider_requires_csrf(monkeypatch: MonkeyPatch) -> None:
         def __init__(self, **_: object) -> None:
             self.cookies = httpx.Cookies()
 
-        def __enter__(self) -> _TokenlessClient:
+        def __enter__(self) -> "_TokenlessClient":
             return self
 
         def __exit__(self, *_: object) -> None:
@@ -304,11 +323,32 @@ def test_format_prompt_for_share_includes_sections(monkeypatch: MonkeyPatch) -> 
     )
 
 
-def test_normalise_privatebin_base_url_adds_trailing_slash() -> None:
+def test_normalise_privatebin_base_url_adds_trailing_slash(monkeypatch: MonkeyPatch) -> None:
     """Normalise base URLs and reject missing schemes."""
 
-    normalised = _normalise_privatebin_base_url("https://pb.local/nested")
-    assert normalised == "https://pb.local/nested/"
+    captured: dict[str, object] = {}
 
-    with pytest.raises(ValueError):
-        _normalise_privatebin_base_url("pb.local")
+    def fake_post(
+        url: str,
+        *,
+        content: bytes,
+        headers: dict[str, str],
+        timeout: float,
+    ) -> _DummyHttpxResponse:
+        captured["url"] = url
+        captured["content"] = content
+        captured["headers"] = headers
+        captured["timeout"] = timeout
+        return _DummyHttpxResponse({"status": 0, "id": "abc123", "deletetoken": "del-token"})
+
+    monkeypatch.setattr("core.sharing.httpx.post", fake_post)
+    monkeypatch.setattr("core.sharing.secrets.token_bytes", _StaticBytes())
+    monkeypatch.setattr("core.sharing._base58_encode", _base58_encoded)
+
+    provider = PrivateBinProvider(base_url="https://pb.local/nested")
+    result = provider.share("Payload body", prompt=None)
+    assert captured["url"] == "https://pb.local/nested/"
+    assert result.url.startswith("https://pb.local/nested/?")
+
+    with pytest.raises(ShareProviderError):
+        PrivateBinProvider(base_url="pb.local")
