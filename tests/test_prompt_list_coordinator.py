@@ -9,9 +9,13 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import cast
+from typing import TYPE_CHECKING, Any, cast
 
 from core import PromptManagerError
+
+if TYPE_CHECKING:
+    from core import PromptManager
+    from gui.widgets import PromptFilterPanel
 from gui.prompt_list_coordinator import PromptListCoordinator
 from models.prompt_model import Prompt
 
@@ -66,6 +70,14 @@ class _FilterPanelStub:
         return self._min_quality
 
 
+def _build_coordinator(manager: _ManagerStub) -> PromptListCoordinator:
+    return PromptListCoordinator(cast("PromptManager", cast("Any", manager)))
+
+
+def _panel_stub(panel: _FilterPanelStub) -> PromptFilterPanel:
+    return cast("PromptFilterPanel", cast("Any", panel))
+
+
 def _prompt(name: str, *, is_favorite: bool) -> Prompt:
     return Prompt(
         id=uuid.uuid4(),
@@ -84,7 +96,7 @@ def test_fetch_prompts_keeps_search_mode_for_no_match_results() -> None:
     manager = _ManagerStub()
     manager.repository = _RepositoryStub([_prompt("Alpha", is_favorite=True)])
     manager.search_results = []
-    coordinator = PromptListCoordinator(cast("object", manager))
+    coordinator = _build_coordinator(manager)
 
     result = coordinator.fetch_prompts("rollback")
 
@@ -99,7 +111,7 @@ def test_fetch_prompts_records_search_errors_without_faking_empty_results() -> N
     manager = _ManagerStub()
     manager.repository = _RepositoryStub([_prompt("Alpha", is_favorite=True)])
     manager.search_error = PromptManagerError("search backend down")
-    coordinator = PromptListCoordinator(cast("object", manager))
+    coordinator = _build_coordinator(manager)
 
     result = coordinator.fetch_prompts("rollback")
 
@@ -114,7 +126,7 @@ def test_fetch_prompts_exposes_operator_state_for_no_match_search() -> None:
     manager = _ManagerStub()
     manager.repository = _RepositoryStub([_prompt("Alpha", is_favorite=True)])
     manager.search_results = []
-    coordinator = PromptListCoordinator(cast("object", manager))
+    coordinator = _build_coordinator(manager)
 
     result = coordinator.fetch_prompts("rollback")
 
@@ -126,7 +138,7 @@ def test_fetch_prompts_exposes_operator_state_for_search_errors() -> None:
     manager = _ManagerStub()
     manager.repository = _RepositoryStub([_prompt("Alpha", is_favorite=True)])
     manager.search_error = PromptManagerError("search backend down")
-    coordinator = PromptListCoordinator(cast("object", manager))
+    coordinator = _build_coordinator(manager)
 
     result = coordinator.fetch_prompts("rollback")
 
@@ -137,7 +149,7 @@ def test_fetch_prompts_exposes_operator_state_for_default_catalog() -> None:
     """Blank search should expose the ordinary catalog posture instead of a search-state cue."""
     manager = _ManagerStub()
     manager.repository = _RepositoryStub([_prompt("Alpha", is_favorite=True)])
-    coordinator = PromptListCoordinator(cast("object", manager))
+    coordinator = _build_coordinator(manager)
 
     result = coordinator.fetch_prompts("")
 
@@ -146,21 +158,21 @@ def test_fetch_prompts_exposes_operator_state_for_default_catalog() -> None:
 
 def test_apply_filters_keeps_only_favorite_prompts_when_requested() -> None:
     """Favorites-only filtering should exclude non-favorite prompts from the list."""
-    coordinator = PromptListCoordinator(cast("object", _ManagerStub()))
+    coordinator = _build_coordinator(_ManagerStub())
     prompts = [_prompt("Alpha", is_favorite=True), _prompt("Beta", is_favorite=False)]
     panel = _FilterPanelStub(favorites_only=True)
 
-    filtered = coordinator.apply_filters(cast("object", panel), prompts)
+    filtered = coordinator.apply_filters(_panel_stub(panel), prompts)
 
     assert [prompt.name for prompt in filtered] == ["Alpha"]
 
 
 def test_apply_filters_leaves_existing_results_unchanged_when_favorites_disabled() -> None:
     """The added favorite filter should stay inert when the checkbox is off."""
-    coordinator = PromptListCoordinator(cast("object", _ManagerStub()))
+    coordinator = _build_coordinator(_ManagerStub())
     prompts = [_prompt("Alpha", is_favorite=True), _prompt("Beta", is_favorite=False)]
     panel = _FilterPanelStub(favorites_only=False)
 
-    filtered = coordinator.apply_filters(cast("object", panel), prompts)
+    filtered = coordinator.apply_filters(_panel_stub(panel), prompts)
 
     assert [prompt.name for prompt in filtered] == ["Alpha", "Beta"]
