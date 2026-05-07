@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 from types import SimpleNamespace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from core.execution import CodexExecutionResult
 from core.litellm_adapter import LiteLLMNotInstalledError
@@ -18,7 +18,13 @@ from core.prompt_manager.execution_history import ExecutionOutcome
 from models.prompt_chain_model import PromptChain, PromptChainStep
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping
+
     import pytest
+
+
+type _LitePayload = dict[str, list[dict[str, dict[str, str]]]]
+type _LiteExceptionFactory = Callable[[], tuple[Callable[..., object | None], type[Exception]]]
 
 
 class _ChainSummaryHarness(PromptChainMixin):
@@ -35,6 +41,31 @@ class _ChainSummaryHarness(PromptChainMixin):
             timeout_seconds=5,
             drop_params=None,
         )
+
+    def build_chain_summary(self, step_runs: list[PromptChainStepRun]) -> str | None:
+        return self._build_chain_summary(step_runs)
+
+
+def _fake_litellm_factory(
+    completion: Callable[..., object | None],
+    error_type: type[Exception],
+) -> _LiteExceptionFactory:
+    def _factory() -> tuple[Callable[..., object | None], type[Exception]]:
+        return completion, error_type
+
+    return _factory
+
+
+def _messages_from_request(request: object) -> list[Mapping[str, object]]:
+    typed_request = cast("Mapping[str, object]", request)
+    return cast("list[Mapping[str, object]]", typed_request["messages"])
+
+
+def _set_prompt_templates(
+    harness: _ChainSummaryHarness,
+    templates: dict[str, str],
+) -> None:
+    cast("Any", harness)._prompt_templates = templates
 
 
 def _step_run(
@@ -74,10 +105,17 @@ def test_chain_summary_prefers_litellm_last_step(monkeypatch: pytest.MonkeyPatch
     class _FakeLiteError(Exception):
         pass
 
-    def fake_get_completion():  # noqa: ANN202 - helper for monkeypatch
-        return (lambda **_kwargs: None, _FakeLiteError)
+    def _completion(**_kwargs: object) -> None:
+        return None
 
-    def fake_call_completion(request, *_args, **_kwargs):  # noqa: ANN202 - helper stub
+    def fake_get_completion() -> tuple[Callable[..., object | None], type[Exception]]:
+        return _fake_litellm_factory(_completion, _FakeLiteError)()
+
+    def fake_call_completion(
+        request: object,
+        *_args: object,
+        **_kwargs: object,
+    ) -> _LitePayload:
         captured["request"] = request
         return {"choices": [{"message": {"content": "LLM summary text"}}]}
 
@@ -90,14 +128,15 @@ def test_chain_summary_prefers_litellm_last_step(monkeypatch: pytest.MonkeyPatch
     first = _step_run(1, "Initial output.")
     final = _step_run(2, "Final output to summarise.")
 
-    summary = harness._build_chain_summary([first, final])
+    summary = harness.build_chain_summary([first, final])
 
     assert summary == "LLM summary text"
     assert "request" in captured
-    request = captured["request"]
+    request = cast("dict[str, object]", captured["request"])
     assert isinstance(request, dict)
     assert request.get("model") == "fast-model"
-    user_prompt = request["messages"][1]["content"]  # type: ignore[index]
+    messages = _messages_from_request(request)
+    user_prompt = messages[1]["content"]
     assert user_prompt == "Final output to summarise."
 
 
@@ -105,13 +144,20 @@ def test_chain_summary_respects_prompt_template_override(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     harness = _ChainSummaryHarness()
-    harness._prompt_templates = {"chain_summary": "Override summary prompt."}
+    _set_prompt_templates(harness, {"chain_summary": "Override summary prompt."})
     captured: dict[str, object] = {}
 
-    def fake_get_completion():  # noqa: ANN202 - helper for monkeypatch
-        return (lambda **_kwargs: None, Exception)
+    def _completion(**_kwargs: object) -> None:
+        return None
 
-    def fake_call_completion(request, *_args, **_kwargs):  # noqa: ANN202
+    def fake_get_completion() -> tuple[Callable[..., object | None], type[Exception]]:
+        return _fake_litellm_factory(_completion, Exception)()
+
+    def fake_call_completion(
+        request: object,
+        *_args: object,
+        **_kwargs: object,
+    ) -> _LitePayload:
         captured["request"] = request
         return {"choices": [{"message": {"content": "Result"}}]}
 
@@ -121,21 +167,21 @@ def test_chain_summary_respects_prompt_template_override(
         fake_call_completion,
     )
 
-    harness._build_chain_summary([_step_run(1, "Content")])
-    request = captured["request"]
-    messages = request["messages"]  # type: ignore[index]
+    harness.build_chain_summary([_step_run(1, "Content")])
+    request = cast("dict[str, object]", captured["request"])
+    messages = _messages_from_request(request)
     assert messages[0]["content"] == "Override summary prompt."
 
 
 def test_chain_summary_falls_back_without_litellm(monkeypatch: pytest.MonkeyPatch) -> None:
     harness = _ChainSummaryHarness()
 
-    def fake_get_completion():  # noqa: ANN202 - helper for monkeypatch
+    def fake_get_completion() -> tuple[Callable[..., object | None], type[Exception]]:
         raise LiteLLMNotInstalledError("liteLLM missing")
 
     monkeypatch.setattr("core.prompt_manager.chains.get_completion", fake_get_completion)
 
-    summary = harness._build_chain_summary([_step_run(1, "Short final response.")])
+    summary = harness.build_chain_summary([_step_run(1, "Short final response.")])
 
     assert summary == "Short final response."
 
@@ -144,7 +190,7 @@ def test_chain_summary_returns_none_without_successful_steps() -> None:
     harness = _ChainSummaryHarness()
     failed = _step_run(1, "", status="failed")
 
-    summary = harness._build_chain_summary([failed])
+    summary = harness.build_chain_summary([failed])
 
     assert summary is None
 
@@ -347,8 +393,14 @@ class _ChainHistoryHarness(PromptChainMixin):
     def __init__(self) -> None:
         self._chain_run_history_records: list[dict[str, str | None]] = []
 
-    def _record_chain_run_history(self, result: PromptChainRunResult) -> None:
-        super()._record_chain_run_history(result)
+    def build_chain_history_record(
+        self,
+        result: PromptChainRunResult,
+    ) -> dict[str, str | None]:
+        return self._build_chain_history_record(result)
+
+    def record_chain_run_history(self, result: PromptChainRunResult) -> None:
+        self._record_chain_run_history(result)
 
     def list_recent_prompt_chain_runs(self, *, limit: int = 20) -> list[dict[str, str | None]]:
         return super().list_recent_prompt_chain_runs(limit=limit)
@@ -375,7 +427,7 @@ def test_build_chain_history_record_returns_minimum_bounded_evidence() -> None:
         final_step_label="final",
     )
 
-    record = harness._build_chain_history_record(result)
+    record = harness.build_chain_history_record(result)
 
     assert record["chain_id"] == str(chain_id)
     assert record["chain_name"] == "History Chain"
@@ -410,7 +462,7 @@ def test_build_chain_history_record_prefers_backend_run_status() -> None:
         final_step_output_key="step_1",
     )
 
-    record = harness._build_chain_history_record(result)
+    record = harness.build_chain_history_record(result)
 
     assert record["status"] == "partial_success"
 
@@ -433,7 +485,7 @@ def test_list_recent_prompt_chain_runs_normalizes_zero_limit_to_one() -> None:
             run_status="success",
             final_step_output_key=f"step_{index}",
         )
-        harness._record_chain_run_history(result)
+        harness.record_chain_run_history(result)
 
     recent = harness.list_recent_prompt_chain_runs(limit=0)
 
@@ -458,7 +510,7 @@ def test_record_chain_run_history_stores_newest_first_and_bounded_retention() ->
             final_output_text=f"output {index}",
             final_step_output_key=f"step_{index}",
         )
-        harness._record_chain_run_history(result)
+        harness.record_chain_run_history(result)
 
     recent = harness.list_recent_prompt_chain_runs(limit=20)
 

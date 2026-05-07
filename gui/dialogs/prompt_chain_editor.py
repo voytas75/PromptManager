@@ -69,10 +69,12 @@ class PromptChainEditorDialog(QDialog):
         layout = QVBoxLayout(self)
         form = QFormLayout()
         self._name_input = QLineEdit(self)
+        self._name_input.setObjectName("promptChainEditorNameInput")
         self._name_input.setPlaceholderText("e.g. Content Review Flow")
         self._add_form_row(form, "Name", self._name_input, "Friendly chain label shown in lists.")
 
         self._description_input = QPlainTextEdit(self)
+        self._description_input.setObjectName("promptChainEditorDescriptionInput")
         self._description_input.setPlaceholderText("Describe what the chain does…")
         self._add_form_row(
             form,
@@ -96,6 +98,7 @@ class PromptChainEditorDialog(QDialog):
         form.addRow("Active", self._active_checkbox)
 
         self._summarize_checkbox = QCheckBox("Summarize final step output", self)
+        self._summarize_checkbox.setObjectName("promptChainEditorSummarizeCheckbox")
         self._summarize_checkbox.setChecked(True)
         self._add_form_row(
             form,
@@ -106,6 +109,7 @@ class PromptChainEditorDialog(QDialog):
         layout.addLayout(form)
 
         self._steps_table = QTableWidget(0, 3, self)
+        self._steps_table.setObjectName("promptChainEditorStepsTable")
         self._steps_table.setHorizontalHeaderLabels(["Order", "Prompt", "Failure handling"])
         self._steps_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self._steps_table.itemDoubleClicked.connect(self._handle_step_double_click)  # type: ignore[arg-type]
@@ -113,6 +117,7 @@ class PromptChainEditorDialog(QDialog):
         layout.addWidget(self._steps_table, 1)
 
         self._warning_label = QLabel("", self)
+        self._warning_label.setObjectName("promptChainEditorWarningLabel")
         self._warning_label.setWordWrap(True)
         self._warning_label.setStyleSheet("color: #b26a00;")
         layout.addWidget(self._warning_label)
@@ -135,10 +140,12 @@ class PromptChainEditorDialog(QDialog):
         step_actions.addWidget(self._duplicate_step_button)
 
         self._move_step_up_button = QPushButton("Move Up", self)
+        self._move_step_up_button.setObjectName("promptChainEditorMoveStepUpButton")
         self._move_step_up_button.clicked.connect(self._move_selected_step_up)  # type: ignore[arg-type]
         step_actions.addWidget(self._move_step_up_button)
 
         self._move_step_down_button = QPushButton("Move Down", self)
+        self._move_step_down_button.setObjectName("promptChainEditorMoveStepDownButton")
         self._move_step_down_button.clicked.connect(self._move_selected_step_down)  # type: ignore[arg-type]
         step_actions.addWidget(self._move_step_down_button)
         step_actions.addStretch(1)
@@ -159,6 +166,47 @@ class PromptChainEditorDialog(QDialog):
     def result_chain(self) -> PromptChain | None:
         """Return the saved chain instance when available."""
         return self._result_chain
+
+    def chain_id(self) -> uuid.UUID:
+        """Return the active chain identifier for tests and callers."""
+        return self._chain_id
+
+    def set_steps(self, steps: list[PromptChainStep]) -> None:
+        """Replace the current steps and refresh the rendered table."""
+        self._steps = list(steps)
+        self._refresh_steps()
+
+    def steps(self) -> list[PromptChainStep]:
+        """Return a copy of the current step list."""
+        return list(self._steps)
+
+    def accept_chain(self) -> None:
+        """Public wrapper for validating and accepting the dialog."""
+        self._handle_accept()
+
+    def refresh_steps(self) -> None:
+        """Public wrapper for refreshing the rendered steps table."""
+        self._refresh_steps()
+
+    def move_selected_step_up(self) -> None:
+        """Public wrapper for moving the selected step upward."""
+        self._move_selected_step_up()
+
+    def move_selected_step_down(self) -> None:
+        """Public wrapper for moving the selected step downward."""
+        self._move_selected_step_down()
+
+    def update_step_action_state(self) -> None:
+        """Public wrapper for recalculating action button enabled state."""
+        self._update_step_action_state()
+
+    def open_step_preview(self, item: QTableWidgetItem) -> None:
+        """Public wrapper for the prompt preview flow triggered from the steps table."""
+        self._handle_step_double_click(item)
+
+    def duplicate_selected_step(self) -> None:
+        """Public wrapper for duplicating the selected step."""
+        self._duplicate_selected_step()
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -405,6 +453,7 @@ class PromptChainStepDialog(QDialog):
         self._add_step_row(layout, "Order", self._order_input, "Determines the execution sequence.")
 
         self._prompt_combo = QComboBox(self)
+        self._prompt_combo.setObjectName("promptChainStepPromptCombo")
         self._prompt_combo.setEditable(True)
         self._prompt_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         self._prompt_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
@@ -417,6 +466,7 @@ class PromptChainStepDialog(QDialog):
         )
 
         self._prompt_preview = QPlainTextEdit(self)
+        self._prompt_preview.setObjectName("promptChainStepPromptPreview")
         self._prompt_preview.setReadOnly(True)
         self._prompt_preview.setMaximumBlockCount(0)
         self._prompt_preview.setPlaceholderText("Prompt preview will appear here.")
@@ -457,6 +507,14 @@ class PromptChainStepDialog(QDialog):
         """Return the saved step when available."""
         return self._result_step
 
+    def prompt_combo(self) -> QComboBox:
+        """Expose the prompt selector for tests and callers."""
+        return self._prompt_combo
+
+    def prompt_preview_text(self) -> str:
+        """Return the current prompt preview body."""
+        return self._prompt_preview.toPlainText()
+
     def _populate_prompt_combo(self) -> None:
         if not self._prompt_options:
             self._prompt_combo.addItem("Enter prompt ID…")
@@ -491,8 +549,7 @@ class PromptChainStepDialog(QDialog):
         )
         if prompt is None:
             self._prompt_preview.setPlainText(
-                f"Prompt ID: {prompt_id_text}\n\n"
-                "Prompt body not available in the current catalog."
+                f"Prompt ID: {prompt_id_text}\n\nPrompt body not available in the current catalog."
             )
             return
         body = (prompt.context or prompt.description or "").strip()

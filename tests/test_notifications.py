@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import pytest
 
-from core.notifications import NotificationCenter, NotificationLevel, NotificationStatus
+from core.notifications import (
+    Notification,
+    NotificationCenter,
+    NotificationLevel,
+    NotificationStatus,
+)
 
 
 def test_track_task_publishes_start_and_success() -> None:
     center = NotificationCenter()
-    events = []
+    events: list[Notification] = []
 
     center.subscribe(events.append)
 
@@ -30,7 +35,7 @@ def test_track_task_publishes_start_and_success() -> None:
 
 def test_track_task_failure_includes_exception() -> None:
     center = NotificationCenter()
-    failure_events = []
+    failure_events: list[Notification] = []
     center.subscribe(failure_events.append)
 
     with pytest.raises(RuntimeError, match="boom"):
@@ -50,7 +55,7 @@ def test_track_task_failure_includes_exception() -> None:
 
 def test_subscription_can_be_closed() -> None:
     center = NotificationCenter()
-    events = []
+    events: list[Notification] = []
     subscription = center.subscribe(events.append)
     subscription.close()
 

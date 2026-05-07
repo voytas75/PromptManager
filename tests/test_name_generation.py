@@ -4,6 +4,9 @@ Updates:
   v0.1.1 - 2025-12-01 - Cover ModelResponse payloads across metadata generators.
 """
 
+from collections.abc import Callable
+from typing import Any
+
 import pytest
 
 import core.name_generation as name_gen_module
@@ -16,18 +19,28 @@ from core.name_generation import (
 )
 from models.category_model import PromptCategory
 
+type _Payload = dict[str, list[dict[str, dict[str, str]]]]
+type _CompletionFunc = Callable[..., _Payload | object]
+type _CompletionFactory = Callable[[], tuple[_CompletionFunc, type[Exception]]]
+
+
+def _patch_completion_factory(
+    monkeypatch: pytest.MonkeyPatch,
+    factory: _CompletionFactory,
+) -> None:
+    monkeypatch.setattr(name_gen_module, "get_completion", factory)
+
 
 def test_litellm_name_generator_returns_trimmed_name(monkeypatch: pytest.MonkeyPatch) -> None:
-    def _fake_completion(**kwargs):
+    def _fake_completion(**kwargs: object) -> _Payload:
         assert kwargs["model"] == "gpt-4o-mini"
         assert "api_key" in kwargs and kwargs["api_key"] == "secret"
         return {"choices": [{"message": {"content": "Refactor Navigator"}}]}
 
-    monkeypatch.setattr(
-        name_gen_module,
-        "get_completion",
-        lambda: (_fake_completion, Exception),
-    )
+    def _factory() -> tuple[_CompletionFunc, type[Exception]]:
+        return _fake_completion, Exception
+
+    _patch_completion_factory(monkeypatch, _factory)
 
     generator = LiteLLMNameGenerator(model="gpt-4o-mini", api_key="secret")
     name = generator.generate("Refactor this service to improve maintainability.")
@@ -35,14 +48,13 @@ def test_litellm_name_generator_returns_trimmed_name(monkeypatch: pytest.MonkeyP
 
 
 def test_litellm_name_generator_raises_on_failure(monkeypatch: pytest.MonkeyPatch) -> None:
-    def _failing_completion(**kwargs):
+    def _failing_completion(**kwargs: object) -> Any:
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(
-        name_gen_module,
-        "get_completion",
-        lambda: (_failing_completion, RuntimeError),
-    )
+    def _factory() -> tuple[_CompletionFunc, type[Exception]]:
+        return _failing_completion, RuntimeError
+
+    _patch_completion_factory(monkeypatch, _factory)
 
     generator = LiteLLMNameGenerator(model="gpt-4o-mini")
     with pytest.raises(NameGenerationError):
@@ -50,15 +62,14 @@ def test_litellm_name_generator_raises_on_failure(monkeypatch: pytest.MonkeyPatc
 
 
 def test_litellm_description_generator_returns_summary(monkeypatch: pytest.MonkeyPatch) -> None:
-    def _fake_completion(**kwargs):
+    def _fake_completion(**kwargs: object) -> _Payload:
         assert kwargs["model"] == "gpt-4o-mini"
         return {"choices": [{"message": {"content": "Summarise prompts clearly and quickly."}}]}
 
-    monkeypatch.setattr(
-        name_gen_module,
-        "get_completion",
-        lambda: (_fake_completion, Exception),
-    )
+    def _factory() -> tuple[_CompletionFunc, type[Exception]]:
+        return _fake_completion, Exception
+
+    _patch_completion_factory(monkeypatch, _factory)
 
     generator = LiteLLMDescriptionGenerator(model="gpt-4o-mini")
     summary = generator.generate("Prompt body")
@@ -66,14 +77,13 @@ def test_litellm_description_generator_returns_summary(monkeypatch: pytest.Monke
 
 
 def test_litellm_description_generator_raises(monkeypatch: pytest.MonkeyPatch) -> None:
-    def _failing_completion(**kwargs):
+    def _failing_completion(**kwargs: object) -> Any:
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(
-        name_gen_module,
-        "get_completion",
-        lambda: (_failing_completion, RuntimeError),
-    )
+    def _factory() -> tuple[_CompletionFunc, type[Exception]]:
+        return _failing_completion, RuntimeError
+
+    _patch_completion_factory(monkeypatch, _factory)
 
     generator = LiteLLMDescriptionGenerator(model="gpt-4o-mini")
     with pytest.raises(DescriptionGenerationError):
@@ -84,16 +94,15 @@ def test_content_filter_error_is_summarised(monkeypatch: pytest.MonkeyPatch) -> 
     class _ContentFilterError(Exception):
         pass
 
-    def _failing_completion(**kwargs):  # noqa: ARG001
+    def _failing_completion(**kwargs: object) -> Any:  # noqa: ARG001
         raise _ContentFilterError(
             "AzureException - Error code: 400 - {'error': {'code': 'content_filter'}}"
         )
 
-    monkeypatch.setattr(
-        name_gen_module,
-        "get_completion",
-        lambda: (_failing_completion, _ContentFilterError),
-    )
+    def _factory() -> tuple[_CompletionFunc, type[Exception]]:
+        return _failing_completion, _ContentFilterError
+
+    _patch_completion_factory(monkeypatch, _factory)
 
     generator = LiteLLMNameGenerator(model="gpt-4o-mini")
     with pytest.raises(NameGenerationError) as exc:
@@ -105,16 +114,15 @@ def test_description_content_filter_error_is_summarised(monkeypatch: pytest.Monk
     class _ContentFilterError(Exception):
         pass
 
-    def _failing_completion(**kwargs):  # noqa: ARG001
+    def _failing_completion(**kwargs: object) -> Any:  # noqa: ARG001
         raise _ContentFilterError(
             "AzureException - Error code: 400 - {'error': {'code': 'ResponsibleAIPolicyViolation'}}"
         )
 
-    monkeypatch.setattr(
-        name_gen_module,
-        "get_completion",
-        lambda: (_failing_completion, _ContentFilterError),
-    )
+    def _factory() -> tuple[_CompletionFunc, type[Exception]]:
+        return _failing_completion, _ContentFilterError
+
+    _patch_completion_factory(monkeypatch, _factory)
 
     generator = LiteLLMDescriptionGenerator(model="gpt-4o-mini")
     with pytest.raises(DescriptionGenerationError) as exc:
@@ -132,14 +140,13 @@ def test_name_generator_handles_model_response(monkeypatch: pytest.MonkeyPatch) 
         def model_dump(self) -> dict[str, object]:
             return dict(self._payload)
 
-    def _fake_completion(**kwargs):  # noqa: ARG001
+    def _fake_completion(**kwargs: object) -> _ModelResponse:  # noqa: ARG001
         return _ModelResponse({"choices": [{"message": {"content": "Draft Buddy"}}]})
 
-    monkeypatch.setattr(
-        name_gen_module,
-        "get_completion",
-        lambda: (_fake_completion, Exception),
-    )
+    def _factory() -> tuple[_CompletionFunc, type[Exception]]:
+        return _fake_completion, Exception
+
+    _patch_completion_factory(monkeypatch, _factory)
 
     generator = LiteLLMNameGenerator(model="gpt-4o-mini")
     assert generator.generate("Refactor code") == "Draft Buddy"
@@ -155,14 +162,13 @@ def test_description_generator_handles_model_response(monkeypatch: pytest.Monkey
         def dict(self) -> dict[str, object]:
             return dict(self._payload)
 
-    def _fake_completion(**kwargs):  # noqa: ARG001
+    def _fake_completion(**kwargs: object) -> _ModelResponse:  # noqa: ARG001
         return _ModelResponse({"choices": [{"message": {"content": "Summarise request context."}}]})
 
-    monkeypatch.setattr(
-        name_gen_module,
-        "get_completion",
-        lambda: (_fake_completion, Exception),
-    )
+    def _factory() -> tuple[_CompletionFunc, type[Exception]]:
+        return _fake_completion, Exception
+
+    _patch_completion_factory(monkeypatch, _factory)
 
     generator = LiteLLMDescriptionGenerator(model="gpt-4o-mini")
     summary = generator.generate("Prompt body")
@@ -179,14 +185,13 @@ def test_category_generator_handles_model_response(monkeypatch: pytest.MonkeyPat
         def model_dump(self) -> dict[str, object]:
             return dict(self._payload)
 
-    def _fake_completion(**kwargs):  # noqa: ARG001
+    def _fake_completion(**kwargs: object) -> _ModelResponse:  # noqa: ARG001
         return _ModelResponse({"choices": [{"message": {"content": "Analysis"}}]})
 
-    monkeypatch.setattr(
-        name_gen_module,
-        "get_completion",
-        lambda: (_fake_completion, Exception),
-    )
+    def _factory() -> tuple[_CompletionFunc, type[Exception]]:
+        return _fake_completion, Exception
+
+    _patch_completion_factory(monkeypatch, _factory)
 
     generator = LiteLLMCategoryGenerator(model="gpt-4o-mini")
     categories = [PromptCategory(slug="analysis", label="Analysis", description="")]

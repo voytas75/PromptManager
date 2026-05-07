@@ -231,6 +231,7 @@ class PromptChainManagerPanel(QWidget):
         list_layout.addLayout(header_row)
 
         self._chain_list = QListWidget(list_container)
+        self._chain_list.setObjectName("promptChainList")
         self._chain_list.currentRowChanged.connect(self._handle_selection_changed)  # type: ignore[arg-type]
         self._chain_list.itemActivated.connect(self._handle_chain_activation)  # type: ignore[arg-type]
         list_layout.addWidget(self._chain_list, 1)
@@ -304,6 +305,7 @@ class PromptChainManagerPanel(QWidget):
         steps_layout.addWidget(steps_label)
 
         self._steps_table = QTableWidget(0, 3, steps_container)
+        self._steps_table.setObjectName("promptChainStepsTable")
         self._steps_table.setHorizontalHeaderLabels(["Order", "Prompt", "Failure handling"])
         self._steps_table.horizontalHeader().setStretchLastSection(True)
         self._steps_table.verticalHeader().setVisible(False)
@@ -323,6 +325,7 @@ class PromptChainManagerPanel(QWidget):
         run_layout.addWidget(run_header)
 
         self._chain_input_edit = QPlainTextEdit(run_container)
+        self._chain_input_edit.setObjectName("promptChainInputEdit")
         self._chain_input_edit.setPlaceholderText(
             "Type the text you want to feed into the first step…"
         )
@@ -346,6 +349,7 @@ class PromptChainManagerPanel(QWidget):
         self._clear_input_button.clicked.connect(self._chain_input_edit.clear)  # type: ignore[arg-type]
         actions_row.addWidget(self._clear_input_button)
         self._web_search_checkbox = QCheckBox("Use web search", run_container)
+        self._web_search_checkbox.setObjectName("promptChainWebSearchCheckbox")
         self._web_search_checkbox.setChecked(self._load_web_search_preference())
         self._web_search_checkbox.setToolTip(self._build_web_search_tooltip())
         self._web_search_checkbox.stateChanged.connect(  # type: ignore[arg-type]
@@ -388,6 +392,7 @@ class PromptChainManagerPanel(QWidget):
         results_layout.addLayout(results_header)
 
         self._result_format_checkbox = QCheckBox("Markdown", results_container)
+        self._result_format_checkbox.setObjectName("promptChainMarkdownCheckbox")
         self._result_format_checkbox.setChecked(True)
         self._result_format_checkbox.toggled.connect(self._handle_result_format_changed)  # type: ignore[arg-type]
         results_header.addWidget(self._result_format_checkbox)
@@ -395,11 +400,13 @@ class PromptChainManagerPanel(QWidget):
         self._auto_scroll_checkbox.setChecked(True)
         results_header.addWidget(self._auto_scroll_checkbox)
         self._wrap_checkbox = QCheckBox("Wrap lines", results_container)
+        self._wrap_checkbox.setObjectName("promptChainWrapCheckbox")
         self._wrap_checkbox.setChecked(True)
         self._wrap_checkbox.toggled.connect(self._handle_wrap_changed)  # type: ignore[arg-type]
         results_header.addWidget(self._wrap_checkbox)
 
         self._result_view = QTextEdit(results_container)
+        self._result_view.setObjectName("promptChainResultView")
         self._result_view.setReadOnly(True)
         self._result_view.setPlaceholderText("Execution results, outputs, and per-step summary.")
         self._result_view.setAcceptRichText(True)
@@ -746,6 +753,10 @@ class PromptChainManagerPanel(QWidget):
                 self._render_chain_details(chain)
                 return
 
+    def run_selected_chain(self) -> None:
+        """Public wrapper for executing the currently selected chain."""
+        self._run_selected_chain()
+
     def _run_selected_chain(self) -> None:
         """Execute the currently selected chain with the provided plain-text input."""
         chain = next(
@@ -810,6 +821,10 @@ class PromptChainManagerPanel(QWidget):
         self._record_run_history(result)
         self._display_run_result(result)
         show_toast(self, f"Chain '{chain.name}' completed.")
+
+    def display_run_result(self, result: PromptChainRunResult) -> None:
+        """Public wrapper for rendering a chain run result."""
+        self._display_run_result(result)
 
     def _display_run_result(self, result: PromptChainRunResult) -> None:
         """Render execution outputs and per-step summary for *result*."""
@@ -1064,8 +1079,7 @@ class PromptChainManagerPanel(QWidget):
         if step_run.prompt_name:
             prompt_html = html.escape(step_run.prompt_name)
             parts.append(
-                "<div class='chain-step-detail'><strong>Prompt:</strong> "
-                f"{prompt_html}</div>"
+                f"<div class='chain-step-detail'><strong>Prompt:</strong> {prompt_html}</div>"
             )
         parts.append(
             "<div class='chain-step-detail'><strong>Output key:</strong> "
@@ -1161,6 +1175,10 @@ class PromptChainManagerPanel(QWidget):
         self._settings.setValue("managementSplitterState", self._management_splitter.saveState())
         self._settings.setValue("detailSplitterState", self._detail_splitter.saveState())
 
+    def clear_results(self) -> None:
+        """Public wrapper for clearing the rendered results."""
+        self._handle_clear_results()
+
     def _handle_clear_results(self) -> None:
         """Reset the execution results pane."""
         self._end_stream_preview()
@@ -1169,6 +1187,10 @@ class PromptChainManagerPanel(QWidget):
         self._last_final_output_text = ""
         self._last_final_summary_text = ""
         self._apply_result_view()
+
+    def copy_final_output(self) -> None:
+        """Public wrapper for copying the last final output."""
+        self._copy_final_output()
 
     def _copy_final_output(self) -> None:
         """Copy the last final output text to the system clipboard."""
@@ -1183,6 +1205,10 @@ class PromptChainManagerPanel(QWidget):
         clipboard.setText(output_text)
         show_toast(self, "Final output copied.")
 
+    def copy_final_summary(self) -> None:
+        """Public wrapper for copying the last final summary."""
+        self._copy_final_summary()
+
     def _copy_final_summary(self) -> None:
         """Copy the last final summary text to the system clipboard."""
         summary_text = self._last_final_summary_text.strip()
@@ -1195,6 +1221,10 @@ class PromptChainManagerPanel(QWidget):
             return
         clipboard.setText(summary_text)
         show_toast(self, "Final summary copied.")
+
+    def save_result_to_file(self) -> None:
+        """Public wrapper for saving the current result to disk."""
+        self._save_result_to_file()
 
     def _save_result_to_file(self) -> None:
         """Persist the currently rendered chain result to a text file."""
@@ -1466,6 +1496,74 @@ class PromptChainManagerPanel(QWidget):
 
     def _handle_web_search_toggle(self, state: int) -> None:
         self._settings.setValue("chainWebSearchEnabled", bool(state))
+
+    def activate_step_at(self, row: int, column: int = 0) -> None:
+        """Public wrapper for activating a rendered step row."""
+        self._handle_step_table_activated(row, column)
+
+    def activate_chain_item(self, item: QListWidgetItem | None) -> None:
+        """Public wrapper for opening the selected chain editor from a list item."""
+        self._handle_chain_activation(item)
+
+    def create_chain(self) -> None:
+        """Public wrapper for the create-chain workflow."""
+        self._create_chain()
+
+    def select_chain(self, chain_id: UUID) -> None:
+        """Public wrapper for selecting a chain by identifier."""
+        self._select_chain(chain_id)
+
+    def duplicate_chain(self) -> None:
+        """Public wrapper for duplicating the currently selected chain."""
+        self._duplicate_chain()
+
+    def delete_chain(self) -> None:
+        """Public wrapper for deleting the currently selected chain."""
+        self._delete_chain()
+
+    def chains(self) -> list[PromptChain]:
+        """Return a copy of the loaded prompt chains."""
+        return list(self._chains)
+
+    def record_run_history(self, result: PromptChainRunResult) -> None:
+        """Public wrapper for appending a run history entry."""
+        self._record_run_history(result)
+
+    def run_history(self) -> list[_PromptChainRunHistoryEntry]:
+        """Return a copy of the bounded in-memory run history."""
+        return list(self._run_history)
+
+    def history_label_text(self) -> str:
+        """Return the rendered recent-run summary text."""
+        return self._history_label.text()
+
+    def set_selected_chain_id(self, chain_id: str | None) -> None:
+        """Update the tracked selected chain id for tests and wrappers."""
+        self._selected_chain_id = chain_id
+
+    def refresh_run_history_label(self) -> None:
+        """Public wrapper for recomputing the run history label."""
+        self._refresh_run_history_label()
+
+    def begin_stream_preview(self, chain: PromptChain, chain_input: str) -> None:
+        """Public wrapper for initialising the streaming preview state."""
+        self._begin_stream_preview(chain, chain_input)
+
+    def register_stream_chunk(self, step: PromptChainStep, chunk: str, is_final: bool) -> None:
+        """Public wrapper for appending streamed output to the preview."""
+        self._register_stream_chunk(step, chunk, is_final)
+
+    def end_stream_preview(self) -> None:
+        """Public wrapper for clearing the streaming preview state."""
+        self._end_stream_preview()
+
+    def result_view_plaintext(self) -> str:
+        """Return the currently rendered result view text."""
+        return self._result_view.toPlainText()
+
+    def is_streaming_enabled(self) -> bool:
+        """Public wrapper for checking runtime streaming availability."""
+        return self._is_streaming_enabled()
 
     def _handle_step_table_activated(self, row: int, _: int) -> None:
         prompt_id = self._step_prompt_ids.get(row)

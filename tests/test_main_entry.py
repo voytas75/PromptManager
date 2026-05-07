@@ -22,9 +22,12 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
+
+if TYPE_CHECKING:
+    from _pytest.capture import CaptureFixture
 
 import main
 from config import SettingsError
@@ -70,14 +73,14 @@ class _DummySettings(SimpleNamespace):
 
 class _DummyRepository:
     def __init__(self) -> None:
-        self._store: list[object] = []
+        self.store: list[object] = []
 
     def list(self, limit: int | None = None) -> list[object]:
-        values = list(self._store)
+        values = list(self.store)
         return values if limit is None else values[:limit]
 
     def get(self, prompt_id: uuid.UUID) -> object:
-        for prompt in self._store:
+        for prompt in self.store:
             if getattr(prompt, "id", None) == prompt_id:
                 return prompt
         raise KeyError(prompt_id)
@@ -168,14 +171,16 @@ class _DummyManager:
             return self.token_usage_totals_all
         return self.token_usage_totals_window
 
-    def create_prompt(self, prompt: object, embedding=None) -> object:
-        self.repository._store.append(prompt)
+    def create_prompt(self, prompt: object, embedding: object | None = None) -> object:
+        del embedding
+        self.repository.store.append(prompt)
         return prompt
 
-    def update_prompt(self, prompt: object, embedding=None) -> object:
-        for index, existing in enumerate(self.repository._store):
+    def update_prompt(self, prompt: object, embedding: object | None = None) -> object:
+        del embedding
+        for index, existing in enumerate(self.repository.store):
             if getattr(existing, "id", None) == getattr(prompt, "id", None):
-                self.repository._store[index] = prompt
+                self.repository.store[index] = prompt
                 return prompt
         raise KeyError(getattr(prompt, "id", None))
 
@@ -266,6 +271,85 @@ def _build_dummy_snapshot() -> SimpleNamespace:
     )
 
 
+def _build_manager_with(manager: _DummyManager):
+    def _builder(_settings: object) -> _DummyManager:
+        return manager
+
+    return _builder
+
+
+def _build_snapshot(
+    *_args: object,
+    snapshot: SimpleNamespace | None = None,
+    **_kwargs: object,
+) -> SimpleNamespace:
+    if snapshot is not None:
+        return snapshot
+    return _build_dummy_snapshot()
+
+
+def _yes_input(_prompt: object) -> str:
+    return "y"
+
+
+def _empty_dataset_rows(*_args: object) -> list[object]:
+    return []
+
+
+def _snapshot_builder_with(snapshot: SimpleNamespace) -> Any:
+    def _builder(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        return _build_snapshot(snapshot=snapshot)
+
+    return _builder
+
+
+def _dataset_rows_for_usage(_snapshot: object, dataset: str) -> list[dict[str, object]]:
+    assert dataset == "usage"
+    return [{"prompt_name": "Prompt Delta", "usage_count": 4}]
+
+
+def _load_entrypoint_settings() -> _DummySettings:
+    settings = _DummySettings()
+    settings.litellm_model = "azure/gpt-4o-mini"
+    settings.litellm_api_key = "secret-key"
+    return settings
+
+
+def _export_catalog_stub(*_args: object, **_kwargs: object) -> Path:
+    return Path("export.json")
+
+
+def _diff_catalog_stub(*_args: object, **_kwargs: object) -> SimpleNamespace:
+    return SimpleNamespace(
+        added=0,
+        updated=0,
+        skipped=0,
+        unchanged=0,
+    )
+
+
+def _import_catalog_stub(*_args: object, **_kwargs: object) -> SimpleNamespace:
+    return SimpleNamespace(
+        added=0,
+        updated=0,
+        skipped=0,
+        errors=0,
+    )
+
+
+def _analytics_snapshot_stub(*_args: object, **_kwargs: object) -> SimpleNamespace:
+    return SimpleNamespace()
+
+
+def _snapshot_rows_stub(*_args: object, **_kwargs: object) -> list[object]:
+    return []
+
+
+def _launch_prompt_manager_stub(_manager: object, settings: object | None = None) -> int:
+    del settings
+    return 0
+
+
 def test_main_print_settings_logs_and_exits(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -274,7 +358,7 @@ def test_main_print_settings_logs_and_exits(
     settings.litellm_drop_params = ["max_tokens", "temperature"]
     _patch_main(monkeypatch, "load_settings", lambda: settings)
     manager = _DummyManager()
-    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
@@ -334,12 +418,8 @@ def test_main_diagnostics_analytics_uses_shared_snapshot_sections(
     settings = _DummySettings()
     manager = _DummyManager()
     _patch_main(monkeypatch, "load_settings", lambda: settings)
-    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
-    _patch_main(
-        monkeypatch,
-        "build_analytics_snapshot",
-        lambda *args, **kwargs: _build_dummy_snapshot(),
-    )
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+    _patch_main(monkeypatch, "build_analytics_snapshot", _build_snapshot)
 
     exit_code = main.main()
 
@@ -390,7 +470,7 @@ def test_main_offers_config_creation_on_missing_file(
 
     _patch_main(monkeypatch, "load_settings", _load)
     monkeypatch.setattr(main.sys, "stdin", SimpleNamespace(isatty=lambda: True))
-    monkeypatch.setattr("builtins.input", lambda _: "y")
+    monkeypatch.setattr("builtins.input", _yes_input)
 
     exit_code = main.main()
 
@@ -480,7 +560,7 @@ def test_main_logs_ready_message_on_success(
     settings.litellm_api_key = "secret-key"
     _patch_main(monkeypatch, "load_settings", lambda: settings)
     manager = _DummyManager()
-    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
@@ -492,9 +572,9 @@ def test_main_logs_ready_message_on_success(
 
 
 def test_main_reexports_core_headless_surfaces_for_cli_parity() -> None:
-    assert main.export_prompt_catalog is main._core_export_prompt_catalog
-    assert main.build_analytics_snapshot is main._core_build_analytics_snapshot
-    assert main.snapshot_dataset_rows is main._core_snapshot_dataset_rows
+    assert main.export_prompt_catalog.__name__ == "export_prompt_catalog"
+    assert main.build_analytics_snapshot.__name__ == "build_analytics_snapshot"
+    assert main.snapshot_dataset_rows.__name__ == "snapshot_dataset_rows"
 
 
 def test_main_launches_gui_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -504,7 +584,7 @@ def test_main_launches_gui_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     settings.litellm_model = "azure/gpt-4o-mini"
     settings.litellm_api_key = "secret-key"
     _patch_main(monkeypatch, "load_settings", lambda: settings)
-    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: dummy_manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(dummy_manager))
 
     called = {}
 
@@ -533,7 +613,7 @@ def test_main_returns_error_when_gui_dependency_missing(
     settings.litellm_model = "azure/gpt-4o-mini"
     settings.litellm_api_key = "secret-key"
     _patch_main(monkeypatch, "load_settings", lambda: settings)
-    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     class _GuiError(RuntimeError):
         pass
@@ -555,11 +635,13 @@ def test_main_returns_error_when_gui_dependency_missing(
     assert manager.closed is True
 
 
-def test_main_runs_embedding_diagnostics(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+def test_main_runs_embedding_diagnostics(
+    monkeypatch: pytest.MonkeyPatch, capsys: CaptureFixture[str]
+) -> None:
     monkeypatch.setattr("sys.argv", ["prompt-manager", "diagnostics", "embeddings"])
     _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
     manager = _DummyManager()
-    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
@@ -571,7 +653,7 @@ def test_main_runs_embedding_diagnostics(monkeypatch: pytest.MonkeyPatch, capsys
 
 
 def test_main_embedding_diagnostics_returns_failure_on_issue(
-    monkeypatch: pytest.MonkeyPatch, capsys
+    monkeypatch: pytest.MonkeyPatch, capsys: CaptureFixture[str]
 ) -> None:
     monkeypatch.setattr("sys.argv", ["prompt-manager", "diagnostics", "embeddings"])
     _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
@@ -592,7 +674,7 @@ def test_main_embedding_diagnostics_returns_failure_on_issue(
         mismatched_prompts=[mismatch],
         consistent_counts=False,
     )
-    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
@@ -603,7 +685,9 @@ def test_main_embedding_diagnostics_returns_failure_on_issue(
     assert manager.closed is True
 
 
-def test_main_analytics_diagnostics_runs(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+def test_main_analytics_diagnostics_runs(
+    monkeypatch: pytest.MonkeyPatch, capsys: CaptureFixture[str]
+) -> None:
     monkeypatch.setattr(
         "sys.argv",
         [
@@ -634,9 +718,9 @@ def test_main_analytics_diagnostics_runs(monkeypatch: pytest.MonkeyPatch, capsys
         captured_args["usage_log_path"] = usage_log_path
         return _build_dummy_snapshot()
 
-    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
     _patch_main(monkeypatch, "build_analytics_snapshot", _snapshot_stub)
-    _patch_main(monkeypatch, "snapshot_dataset_rows", lambda *_: [])
+    _patch_main(monkeypatch, "snapshot_dataset_rows", _empty_dataset_rows)
 
     exit_code = main.main()
 
@@ -659,7 +743,7 @@ def test_main_analytics_diagnostics_runs(monkeypatch: pytest.MonkeyPatch, capsys
 def test_main_analytics_diagnostics_exports_csv(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    capsys,
+    capsys: CaptureFixture[str],
 ) -> None:
     export_path = tmp_path / "analytics.csv"
     monkeypatch.setattr(
@@ -677,14 +761,14 @@ def test_main_analytics_diagnostics_exports_csv(
     _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
     manager = _DummyManager()
     snapshot = _build_dummy_snapshot()
-    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
-    _patch_main(monkeypatch, "build_analytics_snapshot", lambda *_, **__: snapshot)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+    _patch_main(
+        monkeypatch,
+        "build_analytics_snapshot",
+        _snapshot_builder_with(snapshot),
+    )
 
-    def _dataset_rows(_, dataset: str) -> list[dict[str, object]]:
-        assert dataset == "usage"
-        return [{"prompt_name": "Prompt Delta", "usage_count": 4}]
-
-    _patch_main(monkeypatch, "snapshot_dataset_rows", _dataset_rows)
+    _patch_main(monkeypatch, "snapshot_dataset_rows", _dataset_rows_for_usage)
 
     exit_code = main.main()
 
@@ -725,7 +809,7 @@ def test_suggest_command_outputs_results(
         fallback_used=False,
     )
     manager.suggestion_response = suggestion_payload
-    _patch_main(monkeypatch, "build_prompt_manager", lambda _: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
@@ -745,7 +829,7 @@ def test_prompt_show_command_outputs_prompt_details(
     settings = _DummySettings()
     _patch_main(monkeypatch, "load_settings", lambda: settings)
     manager = _DummyManager()
-    manager.repository._store.append(
+    manager.repository.store.append(
         Prompt(
             id=prompt_id,
             name="CI Failure Triage",
@@ -757,7 +841,7 @@ def test_prompt_show_command_outputs_prompt_details(
             source="catalog",
         )
     )
-    _patch_main(monkeypatch, "build_prompt_manager", lambda _: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
@@ -785,7 +869,7 @@ def test_prompt_show_command_falls_back_to_exact_name(
     _patch_main(monkeypatch, "load_settings", lambda: settings)
     manager = _DummyManager()
     prompt_id = uuid.uuid4()
-    manager.repository._store.append(
+    manager.repository.store.append(
         Prompt(
             id=prompt_id,
             name="CI Failure Triage",
@@ -797,7 +881,7 @@ def test_prompt_show_command_falls_back_to_exact_name(
             source="catalog",
         )
     )
-    _patch_main(monkeypatch, "build_prompt_manager", lambda _: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
@@ -817,7 +901,7 @@ def test_prompt_find_command_lists_matching_prompts(
     _patch_main(monkeypatch, "load_settings", lambda: settings)
     manager = _DummyManager()
     matching_id = uuid.uuid4()
-    manager.repository._store.extend(
+    manager.repository.store.extend(
         [
             Prompt(
                 id=matching_id,
@@ -841,7 +925,7 @@ def test_prompt_find_command_lists_matching_prompts(
             ),
         ]
     )
-    _patch_main(monkeypatch, "build_prompt_manager", lambda _: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
@@ -861,7 +945,7 @@ def test_prompt_find_command_outputs_json_payload(
     _patch_main(monkeypatch, "load_settings", lambda: settings)
     manager = _DummyManager()
     matching_id = uuid.uuid4()
-    manager.repository._store.extend(
+    manager.repository.store.extend(
         [
             Prompt(
                 id=matching_id,
@@ -885,12 +969,12 @@ def test_prompt_find_command_outputs_json_payload(
             ),
         ]
     )
-    _patch_main(monkeypatch, "build_prompt_manager", lambda _: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
     assert exit_code == 0
-    output = json.loads(capsys.readouterr().out)
+    output = cast("list[dict[str, object]]", json.loads(capsys.readouterr().out))
     assert isinstance(output, list)
     assert len(output) == 1
     assert output[0]["id"] == str(matching_id)
@@ -920,7 +1004,7 @@ def test_prompt_find_command_filters_by_category_and_tag(
     _patch_main(monkeypatch, "load_settings", lambda: settings)
     manager = _DummyManager()
     matching_id = uuid.uuid4()
-    manager.repository._store.extend(
+    manager.repository.store.extend(
         [
             Prompt(
                 id=matching_id,
@@ -954,7 +1038,7 @@ def test_prompt_find_command_filters_by_category_and_tag(
             ),
         ]
     )
-    _patch_main(monkeypatch, "build_prompt_manager", lambda _: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
@@ -986,7 +1070,7 @@ def test_prompt_find_command_filters_by_source_and_active_state(
     _patch_main(monkeypatch, "load_settings", lambda: settings)
     manager = _DummyManager()
     matching_id = uuid.uuid4()
-    manager.repository._store.extend(
+    manager.repository.store.extend(
         [
             Prompt(
                 id=matching_id,
@@ -1020,7 +1104,7 @@ def test_prompt_find_command_filters_by_source_and_active_state(
             ),
         ]
     )
-    _patch_main(monkeypatch, "build_prompt_manager", lambda _: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
@@ -1044,7 +1128,7 @@ def test_prompt_history_command_outputs_recent_execution_summary(
     settings = _DummySettings()
     _patch_main(monkeypatch, "load_settings", lambda: settings)
     manager = _DummyManager()
-    manager.repository._store.append(
+    manager.repository.store.append(
         Prompt(
             id=prompt_id,
             name="CI Failure Triage",
@@ -1097,7 +1181,7 @@ def test_prompt_history_command_outputs_recent_execution_summary(
         next_action_summary="Retry with the fast model for baseline checks.",
         freshness_summary="Validation freshness: recent",
     )
-    _patch_main(monkeypatch, "build_prompt_manager", lambda _: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
@@ -1136,7 +1220,7 @@ def test_prompt_history_command_outputs_json_payload(
     settings = _DummySettings()
     _patch_main(monkeypatch, "load_settings", lambda: settings)
     manager = _DummyManager()
-    manager.repository._store.append(
+    manager.repository.store.append(
         Prompt(
             id=prompt_id,
             name="CI Failure Triage",
@@ -1177,7 +1261,7 @@ def test_prompt_history_command_outputs_json_payload(
         next_action_summary="Reuse for first-pass diagnostics.",
         freshness_summary="Validation freshness: recent",
     )
-    _patch_main(monkeypatch, "build_prompt_manager", lambda _: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
@@ -1219,7 +1303,7 @@ def test_prompt_history_command_filters_by_status_and_window_days(
     old_execution_at = now - timedelta(days=2)
     recent_failed_at = now - timedelta(hours=2)
     recent_success_at = now - timedelta(minutes=90)
-    manager.repository._store.append(
+    manager.repository.store.append(
         Prompt(
             id=prompt_id,
             name="CI Failure Triage",
@@ -1278,7 +1362,7 @@ def test_prompt_history_command_filters_by_status_and_window_days(
         completion_tokens=28,
         total_tokens=50,
     )
-    _patch_main(monkeypatch, "build_prompt_manager", lambda _: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
@@ -1304,7 +1388,7 @@ def test_prompt_show_command_outputs_json_payload(
     settings = _DummySettings()
     _patch_main(monkeypatch, "load_settings", lambda: settings)
     manager = _DummyManager()
-    manager.repository._store.append(
+    manager.repository.store.append(
         Prompt(
             id=prompt_id,
             name="CI Failure Triage",
@@ -1316,7 +1400,7 @@ def test_prompt_show_command_outputs_json_payload(
             source="catalog",
         )
     )
-    _patch_main(monkeypatch, "build_prompt_manager", lambda _: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
@@ -1334,8 +1418,9 @@ def test_setup_logging_basic_config_fallback(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     missing_path = tmp_path / "absent.ini"
+    runtime_setup_logging = cast("Any", main)._runtime_setup_logging
+    runtime_setup_logging(missing_path)
     with caplog.at_level(logging.INFO):
-        main._setup_logging(missing_path)
         logging.getLogger("prompt_manager.testing").info("hello from fallback")
 
     assert "hello from fallback" in caplog.text
@@ -1375,41 +1460,25 @@ def test_main_entrypoint_guard_executes(
     monkeypatch.setattr("sys.argv", ["prompt-manager"])
 
     config_stub = _mock_module("config")
-    config_stub.load_settings = lambda: (
-        lambda settings: (
-            setattr(settings, "litellm_model", "azure/gpt-4o-mini"),
-            setattr(settings, "litellm_api_key", "secret-key"),
-            settings,
-        )[2]
-    )(_DummySettings())
+    config_stub.load_settings = _load_entrypoint_settings
     config_stub.PromptManagerSettings = type("PromptManagerSettings", (), {})
     config_stub.LITELLM_ROUTED_WORKFLOWS = {"prompt_execution": "Prompt execution"}
     config_stub.DEFAULT_EMBEDDING_BACKEND = DEFAULT_EMBEDDING_BACKEND
     config_stub.DEFAULT_EMBEDDING_MODEL = DEFAULT_EMBEDDING_MODEL
     core_stub = _mock_module("core")
     dummy_manager = _DummyManager()
-    core_stub.build_prompt_manager = lambda settings: dummy_manager
-    core_stub.export_prompt_catalog = lambda *args, **kwargs: Path("export.json")
-    core_stub.diff_prompt_catalog = lambda *args, **kwargs: SimpleNamespace(
-        added=0,
-        updated=0,
-        skipped=0,
-        unchanged=0,
-    )
-    core_stub.import_prompt_catalog = lambda *args, **kwargs: SimpleNamespace(
-        added=0,
-        updated=0,
-        skipped=0,
-        errors=0,
-    )
+    core_stub.build_prompt_manager = _build_manager_with(dummy_manager)
+    core_stub.export_prompt_catalog = _export_catalog_stub
+    core_stub.diff_prompt_catalog = _diff_catalog_stub
+    core_stub.import_prompt_catalog = _import_catalog_stub
     core_stub.PromptManagerError = RuntimeError
-    core_stub.build_analytics_snapshot = lambda *args, **kwargs: SimpleNamespace()
-    core_stub.snapshot_dataset_rows = lambda *args, **kwargs: []
+    core_stub.build_analytics_snapshot = _analytics_snapshot_stub
+    core_stub.snapshot_dataset_rows = _snapshot_rows_stub
 
     monkeypatch.setitem(sys.modules, "config", config_stub)
     monkeypatch.setitem(sys.modules, "core", core_stub)
     gui_stub = types.SimpleNamespace(
-        launch_prompt_manager=lambda manager, settings=None: 0,
+        launch_prompt_manager=_launch_prompt_manager_stub,
         GuiDependencyError=RuntimeError,
     )
     monkeypatch.setitem(sys.modules, "gui", gui_stub)
@@ -1459,7 +1528,7 @@ def test_usage_report_command(
     )
     _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
     manager = _DummyManager()
-    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
@@ -1480,7 +1549,7 @@ def test_catalog_export_command(
     )
     manager = _DummyManager()
     _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
-    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exported = {}
 
@@ -1527,7 +1596,7 @@ def test_prompt_add_command_accepts_json_file_alias(
     )
     manager = _DummyManager()
     _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
-    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
@@ -1651,7 +1720,7 @@ def test_prompt_add_command_accepts_json_string(
     )
     manager = _DummyManager()
     _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
-    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
@@ -1680,7 +1749,7 @@ def test_prompt_add_command_accepts_stdin_json(
     monkeypatch.setattr(main.sys, "stdin", SimpleNamespace(read=lambda: payload))
     manager = _DummyManager()
     _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
-    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
@@ -1766,7 +1835,7 @@ def test_prompt_add_command_accepts_inline_fields(
     )
     manager = _DummyManager()
     _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
-    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
@@ -1865,7 +1934,7 @@ def test_prompt_add_command_dry_run(
     )
     manager = _DummyManager()
     _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
-    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
@@ -1897,7 +1966,7 @@ def test_prompt_add_command_applies_changes(
     )
     manager = _DummyManager()
     _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
-    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
@@ -1938,7 +2007,7 @@ def test_prompt_add_command_no_overwrite_skips_existing(
         )
     )
     _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
-    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
@@ -1946,7 +2015,7 @@ def test_prompt_add_command_no_overwrite_skips_existing(
     output = capsys.readouterr().out
     assert "Catalog import applied" in output
     assert "skipped=1" in output
-    stored = manager.repository.list()[0]
+    stored = cast("Prompt", manager.repository.list()[0])
     assert stored.description == "Existing prompt"
     assert manager.closed is True
 
@@ -1972,7 +2041,7 @@ def test_prompt_add_command_returns_error_when_importer_reports_failures(
     )
     manager = _DummyManager()
     _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
-    _patch_main(monkeypatch, "build_prompt_manager", lambda settings: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     def _import_stub(*args: object, **kwargs: object):
         return SimpleNamespace(added=0, updated=0, skipped=0, errors=1)
@@ -1995,7 +2064,7 @@ def test_reembed_command_succeeds(
     manager = _DummyManager()
     manager.reembed_result = (4, 0)
     _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
-    _patch_main(monkeypatch, "build_prompt_manager", lambda _: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
@@ -2012,7 +2081,7 @@ def test_reembed_command_reports_failures(
     manager = _DummyManager()
     manager.reembed_result = (2, 1)
     _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
-    _patch_main(monkeypatch, "build_prompt_manager", lambda _: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
@@ -2029,7 +2098,7 @@ def test_reembed_command_handles_manager_errors(
     manager = _DummyManager()
     manager.reembed_error = PromptManagerError("failed")
     _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
-    _patch_main(monkeypatch, "build_prompt_manager", lambda _: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
@@ -2048,7 +2117,7 @@ def test_history_analytics_command_renders_summary(
     manager = _DummyManager()
     manager.execution_analytics = _build_execution_analytics()
     _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
-    _patch_main(monkeypatch, "build_prompt_manager", lambda _: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
@@ -2077,7 +2146,7 @@ def test_history_analytics_handles_empty_results(
         window_start=None,
     )
     _patch_main(monkeypatch, "load_settings", lambda: _DummySettings())
-    _patch_main(monkeypatch, "build_prompt_manager", lambda _: manager)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 

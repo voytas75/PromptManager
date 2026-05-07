@@ -24,8 +24,14 @@ from models.prompt_model import Prompt
 if TYPE_CHECKING:  # pragma: no cover - typing helpers only
     from collections.abc import Callable
 
+    from gui.controllers.execution_controller import ExecutionController
     from gui.layout_state import WindowStateManager
     from gui.prompt_list_model import PromptListModel
+
+
+type _ExecutionControllerSupplier = Callable[[], ExecutionController | None]
+type _ExecutionHistorySupplier = Callable[[Prompt], list[object]]
+type _StatusCallback = Callable[[str, int], None]
 
 try:
     from PySide6.QtWidgets import (
@@ -141,6 +147,33 @@ class _ExecutionControllerStub:
         self.context_calls.append((prompt, task_text, context_text))
 
 
+def _noop_status_callback(_message: str, _duration: int) -> None:
+    return None
+
+
+def _no_execution_controller() -> ExecutionController | None:
+    return None
+
+
+def _object_execution_controller() -> ExecutionController | None:
+    return cast("ExecutionController", object())
+
+
+def _append_status_message(
+    sink: list[tuple[str, int]],
+) -> _StatusCallback:
+    def _callback(message: str, duration: int) -> None:
+        sink.append((message, duration))
+
+    return _callback
+
+
+def _history_entries(
+    _prompt: Prompt,
+) -> list[object]:
+    return [_ExecutionHistoryEntryStub(executed_at=datetime(2026, 4, 7, 9, 0, tzinfo=UTC))]
+
+
 def _build_prompt(*, context: str | None, description: str) -> Prompt:
     """Create a minimal prompt for reuse-action tests."""
     return Prompt(
@@ -160,8 +193,8 @@ def _build_controller(
     workspace_view: WorkspaceViewController | None,
     status_messages: list[tuple[str, int]],
     toast_messages: list[tuple[str, int]],
-    execution_supplier: Callable[[], None],
-    execution_history_supplier: Callable[[Prompt], list[_ExecutionHistoryEntryStub]] | None = None,
+    execution_supplier: _ExecutionControllerSupplier,
+    execution_history_supplier: _ExecutionHistorySupplier | None = None,
 ) -> PromptActionsController:
     """Create a prompt-actions controller with bounded test doubles."""
     return PromptActionsController(
@@ -178,9 +211,9 @@ def _build_controller(
         duplicate_callback=lambda _prompt: None,
         fork_callback=lambda _prompt: None,
         similar_callback=None,
-        status_callback=lambda message, duration: status_messages.append((message, duration)),
+        status_callback=_append_status_message(status_messages),
         error_callback=lambda _title, _message: None,
-        toast_callback=lambda message, duration: toast_messages.append((message, duration)),
+        toast_callback=_append_status_message(toast_messages),
         usage_logger=IntentUsageLogger(enabled=False),
     )
 
@@ -194,8 +227,8 @@ def test_open_prompt_in_workspace_surfaces_stale_validation_handoff_hint(
         query_input,
         QTabWidget(),
         QLabel(),
-        status_callback=lambda *_: None,
-        execution_controller_supplier=lambda: None,
+        status_callback=_noop_status_callback,
+        execution_controller_supplier=_no_execution_controller,
         quick_action_controller_supplier=lambda: None,
     )
     status_messages: list[tuple[str, int]] = []
@@ -213,9 +246,7 @@ def test_open_prompt_in_workspace_surfaces_stale_validation_handoff_hint(
         status_messages=status_messages,
         toast_messages=toast_messages,
         execution_supplier=_execution_supplier,
-        execution_history_supplier=lambda _prompt: [
-            _ExecutionHistoryEntryStub(executed_at=datetime(2026, 4, 7, 9, 0, tzinfo=UTC))
-        ],
+        execution_history_supplier=_history_entries,
     )
     prompt = _build_prompt(context="Prompt body to reuse", description="Fallback description")
 
@@ -246,8 +277,8 @@ def test_open_prompt_in_workspace_seeds_text_without_running(qt_app: QApplicatio
         query_input,
         QTabWidget(),
         QLabel(),
-        status_callback=lambda *_: None,
-        execution_controller_supplier=lambda: None,
+        status_callback=_noop_status_callback,
+        execution_controller_supplier=_no_execution_controller,
         quick_action_controller_supplier=lambda: None,
     )
     status_messages: list[tuple[str, int]] = []
@@ -292,8 +323,8 @@ def test_open_prompt_in_workspace_keeps_handoff_cues_action_local(
         query_input,
         QTabWidget(),
         QLabel(),
-        status_callback=lambda *_: None,
-        execution_controller_supplier=lambda: None,
+        status_callback=_noop_status_callback,
+        execution_controller_supplier=_no_execution_controller,
         quick_action_controller_supplier=lambda: None,
     )
     status_messages: list[tuple[str, int]] = []
@@ -336,9 +367,9 @@ def test_open_prompt_in_workspace_keeps_handoff_cues_action_local(
         duplicate_callback=lambda _prompt: None,
         fork_callback=lambda _prompt: None,
         similar_callback=None,
-        status_callback=lambda message, duration: status_messages.append((message, duration)),
+        status_callback=_append_status_message(status_messages),
         error_callback=lambda _title, _message: None,
-        toast_callback=lambda message, duration: toast_messages.append((message, duration)),
+        toast_callback=_append_status_message(toast_messages),
         usage_logger=cast("IntentUsageLogger", usage_logger),
     )
     prompt = _build_prompt(context="Prompt body to reuse", description="Fallback description")
@@ -393,8 +424,8 @@ def test_execute_prompt_as_context_delegates_task_and_context(
         query_input,
         QTabWidget(),
         QLabel(),
-        status_callback=lambda *_: None,
-        execution_controller_supplier=lambda: None,
+        status_callback=_noop_status_callback,
+        execution_controller_supplier=_no_execution_controller,
         quick_action_controller_supplier=lambda: None,
     )
     status_messages: list[tuple[str, int]] = []
@@ -413,7 +444,10 @@ def test_execute_prompt_as_context_delegates_task_and_context(
         workspace_view=workspace_view,
         status_messages=status_messages,
         toast_messages=toast_messages,
-        execution_supplier=lambda: execution_controller,
+        execution_supplier=cast(
+            "_ExecutionControllerSupplier",
+            lambda: cast("ExecutionController", execution_controller),
+        ),
     )
 
     controller.execute_prompt_as_context(prompt)
@@ -488,15 +522,15 @@ def test_show_context_menu_explains_disabled_execute_as_context_without_body(
         query_input=query_input,
         layout_state=cast("WindowStateManager", _LayoutStateStub()),
         workspace_view=None,
-        execution_controller_supplier=lambda: object(),
+        execution_controller_supplier=_object_execution_controller,
         current_prompt_supplier=lambda: prompt,
         edit_callback=lambda: None,
         duplicate_callback=lambda _prompt: None,
         fork_callback=lambda _prompt: None,
         similar_callback=None,
-        status_callback=lambda message, duration: status_messages.append((message, duration)),
+        status_callback=_append_status_message(status_messages),
         error_callback=lambda _title, _message: None,
-        toast_callback=lambda message, duration: toast_messages.append((message, duration)),
+        toast_callback=_append_status_message(toast_messages),
         usage_logger=IntentUsageLogger(enabled=False),
     )
 
@@ -532,15 +566,15 @@ def test_show_context_menu_explains_fork_prompt_action(
         query_input=query_input,
         layout_state=cast("WindowStateManager", _LayoutStateStub()),
         workspace_view=None,
-        execution_controller_supplier=lambda: object(),
+        execution_controller_supplier=_object_execution_controller,
         current_prompt_supplier=lambda: prompt,
         edit_callback=lambda: None,
         duplicate_callback=lambda _prompt: None,
         fork_callback=lambda _prompt: None,
         similar_callback=None,
-        status_callback=lambda message, duration: status_messages.append((message, duration)),
+        status_callback=_append_status_message(status_messages),
         error_callback=lambda _title, _message: None,
-        toast_callback=lambda message, duration: toast_messages.append((message, duration)),
+        toast_callback=_append_status_message(toast_messages),
         usage_logger=IntentUsageLogger(enabled=False),
     )
 
@@ -577,15 +611,15 @@ def test_show_context_menu_keeps_similar_prompts_wording_distinct_from_search_an
         query_input=query_input,
         layout_state=cast("WindowStateManager", _LayoutStateStub()),
         workspace_view=None,
-        execution_controller_supplier=lambda: object(),
+        execution_controller_supplier=_object_execution_controller,
         current_prompt_supplier=lambda: prompt,
         edit_callback=lambda: None,
         duplicate_callback=lambda _prompt: None,
         fork_callback=lambda _prompt: None,
         similar_callback=lambda _prompt: None,
-        status_callback=lambda message, duration: status_messages.append((message, duration)),
+        status_callback=_append_status_message(status_messages),
         error_callback=lambda _title, _message: None,
-        toast_callback=lambda message, duration: toast_messages.append((message, duration)),
+        toast_callback=_append_status_message(toast_messages),
         usage_logger=IntentUsageLogger(enabled=False),
     )
 
@@ -625,15 +659,15 @@ def test_show_context_menu_keeps_duplicate_and_fork_wording_explicit_and_distinc
         query_input=query_input,
         layout_state=cast("WindowStateManager", _LayoutStateStub()),
         workspace_view=None,
-        execution_controller_supplier=lambda: object(),
+        execution_controller_supplier=_object_execution_controller,
         current_prompt_supplier=lambda: prompt,
         edit_callback=lambda: None,
         duplicate_callback=lambda _prompt: None,
         fork_callback=lambda _prompt: None,
         similar_callback=lambda _prompt: None,
-        status_callback=lambda message, duration: status_messages.append((message, duration)),
+        status_callback=_append_status_message(status_messages),
         error_callback=lambda _title, _message: None,
-        toast_callback=lambda message, duration: toast_messages.append((message, duration)),
+        toast_callback=_append_status_message(toast_messages),
         usage_logger=IntentUsageLogger(enabled=False),
     )
 
@@ -674,15 +708,15 @@ def test_show_context_menu_keeps_execute_actions_bounded_and_distinct(
         query_input=query_input,
         layout_state=cast("WindowStateManager", _LayoutStateStub()),
         workspace_view=None,
-        execution_controller_supplier=lambda: object(),
+        execution_controller_supplier=_object_execution_controller,
         current_prompt_supplier=lambda: prompt,
         edit_callback=lambda: None,
         duplicate_callback=lambda _prompt: None,
         fork_callback=lambda _prompt: None,
         similar_callback=lambda _prompt: None,
-        status_callback=lambda message, duration: status_messages.append((message, duration)),
+        status_callback=_append_status_message(status_messages),
         error_callback=lambda _title, _message: None,
-        toast_callback=lambda message, duration: toast_messages.append((message, duration)),
+        toast_callback=_append_status_message(toast_messages),
         usage_logger=IntentUsageLogger(enabled=False),
     )
 
@@ -731,9 +765,9 @@ def test_show_context_menu_uses_shared_copy_prompt_label(
         duplicate_callback=lambda _prompt: None,
         fork_callback=lambda _prompt: None,
         similar_callback=None,
-        status_callback=lambda message, duration: status_messages.append((message, duration)),
+        status_callback=_append_status_message(status_messages),
         error_callback=lambda _title, _message: None,
-        toast_callback=lambda message, duration: toast_messages.append((message, duration)),
+        toast_callback=_append_status_message(toast_messages),
         usage_logger=IntentUsageLogger(enabled=False),
     )
 
