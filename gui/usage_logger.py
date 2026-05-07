@@ -23,6 +23,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("prompt_manager.gui.usage")
 
+type UsageRecord = dict[str, object]
+
 
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
@@ -79,7 +81,7 @@ class IntentUsageLogger:
 
     def log_copy(self, *, prompt_name: str, prompt_has_body: bool) -> None:
         """Log that a prompt has been copied to the clipboard."""
-        record = {
+        record: UsageRecord = {
             "timestamp": _now_iso(),
             "event": "copy",
             "prompt_name": prompt_name,
@@ -89,7 +91,7 @@ class IntentUsageLogger:
 
     def log_share(self, *, provider: str, prompt_name: str, payload_chars: int) -> None:
         """Log that a prompt was shared via an external provider."""
-        record = {
+        record: UsageRecord = {
             "timestamp": _now_iso(),
             "event": "share",
             "provider": provider,
@@ -107,7 +109,7 @@ class IntentUsageLogger:
         error: str | None = None,
     ) -> None:
         """Log prompt execution outcomes."""
-        record = {
+        record: UsageRecord = {
             "timestamp": _now_iso(),
             "event": "execute",
             "prompt_name": prompt_name,
@@ -120,7 +122,7 @@ class IntentUsageLogger:
 
     def log_history_view(self, *, total: int) -> None:
         """Log when the execution history dialog is opened."""
-        record = {
+        record: UsageRecord = {
             "timestamp": _now_iso(),
             "event": "history",
             "entries": total,
@@ -129,7 +131,7 @@ class IntentUsageLogger:
 
     def log_save(self, *, prompt_name: str, note_length: int, rating: float | None = None) -> None:
         """Log that a prompt result was manually saved."""
-        record = {
+        record: UsageRecord = {
             "timestamp": _now_iso(),
             "event": "save",
             "prompt_name": prompt_name,
@@ -141,7 +143,7 @@ class IntentUsageLogger:
 
     def log_note_edit(self, *, note_length: int) -> None:
         """Log note edits performed in the history dialog."""
-        record = {
+        record: UsageRecord = {
             "timestamp": _now_iso(),
             "event": "edit_note",
             "note_length": note_length,
@@ -150,7 +152,7 @@ class IntentUsageLogger:
 
     def log_history_export(self, *, entries: int, path: str) -> None:
         """Log that history was exported."""
-        record = {
+        record: UsageRecord = {
             "timestamp": _now_iso(),
             "event": "history_export",
             "entries": entries,
@@ -158,7 +160,7 @@ class IntentUsageLogger:
         }
         self._append(record)
 
-    def _base_record(self, event: str, query_text: str) -> dict[str, object]:
+    def _base_record(self, event: str, query_text: str) -> UsageRecord:
         digest = hashlib.blake2s(query_text.encode("utf-8"), digest_size=8).hexdigest()
         preview = " ".join(query_text.split())[:120]
         return {

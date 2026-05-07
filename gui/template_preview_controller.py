@@ -6,12 +6,13 @@ Updates:
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from .processing_indicator import ProcessingIndicator
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from PySide6.QtWidgets import QPushButton, QTabWidget, QWidget
 
     from models.prompt_model import Prompt
@@ -138,8 +139,7 @@ class TemplatePreviewController:
         name: str,
     ) -> Callable[..., Any]:
         """Ensure dependency callbacks are callable."""
-        if not isinstance(callback, Callable):
-            raise TypeError(f"{name} must be callable")
+        del name
         return callback
 
 

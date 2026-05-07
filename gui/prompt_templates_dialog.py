@@ -52,9 +52,7 @@ class PromptTemplateEditorDialog(QDialog):
 
         self._defaults: dict[str, str] = dict(DEFAULT_PROMPT_TEMPLATES)
         self._initial_overrides: dict[str, str] = {
-            key: value
-            for key, value in (templates or {}).items()
-            if isinstance(value, str) and value.strip()
+            key: value for key, value in (templates or {}).items() if value.strip()
         }
         self._editors: dict[str, QPlainTextEdit] = {}
         self._status_labels: dict[str, QLabel] = {}

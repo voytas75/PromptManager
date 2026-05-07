@@ -7,7 +7,6 @@ Updates:
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import Qt, Signal
@@ -23,6 +22,8 @@ from PySide6.QtWidgets import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
+    from collections.abc import Sequence
+
     from models.category_model import PromptCategory
 else:  # pragma: no cover - runtime fallback for type checking aids
     PromptCategory = Any
@@ -43,8 +44,6 @@ class PromptFilterPanel(QWidget):
     ) -> None:
         """Build filter controls and wire their change signals."""
         super().__init__(parent)
-        if not isinstance(sort_options, Sequence):  # pragma: no cover - defensive
-            raise TypeError("sort_options must be a sequence of (label, value) tuples.")
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)

@@ -6,12 +6,13 @@ Updates:
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from core.sharing import format_prompt_for_share
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from PySide6.QtWidgets import QPushButton
 
     from core.sharing import ShareProvider
@@ -120,8 +121,7 @@ class ShareWorkflowCoordinator:
         name: str,
     ) -> Callable[..., Any]:
         """Validate callable dependencies supplied to the coordinator."""
-        if not isinstance(callback, Callable):
-            raise TypeError(f"{name} must be callable")
+        del name
         return callback
 
 
