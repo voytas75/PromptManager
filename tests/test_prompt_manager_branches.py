@@ -15,10 +15,9 @@ import types
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, cast, override
 
 import pytest
-from overrides import override
 
 from core.embedding import EmbeddingGenerationError
 from core.intent_classifier import IntentClassifier
@@ -133,10 +132,6 @@ def _as_redis_client(client: object | None) -> RedisClientProtocol | None:
     if client is None:
         return None
     return cast("RedisClientProtocol", client)
-
-
-def _pm(manager: PromptManager) -> Any:
-    return cast("Any", manager)
 
 
 class _RecordingRepository:
@@ -480,7 +475,11 @@ def test_suggest_prompts_falls_back_to_repository_list() -> None:
     )
     repository.add(prompt)
 
-    empty_result = {"ids": [[]], "documents": [[]], "metadatas": [[]]}
+    empty_result: dict[str, list[list[object]]] = {
+        "ids": [[]],
+        "documents": [[]],
+        "metadatas": [[]],
+    }
     collection = _StubCollection(query_result=empty_result)
     manager = _build_manager(repository=repository, collection=collection)
 
@@ -509,9 +508,14 @@ def test_prompt_manager_falls_back_to_persistent_client(monkeypatch: pytest.Monk
 
     persistent_client = _PersistentClient(path=None)
     monkeypatch.setattr("core.prompt_manager.chromadb.Client", _failing_client)
+
+    def _persistent_client_factory(path: str) -> _PersistentClient:
+        assert path == "/tmp/chroma"
+        return persistent_client
+
     monkeypatch.setattr(
         "core.prompt_manager.chromadb.PersistentClient",
-        lambda path: persistent_client,
+        _persistent_client_factory,
     )
 
     manager = PromptManager(
@@ -565,7 +569,7 @@ def test_get_prompt_returns_cached_value() -> None:
 
     result = manager.get_prompt(prompt.id)
     assert result.id == prompt.id
-    assert redis_client.last_get == manager._cache_key(prompt.id)
+    assert redis_client.last_get == manager.cache_key(prompt.id)
 
 
 def test_get_cached_prompt_invalid_json_raises() -> None:
@@ -1104,7 +1108,7 @@ def test_increment_usage_updates_repository() -> None:
 def test_get_cached_prompt_returns_none_when_missing() -> None:
     redis_client = _RedisStub(payload=None)
     manager = _build_manager(redis_client=redis_client)
-    assert manager._get_cached_prompt(uuid.uuid4()) is None
+    assert manager.get_cached_prompt(uuid.uuid4()) is None
 
 
 def test_cache_and_evict_prompt_raise_prompt_cache_error() -> None:
@@ -1113,17 +1117,17 @@ def test_cache_and_evict_prompt_raise_prompt_cache_error() -> None:
     redis_fail = _RedisStub(set_exception=RedisError("set"))
     manager = _build_manager(redis_client=redis_fail)
     with pytest.raises(PromptCacheError):
-        manager._cache_prompt(_sample_prompt())
+        manager.cache_prompt(_sample_prompt())
 
     redis_get_fail = _RedisStub(get_exception=RedisError("get"))
     manager_get = _build_manager(redis_client=redis_get_fail)
     with pytest.raises(PromptCacheError):
-        manager_get._get_cached_prompt(uuid.uuid4())
+        manager_get.get_cached_prompt(uuid.uuid4())
 
     redis_delete_fail = _RedisStub(delete_exception=RedisError("delete"))
     manager_del = _build_manager(redis_client=redis_delete_fail)
     with pytest.raises(PromptCacheError):
-        manager_del._evict_cached_prompt(uuid.uuid4())
+        manager_del.evict_cached_prompt(uuid.uuid4())
 
 
 def test_prompt_version_commit_and_restore() -> None:

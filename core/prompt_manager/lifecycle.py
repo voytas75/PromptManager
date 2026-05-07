@@ -425,6 +425,23 @@ class PromptLifecycleMixin:
         """Format cache key for prompt entries."""
         return f"prompt:{prompt_id}"
 
+    def get_cached_prompt(self, prompt_id: UUID) -> Prompt | None:
+        """Public wrapper for retrieving a prompt from the optional Redis cache."""
+        return self._get_cached_prompt(prompt_id)
+
+    def cache_prompt(self, prompt: Prompt) -> None:
+        """Public wrapper for writing a prompt into the optional Redis cache."""
+        self._cache_prompt(prompt)
+
+    def evict_cached_prompt(self, prompt_id: UUID) -> None:
+        """Public wrapper for evicting a prompt from the optional Redis cache."""
+        self._evict_cached_prompt(prompt_id)
+
+    @staticmethod
+    def cache_key(prompt_id: UUID) -> str:
+        """Public wrapper for formatting a prompt cache key."""
+        return f"prompt:{prompt_id}"
+
     def _persist_embedding(
         self,
         prompt: Prompt,
