@@ -63,6 +63,7 @@ class PromptFilterPanel(QWidget):
 
         layout.addWidget(QLabel("Tag:", self))
         self._tag_combo = QComboBox(self)
+        self._tag_combo.setObjectName("tagFilterCombo")
         self._tag_combo.addItem("All tags", None)
         self._tag_combo.currentIndexChanged.connect(self._handle_tag_changed)  # type: ignore[arg-type]
         layout.addWidget(self._tag_combo)
@@ -80,6 +81,7 @@ class PromptFilterPanel(QWidget):
         self._sort_visibility_label.setObjectName("sortFilterVisibilityLabel")
 
         self._favorites_only_checkbox = QCheckBox("Favorites only", self)
+        self._favorites_only_checkbox.setObjectName("favoritesOnlyFilterCheckbox")
         self._favorites_only_checkbox.toggled.connect(self._handle_favorites_toggled)  # type: ignore[arg-type]
         layout.addWidget(self._favorites_only_checkbox)
 
