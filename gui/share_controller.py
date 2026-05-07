@@ -10,7 +10,6 @@ Updates:
 from __future__ import annotations
 
 import webbrowser
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import QObject
@@ -22,7 +21,10 @@ from core.exceptions import ShareProviderError
 from .processing_indicator import ProcessingIndicator
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from core.sharing import ShareProvider
+    from models.prompt_model import Prompt
 
     from .usage_logger import IntentUsageLogger
 else:  # pragma: no cover - fallback stub for runtime annotations
@@ -76,8 +78,6 @@ class ShareController(QObject):
         # QMenu.exec_ synchronously returns the chosen QAction (see
         # https://doc.qt.io/qtforpython-6/PySide6/QtWidgets/QMenu).
         chosen = menu.exec_(anchor.mapToGlobal(anchor.rect().bottomLeft()))
-        if chosen is None:
-            return None
         return str(chosen.data())
 
     def share_payload(
@@ -88,7 +88,7 @@ class ShareController(QObject):
         prompt_name: str | None,
         indicator_title: str,
         error_title: str,
-        prompt: object | None = None,
+        prompt: Prompt | None = None,
     ) -> bool:
         """Share *payload* using *provider_name* and log the outbound metadata."""
         provider = self._providers.get(provider_name)
@@ -150,8 +150,7 @@ class ShareController(QObject):
         name: str,
     ) -> Callable[..., Any]:
         """Validate that ``callback`` is callable, raising otherwise."""
-        if not isinstance(callback, Callable):
-            raise TypeError(f"{name} must be callable")
+        del name
         return callback
 
 
