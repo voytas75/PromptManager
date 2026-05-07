@@ -24,6 +24,19 @@ class PromptListDelegate(QStyledItemDelegate):
     _VERTICAL_PADDING = 6
     _LINE_SPACING = 2
 
+    @staticmethod
+    def preview_font(font: QFont) -> QFont:
+        """Public helper exposing the preview font choice for bounded tests."""
+        return PromptListDelegate._preview_font(font)
+
+    @staticmethod
+    def build_text_runs(
+        text: str,
+        spans: tuple[tuple[int, int], ...],
+    ) -> tuple[tuple[str, bool], ...]:
+        """Public helper exposing bounded emphasis-run building for tests."""
+        return PromptListDelegate._build_text_runs(text, spans)
+
     def paint(
         self,
         painter: QPainter,

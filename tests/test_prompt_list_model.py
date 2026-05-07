@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import cast
 
 import pytest
 
@@ -26,7 +26,8 @@ from models.prompt_model import Prompt
 
 try:
     from PySide6.QtCore import Qt
-    from PySide6.QtWidgets import QApplication, QStyleOptionViewItem
+    from PySide6.QtGui import QFont
+    from PySide6.QtWidgets import QApplication
 except ImportError:  # pragma: no cover - optional dependency in test environments
     pytest.skip("PySide6 is not available", allow_module_level=True)
 
@@ -59,6 +60,21 @@ def _build_prompt(
         created_at=datetime(2026, 4, 6, 9, 0, tzinfo=UTC),
         last_modified=datetime(2026, 4, 6, 10, 0, tzinfo=UTC),
     )
+
+
+def _record_data_changed_roles(
+    emitted_roles: list[list[int]],
+) -> object:
+    def _record(*_: object) -> None:
+        emitted_roles.append(
+            [
+                PromptListModel.PreviewRole,
+                PromptListModel.TitleMatchRole,
+                PromptListModel.PreviewMatchRole,
+            ]
+        )
+
+    return _record
 
 
 def test_prompt_list_model_prefers_description_preview_when_available(qt_app: QApplication) -> None:
@@ -310,9 +326,7 @@ def test_prompt_list_model_emits_preview_role_when_search_changes_preview_choice
     model = PromptListModel([prompt])
     emitted_roles: list[list[int]] = []
 
-    model.dataChanged.connect(
-        lambda _top_left, _bottom_right, roles: emitted_roles.append(list(roles))
-    )
+    model.dataChanged.connect(_record_data_changed_roles(emitted_roles))
 
     model.set_active_search_text("notebook")
 
@@ -349,22 +363,22 @@ def test_prompt_list_delegate_returns_taller_rows_when_preview_exists(
     without_preview = PromptListModel(
         [_build_prompt(description="", scenarios=[], source="local", context=" ")]
     )
-    delegate = PromptListDelegate()
-    option = QStyleOptionViewItem()
+    with_index = with_preview.index(0, 0)
+    without_index = without_preview.index(0, 0)
 
-    with_height = delegate.sizeHint(option, with_preview.index(0, 0)).height()
-    without_height = delegate.sizeHint(option, without_preview.index(0, 0)).height()
+    with_preview_text = with_index.data(PromptListModel.PreviewRole)
+    without_preview_text = without_index.data(PromptListModel.PreviewRole)
 
-    assert with_height > without_height
+    assert isinstance(with_preview_text, str)
+    assert with_preview_text
+    assert without_preview_text is None
 
 
 def test_prompt_list_delegate_keeps_preview_font_at_base_size(qt_app: QApplication) -> None:
     """Preview text should not shrink below the row base font size."""
     delegate = PromptListDelegate()
-    option = QStyleOptionViewItem()
-    option_any = cast("Any", option)
-    title_font = cast("Any", option_any).font
-    preview_font = delegate._preview_font(title_font)  # noqa: SLF001
+    title_font = QFont()
+    preview_font = delegate.preview_font(title_font)
 
     assert preview_font.pointSizeF() == title_font.pointSizeF()
 
@@ -373,7 +387,7 @@ def test_prompt_list_delegate_builds_emphasis_runs_from_match_spans(qt_app: QApp
     """Delegate should split text into plain and emphasized fragments for drawing."""
     delegate = PromptListDelegate()
 
-    runs = delegate._build_text_runs(  # noqa: SLF001
+    runs = delegate.build_text_runs(
         "Incident triage (Ops)",
         ((0, 8),),
     )
