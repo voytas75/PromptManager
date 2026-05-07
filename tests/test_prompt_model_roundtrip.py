@@ -6,51 +6,49 @@ import json
 import uuid
 from datetime import UTC, datetime
 
-import pytest
-
 from models.prompt_model import (
     Prompt,
-    _deserialize_list,
-    _deserialize_metadata,
-    _ensure_datetime,
-    _ensure_uuid,
-    _serialize_list,
-    _serialize_metadata,
+    deserialize_prompt_list,
+    deserialize_prompt_metadata,
+    ensure_prompt_datetime,
+    ensure_prompt_uuid,
+    serialize_prompt_list,
+    serialize_prompt_metadata,
 )
 
 
 def test_helper_functions_cover_edge_cases() -> None:
     """Exercise helper conversion utilities against edge-case payloads."""
     sample_uuid = uuid.uuid4()
-    assert _ensure_uuid(sample_uuid) is sample_uuid
-    assert _ensure_uuid(str(sample_uuid)) == sample_uuid
+    assert ensure_prompt_uuid(sample_uuid) is sample_uuid
+    assert ensure_prompt_uuid(str(sample_uuid)) == sample_uuid
 
     naive_dt = datetime(2025, 10, 30, 12, 0, 0)
-    ensured = _ensure_datetime(naive_dt)
+    ensured = ensure_prompt_datetime(naive_dt)
     assert ensured.tzinfo is not None
-    auto_now = _ensure_datetime(None)
+    auto_now = ensure_prompt_datetime(None)
     assert auto_now.tzinfo == UTC
 
-    assert _serialize_list(["a", "b"]) == ["a", "b"]
-    assert _serialize_list({"a", "b"})  # set coverage
-    assert _serialize_list("tag") == ["tag"]
+    assert serialize_prompt_list(["a", "b"]) == ["a", "b"]
+    assert serialize_prompt_list({"a", "b"})  # set coverage
+    assert serialize_prompt_list("tag") == ["tag"]
 
-    assert _serialize_metadata(None) is None
-    assert _serialize_metadata("text") == "text"
+    assert serialize_prompt_metadata(None) is None
+    assert serialize_prompt_metadata("text") == "text"
     complex_meta = {"score": 1}
-    serialized_meta = _serialize_metadata(complex_meta)
+    serialized_meta = serialize_prompt_metadata(complex_meta)
     assert serialized_meta is not None
     assert json.loads(serialized_meta) == complex_meta
 
-    assert _deserialize_metadata(None) is None
-    assert _deserialize_metadata("null") is None
-    assert _deserialize_metadata('{"broken": 1') == '{"broken": 1'
-    assert _deserialize_metadata('{"a":1}') == {"a": 1}
+    assert deserialize_prompt_metadata(None) is None
+    assert deserialize_prompt_metadata("null") is None
+    assert deserialize_prompt_metadata('{"broken": 1') == '{"broken": 1'
+    assert deserialize_prompt_metadata('{"a":1}') == {"a": 1}
 
-    assert _deserialize_list(None) == []
-    assert _deserialize_list('["x",1]') == ["x", "1"]
-    assert _deserialize_list("plain") == ["plain"]
-    assert _deserialize_list([1, "b"]) == ["1", "b"]
+    assert deserialize_prompt_list(None) == []
+    assert deserialize_prompt_list('["x",1]') == ["x", "1"]
+    assert deserialize_prompt_list("plain") == ["plain"]
+    assert deserialize_prompt_list([1, "b"]) == ["1", "b"]
 
 
 def test_prompt_roundtrip_metadata_and_record() -> None:
@@ -105,7 +103,7 @@ def test_prompt_roundtrip_metadata_and_record() -> None:
         "Share with onboarding teammates",
     ]
     assert reconstructed.rating_count == 3
-    assert reconstructed.rating_sum == pytest.approx(27.0)
+    assert abs(reconstructed.rating_sum - 27.0) < 1e-9
 
 
 def test_prompt_from_chroma_handles_stringified_lists() -> None:

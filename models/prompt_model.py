@@ -119,6 +119,14 @@ def _deserialize_list(value: Any) -> list[str]:
     return [str(value)]
 
 
+ensure_prompt_uuid = _ensure_uuid
+ensure_prompt_datetime = _ensure_datetime
+serialize_prompt_list = _serialize_list
+serialize_prompt_metadata = _serialize_metadata
+deserialize_prompt_metadata = _deserialize_metadata
+deserialize_prompt_list = _deserialize_list
+
+
 def _coerce_bool(value: Any) -> bool:
     """Return a predictable boolean for mixed persisted truthy values."""
     if isinstance(value, bool):
@@ -689,4 +697,10 @@ __all__ = [
     "ExecutionStatus",
     "UserProfile",
     "DEFAULT_PROFILE_ID",
+    "ensure_prompt_uuid",
+    "ensure_prompt_datetime",
+    "serialize_prompt_list",
+    "serialize_prompt_metadata",
+    "deserialize_prompt_metadata",
+    "deserialize_prompt_list",
 ]
