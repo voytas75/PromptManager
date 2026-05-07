@@ -25,6 +25,7 @@ from models.prompt_model import Prompt
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from collections.abc import Callable
 
+    import pytest
     from PySide6.QtWidgets import QWidget
 
     from core import PromptManager
@@ -120,7 +121,9 @@ class _DraftPromoteDialogStub:
 class _DraftPromoteDialogFactoryStub:
     dialog: _DraftPromoteDialogStub
     built_prompts: list[Prompt]
-    built_similar_prompts: list[list[Prompt]] = field(default_factory=list)
+    built_similar_prompts: list[list[Prompt]] = field(
+        default_factory=lambda: cast("list[list[Prompt]]", [])
+    )
 
     def build(
         self,
@@ -179,6 +182,14 @@ class _ManagerStub:
         return list(self.search_results)
 
 
+def _ignore_error(*_: object) -> None:
+    """Ignore test-only error callback invocations."""
+
+
+def _ignore_status(*_: object) -> None:
+    """Ignore test-only status callback invocations."""
+
+
 class _ProcessingIndicatorStub:
     def __init__(self, *_args: Any, **_kwargs: Any) -> None:
         """Mirror the production indicator constructor without GUI work."""
@@ -211,7 +222,7 @@ def _build_flow(
         select_prompt=select_prompt,
         delete_prompt=delete_prompt,
         status_callback=status_callback,
-        error_callback=lambda *_: None,
+        error_callback=_ignore_error,
     )
 
 
@@ -245,7 +256,7 @@ def test_edit_prompt_delete_requests_skip_confirmation_keyword() -> None:
         delete_prompt=_delete_prompt,
         load_prompts=lambda _: None,
         select_prompt=lambda _: None,
-        status_callback=lambda *_: None,
+        status_callback=_ignore_status,
     )
     prompt = Prompt(
         id=uuid.uuid4(),
@@ -326,7 +337,9 @@ def test_quick_capture_creates_draft_selects_prompt_and_opens_editor() -> None:
     assert editor_builds == [created]
 
 
-def test_promote_draft_updates_prompt_and_clears_draft_status(monkeypatch) -> None:
+def test_promote_draft_updates_prompt_and_clears_draft_status(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Promoting a draft should reuse update flow and clear only active draft state."""
     monkeypatch.setattr(prompt_editor_flow_module, "ProcessingIndicator", _ProcessingIndicatorStub)
     manager = _ManagerStub()
@@ -413,7 +426,9 @@ def test_promote_draft_updates_prompt_and_clears_draft_status(monkeypatch) -> No
     assert status_messages == [("Draft promoted.", 4000)]
 
 
-def test_edit_prompt_can_apply_changes_then_handoff_into_promote(monkeypatch) -> None:
+def test_edit_prompt_can_apply_changes_then_handoff_into_promote(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Draft editor shortcut should save pending changes before entering promote flow."""
     monkeypatch.setattr(prompt_editor_flow_module, "ProcessingIndicator", _ProcessingIndicatorStub)
     manager = _ManagerStub()
@@ -505,7 +520,9 @@ def test_edit_prompt_can_apply_changes_then_handoff_into_promote(monkeypatch) ->
     ]
 
 
-def test_promote_draft_passes_similar_matches_and_can_open_existing(monkeypatch) -> None:
+def test_promote_draft_passes_similar_matches_and_can_open_existing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Draft promotion should surface similar matches and allow opening one instead."""
     monkeypatch.setattr(prompt_editor_flow_module, "ProcessingIndicator", _ProcessingIndicatorStub)
     manager = _ManagerStub()
