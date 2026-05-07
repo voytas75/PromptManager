@@ -15,6 +15,8 @@ from core.sharing import ShareProviderInfo, ShareResult
 from gui.share_controller import ShareController
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers only
+    from collections.abc import Callable
+
     from PySide6.QtWidgets import QWidget
 
     from gui.usage_logger import IntentUsageLogger
@@ -56,8 +58,17 @@ class _DummyIndicator:
     def __init__(self, *_: Any, **__: Any) -> None:
         return None
 
-    def run(self, func, *args):  # noqa: ANN001
+    def run(self, func: Callable[..., bool], *args: object) -> bool:
         return func(*args)
+
+
+def _noop_callback(*_args: object) -> None:
+    return None
+
+
+def _always_true(*_args: object, **_kwargs: object) -> bool:
+    del _args, _kwargs
+    return True
 
 
 class _DummyClipboard:
@@ -69,7 +80,7 @@ class _DummyClipboard:
 
 
 @pytest.fixture(autouse=True)
-def _patch_processing_indicator(monkeypatch: pytest.MonkeyPatch) -> None:
+def processing_indicator_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("gui.share_controller.ProcessingIndicator", _DummyIndicator)
 
 
@@ -77,18 +88,21 @@ def test_share_controller_opens_browser(monkeypatch: pytest.MonkeyPatch) -> None
     """Open the default browser automatically when preference is enabled."""
 
     opened: list[str] = []
-    monkeypatch.setattr(
-        "gui.share_controller.webbrowser.open",
-        lambda url, new=2: opened.append(url) or True,
-    )
+
+    def _open_browser(url: str, new: int = 2) -> bool:
+        del new
+        opened.append(url)
+        return True
+
+    monkeypatch.setattr("gui.share_controller.webbrowser.open", _open_browser)
     clipboard = _DummyClipboard()
     monkeypatch.setattr("PySide6.QtGui.QGuiApplication.clipboard", lambda: clipboard)
 
     controller = ShareController(
         cast("QWidget", None),
-        toast_callback=lambda *_: None,
-        status_callback=lambda *_: None,
-        error_callback=lambda *_: None,
+        toast_callback=_noop_callback,
+        status_callback=_noop_callback,
+        error_callback=_noop_callback,
         usage_logger=cast("IntentUsageLogger", _DummyUsageLogger()),
         preference_supplier=lambda: True,
     )
@@ -108,14 +122,14 @@ def test_share_controller_opens_browser(monkeypatch: pytest.MonkeyPatch) -> None
 def test_share_controller_respects_disabled_auto_open(monkeypatch: pytest.MonkeyPatch) -> None:
     """Skip opening the browser when preference function returns False."""
 
-    monkeypatch.setattr("gui.share_controller.webbrowser.open", lambda *_, **__: True)
+    monkeypatch.setattr("gui.share_controller.webbrowser.open", _always_true)
     monkeypatch.setattr("PySide6.QtGui.QGuiApplication.clipboard", lambda: _DummyClipboard())
 
     controller = ShareController(
         cast("QWidget", None),
-        toast_callback=lambda *_: None,
-        status_callback=lambda *_: None,
-        error_callback=lambda *_: None,
+        toast_callback=_noop_callback,
+        status_callback=_noop_callback,
+        error_callback=_noop_callback,
         usage_logger=cast("IntentUsageLogger", _DummyUsageLogger()),
         preference_supplier=lambda: False,
     )
@@ -125,7 +139,7 @@ def test_share_controller_respects_disabled_auto_open(monkeypatch: pytest.Monkey
 def test_share_controller_surfaces_management_note(monkeypatch: pytest.MonkeyPatch) -> None:
     """Emit delete links and provider-specific notes through the status callback."""
 
-    monkeypatch.setattr("gui.share_controller.webbrowser.open", lambda *_, **__: True)
+    monkeypatch.setattr("gui.share_controller.webbrowser.open", _always_true)
     monkeypatch.setattr("PySide6.QtGui.QGuiApplication.clipboard", lambda: _DummyClipboard())
 
     status_messages: list[str] = []
@@ -135,9 +149,9 @@ def test_share_controller_surfaces_management_note(monkeypatch: pytest.MonkeyPat
 
     controller = ShareController(
         cast("QWidget", None),
-        toast_callback=lambda *_: None,
+        toast_callback=_noop_callback,
         status_callback=_status,
-        error_callback=lambda *_: None,
+        error_callback=_noop_callback,
         usage_logger=cast("IntentUsageLogger", _DummyUsageLogger()),
         preference_supplier=lambda: False,
     )
