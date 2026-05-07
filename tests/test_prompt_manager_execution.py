@@ -23,6 +23,7 @@ from core import (
 from models.prompt_model import Prompt
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
     from pathlib import Path
 
     from chromadb.api import ClientAPI  # type: ignore[reportMissingTypeArgument]
@@ -98,10 +99,11 @@ class _StubExecutor:
         prompt: Prompt,
         request_text: str,
         *,
-        conversation=None,
+        conversation: Iterable[dict[str, object]] | None = None,
         stream: bool | None = None,
-        on_stream=None,
+        on_stream: Callable[[str], None] | None = None,
     ) -> CodexExecutionResult:
+        del on_stream
         self.called_with = request_text
         if conversation is not None:
             self.conversation_length = len(list(conversation))
@@ -122,10 +124,11 @@ class _FailingExecutor:
         prompt: Prompt,
         request_text: str,
         *,
-        conversation=None,
+        conversation: Iterable[dict[str, object]] | None = None,
         stream: bool | None = None,
-        on_stream=None,
+        on_stream: Callable[[str], None] | None = None,
     ) -> CodexExecutionResult:
+        del prompt, request_text, conversation, stream, on_stream
         raise ExecutionError("model timeout")
 
 
@@ -169,7 +172,7 @@ def _manager_with_dependencies(
 def test_execute_prompt_returns_outcome_and_logs_history(tmp_path: Path) -> None:
     """Execute prompts successfully and capture associated history metadata."""
     executor = _StubExecutor()
-    manager, prompt, tracker = _manager_with_dependencies(tmp_path, executor)
+    manager, prompt, _tracker = _manager_with_dependencies(tmp_path, executor)
 
     outcome = manager.execute_prompt(prompt.id, "print('hello')")
 
@@ -214,7 +217,7 @@ def test_execute_prompt_logs_failure(tmp_path: Path) -> None:
 def test_execute_prompt_supports_conversation(tmp_path: Path) -> None:
     """Preserve and reuse conversation context between runs."""
     executor = _StubExecutor()
-    manager, prompt, tracker = _manager_with_dependencies(tmp_path, executor)
+    manager, prompt, _tracker = _manager_with_dependencies(tmp_path, executor)
 
     first = manager.execute_prompt(prompt.id, "print('hello')")
     assert first.conversation[-1]["role"] == "assistant"
@@ -251,16 +254,17 @@ def test_execute_prompt_streams_to_callback(tmp_path: Path) -> None:
             prompt: Prompt,
             request_text: str,
             *,
-            conversation=None,
+            conversation: Iterable[dict[str, object]] | None = None,
             stream: bool | None = None,
-            on_stream=None,
+            on_stream: Callable[[str], None] | None = None,
         ) -> CodexExecutionResult:
             self.stream_flag = stream
-            if on_stream:
+            prompt_id = prompt.id
+            if on_stream is not None:
                 on_stream("partial ")
                 on_stream("output")
             return CodexExecutionResult(
-                prompt_id=prompt.id,
+                prompt_id=prompt_id,
                 request_text=request_text,
                 response_text="partial output",
                 duration_ms=12,
@@ -269,7 +273,7 @@ def test_execute_prompt_streams_to_callback(tmp_path: Path) -> None:
             )
 
     executor = _StreamingExecutor()
-    manager, prompt, tracker = _manager_with_dependencies(tmp_path, executor)
+    manager, prompt, _tracker = _manager_with_dependencies(tmp_path, executor)
     chunks: list[str] = []
 
     outcome = manager.execute_prompt(
@@ -289,7 +293,7 @@ def test_execute_prompt_streams_to_callback(tmp_path: Path) -> None:
 def test_save_execution_result_records_manual_entry(tmp_path: Path) -> None:
     """Persist manually saved results with optional ratings and notes."""
     executor = _StubExecutor()
-    manager, prompt, tracker = _manager_with_dependencies(tmp_path, executor)
+    manager, prompt, _tracker = _manager_with_dependencies(tmp_path, executor)
 
     outcome = manager.execute_prompt(prompt.id, "print('hello')")
     manual = manager.save_execution_result(
@@ -308,15 +312,16 @@ def test_save_execution_result_records_manual_entry(tmp_path: Path) -> None:
     assert any(entry.id == manual.id for entry in entries)
     refreshed_prompt = manager.get_prompt(prompt.id)
     assert refreshed_prompt.rating_count == 1
-    assert refreshed_prompt.rating_sum == pytest.approx(8.0)
-    assert refreshed_prompt.quality_score == pytest.approx(8.0)
+    assert abs(refreshed_prompt.rating_sum - 8.0) < 1e-9
+    assert refreshed_prompt.quality_score is not None
+    assert abs(refreshed_prompt.quality_score - 8.0) < 1e-9
     manager.close()
 
 
 def test_update_execution_note(tmp_path: Path) -> None:
     """Allow history entries to update their free-form notes."""
     executor = _StubExecutor()
-    manager, prompt, tracker = _manager_with_dependencies(tmp_path, executor)
+    manager, prompt, _tracker = _manager_with_dependencies(tmp_path, executor)
 
     outcome = manager.execute_prompt(prompt.id, "print('hi')")
     saved = manager.save_execution_result(
@@ -341,7 +346,7 @@ def test_history_methods_without_tracker(tmp_path: Path) -> None:
 def test_benchmark_prompts_returns_runs_with_history(tmp_path: Path) -> None:
     """Benchmark prompts against configured models and log outcomes."""
     executor = _StubExecutor()
-    manager, prompt, tracker = _manager_with_dependencies(tmp_path, executor)
+    manager, prompt, _tracker = _manager_with_dependencies(tmp_path, executor)
 
     manager.execute_prompt(prompt.id, "seed history")
     report = manager.benchmark_prompts([prompt.id], "benchmark input")
