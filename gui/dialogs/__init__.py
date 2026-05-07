@@ -35,8 +35,6 @@ from .prompt_chain_editor import PromptChainEditorDialog, PromptChainStepDialog
 from .prompt_chains import PromptChainManagerDialog
 from .prompt_editor import PromptDialog, PromptRefinedDialog
 
-_strip_scenarios_metadata = strip_scenarios_metadata
-
 __all__ = [
     "CatalogPreviewDialog",
     "CategoryEditorDialog",
@@ -54,7 +52,7 @@ __all__ = [
     "PromptVersionHistoryDialog",
     "ResponseStyleDialog",
     "SaveResultDialog",
-    "_strip_scenarios_metadata",
+    "strip_scenarios_metadata",
     "fallback_generate_description",
     "fallback_generate_scenarios",
     "fallback_suggest_prompt_name",

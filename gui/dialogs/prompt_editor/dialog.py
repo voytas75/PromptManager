@@ -135,6 +135,7 @@ class PromptDialog(
         form_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
 
         self._name_input = QLineEdit(self)
+        self._name_input.setObjectName("promptDialogNameInput")
         self._generate_name_button = QPushButton("Generate", self)
         self._generate_name_button.setToolTip("Suggest a name based on the context field.")
         self._generate_name_button.clicked.connect(self._on_generate_name_clicked)  # type: ignore[arg-type]
@@ -162,6 +163,7 @@ class PromptDialog(
         form_layout.addRow("Version", version_container)
 
         self._category_input = QComboBox(self)
+        self._category_input.setObjectName("promptDialogCategoryInput")
         self._category_input.setEditable(True)
         self._category_input.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         self._category_input.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
@@ -172,13 +174,16 @@ class PromptDialog(
         self._language_input = QLineEdit(self)
         self._author_input = QLineEdit(self)
         self._tags_input = QLineEdit(self)
+        self._tags_input.setObjectName("promptDialogTagsInput")
         self._context_input = QPlainTextEdit(self)
+        self._context_input.setObjectName("promptDialogContextInput")
         self._context_input.setPlaceholderText("Paste the full prompt text here…")
         self._context_input.setMinimumHeight(320)
         context_policy = self._context_input.sizePolicy()
         context_policy.setVerticalPolicy(QSizePolicy.Policy.Expanding)
         self._context_input.setSizePolicy(context_policy)
         self._description_input = QPlainTextEdit(self)
+        self._description_input.setObjectName("promptDialogDescriptionInput")
         self._description_input.setFixedHeight(60)
         self._description_input.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
@@ -261,6 +266,7 @@ class PromptDialog(
                 "Configure LiteLLM in Settings to enable prompt engineering."
             )
         self._structure_refine_button = QPushButton("Refine Structure", self)
+        self._structure_refine_button.setObjectName("promptDialogStructureRefineButton")
         self._structure_refine_button.setToolTip(
             "Improve formatting and section layout without altering the prompt's intent."
         )
@@ -339,6 +345,7 @@ class PromptDialog(
                 promote_button.setToolTip(
                     "Apply current changes if needed, then continue in Promote Draft."
                 )
+                promote_button.setObjectName("promptDialogPromoteDraftButton")
                 promote_button.clicked.connect(self._on_promote_draft_clicked)  # type: ignore[arg-type]
                 self._promote_draft_button = promote_button
             delete_button = self._buttons.addButton(
@@ -358,6 +365,14 @@ class PromptDialog(
         self._populate(prompt)
         self._result_prompt = None
         self._delete_requested = False
+
+    def build_prompt(self) -> Prompt | None:
+        """Public wrapper for building a prompt from current dialog state."""
+        return self._build_prompt()
+
+    def request_draft_promotion(self) -> None:
+        """Public wrapper for the bounded draft-promotion handoff flow."""
+        self._on_promote_draft_clicked()
 
     def _populate(self, prompt: Prompt) -> None:
         """Fill inputs with the existing prompt values for editing."""
