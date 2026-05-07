@@ -13,11 +13,12 @@ import types
 import uuid
 import zipfile
 from contextlib import closing
+from types import TracebackType
 from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 from chromadb.errors import ChromaError
-from overrides import override
+from overrides import override  # pyright: ignore[reportUnknownVariableType]
 
 from core.embedding import EmbeddingGenerationError
 from core.exceptions import CategoryError, CategoryNotFoundError, CategoryStorageError
@@ -232,6 +233,90 @@ def _pm(manager: PromptManager) -> Any:
     return cast("Any", manager)
 
 
+def _workflow_models(manager: PromptManager) -> dict[str, str]:
+    return cast("dict[str, str]", cast("Any", manager)._litellm_workflow_models)
+
+
+def _prompt_templates(manager: PromptManager) -> dict[str, str]:
+    return cast("dict[str, str]", cast("Any", manager)._prompt_templates)
+
+
+def _executor_instance(manager: PromptManager) -> Any:
+    return cast("Any", manager)._executor
+
+
+def _litellm_fast_model(manager: PromptManager) -> str | None:
+    return cast("str | None", getattr(manager, "_litellm_fast_model", None))
+
+
+def _litellm_drop_params(manager: PromptManager) -> tuple[str, ...] | None:
+    return cast("tuple[str, ...] | None", getattr(manager, "_litellm_drop_params", None))
+
+
+def _litellm_stream(manager: PromptManager) -> bool:
+    return bool(getattr(manager, "_litellm_stream", False))
+
+
+def _user_profile(manager: PromptManager) -> Any:
+    return getattr(manager, "_user_profile", None)
+
+
+def _set_collection(manager: PromptManager, collection: Any) -> None:
+    cast("Any", manager)._collection = collection
+
+
+def _resolve_repository_path(manager: PromptManager) -> Path:
+    return cast("Path", cast("Any", manager)._resolve_repository_path())
+
+
+def _fallback_category_from_context(
+    manager: PromptManager,
+    context: str,
+    categories: Sequence[PromptCategory],
+) -> str:
+    return cast("str", cast("Any", manager)._fallback_category_from_context(context, categories))
+
+
+def _build_description_fallback(manager: PromptManager, context: str, prompt: Prompt | None) -> str:
+    return cast("str", cast("Any", manager)._build_description_fallback(context, prompt))
+
+
+def _run_category_generator(
+    manager: PromptManager,
+    context: str,
+    categories: Sequence[PromptCategory],
+) -> str:
+    return cast("str", cast("Any", manager)._run_category_generator(context, categories))
+
+
+def _apply_category_metadata(manager: PromptManager, prompt: Prompt) -> Prompt:
+    return cast("Prompt", cast("Any", manager)._apply_category_metadata(prompt))
+
+
+def _persist_embedding_from_worker(
+    manager: PromptManager,
+    prompt: Prompt,
+    embedding: Sequence[float],
+) -> None:
+    cast("Any", manager)._persist_embedding_from_worker(prompt, embedding)
+
+
+def _apply_rating(manager: PromptManager, prompt_id: uuid.UUID, rating: float) -> None:
+    cast("Any", manager)._apply_rating(prompt_id, rating)
+
+
+def _noop(*args: object, **kwargs: object) -> None:
+    return None
+
+
+def _constant_embedding(*args: object, **kwargs: object) -> list[float]:
+    return [0.1, 0.2]
+
+
+def _version_stub(*args: object, **kwargs: object) -> types.SimpleNamespace:
+    return types.SimpleNamespace(id=1, version_number=1)
+
+
 def _as_history_tracker(tracker: object) -> HistoryTracker:
     return cast("HistoryTracker", tracker)
 
@@ -437,20 +522,24 @@ def test_set_name_generator_configures_workflows(
         prompt_templates=overrides,
     )
 
-    assert manager._litellm_workflow_models == {
+    assert _workflow_models(manager) == {
         "prompt_execution": "inference",
         "scenario_generation": "inference",
     }
-    assert manager._prompt_templates == {
+    assert _prompt_templates(manager) == {
         "name_generation": "Custom name template",
         "scenario_generation": "Scenario helper",
     }
-    assert name_factory.instances[0].kwargs["model"] == "fast-model"
-    assert scenario_factory.instances[0].kwargs["model"] == "inference-model"
-    assert engineer_factory.instances and len(engineer_factory.instances) == 2
-    assert executor_factory.instances[0].kwargs["reasoning_effort"] == "medium"
-    executor_instance = manager._executor
-    assert executor_instance is executor_factory.instances[0]
+    name_instances = cast("list[Any]", getattr(name_factory, "instances", []))
+    scenario_instances = cast("list[Any]", getattr(scenario_factory, "instances", []))
+    engineer_instances = cast("list[Any]", getattr(engineer_factory, "instances", []))
+    executor_instances = cast("list[Any]", getattr(executor_factory, "instances", []))
+    assert name_instances[0].kwargs["model"] == "fast-model"
+    assert scenario_instances[0].kwargs["model"] == "inference-model"
+    assert engineer_instances and len(engineer_instances) == 2
+    assert executor_instances[0].kwargs["reasoning_effort"] == "medium"
+    executor_instance = _executor_instance(manager)
+    assert executor_instance is executor_instances[0]
     assert executor_instance is not None
     assert executor_instance.drop_params == ["api_key"]
     assert executor_instance.stream is True
@@ -581,7 +670,7 @@ def test_get_chroma_details_returns_when_collection_missing(
     prompt_manager: tuple[PromptManager, _DummyCollection, _DummyChromaClient, Path],
 ) -> None:
     manager, _, _, _ = prompt_manager
-    manager._collection = None  # type: ignore[assignment]
+    _set_collection(manager, None)
     details = manager.get_chroma_details()
     assert "status" not in details
 
@@ -644,7 +733,12 @@ def test_verify_vector_store_integrity_failure(
         def __enter__(self) -> _IntegrityFailConnection:
             return self
 
-        def __exit__(self, exc_type, exc, tb) -> None:  # noqa: ANN001
+        def __exit__(
+            self,
+            exc_type: type[BaseException] | None,
+            exc: BaseException | None,
+            tb: TracebackType | None,
+        ) -> None:
             return None
 
         def execute(self, sql: str, *args: object) -> _IntegrityFailConnection:
@@ -656,9 +750,12 @@ def test_verify_vector_store_integrity_failure(
                 return [("not ok",)]
             return [("ok",)]
 
+    def _integrity_fail_connect(*args: object, **kwargs: object) -> _IntegrityFailConnection:
+        return _IntegrityFailConnection()
+
     monkeypatch.setattr(
         "core.prompt_manager.sqlite3.connect",
-        lambda *args, **kwargs: _IntegrityFailConnection(),
+        _integrity_fail_connect,
     )
     with pytest.raises(PromptStorageError):
         manager.verify_vector_store()
@@ -675,7 +772,12 @@ def test_verify_vector_store_quick_check_failure(
         def __enter__(self) -> _QuickFailConnection:
             return self
 
-        def __exit__(self, exc_type, exc, tb) -> None:  # noqa: ANN001
+        def __exit__(
+            self,
+            exc_type: type[BaseException] | None,
+            exc: BaseException | None,
+            tb: TracebackType | None,
+        ) -> None:
             return None
 
         def execute(self, sql: str, *args: object) -> _QuickFailConnection:
@@ -687,9 +789,12 @@ def test_verify_vector_store_quick_check_failure(
                 return [("not ok",)]
             return [("ok",)]
 
+    def _quick_fail_connect(*args: object, **kwargs: object) -> _QuickFailConnection:
+        return _QuickFailConnection()
+
     monkeypatch.setattr(
         "core.prompt_manager.sqlite3.connect",
-        lambda *args, **kwargs: _QuickFailConnection(),
+        _quick_fail_connect,
     )
     with pytest.raises(PromptStorageError):
         manager.verify_vector_store()
@@ -700,12 +805,14 @@ def test_verify_vector_store_handles_collection_initialisation_failure(
 ) -> None:
     manager, _, _, chroma_dir = prompt_manager
     _ensure_chroma_database(chroma_dir)
-    manager._collection = None  # type: ignore[assignment]
+    _set_collection(manager, None)
 
     def fake_initialise(self: PromptManager) -> None:
-        self._collection = None
+        _set_collection(self, None)
 
-    manager._initialise_chroma_collection = fake_initialise.__get__(manager, PromptManager)
+    manager._initialise_chroma_collection = fake_initialise.__get__(  # type: ignore[method-assign]
+        manager, PromptManager
+    )
     with pytest.raises(PromptStorageError):
         manager.verify_vector_store()
 
@@ -717,7 +824,7 @@ def test_verify_vector_store_handles_chroma_errors(
     _ensure_chroma_database(chroma_dir)
     failing_collection = _DummyCollection()
     failing_collection.count_exception = _TestChromaError("count fail")
-    manager._collection = failing_collection  # type: ignore[assignment]
+    _set_collection(manager, failing_collection)
     with pytest.raises(PromptStorageError):
         manager.verify_vector_store()
 
@@ -737,7 +844,12 @@ def test_optimize_vector_store_handles_optimize_errors(
         def __enter__(self) -> _ConnectionWrapper:
             return self
 
-        def __exit__(self, exc_type, exc, tb) -> None:  # noqa: ANN001
+        def __exit__(
+            self,
+            exc_type: type[BaseException] | None,
+            exc: BaseException | None,
+            tb: TracebackType | None,
+        ) -> None:
             self._conn.close()
 
         def execute(self, sql: str, parameters: object | None = None) -> sqlite3.Cursor:
@@ -846,7 +958,8 @@ def test_fallback_category_uses_classifier_hints(
 
     manager.set_intent_classifier(_as_intent_classifier(_Classifier()))
     assert (
-        manager._fallback_category_from_context(
+        _fallback_category_from_context(
+            manager,
             "Investigate bug",
             categories,
         )
@@ -855,7 +968,8 @@ def test_fallback_category_uses_classifier_hints(
 
     manager.set_intent_classifier(None)
     assert (
-        manager._fallback_category_from_context(
+        _fallback_category_from_context(
+            manager,
             "Document the feature",
             categories,
         )
@@ -871,13 +985,13 @@ def test_build_description_fallback_composes_segments(
     prompt.tags = ["ops", " observability "]
     prompt.scenarios = [" Investigate regressions "]
 
-    description = manager._build_description_fallback("Context " * 80, prompt)
+    description = _build_description_fallback(manager, "Context " * 80, prompt)
     assert "focuses on general workflows" in description.lower()
     assert "Common tags: ops, observability." in description
     assert "Example use: Investigate regressions." in description
     assert "Overview" in description
 
-    assert manager._build_description_fallback("", None) == "No description available."
+    assert _build_description_fallback(manager, "", None) == "No description available."
 
 
 def test_repository_verification_and_maintenance(
@@ -906,7 +1020,7 @@ def test_snapshot_archive_includes_sqlite_and_chroma(
     archive_path = manager.create_data_snapshot(tmp_path / "snapshots")
     assert archive_path.exists()
 
-    db_name = manager._resolve_repository_path().name  # noqa: SLF001 - test uses private helper
+    db_name = _resolve_repository_path(manager).name
     with zipfile.ZipFile(archive_path) as archive:
         names = set(archive.namelist())
         assert f"sqlite/{db_name}" in names
@@ -1244,13 +1358,13 @@ def test_manager_initialises_litellm_defaults_from_helpers(tmp_path: Path) -> No
         },
     )
 
-    assert manager._litellm_fast_model == "generator-fast"
-    assert manager._litellm_workflow_models == {"prompt_execution": "inference"}
-    assert manager._litellm_drop_params == ("api_key",)
-    executor_instance = manager._executor
+    assert _litellm_fast_model(manager) == "generator-fast"
+    assert _workflow_models(manager) == {"prompt_execution": "inference"}
+    assert _litellm_drop_params(manager) == ("api_key",)
+    executor_instance = _executor_instance(manager)
     assert executor_instance is not None
     assert executor_instance.drop_params == ["api_key"]
-    assert manager._litellm_stream is True
+    assert _litellm_stream(manager) is True
 
 
 def test_refresh_user_profile_handles_repository_errors(
@@ -1264,7 +1378,7 @@ def test_refresh_user_profile_handles_repository_errors(
 
     failing_repo = _FailingRepo()
     manager._repository = failing_repo  # type: ignore[assignment]
-    cached = manager._user_profile
+    cached = _user_profile(manager)
 
     assert manager.refresh_user_profile() is cached
 
@@ -1444,9 +1558,9 @@ def test_execute_prompt_success_and_failure_logging(
     executor = _Executor()
     pm._executor = executor
     pm._history_tracker = None
-    pm._log_execution_success = lambda *args, **kwargs: None
-    pm._log_execution_failure = lambda *args, **kwargs: None
-    pm.increment_usage = lambda *_: None
+    pm._log_execution_success = _noop
+    pm._log_execution_failure = _noop
+    pm.increment_usage = _noop
     outcome = manager.execute_prompt(
         prompt.id,
         "Run task",
@@ -1466,7 +1580,9 @@ def test_create_prompt_embeds_and_persists(
     repo = _InMemoryRepository()
     manager._repository = repo  # type: ignore[assignment]
     prompt = _make_prompt("New Prompt")
-    manager._embedding_provider = types.SimpleNamespace(embed=lambda *_: [0.1, 0.2])  # type: ignore[assignment]
+    manager._embedding_provider = types.SimpleNamespace(  # type: ignore[assignment]
+        embed=_constant_embedding
+    )
     persisted: list[uuid.UUID] = []
 
     def fake_persist(prompt_obj: Prompt, vector: Sequence[float], *, is_new: bool) -> None:
@@ -1475,7 +1591,7 @@ def test_create_prompt_embeds_and_persists(
 
     manager._persist_embedding = fake_persist  # type: ignore[assignment]
     manager._commit_prompt_version = (  # type: ignore[assignment]
-        lambda *args, **kwargs: types.SimpleNamespace(id=1, version_number=1)
+        _version_stub
     )
     created = manager.create_prompt(prompt)
     assert created.id == prompt.id
@@ -1500,7 +1616,7 @@ def test_create_prompt_schedules_worker_on_embedding_failure(
     manager._embedding_worker = types.SimpleNamespace(schedule=scheduled.append)  # type: ignore[assignment]
     manager._cache_prompt = lambda prompt_obj: cached.append(prompt_obj.id)  # type: ignore[assignment]
     manager._commit_prompt_version = (  # type: ignore[assignment]
-        lambda *args, **kwargs: types.SimpleNamespace(id=1, version_number=1)
+        _version_stub
     )
     manager.create_prompt(prompt)
     assert scheduled == [prompt.id]
@@ -1516,7 +1632,7 @@ def test_run_category_generator_and_fallbacks(
         PromptCategory(slug="reporting", label="Reporting", description="Reports"),
     ]
 
-    assert manager._run_category_generator("ctx", categories) == ""
+    assert _run_category_generator(manager, "ctx", categories) == ""
 
     class _FailingCategoryGenerator:
         def generate(self, *_: Any, **__: Any) -> str:
@@ -1524,7 +1640,7 @@ def test_run_category_generator_and_fallbacks(
 
     pm = _pm(manager)
     pm._category_generator = _FailingCategoryGenerator()
-    assert manager._run_category_generator("ctx", categories) == ""
+    assert _run_category_generator(manager, "ctx", categories) == ""
 
     class _Classifier:
         def classify(self, _: str) -> IntentPrediction:
@@ -1536,13 +1652,13 @@ def test_run_category_generator_and_fallbacks(
             )
 
     manager.set_intent_classifier(_as_intent_classifier(_Classifier()))
-    assert manager._fallback_category_from_context("Docs", categories) == "Documentation"
+    assert _fallback_category_from_context(manager, "Docs", categories) == "Documentation"
 
     manager.set_intent_classifier(None)
     assert (
-        manager._fallback_category_from_context("Summary of incidents", categories) == "Reporting"
+        _fallback_category_from_context(manager, "Summary of incidents", categories) == "Reporting"
     )
-    assert manager._fallback_category_from_context("misc context", []) == "General"
+    assert _fallback_category_from_context(manager, "misc context", []) == "General"
 
 
 def test_apply_category_metadata_error_paths(
@@ -1552,7 +1668,7 @@ def test_apply_category_metadata_error_paths(
     prompt = _make_prompt()
     prompt.category = ""
     prompt.category_slug = ""
-    assert manager._apply_category_metadata(prompt).category == ""
+    assert _apply_category_metadata(manager, prompt).category == ""
 
     class _RegistryStub:
         def ensure(self, *_: Any, **__: Any) -> PromptCategory:
@@ -1561,7 +1677,7 @@ def test_apply_category_metadata_error_paths(
     manager._category_registry = _RegistryStub()  # type: ignore[assignment]
     prompt.category = "Docs"
     with pytest.raises(PromptStorageError):
-        manager._apply_category_metadata(prompt)
+        _apply_category_metadata(manager, prompt)
 
     class _ErrorRegistry(_RegistryStub):
         def ensure(self, *_: Any, **__: Any) -> PromptCategory:
@@ -1569,7 +1685,7 @@ def test_apply_category_metadata_error_paths(
 
     manager._category_registry = _ErrorRegistry()  # type: ignore[assignment]
     with pytest.raises(PromptManagerError):
-        manager._apply_category_metadata(prompt)
+        _apply_category_metadata(manager, prompt)
 
 
 def test_persist_embedding_from_worker_updates_prompt(
@@ -1593,7 +1709,7 @@ def test_persist_embedding_from_worker_updates_prompt(
         called["is_new"] = is_new
 
     manager._persist_embedding = fake_persist  # type: ignore[assignment]
-    manager._persist_embedding_from_worker(prompt, [0.1, 0.2])
+    _persist_embedding_from_worker(manager, prompt, [0.1, 0.2])
 
     assert repo.last_prompt.ext4 == [0.1, 0.2]
     assert called["embedding"] == [0.1, 0.2]
@@ -1610,7 +1726,7 @@ def test_apply_rating_handles_fetch_and_update_failures(
         raise PromptManagerError("missing")
 
     manager.get_prompt = failing_get_prompt  # type: ignore[assignment]
-    manager._apply_rating(prompt.id, 4.5)
+    _apply_rating(manager, prompt.id, 4.5)
 
     def returning_get_prompt(_: uuid.UUID) -> Prompt:
         return prompt
@@ -1621,7 +1737,7 @@ def test_apply_rating_handles_fetch_and_update_failures(
         raise PromptManagerError("db down")
 
     manager.update_prompt = failing_update  # type: ignore[assignment]
-    manager._apply_rating(prompt.id, 5.0)
+    _apply_rating(manager, prompt.id, 5.0)
 
 
 def test_clear_usage_logs_creates_and_resets(tmp_path: Path) -> None:
