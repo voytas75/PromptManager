@@ -96,7 +96,7 @@ Nie planuj tych rzeczy ponownie jako nowych feature’ów.
 
 ### Task 1: Sync docs so active ledger is unambiguous
 
-**Status:** pending
+**Status:** done
 
 **Objective:** Usunąć drift dokumentacyjny między SSOT a równoległymi ledgerami, żeby kolejne slice’y miały jeden jasny execution source.
 
@@ -116,11 +116,22 @@ Nie planuj tych rzeczy ponownie jako nowych feature’ów.
 - `search_files("active implementation ledger|Status: superseded|supporting note", path="docs/plans", target="content")`
 - Oczekiwane: jeden aktywny ledger, brak sprzecznych pointerów.
 
+**Implemented:**
+- oznaczono `docs/plans/2026-05-06-prompt-chain-implementation-plan.md` jako supporting note zamiast active,
+- dopisano jawny pointer do aktywnego execution ledger: `docs/plans/2026-05-06-prompt-chain-rollout-plan.md`,
+- doprecyzowano, że `docs/plans/2026-05-06-prompt-chain-next-slices-plan.md` jest tylko forward-looking supporting note,
+- zachowano `docs/plans/2026-05-06-prompt-chain-functional-improvement-implementation-plan.md` jako supporting note dla już domkniętych slices.
+
+**Verified:**
+- `search_files("active implementation ledger|Execution ledger|supporting note|rollout plan", path="docs/plans", target="content")`
+- potwierdzono jeden aktywny ledger: `docs/plans/2026-05-06-prompt-chain-rollout-plan.md`
+- usunięto sprzeczny status `active` z `docs/plans/2026-05-06-prompt-chain-implementation-plan.md`
+
 ---
 
 ### Task 2: Add failing model tests for explicit legacy/inactive semantics labeling
 
-**Status:** pending
+**Status:** completed
 
 **Objective:** Zamrozić oczekiwane zachowanie zanim zmienisz model i inspect surfaces.
 
@@ -145,7 +156,7 @@ Expected: FAIL na nowych asercjach.
 
 ### Task 3: Implement compatibility-safe legacy field labeling in model and CLI inspect surfaces
 
-**Status:** pending
+**Status:** completed
 
 **Objective:** Oczyścić semantykę bez łamania import/export compatibility.
 
@@ -178,7 +189,7 @@ Run:
 
 ### Task 4: Add failing tests for `prompt-chain-validate --json`
 
-**Status:** pending
+**Status:** completed
 
 **Objective:** Zanim dodasz nowy output mode, zamroź jego minimalny report contract.
 
@@ -205,7 +216,7 @@ Expected: FAIL na nowym trybie.
 
 ### Task 5: Implement `prompt-chain-validate --json`
 
-**Status:** pending
+**Status:** functionally-complete / pyright-debt-followup
 
 **Objective:** Dodać machine-readable validation surface bez tworzenia drugiego systemu semantycznego.
 
@@ -233,7 +244,7 @@ Run:
 
 ### Task 6: Add failing tests for `prompt-chain-apply --dry-run`
 
-**Status:** pending
+**Status:** completed (already present in repo)
 
 **Objective:** Zamrozić non-persistent preview behavior przed implementacją.
 
@@ -257,7 +268,7 @@ Expected: FAIL na braku `--dry-run`.
 
 ### Task 7: Implement `prompt-chain-apply --dry-run`
 
-**Status:** pending
+**Status:** functionally-complete / pyright-debt-followup
 
 **Objective:** Pozwolić operatorowi zobaczyć, co zostanie zapisane, zanim dotknie storage.
 
@@ -572,13 +583,13 @@ Run:
 
 ## Current recommended next slice
 
-**Task 1 + Task 2 + Task 3** jako pierwszy bounded cycle.
+**Task 18** jako następny bounded cycle.
 
 Powód:
-- to czyści największy dług semantyczny,
-- obniża ryzyko, że kolejne features będą wzmacniać stary workflow framing,
-- jest małe, odporne i dobrze testowalne,
-- nie wymaga jeszcze zmian persistence ani większego GUI churn.
+- backend persisted recent history jest już gotowy, ale jeszcze nie jest wystawiony operatorowi,
+- to domyka praktyczny feedback loop dla trust/debug/reuse bez rozbudowy dashboard semantics,
+- GUI inspect surface jest zgodny z celem cyklu i może pozostać bounded oraz readable,
+- CLI path powinien pozostać opcjonalny i wejść tylko jeśli nie poszerza scope ponad mały inspect/history surface.
 
 ---
 

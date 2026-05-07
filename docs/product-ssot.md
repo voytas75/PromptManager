@@ -2,7 +2,7 @@
 
 Status: active
 Owner: Wojtek / Prompt Manager Team
-Updated: 2026-04-28
+Updated: 2026-05-06 (prompt-chain result-semantics sync)
 Supersedes:
 - `docs/product-direction-ssot.md`
 - `docs/product-boundary-ssot.md`
@@ -325,7 +325,8 @@ This should improve operator coherence, not create a larger orchestration framew
 Current emphasis inside this stage:
 - keep inspect/detail run evidence easier to read than to over-interpret,
 - prefer wording/order fixes on existing summary seams before adding new cues,
-- treat run-evidence legibility as a bounded continuation of the same asset-to-run-to-refine loop.
+- treat run-evidence legibility as a bounded continuation of the same asset-to-run-to-refine loop,
+- for prompt chains, prefer explicit result contracts and stable operator/machine output semantics over heavier execution power.
 
 ### 6. Open automation surfaces deliberately
 After the product is trustworthy for human operators, expose the same model through CLI/API automation.
@@ -395,6 +396,8 @@ Work that improves:
 - visible run provenance
 - bounded comparison between runs
 - reusable run context for refinement decisions
+- bounded prompt-chain lifecycle completeness, inspectability, result semantics, and run evidence when kept subordinate to the prompt-asset model
+- compact operator-facing run surfaces such as explicit final output vs final summary and deterministic machine-readable exports/results
 
 ### Priority 4 — Asset-to-run-to-refine coherence
 Work that improves:

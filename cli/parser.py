@@ -10,7 +10,9 @@ import argparse
 import json
 import sys
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any, cast
 
 
 def _build_inline_prompt_payload(args: argparse.Namespace) -> dict[str, object]:
@@ -48,20 +50,34 @@ def _write_temp_prompt_payload(payload: object) -> Path:
     return temp_path
 
 
-def _validate_prompt_payload(payload: object, parser: argparse.ArgumentParser) -> object:
-    entries: list[object]
-    if isinstance(payload, dict):
-        prompts_value = payload.get("prompts")
+def _validate_prompt_payload(
+    payload: object,
+    parser: argparse.ArgumentParser,
+) -> dict[str, Any] | list[dict[str, Any]]:
+    entries: list[dict[str, Any]]
+    if isinstance(payload, Mapping):
+        payload_mapping = cast("Mapping[str, Any]", payload)
+        prompts_value = payload_mapping.get("prompts")
         if prompts_value is not None:
             if not isinstance(prompts_value, list):
                 parser.error(
                     "prompt-add payload field 'prompts' must be a JSON list of prompt objects."
                 )
-            entries = list(prompts_value)
+            prompt_entries = cast("list[object]", prompts_value)
+            entries = []
+            for index, item in enumerate(prompt_entries, start=1):
+                if not isinstance(item, Mapping):
+                    parser.error(f"prompt-add entry #{index} must be a JSON object.")
+                entries.append(dict(cast("Mapping[str, Any]", item)))
         else:
-            entries = [payload]
+            entries = [dict(payload_mapping)]
     elif isinstance(payload, list):
-        entries = list(payload)
+        payload_entries = cast("list[object]", payload)
+        entries = []
+        for index, item in enumerate(payload_entries, start=1):
+            if not isinstance(item, Mapping):
+                parser.error(f"prompt-add entry #{index} must be a JSON object.")
+            entries.append(dict(cast("Mapping[str, Any]", item)))
     else:
         parser.error("prompt-add payload must be a JSON object or a list of prompt objects.")
 
@@ -70,8 +86,6 @@ def _validate_prompt_payload(payload: object, parser: argparse.ArgumentParser) -
 
     missing_messages: list[str] = []
     for index, entry in enumerate(entries, start=1):
-        if not isinstance(entry, dict):
-            parser.error(f"prompt-add entry #{index} must be a JSON object.")
         missing_fields = [field for field in ("name", "description") if not entry.get(field)]
         if missing_fields:
             missing_messages.append(
@@ -79,7 +93,10 @@ def _validate_prompt_payload(payload: object, parser: argparse.ArgumentParser) -
             )
     if missing_messages:
         parser.error("prompt-add payload validation failed: " + "; ".join(missing_messages))
-    return payload
+
+    if isinstance(payload, Mapping):
+        return dict(cast("Mapping[str, Any]", payload))
+    return entries
 
 
 def _parse_json_string_payload(raw_json: str, parser: argparse.ArgumentParser) -> object:
@@ -588,6 +605,47 @@ def parse_args() -> argparse.Namespace:
         type=str,
         help="Prompt chain UUID.",
     )
+    chain_show_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print the prompt chain as deterministic JSON.",
+    )
+    chain_show_parser.add_argument(
+        "--history-limit",
+        type=int,
+        default=3,
+        help="Show up to this many recent persisted runs for the selected chain.",
+    )
+
+    chain_export_parser = subparsers.add_parser(
+        "prompt-chain-export",
+        help="Export a prompt chain to a JSON file.",
+    )
+    chain_export_parser.add_argument(
+        "chain_id",
+        type=str,
+        help="Prompt chain UUID.",
+    )
+    chain_export_parser.add_argument(
+        "path",
+        type=Path,
+        help="Destination JSON file path.",
+    )
+
+    chain_validate_parser = subparsers.add_parser(
+        "prompt-chain-validate",
+        help="Validate a prompt chain JSON definition without persisting it.",
+    )
+    chain_validate_parser.add_argument(
+        "path",
+        type=Path,
+        help="Path to the JSON file containing the prompt chain definition.",
+    )
+    chain_validate_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit deterministic JSON output for prompt chain validation.",
+    )
 
     chain_apply_parser = subparsers.add_parser(
         "prompt-chain-apply",
@@ -597,6 +655,11 @@ def parse_args() -> argparse.Namespace:
         "path",
         type=Path,
         help="Path to the JSON file containing the prompt chain definition.",
+    )
+    chain_apply_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview the parsed prompt chain without persisting it.",
     )
 
     chain_run_parser = subparsers.add_parser(
@@ -626,6 +689,54 @@ def parse_args() -> argparse.Namespace:
         "--no-web-search",
         action="store_true",
         help="Disable live web search enrichment for prompt chain runs.",
+    )
+    chain_run_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit deterministic JSON output for prompt chain execution.",
+    )
+    chain_run_parser.add_argument(
+        "--final-output-only",
+        action="store_true",
+        help="Print only the final raw output text.",
+    )
+    chain_run_parser.add_argument(
+        "--summary-only",
+        action="store_true",
+        help="Print only the final summary text.",
+    )
+    chain_run_parser.add_argument(
+        "--status-only",
+        action="store_true",
+        help="Print only the final chain status.",
+    )
+    chain_run_parser.add_argument(
+        "--step-output",
+        type=str,
+        default=None,
+        help="Print only the canonical output text for one step output key.",
+    )
+    chain_run_parser.add_argument(
+        "--step-alias",
+        type=str,
+        default=None,
+        help="Print only the output text resolved from one step alias.",
+    )
+    chain_run_parser.add_argument(
+        "--final-step-meta",
+        action="store_true",
+        help="Print only bounded terminal metadata for the final step.",
+    )
+    chain_run_parser.add_argument(
+        "--compact",
+        action="store_true",
+        help="Print a compact operator-facing run summary.",
+    )
+    chain_run_parser.add_argument(
+        "--output-file",
+        type=Path,
+        default=None,
+        help="Save the run artifact to a file instead of only printing to stdout.",
     )
 
     args = parser.parse_args()

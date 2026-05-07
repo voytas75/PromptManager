@@ -690,6 +690,12 @@ def run_prompt_chain_show(
     except PromptChainError as exc:
         logger.error("Unable to load prompt chain: %s", exc)
         return 5
+    history_limit = max(1, int(getattr(args, "history_limit", 3) or 3))
+    recent_runs = [
+        record
+        for record in manager.list_recent_prompt_chain_runs(limit=history_limit * 5)
+        if str(record.get("chain_id") or "") == str(chain.id)
+    ][:history_limit]
     status = "active" if chain.is_active else "inactive"
     chain_legacy_semantics = _format_chain_legacy_semantics(chain)
     if bool(getattr(args, "json", False)):
@@ -701,6 +707,7 @@ def run_prompt_chain_show(
             "is_active": chain.is_active,
             "summarize_last_response": bool(chain.summarize_last_response),
             "legacy_semantics": chain_legacy_semantics,
+            "recent_runs": recent_runs,
             "steps": [
                 {
                     "id": str(step.id),
@@ -722,6 +729,15 @@ def run_prompt_chain_show(
         print("Legacy semantics:")
         for field_name, _details in chain_legacy_semantics.items():
             print(f"  - {field_name}: inactive compatibility-only field")
+    if recent_runs:
+        print("\nRecent runs:")
+        for record in recent_runs:
+            timestamp = str(record.get("run_timestamp") or "unknown time")
+            run_status = str(record.get("status") or "unknown")
+            input_preview = str(record.get("input_preview") or "(empty)")
+            output_preview = str(record.get("final_output_preview") or "(empty)")
+            print(f"  - {timestamp} [{run_status}] input: {input_preview}")
+            print(f"    output: {output_preview}")
     if not chain.steps:
         print("Steps: (none)")
         return 0
@@ -738,6 +754,21 @@ def run_prompt_chain_show(
                 "     Legacy fields: input_template, output_variable, condition "
                 "(inactive semantics)"
             )
+            if "output_variable" in step_legacy_semantics:
+                print(
+                    "     - output_variable: compatibility alias only; "
+                    "runtime uses canonical step_output_key"
+                )
+            if "input_template" in step_legacy_semantics:
+                print(
+                    "     - input_template: compatibility-only field; "
+                    "inactive in active runtime"
+                )
+            if "condition" in step_legacy_semantics:
+                print(
+                    "     - condition: compatibility-only field; "
+                    "inactive in active runtime"
+                )
     return 0
 
 

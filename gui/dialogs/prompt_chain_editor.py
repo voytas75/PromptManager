@@ -109,7 +109,13 @@ class PromptChainEditorDialog(QDialog):
         self._steps_table.setHorizontalHeaderLabels(["Order", "Prompt", "Failure handling"])
         self._steps_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self._steps_table.itemDoubleClicked.connect(self._handle_step_double_click)  # type: ignore[arg-type]
+        self._steps_table.itemSelectionChanged.connect(self._update_step_action_state)  # type: ignore[arg-type]
         layout.addWidget(self._steps_table, 1)
+
+        self._warning_label = QLabel("", self)
+        self._warning_label.setWordWrap(True)
+        self._warning_label.setStyleSheet("color: #b26a00;")
+        layout.addWidget(self._warning_label)
 
         step_actions = QHBoxLayout()
         self._add_step_button = QPushButton("Add Step", self)
@@ -123,6 +129,18 @@ class PromptChainEditorDialog(QDialog):
         self._remove_step_button = QPushButton("Remove Step", self)
         self._remove_step_button.clicked.connect(self._remove_selected_step)  # type: ignore[arg-type]
         step_actions.addWidget(self._remove_step_button)
+
+        self._duplicate_step_button = QPushButton("Duplicate Step", self)
+        self._duplicate_step_button.clicked.connect(self._duplicate_selected_step)  # type: ignore[arg-type]
+        step_actions.addWidget(self._duplicate_step_button)
+
+        self._move_step_up_button = QPushButton("Move Up", self)
+        self._move_step_up_button.clicked.connect(self._move_selected_step_up)  # type: ignore[arg-type]
+        step_actions.addWidget(self._move_step_up_button)
+
+        self._move_step_down_button = QPushButton("Move Down", self)
+        self._move_step_down_button.clicked.connect(self._move_selected_step_down)  # type: ignore[arg-type]
+        step_actions.addWidget(self._move_step_down_button)
         step_actions.addStretch(1)
         layout.addLayout(step_actions)
 
@@ -136,6 +154,7 @@ class PromptChainEditorDialog(QDialog):
         self._steps: list[PromptChainStep] = []
         if chain is not None:
             self._load_chain(chain)
+        self._update_step_action_state()
 
     def result_chain(self) -> PromptChain | None:
         """Return the saved chain instance when available."""
@@ -154,7 +173,12 @@ class PromptChainEditorDialog(QDialog):
 
     def _refresh_steps(self) -> None:
         self._steps.sort(key=lambda step: step.order_index)
+        current_step_id: str | None = None
+        current_row = self._steps_table.currentRow()
+        if 0 <= current_row < len(self._steps):
+            current_step_id = str(self._steps[current_row].id)
         self._steps_table.setRowCount(len(self._steps))
+        selected_row = -1
         for row, step in enumerate(self._steps):
             self._steps_table.setItem(row, 0, QTableWidgetItem(str(step.order_index)))
             prompt = self._prompt_lookup.get(str(step.prompt_id))
@@ -166,6 +190,14 @@ class PromptChainEditorDialog(QDialog):
             self._steps_table.setItem(row, 1, prompt_item)
             behaviour = "Stop chain on failure" if step.stop_on_failure else "Continue on failure"
             self._steps_table.setItem(row, 2, QTableWidgetItem(behaviour))
+            if current_step_id is not None and str(step.id) == current_step_id:
+                selected_row = row
+        if selected_row >= 0:
+            self._steps_table.selectRow(selected_row)
+        elif self._steps:
+            self._steps_table.clearSelection()
+        self._update_step_action_state()
+        self._update_warning_state()
 
     def _add_step(self) -> None:
         dialog = PromptChainStepDialog(
@@ -206,6 +238,84 @@ class PromptChainEditorDialog(QDialog):
             return
         del self._steps[row]
         self._refresh_steps()
+
+    def _duplicate_selected_step(self) -> None:
+        row = self._steps_table.currentRow()
+        if row < 0 or row >= len(self._steps):
+            return
+        source_step = self._steps[row]
+        duplicated_step = replace(
+            source_step,
+            id=uuid.uuid4(),
+            order_index=row + 2,
+            output_variable=f"step_{row + 2}",
+        )
+        self._steps.insert(row + 1, duplicated_step)
+        self._steps = self._reindexed_steps()
+        self._refresh_steps()
+        self._steps_table.selectRow(row + 1)
+
+    def _move_selected_step_up(self) -> None:
+        row = self._steps_table.currentRow()
+        if row <= 0 or row >= len(self._steps):
+            return
+        self._steps[row - 1], self._steps[row] = self._steps[row], self._steps[row - 1]
+        self._steps[row - 1] = replace(self._steps[row - 1], order_index=row)
+        self._steps[row] = replace(self._steps[row], order_index=row + 1)
+        self._refresh_steps()
+        self._steps_table.selectRow(row - 1)
+
+    def _move_selected_step_down(self) -> None:
+        row = self._steps_table.currentRow()
+        if row < 0 or row >= len(self._steps) - 1:
+            return
+        self._steps[row], self._steps[row + 1] = self._steps[row + 1], self._steps[row]
+        self._steps[row] = replace(self._steps[row], order_index=row + 1)
+        self._steps[row + 1] = replace(self._steps[row + 1], order_index=row + 2)
+        self._refresh_steps()
+        self._steps_table.selectRow(row + 1)
+
+    def _update_step_action_state(self) -> None:
+        row = self._steps_table.currentRow()
+        has_selection = 0 <= row < len(self._steps)
+        self._edit_step_button.setEnabled(has_selection)
+        self._remove_step_button.setEnabled(has_selection)
+        self._duplicate_step_button.setEnabled(has_selection)
+        self._move_step_up_button.setEnabled(has_selection and row > 0)
+        self._move_step_down_button.setEnabled(has_selection and row < len(self._steps) - 1)
+
+    def _update_warning_state(self) -> None:
+        warnings: list[str] = []
+        duplicate_prompt_ids = {
+            str(step.prompt_id)
+            for step in self._steps
+            if sum(1 for candidate in self._steps if candidate.prompt_id == step.prompt_id) > 1
+        }
+        if duplicate_prompt_ids:
+            duplicate_names: list[str] = []
+            for prompt_id in sorted(duplicate_prompt_ids):
+                prompt = self._prompt_lookup.get(prompt_id)
+                duplicate_names.append(prompt.name if prompt and prompt.name else prompt_id)
+            joined_names = ", ".join(duplicate_names)
+            warnings.append(
+                "Same prompt reused across multiple steps"
+                f" ({joined_names}) — verify that repeated execution is intentional."
+            )
+
+        legacy_fields: set[str] = set()
+        for step in self._steps:
+            if step.input_template.strip():
+                legacy_fields.add("input_template")
+            if step.condition and str(step.condition).strip():
+                legacy_fields.add("condition")
+        if legacy_fields:
+            joined_fields = ", ".join(sorted(legacy_fields))
+            warnings.append(
+                "Legacy/inactive semantics detected"
+                f" ({joined_fields}) — preserved for import compatibility only."
+            )
+
+        self._warning_label.setText("Warning: " + " | ".join(warnings) if warnings else "")
 
     def _handle_accept(self) -> None:
         name = self._name_input.text().strip()
@@ -298,11 +408,24 @@ class PromptChainStepDialog(QDialog):
         self._prompt_combo.setEditable(True)
         self._prompt_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         self._prompt_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self._prompt_combo.currentIndexChanged.connect(self._update_prompt_preview)  # type: ignore[arg-type]
         self._add_step_row(
             layout,
             "Prompt",
             self._prompt_combo,
             "Select the catalog prompt to run for this step.",
+        )
+
+        self._prompt_preview = QPlainTextEdit(self)
+        self._prompt_preview.setReadOnly(True)
+        self._prompt_preview.setMaximumBlockCount(0)
+        self._prompt_preview.setPlaceholderText("Prompt preview will appear here.")
+        self._prompt_preview.setMinimumHeight(120)
+        self._add_step_row(
+            layout,
+            "Prompt preview",
+            self._prompt_preview,
+            "Read-only preview of the selected prompt body.",
         )
 
         self._stop_checkbox = QCheckBox("Stop chain when this step fails", self)
@@ -324,6 +447,7 @@ class PromptChainStepDialog(QDialog):
         self._populate_prompt_combo()
         if step is not None:
             self._load_step(step)
+        self._update_prompt_preview()
 
     def set_order_index(self, value: int) -> None:
         """Update the default order index displayed to the user."""
@@ -356,6 +480,31 @@ class PromptChainStepDialog(QDialog):
         self._prompt_combo.addItem(fallback_label, target)
         self._prompt_combo.setCurrentIndex(self._prompt_combo.count() - 1)
 
+    def _update_prompt_preview(self) -> None:
+        prompt_id_text = self._resolve_prompt_uuid_text(silent=True)
+        if prompt_id_text is None:
+            self._prompt_preview.setPlainText("Select a prompt to preview its body.")
+            return
+        prompt = next(
+            (entry for entry in self._prompt_options if str(entry.id) == prompt_id_text),
+            None,
+        )
+        if prompt is None:
+            self._prompt_preview.setPlainText(
+                f"Prompt ID: {prompt_id_text}\n\n"
+                "Prompt body not available in the current catalog."
+            )
+            return
+        body = (prompt.context or prompt.description or "").strip()
+        if len(body) > 1200:
+            body = body[:1197].rstrip() + "…"
+        preview_parts = [f"Prompt: {prompt.name}"]
+        if prompt.category:
+            preview_parts.append(f"Category: {prompt.category}")
+        preview_parts.append("")
+        preview_parts.append(body or "Prompt has no saved body.")
+        self._prompt_preview.setPlainText("\n".join(preview_parts))
+
     def _handle_accept(self) -> None:
         prompt_uuid_text = self._resolve_prompt_uuid_text()
         if prompt_uuid_text is None:
@@ -380,13 +529,14 @@ class PromptChainStepDialog(QDialog):
         )
         self.accept()
 
-    def _resolve_prompt_uuid_text(self) -> str | None:
+    def _resolve_prompt_uuid_text(self, *, silent: bool = False) -> str | None:
         data = self._prompt_combo.currentData(Qt.ItemDataRole.UserRole)
         if data:
             return str(data)
         text = self._prompt_combo.currentText().strip()
         if not text:
-            QMessageBox.warning(self, "Validation", "Select a prompt for this step.")
+            if not silent:
+                QMessageBox.warning(self, "Validation", "Select a prompt for this step.")
             return None
         return text
 

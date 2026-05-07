@@ -226,6 +226,7 @@ Current focus:
 - improving low-friction capture, promotion, retrieval, inspection, reuse, and refinement
 - sharpening retrieval/discovery clarity so search results are easier to trust and act on
 - making settings, routing, and diagnostics trustworthy before broader automation expansion
+- improving bounded execution inspectability so run outputs, summaries, and evidence are easier to trust
 
 ## What PromptManager is not
 

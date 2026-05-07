@@ -28,13 +28,14 @@ from core import PromptChainRunResult, PromptChainStepRun, PromptManager, Prompt
 from core.execution import CodexExecutionResult
 from core.prompt_manager.execution_history import ExecutionOutcome
 from core.web_search import RandomWebSearchProvider, WebSearchResult, WebSearchService
-from gui.dialogs.prompt_chain_editor import PromptChainEditorDialog
+from gui.dialogs.prompt_chain_editor import PromptChainEditorDialog, PromptChainStepDialog
 from gui.dialogs.prompt_chains import PromptChainManagerDialog, PromptChainManagerPanel
 from models.prompt_chain_model import PromptChain, PromptChainStep
 from models.prompt_model import Prompt
 
 if TYPE_CHECKING:  # pragma: no cover - typing helper
     from collections.abc import Callable, Iterator, Mapping
+    from pathlib import Path
 else:  # pragma: no cover - runtime placeholders
     from typing import Any as _Any
 
@@ -181,16 +182,26 @@ class _ManagerStub:
         return PromptChainRunResult(
             chain=chain,
             chain_input=chain_input,
-            outputs={"summary": "ok"},
+            step_outputs={"summary": "ok"},
+            final_output_text=self._step_response_text,
+            final_summary_text="Demo summary",
             steps=[
                 PromptChainStepRun(
                     step=step,
                     status="success",
                     outcome=outcome,
+                    prompt_name="Example Prompt",
+                    request_text=self._step_request_text,
+                    response_text=self._step_response_text,
+                    duration_ms=123,
+                    web_search_requested=bool(use_web_search),
+                    web_search_applied=bool(use_web_search),
+                    skip_reason=None,
                     error=None,
+                    step_label="final",
+                    step_output_key="step_1",
                 )
             ],
-            summary="Demo summary",
         )
 
     def delete_prompt_chain(self, chain_id: uuid.UUID) -> None:
@@ -337,7 +348,7 @@ def test_prompt_chain_dialog_runs_chain(qt_app: QApplication) -> None:
         assert manager.runs[0]["use_web_search"] is True
         text = panel._result_view.toPlainText()  # noqa: SLF001
         assert "Input to chain" in text
-        assert "Chain outputs" in text
+        assert "Step outputs" in text
     finally:
         dialog.close()
         dialog.deleteLater()
@@ -352,9 +363,9 @@ def test_prompt_chain_dialog_renders_chain_summary(qt_app: QApplication) -> None
         panel._chain_input_edit.setPlainText("Summary input")  # noqa: SLF001
         panel._run_selected_chain()  # noqa: SLF001
         text = panel._result_view.toPlainText()  # noqa: SLF001
-        assert "Final chain result" in text
+        assert "Final summary" in text
         assert "Demo summary" in text
-        assert "Chain summary" not in text
+        assert "Final chain result" not in text
     finally:
         dialog.close()
         dialog.deleteLater()
@@ -429,7 +440,7 @@ def test_prompt_chain_markdown_toggle_preserves_text(qt_app: QApplication) -> No
         toggled_text = panel._result_view.toPlainText().strip()  # noqa: SLF001
         assert toggled_text
         assert "Input to chain" in toggled_text
-        assert "chain outputs" in toggled_text.lower()
+        assert "step outputs" in toggled_text.lower()
     finally:
         dialog.close()
         dialog.deleteLater()
@@ -501,6 +512,63 @@ def test_prompt_chain_dialog_clear_results_resets_to_neutral_state(qt_app: QAppl
         dialog.deleteLater()
 
 
+def test_prompt_chain_dialog_can_copy_final_output_to_clipboard(qt_app: QApplication) -> None:
+    manager = _ManagerStub()
+    dialog, panel, manager = _build_dialog(manager)
+    try:
+        panel._chain_input_edit.setPlainText("Clipboard output")  # noqa: SLF001
+        panel._run_selected_chain()  # noqa: SLF001
+        panel._copy_final_output()  # noqa: SLF001
+        clipboard = QApplication.clipboard()
+        assert clipboard is not None
+        assert clipboard.text() == manager._step_response_text
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
+def test_prompt_chain_dialog_can_copy_final_summary_to_clipboard(qt_app: QApplication) -> None:
+    manager = _ManagerStub()
+    dialog, panel, manager = _build_dialog(manager)
+    try:
+        panel._chain_input_edit.setPlainText("Clipboard summary")  # noqa: SLF001
+        panel._run_selected_chain()  # noqa: SLF001
+        panel._copy_final_summary()  # noqa: SLF001
+        clipboard = QApplication.clipboard()
+        assert clipboard is not None
+        assert clipboard.text() == "Demo summary"
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
+def test_prompt_chain_dialog_can_save_displayed_result_to_file(
+    qt_app: QApplication,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    manager = _ManagerStub()
+    dialog, panel, manager = _build_dialog(manager)
+    output_path = tmp_path / "prompt-chain-result.txt"
+    try:
+        panel._chain_input_edit.setPlainText("Save result")  # noqa: SLF001
+        panel._run_selected_chain()  # noqa: SLF001
+        monkeypatch.setattr(
+            "gui.dialogs.prompt_chains.QFileDialog.getSaveFileName",
+            lambda *args, **kwargs: (str(output_path), "Text files (*.txt)"),
+        )
+
+        panel._save_result_to_file()  # noqa: SLF001
+
+        saved = output_path.read_text(encoding="utf-8")
+        assert "Input to chain" in saved
+        assert "Final output" in saved
+        assert "Demo summary" in saved
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
 def test_prompt_chain_dialog_second_run_replaces_previous_result_cues(qt_app: QApplication) -> None:
     """Running a chain again should replace prior result text instead of appending stale cues."""
 
@@ -511,7 +579,7 @@ def test_prompt_chain_dialog_second_run_replaces_previous_result_cues(qt_app: QA
         panel._run_selected_chain()  # noqa: SLF001
         first_plain = panel._result_view.toPlainText()  # noqa: SLF001
         assert "First input" in first_plain
-        assert "Final chain result" in first_plain
+        assert "Final summary" in first_plain
 
         manager._step_response_text = "Second response"
         panel._chain_input_edit.setPlainText("Second input")  # noqa: SLF001
@@ -520,7 +588,7 @@ def test_prompt_chain_dialog_second_run_replaces_previous_result_cues(qt_app: QA
         second_plain = panel._result_view.toPlainText()  # noqa: SLF001
         assert "Second input" in second_plain
         assert second_plain.count("Input to chain") == 1
-        assert second_plain.count("Final chain result") == 1
+        assert second_plain.count("Final summary") == 1
         assert "First input" not in second_plain
     finally:
         dialog.close()
@@ -585,7 +653,9 @@ def test_prompt_chain_dialog_only_last_step_has_reasoning_summary(
         result = PromptChainRunResult(
             chain=base_chain,
             chain_input="Initial text",
-            outputs={"final": "done"},
+            step_outputs={"final": "done"},
+            final_output_text="Second final output",
+            final_summary_text="Summary text",
             steps=[
                 PromptChainStepRun(
                     step=step_one,
@@ -606,7 +676,6 @@ def test_prompt_chain_dialog_only_last_step_has_reasoning_summary(
                     ),
                 ),
             ],
-            summary="Demo summary",
         )
         panel._display_run_result(result)  # noqa: SLF001
         plain = panel._result_plaintext  # noqa: SLF001
@@ -641,7 +710,9 @@ def test_prompt_chain_dialog_shows_later_step_handoff_input(qt_app: QApplication
         result = PromptChainRunResult(
             chain=base_chain,
             chain_input="Initial text",
-            outputs={"final": "Second response"},
+            step_outputs={"final": "Second response"},
+            final_output_text="Second response",
+            final_summary_text="Demo summary",
             steps=[
                 PromptChainStepRun(
                     step=step_one,
@@ -660,7 +731,6 @@ def test_prompt_chain_dialog_shows_later_step_handoff_input(qt_app: QApplication
                     ),
                 ),
             ],
-            summary="Demo summary",
         )
         panel._display_run_result(result)  # noqa: SLF001
         plain = panel._result_plaintext  # noqa: SLF001
@@ -690,9 +760,32 @@ def test_prompt_chain_step_markdown_renders_without_code_fences(qt_app: QApplica
         assert "chain-block--outputs" in rich
         assert "```" not in rich
         plain = panel._result_plaintext  # noqa: SLF001
-        assert "Final chain result" in plain
+        assert "Final summary" in plain
         assert "Chain summary" not in plain
-        assert "### Step output" not in plain
+        assert "### Step output" in rich
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
+def test_prompt_chain_dialog_shows_step_label_and_machine_output_key(
+    qt_app: QApplication,
+) -> None:
+    """Rendered step blocks should expose human label separately from machine output key."""
+
+    manager = _ManagerStub()
+    dialog, panel, manager = _build_dialog(manager)
+    try:
+        panel._chain_input_edit.setPlainText("Label demo")  # noqa: SLF001
+        panel._run_selected_chain()  # noqa: SLF001
+
+        plain = panel._result_plaintext  # noqa: SLF001
+        rich = panel._result_richtext  # noqa: SLF001
+
+        assert "Step 1: final" in plain
+        assert "Output key: step_1" in plain
+        assert "Step 1 – final" in rich
+        assert "Output key:</strong> <code>step_1</code>" in rich
     finally:
         dialog.close()
         dialog.deleteLater()
@@ -771,6 +864,315 @@ def test_prompt_chain_editor_prompt_tooltip_and_double_click(
     assert "Body text" in captured["text"]
 
 
+
+def test_prompt_chain_step_dialog_shows_selected_prompt_preview(
+    qt_app: QApplication,
+) -> None:
+    prompt = Prompt(
+        id=uuid.uuid4(),
+        name="Preview Prompt",
+        description="Short fallback",
+        category="tests",
+        context="Full preview body for the selected prompt.",
+    )
+    dialog = PromptChainStepDialog(None, chain_id=uuid.uuid4(), prompts=[prompt])
+
+    assert "Preview Prompt" in dialog._prompt_preview.toPlainText()  # noqa: SLF001
+    assert "Full preview body for the selected prompt." in dialog._prompt_preview.toPlainText()  # noqa: SLF001
+
+
+
+def test_prompt_chain_step_dialog_updates_prompt_preview_on_selection_change(
+    qt_app: QApplication,
+) -> None:
+    first_prompt = Prompt(
+        id=uuid.uuid4(),
+        name="First Prompt",
+        description="First fallback",
+        category="tests",
+        context="First preview body.",
+    )
+    second_prompt = Prompt(
+        id=uuid.uuid4(),
+        name="Second Prompt",
+        description="Second fallback",
+        category="tests",
+        context="Second preview body.",
+    )
+    dialog = PromptChainStepDialog(
+        None,
+        chain_id=uuid.uuid4(),
+        prompts=[first_prompt, second_prompt],
+    )
+
+    dialog._prompt_combo.setCurrentIndex(1)  # noqa: SLF001
+
+    preview_text = dialog._prompt_preview.toPlainText()  # noqa: SLF001
+    assert "Second Prompt" in preview_text
+    assert "Second preview body." in preview_text
+
+
+
+def test_prompt_chain_editor_reorder_controls_move_selected_step(
+    qt_app: QApplication,
+) -> None:
+    editor = PromptChainEditorDialog(None, manager=None)
+    first_step = PromptChainStep(
+        id=uuid.uuid4(),
+        chain_id=editor._chain_id,  # noqa: SLF001
+        prompt_id=uuid.uuid4(),
+        order_index=1,
+        input_template="",
+        output_variable="first",
+    )
+    second_step = PromptChainStep(
+        id=uuid.uuid4(),
+        chain_id=editor._chain_id,  # noqa: SLF001
+        prompt_id=uuid.uuid4(),
+        order_index=2,
+        input_template="",
+        output_variable="second",
+    )
+    editor._steps = [first_step, second_step]  # noqa: SLF001
+    editor._refresh_steps()  # noqa: SLF001
+
+    editor._steps_table.selectRow(1)  # noqa: SLF001
+    editor._move_selected_step_up()  # noqa: SLF001
+
+    assert [step.output_variable for step in editor._steps] == ["second", "first"]  # noqa: SLF001
+
+    editor._move_selected_step_down()  # noqa: SLF001
+
+    assert [step.output_variable for step in editor._steps] == ["first", "second"]  # noqa: SLF001
+
+
+
+def test_prompt_chain_editor_reorder_controls_update_button_state(
+    qt_app: QApplication,
+) -> None:
+    editor = PromptChainEditorDialog(None, manager=None)
+    editor._steps = [  # noqa: SLF001
+        PromptChainStep(
+            id=uuid.uuid4(),
+            chain_id=editor._chain_id,  # noqa: SLF001
+            prompt_id=uuid.uuid4(),
+            order_index=1,
+            input_template="",
+            output_variable="first",
+        ),
+        PromptChainStep(
+            id=uuid.uuid4(),
+            chain_id=editor._chain_id,  # noqa: SLF001
+            prompt_id=uuid.uuid4(),
+            order_index=2,
+            input_template="",
+            output_variable="second",
+        ),
+    ]
+    editor._refresh_steps()  # noqa: SLF001
+
+    editor._steps_table.selectRow(0)  # noqa: SLF001
+    editor._update_step_action_state()  # noqa: SLF001
+    assert editor._move_step_up_button.isEnabled() is False  # noqa: SLF001
+    assert editor._move_step_down_button.isEnabled() is True  # noqa: SLF001
+
+    editor._steps_table.selectRow(1)  # noqa: SLF001
+    editor._update_step_action_state()  # noqa: SLF001
+    assert editor._move_step_up_button.isEnabled() is True  # noqa: SLF001
+    assert editor._move_step_down_button.isEnabled() is False  # noqa: SLF001
+
+
+
+def test_prompt_chain_editor_reindexes_steps_after_reorder_on_save(
+    qt_app: QApplication,
+) -> None:
+    editor = PromptChainEditorDialog(None, manager=None)
+    editor._name_input.setText("Ordered Chain")  # noqa: SLF001
+    editor._steps = [  # noqa: SLF001
+        PromptChainStep(
+            id=uuid.uuid4(),
+            chain_id=editor._chain_id,  # noqa: SLF001
+            prompt_id=uuid.uuid4(),
+            order_index=2,
+            input_template="",
+            output_variable="second",
+        ),
+        PromptChainStep(
+            id=uuid.uuid4(),
+            chain_id=editor._chain_id,  # noqa: SLF001
+            prompt_id=uuid.uuid4(),
+            order_index=1,
+            input_template="",
+            output_variable="first",
+        ),
+    ]
+
+    editor._handle_accept()  # noqa: SLF001
+
+    chain = editor.result_chain()
+    assert chain is not None
+    assert [step.output_variable for step in chain.steps] == ["first", "second"]
+    assert [step.order_index for step in chain.steps] == [1, 2]
+
+
+
+def test_prompt_chain_editor_warns_when_same_prompt_is_reused(
+    qt_app: QApplication,
+) -> None:
+    prompt_id = uuid.uuid4()
+    editor = PromptChainEditorDialog(None, manager=None)
+    editor._steps = [  # noqa: SLF001
+        PromptChainStep(
+            id=uuid.uuid4(),
+            chain_id=editor._chain_id,  # noqa: SLF001
+            prompt_id=prompt_id,
+            order_index=1,
+            input_template="",
+            output_variable="first",
+        ),
+        PromptChainStep(
+            id=uuid.uuid4(),
+            chain_id=editor._chain_id,  # noqa: SLF001
+            prompt_id=prompt_id,
+            order_index=2,
+            input_template="",
+            output_variable="second",
+        ),
+    ]
+
+    editor._refresh_steps()  # noqa: SLF001
+
+    warning_text = editor._warning_label.text()  # noqa: SLF001
+    assert "Warning:" in warning_text
+    assert "same prompt" in warning_text.lower()
+
+
+
+def test_prompt_chain_editor_hides_duplicate_prompt_warning_when_not_needed(
+    qt_app: QApplication,
+) -> None:
+    editor = PromptChainEditorDialog(None, manager=None)
+    editor._steps = [  # noqa: SLF001
+        PromptChainStep(
+            id=uuid.uuid4(),
+            chain_id=editor._chain_id,  # noqa: SLF001
+            prompt_id=uuid.uuid4(),
+            order_index=1,
+            input_template="",
+            output_variable="first",
+        ),
+        PromptChainStep(
+            id=uuid.uuid4(),
+            chain_id=editor._chain_id,  # noqa: SLF001
+            prompt_id=uuid.uuid4(),
+            order_index=2,
+            input_template="",
+            output_variable="second",
+        ),
+    ]
+
+    editor._refresh_steps()  # noqa: SLF001
+
+    assert editor._warning_label.text() == ""  # noqa: SLF001
+
+
+
+def test_prompt_chain_editor_duplicate_step_copies_selected_prompt_with_new_identity(
+    qt_app: QApplication,
+) -> None:
+    prompt = Prompt(
+        id=uuid.uuid4(),
+        name="Reusable Prompt",
+        description="Body",
+        category="tests",
+    )
+    editor = PromptChainEditorDialog(None, manager=None, prompts=[prompt])
+    original_step = PromptChainStep(
+        id=uuid.uuid4(),
+        chain_id=editor._chain_id,  # noqa: SLF001
+        prompt_id=prompt.id,
+        order_index=1,
+        input_template="{{ legacy }}",
+        output_variable="first",
+        condition="legacy condition",
+        stop_on_failure=False,
+    )
+    editor._steps = [original_step]  # noqa: SLF001
+    editor._refresh_steps()  # noqa: SLF001
+    editor._steps_table.selectRow(0)  # noqa: SLF001
+
+    editor._duplicate_selected_step()  # noqa: SLF001
+
+    assert len(editor._steps) == 2  # noqa: SLF001
+    duplicated_step = editor._steps[1]  # noqa: SLF001
+    assert duplicated_step.id != original_step.id
+    assert duplicated_step.prompt_id == original_step.prompt_id
+    assert duplicated_step.order_index == 2
+    assert duplicated_step.output_variable == "step_2"
+
+
+
+def test_prompt_chain_editor_pre_save_warning_summary_surfaces_bounded_issues(
+    qt_app: QApplication,
+) -> None:
+    prompt_id = uuid.uuid4()
+    editor = PromptChainEditorDialog(None, manager=None)
+    editor._name_input.setText("Warning Chain")  # noqa: SLF001
+    editor._steps = [  # noqa: SLF001
+        PromptChainStep(
+            id=uuid.uuid4(),
+            chain_id=editor._chain_id,  # noqa: SLF001
+            prompt_id=prompt_id,
+            order_index=1,
+            input_template="{{ legacy }}",
+            output_variable="first",
+            condition="legacy condition",
+        ),
+        PromptChainStep(
+            id=uuid.uuid4(),
+            chain_id=editor._chain_id,  # noqa: SLF001
+            prompt_id=prompt_id,
+            order_index=2,
+            input_template="",
+            output_variable="second",
+        ),
+    ]
+
+    editor._refresh_steps()  # noqa: SLF001
+    editor._handle_accept()  # noqa: SLF001
+
+    warning_text = editor._warning_label.text()  # noqa: SLF001
+    assert "same prompt" in warning_text.lower()
+    assert "legacy/inactive semantics" in warning_text.lower()
+    assert editor.result_chain() is not None
+
+
+
+def test_prompt_chain_editor_legacy_warning_mentions_inactive_import_fields(
+    qt_app: QApplication,
+) -> None:
+    editor = PromptChainEditorDialog(None, manager=None)
+    editor._steps = [  # noqa: SLF001
+        PromptChainStep(
+            id=uuid.uuid4(),
+            chain_id=editor._chain_id,  # noqa: SLF001
+            prompt_id=uuid.uuid4(),
+            order_index=1,
+            input_template="{{ imported }}",
+            output_variable="first",
+            condition="legacy condition",
+        )
+    ]
+
+    editor._refresh_steps()  # noqa: SLF001
+
+    warning_text = editor._warning_label.text()  # noqa: SLF001
+    assert "legacy/inactive semantics" in warning_text.lower()
+    assert "input_template" in warning_text
+    assert "condition" in warning_text
+
+
+
 def test_prompt_chain_list_activation_opens_editor(
     qt_app: QApplication, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -833,21 +1235,163 @@ def test_prompt_chain_manager_creates_chain_via_editor(
     dialog.deleteLater()
 
 
+
+def test_prompt_chain_manager_duplicates_chain_via_editor(
+    qt_app: QApplication, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Duplicate action should open the editor with a copied chain and persist the returned copy."""
+
+    manager = _ManagerStub()
+    dialog, panel, manager = _build_dialog(manager)
+    source_chain = manager.list_prompt_chains()[0]
+    panel._select_chain(source_chain.id)  # noqa: SLF001
+    captured: dict[str, PromptChain] = {}
+
+    class _EditorStub:
+        def __init__(self, *_: object, **kwargs: object) -> None:
+            chain = kwargs.get("chain")
+            assert isinstance(chain, PromptChain)
+            captured["editor_chain"] = chain
+            self._chain = chain
+
+        def exec(self) -> int:
+            return int(QDialog.DialogCode.Accepted)
+
+        def result_chain(self) -> PromptChain:
+            return self._chain
+
+    monkeypatch.setattr(
+        "gui.dialogs.prompt_chains.PromptChainEditorDialog",
+        _EditorStub,
+    )
+
+    panel._duplicate_chain()  # noqa: SLF001
+
+    duplicated = manager.saved_chain
+    assert duplicated is not None
+    assert duplicated.id != source_chain.id
+    assert duplicated.name == f"{source_chain.name} (Copy)"
+    assert len(duplicated.steps) == len(source_chain.steps)
+    assert duplicated.steps[0].id != source_chain.steps[0].id
+    assert duplicated.steps[0].chain_id == duplicated.id
+    assert captured["editor_chain"].id == duplicated.id
+    dialog.close()
+    dialog.deleteLater()
+
+
+
 def test_prompt_chain_manager_deletes_chain(
     qt_app: QApplication, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Delete action should invoke PromptManager.delete_prompt_chain."""
 
     manager = _ManagerStub()
+    expected_chain_id = manager._chains[0].id  # noqa: SLF001
     dialog, panel, manager = _build_dialog(manager)
     monkeypatch.setattr(
         "gui.dialogs.prompt_chains.QMessageBox.question",
-        lambda *_, **__: QMessageBox.StandardButton.Yes,
+        lambda *args, **kwargs: QMessageBox.StandardButton.Yes,
     )
     panel._delete_chain()  # noqa: SLF001
-    assert manager.deleted_chain_ids
+    assert manager.deleted_chain_ids == [expected_chain_id]
     dialog.close()
     dialog.deleteLater()
+
+
+
+def test_prompt_chain_panel_records_recent_run_history_in_session(
+    qt_app: QApplication,
+) -> None:
+    manager = _ManagerStub()
+    dialog, panel, manager = _build_dialog(manager)
+    result = manager.run_prompt_chain(
+        manager._chains[0].id,
+        chain_input="history input",
+        use_web_search=True,
+    )  # noqa: SLF001
+
+    panel._record_run_history(result)  # noqa: SLF001
+
+    assert len(panel._run_history) == 1  # noqa: SLF001
+    entry = panel._run_history[0]  # noqa: SLF001
+    assert entry["chain_name"] == manager._chains[0].name  # noqa: SLF001
+    assert entry["chain_id"] == str(manager._chains[0].id)  # noqa: SLF001
+    assert entry["chain_input_preview"] == "history input"
+    assert entry["status"] == "success"
+    assert "Recent runs for 'Demo Chain'" in panel._history_label.text()  # noqa: SLF001
+    assert "output:" in panel._history_label.text()  # noqa: SLF001
+    dialog.close()
+    dialog.deleteLater()
+
+
+
+def test_prompt_chain_panel_caps_recent_run_history_to_five_entries(
+    qt_app: QApplication,
+) -> None:
+    manager = _ManagerStub()
+    dialog, panel, manager = _build_dialog(manager)
+
+    for index in range(6):
+        result = manager.run_prompt_chain(
+            manager._chains[0].id,  # noqa: SLF001
+            chain_input=f"input {index}",
+            use_web_search=True,
+        )
+        panel._record_run_history(result)  # noqa: SLF001
+
+    assert len(panel._run_history) == 5  # noqa: SLF001
+    assert panel._run_history[0]["chain_input_preview"] == "input 5"  # noqa: SLF001
+    assert panel._run_history[-1]["chain_input_preview"] == "input 1"  # noqa: SLF001
+    dialog.close()
+    dialog.deleteLater()
+
+
+def test_prompt_chain_panel_filters_recent_history_to_selected_chain(
+    qt_app: QApplication,
+) -> None:
+    manager = _ManagerStub()
+    second_chain = PromptChain(
+        id=uuid.uuid4(),
+        name="Second Chain",
+        description="Another chain",
+        steps=[
+            PromptChainStep(
+                id=uuid.uuid4(),
+                chain_id=uuid.uuid4(),
+                prompt_id=uuid.uuid4(),
+                order_index=1,
+                input_template="",
+                output_variable="step_1",
+            )
+        ],
+    )
+    second_chain.steps[0].chain_id = second_chain.id
+    manager._chains.append(second_chain)  # noqa: SLF001
+    dialog, panel, manager = _build_dialog(manager)
+
+    first_result = manager.run_prompt_chain(
+        manager._chains[0].id,
+        chain_input="first chain input",
+        use_web_search=True,
+    )  # noqa: SLF001
+    panel._record_run_history(first_result)  # noqa: SLF001
+
+    second_result = manager.run_prompt_chain(
+        second_chain.id,
+        chain_input="second chain input",
+        use_web_search=True,
+    )
+    panel._record_run_history(second_result)  # noqa: SLF001
+
+    panel._selected_chain_id = str(second_chain.id)  # noqa: SLF001
+    panel._refresh_run_history_label()  # noqa: SLF001
+    history_text = panel._history_label.text()  # noqa: SLF001
+    assert "Recent runs for 'Second Chain'" in history_text
+    assert "second chain input" in history_text
+    assert "first chain input" not in history_text
+    dialog.close()
+    dialog.deleteLater()
+
 
 
 def test_prompt_chain_dialog_stream_preview_renders(qt_app: QApplication) -> None:

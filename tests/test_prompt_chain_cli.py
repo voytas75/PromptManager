@@ -34,6 +34,7 @@ class _ChainCliManagerStub:
         self.chain = _make_chain()
         self.saved_chains: list[PromptChain] = []
         self.run_mode = "success"
+        self._recent_runs: list[dict[str, str | None]] = []
 
     def get_prompt_chain(self, chain_id: uuid.UUID) -> PromptChain:
         if chain_id != self.chain.id:
@@ -44,6 +45,10 @@ class _ChainCliManagerStub:
         self.saved_chains.append(chain)
         self.chain = chain
         return chain
+
+    def list_recent_prompt_chain_runs(self, *, limit: int = 20) -> list[dict[str, str | None]]:
+        safe_limit = max(1, int(limit or 20))
+        return list(self._recent_runs[:safe_limit])
 
     def run_prompt_chain(
         self,
@@ -307,6 +312,12 @@ def test_prompt_chain_show_text_surfaces_inactive_legacy_semantics(
         "Legacy fields: input_template, output_variable, condition "
         "(inactive semantics)" in output
     )
+    assert (
+        "output_variable: compatibility alias only; "
+        "runtime uses canonical step_output_key" in output
+    )
+    assert "input_template: compatibility-only field; inactive in active runtime" in output
+    assert "condition: compatibility-only field; inactive in active runtime" in output
 
 
 def test_prompt_chain_export_writes_deterministic_json(tmp_path: Path) -> None:
@@ -416,7 +427,7 @@ def test_prompt_chain_validate_rejects_empty_step_list(
 ) -> None:
     """Validation should fail when active semantic requirements are not met."""
 
-    payload = {
+    payload: dict[str, object] = {
         "name": "Invalid chain",
         "steps": [],
     }
@@ -437,7 +448,7 @@ def test_prompt_chain_validate_json_reports_invalid_payload_shape(
 ) -> None:
     """Validation JSON output should keep a stable shape for invalid payloads."""
 
-    payload = {
+    payload: dict[str, object] = {
         "name": "Invalid chain",
         "steps": [],
     }

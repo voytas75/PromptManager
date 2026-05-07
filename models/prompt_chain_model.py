@@ -15,6 +15,15 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 _SUMMARY_METADATA_KEY = "summarize_last_response"
+_LEGACY_RUNTIME_FIELDS_METADATA_KEY = "legacy_runtime_fields"
+_LEGACY_RUNTIME_FIELDS_STATUS_KEY = "legacy_runtime_fields_status"
+_LEGACY_RUNTIME_FIELDS_NOTE_KEY = "legacy_runtime_fields_note"
+_LEGACY_CHAIN_FIELDS_METADATA_KEY = "legacy_chain_fields"
+_LEGACY_CHAIN_FIELD_NOTE = "Compatibility-only field; not used by the active linear runner."
+_LEGACY_RUNTIME_FIELDS_NOTE = (
+    "Compatibility-only fields preserved for import/export boundaries. "
+    "They do not affect the active linear runner."
+)
 
 
 def _utc_now() -> datetime:
@@ -66,11 +75,18 @@ class PromptChainStep:
     chain_id: uuid.UUID
     prompt_id: uuid.UUID
     order_index: int
-    input_template: str
-    output_variable: str
+    input_template: str = ""
+    output_variable: str = ""
     condition: str | None = None
     stop_on_failure: bool = True
     metadata: MutableMapping[str, Any] | None = None
+
+    def __post_init__(self) -> None:
+        """Normalize legacy-looking step fields to runtime-safe defaults."""
+        self.input_template = str(self.input_template or "")
+        self.output_variable = str(self.output_variable or f"step_{self.order_index}")
+        condition_text = str(self.condition or "").strip()
+        self.condition = condition_text or None
 
     def to_record(self) -> dict[str, Any]:
         """Return a dictionary suitable for SQLite persistence."""
@@ -209,30 +225,53 @@ def chain_from_payload(payload: Mapping[str, Any]) -> PromptChain:
         step_id_value = step_payload.get("id")
         order_index_value = step_payload.get("order_index")
         order_index = int(order_index_value) if order_index_value not in (None, "") else index
-        input_template = str(step_payload.get("input_template") or "")
-        output_variable = str(step_payload.get("output_variable") or f"step_{order_index}")
-        condition_text = str(step_payload.get("condition") or "").strip()
+        legacy_input_template = str(step_payload.get("input_template") or "")
+        legacy_output_variable = str(step_payload.get("output_variable") or "")
+        legacy_condition_text = str(step_payload.get("condition") or "").strip()
+        step_metadata = _coerce_metadata(step_payload.get("metadata")) or {}
+        legacy_runtime_fields = {
+            "input_template": legacy_input_template,
+            "output_variable": legacy_output_variable,
+            "condition": legacy_condition_text or None,
+        }
+        if any(
+            value not in ("", None)
+            for value in (
+                legacy_input_template,
+                legacy_output_variable,
+                legacy_condition_text,
+            )
+        ):
+            step_metadata[_LEGACY_RUNTIME_FIELDS_METADATA_KEY] = legacy_runtime_fields
+            step_metadata[_LEGACY_RUNTIME_FIELDS_STATUS_KEY] = "inactive"
+            step_metadata[_LEGACY_RUNTIME_FIELDS_NOTE_KEY] = _LEGACY_RUNTIME_FIELDS_NOTE
         steps.append(
             PromptChainStep(
                 id=uuid.uuid4() if not step_id_value else uuid.UUID(str(step_id_value)),
                 chain_id=chain_id,
                 prompt_id=uuid.UUID(str(prompt_id_value)),
                 order_index=order_index,
-                input_template=input_template,
-                output_variable=output_variable,
-                condition=condition_text or None,
                 stop_on_failure=bool(step_payload.get("stop_on_failure", True)),
-                metadata=_coerce_metadata(step_payload.get("metadata")),
+                metadata=step_metadata or None,
             )
         )
     summarize_last_response = bool(payload.get("summarize_last_response", True))
+    chain_metadata = _coerce_metadata(payload.get("metadata")) or {}
+    legacy_chain_fields: dict[str, dict[str, str]] = {}
+    if payload.get("variables_schema") is not None:
+        legacy_chain_fields["variables_schema"] = {
+            "status": "inactive",
+            "note": _LEGACY_CHAIN_FIELD_NOTE,
+        }
+    if legacy_chain_fields:
+        chain_metadata[_LEGACY_CHAIN_FIELDS_METADATA_KEY] = legacy_chain_fields
     chain = PromptChain(
         id=chain_id,
         name=name,
         description=description,
         is_active=bool(payload.get("is_active", True)),
         variables_schema=_coerce_metadata(payload.get("variables_schema")),
-        metadata=_coerce_metadata(payload.get("metadata")),
+        metadata=chain_metadata or None,
         summarize_last_response=summarize_last_response,
     )
     return chain.with_steps(steps)

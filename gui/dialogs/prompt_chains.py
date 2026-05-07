@@ -19,13 +19,14 @@ import html
 import json
 import logging
 import threading
+import uuid
 from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 from PySide6.QtCore import QByteArray, QSettings, Qt, QTimer
-from PySide6.QtGui import QPalette, QTextDocument
+from PySide6.QtGui import QGuiApplication, QPalette, QTextDocument
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -152,6 +153,17 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers only
     from models.prompt_model import Prompt
 
 
+class _PromptChainRunHistoryEntry(TypedDict):
+    """Bounded recent run metadata kept in the current panel session only."""
+
+    chain_id: str
+    chain_name: str
+    chain_input_preview: str
+    status: str
+    recorded_at: str
+    final_output_preview: str
+
+
 class PromptChainManagerPanel(QWidget):
     """Widget that lists, imports, and runs stored prompt chains."""
 
@@ -170,12 +182,15 @@ class PromptChainManagerPanel(QWidget):
         self._settings = QSettings("PromptManager", "PromptChainManagerPanel")
         self._result_plaintext: str = ""
         self._result_richtext: str = ""
+        self._last_final_output_text: str = ""
+        self._last_final_summary_text: str = ""
         self._suppress_input_signal = False
         self._current_input_chain_id: str | None = None
         self._web_search_checkbox: QCheckBox | None = None
         self._prompt_edit_callback = prompt_edit_callback
         self._prompt_name_cache: dict[UUID, str] = {}
         self._step_prompt_ids: dict[int, UUID] = {}
+        self._run_history: list[_PromptChainRunHistoryEntry] = []
 
         layout = QVBoxLayout(self)
         intro = QLabel(
@@ -228,6 +243,9 @@ class PromptChainManagerPanel(QWidget):
         self._new_button = QPushButton("New", list_container)
         self._new_button.clicked.connect(self._create_chain)  # type: ignore[arg-type]
         import_run_row.addWidget(self._new_button)
+        self._duplicate_button = QPushButton("Duplicate", list_container)
+        self._duplicate_button.clicked.connect(self._duplicate_chain)  # type: ignore[arg-type]
+        import_run_row.addWidget(self._duplicate_button)
         self._edit_button = QPushButton("Edit", list_container)
         self._edit_button.clicked.connect(self._edit_chain)  # type: ignore[arg-type]
         import_run_row.addWidget(self._edit_button)
@@ -357,6 +375,15 @@ class PromptChainManagerPanel(QWidget):
         self._clear_results_button = QPushButton("Clear", results_container)
         self._clear_results_button.clicked.connect(self._handle_clear_results)  # type: ignore[arg-type]
         results_header.addWidget(self._clear_results_button)
+        self._copy_final_output_button = QPushButton("Copy final output", results_container)
+        self._copy_final_output_button.clicked.connect(self._copy_final_output)  # type: ignore[arg-type]
+        results_header.addWidget(self._copy_final_output_button)
+        self._copy_final_summary_button = QPushButton("Copy final summary", results_container)
+        self._copy_final_summary_button.clicked.connect(self._copy_final_summary)  # type: ignore[arg-type]
+        results_header.addWidget(self._copy_final_summary_button)
+        self._save_result_button = QPushButton("Save result", results_container)
+        self._save_result_button.clicked.connect(self._save_result_to_file)  # type: ignore[arg-type]
+        results_header.addWidget(self._save_result_button)
         results_header.addStretch(1)
         results_layout.addLayout(results_header)
 
@@ -378,6 +405,16 @@ class PromptChainManagerPanel(QWidget):
         self._result_view.setAcceptRichText(True)
         self._handle_wrap_changed(True)
         results_layout.addWidget(self._result_view, 1)
+
+        self._history_label = QLabel(
+            "Recent chain runs in this session will appear here.",
+            results_container,
+        )
+        self._history_label.setObjectName("promptChainRecentHistory")
+        self._history_label.setWordWrap(True)
+        self._history_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        results_layout.addWidget(self._history_label)
+        self._refresh_run_history_label()
         self._stream_preview_active = False
         self._stream_buffers: dict[str, str] = {}
         self._stream_labels: dict[str, str] = {}
@@ -584,6 +621,49 @@ class PromptChainManagerPanel(QWidget):
             return
         self._persist_chain(chain)
 
+    def _duplicate_chain(self) -> None:
+        chain = self._current_chain()
+        if chain is None:
+            QMessageBox.information(self, "Select chain", "Choose a chain to duplicate first.")
+            return
+        duplicated_chain_id = uuid.uuid4()
+        duplicated_steps = [
+            PromptChainStep(
+                id=uuid.uuid4(),
+                chain_id=duplicated_chain_id,
+                prompt_id=step.prompt_id,
+                order_index=step.order_index,
+                input_template=step.input_template,
+                output_variable=step.output_variable,
+                stop_on_failure=step.stop_on_failure,
+                metadata=step.metadata,
+            )
+            for step in chain.steps
+        ]
+        duplicated_chain = PromptChain(
+            id=duplicated_chain_id,
+            name=f"{chain.name} (Copy)",
+            description=chain.description,
+            is_active=chain.is_active,
+            variables_schema=chain.variables_schema,
+            metadata=chain.metadata,
+            summarize_last_response=chain.summarize_last_response,
+            created_at=chain.created_at,
+            updated_at=chain.updated_at,
+        ).with_steps(duplicated_steps)
+        editor = PromptChainEditorDialog(
+            self,
+            manager=self._manager,
+            prompts=self._available_prompts(),
+            chain=duplicated_chain,
+        )
+        if editor.exec() != QDialog.DialogCode.Accepted:
+            return
+        updated = editor.result_chain()
+        if updated is None:
+            return
+        self._persist_chain(updated)
+
     def _edit_chain(self) -> None:
         chain = self._current_chain()
         if chain is None:
@@ -658,6 +738,12 @@ class PromptChainManagerPanel(QWidget):
                 continue
             if item.data(Qt.ItemDataRole.UserRole) == chain_id_text:
                 self._chain_list.setCurrentRow(row)
+                self._selected_chain_id = chain_id_text
+                chain = next(
+                    (entry for entry in self._chains if str(entry.id) == chain_id_text),
+                    None,
+                )
+                self._render_chain_details(chain)
                 return
 
     def _run_selected_chain(self) -> None:
@@ -721,6 +807,7 @@ class PromptChainManagerPanel(QWidget):
         else:
             timestamp = datetime.now().strftime("%H:%M:%S")  # noqa: DTZ005
             self._detail_status.setText(f"Last run succeeded at {timestamp}")
+        self._record_run_history(result)
         self._display_run_result(result)
         show_toast(self, f"Chain '{chain.name}' completed.")
 
@@ -736,9 +823,10 @@ class PromptChainManagerPanel(QWidget):
         html_sections: list[str] = [self._result_style_css(), '<div class="chain-results">']
         step_html_sections: list[str] = []
         summarize_enabled = bool(getattr(result.chain, "summarize_last_response", True))
-        summary_text: str | None = None
-        if summarize_enabled and result.summary:
-            summary_text = result.summary.strip() or None
+        final_summary_text: str | None = None
+        if summarize_enabled and result.final_summary_text:
+            final_summary_text = result.final_summary_text.strip() or None
+        final_output_text = (result.final_output_text or "").strip() or None
         last_success_index: int | None = None
         if summarize_enabled:
             for index in range(len(result.steps) - 1, -1, -1):
@@ -764,19 +852,19 @@ class PromptChainManagerPanel(QWidget):
             plain_sections.append("  (no input provided)")
         plain_sections.append("")
 
-        # Chain outputs
-        plain_sections.append("Chain Outputs")
+        # Step outputs
+        plain_sections.append("Step outputs")
         outputs_text = ""
-        if result.outputs:
-            outputs_text = self._format_json(result.outputs)
+        if result.step_outputs:
+            outputs_text = self._format_json(result.step_outputs)
             plain_sections.extend(_indent_lines(outputs_text))
         else:
-            plain_sections.append("  (no outputs)")
+            plain_sections.append("  (no step outputs)")
         plain_sections.append("")
         html_sections.append(
             self._format_colored_block_html(
-                "Chain outputs",
-                outputs_text or "- (no outputs)",
+                "Step outputs",
+                outputs_text or "- (no step outputs)",
                 color=_CHAIN_OUTPUT_COLOR,
                 class_name="chain-block--outputs",
             )
@@ -788,16 +876,29 @@ class PromptChainManagerPanel(QWidget):
         total_steps = len(result.steps)
         for index, step_run in enumerate(result.steps):
             step = step_run.step
-            step_label = step.output_variable or str(step.prompt_id)
+            step_output_key = step_run.step_output_key or f"step_{step.order_index}"
+            step_label = step_run.step_label or step.output_variable or step_output_key
             plain_sections.append(f"Step {step.order_index}: {step_label}")
+            plain_sections.append(f"  Output key: {step_output_key}")
             plain_sections.append(f"  Status: {step_run.status}")
+            if step_run.prompt_name:
+                plain_sections.append(f"  Prompt: {step_run.prompt_name}")
+            if step_run.duration_ms is not None:
+                plain_sections.append(f"  Duration: {step_run.duration_ms} ms")
+            plain_sections.append(
+                "  Web search: "
+                f"requested={'yes' if step_run.web_search_requested else 'no'}, "
+                f"applied={'yes' if step_run.web_search_applied else 'no'}"
+            )
+            if step_run.skip_reason:
+                plain_sections.append(f"  Skip reason: {step_run.skip_reason}")
             if step_run.error:
                 plain_sections.append(f"  Error: {step_run.error}")
             elif step_run.status == "skipped":
                 plain_sections.append("  Skipped because condition evaluated to false.")
             outcome = step_run.outcome
-            request_text = ""
-            response_text = ""
+            request_text = (step_run.request_text or "").strip()
+            response_text = (step_run.response_text or "").strip()
             reasoning_text = None
             should_render_reasoning = (
                 summarize_enabled
@@ -842,14 +943,26 @@ class PromptChainManagerPanel(QWidget):
         if result.steps:
             html_sections.extend(step_html_sections)
             html_sections.append("</div>")
-        if summary_text:
-            plain_sections.append("Final chain result")
-            plain_sections.extend(_indent_lines(summary_text))
+        if final_output_text:
+            plain_sections.append("Final output")
+            plain_sections.extend(_indent_lines(final_output_text))
             plain_sections.append("")
             html_sections.append(
                 self._format_colored_block_html(
-                    "Final chain result",
-                    summary_text,
+                    "Final output",
+                    final_output_text,
+                    color=_CHAIN_OUTPUT_COLOR,
+                    class_name="chain-block--final-output",
+                )
+            )
+        if final_summary_text:
+            plain_sections.append("Final summary")
+            plain_sections.extend(_indent_lines(final_summary_text))
+            plain_sections.append("")
+            html_sections.append(
+                self._format_colored_block_html(
+                    "Final summary",
+                    final_summary_text,
                     color=_CHAIN_SUMMARY_COLOR,
                     class_name="chain-block--summary",
                     monospace=False,
@@ -860,6 +973,8 @@ class PromptChainManagerPanel(QWidget):
         html_text = "\n".join(html_sections).strip()
         self._result_plaintext = plain_text
         self._result_richtext = html_text
+        self._last_final_output_text = final_output_text or ""
+        self._last_final_summary_text = final_summary_text or ""
         self._apply_result_view()
 
     @staticmethod
@@ -935,7 +1050,8 @@ class PromptChainManagerPanel(QWidget):
     ) -> str:
         """Return styled HTML for a single step entry."""
         step = step_run.step
-        label = step.output_variable or str(step.prompt_id)
+        step_output_key = step_run.step_output_key or f"step_{step.order_index}"
+        label = step_run.step_label or step.output_variable or step_output_key
         parts = ['<div class="chain-step">']
         parts.append(
             f"<div class='chain-step-title'>Step {step.order_index} – {html.escape(label)}</div>"
@@ -945,6 +1061,32 @@ class PromptChainManagerPanel(QWidget):
             f"Status: <code>{html.escape(step_run.status)}</code>"
             "</div>"
         )
+        if step_run.prompt_name:
+            prompt_html = html.escape(step_run.prompt_name)
+            parts.append(
+                "<div class='chain-step-detail'><strong>Prompt:</strong> "
+                f"{prompt_html}</div>"
+            )
+        parts.append(
+            "<div class='chain-step-detail'><strong>Output key:</strong> "
+            f"<code>{html.escape(step_output_key)}</code></div>"
+        )
+        if step_run.duration_ms is not None:
+            parts.append(
+                "<div class='chain-step-detail'><strong>Duration:</strong> "
+                f"{step_run.duration_ms} ms</div>"
+            )
+        parts.append(
+            "<div class='chain-step-detail'><strong>Web search:</strong> "
+            f"requested={'yes' if step_run.web_search_requested else 'no'}, "
+            f"applied={'yes' if step_run.web_search_applied else 'no'}</div>"
+        )
+        if step_run.skip_reason:
+            skip_reason_html = html.escape(step_run.skip_reason)
+            parts.append(
+                "<div class='chain-step-detail'><strong>Skip reason:</strong> "
+                f"{skip_reason_html}</div>"
+            )
         if step_run.error:
             parts.append(f"<div class='chain-step-error'>{html.escape(step_run.error)}</div>")
         elif step_run.status == "skipped":
@@ -1024,7 +1166,108 @@ class PromptChainManagerPanel(QWidget):
         self._end_stream_preview()
         self._result_plaintext = ""
         self._result_richtext = ""
+        self._last_final_output_text = ""
+        self._last_final_summary_text = ""
         self._apply_result_view()
+
+    def _copy_final_output(self) -> None:
+        """Copy the last final output text to the system clipboard."""
+        output_text = self._last_final_output_text.strip()
+        if not output_text:
+            show_toast(self, "No final output available to copy.")
+            return
+        clipboard = QGuiApplication.clipboard()
+        if clipboard is None:
+            show_toast(self, "Clipboard is unavailable.")
+            return
+        clipboard.setText(output_text)
+        show_toast(self, "Final output copied.")
+
+    def _copy_final_summary(self) -> None:
+        """Copy the last final summary text to the system clipboard."""
+        summary_text = self._last_final_summary_text.strip()
+        if not summary_text:
+            show_toast(self, "No final summary available to copy.")
+            return
+        clipboard = QGuiApplication.clipboard()
+        if clipboard is None:
+            show_toast(self, "Clipboard is unavailable.")
+            return
+        clipboard.setText(summary_text)
+        show_toast(self, "Final summary copied.")
+
+    def _save_result_to_file(self) -> None:
+        """Persist the currently rendered chain result to a text file."""
+        result_text = self._result_plaintext.strip()
+        if not result_text:
+            show_toast(self, "No result available to save.")
+            return
+        selected_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save prompt chain result",
+            "prompt-chain-result.txt",
+            "Text files (*.txt);;Markdown files (*.md);;All files (*)",
+        )
+        if not selected_path:
+            return
+        output_path = Path(selected_path)
+        output_path.write_text(f"{self._result_plaintext.rstrip()}\n", encoding="utf-8")
+        show_toast(self, f"Saved result to {output_path.name}.")
+
+    def _record_run_history(self, result: PromptChainRunResult) -> None:
+        """Keep a bounded recent run history for the current GUI session only."""
+        entry: _PromptChainRunHistoryEntry = {
+            "chain_id": str(result.chain.id),
+            "chain_name": result.chain.name,
+            "chain_input_preview": self._history_input_preview(result.chain_input),
+            "status": self._history_status(result),
+            "recorded_at": datetime.now().strftime("%H:%M:%S"),  # noqa: DTZ005
+            "final_output_preview": self._history_input_preview(result.final_output_text),
+        }
+        self._run_history.insert(0, entry)
+        del self._run_history[5:]
+        self._refresh_run_history_label()
+
+    def _refresh_run_history_label(self) -> None:
+        """Render the bounded recent run summary below the main result view."""
+        selected_chain = self._current_chain()
+        if selected_chain is None:
+            self._history_label.setText("Select a chain to inspect recent runs.")
+            return
+        selected_entries = [
+            entry for entry in self._run_history if entry["chain_id"] == str(selected_chain.id)
+        ]
+        if not selected_entries:
+            self._history_label.setText(
+                f"No recent runs for '{selected_chain.name}' in this session yet."
+            )
+            return
+        lines = [f"Recent runs for '{selected_chain.name}' in this session:"]
+        for entry in selected_entries:
+            lines.append(
+                "• "
+                f"{entry['recorded_at']} — [{entry['status']}] "
+                f"input: {entry['chain_input_preview']}"
+            )
+            lines.append(f"  output: {entry['final_output_preview']}")
+        self._history_label.setText("\n".join(lines))
+
+    def _history_input_preview(self, chain_input: str) -> str:
+        """Return a single-line bounded preview for history summaries."""
+        compact = " ".join(chain_input.split())
+        if not compact:
+            return "(empty)"
+        if len(compact) <= 80:
+            return compact
+        return f"{compact[:77]}..."
+
+    def _history_status(self, result: PromptChainRunResult) -> str:
+        """Summarise the overall result status from step outcomes."""
+        if any(step.status == "error" for step in result.steps):
+            return "error"
+        if any(step.status == "skipped" for step in result.steps):
+            return "partial"
+        return "success"
 
     def _handle_result_format_changed(self, _: bool) -> None:
         """Switch between Markdown and plain text views."""
