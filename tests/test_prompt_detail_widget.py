@@ -30,10 +30,120 @@ from typing import cast
 import pytest
 
 pytest.importorskip("PySide6")
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QHBoxLayout, QLabel, QPlainTextEdit, QPushButton
 
 from gui.widgets import PromptDetailWidget
 from models.prompt_model import Prompt
+
+
+def _required_label(widget: PromptDetailWidget, name: str) -> QLabel:
+    found = widget.findChild(QLabel, name)
+    assert found is not None
+    return found
+
+
+def _required_button(widget: PromptDetailWidget, name: str) -> QPushButton:
+    found = widget.findChild(QPushButton, name)
+    assert found is not None
+    return found
+
+
+def _required_plain_text_edit(widget: PromptDetailWidget, name: str) -> QPlainTextEdit:
+    found = widget.findChild(QPlainTextEdit, name)
+    assert found is not None
+    return found
+
+
+def _run_summary_label(widget: PromptDetailWidget) -> QLabel:
+    return _required_label(widget, "promptRunSummary")
+
+
+def _decision_label(widget: PromptDetailWidget) -> QLabel:
+    return _required_label(widget, "promptDecisionSummary")
+
+
+def _next_action_label(widget: PromptDetailWidget) -> QLabel:
+    return _required_label(widget, "promptNextActionSummary")
+
+
+def _decision_provenance_label(widget: PromptDetailWidget) -> QLabel:
+    return _required_label(widget, "promptDecisionProvenanceSummary")
+
+
+def _name_label(widget: PromptDetailWidget) -> QLabel:
+    return _required_label(widget, "promptTitle")
+
+
+def _template_variable_cue_label(widget: PromptDetailWidget) -> QLabel:
+    return _required_label(widget, "promptTemplateVariableCue")
+
+
+def _meta_label(widget: PromptDetailWidget) -> QLabel:
+    return _required_label(widget, "promptInspectionCues")
+
+
+def _usage_cue_label(widget: PromptDetailWidget) -> QLabel:
+    return _required_label(widget, "promptUsageCue")
+
+
+def _reuse_signal_label(widget: PromptDetailWidget) -> QLabel:
+    return _required_label(widget, "promptReuseSignalCue")
+
+
+def _workspace_handoff_cue_label(widget: PromptDetailWidget) -> QLabel:
+    return _required_label(widget, "promptWorkspaceHandoffCue")
+
+
+def _description_label(widget: PromptDetailWidget) -> QLabel:
+    return _required_label(widget, "promptDescription")
+
+
+def _context_label(widget: PromptDetailWidget) -> QLabel:
+    return _required_label(widget, "promptContext")
+
+
+def _scenarios_label(widget: PromptDetailWidget) -> QLabel:
+    return _required_label(widget, "promptScenarios")
+
+
+def _metadata_view(widget: PromptDetailWidget) -> QPlainTextEdit:
+    return _required_plain_text_edit(widget, "promptMetadata")
+
+
+def _copy_prompt_body_button(widget: PromptDetailWidget) -> QPushButton:
+    return _required_button(widget, "copyPromptBodyButton")
+
+
+def _open_in_workspace_button(widget: PromptDetailWidget) -> QPushButton:
+    return _required_button(widget, "openInWorkspaceButton")
+
+
+def _favorite_button(widget: PromptDetailWidget) -> QPushButton:
+    return _required_button(widget, "favoritePromptButton")
+
+
+def _promote_draft_button(widget: PromptDetailWidget) -> QPushButton:
+    return _required_button(widget, "promoteDraftButton")
+
+
+def _edit_button_row(widget: PromptDetailWidget) -> QHBoxLayout:
+    layout = widget.layout()
+    assert layout is not None
+    item = layout.itemAt(0)
+    assert item is not None
+    scroll_area = item.widget()
+    assert scroll_area is not None
+    content = scroll_area.findChild(QLabel, "promptTitle")
+    assert content is not None
+    parent = content.parentWidget()
+    assert parent is not None
+    parent_layout = parent.layout()
+    assert parent_layout is not None
+    row_item = parent_layout.itemAt(0)
+    assert row_item is not None
+    row = row_item.layout()
+    assert isinstance(row, QHBoxLayout)
+    return row
 
 
 @pytest.fixture(scope="module")
@@ -59,8 +169,8 @@ def test_prompt_detail_widget_renders_last_run_summary_label(
     )
     qt_app.processEvents()
 
-    assert widget._run_summary_label.isVisible()  # noqa: SLF001
-    summary_text = widget._run_summary_label.text()  # noqa: SLF001
+    assert _run_summary_label(widget).isVisible()  # noqa: SLF001
+    summary_text = _run_summary_label(widget).text()  # noqa: SLF001
     assert "Last run:" in summary_text
     assert "gpt-4o-mini" in summary_text
     assert "Validation freshness: recent" in summary_text
@@ -78,8 +188,8 @@ def test_prompt_detail_widget_hides_last_run_summary_when_empty(
     widget.update_run_summary(None)
     qt_app.processEvents()
 
-    assert not widget._run_summary_label.isVisible()  # noqa: SLF001
-    assert widget._run_summary_label.text() == ""  # noqa: SLF001
+    assert not _run_summary_label(widget).isVisible()  # noqa: SLF001
+    assert _run_summary_label(widget).text() == ""  # noqa: SLF001
 
 
 def test_prompt_detail_widget_renders_decision_summary_label(
@@ -92,8 +202,8 @@ def test_prompt_detail_widget_renders_decision_summary_label(
     widget.update_decision_summary("Refine before reuse")
     qt_app.processEvents()
 
-    assert widget._decision_label.isVisible()  # noqa: SLF001
-    decision_text = widget._decision_label.text()  # noqa: SLF001
+    assert _decision_label(widget).isVisible()  # noqa: SLF001
+    decision_text = _decision_label(widget).text()  # noqa: SLF001
     assert "Decision:" in decision_text
     assert "Refine before reuse" in decision_text
 
@@ -108,8 +218,8 @@ def test_prompt_detail_widget_renders_next_action_summary_label(
     widget.update_next_action_summary("Compare before validating reuse")
     qt_app.processEvents()
 
-    assert widget._next_action_label.isVisible()  # noqa: SLF001
-    next_action_text = widget._next_action_label.text()  # noqa: SLF001
+    assert _next_action_label(widget).isVisible()  # noqa: SLF001
+    next_action_text = _next_action_label(widget).text()  # noqa: SLF001
     assert "Recommended next action:" in next_action_text
     assert "Compare before validating reuse" in next_action_text
 
@@ -125,9 +235,9 @@ def test_prompt_detail_widget_renders_missing_evidence_next_action_label(
     widget.update_next_action_summary("Validate before reuse")
     qt_app.processEvents()
 
-    assert widget._decision_label.isVisible()  # noqa: SLF001
-    assert widget._next_action_label.isVisible()  # noqa: SLF001
-    next_action_text = widget._next_action_label.text()  # noqa: SLF001
+    assert _decision_label(widget).isVisible()  # noqa: SLF001
+    assert _next_action_label(widget).isVisible()  # noqa: SLF001
+    next_action_text = _next_action_label(widget).text()  # noqa: SLF001
     assert "Recommended next action:" in next_action_text
     assert "Validate before reuse" in next_action_text
 
@@ -143,10 +253,10 @@ def test_prompt_detail_widget_renders_keep_baseline_decision_and_next_action(
     widget.update_next_action_summary("Prefer baseline before reuse")
     qt_app.processEvents()
 
-    assert widget._decision_label.isVisible()  # noqa: SLF001
-    assert widget._next_action_label.isVisible()  # noqa: SLF001
-    decision_text = widget._decision_label.text()  # noqa: SLF001
-    next_action_text = widget._next_action_label.text()  # noqa: SLF001
+    assert _decision_label(widget).isVisible()  # noqa: SLF001
+    assert _next_action_label(widget).isVisible()  # noqa: SLF001
+    decision_text = _decision_label(widget).text()  # noqa: SLF001
+    next_action_text = _next_action_label(widget).text()  # noqa: SLF001
     assert "Decision:" in decision_text
     assert "Keep baseline" in decision_text
     assert "Recommended next action:" in next_action_text
@@ -163,8 +273,8 @@ def test_prompt_detail_widget_renders_decision_provenance_label(
     widget.update_decision_provenance_summary("Based on latest 2 comparable runs")
     qt_app.processEvents()
 
-    assert widget._decision_provenance_label.isVisible()  # noqa: SLF001
-    provenance_text = widget._decision_provenance_label.text()  # noqa: SLF001
+    assert _decision_provenance_label(widget).isVisible()  # noqa: SLF001
+    provenance_text = _decision_provenance_label(widget).text()  # noqa: SLF001
     assert "Based on latest 2 comparable runs" in provenance_text
 
 
@@ -178,8 +288,8 @@ def test_prompt_detail_widget_renders_limited_evidence_provenance_label(
     widget.update_decision_provenance_summary("Based on limited run evidence")
     qt_app.processEvents()
 
-    assert widget._decision_provenance_label.isVisible()  # noqa: SLF001
-    provenance_text = widget._decision_provenance_label.text()  # noqa: SLF001
+    assert _decision_provenance_label(widget).isVisible()  # noqa: SLF001
+    provenance_text = _decision_provenance_label(widget).text()  # noqa: SLF001
     assert "Based on limited run evidence" in provenance_text
 
 
@@ -194,8 +304,8 @@ def test_prompt_detail_widget_hides_next_action_summary_when_empty(
     widget.update_next_action_summary(None)
     qt_app.processEvents()
 
-    assert not widget._next_action_label.isVisible()  # noqa: SLF001
-    assert widget._next_action_label.text() == ""  # noqa: SLF001
+    assert not _next_action_label(widget).isVisible()  # noqa: SLF001
+    assert _next_action_label(widget).text() == ""  # noqa: SLF001
 
 
 def test_prompt_detail_widget_reveals_next_action_after_decision_clears(
@@ -210,8 +320,8 @@ def test_prompt_detail_widget_reveals_next_action_after_decision_clears(
     widget.update_decision_summary(None)
     qt_app.processEvents()
 
-    assert widget._next_action_label.isVisible()  # noqa: SLF001
-    next_action_text = widget._next_action_label.text()  # noqa: SLF001
+    assert _next_action_label(widget).isVisible()  # noqa: SLF001
+    next_action_text = _next_action_label(widget).text()  # noqa: SLF001
     assert "Recommended next action:" in next_action_text
     assert "Refine before reuse" in next_action_text
 
@@ -227,8 +337,8 @@ def test_prompt_detail_widget_hides_redundant_next_action_when_same_as_decision(
     widget.update_next_action_summary("Refine before reuse")
     qt_app.processEvents()
 
-    assert widget._decision_label.isVisible()  # noqa: SLF001
-    assert widget._next_action_label.text() == ""  # noqa: SLF001
+    assert _decision_label(widget).isVisible()  # noqa: SLF001
+    assert _next_action_label(widget).text() == ""  # noqa: SLF001
 
 
 def test_prompt_detail_widget_applies_readable_default_font_sizes(
@@ -240,10 +350,10 @@ def test_prompt_detail_widget_applies_readable_default_font_sizes(
     widget.show()
     qt_app.processEvents()
 
-    assert widget._name_label.font().pointSizeF() > widget.font().pointSizeF()  # noqa: SLF001
-    assert widget._description.font().pointSizeF() > widget.font().pointSizeF()  # noqa: SLF001
-    assert widget._template_variable_cue_label.font().pointSizeF() > widget.font().pointSizeF()  # noqa: SLF001
-    assert widget._metadata_view.font().pointSizeF() > widget.font().pointSizeF()  # noqa: SLF001
+    assert _name_label(widget).font().pointSizeF() > widget.font().pointSizeF()  # noqa: SLF001
+    assert _description_label(widget).font().pointSizeF() > widget.font().pointSizeF()  # noqa: SLF001
+    assert _template_variable_cue_label(widget).font().pointSizeF() > widget.font().pointSizeF()  # noqa: SLF001
+    assert _metadata_view(widget).font().pointSizeF() > widget.font().pointSizeF()  # noqa: SLF001
 
 
 def test_prompt_detail_widget_shows_inspection_cues_for_captured_draft(
@@ -270,13 +380,13 @@ def test_prompt_detail_widget_shows_inspection_cues_for_captured_draft(
     widget.display_prompt(prompt)
     qt_app.processEvents()
 
-    assert widget._meta_label.isVisible()  # noqa: SLF001
-    inspection_text = widget._meta_label.text()  # noqa: SLF001
+    assert _meta_label(widget).isVisible()  # noqa: SLF001
+    inspection_text = _meta_label(widget).text()  # noqa: SLF001
     assert "Inspection:" in inspection_text
     assert "Draft (quick_capture)" in inspection_text
     assert "Source: chat thread" in inspection_text
     assert "Last modified: 2026-04-04 10:30 UTC" in inspection_text
-    assert not widget._metadata_view.isVisible()  # noqa: SLF001
+    assert not _metadata_view(widget).isVisible()  # noqa: SLF001
 
 
 def test_prompt_detail_widget_exposes_bounded_quick_reuse_actions(
@@ -302,19 +412,19 @@ def test_prompt_detail_widget_exposes_bounded_quick_reuse_actions(
     widget.display_prompt(prompt)
     qt_app.processEvents()
 
-    assert widget._copy_prompt_body_button.text() == "Copy Prompt"  # noqa: SLF001
-    assert widget._open_in_workspace_button.text() == "Open in Workspace"  # noqa: SLF001
-    assert widget._copy_prompt_body_button.isEnabled()  # noqa: SLF001
-    assert widget._open_in_workspace_button.isEnabled()  # noqa: SLF001
-    assert widget._copy_prompt_body_button.toolTip() == "Copy the stored prompt body."  # noqa: SLF001
+    assert _copy_prompt_body_button(widget).text() == "Copy Prompt"  # noqa: SLF001
+    assert _open_in_workspace_button(widget).text() == "Open in Workspace"  # noqa: SLF001
+    assert _copy_prompt_body_button(widget).isEnabled()  # noqa: SLF001
+    assert _open_in_workspace_button(widget).isEnabled()  # noqa: SLF001
+    assert _copy_prompt_body_button(widget).toolTip() == "Copy the stored prompt body."  # noqa: SLF001
     assert (
-        widget._open_in_workspace_button.toolTip()
+        _open_in_workspace_button(widget).toolTip()
         == "Open the stored prompt body in the workspace without running it."
     )  # noqa: SLF001
-    assert not widget._usage_cue_label.isVisible()  # noqa: SLF001
+    assert not _usage_cue_label(widget).isVisible()  # noqa: SLF001
 
-    widget._copy_prompt_body_button.click()  # noqa: SLF001
-    widget._open_in_workspace_button.click()  # noqa: SLF001
+    _copy_prompt_body_button(widget).click()  # noqa: SLF001
+    _open_in_workspace_button(widget).click()  # noqa: SLF001
     qt_app.processEvents()
 
     assert copy_requests == ["copy"]
@@ -343,14 +453,14 @@ def test_prompt_detail_widget_toggles_favorite_action_from_detail_flow(
     widget.display_prompt(prompt)
     qt_app.processEvents()
 
-    assert widget._favorite_button.isEnabled()  # noqa: SLF001
-    assert widget._favorite_button.text() == "Add Favorite"  # noqa: SLF001
+    assert _favorite_button(widget).isEnabled()  # noqa: SLF001
+    assert _favorite_button(widget).text() == "Add Favorite"  # noqa: SLF001
     assert (
-        widget._favorite_button.toolTip()
+        _favorite_button(widget).toolTip()
         == "Add this prompt to favorites so it stays easy to find later with Favorites only."
     )  # noqa: SLF001
 
-    widget._favorite_button.click()  # noqa: SLF001
+    _favorite_button(widget).click()  # noqa: SLF001
     qt_app.processEvents()
 
     assert favorite_requests == ["toggle"]
@@ -358,8 +468,8 @@ def test_prompt_detail_widget_toggles_favorite_action_from_detail_flow(
     widget.display_prompt(Prompt.from_record({**prompt.to_record(), "is_favorite": True}))
     qt_app.processEvents()
 
-    assert widget._favorite_button.text() == "Remove Favorite"  # noqa: SLF001
-    assert widget._favorite_button.toolTip() == "Remove this prompt from favorites."  # noqa: SLF001
+    assert _favorite_button(widget).text() == "Remove Favorite"  # noqa: SLF001
+    assert _favorite_button(widget).toolTip() == "Remove this prompt from favorites."  # noqa: SLF001
 
 
 def test_prompt_detail_widget_keeps_favorite_before_promote_for_draft_prompts(
@@ -383,9 +493,9 @@ def test_prompt_detail_widget_keeps_favorite_before_promote_for_draft_prompts(
     widget.display_prompt(prompt)
     qt_app.processEvents()
 
-    assert widget._promote_draft_button.isVisible()  # noqa: SLF001
-    assert widget._edit_button_row.indexOf(widget._favorite_button) < (
-        widget._edit_button_row.indexOf(widget._promote_draft_button)
+    assert _promote_draft_button(widget).isVisible()  # noqa: SLF001
+    assert _edit_button_row(widget).indexOf(_favorite_button(widget)) < (
+        _edit_button_row(widget).indexOf(_promote_draft_button(widget))
     )  # noqa: SLF001
 
 
@@ -408,14 +518,14 @@ def test_prompt_detail_widget_disables_copy_without_a_prompt_body(
     widget.display_prompt(prompt)
     qt_app.processEvents()
 
-    assert not widget._copy_prompt_body_button.isEnabled()  # noqa: SLF001
-    assert widget._open_in_workspace_button.isEnabled()  # noqa: SLF001
+    assert not _copy_prompt_body_button(widget).isEnabled()  # noqa: SLF001
+    assert _open_in_workspace_button(widget).isEnabled()  # noqa: SLF001
     assert (
-        widget._copy_prompt_body_button.toolTip()
+        _copy_prompt_body_button(widget).toolTip()
         == "Copy Prompt is unavailable because this prompt has no stored prompt body."
     )  # noqa: SLF001
     assert (
-        widget._open_in_workspace_button.toolTip()
+        _open_in_workspace_button(widget).toolTip()
         == "Open the saved description in the workspace without running it."
     )  # noqa: SLF001
 
@@ -441,7 +551,7 @@ def test_prompt_detail_widget_keeps_source_visible_for_promoted_prompt(
     widget.display_prompt(prompt)
     qt_app.processEvents()
 
-    inspection_text = widget._meta_label.text()  # noqa: SLF001
+    inspection_text = _meta_label(widget).text()  # noqa: SLF001
     assert "Inspection:" in inspection_text
     assert "Source: ops notebook" in inspection_text
     assert "Draft" not in inspection_text
@@ -468,7 +578,7 @@ def test_prompt_detail_widget_hides_low_signal_source_marker_in_inspection_cues(
     widget.display_prompt(prompt)
     qt_app.processEvents()
 
-    inspection_text = widget._meta_label.text()  # noqa: SLF001
+    inspection_text = _meta_label(widget).text()  # noqa: SLF001
     assert "Inspection:" in inspection_text
     assert "Source:" not in inspection_text
     assert "Last modified: 2026-04-05 09:12 UTC" in inspection_text
@@ -494,8 +604,8 @@ def test_prompt_detail_widget_shows_usage_cue_when_saved_signal_exists(
     widget.display_prompt(prompt)
     qt_app.processEvents()
 
-    assert widget._usage_cue_label.isVisible()  # noqa: SLF001
-    usage_text = widget._usage_cue_label.text()  # noqa: SLF001
+    assert _usage_cue_label(widget).isVisible()  # noqa: SLF001
+    usage_text = _usage_cue_label(widget).text()  # noqa: SLF001
     assert "When to use:" in usage_text
     assert "Use for quick summaries of incident notes before handoff." in usage_text
 
@@ -522,8 +632,8 @@ def test_prompt_detail_widget_uses_context_lead_for_usage_cue_when_saved_signals
     widget.display_prompt(prompt)
     qt_app.processEvents()
 
-    assert widget._usage_cue_label.isVisible()  # noqa: SLF001
-    usage_text = widget._usage_cue_label.text()  # noqa: SLF001
+    assert _usage_cue_label(widget).isVisible()  # noqa: SLF001
+    usage_text = _usage_cue_label(widget).text()  # noqa: SLF001
     assert "When to use:" in usage_text
     assert "Use when summarizing deployment risks for the release handoff." in usage_text
 
@@ -547,8 +657,8 @@ def test_prompt_detail_widget_hides_usage_cue_when_no_credible_signal_exists(
     widget.display_prompt(prompt)
     qt_app.processEvents()
 
-    assert not widget._usage_cue_label.isVisible()  # noqa: SLF001
-    assert widget._usage_cue_label.text() == ""  # noqa: SLF001
+    assert not _usage_cue_label(widget).isVisible()  # noqa: SLF001
+    assert _usage_cue_label(widget).text() == ""  # noqa: SLF001
 
 
 def test_prompt_detail_widget_shows_reuse_signal_when_prompt_has_usage_history(
@@ -571,8 +681,8 @@ def test_prompt_detail_widget_shows_reuse_signal_when_prompt_has_usage_history(
     widget.display_prompt(prompt)
     qt_app.processEvents()
 
-    assert widget._reuse_signal_label.isVisible()  # noqa: SLF001
-    cue_text = widget._reuse_signal_label.text()  # noqa: SLF001
+    assert _reuse_signal_label(widget).isVisible()  # noqa: SLF001
+    cue_text = _reuse_signal_label(widget).text()  # noqa: SLF001
     assert "Reuse signal:" in cue_text
     assert "used 4 times" in cue_text
 
@@ -597,8 +707,8 @@ def test_prompt_detail_widget_uses_singular_reuse_signal_wording(
     widget.display_prompt(prompt)
     qt_app.processEvents()
 
-    assert widget._reuse_signal_label.isVisible()  # noqa: SLF001
-    cue_text = widget._reuse_signal_label.text()  # noqa: SLF001
+    assert _reuse_signal_label(widget).isVisible()  # noqa: SLF001
+    cue_text = _reuse_signal_label(widget).text()  # noqa: SLF001
     assert "used 1 time" in cue_text
     assert "used 1 times" not in cue_text
 
@@ -623,8 +733,8 @@ def test_prompt_detail_widget_hides_reuse_signal_without_usage_history(
     widget.display_prompt(prompt)
     qt_app.processEvents()
 
-    assert not widget._reuse_signal_label.isVisible()  # noqa: SLF001
-    assert widget._reuse_signal_label.text() == ""  # noqa: SLF001
+    assert not _reuse_signal_label(widget).isVisible()  # noqa: SLF001
+    assert _reuse_signal_label(widget).text() == ""  # noqa: SLF001
 
 
 def test_prompt_detail_widget_shows_template_variable_cue_when_prompt_requires_variables(
@@ -646,8 +756,8 @@ def test_prompt_detail_widget_shows_template_variable_cue_when_prompt_requires_v
     widget.display_prompt(prompt)
     qt_app.processEvents()
 
-    assert widget._template_variable_cue_label.isVisible()  # noqa: SLF001
-    cue_text = widget._template_variable_cue_label.text()  # noqa: SLF001
+    assert _template_variable_cue_label(widget).isVisible()  # noqa: SLF001
+    cue_text = _template_variable_cue_label(widget).text()  # noqa: SLF001
     assert "Template variables:" in cue_text
     assert "Requires variables: customer_name, region" in cue_text
     assert "When to use:" not in cue_text
@@ -672,9 +782,9 @@ def test_prompt_detail_widget_makes_workspace_tooltip_template_aware(
     widget.display_prompt(prompt)
     qt_app.processEvents()
 
-    assert widget._copy_prompt_body_button.toolTip() == "Copy the stored prompt body."  # noqa: SLF001
+    assert _copy_prompt_body_button(widget).toolTip() == "Copy the stored prompt body."  # noqa: SLF001
     assert (
-        widget._open_in_workspace_button.toolTip()
+        _open_in_workspace_button(widget).toolTip()
         == "Open the prompt in Workspace to fill variables: customer_name, region."
     )  # noqa: SLF001
 
@@ -698,9 +808,9 @@ def test_prompt_detail_widget_shows_visible_workspace_handoff_cue_for_template_p
     widget.display_prompt(prompt)
     qt_app.processEvents()
 
-    assert widget._open_in_workspace_button.text() == "Open in Workspace"  # noqa: SLF001
-    assert widget._workspace_handoff_cue_label.isVisible()  # noqa: SLF001
-    cue_text = widget._workspace_handoff_cue_label.text()  # noqa: SLF001
+    assert _open_in_workspace_button(widget).text() == "Open in Workspace"  # noqa: SLF001
+    assert _workspace_handoff_cue_label(widget).isVisible()  # noqa: SLF001
+    cue_text = _workspace_handoff_cue_label(widget).text()  # noqa: SLF001
     assert "Next step:" in cue_text
     assert "Open in Workspace to fill variables before reuse." in cue_text
 
@@ -724,9 +834,9 @@ def test_prompt_detail_widget_hides_visible_workspace_handoff_cue_for_plain_prom
     widget.display_prompt(prompt)
     qt_app.processEvents()
 
-    assert widget._open_in_workspace_button.text() == "Open in Workspace"  # noqa: SLF001
-    assert not widget._workspace_handoff_cue_label.isVisible()  # noqa: SLF001
-    assert widget._workspace_handoff_cue_label.text() == ""  # noqa: SLF001
+    assert _open_in_workspace_button(widget).text() == "Open in Workspace"  # noqa: SLF001
+    assert not _workspace_handoff_cue_label(widget).isVisible()  # noqa: SLF001
+    assert _workspace_handoff_cue_label(widget).text() == ""  # noqa: SLF001
 
 
 def test_prompt_detail_widget_hides_template_variable_cue_for_plain_prompt(
@@ -748,8 +858,8 @@ def test_prompt_detail_widget_hides_template_variable_cue_for_plain_prompt(
     widget.display_prompt(prompt)
     qt_app.processEvents()
 
-    assert not widget._template_variable_cue_label.isVisible()  # noqa: SLF001
-    assert widget._template_variable_cue_label.text() == ""  # noqa: SLF001
+    assert not _template_variable_cue_label(widget).isVisible()  # noqa: SLF001
+    assert _template_variable_cue_label(widget).text() == ""  # noqa: SLF001
 
 
 def test_prompt_detail_widget_bounds_template_variable_cue_summary(
@@ -774,7 +884,7 @@ def test_prompt_detail_widget_bounds_template_variable_cue_summary(
     widget.display_prompt(prompt)
     qt_app.processEvents()
 
-    cue_text = widget._template_variable_cue_label.text()  # noqa: SLF001
+    cue_text = _template_variable_cue_label(widget).text()  # noqa: SLF001
     assert "Requires variables: customer_name, product_name +2" in cue_text
 
 
@@ -801,7 +911,7 @@ def test_prompt_detail_widget_bounds_template_aware_workspace_tooltip_summary(
     qt_app.processEvents()
 
     assert (
-        widget._open_in_workspace_button.toolTip()
+        _open_in_workspace_button(widget).toolTip()
         == "Open the prompt in Workspace to fill variables: customer_name, product_name +2."
     )  # noqa: SLF001
 
@@ -826,13 +936,13 @@ def test_prompt_detail_widget_keeps_usage_cue_bounded_in_existing_detail_flow(
     widget.display_prompt(prompt)
     qt_app.processEvents()
 
-    assert widget._meta_label.isVisible()  # noqa: SLF001
-    assert widget._usage_cue_label.isVisible()  # noqa: SLF001
-    assert not widget._template_variable_cue_label.isVisible()  # noqa: SLF001
-    assert "When to use:" not in widget._meta_label.text()  # noqa: SLF001
-    assert "Inspection:" in widget._meta_label.text()  # noqa: SLF001
-    assert "Source: support queue" in widget._meta_label.text()  # noqa: SLF001
-    assert "Description:" in widget._description.text()  # noqa: SLF001
-    assert "Prompt Body (preview):" in widget._context.text()  # noqa: SLF001
-    assert "Scenarios:" in widget._scenarios.text()  # noqa: SLF001
-    assert not widget._metadata_view.isVisible()  # noqa: SLF001
+    assert _meta_label(widget).isVisible()  # noqa: SLF001
+    assert _usage_cue_label(widget).isVisible()  # noqa: SLF001
+    assert not _template_variable_cue_label(widget).isVisible()  # noqa: SLF001
+    assert "When to use:" not in _meta_label(widget).text()  # noqa: SLF001
+    assert "Inspection:" in _meta_label(widget).text()  # noqa: SLF001
+    assert "Source: support queue" in _meta_label(widget).text()  # noqa: SLF001
+    assert "Description:" in _description_label(widget).text()  # noqa: SLF001
+    assert "Prompt Body (preview):" in _context_label(widget).text()  # noqa: SLF001
+    assert "Scenarios:" in _scenarios_label(widget).text()  # noqa: SLF001
+    assert not _metadata_view(widget).isVisible()  # noqa: SLF001
