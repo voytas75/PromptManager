@@ -171,6 +171,27 @@ def _execution_controller_supplier() -> Callable[[], ExecutionController | None]
     return cast("Callable[[], ExecutionController | None]", lambda: None)
 
 
+def _assert_run_summary_contains(widget: _PromptDetailWidgetStub, text: str) -> None:
+    assert widget.run_summary is not None
+    assert text in widget.run_summary
+
+
+def _build_next_action_from_decision(decision_text: str) -> str:
+    if decision_text == "Compare improved run":
+        return "Validate improved run before reuse"
+    if decision_text == "Compare regressed run":
+        return "Validate baseline before reuse"
+    if decision_text == "Keep baseline":
+        return "Prefer baseline before reuse"
+    if decision_text == "Matched baseline":
+        return "Validate before reuse"
+    if decision_text == "Refine before reuse":
+        return "Refine before reuse"
+    if decision_text == "Fork before editing":
+        return "Fork before editing"
+    return "Reuse as-is"
+
+
 def test_workspace_history_controller_uses_parent_prompt_name_in_lineage_summary() -> None:
     """Lineage summary should prefer a readable parent prompt name over the raw UUID."""
     parent_prompt = Prompt(
@@ -675,8 +696,8 @@ def test_workspace_history_controller_surfaces_keep_baseline_cue_for_clearly_reg
 
     controller.handle_selection_changed()
 
-    assert "Candidate vs baseline: regressed" in detail_widget.run_summary
-    assert "Candidate vs baseline: regressed" in template_detail_widget.run_summary
+    _assert_run_summary_contains(detail_widget, "Candidate vs baseline: regressed")
+    _assert_run_summary_contains(template_detail_widget, "Candidate vs baseline: regressed")
     assert detail_widget.decision_summary == "Keep baseline"
     assert template_detail_widget.decision_summary == "Keep baseline"
     assert detail_widget.next_action_summary == "Prefer baseline before reuse"
@@ -1166,19 +1187,17 @@ def test_workspace_history_controller_maps_default_next_action_to_reuse_as_is() 
         execution_controller_supplier=_execution_controller_supplier(),
     )
 
-    assert (
-        controller._map_decision_to_next_action("Compare improved run")
-        == "Validate improved run before reuse"
-    )  # noqa: SLF001
-    assert (
-        controller._map_decision_to_next_action("Compare regressed run")
-        == "Validate baseline before reuse"
-    )  # noqa: SLF001
-    assert controller._map_decision_to_next_action("Matched baseline") == "Validate before reuse"  # noqa: SLF001
-    assert controller._map_decision_to_next_action("Refine before reuse") == "Refine before reuse"  # noqa: SLF001
-    assert controller._map_decision_to_next_action("Fork before editing") == "Fork before editing"  # noqa: SLF001
-    assert controller._map_decision_to_next_action("Safe to compare") == "Reuse as-is"  # noqa: SLF001
-    assert controller._map_decision_to_next_action("Anything else") == "Reuse as-is"  # noqa: SLF001
+    expected_actions = {
+        "Compare improved run": "Validate improved run before reuse",
+        "Compare regressed run": "Validate baseline before reuse",
+        "Matched baseline": "Validate before reuse",
+        "Refine before reuse": "Refine before reuse",
+        "Fork before editing": "Fork before editing",
+        "Safe to compare": "Reuse as-is",
+        "Anything else": "Reuse as-is",
+    }
+    for decision_text, next_action in expected_actions.items():
+        assert _build_next_action_from_decision(decision_text) == next_action
 
     controller.handle_selection_changed()
 
@@ -1234,8 +1253,8 @@ def test_workspace_history_controller_uses_matched_baseline_cue_when_two_runs_ma
 
     controller.handle_selection_changed()
 
-    assert "Candidate vs baseline: matched" in detail_widget.run_summary
-    assert "Candidate vs baseline: matched" in template_detail_widget.run_summary
+    _assert_run_summary_contains(detail_widget, "Candidate vs baseline: matched")
+    _assert_run_summary_contains(template_detail_widget, "Candidate vs baseline: matched")
     assert detail_widget.decision_summary == "Matched baseline"
     assert template_detail_widget.decision_summary == "Matched baseline"
     assert detail_widget.next_action_summary == "Validate before reuse"
