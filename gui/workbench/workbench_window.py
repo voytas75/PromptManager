@@ -334,8 +334,8 @@ class WorkbenchWindow(QMainWindow):
             show_toast(self, "Wizard applied to prompt.")
 
     def _handle_wizard_update(self, payload: Mapping[str, Any]) -> None:
-        constraints = payload.get("constraints") or []
-        variables = payload.get("variables") or {}
+        constraints = cast("list[str]", payload.get("constraints") or [])
+        variables = cast("dict[str, Any]", payload.get("variables") or {})
         self._session.update_from_wizard(
             prompt_name=str(payload.get("prompt_name") or ""),
             goal=str(payload.get("goal") or ""),
@@ -461,7 +461,7 @@ class WorkbenchWindow(QMainWindow):
             self._status.showMessage("Prompt execution unavailable.", 6000)
             return
         raw_request = self._test_input.toPlainText().strip()
-        fallback_message = None
+        fallback_reason: str | None = None
         if raw_request:
             request_text = raw_request
         else:
@@ -473,15 +473,21 @@ class WorkbenchWindow(QMainWindow):
                     break
             if fallback_value is not None:
                 request_text = fallback_value[1]
-                fallback_message = (
-                    f"No test input supplied; using the '{fallback_value[0]}' variable value."
+                fallback_reason = (
+                    "test input was empty, so the preview used "
+                    f"the '{fallback_value[0]}' variable value"
                 )
             else:
-                request_text = (
-                    self._session.goal_statement.strip()
-                    or "Run a preview based on the current prompt."
-                )
-                fallback_message = "No test input supplied; using the prompt goal instead."
+                goal_text = self._session.goal_statement.strip()
+                if goal_text:
+                    request_text = goal_text
+                    fallback_reason = "test input was empty, so the preview used the prompt goal"
+                else:
+                    request_text = "Run a preview based on the current prompt."
+                    fallback_reason = (
+                        "no test input or prompt goal was available, so the "
+                        "preview used a generic request"
+                    )
         prompt = self._session.build_prompt()
         prompt.context = rendered_text
         streaming_enabled = self._is_streaming_enabled()
@@ -526,15 +532,15 @@ class WorkbenchWindow(QMainWindow):
         finally:
             if streaming_enabled:
                 self._end_streaming_run(success=stream_success)
-        self._render_execution(result, request_text, variables)
-        if fallback_message:
-            self._status.showMessage(fallback_message, 5000)
+        self._render_execution(result, request_text, variables, fallback_reason=fallback_reason)
 
     def _render_execution(
         self,
         result: CodexExecutionResult,
         request_text: str,
         variables: Mapping[str, str],
+        *,
+        fallback_reason: str | None = None,
     ) -> None:
         self._output_tabs.setCurrentWidget(self._output_view)
         self._output_view.setPlainText(result.response_text)
@@ -549,7 +555,32 @@ class WorkbenchWindow(QMainWindow):
         self._session.record_execution(record)
         self._update_history()
         self._apply_highlight(record.suggested_focus)
-        self._status.showMessage("Execution complete.", 5000)
+        self._active_refinement_target = record.suggested_focus
+        self._status.showMessage(self._build_run_status_message(record, fallback_reason), 5000)
+
+    def _build_run_status_message(
+        self,
+        record: WorkbenchExecutionRecord,
+        fallback_reason: str | None,
+    ) -> str:
+        focus_label = self._refinement_target_label(record.suggested_focus)
+        if focus_label and fallback_reason:
+            return f"Refine {focus_label} next — {fallback_reason}."
+        if focus_label:
+            return f"Execution complete — refine {focus_label} next."
+        if fallback_reason:
+            return f"Execution complete — {fallback_reason}."
+        return "Execution complete."
+
+    def _refinement_target_label(self, target: str | None) -> str | None:
+        if target is None:
+            return None
+        return {
+            "context": "Context",
+            "system": "System Role",
+            "constraints": "Constraints",
+            "output": "Output Format",
+        }.get(target)
 
     def _apply_highlight(self, target: str | None) -> None:
         if target is None:
@@ -646,6 +677,13 @@ class WorkbenchWindow(QMainWindow):
         record = self._session.execution_history[-1]
         record.rating = rating
         record.feedback = self._feedback_input.text().strip() or None
+        focus_label = self._refinement_target_label(record.suggested_focus)
+        if focus_label:
+            self._status.showMessage(
+                f"Feedback saved for last run — current refinement focus: {focus_label}.",
+                4000,
+            )
+            return
         self._status.showMessage("Feedback saved for last run.", 4000)
 
     def _apply_feedback(self) -> None:

@@ -7,6 +7,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 ### Changed
 
 - Clarified the active prompt-chain rollout ledger so remaining wording debt is now explicitly limited to opportunistic cleanup in supporting notes, while the shipped backend-managed bounded recent-history seam and release `0.22.25` stay treated as closed work.
+- Added one bounded **workbench run-to-refine trust cues v1** slice so Workbench run status now points to the current refinement focus after each preview run, explains when fallback request selection came from a variable, prompt goal, or generic request, and keeps feedback-save messaging aligned with the same focus cue without widening the workflow beyond the existing workbench run/history seam.
 
 ## [0.22.25] - 2026-05-08
 

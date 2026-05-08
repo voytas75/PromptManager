@@ -10,7 +10,7 @@ import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from core.templating import SchemaValidationMode
 from models.category_model import slugify_category
@@ -53,7 +53,9 @@ class WorkbenchExecutionRecord:
     success: bool = True
     rating: float | None = None
     feedback: str | None = None
-    variables: Mapping[str, str] = field(default_factory=dict)
+    variables: Mapping[str, str] = field(
+        default_factory=lambda: cast("Mapping[str, str]", {})
+    )
     suggested_focus: str | None = None
     created_at: datetime = field(default_factory=_now)
 
@@ -67,14 +69,18 @@ class WorkbenchSession:
     audience: str = ""
     system_role: str = ""
     context: str = ""
-    constraints: list[str] = field(default_factory=list)
-    examples: list[str] = field(default_factory=list)
-    variables: dict[str, WorkbenchVariable] = field(default_factory=dict)
+    constraints: list[str] = field(default_factory=lambda: cast("list[str]", []))
+    examples: list[str] = field(default_factory=lambda: cast("list[str]", []))
+    variables: dict[str, WorkbenchVariable] = field(
+        default_factory=lambda: cast("dict[str, WorkbenchVariable]", {})
+    )
     template_text: str = ""
     manual_override: bool = False
     schema_text: str = ""
     schema_mode: SchemaValidationMode = SchemaValidationMode.NONE
-    execution_history: list[WorkbenchExecutionRecord] = field(default_factory=list)
+    execution_history: list[WorkbenchExecutionRecord] = field(
+        default_factory=lambda: cast("list[WorkbenchExecutionRecord]", [])
+    )
 
     def update_from_wizard(
         self,
@@ -186,6 +192,9 @@ class WorkbenchSession:
     def suggest_refinement_target(self, response_text: str) -> str:
         """Heuristically pick the editor section most likely needing updates."""
         lower_constraints = " ".join(self.constraints).lower()
+        template_text = self.template_text.lower()
+        if "### constraints" in template_text and not self.constraints:
+            return "constraints"
         if "json" in lower_constraints and not response_text.strip().startswith("{"):
             return "output"
         if "length" in lower_constraints or "word" in lower_constraints:
