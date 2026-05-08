@@ -55,7 +55,7 @@ Traktuj jako już dostarczone:
 
 Potwierdzone luki po ostatnim review:
 - legacy compatibility fields nadal siedzą w storage modelu i wymagają dalszej ostrożnej boundary hygiene,
-- docs supporting notes nadal zawierają starsze wzmianki o durable/persisted history i wymagają dalszego cleanupu.
+- supporting notes poza aktywnym ledgerem mogą jeszcze zawierać starszy język history/durability i warto go czyścić tylko przy kolejnych dotknięciach tych plików.
 
 Nie planuj tych rzeczy ponownie jako nowych feature’ów.
 

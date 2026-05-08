@@ -4,6 +4,10 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Clarified the active prompt-chain rollout ledger so remaining wording debt is now explicitly limited to opportunistic cleanup in supporting notes, while the shipped backend-managed bounded recent-history seam and release `0.22.25` stay treated as closed work.
+
 ## [0.22.25] - 2026-05-08
 
 ### Added
