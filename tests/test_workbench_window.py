@@ -205,6 +205,10 @@ def test_workbench_window_begin_session_clears_runtime_state_for_blank_mode(
     harness.feedback_input.setText("old feedback")
     harness.test_input.setPlainText("old request")
     harness.window.statusBar().showMessage("old status")
+    harness.session.template_text = "### Context\nOld context"
+    harness.editor.setPlainText(harness.session.template_text)
+    harness.handle_preview_run(harness.session.template_text, {})
+    assert harness.summary_label_text.endswith("Refinement focus: Context")
 
     harness.window.begin_session(WorkbenchMode.BLANK)
 
@@ -217,6 +221,7 @@ def test_workbench_window_begin_session_clears_runtime_state_for_blank_mode(
     assert harness.feedback_input.text() == ""
     assert harness.test_input.toPlainText() == ""
     assert harness.window.statusBar().currentMessage() == ""
+    assert harness.summary_label_text == "No goal defined yet."
 
 
 def test_workbench_window_template_mode_prefills_session_from_prompt(
