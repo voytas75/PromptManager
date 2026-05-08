@@ -17,6 +17,7 @@ import pytest
 pytest.importorskip("PySide6")
 from PySide6.QtWidgets import (
     QApplication,
+    QLabel,
     QLineEdit,
     QListWidget,
     QMessageBox,
@@ -85,8 +86,9 @@ class _PromptManagerStub:
 
 
 class _WorkbenchHarness:
-    def __init__(self, window: WorkbenchWindow) -> None:
+    def __init__(self, window: WorkbenchWindow, executor: _ExecutorStub | None = None) -> None:
         self.window = window
+        self.executor = executor
         self._window_any = cast("Any", window)
 
     @property
@@ -119,6 +121,17 @@ class _WorkbenchHarness:
     def record_rating(self, rating: float) -> None:
         self._window_any._record_rating(rating)
 
+    def run_brainstorm(self) -> None:
+        self._window_any._run_brainstorm()
+
+    def run_peek(self) -> None:
+        self._window_any._run_peek()
+
+    @property
+    def summary_label_text(self) -> str:
+        summary_label = cast("QLabel", self._window_any._summary_label)
+        return summary_label.text()
+
 
 def _make_prompt_manager_stub(
     *, llm_available: bool = True, executor: _ExecutorStub | None = None
@@ -139,7 +152,7 @@ def _make_window(
         mode=mode,
         template_prompt=template_prompt,
     )
-    return _WorkbenchHarness(window)
+    return _WorkbenchHarness(window, executor=executor)
 
 
 def _make_prompt(
@@ -313,6 +326,42 @@ def test_workbench_window_feedback_save_mentions_refinement_focus(qt_app: QAppli
     assert harness.window.statusBar().currentMessage() == (
         "Feedback saved for last run — current refinement focus: Constraints."
     )
+
+
+def test_workbench_window_brainstorm_sets_persistent_refinement_summary(
+    qt_app: QApplication,
+) -> None:
+    """Brainstorm should keep the last refinement focus visible outside the transient status bar."""
+    executor = _ExecutorStub()
+    harness = _make_window(executor=executor)
+    harness.session.template_text = "### Context\nOriginal context\n\n### Goal\nUse variables"
+    harness.editor.setPlainText(harness.session.template_text)
+    harness.session.link_variable("topic", sample_value="database outage")
+    harness.handle_preview_run(harness.session.template_text, harness.session.variable_payload())
+
+    harness.run_brainstorm()
+
+    assert executor.calls[-1].startswith(
+        "Provide three alternative phrasings that could strengthen this prompt."
+    )
+    assert harness.window.statusBar().currentMessage() == "Brainstorm suggestions ready."
+    assert harness.summary_label_text.endswith("Refinement focus: Context")
+
+
+def test_workbench_window_ai_peek_preserves_existing_refinement_focus(qt_app: QApplication) -> None:
+    """AI Peek should not clear the persistent refinement cue established by the last run."""
+    executor = _ExecutorStub()
+    harness = _make_window(executor=executor)
+    harness.session.template_text = "### Constraints\n- Keep it short"
+    harness.editor.setPlainText(harness.session.template_text)
+    harness.handle_preview_run(harness.session.template_text, {})
+
+    harness.run_peek()
+
+    assert executor.calls[-1].startswith(
+        "Summarise this prompt in two sentences and point out obvious gaps."
+    )
+    assert harness.summary_label_text.endswith("Refinement focus: Constraints")
 
 
 def test_workbench_window_run_is_blocked_when_llm_unavailable(

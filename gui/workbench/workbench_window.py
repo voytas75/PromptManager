@@ -296,6 +296,9 @@ class WorkbenchWindow(QMainWindow):
         summary = self._session.goal_statement or "No goal defined yet."
         if self._session.audience:
             summary += f" (Audience: {self._session.audience})"
+        focus_label = self._refinement_target_label(self._active_refinement_target)
+        if focus_label:
+            summary += f"\nRefinement focus: {focus_label}"
         self._summary_label.setText(summary)
 
     def _apply_editor_text(self, text: str, *, from_wizard: bool) -> None:
@@ -556,6 +559,7 @@ class WorkbenchWindow(QMainWindow):
         self._update_history()
         self._apply_highlight(record.suggested_focus)
         self._active_refinement_target = record.suggested_focus
+        self._refresh_summary()
         self._status.showMessage(self._build_run_status_message(record, fallback_reason), 5000)
 
     def _build_run_status_message(
