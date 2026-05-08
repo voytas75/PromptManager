@@ -390,7 +390,6 @@ def test_prompt_chain_show_supports_json_output(
     ]
 
 
-
 def test_prompt_chain_show_text_surfaces_inactive_legacy_semantics(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -411,8 +410,7 @@ def test_prompt_chain_show_text_surfaces_inactive_legacy_semantics(
     assert "Legacy semantics:" in output
     assert "variables_schema: inactive compatibility-only field" in output
     assert (
-        "Legacy fields: input_template, output_variable, condition "
-        "(inactive semantics)" in output
+        "Legacy fields: input_template, output_variable, condition (inactive semantics)" in output
     )
     assert (
         "output_variable: compatibility alias only; "
@@ -478,7 +476,6 @@ def test_prompt_chain_validate_accepts_valid_definition(
     assert str(path) in output
 
 
-
 def test_prompt_chain_validate_supports_json_output(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -517,9 +514,7 @@ def test_prompt_chain_validate_supports_json_output(
         "step_count": 1,
         "legacy_fields_detected": {
             "chain": ["variables_schema"],
-            "steps": {
-                "1": ["input_template", "output_variable", "condition"]
-            },
+            "steps": {"1": ["input_template", "output_variable", "condition"]},
         },
     }
 
@@ -541,7 +536,6 @@ def test_prompt_chain_validate_rejects_empty_step_list(
     exit_code = run_prompt_chain_validate(None, args, logger)
 
     assert exit_code == 5
-
 
 
 def test_prompt_chain_validate_json_reports_invalid_payload_shape(
@@ -570,7 +564,6 @@ def test_prompt_chain_validate_json_reports_invalid_payload_shape(
         "legacy_fields_detected": {"chain": [], "steps": {}},
         "error": "Prompt chain definition must include at least one step.",
     }
-
 
 
 def test_prompt_chain_apply_dry_run_does_not_persist_chain(
@@ -616,9 +609,7 @@ def test_prompt_chain_apply_dry_run_does_not_persist_chain(
         ],
         "legacy_fields_detected": {
             "chain": ["variables_schema"],
-            "steps": {
-                "1": ["input_template", "output_variable", "condition"]
-            },
+            "steps": {"1": ["input_template", "output_variable", "condition"]},
         },
     }
 
@@ -648,43 +639,43 @@ def test_prompt_chain_run_supports_json_output(
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload == {
-            "chain": {
-                "id": str(manager.chain.id),
-                "name": "Demo Chain",
-            },
-            "chain_input": "CLI input text",
-            "final_output_text": "Final response text that should stay visible.",
-            "final_summary_text": "Calm final summary",
-            "run_status": "success",
-            "final_step_id": str(manager.chain.steps[0].id),
-            "final_step_output_key": "step_1",
-            "final_step_label": "final",
-            "terminal_step_id": str(manager.chain.steps[0].id),
-            "terminal_step_output_key": "step_1",
-            "terminal_step_label": "final",
-            "terminal_step_status": "success",
-            "step_aliases": {"final": "step_1"},
-            "step_outputs": {"step_1": "Final response text that should stay visible."},
-            "steps": [
-                {
-                    "step_id": str(manager.chain.steps[0].id),
-                    "order_index": 1,
-                    "prompt_id": str(manager.chain.steps[0].prompt_id),
-                    "step_label": "final",
-                    "step_output_key": "step_1",
-                    "output_variable": "final",
-                    "prompt_name": "Final Prompt",
-                    "status": "success",
-                    "duration_ms": 12,
-                    "error": None,
-                    "request_text": "Previous output\n\n[Search context attached]",
-                    "response_text": "Final response text that should stay visible.",
-                    "web_search_requested": True,
-                    "web_search_applied": True,
-                    "skip_reason": None,
-                }
-            ],
-        }
+        "chain": {
+            "id": str(manager.chain.id),
+            "name": "Demo Chain",
+        },
+        "chain_input": "CLI input text",
+        "final_output_text": "Final response text that should stay visible.",
+        "final_summary_text": "Calm final summary",
+        "run_status": "success",
+        "final_step_id": str(manager.chain.steps[0].id),
+        "final_step_output_key": "step_1",
+        "final_step_label": "final",
+        "terminal_step_id": str(manager.chain.steps[0].id),
+        "terminal_step_output_key": "step_1",
+        "terminal_step_label": "final",
+        "terminal_step_status": "success",
+        "step_aliases": {"final": "step_1"},
+        "step_outputs": {"step_1": "Final response text that should stay visible."},
+        "steps": [
+            {
+                "step_id": str(manager.chain.steps[0].id),
+                "order_index": 1,
+                "prompt_id": str(manager.chain.steps[0].prompt_id),
+                "step_label": "final",
+                "step_output_key": "step_1",
+                "output_variable": "final",
+                "prompt_name": "Final Prompt",
+                "status": "success",
+                "duration_ms": 12,
+                "error": None,
+                "request_text": "Previous output\n\n[Search context attached]",
+                "response_text": "Final response text that should stay visible.",
+                "web_search_requested": True,
+                "web_search_applied": True,
+                "skip_reason": None,
+            }
+        ],
+    }
 
 
 def test_prompt_chain_run_surfaces_final_chain_result_label(
@@ -808,7 +799,6 @@ def test_prompt_chain_run_supports_output_file_for_json_mode(
     assert output_path.as_posix() in capsys.readouterr().out
 
 
-
 def test_prompt_chain_run_supports_summary_only_mode(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -831,7 +821,6 @@ def test_prompt_chain_run_supports_summary_only_mode(
     assert exit_code == 0
     output = capsys.readouterr().out
     assert output == "Calm final summary\n"
-
 
 
 def test_prompt_chain_run_supports_status_only_mode(
@@ -862,7 +851,6 @@ def test_prompt_chain_run_supports_status_only_mode(
     assert output == "success\n"
 
 
-
 def test_prompt_chain_run_status_only_uses_backend_run_status(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -889,7 +877,6 @@ def test_prompt_chain_run_status_only_uses_backend_run_status(
 
     assert exit_code == 0
     assert capsys.readouterr().out == "partial_success\n"
-
 
 
 def test_prompt_chain_run_supports_step_output_mode(
@@ -919,7 +906,6 @@ def test_prompt_chain_run_supports_step_output_mode(
     assert capsys.readouterr().out == "Final response text that should stay visible.\n"
 
 
-
 def test_prompt_chain_run_supports_step_alias_mode(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -945,7 +931,6 @@ def test_prompt_chain_run_supports_step_alias_mode(
 
     assert exit_code == 0
     assert capsys.readouterr().out == "Final response text that should stay visible.\n"
-
 
 
 def test_prompt_chain_run_supports_final_step_meta_mode(
@@ -982,7 +967,6 @@ def test_prompt_chain_run_supports_final_step_meta_mode(
         "terminal_step_status": "success",
         "run_status": "success",
     }
-
 
 
 def test_prompt_chain_run_final_step_meta_keeps_final_and_terminal_semantics_separate(
@@ -1022,7 +1006,6 @@ def test_prompt_chain_run_final_step_meta_keeps_final_and_terminal_semantics_sep
     }
 
 
-
 def test_prompt_chain_run_rejects_conflicting_selective_output_modes(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -1048,7 +1031,6 @@ def test_prompt_chain_run_rejects_conflicting_selective_output_modes(
 
     assert exit_code == 5
     assert capsys.readouterr().out == ""
-
 
 
 def test_prompt_chain_run_supports_compact_mode(

@@ -53,9 +53,7 @@ class WorkbenchExecutionRecord:
     success: bool = True
     rating: float | None = None
     feedback: str | None = None
-    variables: Mapping[str, str] = field(
-        default_factory=lambda: cast("Mapping[str, str]", {})
-    )
+    variables: Mapping[str, str] = field(default_factory=lambda: cast("Mapping[str, str]", {}))
     suggested_focus: str | None = None
     created_at: datetime = field(default_factory=_now)
 

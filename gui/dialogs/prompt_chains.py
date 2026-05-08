@@ -1300,9 +1300,7 @@ class PromptChainManagerPanel(QWidget):
         lines = [f"Recent runs for '{selected_chain.name}':"]
         for entry in selected_entries:
             lines.append(
-                "• "
-                f"{entry['run_timestamp']} — [{entry['status']}] "
-                f"input: {entry['input_preview']}"
+                f"• {entry['run_timestamp']} — [{entry['status']}] input: {entry['input_preview']}"
             )
             output_line = f"  output: {entry['final_output_preview']}"
             final_step_label = entry.get("final_step_label")

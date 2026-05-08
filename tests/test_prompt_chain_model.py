@@ -116,7 +116,6 @@ def test_chain_from_payload_ignores_legacy_runtime_step_fields() -> None:
     assert step.condition is None
 
 
-
 def test_chain_from_payload_preserves_legacy_fields_only_as_inactive_metadata() -> None:
     """Legacy step fields should survive only as compatibility metadata."""
 
@@ -147,7 +146,6 @@ def test_chain_from_payload_preserves_legacy_fields_only_as_inactive_metadata() 
         "Compatibility-only fields preserved for import/export boundaries. "
         "They do not affect the active linear runner."
     )
-
 
 
 def test_prompt_chain_storage_fields_do_not_imply_active_runtime_semantics() -> None:

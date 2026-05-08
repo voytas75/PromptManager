@@ -638,9 +638,7 @@ def _format_chain_legacy_semantics(chain: Any) -> dict[str, Any]:
     legacy = metadata.get("legacy_chain_fields")
     if isinstance(legacy, Mapping):
         return {
-            str(key): dict(value)
-            for key, value in legacy.items()
-            if isinstance(value, Mapping)
+            str(key): dict(value) for key, value in legacy.items() if isinstance(value, Mapping)
         }
     return {}
 
@@ -760,15 +758,9 @@ def run_prompt_chain_show(
                     "runtime uses canonical step_output_key"
                 )
             if "input_template" in step_legacy_semantics:
-                print(
-                    "     - input_template: compatibility-only field; "
-                    "inactive in active runtime"
-                )
+                print("     - input_template: compatibility-only field; inactive in active runtime")
             if "condition" in step_legacy_semantics:
-                print(
-                    "     - condition: compatibility-only field; "
-                    "inactive in active runtime"
-                )
+                print("     - condition: compatibility-only field; inactive in active runtime")
     return 0
 
 
@@ -1055,9 +1047,7 @@ def _build_prompt_chain_run_text_output(result: Any, final_status: str) -> str:
             or step_run.step.output_variable
             or f"step_{step_run.step.order_index}"
         )
-        step_output_key = (
-            step_run.step_output_key or f"step_{step_run.step.order_index}"
-        )
+        step_output_key = step_run.step_output_key or f"step_{step_run.step.order_index}"
         text_lines.append(
             f"  Step {step_run.step.order_index} "
             f"({step_label} | output key: {step_output_key}): {step_run.status}"

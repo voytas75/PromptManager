@@ -308,8 +308,7 @@ def test_workbench_window_run_uses_goal_when_no_input_or_variables_exist(
     harness = _make_window(executor=executor)
     harness.session.goal_statement = "Summarise the deployment impact"
     harness.session.template_text = (
-        "### Context\nDeployment notes\n\n"
-        "### Goal\nSummarise the deployment impact"
+        "### Context\nDeployment notes\n\n### Goal\nSummarise the deployment impact"
     )
     harness.editor.setPlainText(harness.session.template_text)
 
@@ -414,8 +413,7 @@ def test_workbench_window_preview_run_after_helper_replaces_stale_summary_focus(
     harness.run_peek()
     harness.session.goal_statement = "Summarise the deployment impact"
     harness.session.template_text = (
-        "### Context\nDeployment notes\n\n"
-        "### Goal\nSummarise the deployment impact"
+        "### Context\nDeployment notes\n\n### Goal\nSummarise the deployment impact"
     )
     harness.editor.setPlainText(harness.session.template_text)
 
@@ -442,8 +440,7 @@ def test_workbench_window_feedback_after_helper_tracks_latest_run_focus(
     harness.run_peek()
     harness.session.goal_statement = "Summarise the deployment impact"
     harness.session.template_text = (
-        "### Context\nDeployment notes\n\n"
-        "### Goal\nSummarise the deployment impact"
+        "### Context\nDeployment notes\n\n### Goal\nSummarise the deployment impact"
     )
     harness.editor.setPlainText(harness.session.template_text)
     harness.handle_preview_run(harness.session.template_text, {})
