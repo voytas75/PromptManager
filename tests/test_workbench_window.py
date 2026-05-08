@@ -230,16 +230,19 @@ def test_workbench_window_template_mode_prefills_session_from_prompt(
     """Template mode should preload the selected prompt into the new workbench session."""
     prompt = _make_prompt(name="Incident Template", description="Summarise outage")
 
-    harness = _make_window(
-        executor=_ExecutorStub(),
-        mode=WorkbenchMode.TEMPLATE,
-        template_prompt=prompt,
-    )
+    harness = _make_window(executor=_ExecutorStub())
+    harness.session.template_text = "### Constraints\n- Keep it short"
+    harness.editor.setPlainText(harness.session.template_text)
+    harness.handle_preview_run(harness.session.template_text, {})
+    assert harness.summary_label_text.endswith("Refinement focus: Constraints")
+
+    harness.window.begin_session(WorkbenchMode.TEMPLATE, template_prompt=prompt)
 
     assert harness.session.prompt_name == "Incident Template"
     assert harness.session.goal_statement == "Summarise outage"
     assert harness.session.template_text == prompt.context
     assert harness.editor.toPlainText() == prompt.context
+    assert harness.summary_label_text == "Summarise outage"
 
 
 def test_workbench_window_run_uses_first_variable_when_test_input_missing(
