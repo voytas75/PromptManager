@@ -154,14 +154,17 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers only
 
 
 class _PromptChainRunHistoryEntry(TypedDict):
-    """Bounded recent run metadata kept in the current panel session only."""
+    """Backend-managed bounded recent run metadata rendered by the panel."""
 
     chain_id: str
     chain_name: str
-    chain_input_preview: str
+    input_preview: str
     status: str
-    recorded_at: str
+    run_timestamp: str
     final_output_preview: str
+    final_step_output_key: str | None
+    final_step_id: str | None
+    final_step_label: str | None
 
 
 class PromptChainManagerPanel(QWidget):
@@ -190,7 +193,6 @@ class PromptChainManagerPanel(QWidget):
         self._prompt_edit_callback = prompt_edit_callback
         self._prompt_name_cache: dict[UUID, str] = {}
         self._step_prompt_ids: dict[int, UUID] = {}
-        self._run_history: list[_PromptChainRunHistoryEntry] = []
 
         layout = QVBoxLayout(self)
         intro = QLabel(
@@ -414,7 +416,7 @@ class PromptChainManagerPanel(QWidget):
         results_layout.addWidget(self._result_view, 1)
 
         self._history_label = QLabel(
-            "Recent chain runs in this session will appear here.",
+            "Recent backend-managed chain runs will appear here.",
             results_container,
         )
         self._history_label.setObjectName("promptChainRecentHistory")
@@ -1245,18 +1247,41 @@ class PromptChainManagerPanel(QWidget):
         show_toast(self, f"Saved result to {output_path.name}.")
 
     def _record_run_history(self, result: PromptChainRunResult) -> None:
-        """Keep a bounded recent run history for the current GUI session only."""
-        entry: _PromptChainRunHistoryEntry = {
-            "chain_id": str(result.chain.id),
-            "chain_name": result.chain.name,
-            "chain_input_preview": self._history_input_preview(result.chain_input),
-            "status": self._history_status(result),
-            "recorded_at": datetime.now().strftime("%H:%M:%S"),  # noqa: DTZ005
-            "final_output_preview": self._history_input_preview(result.final_output_text),
-        }
-        self._run_history.insert(0, entry)
-        del self._run_history[5:]
+        """Refresh the rendered history after the backend records a completed run."""
+        del result
         self._refresh_run_history_label()
+
+    def _recent_run_history(self) -> list[_PromptChainRunHistoryEntry]:
+        """Return backend-managed bounded run history records for the selected chain."""
+        records = getattr(self._manager, "list_recent_prompt_chain_runs", lambda **_: [])(limit=20)
+        entries: list[_PromptChainRunHistoryEntry] = []
+        for record in records:
+            entries.append(
+                {
+                    "chain_id": str(record.get("chain_id") or ""),
+                    "chain_name": str(record.get("chain_name") or ""),
+                    "input_preview": str(record.get("input_preview") or "(empty)"),
+                    "status": str(record.get("status") or "unknown"),
+                    "run_timestamp": str(record.get("run_timestamp") or "unknown time"),
+                    "final_output_preview": str(record.get("final_output_preview") or "(empty)"),
+                    "final_step_output_key": (
+                        None
+                        if record.get("final_step_output_key") in (None, "")
+                        else str(record.get("final_step_output_key"))
+                    ),
+                    "final_step_id": (
+                        None
+                        if record.get("final_step_id") in (None, "")
+                        else str(record.get("final_step_id"))
+                    ),
+                    "final_step_label": (
+                        None
+                        if record.get("final_step_label") in (None, "")
+                        else str(record.get("final_step_label"))
+                    ),
+                }
+            )
+        return entries
 
     def _refresh_run_history_label(self) -> None:
         """Render the bounded recent run summary below the main result view."""
@@ -1265,39 +1290,28 @@ class PromptChainManagerPanel(QWidget):
             self._history_label.setText("Select a chain to inspect recent runs.")
             return
         selected_entries = [
-            entry for entry in self._run_history if entry["chain_id"] == str(selected_chain.id)
+            entry
+            for entry in self._recent_run_history()
+            if entry["chain_id"] == str(selected_chain.id)
         ]
         if not selected_entries:
-            self._history_label.setText(
-                f"No recent runs for '{selected_chain.name}' in this session yet."
-            )
+            self._history_label.setText(f"No recent runs for '{selected_chain.name}' yet.")
             return
-        lines = [f"Recent runs for '{selected_chain.name}' in this session:"]
+        lines = [f"Recent runs for '{selected_chain.name}':"]
         for entry in selected_entries:
             lines.append(
                 "• "
-                f"{entry['recorded_at']} — [{entry['status']}] "
-                f"input: {entry['chain_input_preview']}"
+                f"{entry['run_timestamp']} — [{entry['status']}] "
+                f"input: {entry['input_preview']}"
             )
-            lines.append(f"  output: {entry['final_output_preview']}")
+            output_line = f"  output: {entry['final_output_preview']}"
+            final_step_label = entry.get("final_step_label")
+            final_step_output_key = entry.get("final_step_output_key")
+            if final_step_label or final_step_output_key:
+                label = final_step_label or final_step_output_key or ""
+                output_line = f"{output_line} ({label})"
+            lines.append(output_line)
         self._history_label.setText("\n".join(lines))
-
-    def _history_input_preview(self, chain_input: str) -> str:
-        """Return a single-line bounded preview for history summaries."""
-        compact = " ".join(chain_input.split())
-        if not compact:
-            return "(empty)"
-        if len(compact) <= 80:
-            return compact
-        return f"{compact[:77]}..."
-
-    def _history_status(self, result: PromptChainRunResult) -> str:
-        """Summarise the overall result status from step outcomes."""
-        if any(step.status == "error" for step in result.steps):
-            return "error"
-        if any(step.status == "skipped" for step in result.steps):
-            return "partial"
-        return "success"
 
     def _handle_result_format_changed(self, _: bool) -> None:
         """Switch between Markdown and plain text views."""
@@ -1526,12 +1540,12 @@ class PromptChainManagerPanel(QWidget):
         return list(self._chains)
 
     def record_run_history(self, result: PromptChainRunResult) -> None:
-        """Public wrapper for appending a run history entry."""
+        """Public wrapper for refreshing history after a completed run."""
         self._record_run_history(result)
 
     def run_history(self) -> list[_PromptChainRunHistoryEntry]:
-        """Return a copy of the bounded in-memory run history."""
-        return list(self._run_history)
+        """Return a copy of the backend-managed bounded run history."""
+        return list(self._recent_run_history())
 
     def history_label_text(self) -> str:
         """Return the rendered recent-run summary text."""

@@ -139,6 +139,7 @@ class _ManagerStub:
         self._step_response_text = step_response_text
         self._step_reasoning_text = step_reasoning_text
         self.last_use_web_search: bool | None = None
+        self._recent_runs: list[dict[str, str | None]] = []
         self.web_search_service: WebSearchService = WebSearchService()
         self.web_search: WebSearchService = self.web_search_service
         prompt_id = self._chains[0].steps[0].prompt_id
@@ -168,6 +169,10 @@ class _ManagerStub:
         else:
             self._chains.append(chain)
         return chain
+
+    def list_recent_prompt_chain_runs(self, *, limit: int = 20) -> list[dict[str, str | None]]:
+        safe_limit = max(1, int(limit or 20))
+        return list(self._recent_runs[:safe_limit])
 
     def run_prompt_chain(
         self,
@@ -214,7 +219,7 @@ class _ManagerStub:
             raw_response=raw_response,
         )
         outcome = ExecutionOutcome(result=execution_result, history_entry=None, conversation=[])
-        return PromptChainRunResult(
+        result = PromptChainRunResult(
             chain=chain,
             chain_input=chain_input,
             step_outputs={"summary": "ok"},
@@ -237,7 +242,27 @@ class _ManagerStub:
                     step_output_key="step_1",
                 )
             ],
+            run_status="success",
+            final_step_id=step.id,
+            final_step_output_key="step_1",
+            final_step_label="final",
         )
+        self._recent_runs.insert(
+            0,
+            {
+                "chain_id": str(chain.id),
+                "chain_name": chain.name,
+                "run_timestamp": "2026-05-08T12:00:00+00:00",
+                "status": "success",
+                "input_preview": chain_input,
+                "final_output_preview": self._step_response_text,
+                "final_step_output_key": "step_1",
+                "final_step_id": str(step.id),
+                "final_step_label": "final",
+            },
+        )
+        del self._recent_runs[20:]
+        return result
 
     def delete_prompt_chain(self, chain_id: uuid.UUID) -> None:
         self.deleted_chain_ids.append(chain_id)
@@ -1444,7 +1469,7 @@ def test_prompt_chain_manager_deletes_chain(
     dialog.deleteLater()
 
 
-def test_prompt_chain_panel_records_recent_run_history_in_session(
+def test_prompt_chain_panel_refreshes_backend_recent_run_history(
     qt_app: QApplication,
 ) -> None:
     manager = _ManagerStub()
@@ -1461,15 +1486,18 @@ def test_prompt_chain_panel_records_recent_run_history_in_session(
     entry = panel.run_history()[0]
     assert entry["chain_name"] == manager.list_prompt_chains()[0].name
     assert entry["chain_id"] == str(manager.list_prompt_chains()[0].id)
-    assert entry["chain_input_preview"] == "history input"
+    assert entry["input_preview"] == "history input"
     assert entry["status"] == "success"
+    assert entry["run_timestamp"] == "2026-05-08T12:00:00+00:00"
+    assert entry["final_step_label"] == "final"
     assert "Recent runs for 'Demo Chain'" in panel.history_label_text()
     assert "output:" in panel.history_label_text()
+    assert "in this session" not in panel.history_label_text()
     dialog.close()
     dialog.deleteLater()
 
 
-def test_prompt_chain_panel_caps_recent_run_history_to_five_entries(
+def test_prompt_chain_panel_uses_backend_bounded_recent_run_history(
     qt_app: QApplication,
 ) -> None:
     manager = _ManagerStub()
@@ -1483,14 +1511,16 @@ def test_prompt_chain_panel_caps_recent_run_history_to_five_entries(
         )
         panel.record_run_history(result)
 
-    assert len(panel.run_history()) == 5
-    assert panel.run_history()[0]["chain_input_preview"] == "input 5"
-    assert panel.run_history()[-1]["chain_input_preview"] == "input 1"
+    assert len(panel.run_history()) == 6
+    assert panel.run_history()[0]["input_preview"] == "input 5"
+    assert panel.run_history()[-1]["input_preview"] == "input 0"
+    assert "input 5" in panel.history_label_text()
+    assert "input 0" in panel.history_label_text()
     dialog.close()
     dialog.deleteLater()
 
 
-def test_prompt_chain_panel_filters_recent_history_to_selected_chain(
+def test_prompt_chain_panel_filters_backend_recent_history_to_selected_chain(
     qt_app: QApplication,
 ) -> None:
     manager = _ManagerStub()

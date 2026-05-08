@@ -401,11 +401,11 @@ Run:
 
 ---
 
-## Phase 4 — Lightweight persisted history
+## Phase 4 — Supporting note: older durable-history track
 
-### Task 11: Design the smallest durable chain-run evidence record
+### Task 11: Design the smallest bounded recent-run evidence record for any future durable storage
 
-**Objective:** Define the minimum persisted history shape before adding storage.
+**Objective:** Define the minimum bounded recent-history shape before adding any future durable storage.
 
 **Files:**
 - Modify: `docs/plans/2026-05-06-prompt-chain-ssot.md`
@@ -428,9 +428,9 @@ No token-heavy archival of every request/response by default.
 
 ---
 
-### Task 12: Add failing repository/backend tests for persisted recent chain history
+### Task 12: Add failing repository/backend tests for bounded recent chain history
 
-**Objective:** Freeze the minimum durable history semantics in tests.
+**Objective:** Freeze the minimum bounded recent-history semantics in tests.
 
 **Files:**
 - Modify: repository/history tests once seam is identified
@@ -531,7 +531,7 @@ If you want the best cost/value order, execute:
 1. Task 1–4 (contract tightening)
 2. Task 5–7 (artifact handling)
 3. Task 8–10 (model cleanup)
-4. Task 11–13 (persisted history)
+4. Task 11–13 (bounded recent history)
 5. Task 14–15 (consistency + docs)
 
 ---

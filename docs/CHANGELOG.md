@@ -6,6 +6,10 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Added
 
+- Added one bounded **prompt chain recent-history alignment v1** so prompt chains now expose one shared backend-managed bounded recent-run seam across backend, GUI, and CLI: the GUI recent-runs panel now reads manager history instead of a panel-local session ledger, `prompt-chain-show` keeps a lightweight recent-run section, and the new `prompt-chain-history` command adds bounded `--chain-id` / `--limit` / `--json` inspection without implying durable persistence across restarts.
+
+- Closed the bounded **Prompt Chain semantics / recent-history alignment** cycle in the active rollout ledger by marking backend-owned `run_status`, explicit `final_step_*` vs `terminal_step_*`, and unified GUI/CLI recent-history consumption as delivered, while narrowing docs language from older `persisted history` wording to the current process-local backend-managed recent-history seam.
+
 - Closed the bounded **Prompt Chain Clarity / Continuity** cycle by marking `docs/plans/2026-04-29-prompt-chain-clarity-continuity-roadmap.md` complete after shipping the full planned batch: GUI step-handoff continuity, clearer `Final chain result` wording, a guard-only neutral reset proof, and calmer CLI output cues for `prompt-chain-show` / `prompt-chain-run`, all kept on existing prompt-chain presentation seams without chain-engine expansion or product repositioning.
 
 - Added one bounded **prompt chain CLI output legibility v1** on the existing prompt-chain show/run console seam so `prompt-chain-show` now renders calmer step structure lines (`Prompt:` / `Failure:`) and `prompt-chain-run` now distinguishes `Input to chain`, `Final chain result`, and `Chain outputs`, improving terminal readability without changing chain execution logic or introducing a new API/export surface.

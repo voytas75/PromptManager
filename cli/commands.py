@@ -772,6 +772,42 @@ def run_prompt_chain_show(
     return 0
 
 
+def run_prompt_chain_history(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    if manager is None:
+        raise ValueError("Prompt Manager is required for prompt chain history inspection.")
+    history_limit = max(1, int(getattr(args, "limit", 10) or 10))
+    records = manager.list_recent_prompt_chain_runs(limit=history_limit)
+    chain_id_text = str(getattr(args, "chain_id", "") or "").strip()
+    if chain_id_text:
+        try:
+            chain_id = str(uuid.UUID(chain_id_text))
+        except (TypeError, ValueError) as exc:
+            logger.error("Invalid chain id: %s", exc)
+            return 5
+        records = [record for record in records if str(record.get("chain_id") or "") == chain_id]
+    if bool(getattr(args, "json", False)):
+        print(json.dumps(records, ensure_ascii=False, indent=2))
+        return 0
+    if not records:
+        print("No recent prompt chain runs found.")
+        return 0
+    print("Recent prompt chain runs:")
+    for record in records:
+        timestamp = str(record.get("run_timestamp") or "unknown time")
+        chain_name = str(record.get("chain_name") or "Unknown chain")
+        run_status = str(record.get("status") or "unknown")
+        input_preview = str(record.get("input_preview") or "(empty)")
+        output_preview = str(record.get("final_output_preview") or "(empty)")
+        print(f"  - {timestamp} [{run_status}] {chain_name}")
+        print(f"    input: {input_preview}")
+        print(f"    output: {output_preview}")
+    return 0
+
+
 def run_prompt_chain_export(
     manager: PromptManager | None,
     args: argparse.Namespace,
@@ -1693,6 +1729,7 @@ COMMAND_SPECS: dict[str | None, CommandSpec] = {
     "diagnostics": CommandSpec(run_diagnostics),
     "prompt-chain-list": CommandSpec(run_prompt_chain_list),
     "prompt-chain-show": CommandSpec(run_prompt_chain_show),
+    "prompt-chain-history": CommandSpec(run_prompt_chain_history),
     "prompt-chain-export": CommandSpec(run_prompt_chain_export),
     "prompt-chain-validate": CommandSpec(run_prompt_chain_validate, requires_manager=False),
     "prompt-chain-apply": CommandSpec(run_prompt_chain_apply),

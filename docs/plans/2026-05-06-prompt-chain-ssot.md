@@ -159,6 +159,7 @@ The following are treated as confirmed current behavior:
 - GUI chain CRUD exists,
 - CLI chain list/show/apply/run/validate/export exists,
 - `prompt-chain-show --json` exists,
+- `prompt-chain-history` exists for bounded recent-run inspection,
 - `prompt-chain-run --json` exists,
 - chain execution uses a single plain-text input,
 - later steps receive previous step output,
@@ -257,24 +258,24 @@ Allowed next improvements:
 - clearer warnings and validation.
 
 ### 5. Run-semantics consistency gap
-The product now exposes richer run-result fields, but the feature still has a confirmed semantics gap around:
-- aggregate run status,
-- `final_step_*` versus terminal execution step identity,
-- consistent consumption of those semantics across backend, CLI, GUI, and history surfaces.
+This gap is now closed in the active implementation path.
 
-Canonical direction:
-- compute one backend-owned aggregate `run_status`,
-- distinguish clearly between the last successful step that produced final output and the terminal step where execution ended,
-- avoid local CLI/GUI heuristics that reinterpret the same run differently.
+Confirmed current behavior:
+- aggregate `run_status` is backend-owned,
+- `final_step_*` and `terminal_step_*` are distinct and consumed across backend, CLI, GUI, and history surfaces,
+- local CLI/GUI heuristics are no longer the primary source of finality/status semantics.
 
 ### 6. Bounded history gap
-Lightweight run history now exists as a bounded backend seam, but its product semantics are not fully unified yet.
-The remaining gap is:
-- consistent status semantics between backend and GUI recent-run views,
-- clear positioning of current history as bounded trust/debug evidence,
-- explicit confirmation whether the current surface is session/process-level or durable across restarts.
+The bounded recent-history seam is now unified across backend, GUI, and CLI.
 
-It should remain tied to evidence and reuse value, not expand into dashboard-first behavior.
+Confirmed current behavior:
+- GUI recent-run views read backend-managed bounded recent history,
+- CLI exposes the same seam via `prompt-chain-show` and `prompt-chain-history`,
+- current history remains process-local/in-memory rather than durable across restarts.
+
+Remaining rule:
+- keep this seam evidence-first and bounded,
+- do not market it as durable persistence until storage survives restarts.
 
 ---
 
@@ -296,7 +297,7 @@ The following subfunctions are explicitly approved as next-step planning candida
 - GUI duplicate-chain action
 - GUI step reorder controls
 - bounded recent-runs / lightweight chain history
-- minimum durable chain-run evidence record
+- minimum backend-managed recent-run evidence record
 
 ### Approved semantic follow-up
 - backend-owned `run_status` contract
@@ -326,9 +327,10 @@ Short rule:
 
 ---
 
-## Minimum durable chain-run evidence record
+## Minimum backend-managed bounded recent-run evidence record
 
-If lightweight chain-run history is persisted, the durable record must stay bounded and evidence-first.
+The current lightweight chain-run history is process-local and evidence-first.
+If durable persistence is added later, it must preserve the same bounded record shape.
 
 **Required fields:**
 - `chain_id`

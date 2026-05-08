@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, cast
 from cli.commands import (
     run_prompt_chain_apply,
     run_prompt_chain_export,
+    run_prompt_chain_history,
     run_prompt_chain_run,
     run_prompt_chain_show,
     run_prompt_chain_validate,
@@ -229,6 +230,107 @@ def test_prompt_chain_show_lists_step_labels_with_failure_behavior(
     assert "Prompt:" in output
     assert "Failure:" in output
     assert "Stop chain on failure" in output
+
+
+def test_prompt_chain_history_supports_json_output(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Recent history JSON output should be deterministic and bounded."""
+
+    manager = _ChainCliManagerStub()
+    manager._recent_runs = [
+        {
+            "chain_id": str(manager.chain.id),
+            "chain_name": manager.chain.name,
+            "run_timestamp": "2026-05-08T12:00:00+00:00",
+            "status": "success",
+            "input_preview": "history input",
+            "final_output_preview": "history output",
+            "final_step_output_key": "step_1",
+            "final_step_id": str(manager.chain.steps[0].id),
+            "final_step_label": "final",
+        }
+    ]
+    logger = logging.getLogger("test_prompt_chain_history_json")
+    args = argparse.Namespace(chain_id=None, limit=10, json=True)
+
+    exit_code = run_prompt_chain_history(
+        cast("Any", manager),
+        args,
+        logger,
+    )
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload == manager._recent_runs
+
+
+def test_prompt_chain_history_supports_chain_filtering_text_output(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Recent history text output should support filtering to one chain."""
+
+    manager = _ChainCliManagerStub()
+    other_chain_id = uuid.uuid4()
+    manager._recent_runs = [
+        {
+            "chain_id": str(other_chain_id),
+            "chain_name": "Other Chain",
+            "run_timestamp": "2026-05-08T11:59:00+00:00",
+            "status": "failed",
+            "input_preview": "other input",
+            "final_output_preview": "other output",
+            "final_step_output_key": None,
+            "final_step_id": None,
+            "final_step_label": None,
+        },
+        {
+            "chain_id": str(manager.chain.id),
+            "chain_name": manager.chain.name,
+            "run_timestamp": "2026-05-08T12:00:00+00:00",
+            "status": "success",
+            "input_preview": "history input",
+            "final_output_preview": "history output",
+            "final_step_output_key": "step_1",
+            "final_step_id": str(manager.chain.steps[0].id),
+            "final_step_label": "final",
+        },
+    ]
+    logger = logging.getLogger("test_prompt_chain_history_text")
+    args = argparse.Namespace(chain_id=str(manager.chain.id), limit=10, json=False)
+
+    exit_code = run_prompt_chain_history(
+        cast("Any", manager),
+        args,
+        logger,
+    )
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "Recent prompt chain runs:" in output
+    assert manager.chain.name in output
+    assert "history input" in output
+    assert "Other Chain" not in output
+
+
+def test_prompt_chain_history_reports_empty_history(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Recent history command should stay calm when there is nothing to show."""
+
+    manager = _ChainCliManagerStub()
+    logger = logging.getLogger("test_prompt_chain_history_empty")
+    args = argparse.Namespace(chain_id=None, limit=10, json=False)
+
+    exit_code = run_prompt_chain_history(
+        cast("Any", manager),
+        args,
+        logger,
+    )
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "No recent prompt chain runs found." in output
 
 
 def test_prompt_chain_show_supports_json_output(

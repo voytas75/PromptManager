@@ -8,6 +8,7 @@ Updates:
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 
@@ -442,6 +443,92 @@ def test_build_chain_history_record_returns_minimum_bounded_evidence() -> None:
     assert "step_outputs" not in record
     assert "request_text" not in record
     assert "response_text" not in record
+
+
+def test_build_chain_history_record_omits_optional_final_step_fields_when_absent() -> None:
+    harness = _ChainHistoryHarness()
+    chain = PromptChain(
+        id=uuid.uuid4(),
+        name="No Final Step Metadata",
+        description="",
+        steps=[],
+    )
+    result = PromptChainRunResult(
+        chain=chain,
+        chain_input="input",
+        step_outputs={},
+        steps=[],
+        final_output_text=None,
+        final_summary_text=None,
+        run_status="failed",
+        final_step_output_key=None,
+        final_step_id=None,
+        final_step_label=None,
+    )
+
+    record = harness.build_chain_history_record(result)
+
+    assert record["chain_id"] == str(chain.id)
+    assert record["status"] == "failed"
+    assert record["final_step_output_key"] is None
+    assert record["final_output_preview"] == ""
+    assert "final_step_id" not in record
+    assert "final_step_label" not in record
+
+
+def test_build_chain_history_record_uses_bounded_previews() -> None:
+    harness = _ChainHistoryHarness()
+    chain = PromptChain(
+        id=uuid.uuid4(),
+        name="Bounded Preview Chain",
+        description="",
+        steps=[],
+    )
+    long_input = "i" * 200
+    long_output = "o" * 200
+    result = PromptChainRunResult(
+        chain=chain,
+        chain_input=long_input,
+        step_outputs={"step_1": long_output},
+        steps=[],
+        final_output_text=long_output,
+        final_summary_text=None,
+        run_status="success",
+        final_step_output_key="step_1",
+    )
+
+    record = harness.build_chain_history_record(result)
+
+    assert len(str(record["input_preview"])) == 160
+    assert len(str(record["final_output_preview"])) == 160
+    assert str(record["input_preview"]).endswith("…")
+    assert str(record["final_output_preview"]).endswith("…")
+
+
+def test_build_chain_history_record_run_timestamp_is_utc_isoformat() -> None:
+    harness = _ChainHistoryHarness()
+    chain = PromptChain(
+        id=uuid.uuid4(),
+        name="Timestamp Chain",
+        description="",
+        steps=[],
+    )
+    result = PromptChainRunResult(
+        chain=chain,
+        chain_input="input",
+        step_outputs={"step_1": "output"},
+        steps=[],
+        final_output_text="output",
+        final_summary_text=None,
+        run_status="success",
+        final_step_output_key="step_1",
+    )
+
+    record = harness.build_chain_history_record(result)
+
+    timestamp = str(record["run_timestamp"])
+    parsed = datetime.fromisoformat(timestamp)
+    assert parsed.tzinfo == UTC
 
 
 def test_build_chain_history_record_prefers_backend_run_status() -> None:

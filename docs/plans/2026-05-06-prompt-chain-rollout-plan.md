@@ -4,7 +4,7 @@
 
 **Goal:** Domknąć prompt chains jako bounded, czytelny i przewidywalny linear runner: bez workflow-engine drift, z lepszą walidacją, spójną semantyką runów, wygodniejszą konsumpcją wyników i lekką historią uruchomień.
 
-**Architecture:** Utrzymaj obecny model liniowego uruchamiania i nie poszerzaj semantyki silnika. Najpierw oczyść kontrakt i narrację modelu, potem dołóż małe operator-facing seams w CLI/GUI, a na końcu lekką trwałą historię opartą o bounded evidence. Każdy slice ma być mały, testowalny i zgodny z SSOT `docs/plans/2026-05-06-prompt-chain-ssot.md`.
+**Architecture:** Utrzymaj obecny model liniowego uruchamiania i nie poszerzaj semantyki silnika. Najpierw oczyść kontrakt i narrację modelu, potem dołóż małe operator-facing seams w CLI/GUI, a na końcu lekką backend-managed bounded recent history opartą o evidence-only records. Każdy slice ma być mały, testowalny i zgodny z SSOT `docs/plans/2026-05-06-prompt-chain-ssot.md`.
 
 **Tech Stack:** Python 3.13+, PromptManager core/CLI/GUI, pytest, Ruff, Pyright strict, istniejące docs/SSOT pod `docs/plans/`.
 
@@ -19,7 +19,7 @@ Ten plan może poprawiać tylko:
 - validate/apply dry-run ergonomics,
 - bounded result-consumption modes,
 - editor ergonomics bez workflow-canvas,
-- lightweight persisted history,
+- lightweight backend-managed bounded recent history,
 - minimal docs sync między SSOT a aktywnym ledgerem.
 - run-semantics alignment między backend, CLI, GUI i history seams.
 
@@ -51,11 +51,11 @@ Traktuj jako już dostarczone:
 - explicit `final_output_text` vs `final_summary_text`,
 - canonical `step_output_key`, explicit `step_aliases`, explicit `final_step_*`,
 - GUI copy/save result actions,
-- GUI session-only recent run history.
+- backend-managed bounded recent run history surfaced in GUI/CLI.
 
-Potwierdzona luka po ostatnim review:
-- `final_step_*` nie są jeszcze semantycznie domknięte względem terminalnego kroku wykonania,
-- aggregate run status nie jest jeszcze jednym backend-owned contract konsumowanym wszędzie.
+Potwierdzone luki po ostatnim review:
+- legacy compatibility fields nadal siedzą w storage modelu i wymagają dalszej ostrożnej boundary hygiene,
+- docs supporting notes nadal zawierają starsze wzmianki o durable/persisted history i wymagają dalszego cleanupu.
 
 Nie planuj tych rzeczy ponownie jako nowych feature’ów.
 
@@ -76,19 +76,29 @@ Nie planuj tych rzeczy ponownie jako nowych feature’ów.
 
 ### Task 0A: Define run-status and final/terminal-step semantics
 
-**Status:** planned
+**Status:** completed
 
 **Objective:** Ustalić jeden backend-owned contract dla `run_status`, `final_step_*` i `terminal_step_*`.
 
 **Execution note:** Szczegółowy plan wykonawczy jest w `docs/plans/2026-05-06-prompt-chain-semantic-slices-plan.md` (Slice A).
 
+**Implemented:**
+- backend run result contract jednoznacznie rozdziela `final_step_*` od `terminal_step_*`,
+- `run_status` jest liczony po stronie backendu i konsumowany przez CLI/history surfaces,
+- focused backend/CLI coverage blokuje powrót do lokalnych heurystyk statusu/finalności.
+
 ### Task 0B: Align CLI and history consumers with backend run semantics
 
-**Status:** planned
+**Status:** completed
 
 **Objective:** Usunąć lokalne heurystyki statusu/finalności z CLI i history surfaces.
 
 **Execution note:** Szczegółowy plan wykonawczy jest w `docs/plans/2026-05-06-prompt-chain-semantic-slices-plan.md` (Slice A + Slice B).
+
+**Implemented:**
+- `prompt-chain-show` konsumuje backend-owned recent-run semantics,
+- GUI recent history czyta backend-managed run records zamiast własnego session-only SSOT,
+- nowa komenda `prompt-chain-history` wystawia ten sam bounded evidence seam w CLI.
 
 ---
 
@@ -474,9 +484,9 @@ Run:
 
 ---
 
-## Phase 5 — Persisted lightweight history
+## Phase 5 — Backend-managed bounded recent history
 
-### Task 15: Document the minimum durable chain-run evidence record
+### Task 15: Document the minimum backend-managed recent-run evidence record
 
 **Status:** done
 
@@ -501,11 +511,11 @@ Run:
 
 ---
 
-### Task 16: Add failing tests for persisted recent chain history
+### Task 16: Add failing tests for bounded recent chain history
 
 **Status:** done
 
-**Objective:** Zamrozić minimum trwałej historii przed implementacją storage.
+**Objective:** Zamrozić minimum bounded recent-history seam przed ewentualnym future storage work.
 
 **Files:**
 - Modify: `tests/test_prompt_chain_backend.py`
@@ -525,11 +535,11 @@ Expected: FAIL.
 
 ---
 
-### Task 17: Implement persisted recent chain history backend
+### Task 17: Implement backend-managed bounded recent chain history backend
 
 **Status:** done
 
-**Objective:** Dodać trwałe evidence surface dla trust/debug/reuse.
+**Objective:** Dodać backend-managed evidence surface dla trust/debug/reuse bez durable-storage claim.
 
 **Files:**
 - Modify: repository/history layer after seam discovery
@@ -554,42 +564,55 @@ Run:
 
 ---
 
-### Task 18: Surface persisted history in GUI and optional CLI inspect
+### Task 18: Surface backend-managed bounded recent history in GUI and optional CLI inspect
 
-**Status:** pending
+**Status:** completed
 
-**Objective:** Uczynić trwałą historię realnie użyteczną operatorowi.
+**Objective:** Uczynić backend-managed bounded recent history realnie użyteczną operatorowi bez sugerowania durable persistence.
 
 **Files:**
 - Modify: `gui/dialogs/prompt_chains.py`
-- Modify: `cli/commands.py` if adding lightweight CLI inspect surface
+- Modify: `cli/commands.py`
+- Modify: `cli/parser.py`
 - Modify: `tests/test_prompt_chain_dialog.py`
-- Modify: `tests/test_prompt_chain_cli.py` if needed
+- Modify: `tests/test_prompt_chain_cli.py`
+- Reference: `core/prompt_manager/chains.py`
 
 **Implementation targets:**
 - GUI: recent runs for selected chain, bounded and readable,
-- optionally CLI: `prompt-chain-history` lub mały history section w show,
-- evidence-only surface: timestamp, status, previews.
+- CLI: `prompt-chain-history` plus bounded recent-run section in `prompt-chain-show`,
+- evidence-only surface: timestamp, status, previews,
+- one shared backend-managed source of truth for recent run evidence.
 
 **Constraint:**
-Jeśli CLI path robi się za szeroki, dowieźć najpierw GUI inspect surface i zostawić CLI jako next candidate.
+Nie nazywać tego durable/persisted history, dopóki backend seam nie przeżywa restartów procesu.
+
+**Implemented:**
+- GUI recent history czyta `list_recent_prompt_chain_runs(...)` zamiast lokalnego session-only store,
+- `prompt-chain-show` pozostaje lekkim chain-inspect surface z recent-run section,
+- dodano osobną komendę `prompt-chain-history --chain-id/--limit/--json`,
+- focused backend/GUI/CLI tests blokują regresję contractu historii.
 
 **Verification:**
 Run:
-- `pytest tests/test_prompt_chain_dialog.py tests/test_prompt_chain_cli.py -q`
-- `ruff check gui/dialogs/prompt_chains.py cli/commands.py tests/test_prompt_chain_dialog.py tests/test_prompt_chain_cli.py`
+- `pytest tests/test_prompt_chain_backend.py tests/test_prompt_chain_dialog.py tests/test_prompt_chain_cli.py -q`
+- `ruff check core/prompt_manager/chains.py gui/dialogs/prompt_chains.py cli/commands.py cli/parser.py tests/test_prompt_chain_backend.py tests/test_prompt_chain_dialog.py tests/test_prompt_chain_cli.py`
+
+**Verified:**
+- `tests/test_prompt_chain_backend.py`: 16 passed
+- `tests/test_prompt_chain_dialog.py`: 45 passed
+- `tests/test_prompt_chain_cli.py`: 26 passed
 
 ---
 
 ## Current recommended next slice
 
-**Task 18** jako następny bounded cycle.
+Nie ma już aktywnego next slice w tym ledgerze dla recent-history surface.
 
-Powód:
-- backend persisted recent history jest już gotowy, ale jeszcze nie jest wystawiony operatorowi,
-- to domyka praktyczny feedback loop dla trust/debug/reuse bez rozbudowy dashboard semantics,
-- GUI inspect surface jest zgodny z celem cyklu i może pozostać bounded oraz readable,
-- CLI path powinien pozostać opcjonalny i wejść tylko jeśli nie poszerza scope ponad mały inspect/history surface.
+Najbliższe sensowne bounded domknięcia:
+- cleanup supporting docs, żeby usunąć stare durable/persisted wording,
+- ostrożny legacy-boundary cleanup wokół `variables_schema` i innych compatibility fields,
+- final focused Ruff/Pyright verification pack dla dotkniętych plików.
 
 ---
 

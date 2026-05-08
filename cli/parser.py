@@ -617,6 +617,28 @@ def parse_args() -> argparse.Namespace:
         help="Show up to this many recent persisted runs for the selected chain.",
     )
 
+    chain_history_parser = subparsers.add_parser(
+        "prompt-chain-history",
+        help="Display bounded recent prompt chain run history.",
+    )
+    chain_history_parser.add_argument(
+        "--chain-id",
+        type=str,
+        default=None,
+        help="Optional prompt chain UUID to filter recent history.",
+    )
+    chain_history_parser.add_argument(
+        "--limit",
+        type=int,
+        default=10,
+        help="Show up to this many recent prompt chain runs.",
+    )
+    chain_history_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print recent prompt chain history as deterministic JSON.",
+    )
+
     chain_export_parser = subparsers.add_parser(
         "prompt-chain-export",
         help="Export a prompt chain to a JSON file.",
