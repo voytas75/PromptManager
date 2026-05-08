@@ -400,6 +400,36 @@ def test_workbench_window_ai_peek_preserves_existing_refinement_focus(qt_app: QA
     assert harness.summary_label_text.endswith("Refinement focus: Constraints")
 
 
+def test_workbench_window_preview_run_after_helper_replaces_stale_summary_focus(
+    qt_app: QApplication,
+) -> None:
+    """A fresh preview run after helper actions should overwrite the previous focus cue."""
+    executor = _ExecutorStub()
+    harness = _make_window(executor=executor)
+    harness.session.template_text = "### Constraints\n- Keep it short"
+    harness.editor.setPlainText(harness.session.template_text)
+    harness.handle_preview_run(harness.session.template_text, {})
+    assert harness.summary_label_text.endswith("Refinement focus: Constraints")
+
+    harness.run_peek()
+    harness.session.goal_statement = "Summarise the deployment impact"
+    harness.session.template_text = (
+        "### Context\nDeployment notes\n\n"
+        "### Goal\nSummarise the deployment impact"
+    )
+    harness.editor.setPlainText(harness.session.template_text)
+
+    harness.handle_preview_run(harness.session.template_text, {})
+
+    assert executor.calls[-1] == "Summarise the deployment impact"
+    assert harness.window.statusBar().currentMessage() == (
+        "Refine Context next — test input was empty, so the preview used the prompt goal."
+    )
+    assert harness.summary_label_text == (
+        "Summarise the deployment impact\nRefinement focus: Context"
+    )
+
+
 def test_workbench_window_run_is_blocked_when_llm_unavailable(
     qt_app: QApplication, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -12,6 +12,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 - Added one bounded **workbench refinement cue neutral reset guard v1** slice so focused Workbench coverage now explicitly proves a fresh blank session clears any previously visible persistent refinement focus and returns the summary label to its neutral state, without changing runtime behavior because the reset seam already worked correctly.
 - Added one bounded **workbench template restart continuity guard v1** slice so focused Workbench coverage now explicitly proves switching into a fresh template session replaces any stale persistent refinement focus with the template's own neutral summary, without changing runtime behavior because the template restart seam already reset correctly.
 - Added one bounded **workbench wizard restart continuity guard v1** slice so Workbench wizard updates now clear any stale persistent refinement focus before rendering the wizard-owned summary, and focused coverage explicitly proves the summary returns to wizard content instead of leaking the prior run's cue.
+- Added one bounded **workbench helper-to-run continuity guard v1** slice so focused Workbench coverage now explicitly proves a fresh preview run after Brainstorm or AI Peek replaces the older helper-carried refinement cue with the new run's own summary and status messaging, without widening behavior beyond the existing helper/run seam.
 
 ## [0.22.25] - 2026-05-08
 
