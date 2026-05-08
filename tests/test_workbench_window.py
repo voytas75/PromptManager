@@ -430,6 +430,36 @@ def test_workbench_window_preview_run_after_helper_replaces_stale_summary_focus(
     )
 
 
+def test_workbench_window_feedback_after_helper_tracks_latest_run_focus(
+    qt_app: QApplication,
+) -> None:
+    """Feedback after helper usage should target the latest run focus, not stale helper context."""
+    executor = _ExecutorStub()
+    harness = _make_window(executor=executor)
+    harness.session.template_text = "### Constraints\n- Keep it short"
+    harness.editor.setPlainText(harness.session.template_text)
+    harness.handle_preview_run(harness.session.template_text, {})
+    harness.run_peek()
+    harness.session.goal_statement = "Summarise the deployment impact"
+    harness.session.template_text = (
+        "### Context\nDeployment notes\n\n"
+        "### Goal\nSummarise the deployment impact"
+    )
+    harness.editor.setPlainText(harness.session.template_text)
+    harness.handle_preview_run(harness.session.template_text, {})
+    harness.feedback_input.setText("Sharper deployment summary needed")
+
+    harness.record_rating(1.0)
+
+    record = harness.session.execution_history[-1]
+    assert record.request_text == "Summarise the deployment impact"
+    assert record.feedback == "Sharper deployment summary needed"
+    assert record.suggested_focus == "context"
+    assert harness.window.statusBar().currentMessage() == (
+        "Feedback saved for last run — current refinement focus: Context."
+    )
+
+
 def test_workbench_window_run_is_blocked_when_llm_unavailable(
     qt_app: QApplication, monkeypatch: pytest.MonkeyPatch
 ) -> None:
