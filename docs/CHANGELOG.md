@@ -4,6 +4,8 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ## [Unreleased]
 
+## [0.22.25] - 2026-05-08
+
 ### Added
 
 - Added one bounded **prompt chain recent-history alignment v1** so prompt chains now expose one shared backend-managed bounded recent-run seam across backend, GUI, and CLI: the GUI recent-runs panel now reads manager history instead of a panel-local session ledger, `prompt-chain-show` keeps a lightweight recent-run section, and the new `prompt-chain-history` command adds bounded `--chain-id` / `--limit` / `--json` inspection without implying durable persistence across restarts.
