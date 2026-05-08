@@ -337,6 +337,7 @@ class WorkbenchWindow(QMainWindow):
             show_toast(self, "Wizard applied to prompt.")
 
     def _handle_wizard_update(self, payload: Mapping[str, Any]) -> None:
+        self._active_refinement_target = None
         constraints = cast("list[str]", payload.get("constraints") or [])
         variables = cast("dict[str, Any]", payload.get("variables") or {})
         self._session.update_from_wizard(

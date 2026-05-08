@@ -127,6 +127,9 @@ class _WorkbenchHarness:
     def run_peek(self) -> None:
         self._window_any._run_peek()
 
+    def handle_wizard_update(self, payload: dict[str, Any]) -> None:
+        self._window_any._handle_wizard_update(payload)
+
     @property
     def summary_label_text(self) -> str:
         summary_label = cast("QLabel", self._window_any._summary_label)
@@ -243,6 +246,31 @@ def test_workbench_window_template_mode_prefills_session_from_prompt(
     assert harness.session.template_text == prompt.context
     assert harness.editor.toPlainText() == prompt.context
     assert harness.summary_label_text == "Summarise outage"
+
+
+def test_workbench_window_wizard_update_replaces_stale_refinement_focus(
+    qt_app: QApplication,
+) -> None:
+    """Wizard restart/update should replace old refinement focus with the wizard summary."""
+    harness = _make_window(executor=_ExecutorStub())
+    harness.session.template_text = "### Constraints\n- Keep it short"
+    harness.editor.setPlainText(harness.session.template_text)
+    harness.handle_preview_run(harness.session.template_text, {})
+    assert harness.summary_label_text.endswith("Refinement focus: Constraints")
+
+    harness.handle_wizard_update(
+        {
+            "prompt_name": "Wizard Prompt",
+            "goal": "Draft an incident update",
+            "system_role": "You are an operations writer.",
+            "context": "System status and operator notes.",
+            "audience": "On-call engineers",
+            "constraints": ["Keep it short"],
+            "variables": {},
+        }
+    )
+
+    assert harness.summary_label_text == "Draft an incident update (Audience: On-call engineers)"
 
 
 def test_workbench_window_run_uses_first_variable_when_test_input_missing(
