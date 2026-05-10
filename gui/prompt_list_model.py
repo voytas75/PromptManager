@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QAbstractListModel, QModelIndex, QPersistentModelIndex, Qt
+from PySide6.QtCore import QAbstractListModel, QModelIndex, QObject, QPersistentModelIndex, Qt
 
 from .prompt_preview import (
     PREVIEW_MAX_LENGTH,
@@ -38,9 +38,14 @@ class PromptListModel(QAbstractListModel):
     TitleMatchRole = int(Qt.ItemDataRole.UserRole) + 2
     PreviewMatchRole = int(Qt.ItemDataRole.UserRole) + 3
     MatchReasonRole = int(Qt.ItemDataRole.UserRole) + 4
+    HandoffCueRole = int(Qt.ItemDataRole.UserRole) + 5
     PreviewMaxLength = PREVIEW_MAX_LENGTH
 
-    def __init__(self, prompts: Sequence[Prompt] | None = None, parent=None) -> None:
+    def __init__(
+        self,
+        prompts: Sequence[Prompt] | None = None,
+        parent: QObject | None = None,
+    ) -> None:
         """Initialise the model with optional starting *prompts*."""
         super().__init__(parent)
         self._prompts: list[Prompt] = list(prompts or [])
@@ -73,6 +78,8 @@ class PromptListModel(QAbstractListModel):
             return self._preview_text(prompt)
         if role == self.MatchReasonRole:
             return self._match_reason_text(prompt)
+        if role == self.HandoffCueRole:
+            return self._handoff_cue_text(prompt)
         if role == self.TitleMatchRole:
             return self._match_ranges(self._display_text(prompt))
         if role == self.PreviewMatchRole:
@@ -147,6 +154,15 @@ class PromptListModel(QAbstractListModel):
                 continue
             previews.append(truncate_preview_text(normalized))
         return tuple(previews)
+
+    def _handoff_cue_text(self, prompt: Prompt) -> str | None:
+        """Return one compact list-local handoff cue."""
+        match_reason = self._match_reason_text(prompt)
+        if match_reason == "Matched in title":
+            return "Ready to reuse"
+        if match_reason in {"Matched in source", "Matched in scenario"}:
+            return "Inspect before reuse"
+        return None
 
     @staticmethod
     def _display_text(prompt: Prompt) -> str:

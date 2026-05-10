@@ -27,7 +27,7 @@ from models.prompt_model import Prompt
 try:
     from PySide6.QtCore import Qt
     from PySide6.QtGui import QFont
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication, QStyleOptionViewItem
 except ImportError:  # pragma: no cover - optional dependency in test environments
     pytest.skip("PySide6 is not available", allow_module_level=True)
 
@@ -161,6 +161,63 @@ def test_prompt_list_model_reports_title_match_reason_when_title_is_visible_matc
         "Reusable incident handoff prompt for routine operator transitions."
     )
     assert index.data(PromptListModel.MatchReasonRole) == "Matched in title"
+
+
+def test_prompt_list_model_exposes_title_match_handoff_cue_for_immediate_reuse(
+    qt_app: QApplication,
+) -> None:
+    """A title match should expose one compact list-side handoff cue."""
+    prompt = _build_prompt(
+        description="Reusable incident handoff prompt for routine operator transitions.",
+        scenarios=["Use after on-call handoff cleanup."],
+        source="ops notebook",
+    )
+    model = PromptListModel([prompt])
+    model.set_active_search_text("incident")
+
+    index = model.index(0, 0)
+
+    assert index.data(PromptListModel.MatchReasonRole) == "Matched in title"
+    assert index.data(PromptListModel.HandoffCueRole) == "Ready to reuse"
+
+
+def test_prompt_list_model_exposes_inspect_first_handoff_cue_for_source_match(
+    qt_app: QApplication,
+) -> None:
+    """A source match should nudge the operator toward inspection before reuse."""
+    prompt = _build_prompt(
+        description="Reusable incident handoff prompt for routine operator transitions.",
+        scenarios=["Use after on-call handoff cleanup."],
+        source="PagerDuty ops notebook",
+    )
+    model = PromptListModel([prompt])
+    model.set_active_search_text("notebook")
+
+    index = model.index(0, 0)
+
+    assert index.data(PromptListModel.MatchReasonRole) == "Matched in source"
+    assert index.data(PromptListModel.HandoffCueRole) == "Inspect before reuse"
+
+
+def test_prompt_list_model_exposes_inspect_first_handoff_cue_for_scenario_match(
+    qt_app: QApplication,
+) -> None:
+    """A scenario match should nudge the operator toward inspection before reuse."""
+    prompt = _build_prompt(
+        description="Reusable incident handoff prompt for routine operator transitions.",
+        scenarios=[
+            "Use after rollback review for release readiness decisions.",
+            "Use after on-call handoff cleanup.",
+        ],
+        source="ops notebook",
+    )
+    model = PromptListModel([prompt])
+    model.set_active_search_text("rollback review")
+
+    index = model.index(0, 0)
+
+    assert index.data(PromptListModel.MatchReasonRole) == "Matched in scenario"
+    assert index.data(PromptListModel.HandoffCueRole) == "Inspect before reuse"
 
 
 def test_prompt_list_model_keeps_matching_description_over_matching_scenario_for_active_search(
@@ -393,3 +450,51 @@ def test_prompt_list_delegate_builds_emphasis_runs_from_match_spans(qt_app: QApp
     )
 
     assert runs == (("Incident", True), (" triage (Ops)", False))
+
+
+def test_prompt_list_delegate_exposes_handoff_cue_text_for_non_title_matches(
+    qt_app: QApplication,
+) -> None:
+    """Delegate should expose the model handoff cue as visible row text for non-title matches."""
+    prompt = _build_prompt(
+        description="Reusable incident handoff prompt for routine operator transitions.",
+        scenarios=["Use after rollback review for release readiness decisions."],
+        source="PagerDuty ops notebook",
+    )
+    model = PromptListModel([prompt])
+    model.set_active_search_text("rollback review")
+    index = model.index(0, 0)
+
+    assert index.data(PromptListModel.HandoffCueRole) == "Inspect before reuse"
+    assert PromptListDelegate.handoff_cue_text(index) == "Inspect before reuse"
+
+
+def test_prompt_list_delegate_adds_height_for_visible_handoff_cue(qt_app: QApplication) -> None:
+    """Rows with a visible handoff cue should reserve extra height for the added line."""
+    prompt = _build_prompt(
+        description="Reusable incident handoff prompt for routine operator transitions.",
+        scenarios=["Use after rollback review for release readiness decisions."],
+        source="PagerDuty ops notebook",
+    )
+    model = PromptListModel([prompt])
+    model.set_active_search_text("rollback review")
+    index = model.index(0, 0)
+
+    no_cue_prompt = _build_prompt(
+        description="Summarise incident updates for the next on-call handoff.",
+        scenarios=[],
+        source="local",
+    )
+    no_cue_model = PromptListModel([no_cue_prompt])
+    no_cue_index = no_cue_model.index(0, 0)
+
+    delegate = PromptListDelegate()
+    option = QStyleOptionViewItem()
+    option.font = QFont()
+
+    with_cue_height = delegate.sizeHint(option, index).height()
+    without_cue_height = delegate.sizeHint(option, no_cue_index).height()
+
+    assert PromptListDelegate.handoff_cue_text(index) == "Inspect before reuse"
+    assert PromptListDelegate.handoff_cue_text(no_cue_index) is None
+    assert with_cue_height > without_cue_height

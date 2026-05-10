@@ -11,11 +11,20 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from PySide6.QtCore import QPointF, QRect, QSize, Qt
+from PySide6.QtCore import (
+    QModelIndex,
+    QPersistentModelIndex as _QPersistentModelIndex,
+    QPointF,
+    QRect,
+    QSize,
+    Qt,
+)
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPalette
 from PySide6.QtWidgets import QApplication, QStyle, QStyledItemDelegate, QStyleOptionViewItem
 
 from .prompt_list_model import PromptListModel
+
+type IndexLike = QModelIndex | _QPersistentModelIndex
 
 
 class PromptListDelegate(QStyledItemDelegate):
@@ -30,6 +39,17 @@ class PromptListDelegate(QStyledItemDelegate):
         return PromptListDelegate._preview_font(font)
 
     @staticmethod
+    def _data_as_text(index: IndexLike, role: int) -> str | None:
+        """Return one role value as visible text when the model exposes a non-empty string."""
+        value = cast("object", index.data(role))
+        return value if isinstance(value, str) and value else None
+
+    @staticmethod
+    def handoff_cue_text(index: IndexLike) -> str | None:
+        """Public helper exposing the visible row handoff cue for bounded tests."""
+        return PromptListDelegate._data_as_text(index, PromptListModel.HandoffCueRole)
+
+    @staticmethod
     def build_text_runs(
         text: str,
         spans: tuple[tuple[int, int], ...],
@@ -41,20 +61,26 @@ class PromptListDelegate(QStyledItemDelegate):
         self,
         painter: QPainter,
         option: QStyleOptionViewItem,
-        index,
+        index: IndexLike,
     ) -> None:
-        """Draw the standard row plus one compact preview line when available."""
-        preview = index.data(PromptListModel.PreviewRole)
-        title_spans = self._coerce_match_spans(index.data(PromptListModel.TitleMatchRole))
-        preview_spans = self._coerce_match_spans(index.data(PromptListModel.PreviewMatchRole))
-        has_preview = isinstance(preview, str) and bool(preview)
-        if not has_preview and not title_spans:
+        """Draw the standard row plus bounded preview and handoff cue lines when available."""
+        preview = self._data_as_text(index, PromptListModel.PreviewRole)
+        handoff_cue = self.handoff_cue_text(index)
+        title_spans = self._coerce_match_spans(
+            cast("object", index.data(PromptListModel.TitleMatchRole))
+        )
+        preview_spans = self._coerce_match_spans(
+            cast("object", index.data(PromptListModel.PreviewMatchRole))
+        )
+        has_preview = preview is not None
+        has_handoff_cue = handoff_cue is not None
+        if not has_preview and not title_spans and not has_handoff_cue:
             super().paint(painter, option, index)
             return
 
         item_option = QStyleOptionViewItem(option)
         self.initStyleOption(item_option, index)
-        title = str(index.data(Qt.ItemDataRole.DisplayRole) or "")
+        title = str(cast("object", index.data(Qt.ItemDataRole.DisplayRole)) or "")
         item_option_any = cast("Any", item_option)
         item_option_any.text = ""
 
@@ -78,14 +104,19 @@ class PromptListDelegate(QStyledItemDelegate):
         )
         title_font = cast("QFont", item_option_any.font)
         preview_font = self._preview_font(title_font)
+        handoff_font = self._handoff_cue_font(title_font)
         title_metrics = QFontMetrics(title_font)
         preview_metrics = QFontMetrics(preview_font)
+        handoff_metrics = QFontMetrics(handoff_font)
 
         title_rect = QRect(text_rect)
         title_rect.setHeight(title_metrics.height())
         preview_rect = QRect(text_rect)
         preview_rect.setTop(title_rect.bottom() + self._LINE_SPACING)
         preview_rect.setHeight(preview_metrics.height())
+        handoff_rect = QRect(text_rect)
+        handoff_rect.setTop(preview_rect.bottom() + self._LINE_SPACING)
+        handoff_rect.setHeight(handoff_metrics.height())
 
         painter.setClipRect(text_rect)
         title_text, title_spans = self._elide_text_and_spans(
@@ -118,30 +149,58 @@ class PromptListDelegate(QStyledItemDelegate):
                 preview_text,
                 preview_spans,
             )
+
+        if has_handoff_cue:
+            handoff_text, handoff_spans = self._elide_text_and_spans(
+                handoff_cue,
+                (),
+                handoff_metrics,
+                handoff_rect.width(),
+            )
+            self._draw_text_runs(
+                painter,
+                handoff_rect,
+                handoff_font,
+                self._handoff_cue_color(item_option_any.palette, item_option_any.state),
+                handoff_text,
+                handoff_spans,
+            )
         painter.restore()
 
-    def sizeHint(self, option: QStyleOptionViewItem, index) -> QSize:
-        """Return a taller row height only when preview text is available."""
+    def sizeHint(
+        self,
+        option: QStyleOptionViewItem,
+        index: IndexLike,
+    ) -> QSize:
+        """Return a taller row height when preview text or a visible handoff cue is available."""
         base_size = super().sizeHint(option, index)
-        preview = index.data(PromptListModel.PreviewRole)
-        if not isinstance(preview, str) or not preview:
+        preview = self._data_as_text(index, PromptListModel.PreviewRole)
+        handoff_cue = self.handoff_cue_text(index)
+        has_preview = preview is not None
+        has_handoff_cue = handoff_cue is not None
+        if not has_preview and not has_handoff_cue:
             return base_size
 
         option_any = cast("Any", option)
         title_font = cast("QFont", option_any.font)
         title_metrics = QFontMetrics(title_font)
-        preview_metrics = QFontMetrics(self._preview_font(title_font))
-        height = (
-            self._VERTICAL_PADDING * 2
-            + title_metrics.height()
-            + self._LINE_SPACING
-            + preview_metrics.height()
-        )
+        height = self._VERTICAL_PADDING * 2 + title_metrics.height()
+        if has_preview:
+            preview_metrics = QFontMetrics(self._preview_font(title_font))
+            height += self._LINE_SPACING + preview_metrics.height()
+        if has_handoff_cue:
+            handoff_metrics = QFontMetrics(self._handoff_cue_font(title_font))
+            height += self._LINE_SPACING + handoff_metrics.height()
         return QSize(base_size.width(), max(base_size.height(), height))
 
     @staticmethod
     def _preview_font(font: QFont) -> QFont:
         """Return the same readable base font for preview text."""
+        return QFont(font)
+
+    @staticmethod
+    def _handoff_cue_font(font: QFont) -> QFont:
+        """Return a subtle readable font for the bounded handoff cue line."""
         return QFont(font)
 
     @staticmethod
@@ -174,21 +233,38 @@ class PromptListDelegate(QStyledItemDelegate):
         return color
 
     @staticmethod
+    def _handoff_cue_color(palette: QPalette, state: QStyle.StateFlag) -> QColor:
+        """Return a muted color for the bounded handoff cue line."""
+        role = (
+            QPalette.ColorRole.HighlightedText
+            if state & QStyle.StateFlag.State_Selected
+            else QPalette.ColorRole.Text
+        )
+        color = QColor(palette.color(role))
+        color.setAlpha(150 if state & QStyle.StateFlag.State_Selected else 160)
+        return color
+
+    @staticmethod
     def _coerce_match_spans(value: object | None) -> tuple[tuple[int, int], ...]:
         """Normalize model-provided match spans into a validated tuple."""
         if not isinstance(value, (list, tuple)):
             return ()
         spans: list[tuple[int, int]] = []
-        for candidate in value:
+        for candidate_any in cast("tuple[object, ...]", tuple(cast("Any", value))):
+            if not isinstance(candidate_any, tuple):
+                continue
+            candidate_items = cast("tuple[object, ...]", candidate_any)
+            if len(candidate_items) != 2:
+                continue
+            start = candidate_items[0]
+            length = candidate_items[1]
             if (
-                isinstance(candidate, tuple)
-                and len(candidate) == 2
-                and isinstance(candidate[0], int)
-                and isinstance(candidate[1], int)
-                and candidate[0] >= 0
-                and candidate[1] > 0
+                isinstance(start, int)
+                and isinstance(length, int)
+                and start >= 0
+                and length > 0
             ):
-                spans.append(candidate)
+                spans.append((start, length))
         return tuple(spans)
 
     @staticmethod
