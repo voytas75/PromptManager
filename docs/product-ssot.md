@@ -265,19 +265,47 @@ PromptManager should grow by becoming more trustworthy and more operable, not ma
 
 The intended product evolution order is:
 
-### 1. Strengthen the prompt-asset core
-Priority goes first to improvements in:
-- capture
-- normalization
-- retrieval
-- inspection
-- reuse
-- refinement
+### 1. Tighten retrieval-to-action confidence
+Priority goes first to the operator path from finding a prompt to knowing what to do next.
 
-This remains the main product center and must not be diluted.
+Work in this stage should improve:
+- retrieval and discovery legibility
+- prompt-list confidence and scanability
+- compact search-match reason clarity
+- faster handoff from search or recent results into inspect, reuse, or refinement
+- lower hesitation before opening detail or reusing immediately
 
-### 2. Make settings and routing deterministic
-The next major direction is to make settings, provider resolution, model routing, and embedding resolution fully legible and deterministic.
+Constraint:
+- do not redesign ranking or retrieval architecture before this operator path is clearer.
+
+### 2. Make inspect/detail a clear decision surface
+After retrieval clarity, the product should make the detail surface answer the core operator questions with less ambiguity.
+
+Work in this stage should improve:
+- fit-to-use judgment
+- evidence / provenance / next-action consistency
+- compact decision-support cues
+- comparison and validation readability
+- handoff clarity from detail into reuse, workspace, or refinement
+
+Constraint:
+- prefer consistency and ordering improvements on existing surfaces over adding new panels or parallel guidance layers.
+
+### 3. Tighten the reuse / refine / fork operating path
+Once the user can find and understand the prompt faster, the next priority is reducing friction in the action path.
+
+Work in this stage should improve:
+- copy vs open-in-workspace clarity
+- edit vs fork clarity
+- lineage-preserving refinement decisions
+- run-to-refine and inspect-to-refine continuity where it materially supports the asset loop
+- low-friction movement from prompt asset to practical next action
+
+Constraint:
+- do not turn the editor, workspace, or workbench into a separate product center.
+
+### 4. Make settings and routing deterministic
+After the main asset loop is clearer, settings, provider resolution, model routing, and embedding resolution should remain fully legible and deterministic.
 
 Required outcomes:
 - one clear precedence model across JSON config, `.env`, runtime env, and defaults
@@ -288,7 +316,7 @@ Required outcomes:
 Exit condition:
 - the app can always answer what value is active, where it came from, and why it is being used
 
-### 3. Make diagnostics a first-class trust layer
+### 5. Make diagnostics a first-class trust layer
 After deterministic configuration, the effective runtime state must become visible and operationally clear.
 
 Required outcomes:
@@ -298,8 +326,8 @@ Required outcomes:
 - high-contrast health states for model access, embeddings, database, and vector store
 - low-noise messaging that helps decisions
 
-### 4. Mature execution into a structured run system
-Execution should then become a structured run layer tied to prompt assets.
+### 6. Mature execution into a structured run system
+Execution should then mature as a structured run layer tied to prompt assets.
 
 Required outcomes:
 - reproducible runs
@@ -312,24 +340,15 @@ Constraint:
 - execution must remain attached to prompt asset quality and reuse
 - it must not redefine the product as an agent workbench
 
-### 5. Tighten the asset-to-run-to-refine loop
-The next direction is to improve the handoff between:
-- finding a prompt
-- understanding whether it fits
-- running it
-- reviewing the result
-- deciding whether to reuse, refine, fork, or replace it
-
-This should improve operator coherence, not create a larger orchestration framework.
-
 Current emphasis inside this stage:
 - keep inspect/detail run evidence easier to read than to over-interpret,
 - prefer wording/order fixes on existing summary seams before adding new cues,
 - treat run-evidence legibility as a bounded continuation of the same asset-to-run-to-refine loop,
 - for prompt chains, prefer explicit result contracts and stable operator/machine output semantics over heavier execution power.
 
-### 6. Open automation surfaces deliberately
+### 7. Open automation surfaces deliberately
 After the product is trustworthy for human operators, expose the same model through CLI/API automation.
+
 Principle:
 - GUI for interactive operation
 - CLI/API for repeatable automation
@@ -337,7 +356,7 @@ Principle:
 Constraint:
 - automation must expose the same product model, not create a shadow product
 
-### 7. Add bounded evaluation and governance
+### 8. Add bounded evaluation and governance
 Once runs and automation are solid, PromptManager can add practical evaluation and governance features.
 
 Examples:
@@ -350,7 +369,7 @@ Constraint:
 - keep evaluation practical and decision-oriented
 - avoid bloated benchmarking dashboards
 
-### 8. Keep collaboration subordinate
+### 9. Keep collaboration subordinate
 Sharing and broader multi-user features may grow later, but they must remain subordinate to:
 - local-first ownership
 - prompt asset clarity
@@ -363,21 +382,31 @@ Sharing and broader multi-user features may grow later, but they must remain sub
 
 This is the ordered product backlog posture derived from the roadmap above.
 
-### Priority 1 — Prompt-asset core quality
+### Priority 1 — Retrieval, inspect, and reuse confidence
+Work that improves:
+- stronger retrieval/discovery ergonomics, especially search-result legibility and faster reuse
+- prompt-list confidence and clearer result-level action cues
+- better inspect/detail decision support
+- clearer fit-to-use judgment before action
+- lower-friction reuse, refine, and fork decisions on existing seams
+- faster continuity from search/recent into inspect and practical next action
+
+Why this stays first:
+- PromptManager wins or loses at the moment the operator must find the right prompt and decide what to do next.
+
+### Priority 2 — Prompt-asset library quality
 Work that improves:
 - quick capture quality
 - draft-to-asset promotion clarity
 - duplicate and similarity judgment at ingest
 - rough-input cleanup on the way to usable draft
-- stronger retrieval/discovery ergonomics, especially search-result legibility and faster reuse
 - lower-friction CLI and import ergonomics for getting prompt assets into the catalog
-- better inspect/detail decision support
-- version/fork clarity
+- version/fork clarity where it materially supports later reuse
 
-Why this stays first:
-- prompt library quality is still the main product promise
+Why this remains high:
+- prompt library quality is still the main product promise and the retrieval loop depends on strong asset inputs.
 
-### Priority 2 — Trust infrastructure
+### Priority 3 — Trust infrastructure
 Work that improves:
 - settings precedence clarity
 - routing determinism
@@ -388,9 +417,9 @@ Work that improves:
 - reduction of ambiguous runtime noise
 
 Why this comes next:
-- operational trust is required before expanding execution and automation
+- operational trust should support the core asset loop without replacing it as the main product story.
 
-### Priority 3 — Structured runs
+### Priority 4 — Structured runs and run evidence
 Work that improves:
 - prompt-linked run records
 - visible run provenance
@@ -399,26 +428,27 @@ Work that improves:
 - bounded prompt-chain lifecycle completeness, inspectability, result semantics, and run evidence when kept subordinate to the prompt-asset model
 - compact operator-facing run surfaces such as explicit final output vs final summary and deterministic machine-readable exports/results
 
-### Priority 4 — Asset-to-run-to-refine coherence
+### Priority 5 — Asset-to-run-to-refine coherence
 Work that improves:
 - inspect-to-run handoff
 - run-result-to-revision decision flow
-- clear reuse vs refine vs fork judgment
+- clear reuse vs refine vs fork judgment after validation evidence exists
 - compact inspect/detail cues that avoid repeating the same recommendation twice
+- workbench continuity only where it clearly serves the prompt asset loop
 
-### Priority 5 — Automation surfaces
+### Priority 6 — Automation surfaces
 Work that improves:
 - CLI execution and inspection workflows
 - scriptable run/export paths
 - bounded API/service access where justified
 
-### Priority 6 — Evaluation and governance
+### Priority 7 — Evaluation and governance
 Work that improves:
 - disciplined prompt comparison
 - repeatable evaluation
 - clear review posture and provenance-backed decisions
 
-### Priority 7 — Collaboration and later supporting surfaces
+### Priority 8 — Collaboration and later supporting surfaces
 Only after higher priorities clearly justify it.
 
 ---
@@ -471,4 +501,4 @@ If there is ever a doubt whether PromptManager is:
 
 the governing answer is:
 
-**PromptManager is first a canonical home for prompt assets, then a trustworthy operational layer around them, and only later a controlled automation surface built on the same model.**
+**PromptManager is first a canonical home for prompt assets, then a decision-support system for finding, understanding, reusing, and refining them confidently, then a trustworthy operational layer around them, and only later a controlled automation surface built on the same model.**
