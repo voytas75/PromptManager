@@ -60,6 +60,12 @@ Po **każdej** implementacji wykonaj w tej kolejności:
 - [x] compare recommendation cue distinguishes improved vs regressed candidates
 - [x] removed legacy `Safe to compare` next-action mapping after compare cue split
 
+### Next-cycle pointer
+- Canonical product roadmap and backlog priority now live in `docs/product-ssot.md`.
+- Supporting next-cycle direction note now lives in `docs/plans/2026-05-10-product-direction-ssot-next-cycle.md`.
+- The most recently delivered bounded execution ledger for the prior cycle path now lives in `docs/plans/2026-05-10-workspace-one-run-action-clarity-roadmap.md`.
+- The next active bounded execution ledger now lives in `docs/plans/2026-05-10-detail-edit-vs-fork-clarity-roadmap.md`.
+
 ---
 
 ## Recommended execution order

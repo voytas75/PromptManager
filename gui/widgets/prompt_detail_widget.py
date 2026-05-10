@@ -671,7 +671,56 @@ class PromptDetailWidget(QWidget):
         return f"Requires variables: {summary}"
 
     def _resolve_workspace_handoff_cue(self, prompt: Prompt) -> str | None:
-        """Return one bounded visible workspace handoff cue for template prompts only."""
+        """Return one bounded visible workspace/action handoff cue.
+
+        Supports template prompts, the validation-first reuse path,
+        and one compact refine-first detail handoff.
+        """
+        next_action_text = self._extract_label_value_text(self._next_action_label.text())
+        decision_text = self._extract_label_value_text(self._decision_label.text())
+        has_context = bool((prompt.context or "").strip())
+        if next_action_text == "Validate before reuse" and has_context:
+            return self._format_label_value(
+                "Next step",
+                "Open in Workspace before validating reuse.",
+                multiline=True,
+            )
+        if decision_text == "Reuse as-is" and not next_action_text and has_context:
+            return self._format_label_value(
+                "Next step",
+                "Copy Prompt for direct reuse.",
+                multiline=True,
+            )
+        if next_action_text == "Reuse as-is" and has_context:
+            return self._format_label_value(
+                "Next step",
+                "Copy Prompt for direct reuse.",
+                multiline=True,
+            )
+        if next_action_text == "Prefer baseline before reuse" and has_context:
+            return self._format_label_value(
+                "Next step",
+                "Reuse the baseline prompt.",
+                multiline=True,
+            )
+        if next_action_text == "Edit Prompt before reuse" and has_context:
+            return self._format_label_value(
+                "Next step",
+                "Edit Prompt before reuse.",
+                multiline=True,
+            )
+        if next_action_text == "Inspect before reuse" and has_context:
+            return self._format_label_value(
+                "Next step",
+                "Review prompt details before reusing.",
+                multiline=True,
+            )
+        if next_action_text == "Fork before editing" and has_context:
+            return self._format_label_value(
+                "Next step",
+                "Fork Prompt to preserve the current version before editing.",
+                multiline=True,
+            )
         summary = self._resolve_template_variable_summary(prompt.context)
         if not summary:
             return None
@@ -993,8 +1042,25 @@ class PromptDetailWidget(QWidget):
             self._hidden_duplicate_next_action_text = None
             self.update_next_action_summary(hidden_text)
 
+        prompt = getattr(self, "_current_prompt", None)
+        if prompt is None:
+            self._workspace_handoff_cue_label.clear()
+            self._workspace_handoff_cue_label.setVisible(False)
+            return
+        workspace_handoff_cue = self._resolve_workspace_handoff_cue(prompt)
+        if workspace_handoff_cue:
+            self._workspace_handoff_cue_label.setText(workspace_handoff_cue)
+            self._workspace_handoff_cue_label.setVisible(True)
+        else:
+            self._workspace_handoff_cue_label.clear()
+            self._workspace_handoff_cue_label.setVisible(False)
+
     def update_decision_provenance_summary(self, text: str | None) -> None:
         """Display one compact provenance cue that explains the current decision basis."""
+        if text == "Based on limited run evidence":
+            text = "Note: Based on limited run evidence."
+        elif text == "Based on latest 2 comparable runs":
+            text = "Decision basis: Based on latest 2 comparable runs."
         if text:
             self._decision_provenance_label.setText(text)
             self._decision_provenance_label.setVisible(True)
@@ -1005,20 +1071,34 @@ class PromptDetailWidget(QWidget):
     def update_next_action_summary(self, text: str | None) -> None:
         """Display one compact operator-facing next action for the current prompt."""
         decision_text = self._extract_label_value_text(self._decision_label.text())
-        if text and decision_text == text:
+        allow_duplicate_next_action = text in {"Fork before editing", "Inspect before reuse"}
+        if text and decision_text == text and not allow_duplicate_next_action:
             self._hidden_duplicate_next_action_text = text
             self._next_action_label.clear()
             self._next_action_label.setVisible(False)
-            return
-        self._hidden_duplicate_next_action_text = None
-        if text:
-            self._next_action_label.setText(
-                self._format_label_value("Recommended next action", text, multiline=True)
-            )
-            self._next_action_label.setVisible(True)
         else:
-            self._next_action_label.clear()
-            self._next_action_label.setVisible(False)
+            self._hidden_duplicate_next_action_text = None
+            if text:
+                self._next_action_label.setText(
+                    self._format_label_value("Recommended next action", text, multiline=True)
+                )
+                self._next_action_label.setVisible(True)
+            else:
+                self._next_action_label.clear()
+                self._next_action_label.setVisible(False)
+
+        prompt = getattr(self, "_current_prompt", None)
+        if prompt is None:
+            self._workspace_handoff_cue_label.clear()
+            self._workspace_handoff_cue_label.setVisible(False)
+            return
+        workspace_handoff_cue = self._resolve_workspace_handoff_cue(prompt)
+        if workspace_handoff_cue:
+            self._workspace_handoff_cue_label.setText(workspace_handoff_cue)
+            self._workspace_handoff_cue_label.setVisible(True)
+        else:
+            self._workspace_handoff_cue_label.clear()
+            self._workspace_handoff_cue_label.setVisible(False)
 
     @staticmethod
     def _extract_label_value_text(text: str) -> str:

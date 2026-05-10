@@ -242,6 +242,73 @@ def test_prompt_detail_widget_renders_missing_evidence_next_action_label(
     assert "Validate before reuse" in next_action_text
 
 
+def test_prompt_detail_widget_shows_workspace_validation_handoff_for_validate_before_reuse(
+    qt_app: QApplication,
+) -> None:
+    """Validation-first guidance should point plain prompts to Workspace first."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000141"),
+        name="Validation handoff prompt",
+        description="Reusable prompt with limited confidence.",
+        category="Operations",
+        context="Summarize the incident and call out operator-facing risks.",
+        created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 5, 9, 45, tzinfo=UTC),
+    )
+
+    widget.show()
+    widget.display_prompt(prompt)
+    widget.update_decision_summary("Reuse as-is")
+    widget.update_next_action_summary("Validate before reuse")
+    qt_app.processEvents()
+
+    assert _open_in_workspace_button(widget).text() == "Open in Workspace"  # noqa: SLF001
+    assert _workspace_handoff_cue_label(widget).isVisible()  # noqa: SLF001
+    cue_text = _workspace_handoff_cue_label(widget).text()  # noqa: SLF001
+    assert "Next step:" in cue_text
+    assert "Open in Workspace before validating reuse." in cue_text
+
+
+def test_prompt_detail_widget_shows_validate_decision_package_consistently(
+    qt_app: QApplication,
+) -> None:
+    """Validate-path detail state should expose one coherent decision package."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000149"),
+        name="Validate package prompt",
+        description="Prompt is reusable but should be validated before reuse.",
+        category="Operations",
+        context="Summarize the incident and call out operator-facing risks.",
+        created_at=datetime(2026, 4, 6, 8, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 6, 8, 45, tzinfo=UTC),
+    )
+
+    widget.show()
+    widget.display_prompt(prompt)
+    widget.update_decision_summary("Reuse as-is")
+    widget.update_decision_provenance_summary("Based on latest 2 comparable runs")
+    widget.update_next_action_summary("Validate before reuse")
+    qt_app.processEvents()
+
+    decision_text = _decision_label(widget).text()  # noqa: SLF001
+    provenance_text = _decision_provenance_label(widget).text()  # noqa: SLF001
+    next_action_text = _next_action_label(widget).text()  # noqa: SLF001
+    cue_text = _workspace_handoff_cue_label(widget).text()  # noqa: SLF001
+
+    assert _decision_label(widget).isVisible()  # noqa: SLF001
+    assert _decision_provenance_label(widget).isVisible()  # noqa: SLF001
+    assert _next_action_label(widget).isVisible()  # noqa: SLF001
+    assert _workspace_handoff_cue_label(widget).isVisible()  # noqa: SLF001
+    assert "Decision:</span> Reuse as-is" in decision_text
+    assert "Decision basis: Based on latest 2 comparable runs." in provenance_text
+    assert "Recommended next action:</span> Validate before reuse" in next_action_text
+    assert cue_text.startswith("<span style=")
+    assert "Next step:</span>" in cue_text
+    assert "Open in Workspace before validating reuse." in cue_text
+
+
 def test_prompt_detail_widget_renders_keep_baseline_decision_and_next_action(
     qt_app: QApplication,
 ) -> None:
@@ -261,6 +328,120 @@ def test_prompt_detail_widget_renders_keep_baseline_decision_and_next_action(
     assert "Keep baseline" in decision_text
     assert "Recommended next action:" in next_action_text
     assert "Prefer baseline before reuse" in next_action_text
+
+
+def test_prompt_detail_widget_shows_baseline_handoff_for_keep_baseline(
+    qt_app: QApplication,
+) -> None:
+    """Baseline-first detail guidance should surface one explicit baseline handoff cue."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000145"),
+        name="Baseline candidate",
+        description="Prompt should defer to the stronger baseline before reuse.",
+        category="Operations",
+        context=(
+            "Summarize the incident and compare the current candidate against "
+            "the baseline guidance."
+        ),
+        created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 5, 10, 5, tzinfo=UTC),
+    )
+
+    widget.show()
+    widget.display_prompt(prompt)
+    widget.update_decision_summary("Keep baseline")
+    widget.update_next_action_summary("Prefer baseline before reuse")
+    qt_app.processEvents()
+
+    assert _workspace_handoff_cue_label(widget).isVisible()  # noqa: SLF001
+    cue_text = _workspace_handoff_cue_label(widget).text()  # noqa: SLF001
+    assert "Next step:" in cue_text
+    assert "Reuse the baseline prompt." in cue_text
+
+
+def test_prompt_detail_widget_shows_refine_handoff_cue_for_edit_path(
+    qt_app: QApplication,
+) -> None:
+    """Refine-first guidance should surface one visible next-step handoff on the detail seam."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000142"),
+        name="Refine candidate",
+        description="Prompt likely needs a small local edit before reuse.",
+        category="Operations",
+        context="Summarize the incident and call out operator-facing risks.",
+        created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 5, 10, 5, tzinfo=UTC),
+    )
+
+    widget.show()
+    widget.display_prompt(prompt)
+    widget.update_decision_summary("Refine before reuse")
+    widget.update_next_action_summary("Edit Prompt before reuse")
+    qt_app.processEvents()
+
+    assert _workspace_handoff_cue_label(widget).isVisible()  # noqa: SLF001
+    cue_text = _workspace_handoff_cue_label(widget).text()  # noqa: SLF001
+    assert "Next step:" in cue_text
+    assert "Edit Prompt before reuse." in cue_text
+
+
+def test_prompt_detail_widget_shows_workspace_inspect_handoff_for_inspect_before_reuse(
+    qt_app: QApplication,
+) -> None:
+    """Inspect-first detail guidance should surface one explicit inspect handoff cue."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000144"),
+        name="Inspect candidate",
+        description="Prompt found through a contextual signal and should be checked before reuse.",
+        category="Operations",
+        context=(
+            "Summarize the incident and confirm the recovery step still matches "
+            "the operator goal."
+        ),
+        created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 5, 10, 5, tzinfo=UTC),
+    )
+
+    widget.show()
+    widget.display_prompt(prompt)
+    widget.update_decision_summary("Inspect before reuse")
+    widget.update_next_action_summary("Inspect before reuse")
+    qt_app.processEvents()
+
+    assert _workspace_handoff_cue_label(widget).isVisible()  # noqa: SLF001
+    cue_text = _workspace_handoff_cue_label(widget).text()  # noqa: SLF001
+    assert "Next step:" in cue_text
+    assert "Review prompt details before reusing." in cue_text
+
+
+def test_prompt_detail_widget_shows_workspace_fork_handoff_for_fork_before_editing(
+    qt_app: QApplication,
+) -> None:
+    """Fork-first detail guidance should surface one explicit fork handoff cue."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000143"),
+        name="Fork candidate",
+        description="Prompt should branch before local edits.",
+        category="Operations",
+        context="Summarize the incident and preserve the original prompt.",
+        created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 5, 10, 5, tzinfo=UTC),
+    )
+
+    widget.show()
+    widget.display_prompt(prompt)
+    widget.update_decision_summary("Fork before editing")
+    widget.update_next_action_summary("Fork before editing")
+    qt_app.processEvents()
+
+    assert _workspace_handoff_cue_label(widget).isVisible()  # noqa: SLF001
+    cue_text = _workspace_handoff_cue_label(widget).text()  # noqa: SLF001
+    assert "Next step:" in cue_text
+    assert "Fork Prompt to preserve the current version before editing." in cue_text
 
 
 def test_prompt_detail_widget_renders_decision_provenance_label(
@@ -291,6 +472,38 @@ def test_prompt_detail_widget_renders_limited_evidence_provenance_label(
     assert _decision_provenance_label(widget).isVisible()  # noqa: SLF001
     provenance_text = _decision_provenance_label(widget).text()  # noqa: SLF001
     assert "Based on limited run evidence" in provenance_text
+
+
+def test_prompt_detail_widget_formats_limited_evidence_provenance_as_cautionary_note(
+    qt_app: QApplication,
+) -> None:
+    """Thin run evidence should read as an explicit cautionary provenance cue."""
+    widget = PromptDetailWidget()
+
+    widget.show()
+    widget.update_decision_provenance_summary("Based on limited run evidence")
+    qt_app.processEvents()
+
+    assert _decision_provenance_label(widget).isVisible()  # noqa: SLF001
+    provenance_text = _decision_provenance_label(widget).text()  # noqa: SLF001
+    assert provenance_text.startswith("Note:")
+    assert "Based on limited run evidence." in provenance_text
+
+
+def test_prompt_detail_widget_formats_comparable_evidence_provenance_as_decision_basis(
+    qt_app: QApplication,
+) -> None:
+    """Comparable runs should read as an explicit decision-basis provenance cue."""
+    widget = PromptDetailWidget()
+
+    widget.show()
+    widget.update_decision_provenance_summary("Based on latest 2 comparable runs")
+    qt_app.processEvents()
+
+    assert _decision_provenance_label(widget).isVisible()  # noqa: SLF001
+    provenance_text = _decision_provenance_label(widget).text()  # noqa: SLF001
+    assert provenance_text.startswith("Decision basis:")
+    assert "Based on latest 2 comparable runs." in provenance_text
 
 
 def test_prompt_detail_widget_hides_next_action_summary_when_empty(
@@ -429,6 +642,34 @@ def test_prompt_detail_widget_exposes_bounded_quick_reuse_actions(
 
     assert copy_requests == ["copy"]
     assert open_requests == ["open"]
+
+
+def test_prompt_detail_widget_shows_copy_first_handoff_when_direct_reuse_is_ready(
+    qt_app: QApplication,
+) -> None:
+    """A reuse-ready prompt should expose copying as the direct next step."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000136"),
+        name="Direct reuse prompt",
+        description="Fallback description",
+        category="General",
+        context="Prompt body to reuse",
+        created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 4, 10, 30, tzinfo=UTC),
+    )
+
+    widget.show()
+    widget.display_prompt(prompt)
+    widget.update_decision_summary("Reuse as-is")
+    qt_app.processEvents()
+
+    assert _copy_prompt_body_button(widget).isEnabled()  # noqa: SLF001
+    assert _open_in_workspace_button(widget).isEnabled()  # noqa: SLF001
+    assert _workspace_handoff_cue_label(widget).isVisible()  # noqa: SLF001
+    cue_text = _workspace_handoff_cue_label(widget).text()  # noqa: SLF001
+    assert "Next step:" in cue_text
+    assert "Copy Prompt for direct reuse." in cue_text
 
 
 def test_prompt_detail_widget_toggles_favorite_action_from_detail_flow(
