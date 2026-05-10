@@ -18,7 +18,7 @@ from PySide6.QtGui import QGuiApplication, QTextCursor
 from PySide6.QtWidgets import QDialog, QListView, QMenu, QMessageBox, QPlainTextEdit, QWidget
 
 from .execute_context_dialog import ExecuteContextDialog
-from .workspace_history_controller import WorkspaceHistoryController
+from .workspace_history_controller import build_validation_freshness_summary
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -137,11 +137,9 @@ class PromptActionsController:
                 similar_action.setEnabled(False)
 
         selected_action = menu.exec(self._list_view.viewport().mapToGlobal(point))
-        if selected_action is None:
-            return
-        if selected_action is edit_action:
+        if selected_action == edit_action:
             self._edit_callback()
-        elif selected_action is duplicate_action and prompt is not None:
+        elif selected_action == duplicate_action and prompt is not None:
             self._duplicate_callback(prompt)
         elif selected_action is fork_action and prompt is not None:
             self._fork_callback(prompt)
@@ -278,9 +276,7 @@ class PromptActionsController:
         if callable(history_supplier):
             entries = history_supplier(prompt)
             if entries:
-                freshness = WorkspaceHistoryController._build_validation_freshness_summary(
-                    entries[0]
-                )
+                freshness = build_validation_freshness_summary(entries[0])
                 if freshness == "Validation freshness: stale":
                     return (
                         "Prompt ready in workspace. Latest validation is stale — "

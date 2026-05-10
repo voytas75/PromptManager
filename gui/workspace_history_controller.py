@@ -14,7 +14,7 @@ Updates:
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from core import PromptManager, PromptManagerError, PromptVersionError
 
@@ -40,6 +40,57 @@ else:  # pragma: no cover - runtime placeholders for type-only imports
     PromptListModel = _Any
     TemplatePreviewController = _Any
     PromptDetailWidget = _Any
+
+
+_MetadataMap = dict[str, object]
+
+
+def _coerce_metadata_map(value: object) -> _MetadataMap:
+    if isinstance(value, dict):
+        return cast("_MetadataMap", value)
+    return {}
+
+
+def _metadata_child_map(parent: _MetadataMap, key: str) -> _MetadataMap:
+    return _coerce_metadata_map(parent.get(key))
+
+
+def _metadata_int(parent: _MetadataMap, key: str) -> int | None:
+    value = parent.get(key)
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return None
+    return None
+
+
+def _metadata_text(parent: _MetadataMap, key: str) -> str | None:
+    value = parent.get(key)
+    if isinstance(value, str) and value:
+        return value
+    return None
+
+
+def build_validation_freshness_summary(entry: object) -> str | None:
+    """Return one compact freshness cue from the latest execution timestamp when available."""
+    executed_at = getattr(entry, "executed_at", None)
+    if not isinstance(executed_at, datetime):
+        return None
+    if executed_at.tzinfo is None:
+        return None
+    age = datetime.now(UTC) - executed_at.astimezone(UTC)
+    if age.days >= 30:
+        return "Validation freshness: stale"
+    if age.days >= 3:
+        return "Validation freshness: stale"
+    return "Validation freshness: recent"
 
 
 class WorkspaceHistoryController:
@@ -184,15 +235,15 @@ class WorkspaceHistoryController:
         if not entries:
             return None
         latest = entries[0]
-        metadata = getattr(latest, "metadata", None) or {}
-        context = metadata.get("context", {}) if isinstance(metadata, dict) else {}
-        execution = context.get("execution", {}) if isinstance(context, dict) else {}
-        run = context.get("run", {}) if isinstance(context, dict) else {}
+        metadata = _coerce_metadata_map(getattr(latest, "metadata", None))
+        context = _metadata_child_map(metadata, "context")
+        execution = _metadata_child_map(context, "execution")
+        run = _metadata_child_map(context, "run")
 
         status_value = getattr(getattr(latest, "status", None), "value", None) or "unknown"
-        model = execution.get("model") if isinstance(execution, dict) else None
-        prompt_version = run.get("prompt_version") if isinstance(run, dict) else None
-        conversation_messages = run.get("conversation_messages") if isinstance(run, dict) else None
+        model = _metadata_text(execution, "model")
+        prompt_version = _metadata_int(run, "prompt_version")
+        conversation_messages = _metadata_int(run, "conversation_messages")
         duration_ms = getattr(latest, "duration_ms", None)
 
         parts = [f"Last run: {status_value}"]
@@ -206,7 +257,7 @@ class WorkspaceHistoryController:
         if duration_ms is not None:
             parts.append(f"{duration_ms} ms")
 
-        freshness_summary = self._build_validation_freshness_summary(latest)
+        freshness_summary = build_validation_freshness_summary(latest)
         if freshness_summary is not None:
             parts.append(freshness_summary)
 
@@ -275,18 +326,8 @@ class WorkspaceHistoryController:
 
     @staticmethod
     def _build_validation_freshness_summary(entry: object) -> str | None:
-        """Return one compact freshness cue from the latest execution timestamp when available."""
-        executed_at = getattr(entry, "executed_at", None)
-        if not isinstance(executed_at, datetime):
-            return None
-        if executed_at.tzinfo is None:
-            return None
-        freshness_window_seconds = 3 * 24 * 60 * 60
-        age_seconds = (datetime.now(UTC) - executed_at.astimezone(UTC)).total_seconds()
-        if age_seconds < 0:
-            return None
-        freshness = "recent" if age_seconds <= freshness_window_seconds else "stale"
-        return f"Validation freshness: {freshness}"
+        """Backward-compatible wrapper for the module-level freshness helper."""
+        return build_validation_freshness_summary(entry)
 
     def _list_execution_history(self, prompt: Prompt, *, limit: int = 1) -> list[object]:
         list_history = getattr(self._manager, "list_execution_history", None)
@@ -298,7 +339,7 @@ class WorkspaceHistoryController:
             return []
         if not isinstance(entries, list):
             return []
-        return entries
+        return cast("list[object]", entries)
 
     def _build_decision_summary(self, prompt: Prompt) -> str:
         run_recommendation = self._build_run_recommendation_summary(prompt)
@@ -389,14 +430,14 @@ class WorkspaceHistoryController:
                 self._list_execution_history(prompt, limit=1)[0]
             )
             if freshness == "Validation freshness: recent":
-                return "Evidence: only one run available"
+                return "Run one more time before reusing"
             return "Validate before reuse"
         if missing_evidence_reason == "Evidence: no comparable baseline yet":
-            return "Run another version before comparing"
+            return "Run a different prompt version before comparing"
         if missing_evidence_reason == "Evidence: missing rating for comparison":
-            return "Add ratings before comparing"
+            return "Add ratings to both runs before comparing"
         if missing_evidence_reason == "Evidence: missing duration for comparison":
-            return "Run again before comparing"
+            return "Run both versions again before comparing"
         return None
 
     def _build_run_recommendation_summary(self, prompt: Prompt) -> str | None:
@@ -480,22 +521,10 @@ class WorkspaceHistoryController:
     @staticmethod
     def _extract_prompt_version(entry: object) -> int | None:
         """Return the recorded prompt version from execution metadata when available."""
-        metadata = getattr(entry, "metadata", None) or {}
-        if not isinstance(metadata, dict):
-            return None
-        context = metadata.get("context", {})
-        if not isinstance(context, dict):
-            return None
-        run = context.get("run", {})
-        if not isinstance(run, dict):
-            return None
-        prompt_version = run.get("prompt_version")
-        if prompt_version is None:
-            return None
-        try:
-            return int(prompt_version)
-        except (TypeError, ValueError):
-            return None
+        metadata = _coerce_metadata_map(getattr(entry, "metadata", None))
+        context = _metadata_child_map(metadata, "context")
+        run = _metadata_child_map(context, "run")
+        return _metadata_int(run, "prompt_version")
 
     @staticmethod
     def _changed_fields_against_parent(*, prompt: Prompt, parent_prompt: Prompt) -> list[str]:

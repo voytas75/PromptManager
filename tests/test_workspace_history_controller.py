@@ -891,7 +891,7 @@ def test_workspace_history_controller_keeps_fresh_single_run_cues_aligned_across
 
     expected_decision = "Reuse as-is"
     expected_provenance = "Based on limited run evidence"
-    expected_next_action = "Evidence: only one run available"
+    expected_next_action = "Run one more time before reusing"
 
     assert detail_widget.decision_summary == expected_decision
     assert template_detail_widget.decision_summary == expected_decision
@@ -958,8 +958,10 @@ def test_workspace_history_controller_surfaces_missing_evidence_reason_for_non_c
     assert "Candidate vs baseline:" not in template_detail_widget.run_summary
     assert "Comparison readiness: no baseline yet" in detail_widget.run_summary
     assert "Comparison readiness: no baseline yet" in template_detail_widget.run_summary
-    assert detail_widget.next_action_summary == "Run another version before comparing"
-    assert template_detail_widget.next_action_summary == "Run another version before comparing"
+    assert detail_widget.next_action_summary == "Run a different prompt version before comparing"
+    assert template_detail_widget.next_action_summary == (
+        "Run a different prompt version before comparing"
+    )
 
 
 def test_workspace_history_controller_surfaces_run_based_decision_provenance() -> None:
@@ -1107,8 +1109,10 @@ def test_workspace_history_controller_surfaces_missing_evidence_reason_for_missi
     assert "Comparison readiness: limited" in detail_widget.run_summary
     assert template_detail_widget.run_summary is not None
     assert "Comparison readiness: limited" in template_detail_widget.run_summary
-    assert detail_widget.next_action_summary == "Add ratings before comparing"
-    assert template_detail_widget.next_action_summary == "Add ratings before comparing"
+    assert detail_widget.next_action_summary == "Add ratings to both runs before comparing"
+    assert template_detail_widget.next_action_summary == (
+        "Add ratings to both runs before comparing"
+    )
 
 
 def test_workspace_history_controller_surfaces_missing_evidence_reason_for_missing_duration() -> (
@@ -1161,8 +1165,8 @@ def test_workspace_history_controller_surfaces_missing_evidence_reason_for_missi
 
     assert detail_widget.run_summary is not None
     assert "Candidate vs baseline:" not in detail_widget.run_summary
-    assert detail_widget.next_action_summary == "Run again before comparing"
-    assert template_detail_widget.next_action_summary == "Run again before comparing"
+    assert detail_widget.next_action_summary == "Run both versions again before comparing"
+    assert template_detail_widget.next_action_summary == "Run both versions again before comparing"
 
 
 def test_workspace_history_controller_maps_default_next_action_to_reuse_as_is() -> None:
