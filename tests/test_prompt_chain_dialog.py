@@ -522,7 +522,7 @@ def test_prompt_chain_dialog_runs_selected_chain(qt_app: QApplication) -> None:
 
 
 def test_prompt_chain_dialog_renders_chain_summary(qt_app: QApplication) -> None:
-    """Execution results should include the final summary section when present."""
+    """Execution results should include the supporting summary section when present."""
 
     manager = _ManagerStub()
     dialog, panel, manager = _build_dialog(manager)
@@ -532,9 +532,30 @@ def test_prompt_chain_dialog_renders_chain_summary(qt_app: QApplication) -> None
         chain_input_edit.setPlainText("Summary input")
         panel.run_selected_chain()
         text = result_view.toPlainText()
-        assert "Final summary" in text
+        assert "Supporting summary" in text
         assert "Demo summary" in text
         assert "Final chain result" not in text
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+
+
+def test_prompt_chain_dialog_marks_final_summary_as_supporting_context(
+    qt_app: QApplication,
+) -> None:
+    """When both result blocks exist, the summary should read as supporting context."""
+
+    manager = _ManagerStub()
+    dialog, panel, manager = _build_dialog(manager)
+    chain_input_edit = _chain_input_edit(panel)
+    result_view = _result_view(panel)
+    try:
+        chain_input_edit.setPlainText("Summary context input")
+        panel.run_selected_chain()
+        text = result_view.toPlainText()
+        assert "Final output" in text
+        assert "Supporting summary" in text
+        assert "Demo summary" in text
     finally:
         dialog.close()
         dialog.deleteLater()
@@ -763,7 +784,7 @@ def test_prompt_chain_dialog_second_run_replaces_previous_result_cues(qt_app: QA
         panel.run_selected_chain()
         first_plain = _result_view(panel).toPlainText()
         assert "First input" in first_plain
-        assert "Final summary" in first_plain
+        assert "Supporting summary" in first_plain
 
         cast("Any", manager)._step_response_text = "Second response"
         _chain_input_edit(panel).setPlainText("Second input")
@@ -772,7 +793,7 @@ def test_prompt_chain_dialog_second_run_replaces_previous_result_cues(qt_app: QA
         second_plain = _result_view(panel).toPlainText()
         assert "Second input" in second_plain
         assert second_plain.count("Input to chain") == 1
-        assert second_plain.count("Final summary") == 1
+        assert second_plain.count("Supporting summary") == 1
         assert "First input" not in second_plain
     finally:
         dialog.close()
@@ -944,12 +965,12 @@ def test_prompt_chain_step_markdown_renders_without_code_fences(qt_app: QApplica
         assert "chain-block--outputs" in rich
         assert "```" not in rich
         plain = _panel_plaintext(panel)
-        assert "Final summary" in plain
-        assert "Chain summary" not in plain
-        assert "### Step output" in rich
+        assert "Supporting summary" in plain
+        assert "### Step output" in plain
     finally:
         dialog.close()
         dialog.deleteLater()
+
 
 
 def test_prompt_chain_dialog_shows_step_label_and_machine_output_key(

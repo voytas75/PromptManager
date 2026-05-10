@@ -65,6 +65,9 @@ from .prompt_chain_editor import PromptChainEditorDialog
 
 logger = logging.getLogger(__name__)
 
+_PromptChainHistoryRecord = Mapping[str, object]
+_PromptChainPayload = Mapping[str, object]
+
 _CHAIN_INPUT_COLOR = "#66bb6a"
 _CHAIN_OUTPUT_COLOR = "#66bb6a"
 _CHAIN_SUMMARY_COLOR = "#2e7d32"
@@ -337,12 +340,9 @@ class PromptChainManagerPanel(QWidget):
         actions_row = QHBoxLayout()
         self._run_button = QPushButton("Run Chain", run_container)
         if not getattr(self._manager, "llm_available", False):
-            status_message = getattr(
-                self._manager,
-                "llm_status_message",
-                lambda capability: f"{capability} is unavailable; configure LiteLLM to enable it.",
+            self._run_button.setToolTip(
+                _resolve_llm_status_message(self._manager, "Prompt execution")
             )
-            self._run_button.setToolTip(status_message("Prompt execution"))
         else:
             self._run_button.setToolTip("Execute the selected chain with the provided input.")
         self._run_button.clicked.connect(self._run_selected_chain)  # type: ignore[arg-type]
@@ -485,8 +485,6 @@ class PromptChainManagerPanel(QWidget):
                 target_id = preferred_id or str(self._chains[0].id)
                 for row in range(self._chain_list.count()):
                     item = self._chain_list.item(row)
-                    if item is None:
-                        continue
                     if item.data(Qt.ItemDataRole.UserRole) == target_id:
                         self._chain_list.setCurrentRow(row)
                         selected_chain = self._chains[row]
@@ -517,10 +515,6 @@ class PromptChainManagerPanel(QWidget):
             self._render_chain_details(None)
             return
         item = self._chain_list.item(row)
-        if item is None:
-            self._selected_chain_id = None
-            self._render_chain_details(None)
-            return
         chain_id = item.data(Qt.ItemDataRole.UserRole)
         self._selected_chain_id = chain_id
         chain = next((entry for entry in self._chains if str(entry.id) == chain_id), None)
@@ -600,11 +594,12 @@ class PromptChainManagerPanel(QWidget):
         except json.JSONDecodeError as exc:
             QMessageBox.critical(self, "Invalid JSON", str(exc))
             return
-        if not isinstance(payload, Mapping):
+        chain_payload = _coerce_prompt_chain_payload(payload)
+        if chain_payload is None:
             QMessageBox.warning(self, "Invalid payload", "Chain definition must be a JSON object.")
             return
         try:
-            chain = chain_from_payload(payload)
+            chain = chain_from_payload(chain_payload)
         except ValueError as exc:
             QMessageBox.critical(self, "Invalid chain", str(exc))
             return
@@ -723,8 +718,6 @@ class PromptChainManagerPanel(QWidget):
         show_toast(self, f"Prompt chain '{chain.name}' deleted.")
 
     def _available_prompts(self) -> list[Prompt]:
-        if self._manager is None:
-            return []
         try:
             list_prompts = getattr(self._manager, "list_prompts", None)
             if callable(list_prompts):
@@ -743,8 +736,6 @@ class PromptChainManagerPanel(QWidget):
         chain_id_text = str(chain_id)
         for row in range(self._chain_list.count()):
             item = self._chain_list.item(row)
-            if item is None:
-                continue
             if item.data(Qt.ItemDataRole.UserRole) == chain_id_text:
                 self._chain_list.setCurrentRow(row)
                 self._selected_chain_id = chain_id_text
@@ -773,12 +764,7 @@ class PromptChainManagerPanel(QWidget):
             QMessageBox.warning(self, "Chain input", "Enter text to feed into the first step.")
             return
         if not getattr(self._manager, "llm_available", True):
-            status_message = getattr(
-                self._manager,
-                "llm_status_message",
-                lambda capability: f"{capability} is unavailable; configure LiteLLM to enable it.",
-            )
-            message = status_message("Prompt execution")
+            message = _resolve_llm_status_message(self._manager, "Prompt execution")
             QMessageBox.information(self, "Prompt execution unavailable", message)
             return
 
@@ -973,12 +959,12 @@ class PromptChainManagerPanel(QWidget):
                 )
             )
         if final_summary_text:
-            plain_sections.append("Final summary")
+            plain_sections.append("Supporting summary")
             plain_sections.extend(_indent_lines(final_summary_text))
             plain_sections.append("")
             html_sections.append(
                 self._format_colored_block_html(
-                    "Final summary",
+                    "Supporting summary",
                     final_summary_text,
                     color=_CHAIN_SUMMARY_COLOR,
                     class_name="chain-block--summary",
@@ -1150,9 +1136,10 @@ class PromptChainManagerPanel(QWidget):
         if outcome is None:
             return None
         raw = getattr(outcome.result, "raw_response", None)
-        if not isinstance(raw, Mapping):
+        payload = _coerce_prompt_chain_payload(raw)
+        if payload is None:
             return None
-        return _search_reasoning_payload(raw)
+        return _search_reasoning_payload(payload)
 
     def closeEvent(self, event: QCloseEvent) -> None:  # type: ignore[override]
         """Persist splitter state before closing."""
@@ -1201,9 +1188,6 @@ class PromptChainManagerPanel(QWidget):
             show_toast(self, "No final output available to copy.")
             return
         clipboard = QGuiApplication.clipboard()
-        if clipboard is None:
-            show_toast(self, "Clipboard is unavailable.")
-            return
         clipboard.setText(output_text)
         show_toast(self, "Final output copied.")
 
@@ -1218,9 +1202,6 @@ class PromptChainManagerPanel(QWidget):
             show_toast(self, "No final summary available to copy.")
             return
         clipboard = QGuiApplication.clipboard()
-        if clipboard is None:
-            show_toast(self, "Clipboard is unavailable.")
-            return
         clipboard.setText(summary_text)
         show_toast(self, "Final summary copied.")
 
@@ -1253,31 +1234,28 @@ class PromptChainManagerPanel(QWidget):
 
     def _recent_run_history(self) -> list[_PromptChainRunHistoryEntry]:
         """Return backend-managed bounded run history records for the selected chain."""
-        records = getattr(self._manager, "list_recent_prompt_chain_runs", lambda **_: [])(limit=20)
         entries: list[_PromptChainRunHistoryEntry] = []
-        for record in records:
+        for record in _recent_chain_run_records(self._manager):
             entries.append(
                 {
-                    "chain_id": str(record.get("chain_id") or ""),
-                    "chain_name": str(record.get("chain_name") or ""),
-                    "input_preview": str(record.get("input_preview") or "(empty)"),
-                    "status": str(record.get("status") or "unknown"),
-                    "run_timestamp": str(record.get("run_timestamp") or "unknown time"),
-                    "final_output_preview": str(record.get("final_output_preview") or "(empty)"),
-                    "final_step_output_key": (
-                        None
-                        if record.get("final_step_output_key") in (None, "")
-                        else str(record.get("final_step_output_key"))
+                    "chain_id": _history_record_text(record, "chain_id", ""),
+                    "chain_name": _history_record_text(record, "chain_name", ""),
+                    "input_preview": _history_record_text(record, "input_preview", "(empty)"),
+                    "status": _history_record_text(record, "status", "unknown"),
+                    "run_timestamp": _history_record_text(record, "run_timestamp", "unknown time"),
+                    "final_output_preview": _history_record_text(
+                        record,
+                        "final_output_preview",
+                        "(empty)",
                     ),
-                    "final_step_id": (
-                        None
-                        if record.get("final_step_id") in (None, "")
-                        else str(record.get("final_step_id"))
+                    "final_step_output_key": _history_record_optional_text(
+                        record,
+                        "final_step_output_key",
                     ),
-                    "final_step_label": (
-                        None
-                        if record.get("final_step_label") in (None, "")
-                        else str(record.get("final_step_label"))
+                    "final_step_id": _history_record_optional_text(record, "final_step_id"),
+                    "final_step_label": _history_record_optional_text(
+                        record,
+                        "final_step_label",
                     ),
                 }
             )
@@ -1703,8 +1681,7 @@ class PromptChainManagerPanel(QWidget):
         if not self._auto_scroll_checkbox.isChecked():
             return
         bar = self._result_view.verticalScrollBar()
-        if bar is not None:
-            bar.setValue(bar.maximum())
+        bar.setValue(bar.maximum())
 
 
 class PromptChainManagerDialog(QDialog):
@@ -1755,6 +1732,50 @@ _REASONING_KEYS = (
     "chain_of_thought",
     "thoughts",
 )
+def _coerce_prompt_chain_payload(value: object) -> _PromptChainPayload | None:
+    if isinstance(value, Mapping):
+        return cast("_PromptChainPayload", value)
+    return None
+
+
+def _history_record_text(record: _PromptChainHistoryRecord, key: str, fallback: str) -> str:
+    value = record.get(key)
+    if value in (None, ""):
+        return fallback
+    return str(value)
+
+
+def _history_record_optional_text(record: _PromptChainHistoryRecord, key: str) -> str | None:
+    value = record.get(key)
+    if value in (None, ""):
+        return None
+    return str(value)
+
+
+def _recent_chain_run_records(manager: PromptManager) -> list[_PromptChainHistoryRecord]:
+    loader = getattr(manager, "list_recent_prompt_chain_runs", None)
+    if not callable(loader):
+        return []
+    raw_records = loader(limit=20)
+    if not isinstance(raw_records, list):
+        return []
+    raw_records = cast("list[object]", raw_records)
+    records: list[_PromptChainHistoryRecord] = []
+    for raw_record in raw_records:
+        if isinstance(raw_record, Mapping):
+            records.append(cast("_PromptChainHistoryRecord", raw_record))
+    return records
+
+
+def _default_llm_unavailable_message(capability: str) -> str:
+    return f"{capability} is unavailable; configure LiteLLM to enable it."
+
+
+def _resolve_llm_status_message(manager: PromptManager, capability: str) -> str:
+    maybe_status_message = getattr(manager, "llm_status_message", None)
+    if callable(maybe_status_message):
+        return cast("str", maybe_status_message(capability))
+    return _default_llm_unavailable_message(capability)
 
 
 def _search_reasoning_payload(value: object) -> str | None:
@@ -1765,27 +1786,31 @@ def _search_reasoning_payload(value: object) -> str | None:
         if any(char.isspace() for char in stripped):
             return stripped
         return None
-    if isinstance(value, Mapping):
+    payload = _coerce_prompt_chain_payload(value)
+    if payload is not None:
         for key in _REASONING_KEYS:
-            if key in value:
-                found = _search_reasoning_payload(value[key])
+            candidate = payload.get(key)
+            if candidate is not None:
+                found = _search_reasoning_payload(candidate)
                 if found:
                     return found
-        type_value = value.get("type")
+        type_value = payload.get("type")
         if isinstance(type_value, str) and type_value.lower() in {
             "reasoning",
             "thought",
             "thinking",
         }:
-            found = _search_reasoning_payload(value.get("text") or value.get("content"))
+            text_candidate = payload.get("text") or payload.get("content")
+            found = _search_reasoning_payload(text_candidate)
             if found:
                 return found
-        for child in value.values():
+        for child in payload.values():
             found = _search_reasoning_payload(child)
             if found:
                 return found
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-        for item in value:
+        sequence_items = cast("Sequence[object]", value)
+        for item in sequence_items:
             found = _search_reasoning_payload(item)
             if found:
                 return found
