@@ -55,6 +55,20 @@ Short version:
 
 **assets first, operations second, automation third**
 
+## Long-term strategic posture
+
+PromptManager should continue to be positioned first as an operational memory and asset system for prompt and agent-workflow practice, not as a generic AI workspace.
+
+Long-term preference order:
+1. strengthen the prompt asset lifecycle,
+2. strengthen reuse and inspection confidence,
+3. add controlled execution, evaluation, and routing only when they reinforce the asset model,
+4. avoid broadening into a general-purpose "AI for everything" surface.
+
+Reading rule for future scope decisions:
+- if a feature strengthens prompt assets as durable, reusable working objects, it fits the center;
+- if it mostly adds ambient AI workspace breadth, it is secondary or out of scope.
+
 ---
 
 ## Core user
