@@ -1732,6 +1732,8 @@ _REASONING_KEYS = (
     "chain_of_thought",
     "thoughts",
 )
+
+
 def _coerce_prompt_chain_payload(value: object) -> _PromptChainPayload | None:
     if isinstance(value, Mapping):
         return cast("_PromptChainPayload", value)
