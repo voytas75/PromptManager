@@ -972,7 +972,6 @@ def test_prompt_chain_step_markdown_renders_without_code_fences(qt_app: QApplica
         dialog.deleteLater()
 
 
-
 def test_prompt_chain_dialog_shows_step_label_and_machine_output_key(
     qt_app: QApplication,
 ) -> None:

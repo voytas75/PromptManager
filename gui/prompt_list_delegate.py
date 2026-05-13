@@ -258,12 +258,7 @@ class PromptListDelegate(QStyledItemDelegate):
                 continue
             start = candidate_items[0]
             length = candidate_items[1]
-            if (
-                isinstance(start, int)
-                and isinstance(length, int)
-                and start >= 0
-                and length > 0
-            ):
+            if isinstance(start, int) and isinstance(length, int) and start >= 0 and length > 0:
                 spans.append((start, length))
         return tuple(spans)
 

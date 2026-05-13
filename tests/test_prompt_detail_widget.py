@@ -398,8 +398,7 @@ def test_prompt_detail_widget_shows_workspace_inspect_handoff_for_inspect_before
         description="Prompt found through a contextual signal and should be checked before reuse.",
         category="Operations",
         context=(
-            "Summarize the incident and confirm the recovery step still matches "
-            "the operator goal."
+            "Summarize the incident and confirm the recovery step still matches the operator goal."
         ),
         created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
         last_modified=datetime(2026, 4, 5, 10, 5, tzinfo=UTC),
