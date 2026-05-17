@@ -186,7 +186,7 @@ def _build_next_action_from_decision(decision_text: str) -> str:
     if decision_text == "Matched baseline":
         return "Validate before reuse"
     if decision_text == "Refine before reuse":
-        return "Refine before reuse"
+        return "Edit Prompt before reuse"
     if decision_text == "Fork before editing":
         return "Fork before editing"
     return "Reuse as-is"
@@ -283,8 +283,8 @@ def test_workspace_history_controller_shows_bounded_parent_difference_cue() -> N
     assert template_detail_widget.lineage_summary == expected
     assert detail_widget.decision_summary == "Refine before reuse"
     assert template_detail_widget.decision_summary == "Refine before reuse"
-    assert detail_widget.next_action_summary == "Refine before reuse"
-    assert template_detail_widget.next_action_summary == "Refine before reuse"
+    assert detail_widget.next_action_summary == "Edit Prompt before reuse"
+    assert template_detail_widget.next_action_summary == "Edit Prompt before reuse"
 
 
 def test_workspace_history_controller_surfaces_fresh_validation_cue_for_recent_run() -> None:
@@ -1195,7 +1195,7 @@ def test_workspace_history_controller_maps_default_next_action_to_reuse_as_is() 
         "Compare improved run": "Validate improved run before reuse",
         "Compare regressed run": "Validate baseline before reuse",
         "Matched baseline": "Validate before reuse",
-        "Refine before reuse": "Refine before reuse",
+        "Refine before reuse": "Edit Prompt before reuse",
         "Fork before editing": "Fork before editing",
         "Safe to compare": "Reuse as-is",
         "Anything else": "Reuse as-is",

@@ -1,6 +1,8 @@
 """Coordinate prompt selection, lineage, and template preview updates.
 
 Updates:
+  v0.15.91 - 2026-05-17 - Align refine-first next action wording with the
+             existing detail edit handoff cue.
   v0.15.90 - 2026-04-27 - Make no-history inspect fallback explicit with validation-first next step.
   v0.15.89 - 2026-04-27 - Shorten inspect decision-provenance wording on the existing cue seam.
   v0.15.88 - 2026-04-27 - Align limited-evidence next actions to action-oriented inspect wording.
@@ -406,7 +408,7 @@ class WorkspaceHistoryController:
         if decision_text == "Matched baseline":
             return "Validate before reuse"
         if decision_text == "Refine before reuse":
-            return "Refine before reuse"
+            return "Edit Prompt before reuse"
         if decision_text == "Fork before editing":
             return "Fork before editing"
         return "Reuse as-is"
