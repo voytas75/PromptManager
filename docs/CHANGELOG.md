@@ -6,6 +6,8 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Changed
 
+- Completed the bounded **search/filter narrowing completeness cue v1** slice on the existing `PromptFilterPanel` seam so the always-visible narrowing summary now also reflects active category and minimum-quality constraints alongside the already-shipped search, tag, and favorites cues, without changing filter semantics, ranking, search flow, or persistence.
+- Aligned the remaining fork-lineage-only detail provenance wording with the existing shared decision-provenance family so the prompt detail widget now frames that case as `Decision basis: Based on fork lineage only.` while preserving the already-shipped limited-evidence and comparable-evidence wording.
 - Reframed the canonical product SSOT roadmap so PromptManager now explicitly prioritizes **retrieval-to-action confidence**, **inspect/detail as a decision surface**, and **reuse/refine/fork continuity** ahead of broader trust-infrastructure, execution, and automation expansion, while keeping the asset-first product identity unchanged.
 - Clarified the active prompt-chain rollout ledger so remaining wording debt is now explicitly limited to opportunistic cleanup in supporting notes, while the shipped backend-managed bounded recent-history seam and release `0.22.25` stay treated as closed work.
 - Added one bounded **workbench run-to-refine trust cues v1** slice so Workbench run status now points to the current refinement focus after each preview run, explains when fallback request selection came from a variable, prompt goal, or generic request, and keeps feedback-save messaging aligned with the same focus cue without widening the workflow beyond the existing workbench run/history seam.
@@ -123,6 +125,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Fixed
 
+- Tightened the shared detail action-handoff seam so the direct-reuse `Copy Prompt` cue no longer overrides the existing template-variable workspace cue when a template prompt is otherwise marked `Reuse as-is`, preserving the validation-first and variable-fill guidance on the same local widget seam.
 - Tightened inspect/detail last-run evidence wording so the shared/template run summary now keeps `via <model>` attached to the leading `Last run: <status>` fact instead of splitting it into a detached fragment, making the summary read in a cleaner operator-first order while keeping comparison evidence and validation freshness on the existing seam only.
 - Added one focused regression guard for the shared detail duplicate-suppression path so a previously hidden `Recommended next action` cue now stays suppressed again when the same `Decision` text returns after a temporary clear, without changing runtime behavior or adding new UI state.
 - Added one bounded limited-evidence provenance cue so inspect/detail fallback decisions can now surface `Decision based on limited run evidence` when history exists but comparable run evidence is still too thin, keeping the explanation on the existing decision-support seam without adding persistence, review workflow, or a new panel.
