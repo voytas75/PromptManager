@@ -1,6 +1,10 @@
 """Focused tests for prompt detail inspection cues.
 
 Updates:
+  v0.1.17 - 2026-05-17 - Keep the direct-reuse handoff from overriding the
+             existing template-variable workspace cue.
+  v0.1.16 - 2026-05-17 - Lock fork-lineage detail provenance into the same
+             decision-basis wording family as comparable evidence.
   v0.1.15 - 2026-04-27 - Expect shortened decision-provenance wording on inspect cues.
   v0.1.14 - 2026-04-27 - Expect action-oriented limited-evidence next-action wording.
   v0.1.13 - 2026-04-12 - Keep `Add Favorite` before `Promote Draft` in the
@@ -505,6 +509,22 @@ def test_prompt_detail_widget_formats_comparable_evidence_provenance_as_decision
     assert "Based on latest 2 comparable runs." in provenance_text
 
 
+def test_prompt_detail_widget_formats_fork_lineage_provenance_as_decision_basis(
+    qt_app: QApplication,
+) -> None:
+    """Fork-lineage-only provenance should read as one explicit decision-basis cue."""
+    widget = PromptDetailWidget()
+
+    widget.show()
+    widget.update_decision_provenance_summary("Based on fork lineage only")
+    qt_app.processEvents()
+
+    assert _decision_provenance_label(widget).isVisible()  # noqa: SLF001
+    provenance_text = _decision_provenance_label(widget).text()  # noqa: SLF001
+    assert provenance_text.startswith("Decision basis:")
+    assert "Based on fork lineage only." in provenance_text
+
+
 def test_prompt_detail_widget_hides_next_action_summary_when_empty(
     qt_app: QApplication,
 ) -> None:
@@ -669,6 +689,35 @@ def test_prompt_detail_widget_shows_copy_first_handoff_when_direct_reuse_is_read
     cue_text = _workspace_handoff_cue_label(widget).text()  # noqa: SLF001
     assert "Next step:" in cue_text
     assert "Copy Prompt for direct reuse." in cue_text
+
+
+def test_prompt_detail_widget_keeps_template_workspace_handoff_when_reuse_is_as_is(
+    qt_app: QApplication,
+) -> None:
+    """Template prompts should keep the variable-fill handoff even if detail says reuse as-is."""
+    widget = PromptDetailWidget()
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000150"),
+        name="Template direct reuse boundary",
+        description="Template prompt that still needs variables before reuse.",
+        category="Operations",
+        context="Summarize {{ customer_name }} risk posture for {{ region }}.",
+        created_at=datetime(2026, 4, 4, 9, 0, tzinfo=UTC),
+        last_modified=datetime(2026, 4, 6, 10, 30, tzinfo=UTC),
+    )
+
+    widget.show()
+    widget.display_prompt(prompt)
+    widget.update_decision_summary("Reuse as-is")
+    qt_app.processEvents()
+
+    assert _copy_prompt_body_button(widget).isEnabled()  # noqa: SLF001
+    assert _open_in_workspace_button(widget).isEnabled()  # noqa: SLF001
+    assert _workspace_handoff_cue_label(widget).isVisible()  # noqa: SLF001
+    cue_text = _workspace_handoff_cue_label(widget).text()  # noqa: SLF001
+    assert "Next step:" in cue_text
+    assert "Open in Workspace to fill variables before reuse." in cue_text
+    assert "Copy Prompt for direct reuse." not in cue_text
 
 
 def test_prompt_detail_widget_toggles_favorite_action_from_detail_flow(

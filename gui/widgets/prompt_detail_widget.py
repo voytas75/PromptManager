@@ -1,6 +1,8 @@
 """Prompt detail panel shared between main and template tabs.
 
 Updates:
+  v0.1.26 - 2026-05-17 - Align fork-lineage decision provenance wording with
+             the existing detail-side decision-basis cues.
   v0.1.25 - 2026-04-12 - Keep `Add Favorite` before `Promote Draft` in the
              shared draft detail action row.
   v0.1.24 - 2026-04-12 - Add one bounded favorite toggle to the shared detail flow.
@@ -679,19 +681,25 @@ class PromptDetailWidget(QWidget):
         next_action_text = self._extract_label_value_text(self._next_action_label.text())
         decision_text = self._extract_label_value_text(self._decision_label.text())
         has_context = bool((prompt.context or "").strip())
+        template_variable_summary = self._resolve_template_variable_summary(prompt.context)
         if next_action_text == "Validate before reuse" and has_context:
             return self._format_label_value(
                 "Next step",
                 "Open in Workspace before validating reuse.",
                 multiline=True,
             )
-        if decision_text == "Reuse as-is" and not next_action_text and has_context:
+        if (
+            decision_text == "Reuse as-is"
+            and not next_action_text
+            and has_context
+            and not template_variable_summary
+        ):
             return self._format_label_value(
                 "Next step",
                 "Copy Prompt for direct reuse.",
                 multiline=True,
             )
-        if next_action_text == "Reuse as-is" and has_context:
+        if next_action_text == "Reuse as-is" and has_context and not template_variable_summary:
             return self._format_label_value(
                 "Next step",
                 "Copy Prompt for direct reuse.",
@@ -721,8 +729,7 @@ class PromptDetailWidget(QWidget):
                 "Fork Prompt to preserve the current version before editing.",
                 multiline=True,
             )
-        summary = self._resolve_template_variable_summary(prompt.context)
-        if not summary:
+        if not template_variable_summary:
             return None
         return self._format_label_value(
             "Next step",
@@ -1061,6 +1068,8 @@ class PromptDetailWidget(QWidget):
             text = "Note: Based on limited run evidence."
         elif text == "Based on latest 2 comparable runs":
             text = "Decision basis: Based on latest 2 comparable runs."
+        elif text == "Based on fork lineage only":
+            text = "Decision basis: Based on fork lineage only."
         if text:
             self._decision_provenance_label.setText(text)
             self._decision_provenance_label.setVisible(True)
