@@ -51,7 +51,7 @@ class PromptFilterPanel(QWidget):
         layout.addWidget(QLabel("Category:", self))
         self._category_combo = QComboBox(self)
         self._category_combo.addItem("All categories", None)
-        self._category_combo.currentIndexChanged.connect(self.filters_changed)  # type: ignore[arg-type]
+        self._category_combo.currentIndexChanged.connect(self._handle_category_changed)  # type: ignore[arg-type]
         layout.addWidget(self._category_combo)
 
         self._manage_button = QToolButton(self)
@@ -98,7 +98,7 @@ class PromptFilterPanel(QWidget):
         self._quality_spin.setMinimumWidth(
             self._quality_spin.fontMetrics().horizontalAdvance("10.0") + 32
         )
-        self._quality_spin.valueChanged.connect(self.filters_changed)  # type: ignore[arg-type]
+        self._quality_spin.valueChanged.connect(self._handle_quality_changed)  # type: ignore[arg-type]
         layout.addWidget(self._quality_spin)
 
         layout.addWidget(QLabel("Sort:", self))
@@ -128,6 +128,7 @@ class PromptFilterPanel(QWidget):
             self._category_combo.setCurrentIndex(index if index != -1 else 0)
         finally:
             self._category_combo.blockSignals(False)
+        self._update_active_narrowing_summary_label()
 
     def set_tags(self, tags: Sequence[str], selected_tag: str | None = None) -> None:
         """Populate the tag combo box with *tags*."""
@@ -152,10 +153,17 @@ class PromptFilterPanel(QWidget):
             self._quality_spin.setValue(value)
         finally:
             self._quality_spin.blockSignals(previous)
+        self._update_active_narrowing_summary_label()
 
     def category_slug(self) -> str | None:
         """Return the currently selected category slug."""
         return self._clean_text(self._category_combo.currentData())
+
+    def category_label(self) -> str | None:
+        """Return the currently selected category label."""
+        if self.category_slug() is None:
+            return None
+        return self._clean_text(self._category_combo.currentText())
 
     def tag_value(self) -> str | None:
         """Return the currently selected tag value."""
@@ -218,8 +226,16 @@ class PromptFilterPanel(QWidget):
         self._update_active_narrowing_summary_label()
         self.filters_changed.emit()
 
+    def _handle_category_changed(self) -> None:
+        self._update_active_narrowing_summary_label()
+        self.filters_changed.emit()
+
     def _handle_favorites_toggled(self) -> None:
         self._update_favorites_visibility_label()
+        self._update_active_narrowing_summary_label()
+        self.filters_changed.emit()
+
+    def _handle_quality_changed(self) -> None:
         self._update_active_narrowing_summary_label()
         self.filters_changed.emit()
 
@@ -240,11 +256,17 @@ class PromptFilterPanel(QWidget):
         parts: list[str] = []
         if self._active_search_text:
             parts.append(f"search: {self._active_search_text}")
+        active_category = self.category_label()
+        if active_category is not None:
+            parts.append(f"category: {active_category}")
         active_tag = self.tag_value()
         if active_tag is not None:
             parts.append(f"tag: {active_tag}")
         if self.favorites_only():
             parts.append("favorites only")
+        min_quality = self.min_quality()
+        if min_quality > 0.0:
+            parts.append(f"quality >= {min_quality:.1f}")
         if not parts:
             self._active_narrowing_summary_label.setText("Showing all prompts")
             return

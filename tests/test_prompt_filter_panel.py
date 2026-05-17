@@ -13,10 +13,11 @@ import pytest
 
 pytest.importorskip("PySide6")
 
-from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QLabel
+from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QDoubleSpinBox, QLabel
 
 from gui.prompt_search_controller import PromptSearchController
 from gui.widgets.prompt_filter_panel import PromptFilterPanel
+from models.category_model import PromptCategory
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -95,6 +96,28 @@ class _FavoritesCheckboxHandle:
         checkbox.setChecked(checked)
 
 
+class _CategoryComboHandle:
+    def __init__(self, panel: PromptFilterPanel) -> None:
+        self._panel = panel
+
+    def set_current_index(self, index: int) -> None:
+        for combo in self._panel.findChildren(QComboBox):
+            if combo.itemText(0) == "All categories":
+                combo.setCurrentIndex(index)
+                return
+        raise AssertionError("Category filter combo not found")
+
+
+class _QualitySpinHandle:
+    def __init__(self, panel: PromptFilterPanel) -> None:
+        self._panel = panel
+
+    def set_value(self, value: float) -> None:
+        quality_spin = self._panel.findChild(QDoubleSpinBox)
+        assert quality_spin is not None
+        quality_spin.setValue(value)
+
+
 def _build_search_controller(
     panel: PromptFilterPanel,
     *,
@@ -114,6 +137,10 @@ def _build_search_controller(
         select_prompt=lambda _prompt_id: None,
     )
     return controller, active_presenter, active_layout
+
+
+def _category(label: str, slug: str) -> PromptCategory:
+    return PromptCategory(slug=slug, label=label, description=f"{label} prompts")
 
 
 def test_tag_filter_panel_shows_calm_all_tags_visibility_cue(
@@ -224,6 +251,53 @@ def test_filter_panel_shows_active_narrowing_summary_for_combined_search_and_fil
     )
 
 
+def test_filter_panel_summary_includes_active_category_narrowing(
+    qt_app: QApplication,
+) -> None:
+    """Active category narrowing should appear in the existing compact summary."""
+    panel = _build_panel()
+    panel.set_categories([_category("Docs", "docs"), _category("Ops", "ops")], selected_slug="ops")
+
+    summary = panel.findChild(QLabel, "activeNarrowingSummaryLabel")
+    assert summary is not None
+    assert summary.text() == "Showing prompts narrowed by category: Ops"
+
+
+def test_filter_panel_summary_includes_active_minimum_quality_narrowing(
+    qt_app: QApplication,
+) -> None:
+    """Minimum-quality narrowing should appear once it materially narrows the list."""
+    panel = _build_panel()
+    panel.set_min_quality(7.0)
+
+    summary = panel.findChild(QLabel, "activeNarrowingSummaryLabel")
+    assert summary is not None
+    assert summary.text() == "Showing prompts narrowed by quality >= 7.0"
+
+
+def test_filter_panel_summary_includes_category_and_quality_with_existing_continuity_cues(
+    qt_app: QApplication,
+) -> None:
+    """Category and quality should compose with the existing search, tag, and favorites summary."""
+    panel = _build_panel()
+    panel.set_categories([_category("Docs", "docs"), _category("Ops", "ops")])
+    panel.set_tags(["docs", "ops"], selected_tag="ops")
+    panel.set_favorites_only(True)
+    controller, _presenter, _layout_controller = _build_search_controller(panel)
+
+    _CategoryComboHandle(panel).set_current_index(2)
+    _QualitySpinHandle(panel).set_value(7.0)
+    controller.search_requested("incident", use_indicator=False)
+    QApplication.processEvents()
+
+    summary = panel.findChild(QLabel, "activeNarrowingSummaryLabel")
+    assert summary is not None
+    assert summary.text() == (
+        "Showing prompts narrowed by "
+        "search: incident • category: Ops • tag: ops • favorites only • quality >= 7.0"
+    )
+
+
 def test_filter_panel_search_summary_uses_live_query_text_and_resets_when_search_clears(
     qt_app: QApplication,
 ) -> None:
@@ -249,8 +323,10 @@ def test_filter_panel_reset_restores_neutral_summary_after_search_and_filters_cl
 ) -> None:
     """Combined narrowing state should leave no stale summary after a full reset."""
     panel = _build_panel()
+    panel.set_categories([_category("Docs", "docs"), _category("Ops", "ops")], selected_slug="ops")
     panel.set_tags(["docs", "ops"], selected_tag="ops")
     panel.set_favorites_only(True)
+    panel.set_min_quality(7.0)
     controller, _presenter, _layout_controller = _build_search_controller(panel)
 
     controller.search_requested("outage triage", use_indicator=False)
@@ -259,12 +335,15 @@ def test_filter_panel_reset_restores_neutral_summary_after_search_and_filters_cl
     summary = panel.findChild(QLabel, "activeNarrowingSummaryLabel")
     assert summary is not None
     assert summary.text() == (
-        "Showing prompts narrowed by search: outage triage • tag: ops • favorites only"
+        "Showing prompts narrowed by "
+        "search: outage triage • category: Ops • tag: ops • favorites only • quality >= 7.0"
     )
 
     controller.search_changed("")
+    _CategoryComboHandle(panel).set_current_index(0)
     _TagComboHandle(panel).set_current_index(0)
     _FavoritesCheckboxHandle(panel).set_checked(False)
+    _QualitySpinHandle(panel).set_value(0.0)
     QApplication.processEvents()
 
     assert summary.text() == "Showing all prompts"
