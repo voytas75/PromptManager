@@ -157,6 +157,21 @@ All settings are defined via `pydantic-settings` in `config/settings.py`. Provid
 Secrets must never be committed; rely on `.env` files ignored by git or host-level secret stores.
 The committed [`.env.example`](../.env.example) file is the canonical placeholder template for local setup and must never contain real credentials.
 
+### Logging config vs provider logging
+
+PromptManager startup uses the runtime logging bootstrap in `main.py`, which by default loads `config/logging.conf` unless `--logging-config <path>` overrides it.
+
+This file controls the **global/root console logging level** for the whole process. If `config/logging.conf` sets `root` or the console handler to `DEBUG`, the terminal can fill with debug output from third-party libraries such as ChromaDB, OpenAI, `httpcore`, and `asyncio` during normal GUI startup and shutdown.
+
+This is separate from `PROMPT_MANAGER_LITELLM_LOGGING`.
+
+- `config/logging.conf` controls overall Python logging verbosity.
+- `PROMPT_MANAGER_LITELLM_LOGGING` only controls whether LiteLLM-specific library logs are allowed to surface.
+
+So `PROMPT_MANAGER_LITELLM_LOGGING=false` does **not** silence broad debug output when the root logger is already configured at `DEBUG`.
+
+For normal local GUI use, prefer `INFO` or `WARN` in `config/logging.conf`.
+
 Selecting `PROMPT_MANAGER_WEB_SEARCH_PROVIDER="random"` rotates calls between whichever providers currently have API keys configured; if only one provider has a key, Random behaves like that provider until another key is available.
 
 See [`docs/web_search_plan.md`](web_search_plan.md) for the staged web search integration plan (Exa + Tavily + Serper + SerpApi + Google Programmable Search) if you are extending the provider surface.
