@@ -9,7 +9,8 @@ PromptManager is a PySide6 desktop application for managing reusable AI prompts 
 - `core.prompt_manager.PromptManager` orchestrates persistence, optional Redis caching, LiteLLM execution, and ChromaDB similarity queries.
 - PySide6 GUI (`main.py --gui`) exposes list/search/detail panes, prompt editor with refinement workflow, quick action palette, notes, history, and taxonomy management dialogs.
 - Notification center, status tracking for long-running embedding/LLM tasks, and preference profile ensure responsive UX.
-- Product boundary SSOT now lives in [`docs/product-direction-ssot.md`](product-direction-ssot.md) and should be treated as the canonical source for what PromptManager is, what is core, and what is secondary/later.
+- Product SSOT now lives in [`docs/product-ssot.md`](product-ssot.md) and should be treated as the canonical source for what PromptManager is, what is core, and what is secondary/later.
+- Active near-term planning lives in [`docs/plans/2026-05-10-product-direction-ssot-next-cycle.md`](plans/2026-05-10-product-direction-ssot-next-cycle.md), and delivered slice/history tracking lives in [`docs/STATUS.md`](STATUS.md).
 
 ## Toolchain & Quality Gates
 
@@ -360,19 +361,21 @@ These commands share the same validation logic as the GUI; pass explicit paths a
 
 ## Product Boundary
 
-Before proposing major new features or expanding roadmap scope, read [`docs/product-boundary-ssot.md`](product-boundary-ssot.md).
+Before proposing major new features or expanding roadmap scope, read [`docs/product-ssot.md`](product-ssot.md).
 
 Short version:
-- PromptManager is a **local-first prompt catalog and reuse workspace**.
-- The core loop is **capture → normalize → retrieve → inspect → reuse → refine**.
+- PromptManager is a **local-first system for capturing, organizing, retrieving, inspecting, reusing, and refining prompt assets**.
+- The core loop is **capture → normalize → retrieve → inspect → reuse → refine → optional trustworthy run support**.
 - Execution, analytics, chains, and other advanced surfaces are supporting features only when they materially improve that loop.
 
-Use the SSOT to decide whether a change belongs in:
+Use the product SSOT to decide whether a change belongs in:
 - core,
 - supporting scope,
 - later/frozen scope.
 
-For the first bounded comparison between current implementation and the SSOT, see [`docs/product-boundary-alignment-audit-2026-04-04.md`](product-boundary-alignment-audit-2026-04-04.md).
+For active near-term priorities, use [`docs/plans/2026-05-10-product-direction-ssot-next-cycle.md`](plans/2026-05-10-product-direction-ssot-next-cycle.md).
+For delivered slice/history tracking, use [`docs/STATUS.md`](STATUS.md).
+For the first bounded comparison between implementation and the older boundary framing, see [`docs/product-boundary-alignment-audit-2026-04-04.md`](product-boundary-alignment-audit-2026-04-04.md).
 
 ## Prompt Catalogue Management
 
