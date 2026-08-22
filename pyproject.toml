@@ -108,7 +108,7 @@ fail_under = 80
 
 [tool.pyright]
 include = ["main.py", "core", "config", "gui", "models", "tests"]
-exclude = ["data", "scripts"]
+exclude = ["data", "scripts", "**/__pycache__/**", "**/.venv/**", "**/.mypy_cache/**", "**/.pytest_cache/**", "**/.ruff_cache/**", "**/.*", "**/node_modules/**"]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
 reportMissingImports = "warning"
