@@ -6,6 +6,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Changed
 
+- Added one bounded **description-match action clarity v1** follow-up on the existing prompt-list seam so visible description matches now expose `Matched in description` and the same `Inspect before reuse` handoff used for source/scenario matches, while preserving ranking, retrieval, persistence, and detail-view semantics.
 - Added one bounded **detail-to-edit continuity v1** refinement on the existing inspect/detail seam so `WorkspaceHistoryController` now maps the refine-first decision `Refine before reuse` to the concrete next action `Edit Prompt before reuse`, matching the already-shipped shared detail-widget handoff cue without changing decision logic, widget structure, or any other next-action branch.
 - Completed the bounded **search/filter narrowing completeness cue v1** slice on the existing `PromptFilterPanel` seam so the always-visible narrowing summary now also reflects active category and minimum-quality constraints alongside the already-shipped search, tag, and favorites cues, without changing filter semantics, ranking, search flow, or persistence.
 - Aligned the remaining fork-lineage-only detail provenance wording with the existing shared decision-provenance family so the prompt detail widget now frames that case as `Decision basis: Based on fork lineage only.` while preserving the already-shipped limited-evidence and comparable-evidence wording.

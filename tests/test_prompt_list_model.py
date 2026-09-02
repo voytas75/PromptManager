@@ -1,6 +1,7 @@
 """Focused tests for bounded retrieval previews in the main prompt list.
 
 Updates:
+  v0.1.6 - 2026-09-02 - Cover description-match reason and inspect-first handoff cues.
   v0.1.5 - 2026-04-12 - Cover active-search scenario-priority while keeping
              source and description precedence unchanged.
   v0.1.4 - 2026-04-12 - Cover prompt-body lead fallback while keeping stronger
@@ -69,6 +70,8 @@ def _record_data_changed_roles(
         emitted_roles.append(
             [
                 PromptListModel.PreviewRole,
+                PromptListModel.MatchReasonRole,
+                PromptListModel.HandoffCueRole,
                 PromptListModel.TitleMatchRole,
                 PromptListModel.PreviewMatchRole,
             ]
@@ -239,6 +242,24 @@ def test_prompt_list_model_keeps_matching_description_over_matching_scenario_for
     )
 
 
+def test_prompt_list_model_exposes_inspect_first_handoff_cue_for_description_match(
+    qt_app: QApplication,
+) -> None:
+    """A visible description match should explain the result and direct inspection first."""
+    prompt = _build_prompt(
+        description="Rollback review checklist for release readiness and operator handoff.",
+        scenarios=["Use after deployment review for routine release decisions."],
+        source="ops notebook",
+    )
+    model = PromptListModel([prompt])
+    model.set_active_search_text("rollback review")
+
+    index = model.index(0, 0)
+
+    assert index.data(PromptListModel.MatchReasonRole) == "Matched in description"
+    assert index.data(PromptListModel.HandoffCueRole) == "Inspect before reuse"
+
+
 def test_prompt_list_model_keeps_no_search_preview_priority_unchanged(
     qt_app: QApplication,
 ) -> None:
@@ -390,6 +411,8 @@ def test_prompt_list_model_emits_preview_role_when_search_changes_preview_choice
     assert emitted_roles == [
         [
             PromptListModel.PreviewRole,
+            PromptListModel.MatchReasonRole,
+            PromptListModel.HandoffCueRole,
             PromptListModel.TitleMatchRole,
             PromptListModel.PreviewMatchRole,
         ]

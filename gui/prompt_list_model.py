@@ -1,6 +1,7 @@
 """Qt list model that exposes prompt summaries for list views.
 
 Updates:
+  v0.1.6 - 2026-09-02 - Expose description-match reason and inspect-first handoff cues.
   v0.1.5 - 2026-04-12 - Let active-search source-matched previews reuse the existing preview role.
   v0.1.4 - 2026-04-12 - Expose bounded active-search match spans for prompt title and preview text.
   v0.1.3 - 2026-04-10 - Reuse a shared prompt-preview helper across UI surfaces.
@@ -112,7 +113,13 @@ class PromptListModel(QAbstractListModel):
         self.dataChanged.emit(
             top_left,
             bottom_right,
-            [self.PreviewRole, self.TitleMatchRole, self.PreviewMatchRole],
+            [
+                self.PreviewRole,
+                self.MatchReasonRole,
+                self.HandoffCueRole,
+                self.TitleMatchRole,
+                self.PreviewMatchRole,
+            ],
         )
 
     def prompts(self) -> Sequence[Prompt]:
@@ -137,7 +144,19 @@ class PromptListModel(QAbstractListModel):
             return "Matched in scenario"
         if self._match_ranges(self._display_text(prompt)):
             return "Matched in title"
+        if self._description_matches_active_search(prompt, preview):
+            return "Matched in description"
         return None
+
+    def _description_matches_active_search(self, prompt: Prompt, preview: str) -> bool:
+        """Return whether the visible preview is the description with an active search match."""
+        description = flatten_preview_text(prompt.description)
+        if not description or not is_credible_preview_text(description):
+            return False
+        if preview != truncate_preview_text(description):
+            return False
+        lowered_description = description.casefold()
+        return any(term in lowered_description for term in self._active_search_terms)
 
     def _matching_scenario_previews(self, prompt: Prompt) -> tuple[str, ...]:
         """Return truncated scenario previews that match the active search terms."""
@@ -160,7 +179,7 @@ class PromptListModel(QAbstractListModel):
         match_reason = self._match_reason_text(prompt)
         if match_reason == "Matched in title":
             return "Ready to reuse"
-        if match_reason in {"Matched in source", "Matched in scenario"}:
+        if match_reason in {"Matched in source", "Matched in scenario", "Matched in description"}:
             return "Inspect before reuse"
         return None
 

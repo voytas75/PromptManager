@@ -311,6 +311,31 @@ Run the focused delegate/model tests for the changed seam, plus one nearby smoke
 
 ---
 
+### Task 8: Add description-match reason and inspect-first handoff parity
+
+**Status:** completed
+
+**Objective:** Close the remaining asymmetry where a visible description match was readable but did not explain its match reason or next action.
+
+**Implemented:**
+- Extended `PromptListModel` to expose `Matched in description` when the visible preview is the credible matching description.
+- Reused the existing list-local `Inspect before reuse` handoff for description matches.
+- Extended the active-search `dataChanged` role notification to include `MatchReasonRole` and `HandoffCueRole`, keeping row state updates coherent when search text changes.
+- Kept source/scenario/title precedence, ranking, persistence, delegate structure, and detail-view semantics unchanged.
+
+**Verified:**
+- `QT_QPA_PLATFORM=offscreen uv run --no-sync pytest tests/test_prompt_list_model.py -q -p no:cacheprovider` -> `22 passed`
+- `uv run --no-sync ruff check gui/prompt_list_model.py tests/test_prompt_list_model.py` -> OK
+- `PYTHONDONTWRITEBYTECODE=1 uv run --no-sync python -m py_compile gui/prompt_list_model.py tests/test_prompt_list_model.py` -> OK
+- bounded Pyright still reports one pre-existing test typing issue at `tests/test_prompt_list_model.py:515` (`QStyleOptionViewItem.font`), outside this slice's changed contract.
+
+**Files:**
+- Modify: `gui/prompt_list_model.py`
+- Modify: `tests/test_prompt_list_model.py`
+- Maintain: this execution ledger and `docs/CHANGELOG.md`
+
+---
+
 ## Current recommended next slice
 
 **Status:** delivered for the current v1 seam
@@ -318,6 +343,7 @@ Run the focused delegate/model tests for the changed seam, plus one nearby smoke
 The bounded `non-title search-result action cue v1` slice is now landed on the active prompt-list seam:
 - non-title handoff confidence exists in `gui/prompt_list_model.py`,
 - the cue is visible on the prompt-list row through `gui/prompt_list_delegate.py`,
+- description matches now have the same explicit reason and inspect-first handoff parity as source/scenario matches,
 - focused and nearby smoke tests pass.
 
 **Next successor to choose explicitly:**
