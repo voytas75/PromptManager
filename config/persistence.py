@@ -16,6 +16,7 @@ Updates:
 from __future__ import annotations
 
 import json
+import os
 import re
 from collections.abc import Iterable, Mapping
 from pathlib import Path
@@ -143,14 +144,14 @@ def _normalise_prompt_templates(value: object | None) -> dict[str, str] | None:
 
 
 def persist_settings_to_config(updates: dict[str, object | None]) -> None:
-    """Persist selected settings to ``config/config.json``.
+    """Persist selected settings to the active configuration file.
 
     Secrets (e.g. API keys) are never written to disk. ``litellm_drop_params`` values
     are normalised to de-duplicated lists so changes survive across restarts. Workflow
     routing entries set to ``fast`` are omitted so only explicit ``inference``
     selections persist.
     """
-    config_path = Path("config/config.json")
+    config_path = Path(os.getenv("PROMPT_MANAGER_CONFIG_JSON", "config/config.json"))
     config_data: dict[str, Any] = {}
     if config_path.exists():
         try:

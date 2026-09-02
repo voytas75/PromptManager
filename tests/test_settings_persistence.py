@@ -41,6 +41,24 @@ def test_persist_settings_to_config(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert data["litellm_tts_stream"] is False
 
 
+def test_persist_settings_to_config_uses_explicit_config_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Persist settings to the explicitly selected configuration file."""
+    monkeypatch.chdir(tmp_path)
+    explicit_path = tmp_path / "custom" / "prompt-manager.json"
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(explicit_path))
+
+    from config.persistence import persist_settings_to_config
+
+    persist_settings_to_config({"litellm_model": "azure/gpt-4.1-mini"})
+
+    assert json.loads(explicit_path.read_text(encoding="utf-8")) == {
+        "litellm_model": "azure/gpt-4.1-mini"
+    }
+    assert not (tmp_path / "config" / "config.json").exists()
+
+
 def test_persist_settings_to_config_handles_litellm_logging(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
