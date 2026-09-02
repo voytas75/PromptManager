@@ -123,6 +123,18 @@ Confirmed on 2026-09-02:
 
 **Exit condition:** the risk is documented as accepted-but-open, never presented as fixed.
 
+### Post-remediation Dependabot reconciliation — 2026-09-02
+
+**Verified external closeout:**
+- Nine stale alerts were dismissed as `inaccurate` after their current default-branch pins and successful Dependency Graph runs were checked: LiteLLM `#78`, `#85`, `#86`, `#94`, `#95`; Cryptography `#77`, `#96`, `#97`; and alert `#98` was withdrawn by GitHub.
+- VCR.py `#81` and Pydantic Settings `#82` were then dismissed as `inaccurate` after the token received `admin:repo_hook`; their default-branch pins equal the respective patched floors.
+- REST and GraphQL now agree on **4 open alerts**, all accepted-but-open ChromaDB advisories: `#65`, `#99`, `#100`, and `#101`.
+
+**Campaign closeout:**
+- No remediation is pending for patched dependencies.
+- Do not open another dependency-upgrade slice for alerts that already have safe pins.
+- Monitor for a ChromaDB upstream patch, a new alert for the current resolved graph, or an architectural proposal for Chroma HTTP/server, non-local storage, remote access, or multi-tenancy.
+
 ## Cross-phase rules
 
 1. A green local gate is not Dependabot closure.
