@@ -25,7 +25,7 @@ dependencies = [
     "Jinja2==3.1.6",
     "jsonschema==4.23.0",
     "pydantic==2.12.5",
-    "pydantic-settings==2.12.0",
+    "pydantic-settings==2.14.2",
     "PyYAML==6.0.3",
     "PySide6==6.10.1",
     "httpx==0.28.1",
@@ -44,7 +44,7 @@ dev = [
     "pytest-asyncio==1.3.0",  # Updated to support pytest 9.x
     "hypothesis==6.116.0",
     "respx==0.21.0",
-    "vcrpy==8.1.1",
+    "vcrpy==8.2.1",
     "urllib3>=2.7.0",
     "pytest-mock==3.14.0",
     "bandit==1.7.9",
