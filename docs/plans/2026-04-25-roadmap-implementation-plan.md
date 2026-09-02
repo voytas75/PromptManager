@@ -18,7 +18,7 @@ Po **każdej** implementacji wykonaj w tej kolejności:
 2. dopisz krótki `Implemented:` / `Verified:` note pod taskiem,
 3. zaktualizuj `README.md` jeśli zmienił się user-visible product story,
 4. zaktualizuj `docs/product-ssot.md` tylko jeśli zmienił się produktowy stan, priorytet albo definicja warstwy,
-5. zaktualizuj `docs/product-roadmap-ssot.md` tylko jeśli zmieniła się kolejność lub definicja etapów,
+5. zaktualizuj `docs/product-ssot.md` tylko jeśli zmieniła się kolejność lub definicja warstw produktu,
 6. uruchom adekwatne testy i zanotuj wynik w planie.
 
 **Rule:** nie przepisywać SSOT dla kosmetycznych zmian implementacyjnych. SSOT aktualizować tylko przy zmianie produktu, nie przy samym postępie kodu.
@@ -95,7 +95,7 @@ Po **każdej** implementacji wykonaj w tej kolejności:
 - Modify: `tests/test_settings_dialog_diagnostics.py`
 - Modify: `tests/test_settings_summary.py`
 - Maintain: `docs/plans/2026-04-25-roadmap-implementation-plan.md`
-- Update later if needed: `README.md`, `docs/product-ssot.md`, `docs/product-roadmap-ssot.md`
+- Update later if needed: `README.md`, `docs/product-ssot.md`
 
 **Implementation target:**
 Add a first user-visible `source` field for the most important diagnostics rows, starting with:

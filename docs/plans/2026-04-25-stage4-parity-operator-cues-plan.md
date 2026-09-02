@@ -138,8 +138,7 @@ After each slice:
 Expected likely doc impact:
 - `docs/plans/2026-04-25-roadmap-implementation-plan.md` — yes, definitely
 - `README.md` — only if user-visible capability story materially changes
-- `docs/product-ssot.md` — probably no product-definition change needed; update only if Stage 4 emphasis becomes more explicit
-- `docs/product-roadmap-ssot.md` — only if Stage 4 wording should explicitly mention parity/evidence/operator cues
+- `docs/product-ssot.md` — only if automation-layer wording should explicitly mention parity/evidence/operator cues
 
 Current judgment:
 - README: probably **no immediate change** needed before implementation

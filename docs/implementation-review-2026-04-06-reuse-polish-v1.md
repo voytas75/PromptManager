@@ -64,7 +64,7 @@ If you want one follow-up, make it a separate tiny terminology/UX consistency pa
 
 - `README.md`
 - `docs/CHANGELOG.md`
-- `docs/product-boundary-ssot.md`
+- `docs/product-ssot.md`
 - `gui/widgets/prompt_detail_widget.py`
 - `gui/prompt_actions_controller.py`
 - `tests/test_prompt_detail_widget.py`

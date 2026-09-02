@@ -4,8 +4,7 @@ Date: 2026-04-11
 Status: delivered
 Slice name: Search Match Highlight v1
 Primary sources:
-- `docs/product-boundary-ssot.md`
-- `docs/product-backlog-ssot.md`
+- `docs/product-ssot.md`
 - `docs/session-restart-brief-2026-04-06-slice-guidelines.md`
 - `docs/analysis-review-2026-04-11-quick-capture-real-input-review-v1.md`
 

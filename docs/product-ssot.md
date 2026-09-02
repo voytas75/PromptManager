@@ -2,18 +2,13 @@
 
 Status: active
 Owner: Wojtek / Prompt Manager Team
-Updated: 2026-05-06 (prompt-chain result-semantics sync)
-Supersedes:
-- `docs/product-direction-ssot.md`
-- `docs/product-boundary-ssot.md`
-- `docs/product-backlog-ssot.md`
-- `docs/product-roadmap-ssot.md`
+Updated: 2026-09-02 (single product SSOT consolidation)
 
 ## Purpose
 
 This file is the single source of truth for PromptManager product decisions.
 
-It replaces the split between direction, boundary, backlog, and roadmap files.
+It unifies product direction, scope boundary, backlog, and roadmap order in one place.
 It exists to answer four questions in one place:
 
 1. what PromptManager is
@@ -389,6 +384,18 @@ Sharing and broader multi-user features may grow later, but they must remain sub
 - prompt asset clarity
 - deterministic operations
 - trustworthy run provenance
+
+---
+
+## Product-layer readiness criteria
+
+The roadmap order is a dependency order, not a calendar or a separate planning authority. A layer is ready to lead further work only when its outcome is visible in the existing product model:
+
+1. **Trust and operability** — GUI and CLI expose the same core operational truth; users can see what is configured, optional, or blocking; invalid critical state is not silent.
+2. **Prompt asset loop** — prompts move from rough input to reusable assets; users can find, judge, and reuse them faster than rediscovering them elsewhere.
+3. **Structured operations** — runs are understandable and comparable; recorded evidence supports reuse, refinement, fork, or retirement decisions rather than creating noise.
+4. **Automation** — headless workflows expose the same settings, diagnostics, and product model as interactive operation; no hidden parallel behavior is introduced.
+5. **Later supporting surfaces** — sharing, collaboration, analytics, and convenience features remain additive and do not change the asset-first identity.
 
 ---
 

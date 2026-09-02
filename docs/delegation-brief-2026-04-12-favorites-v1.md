@@ -34,8 +34,7 @@ If the work starts to look like collections, folders, pinning systems, or recomm
 
 Read first:
 - `docs/implementation-brief-2026-04-12-favorites-v1.md`
-- `docs/product-boundary-ssot.md`
-- `docs/product-backlog-ssot.md`
+- `docs/product-ssot.md`
 - `docs/session-restart-brief-2026-04-06-slice-guidelines.md`
 
 Likely implementation seams:

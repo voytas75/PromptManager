@@ -4,8 +4,7 @@ Date: 2026-04-12
 Status: delivered and spot-verified
 Feature: Edit Dialog Promote Draft Shortcut v1
 Primary sources:
-- `docs/product-boundary-ssot.md`
-- `docs/product-backlog-ssot.md`
+- `docs/product-ssot.md`
 - `docs/session-restart-brief-2026-04-06-slice-guidelines.md`
 - `docs/next-slice-brief-2026-04-04-draft-promote-normalize.md`
 - GitHub issue: `#8` `Edit prompt which is as draft`

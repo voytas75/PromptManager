@@ -13,7 +13,7 @@
 ## Why this roadmap exists
 
 Live repo/docs/code review confirms:
-- `docs/product-roadmap-ssot.md` nadal priorytetyzuje **Stage 2 — Core prompt asset loop quality**,
+- `docs/product-ssot.md` nadal priorytetyzuje jakość core prompt asset loop,
 - aktywny retrieval/discovery cycle w `docs/plans/2026-04-28-retrieval-discovery-confidence-roadmap.md` jest praktycznie domknięty: wszystkie slice’y są `implemented`, a search po `**Status:** pending` i `[ ]` w `docs/plans/` zwraca zero otwartych zadań,
 - repo jest clean po ostatnich bounded context-menu clarity slices,
 - PromptManager ma już istniejący filter-panel seam blisko głównego celu produktu: organizować i odzyskiwać prompt assets,

@@ -4,8 +4,7 @@ Date: 2026-04-10
 Status: ready-for-delegation
 Feature: Similar Match Preview v1
 Primary sources:
-- `docs/product-boundary-ssot.md`
-- `docs/product-backlog-ssot.md`
+- `docs/product-ssot.md`
 - `docs/next-slice-brief-2026-04-04-promote-similar-check-v1.md`
 
 ## Goal

@@ -15,7 +15,7 @@ Status: done
 ## Why this roadmap exists
 
 Live repo/SSOT review confirms:
-- `docs/product-roadmap-ssot.md` utrzymuje **Stage 4 — Controlled automation surfaces** jako naturalny kolejny etap po domknięciu ostatniego cyklu entry-clarity,
+- `docs/product-ssot.md` utrzymuje kontrolowane automation surfaces jako późniejszą warstwę rozszerzającą ten sam model produktu,
 - `docs/product-ssot.md` mówi wprost o `stronger CLI workflows`, `exportable or scriptable run operations`, oraz `API/internal service boundaries where justified`,
 - repo ma już kilka ważnych headless seamów (`prompt-add`, `catalog-import`, `suggest`, `history-analytics`, `benchmark`, `refresh-scenarios`, `prompt-chain-*`),
 - obecna warstwa CLI dobrze obsługuje import, benchmarky i analytics snapshoty, ale nadal nie daje jeszcze spójnego, prostego zestawu read-first entry points do katalogu promptów dla AI asystenta pracującego z konsoli,

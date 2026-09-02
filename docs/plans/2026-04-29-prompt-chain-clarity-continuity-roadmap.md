@@ -16,7 +16,7 @@ Status: completed (2026-05-04)
 
 Live repo review confirms:
 - Prompt chains already exist across GUI, CLI, models, backend mixins, and tests, so this is not a greenfield feature area,
-- `docs/product-ssot.md` and `docs/product-boundary-ssot.md` explicitly reject **heavy prompt-chain expansion** as a preferred direction,
+- `docs/product-ssot.md` explicitly reject **heavy prompt-chain expansion** as a preferred direction,
 - recent product positioning work consistently treats chains as a **secondary/supporting surface**, not the main product center,
 - the repo already contains bounded chain seams (`prompt-chain-list`, `prompt-chain-show`, `prompt-chain-apply`, `prompt-chain-run`, GUI manager/editor/run panel),
 - the highest-value next move is therefore not “more chain power”, but making the existing chain path calmer, more legible, and easier to trust when an operator actually uses it.

@@ -1,7 +1,7 @@
 # PromptManager — Product Boundary Alignment Audit
 
 Date: 2026-04-04
-Expected source: `docs/product-boundary-ssot.md`
+Expected source: `docs/product-ssot.md`
 Reviewer: main
 
 ## Verdict
@@ -199,7 +199,7 @@ It should align the existing product with the SSOT.
 
 ## Sources reviewed
 
-- `docs/product-boundary-ssot.md`
+- `docs/product-ssot.md`
 - `README.md`
 - `docs/README-DEV.md`
 - `core/catalog_importer.py`

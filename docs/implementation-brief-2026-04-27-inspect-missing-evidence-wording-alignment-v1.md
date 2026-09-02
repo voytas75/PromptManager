@@ -5,7 +5,6 @@ Status: proposed
 Feature: Inspect Missing-Evidence Wording Alignment v1
 Primary sources:
 - `docs/product-ssot.md`
-- `docs/product-roadmap-ssot.md`
 - `docs/canonical-usage-path-v1.md`
 - `docs/session-restart-brief-2026-04-06-slice-guidelines.md`
 

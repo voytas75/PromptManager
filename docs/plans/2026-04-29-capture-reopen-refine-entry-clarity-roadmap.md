@@ -15,7 +15,7 @@ Status: done
 ## Why this roadmap exists
 
 Live repo/docs/code review confirms:
-- `docs/product-roadmap-ssot.md` nadal utrzymuje **Stage 2 — Core prompt asset loop quality** jako priorytet,
+- `docs/product-ssot.md` utrzymuje jako priorytet jakość core prompt asset loop,
 - ostatnie bounded cycles dla prompt-library filter clarity, favorites clarity, i prompt-actions clarity są już praktycznie domknięte,
 - repo jest clean (`master...origin/master` bez lokalnych zmian) i gotowe na nowy execution ledger,
 - PromptManager ma trzy istniejące, bliskie centrum produktu entry seams, które są już użyteczne, ale były poprawiane tylko fragmentarycznie: `Quick Capture`, `Recent Prompts`, i `Promote Draft`,

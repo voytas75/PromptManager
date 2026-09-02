@@ -16,7 +16,7 @@ Status: done
 
 Live repo review confirms:
 - the just-finished CLI / API console-access cycle is now closed, so the most valuable next work should return to the product center instead of extending Stage 4 by inertia,
-- `docs/product-roadmap-ssot.md` still prioritizes **Stage 2 — Core prompt asset loop quality**, especially stronger search / retrieve flows and lower-friction reuse,
+- `docs/product-ssot.md` prioritizes core prompt asset loop quality, especially stronger search / retrieve flows and lower-friction reuse,
 - recent Stage 2 cycles improved entry points (`Quick Capture`, `Recent Prompts`, `Promote Draft`), favorites clarity, and prompt actions clarity,
 - the prompt-library filter panel already carries multiple bounded operator cues (`Tag filter: ...`, `Favorites filter: ...`, `Sort locked during search`), which makes it a proven seam for small trust-building retrieval improvements,
 - the next useful move is therefore not a search redesign, new ranking system, or another automation surface, but one fresh bounded cycle that makes narrowing state easier to read and harder to misinterpret.

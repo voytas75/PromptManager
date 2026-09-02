@@ -3,7 +3,7 @@
 Date: 2026-04-04
 Status: delivered
 Slice name: Quick Capture to Draft
-Primary source: `docs/product-boundary-ssot.md`
+Primary source: `docs/product-ssot.md`
 Supporting source: `docs/product-boundary-alignment-audit-2026-04-04.md`
 
 ## Recommended slice

@@ -4,7 +4,7 @@ Date: 2026-04-12
 Status: delivered and spot-verified
 Feature: Search Error Specificity v1
 Primary sources:
-- `docs/product-boundary-ssot.md`
+- `docs/product-ssot.md`
 - `docs/session-restart-brief-2026-04-06-slice-guidelines.md`
 - `core/prompt_manager/search.py`
 - `gui/prompt_list_presenter.py`

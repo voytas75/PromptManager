@@ -4,8 +4,7 @@ Date: 2026-04-10
 Status: ready-for-delegation
 Feature: Reuse Payload Tooltip v1
 Primary sources:
-- `docs/product-boundary-ssot.md`
-- `docs/product-backlog-ssot.md`
+- `docs/product-ssot.md`
 - `docs/implementation-review-2026-04-06-reuse-polish-v1.md`
 - `docs/session-restart-brief-2026-04-06-slice-guidelines.md`
 

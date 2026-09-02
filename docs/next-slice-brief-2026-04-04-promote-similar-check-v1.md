@@ -3,7 +3,7 @@
 Date: 2026-04-04
 Status: proposed
 Slice name: Promote-time Similar Prompt Check v1
-Primary source: `docs/product-boundary-ssot.md`
+Primary source: `docs/product-ssot.md`
 Supporting source: `docs/product-boundary-alignment-audit-2026-04-04.md`
 
 ## Task Brief
@@ -12,7 +12,7 @@ Supporting source: `docs/product-boundary-alignment-audit-2026-04-04.md`
 - Done when: The Draft Promote flow can show a small list of similar existing prompts and let the operator either continue promotion as a new asset or open one similar existing prompt, with focused regression coverage for the bounded happy paths.
 - In scope: Only the existing Draft Promote flow, one lightweight similar-prompts presentation, and focused tests for no-match / some-match / continue-as-new / open-existing behavior.
 - Out of scope: Full duplicate detection engine, auto-merge, auto-blocking promotion, batch import duplicate handling, analytics changes, chain/workspace/sharing/web-search work, or broad editor/catalog redesign.
-- Context files: `docs/product-boundary-ssot.md`, `docs/product-boundary-alignment-audit-2026-04-04.md`, `docs/CHANGELOG.md`.
+- Context files: `docs/product-ssot.md`, `docs/product-boundary-alignment-audit-2026-04-04.md`, `docs/CHANGELOG.md`.
 - Constraints: Keep the product center on prompt-asset quality; reuse existing retrieval/catalog capabilities where possible; prefer no schema migration; do not widen the public product contract; no commit/push.
 - Expected output: Minimal patch summary, files changed, tests run, and any risk/uncertainty noted.
 - Timebox: One bounded implementation slice.

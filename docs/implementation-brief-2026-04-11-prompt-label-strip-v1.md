@@ -4,8 +4,7 @@ Date: 2026-04-11
 Status: implemented
 Feature: Prompt Label Strip v1
 Primary sources:
-- `docs/product-boundary-ssot.md`
-- `docs/product-backlog-ssot.md`
+- `docs/product-ssot.md`
 - `docs/session-restart-brief-2026-04-06-slice-guidelines.md`
 - `docs/implementation-brief-2026-04-10-fence-unwrap-v1.md`
 

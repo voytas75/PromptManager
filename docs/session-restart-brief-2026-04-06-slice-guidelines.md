@@ -36,9 +36,8 @@ Nie rozlewać scope'u w stronę:
 ## Source anchors
 
 Przy kolejnych decyzjach i briefach najpierw czytać:
-- `docs/product-boundary-ssot.md`
+- `docs/product-ssot.md`
 - `docs/product-boundary-alignment-audit-2026-04-04.md`
-- `docs/product-backlog-ssot.md`
 - ten plik
 
 Jeśli potrzebny jest kontekst wdrożeniowy dla reuse lub nowszych bounded review:

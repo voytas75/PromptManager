@@ -34,8 +34,7 @@ If the work starts to look like transcript parsing, import normalization, or bro
 
 Read first:
 - `docs/implementation-brief-2026-04-12-single-turn-user-prefix-strip-v1.md`
-- `docs/product-boundary-ssot.md`
-- `docs/product-backlog-ssot.md`
+- `docs/product-ssot.md`
 - `docs/analysis-brief-2026-04-11-quick-capture-real-input-review-v1.md`
 - `docs/analysis-review-2026-04-11-quick-capture-real-input-review-v1.md`
 

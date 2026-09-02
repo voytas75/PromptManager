@@ -4,8 +4,7 @@ Date: 2026-04-12
 Status: ready
 Feature: Favorites v1
 Primary sources:
-- `docs/product-boundary-ssot.md`
-- `docs/product-backlog-ssot.md`
+- `docs/product-ssot.md`
 - `docs/session-restart-brief-2026-04-06-slice-guidelines.md`
 - `gui/widgets/prompt_filter_panel.py`
 - `gui/widgets/prompt_detail_widget.py`

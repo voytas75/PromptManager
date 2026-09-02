@@ -3,7 +3,7 @@
 Date: 2026-04-04
 Status: proposed
 Slice name: Draft Promote / Normalize v1
-Primary source: `docs/product-boundary-ssot.md`
+Primary source: `docs/product-ssot.md`
 Supporting sources:
 - `docs/product-boundary-alignment-audit-2026-04-04.md`
 - `docs/next-slice-brief-2026-04-04-quick-capture-to-draft.md`

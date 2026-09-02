@@ -19,7 +19,7 @@
   - `Inspection clarity`
   - `Reuse and refinement`
   - `compact decision-support cues`
-- `docs/product-roadmap-ssot.md` ustawia po Stage 4 wejście w **Stage 5 — Selective expansion**, ale nadal z filtrem: wzmacniać główną pętlę produktu, nie iść w dashboard-first ani broad automation.
+- `docs/product-ssot.md` utrzymuje supporting surfaces jako późniejszą warstwę, z filtrem: wzmacniać główną pętlę produktu, nie iść w dashboard-first ani broad automation.
 - `docs/plans/2026-04-25-roadmap-implementation-plan.md` ma zamknięte Stage 1–4; nie ma jeszcze rozpisanego pierwszego bounded slice’a dla Stage 5.
 
 ### Wniosek produktowy
@@ -280,7 +280,7 @@ Expected: no output
 **Files:**
 - Modify: `docs/plans/2026-04-25-roadmap-implementation-plan.md`
 - Create or maintain: this plan file `docs/plans/2026-04-25-stage5-next-action-cues-plan.md`
-- Update only if wording truly changes: `README.md`, `docs/product-ssot.md`, `docs/product-roadmap-ssot.md`
+- Update only if wording truly changes: `README.md`, `docs/product-ssot.md`
 
 **Step 1: Update roadmap implementation plan**
 
@@ -295,7 +295,6 @@ Update SSOT only if the product wording itself changed.
 
 Current expectation:
 - `docs/product-ssot.md`: probably **no change needed**
-- `docs/product-roadmap-ssot.md`: probably **no change needed**
 - reason: this slice fits the already-stated core of `inspection clarity` and `compact decision-support cues`
 
 **Step 3: Commit docs**

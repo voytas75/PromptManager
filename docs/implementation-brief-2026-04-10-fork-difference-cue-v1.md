@@ -4,8 +4,7 @@ Date: 2026-04-10
 Status: delivered and spot-verified
 Feature: Fork Difference Cue v1
 Primary sources:
-- `docs/product-boundary-ssot.md`
-- `docs/product-backlog-ssot.md`
+- `docs/product-ssot.md`
 - `docs/session-restart-brief-2026-04-06-slice-guidelines.md`
 - `docs/implementation-review-2026-04-10-product-alignment-and-fork-state.md`
 

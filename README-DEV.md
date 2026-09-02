@@ -196,7 +196,6 @@ If a change increases product breadth but weakens clarity, trust, or the core pr
 
 Developer-facing docs:
 - `docs/product-ssot.md`
-- `docs/product-roadmap-ssot.md`
 - `docs/canonical-usage-path-v1.md`
 
 Use `docs/` for detailed rollout plans or implementation-specific notes that would make this file noisy.

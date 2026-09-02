@@ -3,7 +3,7 @@
 Date: 2026-04-05
 Status: delivered
 Slice name: Capture Provenance v1
-Primary source: `docs/product-boundary-ssot.md`
+Primary source: `docs/product-ssot.md`
 Supporting sources:
 - `docs/product-boundary-alignment-audit-2026-04-04.md`
 - `docs/CHANGELOG.md`

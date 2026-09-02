@@ -4,8 +4,7 @@ Date: 2026-04-12
 Status: ready
 Feature: Body-Lead Preview Fallback v1
 Primary sources:
-- `docs/product-boundary-ssot.md`
-- `docs/product-backlog-ssot.md`
+- `docs/product-ssot.md`
 - `docs/session-restart-brief-2026-04-06-slice-guidelines.md`
 - `docs/implementation-brief-2026-04-12-single-turn-user-prefix-strip-v1.md`
 

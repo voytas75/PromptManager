@@ -3,9 +3,9 @@
 Date: 2026-04-11
 Target: `README positioning cleanup v1`
 Expected source:
-- `docs/product-boundary-ssot.md`
+- `docs/product-ssot.md`
 - `docs/session-restart-brief-2026-04-06-slice-guidelines.md`
-- `docs/product-backlog-ssot.md`
+- `docs/product-ssot.md`
 Reviewer: main
 
 ## Verdict
@@ -78,6 +78,6 @@ Do not reopen this into broad README rewriting or repo-wide terminology cleanup 
 
 - `README.md`
 - `docs/canonical-usage-path-v1.md`
-- `docs/product-boundary-ssot.md`
+- `docs/product-ssot.md`
 - `docs/session-restart-brief-2026-04-06-slice-guidelines.md`
-- `docs/product-backlog-ssot.md`
+- `docs/product-ssot.md`

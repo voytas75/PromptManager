@@ -4,8 +4,7 @@ Date: 2026-04-12
 Status: delivered and spot-verified
 Feature: Usage Confidence Cue v1
 Primary sources:
-- `docs/product-boundary-ssot.md`
-- `docs/product-backlog-ssot.md`
+- `docs/product-ssot.md`
 - `docs/session-restart-brief-2026-04-06-slice-guidelines.md`
 - `docs/canonical-usage-path-v1.md`
 

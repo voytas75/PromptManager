@@ -3,7 +3,7 @@
 Date: 2026-04-10
 Target: product alignment spot review + `Fork Baseline Clarity v1` status check
 Expected source:
-- `docs/product-boundary-ssot.md`
+- `docs/product-ssot.md`
 - `docs/product-boundary-alignment-audit-2026-04-04.md`
 - `docs/session-restart-brief-2026-04-06-slice-guidelines.md`
 - `docs/implementation-brief-2026-04-10-fork-baseline-clarity-v1.md`
@@ -85,7 +85,7 @@ This review did not run a fresh real-world capture → normalize → retrieve �
 ## Sources reviewed
 
 - `README.md`
-- `docs/product-boundary-ssot.md`
+- `docs/product-ssot.md`
 - `docs/product-boundary-alignment-audit-2026-04-04.md`
 - `docs/session-restart-brief-2026-04-06-slice-guidelines.md`
 - `docs/implementation-brief-2026-04-10-fork-baseline-clarity-v1.md`
