@@ -1035,6 +1035,7 @@ def test_delete_prompt_handles_repository_and_chroma_errors() -> None:
     manager_chroma = _build_manager(repository=repo, collection=collection)
     with pytest.raises(PromptStorageError):
         manager_chroma.delete_prompt(prompt.id)
+    assert manager_chroma.get_prompt(prompt.id).id == prompt.id
 
 
 def test_search_prompts_surfaces_sanitized_backend_query_error() -> None:

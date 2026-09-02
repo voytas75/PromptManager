@@ -299,15 +299,15 @@ class PromptLifecycleMixin:
         """Remove a prompt from all data stores."""
         prompt_id = self._ensure_uuid(prompt_id)
         try:
+            self._as_prompt_manager().collection.delete(ids=[str(prompt_id)])
+        except ChromaError as exc:
+            raise PromptStorageError(f"Failed to delete prompt {prompt_id}") from exc
+        try:
             self._repository.delete(prompt_id)
         except RepositoryNotFoundError as exc:
             raise PromptNotFoundError(f"Prompt {prompt_id} not found") from exc
         except RepositoryError as exc:
             raise PromptStorageError(f"Failed to delete prompt {prompt_id} from SQLite") from exc
-        try:
-            self._as_prompt_manager().collection.delete(ids=[str(prompt_id)])
-        except ChromaError as exc:
-            raise PromptStorageError(f"Failed to delete prompt {prompt_id}") from exc
         try:
             self._evict_cached_prompt(prompt_id)
         except PromptCacheError:
