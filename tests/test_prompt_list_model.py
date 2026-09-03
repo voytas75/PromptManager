@@ -513,7 +513,6 @@ def test_prompt_list_delegate_adds_height_for_visible_handoff_cue(qt_app: QAppli
 
     delegate = PromptListDelegate()
     option = QStyleOptionViewItem()
-    option.font = QFont()
 
     with_cue_height = delegate.sizeHint(option, index).height()
     without_cue_height = delegate.sizeHint(option, no_cue_index).height()
