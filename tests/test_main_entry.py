@@ -1811,6 +1811,35 @@ def test_prompt_add_command_rejects_blank_stdin_payload(
     assert excinfo.value.code == 2
 
 
+def test_prompt_add_inline_scenario_is_preserved_in_payload_file(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Inline prompt-add scenario should use the prompt model's serialized shape."""
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "prompt-manager",
+            "prompt-add",
+            "--name",
+            "Inline prompt",
+            "--description",
+            "Prompt description",
+            "--prompt-text",
+            "Prompt body",
+            "--scenario",
+            "Use during an incident handoff.",
+        ],
+    )
+
+    from cli.parser import parse_args
+
+    args = parse_args()
+    payload = json.loads(args.path.read_text())
+    args.path.unlink()
+
+    assert payload["ext5"] == {"scenarios": ["Use during an incident handoff."]}
+
+
 def test_prompt_add_command_accepts_inline_fields(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

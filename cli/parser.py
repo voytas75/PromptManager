@@ -31,7 +31,7 @@ def _build_inline_prompt_payload(args: argparse.Namespace) -> dict[str, object]:
     if getattr(args, "language", None):
         payload["language"] = args.language
     if getattr(args, "scenario", None):
-        payload["ext5"] = args.scenario
+        payload["ext5"] = {"scenarios": [args.scenario]}
     return payload
 
 
