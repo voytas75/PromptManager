@@ -78,6 +78,27 @@ def test_draft_promote_dialog_hides_similar_section_when_no_matches(qt_app: QApp
     assert dialog.selected_existing_prompt_id is None
 
 
+def test_draft_promote_dialog_marks_similarity_check_unavailable(qt_app: QApplication) -> None:
+    """An unavailable similarity lookup must not be rendered as no similar prompts."""
+    prompt = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000060"),
+        name="Captured draft",
+        description="Quick capture draft.",
+        category="General",
+        context="Draft body",
+        ext2={"capture_state": "draft", "capture_method": "quick_capture"},
+    )
+
+    dialog = DraftPromoteDialog(
+        prompt,
+        categories=["General"],
+        similarity_check_available=False,
+    )
+
+    assert "Similarity check unavailable" in _similarity_summary_label(dialog).text()
+    assert "No similar prompts found" not in _similarity_summary_label(dialog).text()
+
+
 def test_draft_promote_dialog_summary_mentions_review_or_continue_posture(
     qt_app: QApplication,
 ) -> None:

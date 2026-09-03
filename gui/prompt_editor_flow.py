@@ -111,6 +111,7 @@ class DraftPromoteDialogFactory:
         prompt: Prompt,
         *,
         similar_prompts: Sequence[Prompt] = (),
+        similarity_check_available: bool = True,
     ) -> DraftPromoteDialog:
         """Return a compact draft-promotion dialog for *prompt*."""
         categories = [
@@ -122,6 +123,7 @@ class DraftPromoteDialogFactory:
             prompt,
             categories=categories,
             similar_prompts=similar_prompts,
+            similarity_check_available=similarity_check_available,
             parent=parent,
         )
 
@@ -195,11 +197,12 @@ class PromptEditorFlow:
         """Promote *prompt* from draft status through a compact metadata flow."""
         if not is_prompt_draft(prompt):
             return
-        similar_prompts = self._find_similar_prompts(prompt)
+        similar_prompts, similarity_check_available = self._find_similar_prompts(prompt)
         dialog = self._draft_promote_dialog_factory.build(
             self._parent,
             prompt,
             similar_prompts=similar_prompts,
+            similarity_check_available=similarity_check_available,
         )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
@@ -305,7 +308,7 @@ class PromptEditorFlow:
         self._select_prompt(forked.id)
         self._status_callback("Prompt fork created.", 4000)
 
-    def _find_similar_prompts(self, prompt: Prompt) -> list[Prompt]:
+    def _find_similar_prompts(self, prompt: Prompt) -> tuple[list[Prompt], bool]:
         """Return a short advisory list of prompts similar to the supplied draft."""
         embedding_vector: list[float] | None
         if prompt.ext4 is not None:
@@ -317,7 +320,7 @@ class PromptEditorFlow:
             embedding_vector = None
 
         if embedding_vector is None and not prompt.document.strip():
-            return []
+            return [], True
 
         try:
             candidates = self._manager.search_prompts(
@@ -326,7 +329,7 @@ class PromptEditorFlow:
                 embedding=embedding_vector,
             )
         except PromptManagerError:
-            return []
+            return [], False
 
         similar_prompts: list[Prompt] = []
         for candidate in candidates:
@@ -338,7 +341,7 @@ class PromptEditorFlow:
             similar_prompts.append(candidate)
             if len(similar_prompts) >= 3:
                 break
-        return similar_prompts
+        return similar_prompts, True
 
     def _handle_prompt_applied(self, prompt: Prompt, dialog: PromptDialog) -> None:
         stored = self._persist_prompt_update(prompt, dialog)

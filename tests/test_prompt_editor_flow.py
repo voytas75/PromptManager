@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any, cast
 from PySide6.QtWidgets import QDialog
 
 import gui.prompt_editor_flow as prompt_editor_flow_module
+from core import PromptManagerError
 from gui.dialogs.draft_promote import build_promoted_prompt
 from gui.dialogs.quick_capture import QuickCaptureDraft
 from gui.prompt_editor_flow import PromptEditorFlow
@@ -124,12 +125,14 @@ class _DraftPromoteDialogFactoryStub:
     built_similar_prompts: list[list[Prompt]] = field(
         default_factory=lambda: cast("list[list[Prompt]]", [])
     )
+    similarity_check_availability: list[bool] = field(default_factory=list)
 
     def build(
         self,
         *args: Any,
         prompt: Prompt | None = None,
         similar_prompts: Any = (),
+        similarity_check_available: bool = True,
         **__: Any,
     ) -> _DraftPromoteDialogStub:
         """Return the shared draft-promotion dialog stub."""
@@ -142,6 +145,7 @@ class _DraftPromoteDialogFactoryStub:
             raise AssertionError("Draft promotion should be invoked with a prompt.")
         self.built_prompts.append(captured_prompt)
         self.built_similar_prompts.append(list(similar_prompts))
+        self.similarity_check_availability.append(similarity_check_available)
         return self.dialog
 
 
@@ -151,6 +155,7 @@ class _ManagerStub:
         self.created_prompts: list[Prompt] = []
         self.updated_prompts: list[Prompt] = []
         self.search_results: list[Prompt] = []
+        self.search_error: Exception | None = None
         self.search_calls: list[dict[str, Any]] = []
 
     def create_prompt(self, prompt: Prompt) -> Prompt:
@@ -179,6 +184,8 @@ class _ManagerStub:
                 "embedding": embedding,
             }
         )
+        if self.search_error is not None:
+            raise self.search_error
         return list(self.search_results)
 
 
@@ -518,6 +525,61 @@ def test_edit_prompt_can_apply_changes_then_handoff_into_promote(
         ("Prompt changes applied.", 4000),
         ("Draft promoted.", 4000),
     ]
+
+
+def test_promote_draft_marks_similarity_check_unavailable_after_search_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A failed advisory lookup should reach promotion as unavailable, not no-match."""
+    monkeypatch.setattr(prompt_editor_flow_module, "ProcessingIndicator", _ProcessingIndicatorStub)
+    manager = _ManagerStub()
+    manager.search_error = PromptManagerError("search backend down")
+    original = Prompt(
+        id=uuid.UUID("00000000-0000-0000-0000-000000000400"),
+        name="Draft title",
+        description="Quick capture draft.",
+        category="General",
+        context="Keep this prompt body exactly as-is.",
+        ext2={"capture_state": "draft", "capture_method": "quick_capture"},
+    )
+    promoted = build_promoted_prompt(
+        original,
+        title="Curated title",
+        category="General",
+        tags_text="",
+        source="",
+        description="",
+    )
+    promote_factory = cast(
+        "DraftPromoteDialogFactory",
+        _DraftPromoteDialogFactoryStub(_DraftPromoteDialogStub(result_prompt=promoted), []),
+    )
+    dialog_factory = cast(
+        "PromptDialogFactory",
+        _DialogFactoryStub(_DialogStub(delete_requested=False), []),
+    )
+    quick_capture_factory = cast(
+        "QuickCaptureDialogFactory",
+        _QuickCaptureDialogFactoryStub(
+            _QuickCaptureDialogStub(dialog_code=QDialog.DialogCode.Rejected)
+        ),
+    )
+    flow = _build_flow(
+        manager=cast("PromptManager", manager),
+        dialog_factory=dialog_factory,
+        quick_capture_dialog_factory=quick_capture_factory,
+        draft_promote_dialog_factory=promote_factory,
+        delete_prompt=lambda *_args, **_kwargs: None,
+        load_prompts=lambda _: None,
+        select_prompt=lambda _: None,
+        status_callback=_ignore_status,
+    )
+
+    flow.promote_draft_prompt(original)
+
+    assert promote_factory.built_similar_prompts == [[]]
+    assert promote_factory.similarity_check_availability == [False]
+    assert manager.updated_prompts == [promoted]
 
 
 def test_promote_draft_passes_similar_matches_and_can_open_existing(

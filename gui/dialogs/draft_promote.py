@@ -117,12 +117,14 @@ class DraftPromoteDialog(QDialog):
         *,
         categories: Sequence[str] = (),
         similar_prompts: Sequence[Prompt] = (),
+        similarity_check_available: bool = True,
         parent: QWidget | None = None,
     ) -> None:
         """Initialise the compact promotion form from the existing prompt state."""
         super().__init__(parent)
         self._source_prompt = prompt
         self._similar_prompts = list(similar_prompts)
+        self._similarity_check_available = similarity_check_available
         self._result_prompt: Prompt | None = None
         self._selected_existing_prompt_id: UUID | None = None
         self.setWindowTitle("Promote Draft")
@@ -224,9 +226,15 @@ class DraftPromoteDialog(QDialog):
         """Render the advisory similar-prompt section."""
         self._similar_prompts_list.clear()
         if not self._similar_prompts:
-            self._similarity_summary.setText(
-                "No similar prompts found. You can promote this draft as a new prompt."
-            )
+            if self._similarity_check_available:
+                self._similarity_summary.setText(
+                    "No similar prompts found. You can promote this draft as a new prompt."
+                )
+            else:
+                self._similarity_summary.setText(
+                    "Similarity check unavailable. You can continue promoting this draft, "
+                    "but no duplicate check was completed."
+                )
             self._similar_prompts_list.hide()
             self._open_existing_button.hide()
             return
