@@ -2,7 +2,7 @@
 
 Status: active
 Owner: Wojtek / Prompt Manager Team
-Updated: 2026-05-17
+Updated: 2026-09-02
 Canonical product SSOT: `docs/product-ssot.md`
 Canonical near-term plan: `docs/plans/2026-05-10-product-direction-ssot-next-cycle.md`
 
@@ -102,9 +102,37 @@ If not, it should not lead the next cycle.
 ## Most recent delivered execution ledger
 
 Most recently delivered bounded execution ledger remembered in active planning docs:
-- `docs/plans/2026-05-10-workspace-one-run-action-clarity-roadmap.md`
+- `docs/plans/2026-09-02-dependabot-remediation-campaign.md`
 
 This is a status pointer only, not an instruction to continue that seam by default.
+
+---
+
+## Current verified checkpoint — 2026-09-02
+
+**Revision and delivery**
+- Current local and remote `master`: `c2ebc73eb3f7764a799bdd1605b38f0f41af3750`.
+- Worktree was clean and `HEAD...origin/master` was `0 / 0` before this status update.
+- Recent delivered commits:
+  - `522edd4` — `fix(config): persist settings to active config path`.
+  - `c2ebc73` — `fix(storage): preserve prompt when Chroma delete fails`.
+- Exact-SHA Quality Gates for `c2ebc73` succeeded: Ruff, formatter verification, CI-scope Pyright, pytest, and clean-tree check.
+
+**Delivered contract repairs**
+- GUI settings persistence now writes to the active `PROMPT_MANAGER_CONFIG_JSON` path; default behavior remains `config/config.json`.
+- `delete_prompt()` deletes the Chroma record before SQLite. A Chroma deletion error therefore preserves the SQLite prompt record.
+- Local verification for the two repairs: `795 passed, 1 skipped`; Ruff, formatter check, CI-scope Pyright, and `git diff --check` passed before delivery.
+
+**Security checkpoint — ChromaDB**
+- REST and GraphQL report four open Dependabot alerts, all for direct `chromadb==1.5.7` in `uv.lock`: `#65`, `#99`, `#100`, and `#101` (two critical, two high).
+- The vulnerable ranges extend through `chromadb==1.5.9`; Dependabot reports no patched version. A scratch-only `1.5.7 -> 1.5.9` resolution changed only `uv.lock` (`7 additions / 7 deletions`) and would not close these alerts.
+- The accepted-but-open decision in `docs/plans/2026-09-02-dependabot-remediation-campaign.md` remains authoritative: ChromaDB is limited to local `PersistentClient` / `EphemeralClient` use. HTTP/server, non-local, remote, and multi-tenant use are prohibited pending a new decision or upstream patch.
+- A later full scratch verification attempt did not start because its temporary worktree command failed with `fatal: not a git repository`; it is not validation evidence and must be recreated only if an upstream patch creates a viable remediation candidate.
+
+**Resume rule — one next slice only**
+1. Do not retry a ChromaDB upgrade until an upstream version above `1.5.9` is published or a non-local/server Chroma proposal appears.
+2. When that trigger occurs: first create a fresh disposable worktree from current `master`, resolve the smallest ChromaDB candidate there, measure its exact diff, run provider-free storage/telemetry tests, then request separate approval before modifying the primary worktree.
+3. Without that trigger, return to the product SSOT priority: read-only probe one current retrieval → inspect → reuse hesitation seam; do not reopen delivered wording slices without a reproduced gap.
 
 ---
 
