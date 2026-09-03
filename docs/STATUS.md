@@ -102,7 +102,7 @@ If not, it should not lead the next cycle.
 ## Most recent delivered execution ledger
 
 Most recently delivered bounded execution ledger remembered in active planning docs:
-- `docs/plans/2026-09-02-dependabot-remediation-campaign.md`
+- `docs/plans/2026-09-03-draft-title-match-handoff-consistency-roadmap.md`
 
 This is a status pointer only, not an instruction to continue that seam by default.
 
@@ -133,6 +133,15 @@ This is a status pointer only, not an instruction to continue that seam by defau
 1. Do not retry a ChromaDB upgrade until an upstream version above `1.5.9` is published or a non-local/server Chroma proposal appears.
 2. When that trigger occurs: first create a fresh disposable worktree from current `master`, resolve the smallest ChromaDB candidate there, measure its exact diff, run provider-free storage/telemetry tests, then request separate approval before modifying the primary worktree.
 3. Without that trigger, return to the product SSOT priority: read-only probe one current retrieval → inspect → reuse hesitation seam; do not reopen delivered wording slices without a reproduced gap.
+
+---
+
+## Latest bounded product correction — 2026-09-03
+
+- Draft prompts found by title no longer receive the list-side `Ready to reuse` handoff.
+- The retrieval reason remains `Matched in title`; `Promote Draft` remains the canonical detail-side action.
+- Verified locally: 23 focused list tests; 73 capture/list/detail parity tests; active-path Pyright, Ruff, and format checks passed.
+- Delivery ledger: `docs/plans/2026-09-03-draft-title-match-handoff-consistency-roadmap.md`.
 
 ---
 

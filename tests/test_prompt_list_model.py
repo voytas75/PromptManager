@@ -184,6 +184,23 @@ def test_prompt_list_model_exposes_title_match_handoff_cue_for_immediate_reuse(
     assert index.data(PromptListModel.HandoffCueRole) == "Ready to reuse"
 
 
+def test_prompt_list_model_hides_title_reuse_handoff_for_captured_draft(
+    qt_app: QApplication,
+) -> None:
+    """A captured draft should not be presented as ready for direct reuse."""
+    prompt = _build_prompt(
+        description="Reusable incident handoff prompt for routine operator transitions.",
+    )
+    prompt.ext2 = {"capture_state": "draft", "capture_method": "quick_capture"}
+    model = PromptListModel([prompt])
+    model.set_active_search_text("incident")
+
+    index = model.index(0, 0)
+
+    assert index.data(PromptListModel.MatchReasonRole) == "Matched in title"
+    assert index.data(PromptListModel.HandoffCueRole) is None
+
+
 def test_prompt_list_model_exposes_inspect_first_handoff_cue_for_source_match(
     qt_app: QApplication,
 ) -> None:

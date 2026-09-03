@@ -177,7 +177,10 @@ class PromptListModel(QAbstractListModel):
     def _handoff_cue_text(self, prompt: Prompt) -> str | None:
         """Return one compact list-local handoff cue."""
         match_reason = self._match_reason_text(prompt)
-        if match_reason == "Matched in title":
+        if (
+            match_reason == "Matched in title"
+            and str((prompt.ext2 or {}).get("capture_state") or "").strip() != "draft"
+        ):
             return "Ready to reuse"
         if match_reason in {"Matched in source", "Matched in scenario", "Matched in description"}:
             return "Inspect before reuse"
