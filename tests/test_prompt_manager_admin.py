@@ -1716,6 +1716,33 @@ def test_persist_embedding_from_worker_updates_prompt(
     assert called["is_new"] is False
 
 
+def test_persist_embedding_from_worker_rolls_back_ext4_when_chroma_upsert_fails(
+    prompt_manager: tuple[PromptManager, _DummyCollection, _DummyChromaClient, Path],
+) -> None:
+    """A failed background Chroma update must restore the prior SQLite embedding."""
+    manager, _, _, _ = prompt_manager
+    original = _make_prompt()
+    original.ext4 = [0.9, 0.8]
+    stored: dict[str, Prompt] = {"prompt": original}
+
+    class _Repo:
+        def update(self, prompt: Prompt) -> Prompt:
+            stored["prompt"] = prompt
+            return prompt
+
+    manager._repository = _Repo()  # type: ignore[assignment]
+
+    def fail_persist(_: Prompt, __: Sequence[float], *, is_new: bool) -> None:
+        raise PromptStorageError("Chroma unavailable")
+
+    manager._persist_embedding = fail_persist  # type: ignore[assignment]
+
+    with pytest.raises(PromptStorageError):
+        _persist_embedding_from_worker(manager, original, [0.1, 0.2])
+
+    assert stored["prompt"].ext4 == [0.9, 0.8]
+
+
 def test_apply_rating_handles_fetch_and_update_failures(
     prompt_manager: tuple[PromptManager, _DummyCollection, _DummyChromaClient, Path],
 ) -> None:

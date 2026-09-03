@@ -490,9 +490,21 @@ class PromptLifecycleMixin:
         embedding: Sequence[float],
     ) -> None:
         """Callback invoked by background worker once embedding is generated."""
+        previous_embedding = list(prompt.ext4) if prompt.ext4 is not None else None
         prompt.ext4 = list(embedding)
         try:
             self._repository.update(prompt)
         except RepositoryError as exc:
             raise PromptStorageError(f"Failed to persist embedding for prompt {prompt.id}") from exc
-        self._persist_embedding(prompt, embedding, is_new=False)
+        try:
+            self._persist_embedding(prompt, embedding, is_new=False)
+        except PromptStorageError:
+            prompt.ext4 = previous_embedding
+            try:
+                self._repository.update(prompt)
+            except RepositoryError:
+                logger.error(
+                    "Unable to roll back SQLite embedding after Chroma failure",
+                    extra={"prompt_id": str(prompt.id)},
+                )
+            raise
