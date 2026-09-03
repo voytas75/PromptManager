@@ -102,7 +102,8 @@ If not, it should not lead the next cycle.
 ## Most recent delivered execution ledger
 
 Most recently delivered bounded execution ledger remembered in active planning docs:
-- `docs/plans/2026-09-03-update-chroma-rollback-integrity.md`
+- `docs/plans/2026-09-03-update-chroma-rollback-integrity.md` — synchronous update rollback.
+- `a2a5d35` — async worker embedding rollback.
 
 This is a status pointer only, not an instruction to continue that seam by default.
 
@@ -145,21 +146,13 @@ This is a status pointer only, not an instruction to continue that seam by defau
 
 ---
 
-## Latest bounded storage-integrity correction — 2026-09-03
+## Latest bounded storage-integrity corrections — 2026-09-03
 
-- `update_prompt()` now restores the prior SQLite prompt if synchronous Chroma embedding persistence fails, then re-raises the original storage error.
-- This prevents SQLite from advancing while the derived semantic index retains the prior record; the asynchronous no-embedding path is unchanged.
-- Verified locally: 2 focused failure-path tests; 55 storage/branch tests; active-path Pyright, Ruff, and format checks passed.
-- Delivery ledger: `docs/plans/2026-09-03-update-chroma-rollback-integrity.md`.
-
----
-
-## Latest bounded storage-integrity correction — 2026-09-03
-
-- `update_prompt()` now restores the prior SQLite prompt if synchronous Chroma embedding persistence fails, then re-raises the original storage error.
-- This prevents SQLite from advancing while the derived semantic index retains the prior record; the asynchronous no-embedding path is unchanged.
-- Verified locally: 2 focused failure-path tests; 55 storage/branch tests; active-path Pyright, Ruff, and format checks passed.
-- Delivery ledger: `docs/plans/2026-09-03-update-chroma-rollback-integrity.md`.
+- Synchronous `update_prompt()` restores the prior SQLite prompt if Chroma embedding persistence fails, then re-raises the original storage error (`c93b892`).
+- The async worker callback now likewise restores the prior SQLite `ext4` embedding when Chroma upsert fails, then re-raises so the existing worker retry can proceed (`a2a5d35`).
+- Together, these repairs prevent SQLite from advancing while the derived semantic index retains the prior record; retry policy and the asynchronous no-embedding path are unchanged.
+- Latest verification: `801 passed, 1 skipped`, coverage `80.38%`; exact-SHA Quality Gates succeeded for `a2a5d35`.
+- Delivery ledger for the synchronous repair: `docs/plans/2026-09-03-update-chroma-rollback-integrity.md`.
 
 ---
 
