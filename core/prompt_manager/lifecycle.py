@@ -264,7 +264,17 @@ class PromptLifecycleMixin:
         except RepositoryError as exc:
             raise PromptStorageError(f"Failed to update prompt {prompt.id} in SQLite") from exc
         if generated_embedding is not None:
-            self._persist_embedding(updated_prompt, generated_embedding, is_new=False)
+            try:
+                self._persist_embedding(updated_prompt, generated_embedding, is_new=False)
+            except PromptStorageError:
+                try:
+                    self._repository.update(previous_prompt)
+                except RepositoryError:
+                    logger.error(
+                        "Unable to roll back SQLite update after Chroma failure",
+                        extra={"prompt_id": str(prompt.id)},
+                    )
+                raise
         else:
             self._embedding_worker.schedule(updated_prompt.id)
             try:

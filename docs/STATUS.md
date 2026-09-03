@@ -2,7 +2,7 @@
 
 Status: active
 Owner: Wojtek / Prompt Manager Team
-Updated: 2026-09-02
+Updated: 2026-09-03
 Canonical product SSOT: `docs/product-ssot.md`
 Canonical near-term plan: `docs/plans/2026-05-10-product-direction-ssot-next-cycle.md`
 
@@ -102,7 +102,7 @@ If not, it should not lead the next cycle.
 ## Most recent delivered execution ledger
 
 Most recently delivered bounded execution ledger remembered in active planning docs:
-- `docs/plans/2026-09-03-draft-title-match-handoff-consistency-roadmap.md`
+- `docs/plans/2026-09-03-update-chroma-rollback-integrity.md`
 
 This is a status pointer only, not an instruction to continue that seam by default.
 
@@ -142,6 +142,24 @@ This is a status pointer only, not an instruction to continue that seam by defau
 - The retrieval reason remains `Matched in title`; `Promote Draft` remains the canonical detail-side action.
 - Verified locally: 23 focused list tests; 73 capture/list/detail parity tests; active-path Pyright, Ruff, and format checks passed.
 - Delivery ledger: `docs/plans/2026-09-03-draft-title-match-handoff-consistency-roadmap.md`.
+
+---
+
+## Latest bounded storage-integrity correction — 2026-09-03
+
+- `update_prompt()` now restores the prior SQLite prompt if synchronous Chroma embedding persistence fails, then re-raises the original storage error.
+- This prevents SQLite from advancing while the derived semantic index retains the prior record; the asynchronous no-embedding path is unchanged.
+- Verified locally: 2 focused failure-path tests; 55 storage/branch tests; active-path Pyright, Ruff, and format checks passed.
+- Delivery ledger: `docs/plans/2026-09-03-update-chroma-rollback-integrity.md`.
+
+---
+
+## Latest bounded storage-integrity correction — 2026-09-03
+
+- `update_prompt()` now restores the prior SQLite prompt if synchronous Chroma embedding persistence fails, then re-raises the original storage error.
+- This prevents SQLite from advancing while the derived semantic index retains the prior record; the asynchronous no-embedding path is unchanged.
+- Verified locally: 2 focused failure-path tests; 55 storage/branch tests; active-path Pyright, Ruff, and format checks passed.
+- Delivery ledger: `docs/plans/2026-09-03-update-chroma-rollback-integrity.md`.
 
 ---
 

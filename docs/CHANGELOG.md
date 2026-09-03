@@ -4,6 +4,10 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Restored the prior SQLite prompt when synchronous Chroma embedding persistence fails during `update_prompt()`, then re-raised the storage error so a prompt asset cannot advance while its derived semantic-index record remains stale.
+
 ### Changed
 
 - Added one bounded **description-match action clarity v1** follow-up on the existing prompt-list seam so visible description matches now expose `Matched in description` and the same `Inspect before reuse` handoff used for source/scenario matches, while preserving ranking, retrieval, persistence, and detail-view semantics.

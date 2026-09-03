@@ -870,6 +870,22 @@ def test_update_prompt_handles_chroma_and_cache_failures() -> None:
     assert updated.id == prompt.id
 
 
+def test_update_prompt_rolls_back_sqlite_when_chroma_upsert_fails() -> None:
+    """A failed derived-index update must not leave SQLite with the new prompt body."""
+    original = _sample_prompt()
+    repo = _RecordingRepository()
+    repo.storage[original.id] = _clone_prompt(original)
+    collection = _StubCollection(upsert_exception=_TestChromaError("upsert"))
+    manager = _build_manager(repository=repo, collection=collection)
+    updated = _clone_prompt(original)
+    updated.context = "Changed body that must not be committed alone."
+
+    with pytest.raises(PromptStorageError):
+        manager.update_prompt(updated)
+
+    assert repo.storage[original.id].context == original.context
+
+
 def test_suggest_prompts_handles_repository_error_on_empty_query() -> None:
     class _Repo(_RecordingRepository):
         def list(self, limit: int | None = None) -> builtins.list[Prompt]:  # type: ignore[override]
