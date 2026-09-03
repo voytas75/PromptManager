@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 import types
 import uuid
 import zipfile
@@ -20,7 +21,7 @@ import pytest
 from chromadb.errors import ChromaError
 from overrides import override  # pyright: ignore[reportUnknownVariableType]
 
-from core.embedding import EmbeddingGenerationError
+from core.embedding import EmbeddingGenerationError, EmbeddingSyncWorker
 from core.exceptions import CategoryError, CategoryNotFoundError, CategoryStorageError
 from core.execution import CodexExecutionResult, ExecutionError
 from core.history_tracker import HistoryTracker, HistoryTrackerError
@@ -1741,6 +1742,51 @@ def test_persist_embedding_from_worker_rolls_back_ext4_when_chroma_upsert_fails(
         _persist_embedding_from_worker(manager, original, [0.1, 0.2])
 
     assert stored["prompt"].ext4 == [0.9, 0.8]
+
+
+def test_background_embedding_retry_restores_then_persists_current_vector(
+    prompt_manager: tuple[PromptManager, _DummyCollection, _DummyChromaClient, Path],
+) -> None:
+    """A retried worker callback should leave SQLite and Chroma on the successful vector."""
+    manager, collection, _, _ = prompt_manager
+    prompt = _make_prompt("Retry consistency")
+    repository = _InMemoryRepository([prompt])
+    manager._repository = repository  # type: ignore[assignment]
+    attempted_vectors: list[list[float]] = []
+    completed = threading.Event()
+
+    def flaky_upsert(**kwargs: Any) -> None:
+        vector = list(kwargs["embeddings"][0])
+        attempted_vectors.append(vector)
+        if len(attempted_vectors) == 1:
+            raise _TestChromaError("temporary upsert failure")
+        collection.upsert_payloads.append(dict(kwargs))
+        completed.set()
+
+    collection.upsert = flaky_upsert  # type: ignore[assignment]
+
+    class _Provider:
+        def embed(self, _: str) -> list[float]:
+            return [0.1, 0.2]
+
+    def persist_callback(prompt_arg: Prompt, vector: Sequence[float]) -> None:
+        _persist_embedding_from_worker(manager, prompt_arg, vector)
+
+    worker = EmbeddingSyncWorker(
+        provider=cast("Any", _Provider()),
+        fetch_prompt=repository.get,
+        persist_callback=persist_callback,
+        max_attempts=2,
+        retry_delay_seconds=0.0,
+    )
+    worker.schedule(prompt.id)
+
+    assert completed.wait(timeout=2.0), "Background retry did not persist embedding"
+    worker.stop()
+
+    assert attempted_vectors == [[0.1, 0.2], [0.1, 0.2]]
+    assert repository.get(prompt.id).ext4 == [0.1, 0.2]
+    assert collection.upsert_payloads[0]["embeddings"] == [[0.1, 0.2]]
 
 
 def test_apply_rating_handles_fetch_and_update_failures(
