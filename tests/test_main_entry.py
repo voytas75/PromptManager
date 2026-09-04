@@ -1703,6 +1703,44 @@ def test_prompt_add_command_rejects_json_string_with_non_object_entries(
     assert excinfo.value.code == 2
 
 
+@pytest.mark.parametrize(
+    ("ext5", "expected_detail"),
+    [
+        ("not-an-object", "field 'ext5' must be a JSON object"),
+        ({"scenarios": 7}, "field 'ext5.scenarios' must be a JSON list or string"),
+        (
+            {"scenarios": {"unexpected": "object"}},
+            "field 'ext5.scenarios' must be a JSON list or string",
+        ),
+    ],
+)
+def test_prompt_add_parser_rejects_malformed_structured_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    ext5: object,
+    expected_detail: str,
+) -> None:
+    payload = json.dumps(
+        {
+            "name": "JSON Diagnostics Helper",
+            "description": "Guide a calm first-pass diagnosis.",
+            "ext5": ext5,
+        }
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-add", "--json", payload, "--dry-run"],
+    )
+
+    from cli.parser import parse_args
+
+    with pytest.raises(SystemExit) as excinfo:
+        parse_args()
+
+    assert excinfo.value.code == 2
+    assert expected_detail in capsys.readouterr().err
+
+
 def test_prompt_add_command_accepts_json_string(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

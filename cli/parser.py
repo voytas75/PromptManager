@@ -91,6 +91,16 @@ def _validate_prompt_payload(
             missing_messages.append(
                 f"entry #{index} is missing required field(s): {', '.join(missing_fields)}"
             )
+        ext5 = entry.get("ext5")
+        if ext5 is not None and not isinstance(ext5, Mapping):
+            missing_messages.append(f"entry #{index} field 'ext5' must be a JSON object")
+        elif isinstance(ext5, Mapping):
+            ext5_mapping = cast("Mapping[str, Any]", ext5)
+            scenarios = ext5_mapping.get("scenarios")
+            if scenarios is not None and not isinstance(scenarios, (list, str)):
+                missing_messages.append(
+                    f"entry #{index} field 'ext5.scenarios' must be a JSON list or string"
+                )
     if missing_messages:
         parser.error("prompt-add payload validation failed: " + "; ".join(missing_messages))
 
