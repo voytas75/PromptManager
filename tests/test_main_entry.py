@@ -127,6 +127,7 @@ class _DummyManager:
         self.fork_calls: list[tuple[uuid.UUID, str | None, str | None]] = []
         self.fork_error: Exception | None = None
         self.fork_lineage: PromptForkLink | None = None
+        self.fork_children: list[PromptForkLink] = []
         self.fork_lineage_error: Exception | None = None
 
     def close(self) -> None:
@@ -199,6 +200,11 @@ class _DummyManager:
         if self.fork_lineage is not None and self.fork_lineage.child_prompt_id == prompt_id:
             return self.fork_lineage
         return None
+
+    def list_prompt_forks(self, prompt_id: uuid.UUID) -> list[PromptForkLink]:
+        if self.fork_lineage_error is not None:
+            raise self.fork_lineage_error
+        return [link for link in self.fork_children if link.source_prompt_id == prompt_id]
 
     def get_execution_analytics(
         self,
@@ -1444,6 +1450,148 @@ def test_prompt_history_command_filters_by_status_and_window_days(
     assert old_execution_at.isoformat(timespec="seconds") not in output
     assert "Old failed request" not in output
     assert "Recent success request" not in output
+    assert manager.closed is True
+
+
+def test_prompt_lineage_command_outputs_text_and_json(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    prompt_id = uuid.uuid4()
+    parent_id = uuid.uuid4()
+    child_one_id = uuid.uuid4()
+    child_two_id = uuid.uuid4()
+    parent_link = PromptForkLink(
+        id=7,
+        source_prompt_id=parent_id,
+        child_prompt_id=prompt_id,
+        created_at=datetime(2026, 9, 18, 9, 15, tzinfo=UTC),
+    )
+    children = [
+        PromptForkLink(
+            id=8,
+            source_prompt_id=prompt_id,
+            child_prompt_id=child_one_id,
+            created_at=datetime(2026, 9, 19, 10, 30, tzinfo=UTC),
+        ),
+        PromptForkLink(
+            id=9,
+            source_prompt_id=prompt_id,
+            child_prompt_id=child_two_id,
+            created_at=datetime(2026, 9, 19, 11, 45, tzinfo=UTC),
+        ),
+    ]
+    for use_json in (False, True):
+        argv = ["prompt-manager", "prompt-lineage", "Lineage Root"]
+        if use_json:
+            argv.append("--json")
+        monkeypatch.setattr("sys.argv", argv)
+        manager = _DummyManager()
+        manager.repository.store.append(
+            Prompt(
+                id=prompt_id,
+                name="Lineage Root",
+                description="Prompt with parent and children.",
+                category="Testing",
+            )
+        )
+        manager.fork_lineage = parent_link
+        manager.fork_children = children
+        _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+        _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+        assert main.main() == 0
+        output = capsys.readouterr().out
+        if use_json:
+            payload = json.loads(output)
+            assert payload["prompt"] == {"id": str(prompt_id), "name": "Lineage Root"}
+            assert payload["parent"]["id"] == 7
+            assert payload["parent"]["prompt_id"] == str(parent_id)
+            assert [child["prompt_id"] for child in payload["children"]] == [
+                str(child_one_id),
+                str(child_two_id),
+            ]
+        else:
+            assert f"prompt: Lineage Root ({prompt_id})" in output
+            assert f"parent: {parent_id}" in output
+            assert "children: 2" in output
+            assert str(child_one_id) in output
+        assert manager.closed is True
+
+
+def test_prompt_lineage_command_reports_no_relations_and_failures(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    prompt_id = uuid.uuid4()
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-lineage", str(prompt_id), "--json"])
+    manager = _DummyManager()
+    manager.repository.store.append(
+        Prompt(
+            id=prompt_id,
+            name="Standalone Prompt",
+            description="No fork relations.",
+            category="Testing",
+        )
+    )
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    assert main.main() == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["parent"] is None
+    assert payload["children"] == []
+    assert manager.closed is True
+
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-lineage", "Missing Prompt"])
+    manager = _DummyManager()
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+    assert main.main() == 4
+    assert "Prompt not found: Missing Prompt" in capsys.readouterr().out
+
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-lineage", str(prompt_id)])
+    manager = _DummyManager()
+    manager.repository.store.append(
+        Prompt(
+            id=prompt_id,
+            name="Standalone Prompt",
+            description="No fork relations.",
+            category="Testing",
+        )
+    )
+    manager.fork_lineage_error = RuntimeError("lineage unavailable")
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+    assert main.main() == 7
+    assert "Unable to load prompt lineage: lineage unavailable" in capsys.readouterr().out
+
+
+def test_prompt_lineage_command_rejects_ambiguous_exact_name(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    first_id = uuid.uuid4()
+    second_id = uuid.uuid4()
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-lineage", "Duplicate"])
+    manager = _DummyManager()
+    for prompt_id in (first_id, second_id):
+        manager.repository.store.append(
+            Prompt(
+                id=prompt_id,
+                name="Duplicate",
+                description="Ambiguous name.",
+                category="Testing",
+            )
+        )
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    assert main.main() == 5
+    output = capsys.readouterr().out
+    assert "Prompt name is ambiguous: Duplicate. Use a UUID:" in output
+    assert str(first_id) in output
+    assert str(second_id) in output
     assert manager.closed is True
 
 

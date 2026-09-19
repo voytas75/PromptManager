@@ -60,7 +60,7 @@ from .utils import (
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from core.prompt_manager import PromptManager
-    from models.prompt_model import Prompt
+    from models.prompt_model import Prompt, PromptForkLink
 else:  # pragma: no cover - runtime placeholders for type-only imports
     PromptManager = object
 
@@ -1534,6 +1534,100 @@ def run_prompt_find(
     return 0
 
 
+def _prompt_fork_link_payload(
+    link: PromptForkLink,
+    *,
+    related_prompt_id: str,
+) -> dict[str, object]:
+    """Serialize one stored parent-child lineage link for CLI output."""
+    return {
+        "id": link.id,
+        "prompt_id": related_prompt_id,
+        "created_at": link.created_at.isoformat(),
+    }
+
+
+def run_prompt_lineage(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    """Inspect stored prompt lineage without changing prompt assets."""
+    if manager is None:
+        raise ValueError("Prompt Manager is required for prompt lineage.")
+    raw_prompt_id = str(getattr(args, "prompt_id", "") or "").strip()
+    prompt = None
+    try:
+        prompt_id = uuid.UUID(raw_prompt_id)
+    except (ValueError, TypeError):
+        prompt_id = None
+    if prompt_id is not None:
+        try:
+            prompt = manager.repository.get(prompt_id)
+        except (RepositoryNotFoundError, KeyError):
+            prompt = None
+        except Exception as exc:  # pragma: no cover - surfaced to CLI
+            print_and_log(logger, logging.ERROR, f"Failed to load prompt: {exc}")
+            return 6
+    if prompt is None and raw_prompt_id:
+        try:
+            matches = [
+                candidate
+                for candidate in manager.repository.list()
+                if candidate.name == raw_prompt_id
+            ]
+        except Exception as exc:  # pragma: no cover - surfaced to CLI
+            print_and_log(logger, logging.ERROR, f"Failed to search prompt by name: {exc}")
+            return 6
+        if len(matches) > 1:
+            prompt_ids = ", ".join(str(candidate.id) for candidate in matches)
+            print_and_log(
+                logger,
+                logging.ERROR,
+                f"Prompt name is ambiguous: {raw_prompt_id}. Use a UUID: {prompt_ids}",
+            )
+            return 5
+        prompt = matches[0] if matches else None
+    if prompt is None:
+        print_and_log(logger, logging.ERROR, f"Prompt not found: {raw_prompt_id}")
+        return 4
+
+    try:
+        parent_link = manager.get_prompt_parent_fork(prompt.id)
+        child_links = manager.list_prompt_forks(prompt.id)
+    except Exception as exc:  # pragma: no cover - surfaced to CLI
+        print_and_log(logger, logging.ERROR, f"Unable to load prompt lineage: {exc}")
+        return 7
+
+    parent = (
+        _prompt_fork_link_payload(parent_link, related_prompt_id=str(parent_link.source_prompt_id))
+        if parent_link is not None
+        else None
+    )
+    children = [
+        _prompt_fork_link_payload(child_link, related_prompt_id=str(child_link.child_prompt_id))
+        for child_link in child_links
+    ]
+    payload = {
+        "prompt": {"id": str(prompt.id), "name": prompt.name},
+        "parent": parent,
+        "children": children,
+    }
+    if bool(getattr(args, "json", False)):
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+
+    print(f"prompt: {prompt.name} ({prompt.id})")
+    if parent is None:
+        print("parent: none")
+    else:
+        print(f"parent: {parent['prompt_id']} | link: {parent['id']} | {parent['created_at']}")
+    print(f"children: {len(children)}")
+    for child in children:
+        print(f"- {child['prompt_id']} | link: {child['id']} | {child['created_at']}")
+    return 0
+
+
 def run_prompt_fork(
     manager: PromptManager | None,
     args: argparse.Namespace,
@@ -2112,6 +2206,7 @@ COMMAND_SPECS: dict[str | None, CommandSpec] = {
     "prompt-show": CommandSpec(run_prompt_show),
     "prompt-find": CommandSpec(run_prompt_find),
     "prompt-history": CommandSpec(run_prompt_history),
+    "prompt-lineage": CommandSpec(run_prompt_lineage),
     "prompt-fork": CommandSpec(run_prompt_fork),
     "prompt-version-diff": CommandSpec(run_prompt_version_diff),
     "prompt-version-list": CommandSpec(run_prompt_version_list),

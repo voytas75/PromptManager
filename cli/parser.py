@@ -426,6 +426,21 @@ def parse_args() -> argparse.Namespace:
         help="Render prompt history as structured JSON.",
     )
 
+    prompt_lineage_parser = subparsers.add_parser(
+        "prompt-lineage",
+        help="Inspect parent and child fork lineage for a prompt.",
+    )
+    prompt_lineage_parser.add_argument(
+        "prompt_id",
+        type=str,
+        help="Prompt UUID or exact prompt name to inspect.",
+    )
+    prompt_lineage_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Render prompt lineage as structured JSON.",
+    )
+
     prompt_fork_parser = subparsers.add_parser(
         "prompt-fork",
         help="Create a named prompt variant while preserving source lineage.",
