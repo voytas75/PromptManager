@@ -312,6 +312,7 @@ Every log entry also stores structured context metadata (prompt snapshot, execut
 | `python -m main reembed` | Rebuild the ChromaDB vector store after backend/model changes or corruption. |
 | `python -m main benchmark --prompt <uuid> [--model <id>] --request "…"` | Execute one or more prompts across configured LiteLLM models and compare duration/token usage alongside history stats. |
 | `python -m main refresh-scenarios <uuid> [--max-scenarios N]` | Regenerate and persist scenario lists for a prompt via LiteLLM or the heuristic fallback. |
+| `python -m main prompt-render <prompt-id-or-name> [--variables-json '{...}'\|--variables-file vars.json] [--validate-only] [--json]` | Render and validate local Jinja prompt variables without calling a model; `--validate-only` checks readiness without printing rendered text. |
 | `python -m main prompt-chain-list` | List stored prompt chains (add `--include-inactive` for archived definitions). |
 | `python -m main prompt-chain-show <uuid>` | Display a prompt chain with ordered steps and target prompts. |
 | `python -m main prompt-chain-apply path/to/chain.json` | Create or update a prompt chain from a JSON definition (`name`, `description`, and ordered `steps` that only specify `prompt_id`, `order_index`, and optional `stop_on_failure`). |

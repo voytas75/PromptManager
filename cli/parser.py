@@ -426,6 +426,39 @@ def parse_args() -> argparse.Namespace:
         help="Render prompt history as structured JSON.",
     )
 
+    prompt_render_parser = subparsers.add_parser(
+        "prompt-render",
+        help="Render and validate a prompt template without calling a model.",
+    )
+    prompt_render_parser.add_argument(
+        "prompt_id",
+        type=str,
+        help="Prompt UUID or exact prompt name to render.",
+    )
+    variables_group = prompt_render_parser.add_mutually_exclusive_group()
+    variables_group.add_argument(
+        "--variables-json",
+        type=str,
+        default=None,
+        help="JSON object containing template variable values.",
+    )
+    variables_group.add_argument(
+        "--variables-file",
+        type=Path,
+        default=None,
+        help="UTF-8 JSON file containing a template variable object.",
+    )
+    prompt_render_parser.add_argument(
+        "--validate-only",
+        action="store_true",
+        help="Validate template variables without emitting rendered text.",
+    )
+    prompt_render_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit a deterministic JSON render or validation result.",
+    )
+
     suggest_parser = subparsers.add_parser(
         "suggest",
         help="Run semantic suggestions for a given query using the configured embedding backend.",

@@ -4,6 +4,10 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added `prompt-render <prompt-id-or-name>` as a provider-free CLI surface for rendering and validating local Jinja prompt variables from `--variables-json` or `--variables-file`; `--validate-only` supports readiness checks without emitting prompt text, while `--json` returns a deterministic result with detected variables, missing values, errors, and rendered text when valid.
+
 ### Fixed
 
 - Restored the prior SQLite prompt when synchronous Chroma embedding persistence fails during `update_prompt()`, then re-raised the storage error so a prompt asset cannot advance while its derived semantic-index record remains stale.

@@ -1376,6 +1376,153 @@ def test_prompt_history_command_filters_by_status_and_window_days(
     assert manager.closed is True
 
 
+def test_prompt_render_command_renders_prompt_with_json_variables(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    prompt_id = uuid.uuid4()
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "prompt-manager",
+            "prompt-render",
+            str(prompt_id),
+            "--variables-json",
+            '{"domain": "distributed systems"}',
+            "--json",
+        ],
+    )
+    settings = _DummySettings()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    manager = _DummyManager()
+    manager.repository.store.append(
+        Prompt(
+            id=prompt_id,
+            name="Mastery Roadmap",
+            description="Build an evidence-backed expertise roadmap.",
+            category="Learning",
+            context="Create a mastery roadmap for {{ domain }}.",
+        )
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["ok"] is True
+    assert output["prompt"]["id"] == str(prompt_id)
+    assert output["variables"] == ["domain"]
+    assert output["missing_variables"] == []
+    assert output["errors"] == []
+    assert output["rendered_text"] == "Create a mastery roadmap for distributed systems."
+    assert manager.closed is True
+
+
+def test_prompt_render_command_validate_only_reports_missing_variables(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    prompt_id = uuid.uuid4()
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "prompt-manager",
+            "prompt-render",
+            str(prompt_id),
+            "--validate-only",
+            "--json",
+        ],
+    )
+    settings = _DummySettings()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    manager = _DummyManager()
+    manager.repository.store.append(
+        Prompt(
+            id=prompt_id,
+            name="Mastery Roadmap",
+            description="Build an evidence-backed expertise roadmap.",
+            category="Learning",
+            context="Create a mastery roadmap for {{ domain }} at {{ level }} level.",
+        )
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    exit_code = main.main()
+
+    assert exit_code == 5
+    output = json.loads(capsys.readouterr().out)
+    assert output["ok"] is False
+    assert output["variables"] == ["domain", "level"]
+    assert output["missing_variables"] == ["domain", "level"]
+    assert output["rendered_text"] is None
+    assert output["errors"] == ["'domain' is undefined"]
+    assert manager.closed is True
+
+
+def test_prompt_render_command_returns_json_for_invalid_variables(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    prompt_id = uuid.uuid4()
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-render", str(prompt_id), "--variables-json", "{", "--json"],
+    )
+    settings = _DummySettings()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    manager = _DummyManager()
+    manager.repository.store.append(
+        Prompt(
+            id=prompt_id,
+            name="Mastery Roadmap",
+            description="Build an evidence-backed expertise roadmap.",
+            category="Learning",
+            context="Create a mastery roadmap for {{ domain }}.",
+        )
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    exit_code = main.main()
+
+    assert exit_code == 5
+    output = json.loads(capsys.readouterr().out)
+    assert output["ok"] is False
+    assert output["prompt"]["id"] == str(prompt_id)
+    assert output["errors"][0].startswith("Invalid template variables JSON:")
+    assert manager.closed is True
+
+
+def test_prompt_render_command_returns_json_for_runtime_template_error(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    prompt_id = uuid.uuid4()
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-render", str(prompt_id), "--json"])
+    settings = _DummySettings()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    manager = _DummyManager()
+    manager.repository.store.append(
+        Prompt(
+            id=prompt_id,
+            name="Broken Template",
+            description="Template with a runtime error.",
+            category="Testing",
+            context="{{ 1 / 0 }}",
+        )
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    exit_code = main.main()
+
+    assert exit_code == 5
+    output = json.loads(capsys.readouterr().out)
+    assert output["ok"] is False
+    assert output["errors"] == ["Template rendering failed: division by zero"]
+    assert output["rendered_text"] is None
+    assert manager.closed is True
+
+
 def test_prompt_show_command_outputs_json_payload(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

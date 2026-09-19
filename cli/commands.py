@@ -31,7 +31,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from core import (
     PromptChainError,
@@ -46,6 +46,7 @@ from core import (
     import_prompt_catalog,
     snapshot_dataset_rows,
 )
+from core.templating import TemplateRenderer
 from models.prompt_chain_model import (
     chain_from_payload,
 )
@@ -1532,6 +1533,184 @@ def run_prompt_find(
     return 0
 
 
+def _prompt_render_payload(
+    *,
+    ok: bool,
+    prompt: object | None,
+    variables: list[str] | None = None,
+    missing_variables: list[str] | None = None,
+    errors: list[str] | None = None,
+    rendered_text: str | None = None,
+) -> dict[str, object]:
+    """Build a stable, JSON-safe result payload for prompt rendering."""
+    prompt_payload: dict[str, str] | None = None
+    if prompt is not None:
+        prompt_payload = {
+            "id": str(getattr(prompt, "id", "")),
+            "name": str(getattr(prompt, "name", "")),
+        }
+    return {
+        "ok": ok,
+        "prompt": prompt_payload,
+        "variables": variables or [],
+        "missing_variables": missing_variables or [],
+        "errors": errors or [],
+        "rendered_text": rendered_text,
+    }
+
+
+def _emit_prompt_render_result(
+    *,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+    payload: dict[str, object],
+) -> None:
+    """Print one prompt-render outcome without corrupting requested JSON output."""
+    if bool(getattr(args, "json", False)):
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return
+    errors = cast("list[str]", payload["errors"])
+    if errors:
+        for message in errors:
+            print_and_log(logger, logging.ERROR, message)
+        return
+    if bool(getattr(args, "validate_only", False)):
+        print("Template validation passed.")
+        return
+    rendered_text = payload["rendered_text"]
+    if isinstance(rendered_text, str):
+        print(rendered_text)
+
+
+def run_prompt_render(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    """Render one prompt template with local JSON variables, without provider execution."""
+    if manager is None:
+        raise ValueError("Prompt Manager is required for prompt rendering.")
+
+    raw_prompt_id = str(getattr(args, "prompt_id", "") or "").strip()
+    prompt = None
+    try:
+        prompt_id = uuid.UUID(raw_prompt_id)
+    except (ValueError, TypeError):
+        prompt_id = None
+    if prompt_id is not None:
+        try:
+            prompt = manager.repository.get(prompt_id)
+        except (RepositoryNotFoundError, KeyError):
+            prompt = None
+        except Exception as exc:  # pragma: no cover - surfaced to CLI
+            payload = _prompt_render_payload(
+                ok=False,
+                prompt=None,
+                errors=[f"Failed to load prompt: {exc}"],
+            )
+            _emit_prompt_render_result(args=args, logger=logger, payload=payload)
+            return 6
+    if prompt is None and raw_prompt_id:
+        try:
+            prompt = next(
+                (
+                    candidate
+                    for candidate in manager.repository.list()
+                    if candidate.name == raw_prompt_id
+                ),
+                None,
+            )
+        except Exception as exc:  # pragma: no cover - surfaced to CLI
+            payload = _prompt_render_payload(
+                ok=False,
+                prompt=None,
+                errors=[f"Failed to search prompt by name: {exc}"],
+            )
+            _emit_prompt_render_result(args=args, logger=logger, payload=payload)
+            return 6
+    if prompt is None:
+        payload = _prompt_render_payload(
+            ok=False,
+            prompt=None,
+            errors=[f"Prompt not found: {raw_prompt_id}"],
+        )
+        _emit_prompt_render_result(args=args, logger=logger, payload=payload)
+        return 4
+
+    raw_variables = getattr(args, "variables_json", None)
+    variables_file = getattr(args, "variables_file", None)
+    try:
+        if raw_variables is not None:
+            parsed_variables = json.loads(str(raw_variables))
+        elif variables_file is not None:
+            parsed_variables = _load_json_file(Path(variables_file))
+        else:
+            parsed_variables = {}
+    except json.JSONDecodeError as exc:
+        payload = _prompt_render_payload(
+            ok=False,
+            prompt=prompt,
+            errors=[f"Invalid template variables JSON: {exc}"],
+        )
+        _emit_prompt_render_result(args=args, logger=logger, payload=payload)
+        return 5
+    except ValueError as exc:
+        payload = _prompt_render_payload(ok=False, prompt=prompt, errors=[str(exc)])
+        _emit_prompt_render_result(args=args, logger=logger, payload=payload)
+        return 5
+    if not isinstance(parsed_variables, Mapping):
+        payload = _prompt_render_payload(
+            ok=False,
+            prompt=prompt,
+            errors=["Template variables must be a JSON object."],
+        )
+        _emit_prompt_render_result(args=args, logger=logger, payload=payload)
+        return 5
+    variables_mapping = cast("Mapping[object, object]", parsed_variables)
+    variables = {str(key): value for key, value in variables_mapping.items()}
+
+    template_text = str(prompt.context or "")
+    renderer = TemplateRenderer()
+    try:
+        variable_names = renderer.extract_variables(template_text)
+    except Exception as exc:
+        payload = _prompt_render_payload(
+            ok=False,
+            prompt=prompt,
+            errors=[f"Template parsing failed: {exc}"],
+        )
+        _emit_prompt_render_result(args=args, logger=logger, payload=payload)
+        return 5
+
+    missing_variables = sorted(name for name in variable_names if name not in variables)
+    try:
+        result = renderer.render(template_text, variables)
+    except Exception as exc:
+        payload = _prompt_render_payload(
+            ok=False,
+            prompt=prompt,
+            variables=variable_names,
+            missing_variables=missing_variables,
+            errors=[f"Template rendering failed: {exc}"],
+        )
+        _emit_prompt_render_result(args=args, logger=logger, payload=payload)
+        return 5
+
+    missing_variables = sorted(set(missing_variables) | result.missing_variables)
+    ok = not result.errors and not missing_variables
+    validate_only = bool(getattr(args, "validate_only", False))
+    payload = _prompt_render_payload(
+        ok=ok,
+        prompt=prompt,
+        variables=variable_names,
+        missing_variables=missing_variables,
+        errors=result.errors,
+        rendered_text=result.rendered_text if ok and not validate_only else None,
+    )
+    _emit_prompt_render_result(args=args, logger=logger, payload=payload)
+    return 0 if ok else 5
+
+
 def run_prompt_history(
     manager: PromptManager | None,
     args: argparse.Namespace,
@@ -1710,6 +1889,7 @@ COMMAND_SPECS: dict[str | None, CommandSpec] = {
     "prompt-show": CommandSpec(run_prompt_show),
     "prompt-find": CommandSpec(run_prompt_find),
     "prompt-history": CommandSpec(run_prompt_history),
+    "prompt-render": CommandSpec(run_prompt_render),
     "suggest": CommandSpec(run_suggest),
     "usage-report": CommandSpec(run_usage_report),
     "history-analytics": CommandSpec(run_history_analytics),
