@@ -11,6 +11,7 @@ Updates:
 from __future__ import annotations
 
 import sqlite3
+import threading
 import uuid
 from contextlib import closing
 from dataclasses import replace
@@ -99,6 +100,73 @@ def test_repository_add_duplicate_raises_error(tmp_path: Path) -> None:
     repo.add(prompt)
     with pytest.raises(RepositoryError):
         repo.add(prompt)
+
+
+def test_repository_update_with_version_is_atomic_when_snapshot_insert_fails(
+    tmp_path: Path,
+) -> None:
+    repo = PromptRepository(str(tmp_path / "repo.db"))
+    prompt = _make_prompt()
+    prompt.context = "original body"
+    repo.add(prompt)
+    changed = replace(prompt, context="changed body", version="2")
+
+    with closing(sqlite3.connect(tmp_path / "repo.db")) as conn:
+        conn.execute(
+            """
+            CREATE TRIGGER reject_prompt_version
+            BEFORE INSERT ON prompt_versions
+            BEGIN
+                SELECT RAISE(ABORT, 'forced snapshot failure');
+            END;
+            """
+        )
+        conn.commit()
+
+    with pytest.raises(RepositoryError, match="Failed to update prompt"):
+        repo.update_with_version(changed, commit_message="must roll back")
+
+    persisted = repo.get(prompt.id)
+    assert persisted.context == "original body"
+    assert persisted.version == prompt.version
+    assert repo.list_prompt_versions(prompt.id) == []
+
+
+def test_repository_update_with_version_serializes_concurrent_version_numbers(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "repo.db"
+    repository = PromptRepository(str(db_path))
+    prompt = _make_prompt()
+    prompt.context = "version one"
+    repository.add(prompt)
+    repository.record_prompt_version(prompt, commit_message="initial")
+    barrier = threading.Barrier(2)
+    errors: list[Exception] = []
+
+    def _update(context: str) -> None:
+        try:
+            repo = PromptRepository(str(db_path))
+            changed = replace(prompt, context=context)
+            barrier.wait(timeout=5)
+            repo.update_with_version(changed, commit_message=context)
+        except Exception as exc:  # pragma: no cover - asserted below
+            errors.append(exc)
+
+    threads = [
+        threading.Thread(target=_update, args=("writer one",)),
+        threading.Thread(target=_update, args=("writer two",)),
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=10)
+
+    assert all(not thread.is_alive() for thread in threads)
+    assert errors == []
+    versions = repository.list_prompt_versions(prompt.id)
+    assert [version.version_number for version in versions] == [3, 2, 1]
+    assert len({version.version_number for version in versions}) == 3
 
 
 def test_repository_update_missing_prompt(tmp_path: Path) -> None:

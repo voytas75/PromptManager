@@ -38,7 +38,7 @@ from core.history_tracker import (
     TokenUsageTotals,
 )
 from core.intent_classifier import IntentLabel, IntentPrediction
-from core.prompt_manager import PromptManagerError
+from core.prompt_manager import PromptManagerError, PromptVersionNotFoundError
 from core.prompt_manager.versioning import PromptVersionDiff
 from models.prompt_model import (
     ExecutionStatus,
@@ -123,7 +123,11 @@ class _DummyManager:
         self.prompt_execution_analytics: PromptExecutionAnalytics | None = None
         self.prompt_executions: list[PromptExecution] = []
         self.prompt_versions: list[object] = []
+        self.prompt_version_lookup: object | None = None
         self.prompt_version_diff: object | None = None
+        self.restore_calls: list[tuple[int, str | None]] = []
+        self.restore_error: Exception | None = None
+        self.restore_result: Prompt | None = None
         self.fork_calls: list[tuple[uuid.UUID, str | None, str | None]] = []
         self.fork_error: Exception | None = None
         self.fork_lineage: PromptForkLink | None = None
@@ -164,6 +168,26 @@ class _DummyManager:
         if self.prompt_version_diff is None:
             raise KeyError("Prompt version diff unavailable")
         return self.prompt_version_diff
+
+    def get_prompt_version(self, version_id: int) -> object:
+        if isinstance(self.prompt_version_lookup, Exception):
+            raise self.prompt_version_lookup
+        if self.prompt_version_lookup is None:
+            raise PromptVersionNotFoundError(f"Prompt version {version_id} not found")
+        return self.prompt_version_lookup
+
+    def restore_prompt_version(
+        self,
+        version_id: int,
+        *,
+        commit_message: str | None = None,
+    ) -> Prompt:
+        self.restore_calls.append((version_id, commit_message))
+        if self.restore_error is not None:
+            raise self.restore_error
+        if self.restore_result is None:
+            raise KeyError("Prompt version restore unavailable")
+        return self.restore_result
 
     def fork_prompt(
         self,
@@ -1595,6 +1619,68 @@ def test_prompt_lineage_command_rejects_ambiguous_exact_name(
     assert manager.closed is True
 
 
+def test_prompt_asset_commands_reject_ambiguous_exact_names(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    commands = [
+        ["prompt-show", "Duplicate"],
+        ["prompt-lineage", "Duplicate"],
+        ["prompt-fork", "Duplicate", "--name", "Rejected child"],
+        ["prompt-version-list", "Duplicate"],
+        ["prompt-render", "Duplicate"],
+        ["prompt-history", "Duplicate"],
+    ]
+    for command in commands:
+        monkeypatch.setattr("sys.argv", ["prompt-manager", *command])
+        manager = _DummyManager()
+        prompt_ids = [uuid.uuid4(), uuid.uuid4()]
+        manager.repository.store.extend(
+            [
+                Prompt(
+                    id=prompt_id,
+                    name="Duplicate",
+                    description="Ambiguous asset name.",
+                    category="Testing",
+                )
+                for prompt_id in prompt_ids
+            ]
+        )
+        _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+        _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+        assert main.main() == 5
+        output = capsys.readouterr().out
+        assert "Prompt name is ambiguous: Duplicate. Use a UUID:" in output
+        assert all(str(prompt_id) in output for prompt_id in prompt_ids)
+        assert manager.fork_calls == []
+        assert manager.closed is True
+
+
+def test_prompt_asset_commands_resolve_uuid_shaped_exact_names(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    uuid_shaped_name = "12345678-1234-4234-8234-123456789abc"
+    prompt_id = uuid.uuid4()
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-show", uuid_shaped_name])
+    manager = _DummyManager()
+    manager.repository.store.append(
+        Prompt(
+            id=prompt_id,
+            name=uuid_shaped_name,
+            description="Name resembles a UUID.",
+            category="Testing",
+        )
+    )
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    assert main.main() == 0
+    assert f"id: {prompt_id}" in capsys.readouterr().out
+    assert manager.closed is True
+
+
 def test_prompt_fork_command_creates_named_fork_with_text_and_json(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -1720,6 +1806,112 @@ def test_prompt_fork_command_reports_not_found_and_failure(
     assert main.main() == 7
     assert "Unable to fork prompt: name already exists" in capsys.readouterr().out
     assert manager.closed is True
+
+
+def test_prompt_restore_version_requires_confirmation_and_outputs_text_and_json(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    prompt_id = uuid.uuid4()
+    restored = Prompt(
+        id=prompt_id,
+        name="Restored prompt",
+        description="Restored description",
+        category="Testing",
+        context="Restored body",
+        version="3",
+    )
+    source_version = PromptVersion(
+        id=12,
+        prompt_id=prompt_id,
+        version_number=3,
+        created_at=datetime(2026, 9, 19, 12, 0, tzinfo=UTC),
+        parent_version_id=11,
+        commit_message="Source snapshot",
+        snapshot=restored.to_record(),
+    )
+
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-restore-version", "12"])
+    manager = _DummyManager()
+    manager.restore_result = restored
+    manager.prompt_version_lookup = source_version
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+    assert main.main() == 5
+    assert manager.restore_calls == []
+    assert "Re-run with --confirm." in capsys.readouterr().out
+
+    for use_json in (False, True):
+        argv = [
+            "prompt-manager",
+            "prompt-restore-version",
+            "12",
+            "--confirm",
+            "--commit-message",
+            "Restore approved",
+        ]
+        if use_json:
+            argv.append("--json")
+        monkeypatch.setattr("sys.argv", argv)
+        manager = _DummyManager()
+        manager.restore_result = restored
+        manager.prompt_version_lookup = source_version
+        _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+        _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+        assert main.main() == 0
+        output = capsys.readouterr().out
+        assert manager.restore_calls == [(12, "Restore approved")]
+        if use_json:
+            payload = json.loads(output)
+            assert payload["restored_from_version_id"] == 12
+            assert payload["prompt"]["id"] == str(prompt_id)
+            assert payload["commit_message"] == "Restore approved"
+        else:
+            assert f"Restored version 12 to Restored prompt ({prompt_id})" in output
+        assert manager.closed is True
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-restore-version", "12", "--confirm", "--json"],
+    )
+    manager = _DummyManager()
+    manager.restore_result = restored
+    manager.prompt_version_lookup = source_version
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+    assert main.main() == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert manager.restore_calls == [(12, None)]
+    assert payload["commit_message"] == "Restore version 3"
+
+
+def test_prompt_restore_version_reports_lookup_and_persistence_failures(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-restore-version", "22", "--confirm"])
+    manager = _DummyManager()
+    manager.prompt_version_lookup = PromptVersionNotFoundError("Prompt version 22 not found")
+    manager.restore_error = PromptVersionNotFoundError("Prompt version 22 not found")
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+    assert main.main() == 4
+    assert "Prompt version not found: Prompt version 22 not found" in capsys.readouterr().out
+
+    manager = _DummyManager()
+    manager.prompt_version_lookup = PromptVersion(
+        id=22,
+        prompt_id=uuid.uuid4(),
+        version_number=3,
+        created_at=datetime(2026, 9, 19, 12, 0, tzinfo=UTC),
+        parent_version_id=None,
+        commit_message="Source snapshot",
+        snapshot={},
+    )
+    manager.restore_error = PromptManagerError("write failed")
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+    assert main.main() == 7
+    assert "Unable to restore prompt version: write failed" in capsys.readouterr().out
 
 
 def test_prompt_version_diff_command_outputs_text_and_json(

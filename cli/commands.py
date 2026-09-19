@@ -38,6 +38,7 @@ from core import (
     PromptChainExecutionError,
     PromptHistoryError,
     PromptManagerError,
+    PromptVersionNotFoundError,
     RepositoryNotFoundError,
     TokenUsageTotals,
     build_analytics_snapshot,
@@ -1391,6 +1392,37 @@ def run_suggest(
     return 0
 
 
+def _resolve_prompt_reference(
+    manager: PromptManager,
+    raw_prompt_id: str,
+) -> tuple[Prompt | None, int, str | None]:
+    """Resolve a UUID or exactly one prompt name for an asset operation."""
+    try:
+        prompt_id = uuid.UUID(raw_prompt_id)
+    except (ValueError, TypeError):
+        prompt_id = None
+    if prompt_id is not None:
+        try:
+            return manager.repository.get(prompt_id), 0, None
+        except (RepositoryNotFoundError, KeyError):
+            pass
+        except Exception as exc:  # pragma: no cover - surfaced by callers
+            return None, 6, f"Failed to load prompt: {exc}"
+
+    try:
+        matches = [
+            candidate for candidate in manager.repository.list() if candidate.name == raw_prompt_id
+        ]
+    except Exception as exc:  # pragma: no cover - surfaced by callers
+        return None, 6, f"Failed to search prompt by name: {exc}"
+    if not matches:
+        return None, 4, f"Prompt not found: {raw_prompt_id}"
+    if len(matches) > 1:
+        prompt_ids = ", ".join(str(candidate.id) for candidate in matches)
+        return None, 5, f"Prompt name is ambiguous: {raw_prompt_id}. Use a UUID: {prompt_ids}"
+    return matches[0], 0, None
+
+
 def run_prompt_show(
     manager: PromptManager | None,
     args: argparse.Namespace,
@@ -1399,40 +1431,10 @@ def run_prompt_show(
     if manager is None:
         raise ValueError("Prompt Manager is required for prompt display.")
     raw_prompt_id = str(getattr(args, "prompt_id", "") or "").strip()
-    prompt = None
-
-    try:
-        prompt_id = uuid.UUID(raw_prompt_id)
-    except (ValueError, TypeError):
-        prompt_id = None
-    if prompt_id is not None:
-        try:
-            prompt = manager.repository.get(prompt_id)
-        except RepositoryNotFoundError:
-            prompt = None
-        except KeyError:
-            prompt = None
-        except Exception as exc:  # pragma: no cover - surfaced to CLI
-            print_and_log(logger, logging.ERROR, f"Failed to load prompt: {exc}")
-            return 6
-
-    if prompt is None and raw_prompt_id:
-        try:
-            for candidate in manager.repository.list():
-                if candidate.name == raw_prompt_id:
-                    prompt = candidate
-                    break
-        except Exception as exc:  # pragma: no cover - surfaced to CLI
-            print_and_log(logger, logging.ERROR, f"Failed to search prompt by name: {exc}")
-            return 6
-
+    prompt, exit_code, error_message = _resolve_prompt_reference(manager, raw_prompt_id)
     if prompt is None:
-        if prompt_id is None and raw_prompt_id:
-            print_and_log(logger, logging.ERROR, f"Prompt not found: {raw_prompt_id}")
-            return 4
-        missing_ref = prompt_id if prompt_id is not None else raw_prompt_id
-        print_and_log(logger, logging.ERROR, f"Prompt not found: {missing_ref}")
-        return 4
+        print_and_log(logger, logging.ERROR, error_message or f"Prompt not found: {raw_prompt_id}")
+        return exit_code
 
     if bool(getattr(args, "json", False)):
         print(json.dumps(prompt.to_record(), ensure_ascii=False, indent=2))
@@ -1556,41 +1558,10 @@ def run_prompt_lineage(
     if manager is None:
         raise ValueError("Prompt Manager is required for prompt lineage.")
     raw_prompt_id = str(getattr(args, "prompt_id", "") or "").strip()
-    prompt = None
-    try:
-        prompt_id = uuid.UUID(raw_prompt_id)
-    except (ValueError, TypeError):
-        prompt_id = None
-    if prompt_id is not None:
-        try:
-            prompt = manager.repository.get(prompt_id)
-        except (RepositoryNotFoundError, KeyError):
-            prompt = None
-        except Exception as exc:  # pragma: no cover - surfaced to CLI
-            print_and_log(logger, logging.ERROR, f"Failed to load prompt: {exc}")
-            return 6
-    if prompt is None and raw_prompt_id:
-        try:
-            matches = [
-                candidate
-                for candidate in manager.repository.list()
-                if candidate.name == raw_prompt_id
-            ]
-        except Exception as exc:  # pragma: no cover - surfaced to CLI
-            print_and_log(logger, logging.ERROR, f"Failed to search prompt by name: {exc}")
-            return 6
-        if len(matches) > 1:
-            prompt_ids = ", ".join(str(candidate.id) for candidate in matches)
-            print_and_log(
-                logger,
-                logging.ERROR,
-                f"Prompt name is ambiguous: {raw_prompt_id}. Use a UUID: {prompt_ids}",
-            )
-            return 5
-        prompt = matches[0] if matches else None
+    prompt, exit_code, error_message = _resolve_prompt_reference(manager, raw_prompt_id)
     if prompt is None:
-        print_and_log(logger, logging.ERROR, f"Prompt not found: {raw_prompt_id}")
-        return 4
+        print_and_log(logger, logging.ERROR, error_message or f"Prompt not found: {raw_prompt_id}")
+        return exit_code
 
     try:
         parent_link = manager.get_prompt_parent_fork(prompt.id)
@@ -1642,35 +1613,10 @@ def run_prompt_fork(
         print_and_log(logger, logging.ERROR, "Fork name must not be blank.")
         return 5
 
-    prompt = None
-    try:
-        prompt_id = uuid.UUID(raw_prompt_id)
-    except (ValueError, TypeError):
-        prompt_id = None
-    if prompt_id is not None:
-        try:
-            prompt = manager.repository.get(prompt_id)
-        except (RepositoryNotFoundError, KeyError):
-            prompt = None
-        except Exception as exc:  # pragma: no cover - surfaced to CLI
-            print_and_log(logger, logging.ERROR, f"Failed to load prompt: {exc}")
-            return 6
-    if prompt is None and raw_prompt_id:
-        try:
-            prompt = next(
-                (
-                    candidate
-                    for candidate in manager.repository.list()
-                    if candidate.name == raw_prompt_id
-                ),
-                None,
-            )
-        except Exception as exc:  # pragma: no cover - surfaced to CLI
-            print_and_log(logger, logging.ERROR, f"Failed to search prompt by name: {exc}")
-            return 6
+    prompt, exit_code, error_message = _resolve_prompt_reference(manager, raw_prompt_id)
     if prompt is None:
-        print_and_log(logger, logging.ERROR, f"Prompt not found: {raw_prompt_id}")
-        return 4
+        print_and_log(logger, logging.ERROR, error_message or f"Prompt not found: {raw_prompt_id}")
+        return exit_code
 
     forked: Prompt | None = None
     lineage = None
@@ -1713,6 +1659,60 @@ def run_prompt_fork(
         return 0
     print(f"Forked: {prompt.name} ({prompt.id})")
     print(f"Created: {forked.name} ({forked.id})")
+    return 0
+
+
+def run_prompt_restore_version(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    """Restore one historical snapshot while preserving append-only history."""
+    if manager is None:
+        raise ValueError("Prompt Manager is required for prompt version restore.")
+    version_id = int(getattr(args, "version_id", 0) or 0)
+    if version_id <= 0:
+        print_and_log(logger, logging.ERROR, "Version ID must be a positive integer.")
+        return 5
+    if not bool(getattr(args, "confirm", False)):
+        print_and_log(
+            logger,
+            logging.ERROR,
+            "Restore is destructive to the live prompt state. Re-run with --confirm.",
+        )
+        return 5
+    try:
+        source_version = manager.get_prompt_version(version_id)
+        commit_message = getattr(args, "commit_message", None) or (
+            f"Restore version {source_version.version_number}"
+        )
+        restored = manager.restore_prompt_version(
+            version_id,
+            commit_message=getattr(args, "commit_message", None),
+        )
+    except PromptVersionNotFoundError as exc:
+        print_and_log(logger, logging.ERROR, f"Prompt version not found: {exc}")
+        return 4
+    except Exception as exc:  # pragma: no cover - surfaced to CLI
+        print_and_log(logger, logging.ERROR, f"Unable to restore prompt version: {exc}")
+        return 7
+
+    payload = {
+        "restored_from_version_id": version_id,
+        "prompt": {
+            "id": str(restored.id),
+            "name": restored.name,
+            "version": restored.version,
+        },
+        "commit_message": commit_message,
+    }
+    if bool(getattr(args, "json", False)):
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    print(
+        f"Restored version {version_id} to {restored.name} ({restored.id}); "
+        f"current version: {restored.version}"
+    )
     return 0
 
 
@@ -1785,35 +1785,10 @@ def run_prompt_version_list(
     if manager is None:
         raise ValueError("Prompt Manager is required for prompt version history.")
     raw_prompt_id = str(getattr(args, "prompt_id", "") or "").strip()
-    prompt = None
-    try:
-        prompt_id = uuid.UUID(raw_prompt_id)
-    except (ValueError, TypeError):
-        prompt_id = None
-    if prompt_id is not None:
-        try:
-            prompt = manager.repository.get(prompt_id)
-        except (RepositoryNotFoundError, KeyError):
-            prompt = None
-        except Exception as exc:  # pragma: no cover - surfaced to CLI
-            print_and_log(logger, logging.ERROR, f"Failed to load prompt: {exc}")
-            return 6
-    if prompt is None and raw_prompt_id:
-        try:
-            prompt = next(
-                (
-                    candidate
-                    for candidate in manager.repository.list()
-                    if candidate.name == raw_prompt_id
-                ),
-                None,
-            )
-        except Exception as exc:  # pragma: no cover - surfaced to CLI
-            print_and_log(logger, logging.ERROR, f"Failed to search prompt by name: {exc}")
-            return 6
+    prompt, exit_code, error_message = _resolve_prompt_reference(manager, raw_prompt_id)
     if prompt is None:
-        print_and_log(logger, logging.ERROR, f"Prompt not found: {raw_prompt_id}")
-        return 4
+        print_and_log(logger, logging.ERROR, error_message or f"Prompt not found: {raw_prompt_id}")
+        return exit_code
 
     limit = max(1, int(getattr(args, "limit", 20) or 20))
     try:
@@ -1909,50 +1884,15 @@ def run_prompt_render(
         raise ValueError("Prompt Manager is required for prompt rendering.")
 
     raw_prompt_id = str(getattr(args, "prompt_id", "") or "").strip()
-    prompt = None
-    try:
-        prompt_id = uuid.UUID(raw_prompt_id)
-    except (ValueError, TypeError):
-        prompt_id = None
-    if prompt_id is not None:
-        try:
-            prompt = manager.repository.get(prompt_id)
-        except (RepositoryNotFoundError, KeyError):
-            prompt = None
-        except Exception as exc:  # pragma: no cover - surfaced to CLI
-            payload = _prompt_render_payload(
-                ok=False,
-                prompt=None,
-                errors=[f"Failed to load prompt: {exc}"],
-            )
-            _emit_prompt_render_result(args=args, logger=logger, payload=payload)
-            return 6
-    if prompt is None and raw_prompt_id:
-        try:
-            prompt = next(
-                (
-                    candidate
-                    for candidate in manager.repository.list()
-                    if candidate.name == raw_prompt_id
-                ),
-                None,
-            )
-        except Exception as exc:  # pragma: no cover - surfaced to CLI
-            payload = _prompt_render_payload(
-                ok=False,
-                prompt=None,
-                errors=[f"Failed to search prompt by name: {exc}"],
-            )
-            _emit_prompt_render_result(args=args, logger=logger, payload=payload)
-            return 6
+    prompt, exit_code, error_message = _resolve_prompt_reference(manager, raw_prompt_id)
     if prompt is None:
         payload = _prompt_render_payload(
             ok=False,
             prompt=None,
-            errors=[f"Prompt not found: {raw_prompt_id}"],
+            errors=[error_message or f"Prompt not found: {raw_prompt_id}"],
         )
         _emit_prompt_render_result(args=args, logger=logger, payload=payload)
-        return 4
+        return exit_code
 
     raw_variables = getattr(args, "variables_json", None)
     variables_file = getattr(args, "variables_file", None)
@@ -2052,37 +1992,10 @@ def run_prompt_history(
             )
             return 5
     window_days = max(0, int(getattr(args, "window_days", 0) or 0))
-    prompt = None
-
-    try:
-        prompt_id = uuid.UUID(raw_prompt_id)
-    except (ValueError, TypeError):
-        prompt_id = None
-    if prompt_id is not None:
-        try:
-            prompt = manager.repository.get(prompt_id)
-        except RepositoryNotFoundError:
-            prompt = None
-        except KeyError:
-            prompt = None
-        except Exception as exc:  # pragma: no cover - surfaced to CLI
-            print_and_log(logger, logging.ERROR, f"Failed to load prompt: {exc}")
-            return 6
-
-    if prompt is None and raw_prompt_id:
-        try:
-            for candidate in manager.repository.list():
-                if candidate.name == raw_prompt_id:
-                    prompt = candidate
-                    break
-        except Exception as exc:  # pragma: no cover - surfaced to CLI
-            print_and_log(logger, logging.ERROR, f"Failed to search prompt by name: {exc}")
-            return 6
-
+    prompt, exit_code, error_message = _resolve_prompt_reference(manager, raw_prompt_id)
     if prompt is None:
-        missing_ref = prompt_id if prompt_id is not None else raw_prompt_id
-        print_and_log(logger, logging.ERROR, f"Prompt not found: {missing_ref}")
-        return 4
+        print_and_log(logger, logging.ERROR, error_message or f"Prompt not found: {raw_prompt_id}")
+        return exit_code
 
     analytics = None
     try:
@@ -2208,6 +2121,7 @@ COMMAND_SPECS: dict[str | None, CommandSpec] = {
     "prompt-history": CommandSpec(run_prompt_history),
     "prompt-lineage": CommandSpec(run_prompt_lineage),
     "prompt-fork": CommandSpec(run_prompt_fork),
+    "prompt-restore-version": CommandSpec(run_prompt_restore_version),
     "prompt-version-diff": CommandSpec(run_prompt_version_diff),
     "prompt-version-list": CommandSpec(run_prompt_version_list),
     "prompt-render": CommandSpec(run_prompt_render),

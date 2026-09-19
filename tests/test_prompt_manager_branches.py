@@ -145,6 +145,7 @@ class _RecordingRepository:
         self._version_index: dict[int, PromptVersion] = {}
         self._version_counter = 0
         self.version_error: Exception | None = None
+        self.update_error: Exception | None = None
         self._fork_links: dict[int, PromptForkLink] = {}
         self._fork_counter = 0
         self.fork_error: Exception | None = None
@@ -160,10 +161,28 @@ class _RecordingRepository:
         return prompt
 
     def update(self, prompt: Prompt) -> Prompt:
+        if self.update_error is not None:
+            raise self.update_error
         if prompt.id not in self.storage:
             raise RepositoryNotFoundError("missing prompt")
         self.storage[prompt.id] = _clone_prompt(prompt)
         return prompt
+
+    def update_with_version(
+        self,
+        prompt: Prompt,
+        *,
+        commit_message: str | None = None,
+        parent_version_id: int | None = None,
+    ) -> PromptVersion:
+        if self.version_error is not None:
+            raise self.version_error
+        self.update(prompt)
+        return self.record_prompt_version(
+            prompt,
+            commit_message=commit_message,
+            parent_version_id=parent_version_id,
+        )
 
     def delete(self, prompt_id: uuid.UUID) -> None:
         if prompt_id not in self.storage:
@@ -1153,6 +1172,23 @@ def test_cache_and_evict_prompt_raise_prompt_cache_error() -> None:
         manager_del.evict_cached_prompt(uuid.uuid4())
 
 
+def test_update_rolls_back_when_version_persistence_fails() -> None:
+    repo = _RecordingRepository()
+    manager = _build_manager(repository=repo)
+    prompt = _sample_prompt()
+    manager.create_prompt(prompt)
+    original_context = prompt.context
+    prompt.context = "Changed context that must be rolled back"
+    repo.version_error = RepositoryError("version write failed")
+
+    with pytest.raises(PromptManagerError, match="Failed to update prompt"):
+        manager.update_prompt(prompt)
+
+    persisted = repo.get(prompt.id)
+    assert persisted.context == original_context
+    assert manager.list_prompt_versions(prompt.id)[0].snapshot["context"] == original_context
+
+
 def test_prompt_version_commit_and_restore() -> None:
     repo = _RecordingRepository()
     manager = _build_manager(repository=repo)
@@ -1173,6 +1209,24 @@ def test_prompt_version_commit_and_restore() -> None:
 
     restored = manager.restore_prompt_version(versions[1].id)
     assert restored.description == "Sample"
+
+
+def test_restore_prompt_version_creates_new_snapshot_for_metadata_only_restore() -> None:
+    repo = _RecordingRepository()
+    manager = _build_manager(repository=repo)
+    prompt = _sample_prompt()
+    manager.create_prompt(prompt)
+    initial_version = manager.list_prompt_versions(prompt.id)[0]
+
+    prompt.description = "Metadata-only revision"
+    manager.update_prompt(prompt)
+    assert len(manager.list_prompt_versions(prompt.id)) == 1
+
+    restored = manager.restore_prompt_version(initial_version.id)
+    versions = manager.list_prompt_versions(prompt.id)
+    assert restored.description == "Sample"
+    assert [version.version_number for version in versions] == [2, 1]
+    assert versions[0].commit_message == "Restore version 1"
 
 
 def test_metadata_only_update_does_not_create_prompt_version() -> None:

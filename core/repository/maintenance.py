@@ -152,6 +152,16 @@ class RepositoryMaintenanceMixin:
             "CREATE INDEX IF NOT EXISTS idx_prompt_versions_created_at "
             "ON prompt_versions(created_at);"
         )
+        try:
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_prompt_versions_prompt_number "
+                "ON prompt_versions(prompt_id, version_number);"
+            )
+        except sqlite3.IntegrityError as exc:
+            raise RepositoryError(
+                "Cannot enforce unique prompt version numbers; "
+                "repair duplicate version history first"
+            ) from exc
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS prompt_forks (

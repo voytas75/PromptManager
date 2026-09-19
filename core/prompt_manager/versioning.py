@@ -121,7 +121,10 @@ class PromptVersionMixin:
         prompt = version.to_prompt()
         prompt.last_modified = datetime.now(UTC)
         message = commit_message or f"Restore version {version.version_number}"
-        return cast("Any", self).update_prompt(prompt, commit_message=message)
+        return cast(
+            "Any",
+            self,
+        ).update_prompt(prompt, commit_message=message, force_version=True)
 
     def merge_prompt_versions(
         self,

@@ -201,6 +201,7 @@ class PromptLifecycleMixin:
         embedding: Sequence[float] | None = None,
         *,
         commit_message: str | None = None,
+        force_version: bool = False,
     ) -> Prompt:
         """Update an existing prompt with new metadata."""
         prompt = self._apply_category_metadata_for_lifecycle(prompt)
@@ -230,7 +231,7 @@ class PromptLifecycleMixin:
         body_changed = self._normalise_body(previous_prompt.context) != self._normalise_body(
             prompt.context
         )
-        should_commit_version = body_changed or not has_version_history
+        should_commit_version = force_version or body_changed or not has_version_history
         current_version_number = latest_version.version_number if latest_version else 0
         target_version_number: int | None
         if should_commit_version:
@@ -255,40 +256,48 @@ class PromptLifecycleMixin:
                     "Scheduling background embedding refresh",
                     extra={"prompt_id": str(prompt.id)},
                 )
-        try:
+        if should_commit_version:
+            embedding_persisted = False
             if generated_embedding is not None:
                 prompt.ext4 = list(generated_embedding)
-            updated_prompt = self._repository.update(prompt)
-        except RepositoryNotFoundError as exc:
-            raise PromptNotFoundError(f"Prompt {prompt.id} not found") from exc
-        except RepositoryError as exc:
-            raise PromptStorageError(f"Failed to update prompt {prompt.id} in SQLite") from exc
-        if generated_embedding is not None:
+                self._persist_embedding(prompt, generated_embedding, is_new=False)
+                embedding_persisted = True
             try:
-                self._persist_embedding(updated_prompt, generated_embedding, is_new=False)
-            except PromptStorageError:
-                try:
-                    self._repository.update(previous_prompt)
-                except RepositoryError:
-                    logger.error(
-                        "Unable to roll back SQLite update after Chroma failure",
-                        extra={"prompt_id": str(prompt.id)},
-                    )
-                raise
-        else:
-            self._embedding_worker.schedule(updated_prompt.id)
-            try:
-                self._cache_prompt(updated_prompt)
-            except PromptCacheError:
-                logger.warning(
-                    "Prompt updated but cache refresh failed",
-                    extra={"prompt_id": str(prompt.id)},
+                version = self._repository.update_with_version(
+                    prompt,
+                    commit_message=commit_message,
                 )
-        if should_commit_version:
-            version = self._commit_prompt_version_for_lifecycle(
-                updated_prompt,
-                commit_message=commit_message,
-            )
+            except RepositoryNotFoundError as exc:
+                if embedding_persisted:
+                    self._restore_embedding_after_failed_update(previous_prompt, prompt.id)
+                raise PromptNotFoundError(f"Prompt {prompt.id} not found") from exc
+            except RepositoryError as exc:
+                if embedding_persisted:
+                    self._restore_embedding_after_failed_update(previous_prompt, prompt.id)
+                raise PromptStorageError(f"Failed to update prompt {prompt.id} in SQLite") from exc
+            updated_prompt = prompt
+        else:
+            try:
+                updated_prompt = self._repository.update(prompt)
+            except RepositoryNotFoundError as exc:
+                raise PromptNotFoundError(f"Prompt {prompt.id} not found") from exc
+            except RepositoryError as exc:
+                raise PromptStorageError(f"Failed to update prompt {prompt.id} in SQLite") from exc
+            version = None
+            if generated_embedding is not None:
+                try:
+                    self._persist_embedding(updated_prompt, generated_embedding, is_new=False)
+                except PromptStorageError:
+                    try:
+                        self._repository.update(previous_prompt)
+                    except RepositoryError:
+                        logger.error(
+                            "Unable to roll back SQLite update after Chroma failure",
+                            extra={"prompt_id": str(prompt.id)},
+                        )
+                    raise
+
+        if version is not None:
             logger.debug(
                 "Prompt version committed",
                 extra={
@@ -303,6 +312,16 @@ class PromptLifecycleMixin:
                 "commit",
                 extra={"prompt_id": str(updated_prompt.id)},
             )
+
+        if generated_embedding is None:
+            self._embedding_worker.schedule(updated_prompt.id)
+            try:
+                self._cache_prompt(updated_prompt)
+            except PromptCacheError:
+                logger.warning(
+                    "Prompt updated but cache refresh failed",
+                    extra={"prompt_id": str(prompt.id)},
+                )
         return updated_prompt
 
     def delete_prompt(self, prompt_id: UUID) -> None:
@@ -451,6 +470,23 @@ class PromptLifecycleMixin:
     def cache_key(prompt_id: UUID) -> str:
         """Public wrapper for formatting a prompt cache key."""
         return f"prompt:{prompt_id}"
+
+    def _restore_embedding_after_failed_update(
+        self,
+        previous_prompt: Prompt,
+        prompt_id: UUID,
+    ) -> None:
+        """Restore Chroma after an atomic SQLite version update failed."""
+        try:
+            if previous_prompt.ext4 is None:
+                self._as_prompt_manager().collection.delete(ids=[str(prompt_id)])
+                self._cache_prompt(previous_prompt)
+            else:
+                self._persist_embedding(previous_prompt, previous_prompt.ext4, is_new=False)
+        except (ChromaError, PromptStorageError, PromptCacheError) as exc:
+            raise PromptStorageError(
+                f"Failed to restore embedding after SQLite update failure for {prompt_id}"
+            ) from exc
 
     def _persist_embedding(
         self,

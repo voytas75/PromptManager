@@ -181,6 +181,68 @@ class PromptStoreMixin:
             raise RepositoryError(f"Failed to update prompt {prompt.id}") from exc
         return prompt
 
+    def update_with_version(
+        self,
+        prompt: Prompt,
+        *,
+        commit_message: str | None = None,
+        parent_version_id: int | None = None,
+    ) -> PromptVersion:
+        """Atomically persist a prompt update and its version snapshot."""
+        assignments = ", ".join(
+            f"{column} = :{column}" for column in self._COLUMNS if column != "id"
+        )
+        update_query = f"UPDATE prompts SET {assignments} WHERE id = :id;"
+        snapshot_json = _prompt_snapshot_json(prompt)
+        timestamp = datetime.now(UTC).isoformat()
+        try:
+            with _connect(self._db_path) as conn:
+                conn.execute("BEGIN IMMEDIATE;")
+                parent_id = parent_version_id
+                if parent_id is None:
+                    parent_id = self._get_latest_version_id(conn, prompt.id)
+                version_number = self._next_version_number(conn, prompt.id)
+                prompt.version = str(version_number)
+                payload = self._prompt_to_row(prompt)
+                cursor = conn.execute(update_query, payload)
+                if cursor.rowcount == 0:
+                    raise RepositoryNotFoundError(f"Prompt {prompt.id} not found")
+                snapshot_json = _prompt_snapshot_json(prompt)
+                cursor = conn.execute(
+                    """
+                    INSERT INTO prompt_versions (
+                        prompt_id,
+                        parent_version,
+                        version_number,
+                        created_at,
+                        commit_message,
+                        snapshot_json
+                    ) VALUES (?, ?, ?, ?, ?, ?);
+                    """,
+                    (
+                        _stringify_uuid(prompt.id),
+                        parent_id,
+                        version_number,
+                        timestamp,
+                        commit_message,
+                        snapshot_json,
+                    ),
+                )
+                row = conn.execute(
+                    (
+                        "SELECT version_id, prompt_id, parent_version, version_number, created_at, "
+                        "commit_message, snapshot_json FROM prompt_versions WHERE version_id = ?;"
+                    ),
+                    (cursor.lastrowid,),
+                ).fetchone()
+        except RepositoryNotFoundError:
+            raise
+        except sqlite3.Error as exc:
+            raise RepositoryError(f"Failed to update prompt {prompt.id} with version") from exc
+        if row is None:  # pragma: no cover - defensive
+            raise RepositoryError("Prompt version insert succeeded but row missing")
+        return PromptVersion.from_row(row)
+
     def delete(self, prompt_id: uuid.UUID) -> None:
         """Delete a prompt by UUID."""
         try:

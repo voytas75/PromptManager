@@ -468,6 +468,32 @@ def parse_args() -> argparse.Namespace:
         help="Render the created fork and its lineage as structured JSON.",
     )
 
+    prompt_restore_parser = subparsers.add_parser(
+        "prompt-restore-version",
+        help="Restore a prompt snapshot as a new recorded version.",
+    )
+    prompt_restore_parser.add_argument(
+        "version_id",
+        type=int,
+        help="Version snapshot ID to restore.",
+    )
+    prompt_restore_parser.add_argument(
+        "--confirm",
+        action="store_true",
+        help="Required acknowledgement that this updates the live prompt.",
+    )
+    prompt_restore_parser.add_argument(
+        "--commit-message",
+        type=str,
+        default=None,
+        help="Optional message recorded for the restored version.",
+    )
+    prompt_restore_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Render the restored prompt as structured JSON.",
+    )
+
     prompt_version_diff_parser = subparsers.add_parser(
         "prompt-version-diff",
         help="Compare two recorded versions of the same prompt.",
