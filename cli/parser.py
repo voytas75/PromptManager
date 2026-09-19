@@ -426,6 +426,27 @@ def parse_args() -> argparse.Namespace:
         help="Render prompt history as structured JSON.",
     )
 
+    prompt_version_list_parser = subparsers.add_parser(
+        "prompt-version-list",
+        help="List recorded versions for a specific prompt.",
+    )
+    prompt_version_list_parser.add_argument(
+        "prompt_id",
+        type=str,
+        help="Prompt UUID or exact prompt name to inspect.",
+    )
+    prompt_version_list_parser.add_argument(
+        "--limit",
+        type=int,
+        default=20,
+        help="Maximum number of versions to display (default: 20).",
+    )
+    prompt_version_list_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Render prompt version history as structured JSON.",
+    )
+
     prompt_render_parser = subparsers.add_parser(
         "prompt-render",
         help="Render and validate a prompt template without calling a model.",

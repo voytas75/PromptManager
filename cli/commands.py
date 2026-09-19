@@ -1533,6 +1533,80 @@ def run_prompt_find(
     return 0
 
 
+def run_prompt_version_list(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    """List version snapshots for one prompt without changing the current prompt."""
+    if manager is None:
+        raise ValueError("Prompt Manager is required for prompt version history.")
+    raw_prompt_id = str(getattr(args, "prompt_id", "") or "").strip()
+    prompt = None
+    try:
+        prompt_id = uuid.UUID(raw_prompt_id)
+    except (ValueError, TypeError):
+        prompt_id = None
+    if prompt_id is not None:
+        try:
+            prompt = manager.repository.get(prompt_id)
+        except (RepositoryNotFoundError, KeyError):
+            prompt = None
+        except Exception as exc:  # pragma: no cover - surfaced to CLI
+            print_and_log(logger, logging.ERROR, f"Failed to load prompt: {exc}")
+            return 6
+    if prompt is None and raw_prompt_id:
+        try:
+            prompt = next(
+                (
+                    candidate
+                    for candidate in manager.repository.list()
+                    if candidate.name == raw_prompt_id
+                ),
+                None,
+            )
+        except Exception as exc:  # pragma: no cover - surfaced to CLI
+            print_and_log(logger, logging.ERROR, f"Failed to search prompt by name: {exc}")
+            return 6
+    if prompt is None:
+        print_and_log(logger, logging.ERROR, f"Prompt not found: {raw_prompt_id}")
+        return 4
+
+    limit = max(1, int(getattr(args, "limit", 20) or 20))
+    try:
+        versions = manager.list_prompt_versions(prompt.id, limit=limit)
+    except Exception as exc:  # pragma: no cover - surfaced to CLI
+        print_and_log(logger, logging.ERROR, f"Unable to load prompt versions: {exc}")
+        return 7
+
+    records = [
+        {
+            "id": version.id,
+            "prompt_id": str(version.prompt_id),
+            "version_number": version.version_number,
+            "created_at": version.created_at.isoformat(),
+            "parent_version_id": version.parent_version_id,
+            "commit_message": version.commit_message,
+        }
+        for version in versions
+    ]
+    if bool(getattr(args, "json", False)):
+        print(json.dumps(records, ensure_ascii=False, indent=2))
+        return 0
+    if not records:
+        print(f"No versions recorded for: {prompt.name}")
+        return 0
+    for record in records:
+        message = record["commit_message"] or "(no message)"
+        parent = record["parent_version_id"]
+        parent_label = parent if parent is not None else "none"
+        print(
+            f"v{record['version_number']} | id: {record['id']} | "
+            f"parent: {parent_label} | {record['created_at']} | {message}"
+        )
+    return 0
+
+
 def _prompt_render_payload(
     *,
     ok: bool,
@@ -1889,6 +1963,7 @@ COMMAND_SPECS: dict[str | None, CommandSpec] = {
     "prompt-show": CommandSpec(run_prompt_show),
     "prompt-find": CommandSpec(run_prompt_find),
     "prompt-history": CommandSpec(run_prompt_history),
+    "prompt-version-list": CommandSpec(run_prompt_version_list),
     "prompt-render": CommandSpec(run_prompt_render),
     "suggest": CommandSpec(run_suggest),
     "usage-report": CommandSpec(run_usage_report),

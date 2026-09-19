@@ -39,7 +39,7 @@ from core.history_tracker import (
 )
 from core.intent_classifier import IntentLabel, IntentPrediction
 from core.prompt_manager import PromptManagerError
-from models.prompt_model import ExecutionStatus, Prompt, PromptExecution
+from models.prompt_model import ExecutionStatus, Prompt, PromptExecution, PromptVersion
 
 
 def _patch_main(monkeypatch: pytest.MonkeyPatch, name: str, value: object) -> None:
@@ -115,6 +115,7 @@ class _DummyManager:
         self.token_usage_totals_all = TokenUsageTotals(125, 250, 375)
         self.prompt_execution_analytics: PromptExecutionAnalytics | None = None
         self.prompt_executions: list[PromptExecution] = []
+        self.prompt_versions: list[object] = []
 
     def close(self) -> None:
         self.closed = True
@@ -133,6 +134,15 @@ class _DummyManager:
         if self.reembed_error is not None:
             raise self.reembed_error
         return self.reembed_result
+
+    def list_prompt_versions(
+        self,
+        prompt_id: uuid.UUID,
+        *,
+        limit: int | None = None,
+    ) -> list[object]:
+        del prompt_id
+        return list(self.prompt_versions if limit is None else self.prompt_versions[:limit])
 
     def get_execution_analytics(
         self,
@@ -276,6 +286,11 @@ def _build_manager_with(manager: _DummyManager):
         return manager
 
     return _builder
+
+
+def _load_dummy_settings() -> _DummySettings:
+    """Return a standard settings double for CLI-entry tests."""
+    return _DummySettings()
 
 
 def _build_snapshot(
@@ -1374,6 +1389,158 @@ def test_prompt_history_command_filters_by_status_and_window_days(
     assert "Old failed request" not in output
     assert "Recent success request" not in output
     assert manager.closed is True
+
+
+def test_prompt_version_list_command_outputs_text_and_json(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    prompt_id = uuid.uuid4()
+    first_version = PromptVersion(
+        id=11,
+        prompt_id=prompt_id,
+        version_number=2,
+        created_at=datetime(2026, 9, 19, 10, 30, tzinfo=UTC),
+        parent_version_id=10,
+        commit_message="Clarify evidence requirements",
+        snapshot={"name": "Mastery Roadmap", "context": "Current version"},
+    )
+    second_version = PromptVersion(
+        id=10,
+        prompt_id=prompt_id,
+        version_number=1,
+        created_at=datetime(2026, 9, 18, 9, 15, tzinfo=UTC),
+        parent_version_id=None,
+        commit_message=None,
+        snapshot={"name": "Mastery Roadmap", "context": "Initial version"},
+    )
+    for use_json in (False, True):
+        argv = ["prompt-manager", "prompt-version-list", str(prompt_id), "--limit", "1"]
+        if use_json:
+            argv.append("--json")
+        monkeypatch.setattr("sys.argv", argv)
+        manager = _DummyManager()
+        manager.repository.store.append(
+            Prompt(
+                id=prompt_id,
+                name="Mastery Roadmap",
+                description="Build an evidence-backed expertise roadmap.",
+                category="Learning",
+            )
+        )
+        manager.prompt_versions = [first_version, second_version]
+
+        _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+        _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+        exit_code = main.main()
+
+        assert exit_code == 0
+        output = capsys.readouterr().out
+        if use_json:
+            payload = json.loads(output)
+            assert payload == [
+                {
+                    "id": 11,
+                    "prompt_id": str(prompt_id),
+                    "version_number": 2,
+                    "created_at": "2026-09-19T10:30:00+00:00",
+                    "parent_version_id": 10,
+                    "commit_message": "Clarify evidence requirements",
+                }
+            ]
+        else:
+            expected_line = (
+                "v2 | id: 11 | parent: 10 | 2026-09-19T10:30:00+00:00 | "
+                "Clarify evidence requirements"
+            )
+            assert expected_line in output
+            assert "v1" not in output
+        assert manager.closed is True
+
+
+def test_prompt_version_list_command_reports_empty_history(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    prompt_id = uuid.uuid4()
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-version-list", str(prompt_id)])
+    settings = _DummySettings()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    manager = _DummyManager()
+    manager.repository.store.append(
+        Prompt(
+            id=prompt_id,
+            name="Mastery Roadmap",
+            description="Build an evidence-backed expertise roadmap.",
+            category="Learning",
+        )
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    assert capsys.readouterr().out.strip() == "No versions recorded for: Mastery Roadmap"
+    assert manager.closed is True
+
+
+def test_prompt_version_list_command_resolves_exact_name_and_not_found(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    prompt_id = uuid.uuid4()
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "prompt-manager",
+            "prompt-version-list",
+            "Exact Mastery Roadmap",
+            "--limit",
+            "1",
+            "--json",
+        ],
+    )
+    manager = _DummyManager()
+    manager.repository.store.append(
+        Prompt(
+            id=prompt_id,
+            name="Exact Mastery Roadmap",
+            description="Build an evidence-backed expertise roadmap.",
+            category="Learning",
+        )
+    )
+    manager.prompt_versions = [
+        PromptVersion(
+            id=21,
+            prompt_id=prompt_id,
+            version_number=1,
+            created_at=datetime(2026, 9, 19, 10, 30, tzinfo=UTC),
+            parent_version_id=None,
+            commit_message="Initial version",
+            snapshot={"name": "Exact Mastery Roadmap", "context": "Initial version"},
+        )
+    ]
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload[0]["prompt_id"] == str(prompt_id)
+    assert payload[0]["id"] == 21
+    assert manager.closed is True
+
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-version-list", "missing name"])
+    missing_manager = _DummyManager()
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(missing_manager))
+
+    exit_code = main.main()
+
+    assert exit_code == 4
+    assert "Prompt not found: missing name" in capsys.readouterr().out
+    assert missing_manager.closed is True
 
 
 def test_prompt_render_command_renders_prompt_with_json_variables(

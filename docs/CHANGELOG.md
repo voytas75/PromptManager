@@ -6,6 +6,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Added
 
+- Added `prompt-version-list <prompt-id-or-name>` as a read-only CLI surface for inspecting a prompt's version snapshots with bounded `--limit` and deterministic `--json` output; records expose version number, snapshot ID, timestamp, parent version, and commit message without changing the current prompt.
 - Added `prompt-render <prompt-id-or-name>` as a provider-free CLI surface for rendering and validating local Jinja prompt variables from `--variables-json` or `--variables-file`; `--validate-only` supports readiness checks without emitting prompt text, while `--json` returns a deterministic result with detected variables, missing values, errors, and rendered text when valid.
 
 ### Fixed
