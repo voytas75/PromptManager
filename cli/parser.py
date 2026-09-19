@@ -426,6 +426,33 @@ def parse_args() -> argparse.Namespace:
         help="Render prompt history as structured JSON.",
     )
 
+    prompt_fork_parser = subparsers.add_parser(
+        "prompt-fork",
+        help="Create a named prompt variant while preserving source lineage.",
+    )
+    prompt_fork_parser.add_argument(
+        "prompt_id",
+        type=str,
+        help="Source prompt UUID or exact prompt name.",
+    )
+    prompt_fork_parser.add_argument(
+        "--name",
+        required=True,
+        type=str,
+        help="Required name for the new forked prompt.",
+    )
+    prompt_fork_parser.add_argument(
+        "--commit-message",
+        type=str,
+        default=None,
+        help="Optional version message recorded for the new fork.",
+    )
+    prompt_fork_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Render the created fork and its lineage as structured JSON.",
+    )
+
     prompt_version_diff_parser = subparsers.add_parser(
         "prompt-version-diff",
         help="Compare two recorded versions of the same prompt.",

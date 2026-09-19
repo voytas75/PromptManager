@@ -8,8 +8,9 @@ Updates:
 from __future__ import annotations
 
 import difflib
+import json
 import uuid
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 
@@ -194,36 +195,60 @@ class PromptVersionMixin:
         """Create a new prompt based on the referenced prompt."""
         source_prompt = cast("Any", self).get_prompt(prompt_id)
         now = datetime.now(UTC)
-        fork_name = name or f"{source_prompt.name} (fork)"
         related_prompts = list(source_prompt.related_prompts)
         source_id_text = str(source_prompt.id)
         if source_id_text not in related_prompts:
             related_prompts.append(source_id_text)
 
-        forked_prompt = replace(
-            source_prompt,
-            id=uuid.uuid4(),
-            name=fork_name,
-            version="1",
-            last_modified=now,
-            created_at=now,
-            usage_count=0,
-            rating_count=0,
-            rating_sum=0.0,
-            similarity=None,
-            source="fork",
-            related_prompts=related_prompts,
-        )
+        fork_record = json.loads(json.dumps(source_prompt.to_record(), ensure_ascii=False))
+        forked_prompt = Prompt.from_record(fork_record)
+        forked_prompt.id = uuid.uuid4()
+        forked_prompt.name = name or f"{source_prompt.name} (fork)"
+        forked_prompt.version = "1"
+        forked_prompt.last_modified = now
+        forked_prompt.created_at = now
+        forked_prompt.usage_count = 0
+        forked_prompt.rating_count = 0
+        forked_prompt.rating_sum = 0.0
+        forked_prompt.similarity = None
+        forked_prompt.source = "fork"
+        forked_prompt.related_prompts = related_prompts
         forked_prompt.quality_score = source_prompt.quality_score
-        stored = cast("Any", self).create_prompt(
-            forked_prompt,
-            commit_message=commit_message or f"Forked from {source_prompt.name}",
-        )
-
+        stored: Prompt | None = None
         try:
-            self._repository.record_prompt_fork(source_prompt.id, stored.id)
-        except RepositoryError as exc:
-            raise PromptVersionError("Failed to record prompt fork relationship") from exc
+            stored = cast(
+                "Prompt",
+                cast("Any", self).create_prompt(
+                    forked_prompt,
+                    commit_message=commit_message or f"Forked from {source_prompt.name}",
+                ),
+            )
+            lineage = self._repository.record_prompt_fork(source_prompt.id, stored.id)
+            if lineage.source_prompt_id != source_prompt.id or lineage.child_prompt_id != stored.id:
+                raise RepositoryError("Recorded prompt fork lineage does not match the new prompt")
+        except Exception as exc:
+            rollback_prompt_id: uuid.UUID | None = stored.id if stored is not None else None
+            if rollback_prompt_id is None:
+                try:
+                    self._repository.get(forked_prompt.id)
+                except RepositoryNotFoundError:
+                    pass
+                except RepositoryError as lookup_exc:
+                    raise PromptVersionError(
+                        "Failed to determine whether the incomplete prompt fork was persisted"
+                    ) from lookup_exc
+                else:
+                    rollback_prompt_id = forked_prompt.id
+            if rollback_prompt_id is not None:
+                try:
+                    cast("Any", self).delete_prompt(rollback_prompt_id)
+                except Exception as rollback_exc:
+                    raise PromptVersionError(
+                        f"Failed to complete prompt fork and roll back fork {rollback_prompt_id}"
+                    ) from rollback_exc
+            if isinstance(exc, RepositoryError):
+                raise PromptVersionError("Failed to record prompt fork relationship") from exc
+            raise
 
         return stored
 

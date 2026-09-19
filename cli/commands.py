@@ -60,6 +60,7 @@ from .utils import (
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from core.prompt_manager import PromptManager
+    from models.prompt_model import Prompt
 else:  # pragma: no cover - runtime placeholders for type-only imports
     PromptManager = object
 
@@ -1533,6 +1534,94 @@ def run_prompt_find(
     return 0
 
 
+def run_prompt_fork(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    """Create a named prompt fork without modifying the source prompt."""
+    if manager is None:
+        raise ValueError("Prompt Manager is required for prompt forking.")
+    raw_prompt_id = str(getattr(args, "prompt_id", "") or "").strip()
+    fork_name = str(getattr(args, "name", "") or "").strip()
+    if not fork_name:
+        print_and_log(logger, logging.ERROR, "Fork name must not be blank.")
+        return 5
+
+    prompt = None
+    try:
+        prompt_id = uuid.UUID(raw_prompt_id)
+    except (ValueError, TypeError):
+        prompt_id = None
+    if prompt_id is not None:
+        try:
+            prompt = manager.repository.get(prompt_id)
+        except (RepositoryNotFoundError, KeyError):
+            prompt = None
+        except Exception as exc:  # pragma: no cover - surfaced to CLI
+            print_and_log(logger, logging.ERROR, f"Failed to load prompt: {exc}")
+            return 6
+    if prompt is None and raw_prompt_id:
+        try:
+            prompt = next(
+                (
+                    candidate
+                    for candidate in manager.repository.list()
+                    if candidate.name == raw_prompt_id
+                ),
+                None,
+            )
+        except Exception as exc:  # pragma: no cover - surfaced to CLI
+            print_and_log(logger, logging.ERROR, f"Failed to search prompt by name: {exc}")
+            return 6
+    if prompt is None:
+        print_and_log(logger, logging.ERROR, f"Prompt not found: {raw_prompt_id}")
+        return 4
+
+    forked: Prompt | None = None
+    lineage = None
+    try:
+        forked = manager.fork_prompt(
+            prompt.id,
+            name=fork_name,
+            commit_message=getattr(args, "commit_message", None),
+        )
+        lineage = manager.get_prompt_parent_fork(forked.id)
+        if (
+            lineage is None
+            or lineage.source_prompt_id != prompt.id
+            or lineage.child_prompt_id != forked.id
+        ):
+            raise RuntimeError("Fork created without a verified parent-child lineage record")
+    except Exception as exc:  # pragma: no cover - surfaced to CLI
+        if forked is not None:
+            print_and_log(
+                logger,
+                logging.ERROR,
+                f"Fork created with ID {forked.id}, but lineage verification failed: {exc}",
+            )
+        else:
+            print_and_log(logger, logging.ERROR, f"Unable to fork prompt: {exc}")
+        return 7
+
+    payload = {
+        "source": {"id": str(prompt.id), "name": prompt.name},
+        "fork": {"id": str(forked.id), "name": forked.name, "source": forked.source},
+        "lineage": {
+            "id": lineage.id,
+            "parent_prompt_id": str(lineage.source_prompt_id),
+            "child_prompt_id": str(lineage.child_prompt_id),
+            "created_at": lineage.created_at.isoformat(),
+        },
+    }
+    if bool(getattr(args, "json", False)):
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    print(f"Forked: {prompt.name} ({prompt.id})")
+    print(f"Created: {forked.name} ({forked.id})")
+    return 0
+
+
 def run_prompt_version_diff(
     manager: PromptManager | None,
     args: argparse.Namespace,
@@ -2023,6 +2112,7 @@ COMMAND_SPECS: dict[str | None, CommandSpec] = {
     "prompt-show": CommandSpec(run_prompt_show),
     "prompt-find": CommandSpec(run_prompt_find),
     "prompt-history": CommandSpec(run_prompt_history),
+    "prompt-fork": CommandSpec(run_prompt_fork),
     "prompt-version-diff": CommandSpec(run_prompt_version_diff),
     "prompt-version-list": CommandSpec(run_prompt_version_list),
     "prompt-render": CommandSpec(run_prompt_render),

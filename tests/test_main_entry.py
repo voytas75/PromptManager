@@ -40,7 +40,13 @@ from core.history_tracker import (
 from core.intent_classifier import IntentLabel, IntentPrediction
 from core.prompt_manager import PromptManagerError
 from core.prompt_manager.versioning import PromptVersionDiff
-from models.prompt_model import ExecutionStatus, Prompt, PromptExecution, PromptVersion
+from models.prompt_model import (
+    ExecutionStatus,
+    Prompt,
+    PromptExecution,
+    PromptForkLink,
+    PromptVersion,
+)
 
 
 def _patch_main(monkeypatch: pytest.MonkeyPatch, name: str, value: object) -> None:
@@ -118,6 +124,10 @@ class _DummyManager:
         self.prompt_executions: list[PromptExecution] = []
         self.prompt_versions: list[object] = []
         self.prompt_version_diff: object | None = None
+        self.fork_calls: list[tuple[uuid.UUID, str | None, str | None]] = []
+        self.fork_error: Exception | None = None
+        self.fork_lineage: PromptForkLink | None = None
+        self.fork_lineage_error: Exception | None = None
 
     def close(self) -> None:
         self.closed = True
@@ -153,6 +163,42 @@ class _DummyManager:
         if self.prompt_version_diff is None:
             raise KeyError("Prompt version diff unavailable")
         return self.prompt_version_diff
+
+    def fork_prompt(
+        self,
+        prompt_id: uuid.UUID,
+        *,
+        name: str | None = None,
+        commit_message: str | None = None,
+    ) -> object:
+        self.fork_calls.append((prompt_id, name, commit_message))
+        if self.fork_error is not None:
+            raise self.fork_error
+        source = cast("Prompt", self.repository.get(prompt_id))
+        forked = Prompt(
+            id=uuid.uuid4(),
+            name=name or f"{source.name} (fork)",
+            description=source.description,
+            category=source.category,
+            context=source.context,
+            source="fork",
+            related_prompts=[str(source.id)],
+        )
+        self.repository.store.append(forked)
+        self.fork_lineage = PromptForkLink(
+            id=1,
+            source_prompt_id=prompt_id,
+            child_prompt_id=forked.id,
+            created_at=datetime.now(UTC),
+        )
+        return forked
+
+    def get_prompt_parent_fork(self, prompt_id: uuid.UUID) -> PromptForkLink | None:
+        if self.fork_lineage_error is not None:
+            raise self.fork_lineage_error
+        if self.fork_lineage is not None and self.fork_lineage.child_prompt_id == prompt_id:
+            return self.fork_lineage
+        return None
 
     def get_execution_analytics(
         self,
@@ -1398,6 +1444,133 @@ def test_prompt_history_command_filters_by_status_and_window_days(
     assert old_execution_at.isoformat(timespec="seconds") not in output
     assert "Old failed request" not in output
     assert "Recent success request" not in output
+    assert manager.closed is True
+
+
+def test_prompt_fork_command_creates_named_fork_with_text_and_json(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    source_id = uuid.uuid4()
+    for use_json in (False, True):
+        argv = [
+            "prompt-manager",
+            "prompt-fork",
+            "Source Mastery Roadmap",
+            "--name",
+            "Evidence-First Mastery Roadmap",
+            "--commit-message",
+            "Create an evidence-first variant",
+        ]
+        if use_json:
+            argv.append("--json")
+        monkeypatch.setattr("sys.argv", argv)
+        manager = _DummyManager()
+        manager.repository.store.append(
+            Prompt(
+                id=source_id,
+                name="Source Mastery Roadmap",
+                description="Build a mastery roadmap.",
+                category="Learning",
+                context="Initial source body.",
+            )
+        )
+        _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+        _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+        exit_code = main.main()
+
+        assert exit_code == 0
+        assert manager.fork_calls == [
+            (source_id, "Evidence-First Mastery Roadmap", "Create an evidence-first variant")
+        ]
+        output = capsys.readouterr().out
+        forked = cast("Prompt", manager.repository.store[-1])
+        assert forked.id != source_id
+        assert forked.source == "fork"
+        assert forked.related_prompts == [str(source_id)]
+        if use_json:
+            payload = json.loads(output)
+            assert payload["source"]["id"] == str(source_id)
+            assert payload["fork"]["id"] == str(forked.id)
+            assert payload["fork"]["name"] == "Evidence-First Mastery Roadmap"
+            assert payload["lineage"]["id"] == 1
+            assert payload["lineage"]["parent_prompt_id"] == str(source_id)
+            assert payload["lineage"]["child_prompt_id"] == str(forked.id)
+            assert payload["lineage"]["created_at"]
+        else:
+            assert f"Forked: Source Mastery Roadmap ({source_id})" in output
+            assert "Evidence-First Mastery Roadmap" in output
+        assert manager.closed is True
+
+
+def test_prompt_fork_command_reports_created_id_when_lineage_check_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    source_id = uuid.uuid4()
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-fork", str(source_id), "--name", "Unverified fork"],
+    )
+    manager = _DummyManager()
+    manager.repository.store.append(
+        Prompt(
+            id=source_id,
+            name="Source Mastery Roadmap",
+            description="Build a mastery roadmap.",
+            category="Learning",
+        )
+    )
+    manager.fork_lineage_error = RuntimeError("lineage read unavailable")
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    assert main.main() == 7
+    created_id = cast("Prompt", manager.repository.store[-1]).id
+    output = capsys.readouterr().out
+    assert f"Fork created with ID {created_id}" in output
+    assert "lineage verification failed: lineage read unavailable" in output
+    assert manager.closed is True
+
+
+def test_prompt_fork_command_reports_not_found_and_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-fork", "Missing prompt", "--name", "A fork", "--json"],
+    )
+    manager = _DummyManager()
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    assert main.main() == 4
+    assert "Prompt not found: Missing prompt" in capsys.readouterr().out
+    assert manager.fork_calls == []
+    assert manager.closed is True
+
+    source_id = uuid.uuid4()
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-fork", str(source_id), "--name", "A fork"],
+    )
+    manager = _DummyManager()
+    manager.repository.store.append(
+        Prompt(
+            id=source_id,
+            name="Source Mastery Roadmap",
+            description="Build a mastery roadmap.",
+            category="Learning",
+        )
+    )
+    manager.fork_error = RuntimeError("name already exists")
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    assert main.main() == 7
+    assert "Unable to fork prompt: name already exists" in capsys.readouterr().out
     assert manager.closed is True
 
 

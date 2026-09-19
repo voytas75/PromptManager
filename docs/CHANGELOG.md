@@ -6,6 +6,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Added
 
+- Added `prompt-fork <prompt-id-or-name> --name "..."` as a bounded mutating CLI surface for creating a named variant without changing its source; it accepts an optional commit message and emits structured parent→child lineage with `--json`.
 - Added `prompt-version-diff <base-version-id> <target-version-id>` as a read-only CLI comparison surface for two snapshots of the same prompt; text and `--json` output expose both version identities, changed fields, and the unified prompt-body diff without changing the live asset.
 - Added `prompt-version-list <prompt-id-or-name>` as a read-only CLI surface for inspecting a prompt's version snapshots with bounded `--limit` and deterministic `--json` output; records expose version number, snapshot ID, timestamp, parent version, and commit message without changing the current prompt.
 - Added `prompt-render <prompt-id-or-name>` as a provider-free CLI surface for rendering and validating local Jinja prompt variables from `--variables-json` or `--variables-file`; `--validate-only` supports readiness checks without emitting prompt text, while `--json` returns a deterministic result with detected variables, missing values, errors, and rendered text when valid.

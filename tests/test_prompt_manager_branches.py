@@ -144,8 +144,10 @@ class _RecordingRepository:
         self._versions: dict[uuid.UUID, list[PromptVersion]] = {}
         self._version_index: dict[int, PromptVersion] = {}
         self._version_counter = 0
+        self.version_error: Exception | None = None
         self._fork_links: dict[int, PromptForkLink] = {}
         self._fork_counter = 0
+        self.fork_error: Exception | None = None
         base_category = PromptCategory(
             slug="general",
             label="General",
@@ -254,6 +256,8 @@ class _RecordingRepository:
         commit_message: str | None = None,
         parent_version_id: int | None = None,
     ) -> PromptVersion:
+        if self.version_error is not None:
+            raise self.version_error
         self._version_counter += 1
         version_list = self._versions.setdefault(prompt.id, [])
         version_number = len(version_list) + 1
@@ -299,6 +303,8 @@ class _RecordingRepository:
         source_prompt_id: uuid.UUID,
         child_prompt_id: uuid.UUID,
     ) -> PromptForkLink:
+        if self.fork_error is not None:
+            raise self.fork_error
         self._fork_counter += 1
         link = PromptForkLink(
             id=self._fork_counter,
@@ -1222,6 +1228,66 @@ def test_prompt_merge_detects_conflicts_and_can_persist() -> None:
 
     assert "Line 2" in (merged.context or "")
     assert "context" in conflicts
+
+
+def test_prompt_fork_rolls_back_when_initial_version_persistence_fails() -> None:
+    class _FailingEmbeddingProvider:
+        def embed(self, _: str) -> list[float]:
+            raise EmbeddingGenerationError("embedding unavailable")
+
+    class _Worker:
+        def __init__(self) -> None:
+            self.scheduled: list[uuid.UUID] = []
+
+        def schedule(self, prompt_id: uuid.UUID) -> None:
+            self.scheduled.append(prompt_id)
+
+    repo = _RecordingRepository()
+    manager = _build_manager(repository=repo)
+    manager._embedding_provider = _FailingEmbeddingProvider()  # type: ignore[assignment]
+    worker = _Worker()
+    manager._embedding_worker = worker  # type: ignore[assignment]
+    prompt = _sample_prompt()
+    manager.create_prompt(prompt)
+    repo.version_error = RepositoryError("initial version write failed")
+
+    with pytest.raises(PromptManagerError, match="Failed to record version"):
+        manager.fork_prompt(prompt.id, name="Versionless experiment")
+
+    assert set(repo.storage) == {prompt.id}
+    assert manager.list_prompt_forks(prompt.id) == []
+    assert worker.scheduled == [prompt.id]
+
+
+def test_prompt_fork_rolls_back_when_lineage_persistence_fails() -> None:
+    repo = _RecordingRepository()
+    manager = _build_manager(repository=repo)
+    prompt = _sample_prompt()
+    manager.create_prompt(prompt)
+    repo.fork_error = RepositoryError("lineage write failed")
+
+    with pytest.raises(PromptManagerError, match="Failed to record prompt fork relationship"):
+        manager.fork_prompt(prompt.id, name="Unlinked experiment")
+
+    assert set(repo.storage) == {prompt.id}
+    assert manager.list_prompt_forks(prompt.id) == []
+
+
+def test_prompt_fork_deep_copies_mutable_metadata() -> None:
+    repo = _RecordingRepository()
+    manager = _build_manager(repository=repo)
+    prompt = _sample_prompt()
+    prompt.ext2 = {"nested": ["source"]}
+    manager.create_prompt(prompt)
+
+    forked = manager.fork_prompt(prompt.id, name="Independent metadata")
+    assert forked.ext2 is not prompt.ext2
+    assert forked.ext2 is not None
+    forked.ext2["nested"].append("fork")
+
+    reloaded_source = manager.get_prompt(prompt.id)
+    assert reloaded_source.ext2 == {"nested": ["source"]}
+    assert manager.get_prompt(forked.id).ext2 == {"nested": ["source", "fork"]}
 
 
 def test_prompt_fork_records_lineage() -> None:

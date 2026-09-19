@@ -145,15 +145,6 @@ class PromptLifecycleMixin:
                         extra={"prompt_id": str(prompt.id)},
                     )
                 raise exc
-        else:
-            self._embedding_worker.schedule(stored_prompt.id)
-            try:
-                self._cache_prompt(stored_prompt)
-            except PromptCacheError:
-                logger.warning(
-                    "Prompt created but not cached",
-                    extra={"prompt_id": str(prompt.id)},
-                )
         version = self._commit_prompt_version_for_lifecycle(
             stored_prompt,
             commit_message=commit_message,
@@ -166,6 +157,15 @@ class PromptLifecycleMixin:
                 "version_number": version.version_number,
             },
         )
+        if generated_embedding is None:
+            self._embedding_worker.schedule(stored_prompt.id)
+            try:
+                self._cache_prompt(stored_prompt)
+            except PromptCacheError:
+                logger.warning(
+                    "Prompt created but not cached",
+                    extra={"prompt_id": str(prompt.id)},
+                )
         return stored_prompt
 
     def _ensure_uuid(self, value: UUID | str) -> UUID:
