@@ -39,6 +39,7 @@ from core.history_tracker import (
 )
 from core.intent_classifier import IntentLabel, IntentPrediction
 from core.prompt_manager import PromptManagerError
+from core.prompt_manager.versioning import PromptVersionDiff
 from models.prompt_model import ExecutionStatus, Prompt, PromptExecution, PromptVersion
 
 
@@ -116,6 +117,7 @@ class _DummyManager:
         self.prompt_execution_analytics: PromptExecutionAnalytics | None = None
         self.prompt_executions: list[PromptExecution] = []
         self.prompt_versions: list[object] = []
+        self.prompt_version_diff: object | None = None
 
     def close(self) -> None:
         self.closed = True
@@ -143,6 +145,14 @@ class _DummyManager:
     ) -> list[object]:
         del prompt_id
         return list(self.prompt_versions if limit is None else self.prompt_versions[:limit])
+
+    def diff_prompt_versions(self, base_version_id: int, target_version_id: int) -> object:
+        del base_version_id, target_version_id
+        if isinstance(self.prompt_version_diff, Exception):
+            raise self.prompt_version_diff
+        if self.prompt_version_diff is None:
+            raise KeyError("Prompt version diff unavailable")
+        return self.prompt_version_diff
 
     def get_execution_analytics(
         self,
@@ -1388,6 +1398,111 @@ def test_prompt_history_command_filters_by_status_and_window_days(
     assert old_execution_at.isoformat(timespec="seconds") not in output
     assert "Old failed request" not in output
     assert "Recent success request" not in output
+    assert manager.closed is True
+
+
+def test_prompt_version_diff_command_outputs_text_and_json(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    prompt_id = uuid.uuid4()
+    base_version = PromptVersion(
+        id=10,
+        prompt_id=prompt_id,
+        version_number=1,
+        created_at=datetime(2026, 9, 18, 9, 15, tzinfo=UTC),
+        parent_version_id=None,
+        commit_message="Initial version",
+        snapshot={"name": "Mastery Roadmap", "context": "Initial prompt body."},
+    )
+    target_version = PromptVersion(
+        id=11,
+        prompt_id=prompt_id,
+        version_number=2,
+        created_at=datetime(2026, 9, 19, 10, 30, tzinfo=UTC),
+        parent_version_id=10,
+        commit_message="Clarify evidence requirements",
+        snapshot={
+            "name": "Mastery Roadmap",
+            "context": "Revised prompt body with evidence requirements.",
+        },
+    )
+    diff = PromptVersionDiff(
+        prompt_id=prompt_id,
+        base_version=base_version,
+        target_version=target_version,
+        changed_fields={
+            "context": {
+                "from": "Initial prompt body.",
+                "to": "Revised prompt body with evidence requirements.",
+            }
+        },
+        body_diff="--- v1\n+++ v2\n@@ -1 +1 @@\n-Initial prompt body.\n+Revised prompt body.",
+    )
+    for use_json in (False, True):
+        argv = ["prompt-manager", "prompt-version-diff", "10", "11"]
+        if use_json:
+            argv.append("--json")
+        monkeypatch.setattr("sys.argv", argv)
+        manager = _DummyManager()
+        manager.prompt_version_diff = diff
+        _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+        _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+        exit_code = main.main()
+
+        assert exit_code == 0
+        output = capsys.readouterr().out
+        if use_json:
+            payload = json.loads(output)
+            assert payload["prompt_id"] == str(prompt_id)
+            assert payload["base_version"]["id"] == 10
+            assert payload["target_version"]["id"] == 11
+            assert payload["changed_fields"]["context"]["to"] == (
+                "Revised prompt body with evidence requirements."
+            )
+        else:
+            assert f"prompt_id: {prompt_id}" in output
+            assert "versions: v1 (id: 10) -> v2 (id: 11)" in output
+            assert "changed fields:" in output
+            assert "context:" in output
+            assert "--- v1" in output
+        assert manager.closed is True
+
+
+def test_prompt_version_diff_command_reports_lookup_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-version-diff", "10", "99", "--json"])
+    manager = _DummyManager()
+    manager.prompt_version_diff = KeyError("Prompt version 99 not found")
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    exit_code = main.main()
+
+    assert exit_code == 7
+    assert (
+        "Unable to compare prompt versions: 'Prompt version 99 not found'"
+        in capsys.readouterr().out
+    )
+    assert manager.closed is True
+
+
+def test_prompt_version_diff_command_rejects_non_positive_ids(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-version-diff", "0", "11"])
+    manager = _DummyManager()
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    exit_code = main.main()
+
+    assert exit_code == 5
+    assert "Version IDs must be positive integers." in capsys.readouterr().out
     assert manager.closed is True
 
 

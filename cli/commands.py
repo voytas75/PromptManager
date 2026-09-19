@@ -1533,6 +1533,66 @@ def run_prompt_find(
     return 0
 
 
+def run_prompt_version_diff(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    """Compare two version snapshots without changing a prompt asset."""
+    if manager is None:
+        raise ValueError("Prompt Manager is required for prompt version comparison.")
+    base_version_id = int(getattr(args, "base_version_id", 0) or 0)
+    target_version_id = int(getattr(args, "target_version_id", 0) or 0)
+    if base_version_id <= 0 or target_version_id <= 0:
+        print_and_log(logger, logging.ERROR, "Version IDs must be positive integers.")
+        return 5
+    try:
+        diff = manager.diff_prompt_versions(base_version_id, target_version_id)
+    except Exception as exc:  # pragma: no cover - surfaced to CLI
+        print_and_log(logger, logging.ERROR, f"Unable to compare prompt versions: {exc}")
+        return 7
+
+    base_version = diff.base_version
+    target_version = diff.target_version
+    payload = {
+        "prompt_id": str(diff.prompt_id),
+        "base_version": {
+            "id": base_version.id,
+            "version_number": base_version.version_number,
+            "created_at": base_version.created_at.isoformat(),
+            "commit_message": base_version.commit_message,
+        },
+        "target_version": {
+            "id": target_version.id,
+            "version_number": target_version.version_number,
+            "created_at": target_version.created_at.isoformat(),
+            "commit_message": target_version.commit_message,
+        },
+        "changed_fields": diff.changed_fields,
+        "body_diff": diff.body_diff,
+    }
+    if bool(getattr(args, "json", False)):
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+
+    print(f"prompt_id: {payload['prompt_id']}")
+    print(
+        "versions: "
+        f"v{base_version.version_number} (id: {base_version.id}) -> "
+        f"v{target_version.version_number} (id: {target_version.id})"
+    )
+    print("changed fields:")
+    if diff.changed_fields:
+        for field, values in diff.changed_fields.items():
+            print(f"- {field}: {values['from']!r} -> {values['to']!r}")
+    else:
+        print("(none)")
+    if diff.body_diff:
+        print("\nbody diff:")
+        print(diff.body_diff)
+    return 0
+
+
 def run_prompt_version_list(
     manager: PromptManager | None,
     args: argparse.Namespace,
@@ -1963,6 +2023,7 @@ COMMAND_SPECS: dict[str | None, CommandSpec] = {
     "prompt-show": CommandSpec(run_prompt_show),
     "prompt-find": CommandSpec(run_prompt_find),
     "prompt-history": CommandSpec(run_prompt_history),
+    "prompt-version-diff": CommandSpec(run_prompt_version_diff),
     "prompt-version-list": CommandSpec(run_prompt_version_list),
     "prompt-render": CommandSpec(run_prompt_render),
     "suggest": CommandSpec(run_suggest),

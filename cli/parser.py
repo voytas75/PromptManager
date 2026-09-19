@@ -426,6 +426,26 @@ def parse_args() -> argparse.Namespace:
         help="Render prompt history as structured JSON.",
     )
 
+    prompt_version_diff_parser = subparsers.add_parser(
+        "prompt-version-diff",
+        help="Compare two recorded versions of the same prompt.",
+    )
+    prompt_version_diff_parser.add_argument(
+        "base_version_id",
+        type=int,
+        help="First/base version snapshot ID; output preserves this comparison order.",
+    )
+    prompt_version_diff_parser.add_argument(
+        "target_version_id",
+        type=int,
+        help="Second/target version snapshot ID; output preserves this comparison order.",
+    )
+    prompt_version_diff_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Render the version diff as structured JSON.",
+    )
+
     prompt_version_list_parser = subparsers.add_parser(
         "prompt-version-list",
         help="List recorded versions for a specific prompt.",
