@@ -1,0 +1,5 @@
+# Keep repository text portable and prevent Windows editor CRLF churn.
+* text=auto eol=lf
+
+# Preserve binary assets exactly.
+*.ico binary
