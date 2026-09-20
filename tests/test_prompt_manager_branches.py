@@ -489,6 +489,44 @@ def test_suggest_prompts_prioritises_classifier_matches() -> None:
     assert not suggestions.fallback_used
 
 
+def test_search_prompts_preserves_semantic_order_without_suggestion_bias() -> None:
+    """The raw search seam must remain query-ranked for CLI consumers."""
+
+    repository = _RecordingRepository()
+    video_prompt = Prompt(
+        id=uuid.uuid4(),
+        name="Video Technical Fact Check Analysis",
+        description="Analyze a video transcript and verify claims.",
+        category="Analysis",
+        tags=["analysis"],
+    )
+    code_prompt = Prompt(
+        id=uuid.uuid4(),
+        name="Code Purpose and Data Flow Analysis",
+        description="Analyze source code behavior.",
+        category="Code Analysis",
+        tags=["enhancement", "feature", "improve"],
+    )
+    for prompt in (video_prompt, code_prompt):
+        repository.add(prompt)
+
+    collection = _StubCollection(
+        query_result={
+            "ids": [[str(video_prompt.id), str(code_prompt.id)]],
+            "documents": [[video_prompt.document, code_prompt.document]],
+            "metadatas": [[video_prompt.to_metadata(), code_prompt.to_metadata()]],
+            "distances": [[0.08, 0.31]],
+        }
+    )
+    manager = _build_manager(repository=repository, collection=collection)
+
+    results = manager.search_prompts("analyze video", limit=2)
+
+    assert [prompt.id for prompt in results] == [video_prompt.id, code_prompt.id]
+    assert results[0].similarity is not None
+    assert results[0].similarity > (results[1].similarity or 0.0)
+
+
 def test_suggest_prompts_falls_back_to_repository_list() -> None:
     repository = _RecordingRepository()
     prompt = Prompt(

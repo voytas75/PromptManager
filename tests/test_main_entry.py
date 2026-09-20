@@ -129,6 +129,8 @@ class _DummyManager:
         self.restore_calls: list[tuple[int, str | None]] = []
         self.restore_error: Exception | None = None
         self.restore_result: Prompt | None = None
+        self.search_response: list[Prompt] | None = None
+        self.search_calls: list[tuple[str, int]] = []
         self.fork_calls: list[tuple[uuid.UUID, str | None, str | None]] = []
         self.fork_error: Exception | None = None
         self.fork_lineage: PromptForkLink | None = None
@@ -145,6 +147,12 @@ class _DummyManager:
         if self.suggestion_response is not None:
             return self.suggestion_response
         return SimpleNamespace(prompts=self.repository.list(limit=limit))
+
+    def search_prompts(self, query: str, limit: int = 5) -> list[Prompt]:
+        self.search_calls.append((query, limit))
+        if self.search_response is not None:
+            return self.search_response[:limit]
+        return cast("list[Prompt]", self.repository.list(limit=limit))
 
     def rebuild_embeddings(self, *, reset_store: bool = False) -> tuple[int, int]:
         self.reembed_called = True
@@ -1042,7 +1050,7 @@ def test_prompt_find_command_lists_matching_prompts(
             ),
         ]
     )
-    manager.suggestion_response = SimpleNamespace(prompts=[manager.repository.store[0]])
+    manager.search_response = [cast("Prompt", manager.repository.store[0])]
     _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
@@ -1078,12 +1086,13 @@ def test_prompt_find_command_uses_ranked_natural_language_suggestions(
         source="catalog",
     )
     manager.repository.store.append(matching_prompt)
-    manager.suggestion_response = SimpleNamespace(prompts=[matching_prompt])
+    manager.search_response = [matching_prompt]
     _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
     assert exit_code == 0
+    assert manager.search_calls == [("score the instruction", 5)]
     assert (
         f"{matching_prompt.id} | Rubric Evaluator | [Analysis] | quality" in capsys.readouterr().out
     )
@@ -1123,12 +1132,13 @@ def test_prompt_find_command_outputs_json_payload(
             ),
         ]
     )
-    manager.suggestion_response = SimpleNamespace(prompts=[manager.repository.store[0]])
+    manager.search_response = [cast("Prompt", manager.repository.store[0])]
     _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
 
     assert exit_code == 0
+    assert manager.search_calls == [("triage", 10)]
     output = cast("list[dict[str, object]]", json.loads(capsys.readouterr().out))
     assert isinstance(output, list)
     assert len(output) == 1
@@ -1136,6 +1146,45 @@ def test_prompt_find_command_outputs_json_payload(
     assert output[0]["name"] == "CI Failure Triage"
     assert output[0]["tags"] == ["ci", "triage"]
     assert output[0]["source"] == "catalog"
+    assert manager.closed is True
+
+
+def test_prompt_find_command_preserves_raw_semantic_order(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Prompt-find must not replace semantic rank with suggestion bias."""
+
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-find", "--limit", "2", "analyze video"],
+    )
+    _patch_main(monkeypatch, "load_settings", _DummySettings)
+    manager = _DummyManager()
+    video_prompt = Prompt(
+        id=uuid.uuid4(),
+        name="Video Technical Fact Check Analysis",
+        description="Analyze a video transcript and verify claims.",
+        category="Analysis",
+        tags=["analysis"],
+    )
+    code_prompt = Prompt(
+        id=uuid.uuid4(),
+        name="Code Purpose and Data Flow Analysis",
+        description="Analyze source code behavior.",
+        category="Code Analysis",
+        tags=["enhancement", "feature", "improve"],
+    )
+    manager.search_response = [video_prompt, code_prompt]
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    assert manager.search_calls == [("analyze video", 2)]
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0].startswith(f"{video_prompt.id} | Video Technical Fact Check Analysis")
+    assert lines[1].startswith(f"{code_prompt.id} | Code Purpose and Data Flow Analysis")
     assert manager.closed is True
 
 

@@ -1500,7 +1500,7 @@ def run_prompt_find(
             return 5
 
     try:
-        prompts = manager.suggest_prompts(query, limit=limit).prompts
+        prompts = manager.search_prompts(query, limit=limit)
     except PromptManagerError as exc:
         print_and_log(logger, logging.ERROR, f"Failed to find prompts: {exc}")
         return 6

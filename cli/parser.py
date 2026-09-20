@@ -355,12 +355,12 @@ def parse_args() -> argparse.Namespace:
 
     prompt_find_parser = subparsers.add_parser(
         "prompt-find",
-        help="Find the best-fitting prompts for a natural-language query.",
+        help="Find prompts by raw semantic rank for a natural-language query.",
     )
     prompt_find_parser.add_argument(
         "query",
         type=str,
-        help="Natural-language query used for semantic prompt retrieval.",
+        help="Natural-language query used for raw semantic prompt retrieval.",
     )
     prompt_find_parser.add_argument(
         "--limit",
