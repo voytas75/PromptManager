@@ -957,16 +957,18 @@ def test_prompt_show_command_outputs_prompt_details(
 
     assert exit_code == 0
     output = capsys.readouterr().out
-    assert f"id: {prompt_id}" in output
-    assert "name: CI Failure Triage" in output
-    assert "description: Summarise the first-pass diagnosis for a failing workflow." in output
-    assert "category: Debugging" in output
-    assert "tags: ci, triage" in output
-    assert "source: catalog" in output
-    assert "active: yes" in output
+    assert "CI Failure Triage\n=================" in output
+    assert f"ID:       {prompt_id}" in output
+    assert "Category: Debugging" in output
+    assert "Tags:     ci, triage" in output
+    assert "Source:   catalog" in output
+    assert "Status:   active" in output
     assert (
-        "context:\nInspect logs, isolate the first failing step, and propose next checks." in output
-    )
+        "\nDescription\n-----------\nSummarise the first-pass diagnosis for a failing workflow."
+    ) in output
+    assert "\nPrompt body\n-----------\n<prompt_body>\n\n" in output
+    assert "Inspect logs, isolate the first failing step, and propose next checks." in output
+    assert "\n\n</prompt_body>" in output
     assert manager.closed is True
 
 
@@ -997,8 +999,9 @@ def test_prompt_show_command_falls_back_to_exact_name(
 
     assert exit_code == 0
     output = capsys.readouterr().out
-    assert f"id: {prompt_id}" in output
-    assert "name: CI Failure Triage" in output
+    assert f"ID:       {prompt_id}" in output
+    assert "<prompt_body>" in output
+    assert "</prompt_body>" in output
     assert manager.closed is True
 
 
@@ -1014,7 +1017,9 @@ def test_prompt_show_help_describes_uuid_or_exact_name_resolution(
         parse_args()
 
     assert excinfo.value.code == 0
-    assert "Prompt UUID or exact prompt name to display." in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "Prompt UUID or exact prompt name to display." in output
+    assert "<prompt_body> tags for easy copy/paste." in output
 
 
 def test_prompt_find_command_lists_matching_prompts(
@@ -1780,7 +1785,9 @@ def test_prompt_asset_commands_resolve_uuid_shaped_exact_names(
     _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     assert main.main() == 0
-    assert f"id: {prompt_id}" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert f"ID:       {prompt_id}" in output
+    assert uuid_shaped_name in output
     assert manager.closed is True
 
 

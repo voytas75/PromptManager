@@ -1423,6 +1423,40 @@ def _resolve_prompt_reference(
     return matches[0], 0, None
 
 
+def _format_prompt_show_text(prompt: Prompt) -> str:
+    """Render one prompt as a readable, copy-friendly operator view."""
+    tags = ", ".join(prompt.tags) if prompt.tags else "-"
+    context = prompt.context.strip() if isinstance(prompt.context, str) else ""
+    description = str(prompt.description or "").strip()
+    lines = [
+        prompt.name,
+        "=" * len(prompt.name),
+        "",
+        f"ID:       {prompt.id}",
+        f"Category: {prompt.category or '-'}",
+        f"Tags:     {tags}",
+        f"Source:   {prompt.source or '-'}",
+        f"Status:   {'active' if prompt.is_active else 'inactive'}",
+    ]
+    if description:
+        lines.extend(["", "Description", "-----------"])
+        lines.extend(textwrap.wrap(description, width=100) or [description])
+    if context:
+        lines.extend(
+            [
+                "",
+                "Prompt body",
+                "-----------",
+                "<prompt_body>",
+                "",
+                context,
+                "",
+                "</prompt_body>",
+            ]
+        )
+    return "\n".join(lines)
+
+
 def run_prompt_show(
     manager: PromptManager | None,
     args: argparse.Namespace,
@@ -1450,22 +1484,7 @@ def run_prompt_show(
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
 
-    tags = ", ".join(prompt.tags) if prompt.tags else "-"
-    context = prompt.context.strip() if isinstance(prompt.context, str) else ""
-    lines = [
-        f"id: {prompt.id}",
-        f"name: {prompt.name}",
-        f"description: {prompt.description}",
-        f"category: {prompt.category}",
-        f"tags: {tags}",
-        f"source: {prompt.source}",
-        f"active: {'yes' if prompt.is_active else 'no'}",
-    ]
-    if context:
-        lines.append("context:")
-        lines.append(context)
-
-    print("\n".join(lines))
+    print(_format_prompt_show_text(prompt))
     return 0
 
 

@@ -334,7 +334,11 @@ def parse_args() -> argparse.Namespace:
 
     prompt_show_parser = subparsers.add_parser(
         "prompt-show",
-        help="Display a prompt by UUID.",
+        help="Display a prompt by UUID or exact name.",
+        description=(
+            "Display a readable prompt record. Default text output wraps its description and "
+            "encloses the prompt context in <prompt_body> tags for easy copy/paste."
+        ),
     )
     prompt_show_parser.add_argument(
         "prompt_id",
