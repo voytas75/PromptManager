@@ -18,6 +18,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Fixed
 
+- Aligned the CLI help and checked-in prompt-import sample with the implemented contract: `prompt-show` now advertises UUID-or-exact-name resolution, and `prompt-add` examples use the importer-visible `context` prompt-body field.
 - Restored the prior SQLite prompt when synchronous Chroma embedding persistence fails during `update_prompt()`, then re-raised the storage error so a prompt asset cannot advance while its derived semantic-index record remains stale.
 
 ### Changed

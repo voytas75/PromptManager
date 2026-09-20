@@ -161,7 +161,7 @@ Example JSON payload:
 {
   "name": "Diagnostics Helper",
   "description": "Guide a quick, evidence-first diagnosis of a failing workflow or service.",
-  "prompt_text": "You are diagnosing a failing workflow. Summarise the observed symptoms, identify the most likely failure points, list the next verification steps, and end with a short recovery recommendation.",
+  "context": "You are diagnosing a failing workflow. Summarise the observed symptoms, identify the most likely failure points, list the next verification steps, and end with a short recovery recommendation.",
   "category": "Operations",
   "tags": ["diagnostics", "incident", "triage"],
   "scenario": "Use when a CI job, background worker, or local service starts failing and you want a calm first-pass triage prompt.",

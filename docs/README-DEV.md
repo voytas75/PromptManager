@@ -312,12 +312,18 @@ Every log entry also stores structured context metadata (prompt snapshot, execut
 | Command | Purpose |
 | --- | --- |
 | `python -m main catalog-export <path> [--format json\|yaml]` | Export prompts; YAML requires PyYAML (already bundled). |
+| `python -m main catalog-import <path> [--dry-run] [--no-overwrite]` | Create or update prompts from a JSON catalogue file or directory. |
+| `python -m main prompt-add [<path>\|--input-file path\|--json '{...}'\|--from-stdin\|inline fields] [--dry-run] [--no-overwrite]` | Add or update prompts through the catalog importer; use `--name`, `--description`, and `--prompt-text` for one inline prompt. Here, `--json` is an input payload, unlike output-format flags on read commands. |
+| `python -m main prompt-show <prompt-id-or-name> [--json]` | Show one prompt resolved by UUID or one exact name; duplicate names require a UUID. |
+| `python -m main prompt-find <query> [--limit N] [--category value] [--tag value] [--source value] [--active true\|false] [--json]` | List matching prompts with deterministic filters and optional structured output. |
+| `python -m main prompt-history <prompt-id-or-name> [--limit N] [--status success\|failed] [--window-days N] [--json]` | Inspect bounded read-only execution evidence for one uniquely resolved prompt. |
 | `python -m main suggest "search query"` | Run semantic retrieval and print top matches with intent metadata. |
 | `python -m main usage-report [--path <file>]` | Summarize anonymized GUI analytics (counts, intents, recommendations). |
 | `python -m main history-analytics [--window-days N --limit M --trend-window K]` | Display execution success rates, durations, ratings, and window/overall token totals for recent prompts. |
 | `python -m main reembed` | Rebuild the ChromaDB vector store after backend/model changes or corruption. |
 | `python -m main benchmark --prompt <uuid> [--model <id>] --request "…"` | Execute one or more prompts across configured LiteLLM models and compare duration/token usage alongside history stats. |
 | `python -m main refresh-scenarios <uuid> [--max-scenarios N]` | Regenerate and persist scenario lists for a prompt via LiteLLM or the heuristic fallback. |
+| `python -m main diagnostics <embeddings\|analytics> [options]` | Run embedding health checks or aggregated analytics diagnostics; `diagnostics <target> --help` lists target options. |
 | `python -m main prompt-lineage <prompt-id-or-name> [--json]` | Inspect the read-only parent and child fork relationships for one uniquely resolved prompt; use UUID when names collide. |
 | `python -m main prompt-fork <prompt-id-or-name> --name "..." [--commit-message "..."] [--json]` | Create a named prompt variant with preserved parent→child lineage while leaving the source asset unchanged; use UUID when names collide. |
 | `python -m main prompt-restore-version <version-id> --confirm [--commit-message "..."] [--json]` | Restore one snapshot to the live prompt and record that result as a new version; `--confirm` is required and historical snapshots remain intact. |
@@ -326,8 +332,13 @@ Every log entry also stores structured context metadata (prompt snapshot, execut
 | `python -m main prompt-render <prompt-id-or-name> [--variables-json '{...}'\|--variables-file vars.json] [--validate-only] [--json]` | Render and validate local Jinja prompt variables without calling a model; `--validate-only` checks readiness without printing rendered text, and UUID is required when names collide. |
 | `python -m main prompt-chain-list` | List stored prompt chains (add `--include-inactive` for archived definitions). |
 | `python -m main prompt-chain-show <uuid>` | Display a prompt chain with ordered steps and target prompts. |
+| `python -m main prompt-chain-history [--chain-id <uuid>] [--limit N] [--json]` | Inspect bounded recent backend-managed prompt-chain run history. |
+| `python -m main prompt-chain-export <uuid> <path>` | Export one stored prompt chain to a JSON file. |
+| `python -m main prompt-chain-validate <path> [--json]` | Validate a prompt-chain JSON definition without persistence. |
 | `python -m main prompt-chain-apply path/to/chain.json` | Create or update a prompt chain from a JSON definition (`name`, `description`, and ordered `steps` that only specify `prompt_id`, `order_index`, and optional `stop_on_failure`). |
 | `python -m main prompt-chain-run <uuid> [--input "text"\|--input-file path] [--no-web-search]` | Execute a chain sequentially by feeding the provided plain-text input into the first step, automatically piping each response into the next step while optionally enriching every hop with live web context. |
+
+Use `python -m main --help` for the complete current command list and `python -m main <command> --help` for the authoritative options and examples for one command.
 
 ### GUI Prompt Chain Manager
 

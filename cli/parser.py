@@ -339,7 +339,7 @@ def parse_args() -> argparse.Namespace:
     prompt_show_parser.add_argument(
         "prompt_id",
         type=str,
-        help="Prompt UUID to display.",
+        help="Prompt UUID or exact prompt name to display.",
     )
 
     prompt_show_parser.add_argument(

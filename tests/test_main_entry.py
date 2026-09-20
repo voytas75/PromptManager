@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from _pytest.capture import CaptureFixture
 
 import main
+from cli.parser import parse_args
 from config import SettingsError
 from config.settings import DEFAULT_EMBEDDING_BACKEND, DEFAULT_EMBEDDING_MODEL
 from core.history_tracker import (
@@ -991,6 +992,21 @@ def test_prompt_show_command_falls_back_to_exact_name(
     assert f"id: {prompt_id}" in output
     assert "name: CI Failure Triage" in output
     assert manager.closed is True
+
+
+def test_prompt_show_help_describes_uuid_or_exact_name_resolution(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Prompt-show help should describe its supported reference contract."""
+
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-show", "--help"])
+
+    with pytest.raises(SystemExit) as excinfo:
+        parse_args()
+
+    assert excinfo.value.code == 0
+    assert "Prompt UUID or exact prompt name to display." in capsys.readouterr().out
 
 
 def test_prompt_find_command_lists_matching_prompts(
