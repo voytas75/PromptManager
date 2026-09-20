@@ -2356,6 +2356,29 @@ def test_prompt_show_command_outputs_json_payload(
     assert manager.closed is True
 
 
+def test_setup_logging_uses_example_when_local_config_is_missing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    example_path = config_dir / "logging.conf.example"
+    example_path.write_text("[loggers]\nkeys=root\n", encoding="utf-8")
+    configured_paths: list[Path] = []
+
+    def _file_config(path: str | Path, *, disable_existing_loggers: bool) -> None:
+        assert disable_existing_loggers is False
+        configured_paths.append(Path(path))
+
+    monkeypatch.setattr("cli.runtime.logging.config.fileConfig", _file_config)
+
+    from cli.runtime import setup_logging
+
+    setup_logging(None)
+
+    assert [path.resolve() for path in configured_paths] == [example_path]
+
+
 def test_setup_logging_basic_config_fallback(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:

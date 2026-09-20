@@ -13,8 +13,10 @@ from pathlib import Path
 
 
 def setup_logging(logging_conf_path: Path | None) -> None:
-    """Configure logging using *logging_conf_path* when available."""
+    """Configure logging from an explicit or local config, then the example."""
     path = logging_conf_path or Path("config/logging.conf")
+    if logging_conf_path is None and not path.exists():
+        path = Path("config/logging.conf.example")
     if path.exists():
         try:
             logging.config.fileConfig(path, disable_existing_loggers=False)

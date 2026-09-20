@@ -18,6 +18,7 @@ result*
 .cursorrules
 chroma.*
 *.log
+config/logging.conf
 index_metadata*
 article chat.*
 .cache

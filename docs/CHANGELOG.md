@@ -6,6 +6,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Added
 
+- Added a tracked `config/logging.conf.example` fallback while making `config/logging.conf` a local ignored override, so host-specific logging levels no longer block repository synchronization.
 - Added `prompt-restore-version <version-id> --confirm` as a guarded CLI restore surface that updates the live prompt from one snapshot while preserving prior history and recording a new version; text and `--json` output identify the restored source snapshot and current asset.
 - Unified `prompt-show`, `prompt-history`, `prompt-render`, `prompt-version-list`, `prompt-lineage`, and `prompt-fork` resolution through a UUID-or-unique-exact-name contract; duplicate names now require an explicit UUID rather than selecting an arbitrary prompt.
 - Restored prompt updates now roll back the live SQLite prompt when version persistence fails, preserving the prior asset state and version history.

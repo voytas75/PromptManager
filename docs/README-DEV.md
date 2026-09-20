@@ -159,9 +159,15 @@ The committed [`.env.example`](../.env.example) file is the canonical placeholde
 
 ### Logging config vs provider logging
 
-PromptManager startup uses the runtime logging bootstrap in `main.py`, which by default loads `config/logging.conf` unless `--logging-config <path>` overrides it.
+PromptManager startup uses the runtime logging bootstrap in `main.py`. It loads a local, ignored `config/logging.conf` when present; otherwise it loads the tracked `config/logging.conf.example`. Pass `--logging-config <path>` to use an explicit file instead.
 
-This file controls the **global/root console logging level** for the whole process. If `config/logging.conf` sets `root` or the console handler to `DEBUG`, the terminal can fill with debug output from third-party libraries such as ChromaDB, OpenAI, `httpcore`, and `asyncio` during normal GUI startup and shutdown.
+Copy the example when you need host-specific verbosity:
+
+```bash
+cp config/logging.conf.example config/logging.conf
+```
+
+The local file controls the **global/root console logging level** for the whole process. If it sets `root` or the console handler to `DEBUG`, the terminal can fill with debug output from third-party libraries such as ChromaDB, OpenAI, `httpcore`, and `asyncio` during normal GUI startup and shutdown.
 
 This is separate from `PROMPT_MANAGER_LITELLM_LOGGING`.
 
