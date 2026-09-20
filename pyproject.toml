@@ -34,6 +34,9 @@ dependencies = [
     "cryptography==50.0.0",
 ]
 
+[project.scripts]
+prompt-manager = "main:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest==9.0.3",
@@ -52,11 +55,15 @@ dev = [
     "tenacity==9.0.0",
 ]
 
+[tool.setuptools]
+py-modules = ["main", "prompt_templates"]
+
 [tool.setuptools.packages.find]
-include = ["config*", "core*", "gui*", "models*"]
+include = ["cli*", "config*", "core*", "gui*", "models*"]
 exclude = ["tests*", "data*", "scripts*"]
 
 [tool.setuptools.package-data]
+"config" = ["config.template.json"]
 "gui.resources" = ["*.ico"]
 
 [tool.ruff]

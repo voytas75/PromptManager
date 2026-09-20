@@ -244,7 +244,11 @@ This keeps repo truth and runtime-visible package metadata aligned without prete
 
 ## Running the GUI
 
-- Launch normally:
+- Launch an installed package:
+  ```bash
+  prompt-manager
+  ```
+- Launch from a repository checkout:
   ```bash
   python -m main
   # or
@@ -252,14 +256,14 @@ This keeps repo truth and runtime-visible package metadata aligned without prete
   ```
 - Launch without the GUI (bootstrap/CLI mode):
   ```bash
-  python -m main --no-gui
-  # or
+  prompt-manager --no-gui
+  # or, from a checkout
   uv run python -m main --no-gui
   ```
 - Smoke-test config and dependencies:
   ```bash
-  python -m main --no-gui --print-settings
-  # or
+  prompt-manager --no-gui --print-settings
+  # or, from a checkout
   uv run python -m main --no-gui --print-settings
   ```
 
@@ -308,6 +312,8 @@ Every log entry also stores structured context metadata (prompt snapshot, execut
 - When executions capture a prompt part, the metadata stores the part ID plus flattened instructions so downstream automations can reuse the formatting contract.
 
 ## CLI Utilities
+
+The installed wheel exposes `prompt-manager`; the `python -m main` forms below remain the equivalent repository-checkout commands.
 
 | Command | Purpose |
 | --- | --- |

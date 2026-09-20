@@ -102,22 +102,28 @@ If not, it should not lead the next cycle.
 ## Current verified checkpoint — 2026-09-20
 
 **Revision and delivery**
-- Current local and remote `master`: `d443e8b513ca7485cbddb47d3a0a4aa7c58b51b3`.
+- Current delivered local and remote `master`: `e218e3796e9b9193561e18b1a9f3971b8be05686`.
 - Worktree was clean and `HEAD...origin/master` was `0 / 0` at this checkpoint.
-- Current delivered CLI contract commits:
+- Delivered CLI contract commits in the current line:
   - `156b046` — help/import-example contract alignment.
   - `d81507a` — semantic natural-language `prompt-find`.
   - `d443e8b` — bounded `prompt-show --json` with `--full` opt-in.
-- Exact-SHA Quality Gates for `d443e8b` succeeded: Ruff autofix/format/verify, CI-scope Pyright, pytest with coverage, and clean-tree check.
+  - `71562e7` — operational documentation currentness reconciliation.
+  - `6524dc3` — query-first raw semantic `prompt-find` ranking repair.
+  - `ab88829` — readable, copy-friendly text `prompt-show`.
+  - `e218e37` — grouped root CLI help card.
+- Exact-SHA Quality Gates for `e218e37` succeeded: Ruff autofix/format/verify, CI-scope Pyright, pytest with coverage, and clean-tree check.
 
 **Current CLI operational contracts**
-- `prompt-find <query>` now uses semantic natural-language retrieval through the existing suggestion seam; explicit category/tag/source/active filters apply after ranking.
+- `prompt-find <query>` sends the original natural-language query to raw semantic retrieval; explicit category/tag/source/active filters apply after ranking. Personalized, intent-hinted ranking remains in `suggest` and GUI recommendations.
+- Text `prompt-show <uuid-or-name>` is a readable operator view: bounded metadata/description sections and a blank-line-separated `<prompt_body>` / `</prompt_body>` copy block for non-empty context.
 - `prompt-show <uuid-or-name> --json` omits the raw `ext4` embedding and returns bounded embedding presence/dimension metadata.
 - `prompt-show <uuid-or-name> --json --full` returns the complete persisted record including `ext4`; `--full` without `--json` is rejected.
+- Root `--help` is a grouped command card with compact `COMMAND` usage; use `<command> --help` for authoritative command options.
 
 **Current local verification**
-- With a stale local `PROMPT_MANAGER_CONFIG_JSON` override unset: `839 passed, 1 skipped`, coverage `80.39%`; Ruff/format and CI-scope Pyright passed.
-- The stale override is an environment condition, not a repository regression: an explicit missing config path is intentionally fail-closed.
+- Last full local gate for this delivered line: `842 passed, 1 skipped`, coverage `80.39%`; Ruff/format and CI-scope Pyright passed.
+- The stale local `PROMPT_MANAGER_CONFIG_JSON` override is an environment condition, not a repository regression: an explicit missing config path intentionally fails closed.
 
 Historical checkpoints below retain their original revision-specific evidence.
 

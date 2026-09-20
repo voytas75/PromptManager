@@ -104,9 +104,15 @@ If you skip this step, PromptManager can still be used for local cataloguing, ed
 
 ### 3. Validate configuration
 
+The installed application command is `prompt-manager`:
+
 ```bash
-python -m main --no-gui --print-settings
-# or
+prompt-manager --no-gui --print-settings
+```
+
+When working from a repository checkout, the existing module invocation remains supported:
+
+```bash
 uv run python -m main --no-gui --print-settings
 ```
 
@@ -175,6 +181,14 @@ Example JSON payload:
 A ready-to-run sample file is included at `examples/prompt-import-example.json`.
 
 ### 5. Launch the app
+
+After installation, launch the desktop app with:
+
+```bash
+prompt-manager
+```
+
+The existing repository-checkout commands remain supported:
 
 ```bash
 python -m main

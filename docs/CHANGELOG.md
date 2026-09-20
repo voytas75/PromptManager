@@ -6,6 +6,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Added
 
+- Added the packaged `prompt-manager` console entrypoint. Wheels now include the CLI, `main.py`, prompt templates, and the default config template; `python -m main` remains supported from a repository checkout.
 - Added `prompt-show --json --full` as an explicit complete-record opt-in. Default `prompt-show --json` now omits the raw `ext4` embedding vector and returns bounded embedding presence/dimension metadata; `--full` requires `--json`.
 - Added semantic natural-language retrieval to `prompt-find <query>` through the existing suggestion seam, while retaining bounded result limits and explicit category/tag/source/active filters after ranking.
 - Added a tracked `config/logging.conf.example` fallback while making `config/logging.conf` a local ignored override, so host-specific logging levels no longer block repository synchronization.

@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+from importlib.resources import files
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -77,13 +78,28 @@ def _initialise_manager(
         return None
 
 
+def _resolve_config_template_path() -> Path | None:
+    """Return the checkout template or the installed package template, if available."""
+    if CONFIG_TEMPLATE_PATH.exists():
+        return CONFIG_TEMPLATE_PATH
+    try:
+        template = files("config").joinpath("config.template.json")
+        if template.is_file():
+            return Path(str(template))
+    except (ModuleNotFoundError, TypeError):  # pragma: no cover - package lookup fallback
+        return None
+    return None
+
+
 def _should_offer_config_creation(exc: Exception) -> bool:
     """Return True when settings loading failed because the default config is missing."""
     config_path_override = os.getenv("PROMPT_MANAGER_CONFIG_JSON")
     if config_path_override and config_path_override != str(DEFAULT_CONFIG_PATH):
         return False
     config_path = DEFAULT_CONFIG_PATH.expanduser()
-    template_path = CONFIG_TEMPLATE_PATH.expanduser()
+    template_path = _resolve_config_template_path()
+    if template_path is None:
+        return False
     try:
         config_path = config_path.resolve(strict=False)
         template_path = template_path.resolve(strict=False)
@@ -93,18 +109,22 @@ def _should_offer_config_creation(exc: Exception) -> bool:
 
 
 def _prompt_create_default_config(logger: logging.Logger) -> bool:
-    """Ask the user to create config/config.json from the template when absent."""
+    """Ask the user to create config/config.json from the available template."""
+    template_path = _resolve_config_template_path()
+    if template_path is None:
+        logger.error("Configuration template %s is unavailable.", CONFIG_TEMPLATE_PATH)
+        return False
     if not sys.stdin.isatty():
         logger.error(
             "Configuration file %s is missing. Create it from %s or set "
             "PROMPT_MANAGER_CONFIG_JSON to continue.",
             DEFAULT_CONFIG_PATH,
-            CONFIG_TEMPLATE_PATH,
+            template_path,
         )
         return False
     prompt = (
         f"Configuration file not found at {DEFAULT_CONFIG_PATH}. "
-        f"Create it from {CONFIG_TEMPLATE_PATH}? [Y/n]: "
+        f"Create it from {template_path}? [Y/n]: "
     )
     response = input(prompt).strip().lower()
     if response not in {"", "y", "yes"}:
@@ -114,10 +134,8 @@ def _prompt_create_default_config(logger: logging.Logger) -> bool:
             DEFAULT_CONFIG_PATH,
         )
         return False
-    contents = "{}\n"
-    if CONFIG_TEMPLATE_PATH.exists():
-        contents = CONFIG_TEMPLATE_PATH.read_text(encoding="utf-8")
     try:
+        contents = template_path.read_text(encoding="utf-8")
         DEFAULT_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
         DEFAULT_CONFIG_PATH.write_text(contents, encoding="utf-8")
     except OSError as write_error:
