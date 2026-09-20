@@ -1437,7 +1437,17 @@ def run_prompt_show(
         return exit_code
 
     if bool(getattr(args, "json", False)):
-        print(json.dumps(prompt.to_record(), ensure_ascii=False, indent=2))
+        if bool(getattr(args, "full", False)):
+            payload = prompt.to_record()
+        else:
+            payload = prompt.to_record()
+            payload.pop("ext4", None)
+            embedding = prompt.ext4
+            payload["embedding"] = {
+                "present": embedding is not None,
+                "dimensions": len(embedding) if embedding is not None else 0,
+            }
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
 
     tags = ", ".join(prompt.tags) if prompt.tags else "-"

@@ -2394,6 +2394,7 @@ def test_prompt_show_command_outputs_json_payload(
             context="Inspect logs, isolate the first failing step, and propose next checks.",
             is_active=True,
             source="catalog",
+            ext4=[0.1, 0.2, 0.3],
         )
     )
     _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
@@ -2407,7 +2408,52 @@ def test_prompt_show_command_outputs_json_payload(
     assert output["tags"] == ["ci", "triage"]
     assert output["source"] == "catalog"
     assert output["is_active"] is True
+    assert "ext4" not in output
+    assert output["embedding"] == {"present": True, "dimensions": 3}
     assert manager.closed is True
+
+
+def test_prompt_show_command_full_json_includes_embedding_vector(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Full JSON should retain the complete persisted prompt record."""
+
+    prompt_id = uuid.uuid4()
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-show", str(prompt_id), "--json", "--full"],
+    )
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    manager = _DummyManager()
+    manager.repository.store.append(
+        Prompt(
+            id=prompt_id,
+            name="Embedding Inspector",
+            description="Expose the complete prompt record on explicit request.",
+            category="Testing",
+            ext4=[0.1, 0.2, 0.3],
+        )
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    assert main.main() == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["id"] == str(prompt_id)
+    assert output["ext4"] == [0.1, 0.2, 0.3]
+    assert "embedding" not in output
+    assert manager.closed is True
+
+
+def test_prompt_show_rejects_full_without_json(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The large full-record output must be an explicit JSON-only opt-in."""
+
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-show", "example", "--full"])
+
+    with pytest.raises(SystemExit) as excinfo:
+        parse_args()
+
+    assert excinfo.value.code == 2
 
 
 def test_setup_logging_uses_example_when_local_config_is_missing(

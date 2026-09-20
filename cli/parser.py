@@ -347,6 +347,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Render the prompt as structured JSON.",
     )
+    prompt_show_parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Include the full persisted record, including the embedding vector (requires --json).",
+    )
 
     prompt_find_parser = subparsers.add_parser(
         "prompt-find",
@@ -914,5 +919,7 @@ def parse_args() -> argparse.Namespace:
     )
 
     args = parser.parse_args()
+    if getattr(args, "command", None) == "prompt-show" and args.full and not args.json:
+        parser.error("prompt-show --full requires --json.")
     _normalise_prompt_add_args(args, parser)
     return args
