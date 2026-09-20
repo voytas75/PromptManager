@@ -17,7 +17,7 @@ PromptManager is a PySide6 desktop application for managing reusable AI prompts 
 - **Python**: 3.13+ (3.14 when stable). GitHub currently enforces `pyright main.py config models` as the stable typed-entrypoint+model gate; broader strict coverage for `core/`, `gui/`, and `tests/` is tracked as incremental technical-debt work. Annotations remain mandatory for new or touched code (no `type: ignore` in `core/`).
 - **Formatting/Linting**: `ruff check --fix .` followed by `ruff format .` (line length 100). Import ordering follows ruff/isort (builtin → stdlib → third-party → local).
 - **Testing**: `pytest -n auto --cov=core --cov-report=term-missing --cov-fail-under=80` with `pytest-asyncio`, `pytest-cov`, and `hypothesis` for parsing/generation code. Under `uv`, prefer `uv sync --extra dev` first, then `uv run pytest ...`, or use one-shot `uv run --extra dev pytest ...`. Mock all external HTTP/DB calls (`respx`, `vcrpy`, `pytest-mock`).
-- **Automation**: `nox -s format lint typecheck test` runs the current CI-equivalent release gate. Keep parity with AGENTS.md quality gates and with the actually enforced workflow scope rather than aspirational full-repo strict coverage.
+- **Automation**: `nox -s format lint typecheck test` is a broader local quality run: its Pyright session checks the full configured scope. The exact GitHub release gate remains `.github/workflows/quality-gates.yml`, including `pyright main.py config models`; do not call the Nox run strict CI parity.
 - **Security & Resilience**: wrap external I/O in timeouts, provide custom exception hierarchy, never use bare `except`, and include actionable context plus retries with exponential backoff where transient failures may occur.
 
 ### What moved out of AGENTS.md
@@ -63,7 +63,7 @@ Operational rule: when touching a file that already carries strict-typing debt, 
 ### Release hardening baseline (Beta → stable)
 
 - This baseline is non-negotiable for merges: strict Ruff/Pyright/Pytest+coverage gates, fail-fast settings validation, and external I/O resilience (timeouts + bounded retries + deterministic mocking).
-- CI uses `.github/workflows/quality-gates.yml`; the local parity command is `nox -s all` (or the individual `.venv/bin/ruff`, `.venv/bin/pyright main.py config models`, and `.venv/bin/pytest ...` invocations). For `uv`-driven local parity, sync dev extras first with `uv sync --extra dev`.
+- CI uses `.github/workflows/quality-gates.yml`; use its individual `.venv/bin/ruff`, `.venv/bin/pyright main.py config models`, and `.venv/bin/pytest ...` invocations for exact local parity. `nox -s all` is a broader local quality run because it invokes full configured Pyright. For `uv`-driven local parity, sync dev extras first with `uv sync --extra dev`.
 - Validate settings early during development with `python -m main --no-gui --print-settings` or `python scripts/validate_settings.py`; configuration failures must be actionable and stop execution.
 - For HTTP I/O, prefer `httpx.AsyncClient(timeout=...)` plus retry helpers (e.g., `core.retry.async_retry`) and mock calls in tests with `httpx.MockTransport`, `respx`, or `vcrpy` (no live external calls in CI).
 

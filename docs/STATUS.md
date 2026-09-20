@@ -2,7 +2,7 @@
 
 Status: active
 Owner: Wojtek / Prompt Manager Team
-Updated: 2026-09-03
+Updated: 2026-09-20
 Canonical product SSOT: `docs/product-ssot.md`
 Canonical near-term plan: `docs/plans/2026-05-10-product-direction-ssot-next-cycle.md`
 
@@ -99,7 +99,35 @@ If not, it should not lead the next cycle.
 
 ---
 
-## Most recent delivered execution ledger
+## Current verified checkpoint — 2026-09-20
+
+**Revision and delivery**
+- Current local and remote `master`: `d443e8b513ca7485cbddb47d3a0a4aa7c58b51b3`.
+- Worktree was clean and `HEAD...origin/master` was `0 / 0` at this checkpoint.
+- Current delivered CLI contract commits:
+  - `156b046` — help/import-example contract alignment.
+  - `d81507a` — semantic natural-language `prompt-find`.
+  - `d443e8b` — bounded `prompt-show --json` with `--full` opt-in.
+- Exact-SHA Quality Gates for `d443e8b` succeeded: Ruff autofix/format/verify, CI-scope Pyright, pytest with coverage, and clean-tree check.
+
+**Current CLI operational contracts**
+- `prompt-find <query>` now uses semantic natural-language retrieval through the existing suggestion seam; explicit category/tag/source/active filters apply after ranking.
+- `prompt-show <uuid-or-name> --json` omits the raw `ext4` embedding and returns bounded embedding presence/dimension metadata.
+- `prompt-show <uuid-or-name> --json --full` returns the complete persisted record including `ext4`; `--full` without `--json` is rejected.
+
+**Current local verification**
+- With a stale local `PROMPT_MANAGER_CONFIG_JSON` override unset: `839 passed, 1 skipped`, coverage `80.39%`; Ruff/format and CI-scope Pyright passed.
+- The stale override is an environment condition, not a repository regression: an explicit missing config path is intentionally fail-closed.
+
+Historical checkpoints below retain their original revision-specific evidence.
+
+---
+
+## Historical checkpoint — 2026-09-03
+
+The following ledger records the 2026-09-03 state and does not describe current `master`.
+
+## Most recent delivered execution ledger at that checkpoint
 
 Most recently delivered bounded execution ledger remembered in active planning docs:
 - `docs/plans/2026-09-03-update-chroma-rollback-integrity.md` — synchronous update rollback.
@@ -109,10 +137,10 @@ This is a status pointer only, not an instruction to continue that seam by defau
 
 ---
 
-## Current verified checkpoint — 2026-09-02
+## Historical verified checkpoint — 2026-09-02
 
 **Revision and delivery**
-- Current local and remote `master`: `c2ebc73eb3f7764a799bdd1605b38f0f41af3750`.
+- Then-current local and remote `master`: `c2ebc73eb3f7764a799bdd1605b38f0f41af3750`.
 - Worktree was clean and `HEAD...origin/master` was `0 / 0` before this status update.
 - Recent delivered commits:
   - `522edd4` — `fix(config): persist settings to active config path`.

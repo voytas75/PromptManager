@@ -1,10 +1,12 @@
 # PromptManager — CLI Retrieval Contract Decision
 
-**Status:** decided
+**Status:** superseded
 **Date:** 2026-09-03
 **Canonical product SSOT:** `docs/product-ssot.md`
 
-## Decision
+> Historical decision record. Superseded by the explicit operator requirement and delivered contract in [`2026-09-20-semantic-prompt-find-v1.md`](2026-09-20-semantic-prompt-find-v1.md): `prompt-find` now performs semantic natural-language retrieval through `PromptManager.suggest_prompts(...)` and applies explicit metadata filters after ranking.
+
+**Historical decision (superseded)**
 
 `prompt-find` remains a deterministic, read-only catalog filter. It matches the documented text fields and composes with `--category`, `--tag`, `--source`, `--active`, `--limit`, and `--json` without requiring ChromaDB or an embedding provider.
 
