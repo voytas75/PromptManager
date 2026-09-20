@@ -20,6 +20,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Fixed
 
+- Replaced the flat root CLI help with a compact task-grouped card. It uses `COMMAND` in usage instead of repeating every command, keeps long command names with their descriptions, and directs users to command-specific help.
 - Made default text `prompt-show` output readable and copy-friendly: metadata now has a clear operator layout, descriptions wrap at a bounded width, and non-empty prompt context is enclosed in blank-line-separated `<prompt_body>` / `</prompt_body>` delimiters. JSON output remains unchanged.
 - Restored query-first ordering for `prompt-find <query>`: the command now sends the original natural-language query directly to semantic search and preserves its rank, while explicit metadata filters still apply afterwards. Intent-hinted, user-personalized ranking remains available through `suggest` and GUI recommendations.
 - Aligned the CLI help and checked-in prompt-import sample with the implemented contract: `prompt-show` now advertises UUID-or-exact-name resolution, and `prompt-add` examples use the importer-visible `context` prompt-body field.

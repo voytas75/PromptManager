@@ -10,9 +10,127 @@ import argparse
 import json
 import sys
 import tempfile
+import textwrap
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
+
+ROOT_COMMAND_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    (
+        "Prompt catalog",
+        (
+            "catalog-export",
+            "catalog-import",
+            "prompt-add",
+            "prompt-show",
+            "prompt-find",
+        ),
+    ),
+    (
+        "Prompt lifecycle and versions",
+        (
+            "prompt-history",
+            "prompt-lineage",
+            "prompt-fork",
+            "prompt-restore-version",
+            "prompt-version-diff",
+            "prompt-version-list",
+            "prompt-render",
+        ),
+    ),
+    (
+        "Search and recommendations",
+        (
+            "suggest",
+            "usage-report",
+            "history-analytics",
+            "refresh-scenarios",
+        ),
+    ),
+    (
+        "Prompt chains",
+        (
+            "prompt-chain-list",
+            "prompt-chain-show",
+            "prompt-chain-history",
+            "prompt-chain-export",
+            "prompt-chain-validate",
+            "prompt-chain-apply",
+            "prompt-chain-run",
+        ),
+    ),
+    (
+        "Operations and diagnostics",
+        (
+            "reembed",
+            "benchmark",
+            "diagnostics",
+        ),
+    ),
+)
+
+_ROOT_HELP_WIDTH = 110
+_ROOT_HELP_COMMAND_COLUMN = 34
+_ROOT_HELP_OPTION_COLUMN = 34
+
+
+class _RootHelpParser(argparse.ArgumentParser):
+    """Render a grouped root help card without changing subcommand parsers."""
+
+    subparsers_action: argparse._SubParsersAction[Any] | None = None  # pyright: ignore[reportPrivateUsage]
+
+    def format_help(self) -> str:
+        if self.subparsers_action is None:
+            return super().format_help()
+
+        choices_actions = cast(
+            "list[argparse.Action]",
+            getattr(self.subparsers_action, "_choices_actions", []),
+        )
+        command_help = {action.dest: action.help or "" for action in choices_actions}
+        grouped_commands = [command for _, commands in ROOT_COMMAND_GROUPS for command in commands]
+        missing = set(command_help).difference(grouped_commands)
+        unknown = set(grouped_commands).difference(command_help)
+        if missing or unknown:
+            return super().format_help()
+
+        lines = [
+            f"usage: {self.prog} [GLOBAL OPTIONS] COMMAND [COMMAND OPTIONS]",
+            "",
+            "Prompt Manager",
+            "Manage, search, version, and run reusable prompts.",
+            "",
+            "Commands",
+        ]
+        for heading, commands in ROOT_COMMAND_GROUPS:
+            lines.extend(["", f"  {heading}"])
+            for command in commands:
+                summary = " ".join(command_help[command].split())
+                available_width = _ROOT_HELP_WIDTH - _ROOT_HELP_COMMAND_COLUMN - 4
+                wrapped_summary = textwrap.wrap(summary, width=available_width) or [""]
+                lines.append(f"    {command:<{_ROOT_HELP_COMMAND_COLUMN}}{wrapped_summary[0]}")
+                lines.extend(
+                    f"    {'':<{_ROOT_HELP_COMMAND_COLUMN}}{continuation}"
+                    for continuation in wrapped_summary[1:]
+                )
+
+        lines.extend(
+            [
+                "",
+                "Global options",
+                f"  {'--logging-config PATH':<{_ROOT_HELP_OPTION_COLUMN}}"
+                "Load logging configuration from an INI file.",
+                f"  {'--print-settings':<{_ROOT_HELP_OPTION_COLUMN}}"
+                "Print resolved settings and exit.",
+                f"  {'--no-gui':<{_ROOT_HELP_OPTION_COLUMN}}"
+                "Initialise services without the desktop app.",
+                f"  {'-h, --help':<{_ROOT_HELP_OPTION_COLUMN}}Show this help card.",
+                "",
+                "Run `main.py COMMAND --help` for command-specific options.",
+                "The desktop app is the default when no command is supplied.",
+            ]
+        )
+        return "\n".join(lines) + "\n"
 
 
 def _build_inline_prompt_payload(args: argparse.Namespace) -> dict[str, object]:
@@ -186,7 +304,14 @@ def _normalise_prompt_add_args(args: argparse.Namespace, parser: argparse.Argume
 
 def parse_args() -> argparse.Namespace:
     """Return parsed CLI arguments for the Prompt Manager launcher."""
-    parser = argparse.ArgumentParser(description="Prompt Manager launcher")
+    parser = _RootHelpParser(
+        description="Prompt Manager launcher",
+        formatter_class=lambda prog: argparse.HelpFormatter(
+            prog,
+            width=_ROOT_HELP_WIDTH,
+            max_help_position=_ROOT_HELP_COMMAND_COLUMN,
+        ),
+    )
     parser.add_argument(
         "--logging-config",
         type=Path,
@@ -213,6 +338,7 @@ def parse_args() -> argparse.Namespace:
     )
 
     subparsers = parser.add_subparsers(dest="command")
+    parser.subparsers_action = subparsers
 
     export_parser = subparsers.add_parser(
         "catalog-export",

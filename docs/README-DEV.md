@@ -338,7 +338,7 @@ Every log entry also stores structured context metadata (prompt snapshot, execut
 | `python -m main prompt-chain-apply path/to/chain.json` | Create or update a prompt chain from a JSON definition (`name`, `description`, and ordered `steps` that only specify `prompt_id`, `order_index`, and optional `stop_on_failure`). |
 | `python -m main prompt-chain-run <uuid> [--input "text"\|--input-file path] [--no-web-search]` | Execute a chain sequentially by feeding the provided plain-text input into the first step, automatically piping each response into the next step while optionally enriching every hop with live web context. |
 
-Use `python -m main --help` for the complete current command list and `python -m main <command> --help` for the authoritative options and examples for one command.
+| `python -m main --help` | Compact root help card grouped by task area; use `python -m main <command> --help` for authoritative command-specific options. |
 
 ### GUI Prompt Chain Manager
 
