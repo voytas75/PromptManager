@@ -142,9 +142,9 @@ class _DummyManager:
         return f"Suggested {context[:10]}".strip()
 
     def suggest_prompts(self, query: str, limit: int = 5):
-        if self.suggestion_response is None:
-            raise AssertionError("suggest_prompts called unexpectedly")
-        return self.suggestion_response
+        if self.suggestion_response is not None:
+            return self.suggestion_response
+        return SimpleNamespace(prompts=self.repository.list(limit=limit))
 
     def rebuild_embeddings(self, *, reset_store: bool = False) -> tuple[int, int]:
         self.reembed_called = True
@@ -1042,6 +1042,7 @@ def test_prompt_find_command_lists_matching_prompts(
             ),
         ]
     )
+    manager.suggestion_response = SimpleNamespace(prompts=[manager.repository.store[0]])
     _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()
@@ -1050,6 +1051,42 @@ def test_prompt_find_command_lists_matching_prompts(
     output = capsys.readouterr().out
     assert f"{matching_id} | CI Failure Triage | [Debugging] | ci, triage" in output
     assert "Release Notes Writer" not in output
+    assert manager.closed is True
+
+
+def test_prompt_find_command_uses_ranked_natural_language_suggestions(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Prompt-find should return semantic suggestions without lexical overlap."""
+
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-find", "--limit", "5", "score the instruction"],
+    )
+    settings = _DummySettings()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    manager = _DummyManager()
+    matching_prompt = Prompt(
+        id=uuid.uuid4(),
+        name="Rubric Evaluator",
+        description="Assess clarity and usefulness against stated criteria.",
+        category="Analysis",
+        tags=["quality"],
+        context="Score each instruction against the supplied rubric.",
+        is_active=True,
+        source="catalog",
+    )
+    manager.repository.store.append(matching_prompt)
+    manager.suggestion_response = SimpleNamespace(prompts=[matching_prompt])
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    assert (
+        f"{matching_prompt.id} | Rubric Evaluator | [Analysis] | quality" in capsys.readouterr().out
+    )
     assert manager.closed is True
 
 
@@ -1086,6 +1123,7 @@ def test_prompt_find_command_outputs_json_payload(
             ),
         ]
     )
+    manager.suggestion_response = SimpleNamespace(prompts=[manager.repository.store[0]])
     _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
     exit_code = main.main()

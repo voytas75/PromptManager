@@ -1466,7 +1466,7 @@ def run_prompt_find(
 ) -> int:
     if manager is None:
         raise ValueError("Prompt Manager is required for prompt search.")
-    query = str(getattr(args, "query", "") or "").strip().lower()
+    query = str(getattr(args, "query", "") or "").strip()
     if not query:
         logger.error("Prompt search query must be provided.")
         return 5
@@ -1490,21 +1490,13 @@ def run_prompt_find(
             return 5
 
     try:
-        prompts = manager.repository.list()
-    except Exception as exc:  # pragma: no cover - surfaced to CLI
-        print_and_log(logger, logging.ERROR, f"Failed to list prompts: {exc}")
+        prompts = manager.suggest_prompts(query, limit=limit).prompts
+    except PromptManagerError as exc:
+        print_and_log(logger, logging.ERROR, f"Failed to find prompts: {exc}")
         return 6
 
     matches = []
     for prompt in prompts:
-        haystacks = [
-            prompt.name,
-            prompt.description,
-            prompt.category,
-            " ".join(prompt.tags or []),
-        ]
-        if not any(query in str(value).lower() for value in haystacks if value):
-            continue
         if category_filter and category_filter != str(prompt.category or "").strip().lower():
             continue
         if tag_filter and tag_filter not in {
