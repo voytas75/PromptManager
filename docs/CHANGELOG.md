@@ -4,6 +4,8 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-09-21
+
 ### Added
 
 - Added `prompt-compare <left> <right> [--json]`, a deterministic provider-free comparison of two current prompt assets. It reports selected metadata/state differences, unified body diff, Jinja variable sets and parse findings, direct fork lineage direction, and persisted usage/rating/quality counters without rendering, providers, embeddings, history reads, or mutations.
