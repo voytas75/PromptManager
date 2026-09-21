@@ -39,11 +39,10 @@ This is an idea backlog, not an active roadmap. Each candidate requires code/tes
    - Candidate evidence: consuming chains, scenarios, fork descendants, latest executions, usage count, models used, and dependent assets.
    - Depends on the dependency view being well-defined; no independent graph model.
 
-4. **`prompt-test <uuid|name>`**
-   Run a named or default regression suite against a prompt.
-   - Candidate follow-ups: `prompt-test-suite-list`, `prompt-test-suite-show`, `prompt-test-suite-run`.
-   - Desired output: totals, passed/failed cases, and precise failed case IDs/reasons.
-   - First decide the durable test-case and expected-result contract; distinguish deterministic tests from explicitly authorised provider runs.
+4. **`prompt-test <uuid|name> --suite PATH`** — delivered in [`2026-09-21-prompt-test-v1.md`](2026-09-21-prompt-test-v1.md)
+   Run deterministic local Jinja-template fixtures against one stored prompt.
+   - v1 consumes an explicit JSON suite with unique case IDs, variable maps, and exact expected output; it reports passed/failed case IDs without exposing prompt or expected bodies by default.
+   - Persisted/named suite catalogs, provider runs, semantic judging, latency/cost assertions, and test history remain deferred.
 
 5. **`prompt-evaluate <uuid|name>`**
    Dataset/history-based response-quality evaluation, separate from validation and regression tests.
@@ -90,11 +89,10 @@ This is an idea backlog, not an active roadmap. Each candidate requires code/tes
 
 1. `prompt-dependencies`
 2. `prompt-impact`
-3. deterministic `prompt-test` foundation
-4. `prompt-evaluate` — only after an approved provider/dataset evidence contract
-5. `prompt-lint`
+3. `prompt-evaluate` — only after an approved provider/dataset evidence contract
+4. `prompt-lint`
 
-**Counterfactual:** advance `prompt-test` before dependencies/impact if users already have stable, valuable test datasets and can name an acceptance metric. Observable signal: repeated manual evaluation of the same prompt inputs or provider runs being used as a de facto regression gate.
+**Counterfactual:** advance `prompt-evaluate` before dependencies/impact only if users already have stable, valuable response datasets and can name an acceptance metric. Observable signal: repeated provider runs over the same inputs are being manually compared as a de facto quality gate.
 
 ## Product and scope guardrails
 

@@ -49,6 +49,12 @@ from core import (
     snapshot_dataset_rows,
 )
 from core.catalog_check import run_catalog_check
+from core.prompt_testing import (
+    PromptTestSuiteError,
+    failed_suite_report,
+    parse_prompt_test_suite,
+    run_prompt_test_suite,
+)
 from core.prompt_validation import validate_prompt
 from core.templating import TemplateRenderer
 from models.prompt_chain_model import (
@@ -64,6 +70,7 @@ from .utils import (
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from core.prompt_manager import PromptManager
+    from core.prompt_testing import PromptTestReport
     from core.prompt_validation import PromptValidationReport
     from models.prompt_model import Prompt, PromptForkLink
 else:  # pragma: no cover - runtime placeholders for type-only imports
@@ -1910,6 +1917,54 @@ def run_prompt_version_list(
     return 0
 
 
+def _emit_prompt_test_report(report: PromptTestReport, *, json_output: bool) -> None:
+    """Render bounded test evidence without exposing rendered fixture bodies."""
+    if json_output:
+        print(json.dumps(report.to_record(), ensure_ascii=False, indent=2))
+        return
+    print(f"Prompt tests: {report.prompt_name} ({report.prompt_id})")
+    print(f"Suite: {report.suite_path} | cases={report.case_count}")
+    print(
+        "Summary: "
+        f"total={report.case_count} passed={report.passed_count} failed={report.failed_count}"
+    )
+    for case in report.cases:
+        suffix = f": {case.error}" if case.error else ""
+        print(f"{case.id} {case.status}{suffix}")
+
+
+def run_prompt_test(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    """Run provider-free exact-output fixtures against one stored prompt template."""
+    if manager is None:
+        raise ValueError("Prompt Manager is required for prompt tests.")
+    raw_prompt_id = str(getattr(args, "prompt_id", "") or "").strip()
+    prompt, exit_code, error_message = _resolve_prompt_reference(manager, raw_prompt_id)
+    if prompt is None:
+        print_and_log(logger, logging.ERROR, error_message or f"Prompt not found: {raw_prompt_id}")
+        return exit_code
+
+    suite_path = Path(args.suite)
+    try:
+        payload = _load_json_file(suite_path)
+        cases = parse_prompt_test_suite(payload)
+    except (OSError, ValueError, PromptTestSuiteError) as exc:
+        report = failed_suite_report(prompt, suite_path=str(suite_path), error=str(exc))
+        _emit_prompt_test_report(report, json_output=bool(getattr(args, "json", False)))
+        return 5
+
+    try:
+        report = run_prompt_test_suite(prompt, cases, suite_path=str(suite_path))
+    except Exception as exc:  # pragma: no cover - defensive CLI boundary
+        print_and_log(logger, logging.ERROR, f"Unable to run prompt test suite: {exc}")
+        return 6
+    _emit_prompt_test_report(report, json_output=bool(getattr(args, "json", False)))
+    return 0 if report.ok else 5
+
+
 def _emit_prompt_validation_report(
     report: PromptValidationReport,
     *,
@@ -2293,6 +2348,7 @@ COMMAND_SPECS: dict[str | None, CommandSpec] = {
     "prompt-version-list": CommandSpec(run_prompt_version_list),
     "prompt-render": CommandSpec(run_prompt_render),
     "prompt-validate": CommandSpec(run_prompt_validate),
+    "prompt-test": CommandSpec(run_prompt_test),
     "suggest": CommandSpec(run_suggest),
     "usage-report": CommandSpec(run_usage_report),
     "history-analytics": CommandSpec(run_history_analytics),

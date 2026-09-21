@@ -2464,6 +2464,109 @@ def test_prompt_version_list_command_resolves_exact_name_and_not_found(
     assert missing_manager.closed is True
 
 
+def test_prompt_test_command_reports_mixed_fixture_results_as_json(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    """Run deterministic template fixtures without any model/provider call."""
+    prompt_id = uuid.uuid4()
+    suite_path = tmp_path / "incident-suite.json"
+    suite_path.write_text(
+        json.dumps(
+            {
+                "cases": [
+                    {
+                        "id": "T01-pass",
+                        "variables": {"repository": "PromptManager"},
+                        "expected": "Review PromptManager.",
+                    },
+                    {
+                        "id": "T02-fail",
+                        "variables": {"repository": "Other"},
+                        "expected": "Expected different text.",
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-test", str(prompt_id), "--suite", str(suite_path), "--json"],
+    )
+    settings = _DummySettings()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    manager = _DummyManager()
+    manager.repository.store.append(
+        Prompt(
+            id=prompt_id,
+            name="Review repository",
+            description="Review one repository.",
+            category="Engineering",
+            context="Review {{ repository }}.",
+        )
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    exit_code = main.main()
+
+    assert exit_code == 5
+    output = json.loads(capsys.readouterr().out)
+    assert output["ok"] is False
+    assert output["prompt"] == {"id": str(prompt_id), "name": "Review repository"}
+    assert output["suite"] == {"path": str(suite_path), "case_count": 2}
+    assert output["summary"] == {"total": 2, "passed": 1, "failed": 1}
+    assert output["cases"] == [
+        {"id": "T01-pass", "status": "passed", "error": None},
+        {"id": "T02-fail", "status": "failed", "error": "Rendered output did not match expected."},
+    ]
+    assert manager.closed is True
+
+
+def test_prompt_test_command_reports_invalid_suite_as_json(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    """Reject malformed fixture suites before attempting any prompt rendering."""
+    prompt_id = uuid.uuid4()
+    suite_path = tmp_path / "invalid-suite.json"
+    suite_path.write_text(json.dumps({"cases": [{"id": "T01", "variables": {}}]}), encoding="utf-8")
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-test", str(prompt_id), "--suite", str(suite_path), "--json"],
+    )
+    settings = _DummySettings()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    manager = _DummyManager()
+    manager.repository.store.append(
+        Prompt(
+            id=prompt_id,
+            name="Review repository",
+            description="Review one repository.",
+            category="Engineering",
+            context="Review {{ repository }}.",
+        )
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    exit_code = main.main()
+
+    assert exit_code == 5
+    output = json.loads(capsys.readouterr().out)
+    assert output["ok"] is False
+    assert output["summary"] == {"total": 0, "passed": 0, "failed": 1}
+    assert output["cases"] == [
+        {
+            "id": "suite",
+            "status": "failed",
+            "error": "Suite case 'T01' must include string field 'expected'.",
+        }
+    ]
+    assert manager.closed is True
+
+
 def test_prompt_validate_command_reports_variables_and_warnings_as_json(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

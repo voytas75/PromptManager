@@ -6,6 +6,8 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Added
 
+- Added `prompt-test <uuid-or-exact-name> --suite PATH [--json]`, a deterministic provider-free regression runner for local Jinja prompt templates. JSON suites define unique case IDs, variable maps, and exact expected output; results report only case status/reasons by default, without model calls, persistence, or prompt-body disclosure.
+
 - Added `prompt-validate <uuid-or-exact-name> [--json]`, a deterministic provider-free check of one persisted prompt. It reports detected template variables and validates blank name/description, empty body, Jinja syntax, local related-prompt references, and blank or duplicate tags without rendering, provider calls, embedding access, or mutation.
 
 - Added `catalog-check [--json]`, a deterministic read-only catalog-integrity pass for prompts and chains. It reports duplicate exact names/bodies, invalid template syntax, broken related-prompt references, missing stored embeddings, and chain steps referencing missing prompts; error findings return a nonzero result while warnings remain non-blocking.

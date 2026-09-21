@@ -39,6 +39,7 @@ ROOT_COMMAND_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "prompt-version-list",
             "prompt-render",
             "prompt-validate",
+            "prompt-test",
         ),
     ),
     (
@@ -733,6 +734,27 @@ def parse_args() -> argparse.Namespace:
         "--json",
         action="store_true",
         help="Emit deterministic structured validation evidence.",
+    )
+
+    prompt_test_parser = subparsers.add_parser(
+        "prompt-test",
+        help="Run deterministic local template fixtures for one stored prompt.",
+    )
+    prompt_test_parser.add_argument(
+        "prompt_id",
+        type=str,
+        help="Prompt UUID or exact prompt name to test.",
+    )
+    prompt_test_parser.add_argument(
+        "--suite",
+        type=Path,
+        required=True,
+        help="UTF-8 JSON fixture suite with cases containing id, variables, and expected.",
+    )
+    prompt_test_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit deterministic structured test results.",
     )
 
     suggest_parser = subparsers.add_parser(
