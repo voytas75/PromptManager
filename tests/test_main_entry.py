@@ -2464,6 +2464,92 @@ def test_prompt_version_list_command_resolves_exact_name_and_not_found(
     assert missing_manager.closed is True
 
 
+def test_prompt_validate_command_reports_variables_and_warnings_as_json(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Expose deterministic provider-free prompt validation evidence."""
+    prompt_id = uuid.uuid4()
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-validate", str(prompt_id), "--json"],
+    )
+    settings = _DummySettings()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    manager = _DummyManager()
+    manager.repository.store.append(
+        Prompt(
+            id=prompt_id,
+            name="Incident handoff",
+            description="Prepare a handoff summary.",
+            category="Operations",
+            context="Summarise {{ incident_id }} for {{ audience }}.",
+            tags=["operations", "Operations", " "],
+        )
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["valid"] is True
+    assert output["prompt"] == {"id": str(prompt_id), "name": "Incident handoff"}
+    assert output["variables"] == ["audience", "incident_id"]
+    assert output["summary"] == {"errors": 0, "warnings": 1}
+    assert output["issues"] == [
+        {
+            "code": "VAL006",
+            "severity": "warning",
+            "message": "Tags contain blank values or duplicate values case-insensitively.",
+        }
+    ]
+    assert manager.closed is True
+
+
+def test_prompt_validate_command_returns_error_for_invalid_template_and_reference(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Return nonzero structured evidence for invalid stored prompt contracts."""
+    prompt_id = uuid.uuid4()
+    missing_id = uuid.uuid4()
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-validate", str(prompt_id), "--json"],
+    )
+    settings = _DummySettings()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    manager = _DummyManager()
+    manager.repository.store.append(
+        Prompt(
+            id=prompt_id,
+            name="Broken prompt",
+            description=" ",
+            category="Testing",
+            context="{{ unclosed ",
+            related_prompts=[str(missing_id), "not-a-uuid"],
+        )
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    exit_code = main.main()
+
+    assert exit_code == 5
+    output = json.loads(capsys.readouterr().out)
+    assert output["valid"] is False
+    assert output["variables"] == []
+    assert output["summary"] == {"errors": 4, "warnings": 0}
+    assert [issue["code"] for issue in output["issues"]] == [
+        "VAL002",
+        "VAL004",
+        "VAL005",
+        "VAL005",
+    ]
+    assert "Invalid template syntax:" in output["issues"][1]["message"]
+    assert manager.closed is True
+
+
 def test_prompt_render_command_renders_prompt_with_json_variables(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

@@ -49,6 +49,7 @@ from core import (
     snapshot_dataset_rows,
 )
 from core.catalog_check import run_catalog_check
+from core.prompt_validation import validate_prompt
 from core.templating import TemplateRenderer
 from models.prompt_chain_model import (
     chain_from_payload,
@@ -63,6 +64,7 @@ from .utils import (
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from core.prompt_manager import PromptManager
+    from core.prompt_validation import PromptValidationReport
     from models.prompt_model import Prompt, PromptForkLink
 else:  # pragma: no cover - runtime placeholders for type-only imports
     PromptManager = object
@@ -1908,6 +1910,78 @@ def run_prompt_version_list(
     return 0
 
 
+def _emit_prompt_validation_report(
+    report: PromptValidationReport,
+    *,
+    json_output: bool,
+) -> None:
+    """Render one validation report without calling a model or mutation path."""
+    if json_output:
+        print(json.dumps(report.to_record(), ensure_ascii=False, indent=2))
+        return
+    print(f"Prompt validation: {report.prompt_name} ({report.prompt_id})")
+    print(f"Variables: {', '.join(report.variables) if report.variables else '-'}")
+    print(f"Summary: errors={report.error_count} warnings={report.warning_count}")
+    for issue in report.issues:
+        print(f"{issue.code} {issue.severity}: {issue.message}")
+
+
+def run_prompt_validate(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    """Validate one persisted prompt using only local technical contracts."""
+    if manager is None:
+        raise ValueError("Prompt Manager is required for prompt validation.")
+    raw_prompt_id = str(getattr(args, "prompt_id", "") or "").strip()
+    prompt, exit_code, error_message = _resolve_prompt_reference(manager, raw_prompt_id)
+    if prompt is None:
+        message = error_message or f"Prompt not found: {raw_prompt_id}"
+        if bool(getattr(args, "json", False)):
+            print(
+                json.dumps(
+                    {
+                        "valid": False,
+                        "prompt": None,
+                        "variables": [],
+                        "summary": {"errors": 1, "warnings": 0},
+                        "issues": [{"code": "VAL000", "severity": "error", "message": message}],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+        else:
+            print_and_log(logger, logging.ERROR, message)
+        return exit_code
+    try:
+        known_prompt_ids = [candidate.id for candidate in manager.repository.list()]
+        report = validate_prompt(prompt, known_prompt_ids)
+    except Exception as exc:  # pragma: no cover - surfaced to CLI
+        message = f"Unable to validate prompt: {exc}"
+        if bool(getattr(args, "json", False)):
+            print(
+                json.dumps(
+                    {
+                        "valid": False,
+                        "prompt": {"id": str(prompt.id), "name": prompt.name},
+                        "variables": [],
+                        "summary": {"errors": 1, "warnings": 0},
+                        "issues": [{"code": "VAL000", "severity": "error", "message": message}],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+        else:
+            print_and_log(logger, logging.ERROR, message)
+        return 6
+
+    _emit_prompt_validation_report(report, json_output=bool(getattr(args, "json", False)))
+    return 0 if report.valid else 5
+
+
 def _prompt_render_payload(
     *,
     ok: bool,
@@ -2218,6 +2292,7 @@ COMMAND_SPECS: dict[str | None, CommandSpec] = {
     "prompt-version-diff": CommandSpec(run_prompt_version_diff),
     "prompt-version-list": CommandSpec(run_prompt_version_list),
     "prompt-render": CommandSpec(run_prompt_render),
+    "prompt-validate": CommandSpec(run_prompt_validate),
     "suggest": CommandSpec(run_suggest),
     "usage-report": CommandSpec(run_usage_report),
     "history-analytics": CommandSpec(run_history_analytics),

@@ -38,6 +38,7 @@ ROOT_COMMAND_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "prompt-version-diff",
             "prompt-version-list",
             "prompt-render",
+            "prompt-validate",
         ),
     ),
     (
@@ -717,6 +718,21 @@ def parse_args() -> argparse.Namespace:
         "--json",
         action="store_true",
         help="Emit a deterministic JSON render or validation result.",
+    )
+
+    prompt_validate_parser = subparsers.add_parser(
+        "prompt-validate",
+        help="Validate one stored prompt without rendering or calling a model.",
+    )
+    prompt_validate_parser.add_argument(
+        "prompt_id",
+        type=str,
+        help="Prompt UUID or exact prompt name to validate.",
+    )
+    prompt_validate_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit deterministic structured validation evidence.",
     )
 
     suggest_parser = subparsers.add_parser(
