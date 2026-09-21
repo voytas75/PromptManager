@@ -49,9 +49,10 @@ This is an idea backlog, not an active roadmap. Each candidate requires code/tes
    - Candidate metrics: pass rate, latency, token/cost data, evaluator scores, and comparison to a previous version.
    - Provider/dataset runs need an explicit acceptance boundary and reproducible evidence contract.
 
-6. **`prompt-lint <uuid|name>`**
+6. **`prompt-lint <uuid|name>`** — delivered in [`2026-09-21-prompt-lint-v1.md`](2026-09-21-prompt-lint-v1.md)
    Design-quality guidance, distinct from technical correctness.
-   - Candidate diagnostics: vague instructions, redundant/conflicting constraints, weakly used variables, and length deltas versus prior versions.
+   - v1 deterministically advises on short descriptions, missing action cues, unstructured long bodies, repeated instruction lines, and undocumented Jinja input context.
+   - Linguistic vagueness, conflicting semantic constraints, unused variables, version-length deltas, and model-backed judgement remain deferred.
    - Keep the boundary explicit:
      - `validate`: technically correct and executable contract;
      - `lint`: likely design/maintainability problems.

@@ -40,6 +40,7 @@ ROOT_COMMAND_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "prompt-compare",
             "prompt-render",
             "prompt-validate",
+            "prompt-lint",
             "prompt-test",
         ),
     ),
@@ -755,6 +756,21 @@ def parse_args() -> argparse.Namespace:
         "--json",
         action="store_true",
         help="Emit deterministic structured validation evidence.",
+    )
+
+    prompt_lint_parser = subparsers.add_parser(
+        "prompt-lint",
+        help="Lint one stored prompt with deterministic advisory checks.",
+    )
+    prompt_lint_parser.add_argument(
+        "prompt_id",
+        type=str,
+        help="Prompt UUID or exact prompt name to lint.",
+    )
+    prompt_lint_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit deterministic structured lint evidence.",
     )
 
     prompt_test_parser = subparsers.add_parser(

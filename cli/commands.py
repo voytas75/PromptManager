@@ -50,6 +50,7 @@ from core import (
 )
 from core.catalog_check import run_catalog_check
 from core.prompt_comparison import compare_prompts
+from core.prompt_linting import lint_prompt
 from core.prompt_testing import (
     PromptTestSuiteError,
     failed_suite_report,
@@ -70,6 +71,7 @@ from .utils import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
+    from core.prompt_linting import PromptLintReport
     from core.prompt_manager import PromptManager
     from core.prompt_testing import PromptTestReport
     from core.prompt_validation import PromptValidationReport
@@ -2134,6 +2136,92 @@ def run_prompt_validate(
     return 0 if report.valid else 5
 
 
+def _emit_prompt_lint_report(
+    report: PromptLintReport,
+    *,
+    json_output: bool,
+) -> None:
+    """Render advisory lint evidence without treating warnings as invalidity."""
+    if json_output:
+        print(json.dumps(report.to_record(), ensure_ascii=False, indent=2))
+        return
+    print(f"Prompt lint: {report.prompt_name} ({report.prompt_id})")
+    parse_status = report.template_parse_error or "-"
+    print(
+        "Metrics: "
+        f"body_characters={report.body_characters} body_lines={report.body_lines} "
+        f"variables={', '.join(report.variables) if report.variables else '-'}"
+    )
+    print(f"Template parse error: {parse_status}")
+    print(f"Summary: warnings={report.warning_count}")
+    for issue in report.issues:
+        print(f"{issue.code} {issue.severity}: {issue.message}")
+
+
+def run_prompt_lint(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    """Lint one persisted prompt using only deterministic local advisory rules."""
+    if manager is None:
+        raise ValueError("Prompt Manager is required for prompt linting.")
+    raw_prompt_id = str(getattr(args, "prompt_id", "") or "").strip()
+    prompt, exit_code, error_message = _resolve_prompt_reference(manager, raw_prompt_id)
+    if prompt is None:
+        message = error_message or f"Prompt not found: {raw_prompt_id}"
+        if bool(getattr(args, "json", False)):
+            print(
+                json.dumps(
+                    {
+                        "clean": False,
+                        "prompt": None,
+                        "metrics": {
+                            "body_characters": 0,
+                            "body_lines": 0,
+                            "variables": [],
+                            "template_parse_error": None,
+                        },
+                        "summary": {"warnings": 0},
+                        "issues": [{"code": "LINT000", "severity": "error", "message": message}],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+        else:
+            print_and_log(logger, logging.ERROR, message)
+        return exit_code
+    try:
+        report = lint_prompt(prompt)
+    except Exception as exc:  # pragma: no cover - defensive CLI boundary
+        message = f"Unable to lint prompt: {exc}"
+        if bool(getattr(args, "json", False)):
+            print(
+                json.dumps(
+                    {
+                        "clean": False,
+                        "prompt": {"id": str(prompt.id), "name": prompt.name},
+                        "metrics": {
+                            "body_characters": 0,
+                            "body_lines": 0,
+                            "variables": [],
+                            "template_parse_error": None,
+                        },
+                        "summary": {"warnings": 0},
+                        "issues": [{"code": "LINT000", "severity": "error", "message": message}],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+        else:
+            print_and_log(logger, logging.ERROR, message)
+        return 6
+    _emit_prompt_lint_report(report, json_output=bool(getattr(args, "json", False)))
+    return 0
+
+
 def _prompt_render_payload(
     *,
     ok: bool,
@@ -2446,6 +2534,7 @@ COMMAND_SPECS: dict[str | None, CommandSpec] = {
     "prompt-compare": CommandSpec(run_prompt_compare),
     "prompt-render": CommandSpec(run_prompt_render),
     "prompt-validate": CommandSpec(run_prompt_validate),
+    "prompt-lint": CommandSpec(run_prompt_lint),
     "prompt-test": CommandSpec(run_prompt_test),
     "suggest": CommandSpec(run_suggest),
     "usage-report": CommandSpec(run_usage_report),

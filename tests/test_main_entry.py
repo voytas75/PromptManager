@@ -2747,6 +2747,79 @@ def test_prompt_validate_command_returns_error_for_invalid_template_and_referenc
     assert manager.closed is True
 
 
+def test_prompt_lint_command_reports_advisories_without_failing_as_json(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Expose advisory lint evidence while keeping warnings non-blocking."""
+    prompt_id = uuid.uuid4()
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-lint", str(prompt_id), "--json"],
+    )
+    settings = _DummySettings()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    manager = _DummyManager()
+    manager.repository.store.append(
+        Prompt(
+            id=prompt_id,
+            name="Handoff",
+            description="Help",
+            category="Operations",
+            context="Incident {{ incident_id }} context.",
+        )
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["clean"] is False
+    assert output["prompt"] == {"id": str(prompt_id), "name": "Handoff"}
+    assert output["metrics"] == {
+        "body_characters": 35,
+        "body_lines": 1,
+        "variables": ["incident_id"],
+        "template_parse_error": None,
+    }
+    assert output["summary"] == {"warnings": 3}
+    assert [issue["code"] for issue in output["issues"]] == ["LINT001", "LINT002", "LINT005"]
+    assert manager.closed is True
+
+
+def test_prompt_lint_command_reports_missing_prompt_as_structured_error(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Keep the established resolver error contract for lint JSON output."""
+    missing_prompt_id = uuid.uuid4()
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-lint", str(missing_prompt_id), "--json"],
+    )
+    settings = _DummySettings()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    manager = _DummyManager()
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    exit_code = main.main()
+
+    assert exit_code == 4
+    output = json.loads(capsys.readouterr().out)
+    assert output["clean"] is False
+    assert output["prompt"] is None
+    assert output["summary"] == {"warnings": 0}
+    assert output["issues"] == [
+        {
+            "code": "LINT000",
+            "severity": "error",
+            "message": f"Prompt not found: {missing_prompt_id}",
+        }
+    ]
+    assert manager.closed is True
+
+
 def test_prompt_render_command_renders_prompt_with_json_variables(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
