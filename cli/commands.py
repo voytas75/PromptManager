@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import random
 import sys
 import textwrap
 import uuid
@@ -1461,6 +1462,27 @@ def _format_prompt_show_text(prompt: Prompt) -> str:
     return "\n".join(lines)
 
 
+def run_prompt_random(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    """Display one randomly selected local prompt without changing repository state."""
+    del args, logger
+    if manager is None:
+        raise ValueError("Prompt Manager is required for random prompt display.")
+    try:
+        prompts = manager.repository.list()
+    except Exception as exc:  # pragma: no cover - surfaced to CLI
+        print(f"Unable to load prompts: {exc}")
+        return 6
+    if not prompts:
+        print("No prompts available. Add or import a prompt first.")
+        return 0
+    print(_format_prompt_show_text(random.choice(prompts)))
+    return 0
+
+
 def run_prompt_show(
     manager: PromptManager | None,
     args: argparse.Namespace,
@@ -2152,6 +2174,7 @@ COMMAND_SPECS: dict[str | None, CommandSpec] = {
     "catalog-import": CommandSpec(run_catalog_import),
     "prompt-add": CommandSpec(run_catalog_import),
     "prompt-show": CommandSpec(run_prompt_show),
+    "prompt-random": CommandSpec(run_prompt_random),
     "prompt-find": CommandSpec(run_prompt_find),
     "prompt-history": CommandSpec(run_prompt_history),
     "prompt-lineage": CommandSpec(run_prompt_lineage),

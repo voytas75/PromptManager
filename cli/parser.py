@@ -23,6 +23,7 @@ ROOT_COMMAND_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "catalog-import",
             "prompt-add",
             "prompt-show",
+            "prompt-random",
             "prompt-find",
         ),
     ),
@@ -483,6 +484,10 @@ def parse_args() -> argparse.Namespace:
         help="Include the full persisted record, including the embedding vector (requires --json).",
     )
 
+    _ = subparsers.add_parser(
+        "prompt-random",
+        help="Display one randomly selected local prompt.",
+    )
     prompt_find_parser = subparsers.add_parser(
         "prompt-find",
         help="Find prompts by raw semantic rank for a natural-language query.",

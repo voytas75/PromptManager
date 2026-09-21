@@ -27,6 +27,8 @@ from typing import TYPE_CHECKING, Any, cast
 import pytest
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from _pytest.capture import CaptureFixture
 
 import main
@@ -56,6 +58,11 @@ def _patch_main(monkeypatch: pytest.MonkeyPatch, name: str, value: object) -> No
 
 def _mock_module(name: str) -> Any:
     return cast("Any", types.ModuleType(name))
+
+
+def _choose_second_prompt(prompts: Sequence[Prompt]) -> Prompt:
+    """Return a deterministic test selection from the supplied prompt list."""
+    return prompts[1]
 
 
 class _DummySettings(SimpleNamespace):
@@ -941,6 +948,58 @@ def test_suggest_command_outputs_results(
     output = capsys.readouterr().out
     assert "Top 1 suggestions" in output
     assert "Debug Sentinel" in output
+    assert manager.closed is True
+
+
+def test_prompt_random_command_displays_one_repository_prompt(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Render the selected local prompt through the standard detail view."""
+    prompt_id = uuid.uuid4()
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-random"])
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    manager = _DummyManager()
+    manager.repository.store.extend(
+        [
+            Prompt(
+                id=uuid.uuid4(),
+                name="Other prompt",
+                description="Not selected.",
+                category="Testing",
+            ),
+            Prompt(
+                id=prompt_id,
+                name="Randomly selected prompt",
+                description="Selected through the CLI random prompt command.",
+                category="Testing",
+                context="Use this prompt body.",
+            ),
+        ]
+    )
+    monkeypatch.setattr("cli.commands.random.choice", _choose_second_prompt)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    assert main.main() == 0
+
+    output = capsys.readouterr().out
+    assert "Randomly selected prompt" in output
+    assert f"ID:       {prompt_id}" in output
+    assert "<prompt_body>" in output
+    assert manager.closed is True
+
+
+def test_prompt_random_command_reports_empty_repository(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-random"])
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    manager = _DummyManager()
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    assert main.main() == 0
+    assert "No prompts available. Add or import a prompt first." in capsys.readouterr().out
     assert manager.closed is True
 
 

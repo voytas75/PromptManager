@@ -6,6 +6,8 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Added
 
+- Added `prompt-random`, a read-only CLI command that displays one randomly selected local prompt through the existing readable prompt-detail view; it makes no provider calls or repository changes and reports a clear empty-catalog response.
+
 - Added a local durable prompt activity ledger for successful asset mutations: `created`, `updated`, `forked`, `restored`, and `deleted` events now retain prompt ID, UTC timestamp, and CLI/GUI origin without storing prompt bodies. Catalog import, scenario refresh, fork, and version restore explicitly record CLI origin; existing GUI domain paths use the GUI default. Search, filters, reads, and keystrokes remain untracked.
 
 - Added the packaged `prompt-manager` console entrypoint. Wheels now include the CLI, `main.py`, prompt templates, and the default config template; `python -m main` remains supported from a repository checkout.
