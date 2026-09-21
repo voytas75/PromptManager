@@ -1,6 +1,6 @@
 # PromptManager — `prompt-test` v1
 
-**Status:** in progress
+**Status:** completed — 2026-09-21
 **Owner:** PromptManager Team
 
 ## Product decision

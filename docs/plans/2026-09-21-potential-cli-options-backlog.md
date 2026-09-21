@@ -2,7 +2,7 @@
 
 **Status:** living idea backlog / not approved for implementation
 **Owner:** PromptManager Team
-**Source:** operator product review, updated after delivery of `catalog-check`
+**Source:** operator product review, updated after the September CLI delivery set
 
 ## Current baseline
 
