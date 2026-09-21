@@ -26,6 +26,9 @@ ROOT_COMMAND_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "prompt-show",
             "prompt-random",
             "prompt-find",
+            "tag-list",
+            "tag-show",
+            "prompt-tag",
         ),
     ),
     (
@@ -547,6 +550,61 @@ def parse_args() -> argparse.Namespace:
         "--json",
         action="store_true",
         help="Render matching prompts as structured JSON.",
+    )
+
+    tag_list_parser = subparsers.add_parser(
+        "tag-list",
+        help="List distinct prompt tags with prompt and active-prompt counts.",
+    )
+    tag_list_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Render tag aggregates as structured JSON.",
+    )
+
+    tag_show_parser = subparsers.add_parser(
+        "tag-show",
+        help="Show prompts having one exact tag (case-insensitive).",
+    )
+    tag_show_parser.add_argument(
+        "tag",
+        type=str,
+        help="Tag to inspect (case-insensitive exact match).",
+    )
+    tag_show_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Render the tag and matching prompts as structured JSON.",
+    )
+
+    prompt_tag_parser = subparsers.add_parser(
+        "prompt-tag",
+        help="Add or remove one tag on a prompt by UUID or exact name.",
+    )
+    prompt_tag_parser.add_argument(
+        "prompt_id",
+        type=str,
+        help="Prompt UUID or exact prompt name to update.",
+    )
+    prompt_tag_parser.add_argument(
+        "action",
+        choices=("add", "remove"),
+        help="Add a missing tag or remove an existing tag.",
+    )
+    prompt_tag_parser.add_argument(
+        "tag",
+        type=str,
+        help="Single non-blank tag to add or remove (case-insensitive match).",
+    )
+    prompt_tag_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview the tag change without writing it.",
+    )
+    prompt_tag_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Render the tag change summary as structured JSON.",
     )
 
     prompt_history_parser = subparsers.add_parser(

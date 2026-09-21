@@ -144,6 +144,7 @@ class _DummyManager:
         self.fork_children: list[PromptForkLink] = []
         self.fork_lineage_error: Exception | None = None
         self.prompt_chains: list[object] = []
+        self.update_calls: list[tuple[str | None, str, bool]] = []
 
     def close(self) -> None:
         self.closed = True
@@ -305,9 +306,12 @@ class _DummyManager:
         prompt: object,
         embedding: object | None = None,
         *,
+        commit_message: str | None = None,
         origin: str = "gui",
+        refresh_derived_state: bool = True,
     ) -> object:
-        del embedding, origin
+        del embedding
+        self.update_calls.append((commit_message, origin, refresh_derived_state))
         for index, existing in enumerate(self.repository.store):
             if getattr(existing, "id", None) == getattr(prompt, "id", None):
                 self.repository.store[index] = prompt
@@ -1500,6 +1504,167 @@ def test_prompt_find_command_filters_by_source_and_active_state(
     assert f"{matching_id} | Catalog Active Prompt | [Debugging] | triage" in output
     assert "Catalog Inactive Prompt" not in output
     assert "User Active Prompt" not in output
+    assert manager.closed is True
+
+
+def test_tag_list_command_aggregates_case_insensitive_tags(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["prompt-manager", "--no-gui", "tag-list", "--json"])
+    _patch_main(monkeypatch, "load_settings", _DummySettings)
+    manager = _DummyManager()
+    manager.repository.store.extend(
+        [
+            Prompt(
+                id=uuid.uuid4(),
+                name="Active Ops",
+                description="Description",
+                category="Operations",
+                tags=["Ops", " ops ", "CI"],
+            ),
+            Prompt(
+                id=uuid.uuid4(),
+                name="Inactive Ops",
+                description="Description",
+                category="Operations",
+                tags=["ops"],
+                is_active=False,
+            ),
+        ]
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload == {
+        "tags": [
+            {"tag": "Ops", "prompt_count": 2, "active_prompt_count": 1},
+            {"tag": "CI", "prompt_count": 1, "active_prompt_count": 1},
+        ]
+    }
+    assert manager.closed is True
+
+
+def test_tag_show_command_returns_case_insensitive_exact_matches_as_json(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["prompt-manager", "--no-gui", "tag-show", " OPS ", "--json"],
+    )
+    _patch_main(monkeypatch, "load_settings", _DummySettings)
+    manager = _DummyManager()
+    matching = Prompt(
+        id=uuid.uuid4(),
+        name="Operations Triage",
+        description="Description",
+        category="Operations",
+        tags=["ops", "triage"],
+    )
+    manager.repository.store.extend(
+        [
+            Prompt(
+                id=uuid.uuid4(),
+                name="Unrelated",
+                description="Description",
+                category="Writing",
+                tags=["review"],
+            ),
+            matching,
+        ]
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["tag"] == {"tag": "ops", "prompt_count": 1, "active_prompt_count": 1}
+    assert payload["prompts"] == [
+        {
+            "id": str(matching.id),
+            "name": "Operations Triage",
+            "category": "Operations",
+            "tags": ["ops", "triage"],
+            "active": True,
+        }
+    ]
+    assert manager.closed is True
+
+
+def test_prompt_tag_command_previews_and_persists_one_idempotent_change(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    prompt_id = uuid.uuid4()
+    manager = _DummyManager()
+    prompt = Prompt(
+        id=prompt_id,
+        name="Incident Triage",
+        description="Description",
+        category="Operations",
+        tags=["ops"],
+    )
+    manager.repository.store.append(prompt)
+    _patch_main(monkeypatch, "load_settings", _DummySettings)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "prompt-manager",
+            "--no-gui",
+            "prompt-tag",
+            str(prompt_id),
+            "add",
+            "CI",
+            "--dry-run",
+            "--json",
+        ],
+    )
+    preview_exit_code = main.main()
+    preview = json.loads(capsys.readouterr().out)
+
+    assert preview_exit_code == 0
+    assert preview["changed"] is True
+    assert preview["dry_run"] is True
+    assert preview["prompt"]["tags"] == ["ops", "CI"]
+    assert prompt.tags == ["ops"]
+
+    manager.closed = False
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["prompt-manager", "--no-gui", "prompt-tag", str(prompt_id), "add", "CI", "--json"],
+    )
+    write_exit_code = main.main()
+    written = json.loads(capsys.readouterr().out)
+
+    assert write_exit_code == 0
+    assert written["changed"] is True
+    assert written["dry_run"] is False
+    assert cast("Prompt", manager.repository.store[0]).tags == ["ops", "CI"]
+    assert manager.update_calls == [("Tag add: CI", "cli", False)]
+
+    manager.closed = False
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["prompt-manager", "--no-gui", "prompt-tag", str(prompt_id), "add", "ci", "--json"],
+    )
+    unchanged_exit_code = main.main()
+    unchanged = json.loads(capsys.readouterr().out)
+
+    assert unchanged_exit_code == 0
+    assert unchanged["changed"] is False
+    assert cast("Prompt", manager.repository.store[0]).tags == ["ops", "CI"]
+    assert manager.update_calls == [("Tag add: CI", "cli", False)]
     assert manager.closed is True
 
 

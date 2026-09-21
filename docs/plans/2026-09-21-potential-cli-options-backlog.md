@@ -65,8 +65,8 @@ This is an idea backlog, not an active roadmap. Each candidate requires code/tes
   - Surface active/inactive lifecycle state as explicit operations.
   - Verify the existing GUI/state semantics before adding write paths.
 
-- **`prompt-tag <id> add|remove <tag>`**, **`tag-list`**, **`tag-show <tag>`**
-  - Convenience metadata operations; lower priority than quality, integrity, and change-safety tooling.
+- **`prompt-tag <id> add|remove <tag>`**, **`tag-list`**, **`tag-show <tag>`** — delivered in [`2026-09-21-prompt-tags-cli-v1.md`](2026-09-21-prompt-tags-cli-v1.md)
+  - Deterministic local tag aggregates/inspection plus idempotent single-prompt changes with a non-mutating `--dry-run`; mass taxonomy operations remain deferred.
 
 - **`prompt-clone <id> --name NAME`**
   - Add only if product semantics differ meaningfully from the existing lineage-preserving `prompt-fork`.

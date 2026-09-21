@@ -242,9 +242,11 @@ class PromptLifecycleMixin:
         force_version: bool = False,
         origin: PromptActivityOrigin = "gui",
         record_activity: bool = True,
+        refresh_derived_state: bool = True,
     ) -> Prompt:
-        """Update an existing prompt with new metadata."""
-        prompt = self._apply_category_metadata_for_lifecycle(prompt)
+        """Update an existing prompt, optionally skipping provider-derived refreshes."""
+        if refresh_derived_state:
+            prompt = self._apply_category_metadata_for_lifecycle(prompt)
         try:
             previous_prompt = self._repository.get(prompt.id)
         except RepositoryNotFoundError as exc:
@@ -266,7 +268,8 @@ class PromptLifecycleMixin:
                 exc_info=True,
             )
 
-        self._update_category_insight_for_lifecycle(prompt, previous_prompt=previous_prompt)
+        if refresh_derived_state:
+            self._update_category_insight_for_lifecycle(prompt, previous_prompt=previous_prompt)
 
         body_changed = self._normalise_body(previous_prompt.context) != self._normalise_body(
             prompt.context
@@ -288,7 +291,7 @@ class PromptLifecycleMixin:
         generated_embedding: list[float] | None = None
         if embedding is not None:
             generated_embedding = list(embedding)
-        else:
+        elif refresh_derived_state:
             try:
                 generated_embedding = self._embedding_provider.embed(prompt.document)
             except EmbeddingGenerationError:
@@ -354,7 +357,8 @@ class PromptLifecycleMixin:
             )
 
         if generated_embedding is None:
-            self._embedding_worker.schedule(updated_prompt.id)
+            if refresh_derived_state:
+                self._embedding_worker.schedule(updated_prompt.id)
             try:
                 self._cache_prompt(updated_prompt)
             except PromptCacheError:

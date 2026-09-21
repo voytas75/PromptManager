@@ -29,6 +29,7 @@ import textwrap
 import uuid
 from collections import Counter
 from collections.abc import Callable, Mapping
+from copy import copy
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -51,6 +52,12 @@ from core import (
 from core.catalog_check import run_catalog_check
 from core.prompt_comparison import compare_prompts
 from core.prompt_linting import lint_prompt
+from core.prompt_tagging import (
+    apply_prompt_tag,
+    build_tag_catalog,
+    find_tagged_prompts,
+    normalize_tag,
+)
 from core.prompt_template_listing import list_effective_prompt_templates
 from core.prompt_testing import (
     PromptTestSuiteError,
@@ -1631,6 +1638,190 @@ def run_prompt_find(
     return 0
 
 
+def _tagged_prompt_record(prompt: Prompt) -> dict[str, object]:
+    """Return compact prompt identity metadata for tag read/mutation reports."""
+    return {
+        "id": str(prompt.id),
+        "name": prompt.name,
+        "category": prompt.category,
+        "tags": list(prompt.tags),
+        "active": prompt.is_active,
+    }
+
+
+def _load_tag_prompts(
+    manager: PromptManager,
+    logger: logging.Logger,
+) -> tuple[list[Prompt] | None, int]:
+    """Load tag source prompts once and keep repository failures consistent."""
+    try:
+        return manager.repository.list(), 0
+    except Exception as exc:  # pragma: no cover - surfaced to CLI
+        print_and_log(logger, logging.ERROR, f"Unable to load prompt tags: {exc}")
+        return None, 6
+
+
+def run_tag_list(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    """List deterministic logical tag aggregates without changing prompts."""
+    if manager is None:
+        raise ValueError("Prompt Manager is required for tag listing.")
+    prompts, exit_code = _load_tag_prompts(manager, logger)
+    if prompts is None:
+        return exit_code
+    tags = build_tag_catalog(prompts)
+    if bool(getattr(args, "json", False)):
+        payload = {"tags": [tag.to_record() for tag in tags]}
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    if not tags:
+        print("No tags found. Add tags to prompts first.")
+        return 0
+    print(f"Tags: {len(tags)}")
+    for tag in tags:
+        print(f"{tag.tag} | prompts: {tag.prompt_count} | active: {tag.active_prompt_count}")
+    return 0
+
+
+def run_tag_show(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    """Show compact records for prompts with one case-insensitive exact tag."""
+    if manager is None:
+        raise ValueError("Prompt Manager is required for tag inspection.")
+    try:
+        requested_tag = normalize_tag(getattr(args, "tag", ""))
+    except ValueError as exc:
+        print_and_log(logger, logging.ERROR, str(exc))
+        return 5
+    prompts, exit_code = _load_tag_prompts(manager, logger)
+    if prompts is None:
+        return exit_code
+    matches = find_tagged_prompts(prompts, requested_tag)
+    record = next(
+        (
+            tag
+            for tag in build_tag_catalog(prompts)
+            if tag.tag.casefold() == requested_tag.casefold()
+        ),
+        None,
+    )
+    tag_payload = (
+        record.to_record()
+        if record is not None
+        else {"tag": requested_tag, "prompt_count": 0, "active_prompt_count": 0}
+    )
+    payload = {
+        "tag": tag_payload,
+        "prompts": [_tagged_prompt_record(prompt) for prompt in matches],
+    }
+    if bool(getattr(args, "json", False)):
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    if not matches:
+        print(f"No prompts use tag: {requested_tag}")
+        return 0
+    assert record is not None
+    print(
+        f"Tag: {record.tag} | prompts: {record.prompt_count} | active: {record.active_prompt_count}"
+    )
+    for prompt in matches:
+        tags = ", ".join(prompt.tags) if prompt.tags else "-"
+        print(f"{prompt.id} | {prompt.name} | [{prompt.category}] | {tags}")
+    return 0
+
+
+def _tagged_values_after_action(prompt: Prompt, action: str, tag: str) -> tuple[list[str], bool]:
+    """Preview an action on a detached tag list, leaving the prompt untouched."""
+    preview = copy(prompt)
+    preview.tags = list(prompt.tags)
+    changed = apply_prompt_tag(preview, action, tag)
+    return list(preview.tags), changed
+
+
+def _emit_prompt_tag_result(
+    prompt: Prompt,
+    *,
+    tags: list[str],
+    action: str,
+    tag: str,
+    changed: bool,
+    dry_run: bool,
+    json_output: bool,
+) -> None:
+    """Render a stable mutation preview/result without exposing prompt bodies."""
+    record = _tagged_prompt_record(prompt)
+    record["tags"] = tags
+    payload = {
+        "prompt": record,
+        "action": action,
+        "tag": tag,
+        "changed": changed,
+        "dry_run": dry_run,
+    }
+    if json_output:
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return
+    mode = "Preview" if dry_run else "Updated"
+    state = "changed" if changed else "unchanged"
+    print(f"{mode}: {prompt.name} ({prompt.id})")
+    print(f"Tag {action}: {tag} ({state})")
+    print(f"Tags: {', '.join(tags) if tags else '-'}")
+
+
+def run_prompt_tag(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    """Apply one idempotent prompt tag operation, optionally as a preview only."""
+    if manager is None:
+        raise ValueError("Prompt Manager is required for prompt tag updates.")
+    raw_prompt_id = str(getattr(args, "prompt_id", "") or "").strip()
+    prompt, exit_code, error_message = _resolve_prompt_reference(manager, raw_prompt_id)
+    if prompt is None:
+        print_and_log(logger, logging.ERROR, error_message or f"Prompt not found: {raw_prompt_id}")
+        return exit_code
+    action = str(getattr(args, "action", "") or "")
+    try:
+        tag = normalize_tag(getattr(args, "tag", ""))
+        preview_tags, changed = _tagged_values_after_action(prompt, action, tag)
+    except ValueError as exc:
+        print_and_log(logger, logging.ERROR, str(exc))
+        return 5
+    dry_run = bool(getattr(args, "dry_run", False))
+    tags = preview_tags
+    if changed and not dry_run:
+        updated_prompt = copy(prompt)
+        updated_prompt.tags = preview_tags
+        try:
+            prompt = manager.update_prompt(
+                updated_prompt,
+                commit_message=f"Tag {action}: {tag}",
+                origin="cli",
+                refresh_derived_state=False,
+            )
+            tags = list(prompt.tags)
+        except Exception as exc:  # pragma: no cover - surfaced to CLI
+            print_and_log(logger, logging.ERROR, f"Unable to update prompt tags: {exc}")
+            return 6
+    _emit_prompt_tag_result(
+        prompt,
+        tags=tags,
+        action=action,
+        tag=tag,
+        changed=changed,
+        dry_run=dry_run,
+        json_output=bool(getattr(args, "json", False)),
+    )
+    return 0
+
+
 def _prompt_fork_link_payload(
     link: PromptForkLink,
     *,
@@ -2592,6 +2783,9 @@ COMMAND_SPECS: dict[str | None, CommandSpec] = {
     "prompt-show": CommandSpec(run_prompt_show),
     "prompt-random": CommandSpec(run_prompt_random),
     "prompt-find": CommandSpec(run_prompt_find),
+    "tag-list": CommandSpec(run_tag_list),
+    "tag-show": CommandSpec(run_tag_show),
+    "prompt-tag": CommandSpec(run_prompt_tag),
     "prompt-history": CommandSpec(run_prompt_history),
     "prompt-lineage": CommandSpec(run_prompt_lineage),
     "prompt-fork": CommandSpec(run_prompt_fork),
