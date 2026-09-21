@@ -11,7 +11,7 @@ import logging
 import uuid
 from collections.abc import Mapping, MutableMapping, Sequence
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, NoReturn, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Literal, NoReturn, TypeVar, cast
 
 from models.category_model import PromptCategory, slugify_category
 
@@ -238,6 +238,7 @@ class GenerationMixin:
         prompt_id: uuid.UUID,
         *,
         max_scenarios: int = 3,
+        origin: Literal["cli", "gui"] = "gui",
     ) -> Prompt:
         """Regenerate and persist scenarios for the specified prompt."""
         manager = self._as_prompt_manager()
@@ -265,7 +266,7 @@ class GenerationMixin:
         prompt.ext5 = ext5_payload
         prompt.last_modified = datetime.now(UTC)
         try:
-            return manager.update_prompt(prompt)
+            return manager.update_prompt(prompt, origin=origin)
         except PromptManagerError as exc:
             raise PromptStorageError("Failed to persist refreshed scenarios") from exc
 

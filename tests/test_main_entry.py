@@ -126,12 +126,12 @@ class _DummyManager:
         self.prompt_versions: list[object] = []
         self.prompt_version_lookup: object | None = None
         self.prompt_version_diff: object | None = None
-        self.restore_calls: list[tuple[int, str | None]] = []
+        self.restore_calls: list[tuple[int, str | None, str]] = []
         self.restore_error: Exception | None = None
         self.restore_result: Prompt | None = None
         self.search_response: list[Prompt] | None = None
         self.search_calls: list[tuple[str, int]] = []
-        self.fork_calls: list[tuple[uuid.UUID, str | None, str | None]] = []
+        self.fork_calls: list[tuple[uuid.UUID, str | None, str | None, str]] = []
         self.fork_error: Exception | None = None
         self.fork_lineage: PromptForkLink | None = None
         self.fork_children: list[PromptForkLink] = []
@@ -190,8 +190,9 @@ class _DummyManager:
         version_id: int,
         *,
         commit_message: str | None = None,
+        origin: str = "gui",
     ) -> Prompt:
-        self.restore_calls.append((version_id, commit_message))
+        self.restore_calls.append((version_id, commit_message, origin))
         if self.restore_error is not None:
             raise self.restore_error
         if self.restore_result is None:
@@ -204,8 +205,9 @@ class _DummyManager:
         *,
         name: str | None = None,
         commit_message: str | None = None,
+        origin: str = "gui",
     ) -> object:
-        self.fork_calls.append((prompt_id, name, commit_message))
+        self.fork_calls.append((prompt_id, name, commit_message, origin))
         if self.fork_error is not None:
             raise self.fork_error
         source = cast("Prompt", self.repository.get(prompt_id))
@@ -276,13 +278,25 @@ class _DummyManager:
             return self.token_usage_totals_all
         return self.token_usage_totals_window
 
-    def create_prompt(self, prompt: object, embedding: object | None = None) -> object:
-        del embedding
+    def create_prompt(
+        self,
+        prompt: object,
+        embedding: object | None = None,
+        *,
+        origin: str = "gui",
+    ) -> object:
+        del embedding, origin
         self.repository.store.append(prompt)
         return prompt
 
-    def update_prompt(self, prompt: object, embedding: object | None = None) -> object:
-        del embedding
+    def update_prompt(
+        self,
+        prompt: object,
+        embedding: object | None = None,
+        *,
+        origin: str = "gui",
+    ) -> object:
+        del embedding, origin
         for index, existing in enumerate(self.repository.store):
             if getattr(existing, "id", None) == getattr(prompt, "id", None):
                 self.repository.store[index] = prompt
@@ -1403,17 +1417,22 @@ def test_prompt_history_command_outputs_recent_execution_summary(
     assert "avg_rating: 4.5" in output
     assert "decision: Keep prompt but inspect unstable model responses." in output
     assert "recent executions:" in output
+    assert "==== Execution 1 " in output
     assert (
-        "[1] 2026-04-29T10:30:00+00:00 | success | 210 ms | rating: 4.5 | "
+        "2026-04-29T10:30:00+00:00 | success | 210 ms | rating: 4.5 | "
         "model: gpt-fast | tokens: 42" in output
     )
-    assert "request: First request payload" in output
-    assert "response: First response payload" in output
+    assert "--- Request " in output
+    assert "First request payload" in output
+    assert "--- Response " in output
+    assert "First response payload" in output
+    assert "==== Execution 2 " in output
     assert (
-        "[2] 2026-04-29T09:15:00+00:00 | failed | 900 ms | rating: n/a | "
+        "2026-04-29T09:15:00+00:00 | failed | 900 ms | rating: n/a | "
         "model: gpt-reasoning | tokens: 17" in output
     )
-    assert "error: Timeout while calling model" in output
+    assert "--- Error " in output
+    assert "Timeout while calling model" in output
     assert manager.closed is True
 
 
@@ -1826,7 +1845,7 @@ def test_prompt_fork_command_creates_named_fork_with_text_and_json(
 
         assert exit_code == 0
         assert manager.fork_calls == [
-            (source_id, "Evidence-First Mastery Roadmap", "Create an evidence-first variant")
+            (source_id, "Evidence-First Mastery Roadmap", "Create an evidence-first variant", "cli")
         ]
         output = capsys.readouterr().out
         forked = cast("Prompt", manager.repository.store[-1])
@@ -1971,7 +1990,7 @@ def test_prompt_restore_version_requires_confirmation_and_outputs_text_and_json(
 
         assert main.main() == 0
         output = capsys.readouterr().out
-        assert manager.restore_calls == [(12, "Restore approved")]
+        assert manager.restore_calls == [(12, "Restore approved", "cli")]
         if use_json:
             payload = json.loads(output)
             assert payload["restored_from_version_id"] == 12
@@ -1991,7 +2010,7 @@ def test_prompt_restore_version_requires_confirmation_and_outputs_text_and_json(
     _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
     assert main.main() == 0
     payload = json.loads(capsys.readouterr().out)
-    assert manager.restore_calls == [(12, None)]
+    assert manager.restore_calls == [(12, None, "cli")]
     assert payload["commit_message"] == "Restore version 3"
 
 

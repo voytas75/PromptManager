@@ -10,7 +10,7 @@ import json
 import logging
 from datetime import UTC, datetime
 from inspect import Signature, signature
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 from uuid import UUID
 
 from chromadb.errors import ChromaError
@@ -39,6 +39,8 @@ else:  # pragma: no cover - runtime fallback
 logger = logging.getLogger(__name__)
 
 RedisValue = str | bytes | memoryview
+PromptActivityOperation = Literal["created", "updated", "forked", "restored", "deleted"]
+PromptActivityOrigin = Literal["cli", "gui"]
 
 __all__ = ["PromptLifecycleMixin"]
 
@@ -55,6 +57,34 @@ class PromptLifecycleMixin:
     def _as_prompt_manager(self) -> _PromptManager:
         """Return self casted to PromptManager for cross-mixin helpers."""
         return cast("_PromptManager", self)
+
+    def _record_prompt_activity_for_lifecycle(
+        self,
+        prompt_id: UUID,
+        *,
+        operation: PromptActivityOperation,
+        origin: PromptActivityOrigin,
+    ) -> None:
+        """Record one successful prompt mutation without storing prompt content."""
+        recorder = getattr(self._repository, "record_prompt_activity", None)
+        if recorder is None:
+            logger.warning(
+                "Prompt mutation succeeded but activity recording is unavailable",
+                extra={"prompt_id": str(prompt_id), "operation": operation, "origin": origin},
+            )
+            return
+        try:
+            recorder(
+                prompt_id,
+                operation=operation,
+                origin=origin,
+            )
+        except RepositoryError:
+            logger.warning(
+                "Prompt mutation succeeded but activity recording failed",
+                extra={"prompt_id": str(prompt_id), "operation": operation, "origin": origin},
+                exc_info=True,
+            )
 
     def _apply_category_metadata_for_lifecycle(self, prompt: Prompt) -> Prompt:
         """Apply category metadata through the prompt manager when available."""
@@ -112,6 +142,8 @@ class PromptLifecycleMixin:
         embedding: Sequence[float] | None = None,
         *,
         commit_message: str | None = None,
+        origin: PromptActivityOrigin = "gui",
+        record_activity: bool = True,
     ) -> Prompt:
         """Persist a new prompt in SQLite/ChromaDB and prime the cache."""
         prompt = self._apply_category_metadata_for_lifecycle(prompt)
@@ -166,6 +198,12 @@ class PromptLifecycleMixin:
                     "Prompt created but not cached",
                     extra={"prompt_id": str(prompt.id)},
                 )
+        if record_activity:
+            self._record_prompt_activity_for_lifecycle(
+                stored_prompt.id,
+                operation="created",
+                origin=origin,
+            )
         return stored_prompt
 
     def _ensure_uuid(self, value: UUID | str) -> UUID:
@@ -202,6 +240,8 @@ class PromptLifecycleMixin:
         *,
         commit_message: str | None = None,
         force_version: bool = False,
+        origin: PromptActivityOrigin = "gui",
+        record_activity: bool = True,
     ) -> Prompt:
         """Update an existing prompt with new metadata."""
         prompt = self._apply_category_metadata_for_lifecycle(prompt)
@@ -322,9 +362,21 @@ class PromptLifecycleMixin:
                     "Prompt updated but cache refresh failed",
                     extra={"prompt_id": str(prompt.id)},
                 )
+        if record_activity:
+            self._record_prompt_activity_for_lifecycle(
+                updated_prompt.id,
+                operation="updated",
+                origin=origin,
+            )
         return updated_prompt
 
-    def delete_prompt(self, prompt_id: UUID) -> None:
+    def delete_prompt(
+        self,
+        prompt_id: UUID,
+        *,
+        origin: PromptActivityOrigin = "gui",
+        record_activity: bool = True,
+    ) -> None:
         """Remove a prompt from all data stores."""
         prompt_id = self._ensure_uuid(prompt_id)
         try:
@@ -343,6 +395,12 @@ class PromptLifecycleMixin:
             logger.debug(
                 "Prompt deleted but cache eviction failed",
                 extra={"prompt_id": str(prompt_id)},
+            )
+        if record_activity:
+            self._record_prompt_activity_for_lifecycle(
+                prompt_id,
+                operation="deleted",
+                origin=origin,
             )
 
     def increment_usage(self, prompt_id: UUID) -> None:

@@ -140,6 +140,7 @@ class _RecordingRepository:
     def __init__(self) -> None:
         self.storage: dict[uuid.UUID, Prompt] = {}
         self.deleted: list[uuid.UUID] = []
+        self.activity_events: list[tuple[uuid.UUID, str, str]] = []
         self.profile = UserProfile.create_default()
         self._versions: dict[uuid.UUID, list[PromptVersion]] = {}
         self._version_index: dict[int, PromptVersion] = {}
@@ -189,6 +190,15 @@ class _RecordingRepository:
             raise RepositoryNotFoundError("missing delete")
         del self.storage[prompt_id]
         self.deleted.append(prompt_id)
+
+    def record_prompt_activity(
+        self,
+        prompt_id: uuid.UUID,
+        *,
+        operation: str,
+        origin: str,
+    ) -> None:
+        self.activity_events.append((prompt_id, operation, origin))
 
     def get(self, prompt_id: uuid.UUID) -> Prompt:
         if prompt_id not in self.storage:
@@ -1247,6 +1257,43 @@ def test_prompt_version_commit_and_restore() -> None:
 
     restored = manager.restore_prompt_version(versions[1].id)
     assert restored.description == "Sample"
+
+
+def test_prompt_mutations_record_one_semantic_activity_event_per_operation() -> None:
+    repo = _RecordingRepository()
+    manager = _build_manager(repository=repo)
+    prompt = _sample_prompt()
+
+    manager.create_prompt(prompt, origin="cli")
+    prompt.context = "Changed context"
+    manager.update_prompt(prompt, origin="cli")
+    initial_version = manager.list_prompt_versions(prompt.id)[-1]
+    manager.restore_prompt_version(initial_version.id, origin="cli")
+    forked = manager.fork_prompt(prompt.id, name="CLI variant", origin="cli")
+    manager.delete_prompt(forked.id, origin="cli")
+
+    assert repo.activity_events == [
+        (prompt.id, "created", "cli"),
+        (prompt.id, "updated", "cli"),
+        (prompt.id, "restored", "cli"),
+        (forked.id, "forked", "cli"),
+        (forked.id, "deleted", "cli"),
+    ]
+
+
+def test_failed_fork_does_not_record_an_activity_event() -> None:
+    repo = _RecordingRepository()
+    manager = _build_manager(repository=repo)
+    prompt = _sample_prompt()
+    manager.create_prompt(prompt)
+    repo.fork_error = RepositoryError("lineage write failed")
+    before = list(repo.activity_events)
+    assert before == [(prompt.id, "created", "gui")]
+
+    with pytest.raises(PromptManagerError, match="Failed to record prompt fork relationship"):
+        manager.fork_prompt(prompt.id, name="Unlinked experiment")
+
+    assert repo.activity_events == before
 
 
 def test_restore_prompt_version_creates_new_snapshot_for_metadata_only_restore() -> None:

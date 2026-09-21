@@ -9,10 +9,11 @@ from __future__ import annotations
 
 import difflib
 import json
+import logging
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from models.prompt_model import Prompt, PromptForkLink, PromptVersion
 
@@ -26,6 +27,9 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers only
     from ..repository import PromptRepository
 
 __all__ = ["PromptVersionDiff", "PromptVersionMixin"]
+
+PromptActivityOrigin = Literal["cli", "gui"]
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -43,6 +47,34 @@ class PromptVersionMixin:
     """Prompt versioning, diff, and fork helpers."""
 
     _repository: PromptRepository
+
+    def _record_prompt_activity_for_versioning(
+        self,
+        prompt_id: uuid.UUID,
+        *,
+        operation: Literal["forked", "restored"],
+        origin: PromptActivityOrigin,
+    ) -> None:
+        """Record a semantic versioning mutation without duplicating nested CRUD events."""
+        recorder = getattr(self._repository, "record_prompt_activity", None)
+        if recorder is None:
+            logger.warning(
+                "Prompt versioning mutation succeeded but activity recording is unavailable",
+                extra={"prompt_id": str(prompt_id), "operation": operation, "origin": origin},
+            )
+            return
+        try:
+            recorder(
+                prompt_id,
+                operation=operation,
+                origin=origin,
+            )
+        except RepositoryError:
+            logger.warning(
+                "Prompt versioning mutation succeeded but activity recording failed",
+                extra={"prompt_id": str(prompt_id), "operation": operation, "origin": origin},
+                exc_info=True,
+            )
 
     # Public APIs ------------------------------------------------------ #
 
@@ -115,16 +147,29 @@ class PromptVersionMixin:
         version_id: int,
         *,
         commit_message: str | None = None,
+        origin: PromptActivityOrigin = "gui",
     ) -> Prompt:
         """Replace the live prompt with the contents of the specified version."""
         version = self.get_prompt_version(version_id)
         prompt = version.to_prompt()
         prompt.last_modified = datetime.now(UTC)
         message = commit_message or f"Restore version {version.version_number}"
-        return cast(
+        restored = cast(
             "Any",
             self,
-        ).update_prompt(prompt, commit_message=message, force_version=True)
+        ).update_prompt(
+            prompt,
+            commit_message=message,
+            force_version=True,
+            origin=origin,
+            record_activity=False,
+        )
+        self._record_prompt_activity_for_versioning(
+            restored.id,
+            operation="restored",
+            origin=origin,
+        )
+        return restored
 
     def merge_prompt_versions(
         self,
@@ -194,6 +239,7 @@ class PromptVersionMixin:
         *,
         name: str | None = None,
         commit_message: str | None = None,
+        origin: PromptActivityOrigin = "gui",
     ) -> Prompt:
         """Create a new prompt based on the referenced prompt."""
         source_prompt = cast("Any", self).get_prompt(prompt_id)
@@ -224,6 +270,8 @@ class PromptVersionMixin:
                 cast("Any", self).create_prompt(
                     forked_prompt,
                     commit_message=commit_message or f"Forked from {source_prompt.name}",
+                    origin=origin,
+                    record_activity=False,
                 ),
             )
             lineage = self._repository.record_prompt_fork(source_prompt.id, stored.id)
@@ -244,7 +292,11 @@ class PromptVersionMixin:
                     rollback_prompt_id = forked_prompt.id
             if rollback_prompt_id is not None:
                 try:
-                    cast("Any", self).delete_prompt(rollback_prompt_id)
+                    cast("Any", self).delete_prompt(
+                        rollback_prompt_id,
+                        origin=origin,
+                        record_activity=False,
+                    )
                 except Exception as rollback_exc:
                     raise PromptVersionError(
                         f"Failed to complete prompt fork and roll back fork {rollback_prompt_id}"
@@ -253,6 +305,11 @@ class PromptVersionMixin:
                 raise PromptVersionError("Failed to record prompt fork relationship") from exc
             raise
 
+        self._record_prompt_activity_for_versioning(
+            stored.id,
+            operation="forked",
+            origin=origin,
+        )
         return stored
 
     def list_prompt_forks(self, prompt_id: uuid.UUID) -> list[PromptForkLink]:

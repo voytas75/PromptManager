@@ -59,15 +59,31 @@ class _StubManager:
         self.repository = _StubRepository()
         self.created: list[Prompt] = []
         self.updated: list[Prompt] = []
+        self.create_origins: list[str] = []
+        self.update_origins: list[str] = []
 
-    def create_prompt(self, prompt: Prompt, embedding: object | None = None) -> Prompt:  # noqa: D401
+    def create_prompt(
+        self,
+        prompt: Prompt,
+        embedding: object | None = None,
+        *,
+        origin: str = "gui",
+    ) -> Prompt:  # noqa: D401
         del embedding
         self.created.append(prompt)
+        self.create_origins.append(origin)
         return self.repository.add(prompt)
 
-    def update_prompt(self, prompt: Prompt, embedding: object | None = None) -> Prompt:  # noqa: D401
+    def update_prompt(
+        self,
+        prompt: Prompt,
+        embedding: object | None = None,
+        *,
+        origin: str = "gui",
+    ) -> Prompt:  # noqa: D401
         del embedding
         self.updated.append(prompt)
+        self.update_origins.append(origin)
         return self.repository.update(prompt)
 
 
@@ -98,12 +114,13 @@ def test_import_prompt_catalog_adds_and_updates(tmp_path: Path) -> None:
     ]
     catalog_path.write_text(json.dumps(catalog_payload), encoding="utf-8")
 
-    result = import_prompt_catalog(_as_prompt_manager(manager), catalog_path)
+    result = import_prompt_catalog(_as_prompt_manager(manager), catalog_path, origin="cli")
     assert isinstance(result, CatalogImportResult)
     assert result.added == 1
     assert result.updated == 0
     assert result.preview is not None
     assert manager.created and not manager.updated
+    assert manager.create_origins == ["cli"]
 
     stored_prompt = manager.repository.list()[0]
     assert stored_prompt.name == "Diagnostics Helper"
@@ -116,11 +133,12 @@ def test_import_prompt_catalog_adds_and_updates(tmp_path: Path) -> None:
     updated_payload["tags"] = ["ci", "debugging", "logs"]
     catalog_path.write_text(json.dumps([updated_payload]), encoding="utf-8")
 
-    second_result = import_prompt_catalog(_as_prompt_manager(manager), catalog_path)
+    second_result = import_prompt_catalog(_as_prompt_manager(manager), catalog_path, origin="cli")
     assert second_result.added == 0
     assert second_result.updated == 1
     assert second_result.preview is not None
     assert manager.updated
+    assert manager.update_origins == ["cli"]
     refreshed_prompt = manager.repository.list()[0]
     assert refreshed_prompt.quality_score is not None
     assert abs(refreshed_prompt.quality_score - 9.1) < 1e-9

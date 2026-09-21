@@ -102,6 +102,29 @@ def test_repository_add_duplicate_raises_error(tmp_path: Path) -> None:
         repo.add(prompt)
 
 
+def test_repository_prompt_activity_roundtrip_survives_prompt_deletion(tmp_path: Path) -> None:
+    """Keep prompt mutation evidence after the affected asset is deleted."""
+    repo = PromptRepository(str(tmp_path / "repo.db"))
+    prompt = _make_prompt()
+    repo.add(prompt)
+
+    created = repo.record_prompt_activity(prompt.id, operation="created", origin="cli")
+    updated = repo.record_prompt_activity(prompt.id, operation="updated", origin="gui")
+    repo.delete(prompt.id)
+    deleted = repo.record_prompt_activity(prompt.id, operation="deleted", origin="gui")
+
+    events = repo.list_prompt_activity(prompt.id)
+
+    assert [(event.operation, event.origin) for event in events] == [
+        ("deleted", "gui"),
+        ("updated", "gui"),
+        ("created", "cli"),
+    ]
+    assert events[0] == deleted
+    assert events[-1] == created
+    assert updated.prompt_id == prompt.id
+
+
 def test_repository_update_with_version_is_atomic_when_snapshot_insert_fails(
     tmp_path: Path,
 ) -> None:

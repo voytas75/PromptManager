@@ -65,6 +65,23 @@ class RepositoryMaintenanceMixin:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_prompts_name ON prompts(name);")
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS prompt_activity_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                prompt_id TEXT NOT NULL,
+                operation TEXT NOT NULL CHECK(operation IN (
+                    'created', 'updated', 'forked', 'restored', 'deleted'
+                )),
+                origin TEXT NOT NULL CHECK(origin IN ('cli', 'gui')),
+                occurred_at TEXT NOT NULL
+            );
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_prompt_activity_events_prompt_id "
+            "ON prompt_activity_events(prompt_id, id DESC);"
+        )
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS prompt_categories (
                 slug TEXT PRIMARY KEY,
                 label TEXT NOT NULL,

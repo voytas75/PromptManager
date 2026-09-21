@@ -6,6 +6,8 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Added
 
+- Added a local durable prompt activity ledger for successful asset mutations: `created`, `updated`, `forked`, `restored`, and `deleted` events now retain prompt ID, UTC timestamp, and CLI/GUI origin without storing prompt bodies. Catalog import, scenario refresh, fork, and version restore explicitly record CLI origin; existing GUI domain paths use the GUI default. Search, filters, reads, and keystrokes remain untracked.
+
 - Added the packaged `prompt-manager` console entrypoint. Wheels now include the CLI, `main.py`, prompt templates, and the default config template; `python -m main` remains supported from a repository checkout.
 - Added `prompt-show --json --full` as an explicit complete-record opt-in. Default `prompt-show --json` now omits the raw `ext4` embedding vector and returns bounded embedding presence/dimension metadata; `--full` requires `--json`.
 - Added semantic natural-language retrieval to `prompt-find <query>` through the existing suggestion seam, while retaining bounded result limits and explicit category/tag/source/active filters after ranking.
@@ -28,6 +30,8 @@ All notable changes to **Prompt Manager** will be documented in this file.
 - Restored the prior SQLite prompt when synchronous Chroma embedding persistence fails during `update_prompt()`, then re-raised the storage error so a prompt asset cannot advance while its derived semantic-index record remains stale.
 
 ### Changed
+
+- Improved text-mode `prompt-history` readability: each execution now has a distinct ASCII record block, and request, response, and error bodies render in separately labelled sections while preserving multiline content. JSON output remains unchanged.
 
 - Added one bounded **description-match action clarity v1** follow-up on the existing prompt-list seam so visible description matches now expose `Matched in description` and the same `Inspect before reuse` handoff used for source/scenario matches, while preserving ranking, retrieval, persistence, and detail-view semantics.
 - Added one bounded **detail-to-edit continuity v1** refinement on the existing inspect/detail seam so `WorkspaceHistoryController` now maps the refine-first decision `Refine before reuse` to the concrete next action `Edit Prompt before reuse`, matching the already-shipped shared detail-widget handoff cue without changing decision logic, widget structure, or any other next-action branch.

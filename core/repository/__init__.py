@@ -19,6 +19,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+from .activity import PromptActivity, PromptActivityStoreMixin
 from .base import (
     PromptCatalogueStats,
     RepositoryError,
@@ -42,6 +43,7 @@ from .response_styles import ResponseStyleStoreMixin
 
 class PromptRepository(
     RepositoryMaintenanceMixin,
+    PromptActivityStoreMixin,
     PromptStoreMixin,
     ExecutionStoreMixin,
     ProfileStoreMixin,
@@ -64,6 +66,7 @@ class PromptRepository(
 
 __all__ = [
     "PromptRepository",
+    "PromptActivity",
     "PromptCatalogueStats",
     "RepositoryError",
     "RepositoryNotFoundError",

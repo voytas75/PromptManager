@@ -173,7 +173,7 @@ def run_catalog_import(
 
     import_fn = _get_main_callable("import_prompt_catalog", import_prompt_catalog)
     try:
-        result = import_fn(manager, input_path, overwrite=overwrite)
+        result = import_fn(manager, input_path, overwrite=overwrite, origin="cli")
     except Exception as exc:  # pragma: no cover - surfaced to CLI
         message = f"Failed to import catalogue: {exc}"
         print_and_log(logger, logging.ERROR, message)
@@ -361,7 +361,11 @@ def run_refresh_scenarios(
 
     max_scenarios = max(1, int(getattr(args, "max_scenarios", 3) or 3))
     try:
-        prompt = manager.refresh_prompt_scenarios(prompt_id, max_scenarios=max_scenarios)
+        prompt = manager.refresh_prompt_scenarios(
+            prompt_id,
+            max_scenarios=max_scenarios,
+            origin="cli",
+        )
     except PromptManagerError as exc:
         logger.error("Failed to refresh scenarios: %s", exc)
         return 5
@@ -1646,6 +1650,7 @@ def run_prompt_fork(
             prompt.id,
             name=fork_name,
             commit_message=getattr(args, "commit_message", None),
+            origin="cli",
         )
         lineage = manager.get_prompt_parent_fork(forked.id)
         if (
@@ -1710,6 +1715,7 @@ def run_prompt_restore_version(
         restored = manager.restore_prompt_version(
             version_id,
             commit_message=getattr(args, "commit_message", None),
+            origin="cli",
         )
     except PromptVersionNotFoundError as exc:
         print_and_log(logger, logging.ERROR, f"Prompt version not found: {exc}")
@@ -2119,15 +2125,23 @@ def run_prompt_history(
             duration = f"{execution.duration_ms} ms" if execution.duration_ms is not None else "n/a"
             rating = _format_metric(execution.rating)
             executed_at = execution.executed_at.isoformat(timespec="seconds")
-            lines.append(
-                f"[{index}] {executed_at} | {execution.status.value} | {duration} | "
+            header = (
+                f"{executed_at} | {execution.status.value} | {duration} | "
                 f"rating: {rating} | model: {model} | tokens: {token_label}"
             )
-            lines.append(f"request: {execution.request_text}")
+            lines.append(f"==== Execution {index} {'=' * 60}")
+            lines.append(header)
+            lines.append("")
+            lines.append(f"--- Request {'-' * 62}")
+            lines.append(execution.request_text or "(empty)")
             if execution.response_text:
-                lines.append(f"response: {execution.response_text}")
+                lines.append("")
+                lines.append(f"--- Response {'-' * 61}")
+                lines.append(execution.response_text)
             if execution.error_message:
-                lines.append(f"error: {execution.error_message}")
+                lines.append("")
+                lines.append(f"--- Error {'-' * 64}")
+                lines.append(execution.error_message)
 
     print("\n".join(lines))
     return 0

@@ -19,7 +19,7 @@ from collections.abc import Iterable as IterableABC, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from pathlib import Path
@@ -417,6 +417,7 @@ def import_prompt_catalog(
     catalog_path: Path | None,
     *,
     overwrite: bool = True,
+    origin: Literal["cli", "gui"] = "gui",
 ) -> CatalogImportResult:
     """Apply catalogue changes to the repository and return a summary result."""
     prompts = load_prompt_catalog(catalog_path)
@@ -426,7 +427,7 @@ def import_prompt_catalog(
 
     for prompt in plan.create:
         try:
-            manager.create_prompt(prompt)
+            manager.create_prompt(prompt, origin=origin)
             result.added += 1
         except Exception as exc:
             logger.error("Unable to create prompt %s: %s", prompt.name, exc)
@@ -435,7 +436,7 @@ def import_prompt_catalog(
     for existing, incoming in plan.update:
         try:
             merged = _merge_prompt(existing, incoming)
-            manager.update_prompt(merged)
+            manager.update_prompt(merged, origin=origin)
             result.updated += 1
         except Exception as exc:
             logger.error("Unable to update prompt %s: %s", existing.name, exc)
