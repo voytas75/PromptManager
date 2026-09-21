@@ -190,9 +190,17 @@ Treat versioning as a deliberately small system:
 - **`docs/CHANGELOG.md` is the SSOT for release history.**
 - **`*.egg-info/` and `PKG-INFO` are generated local metadata, not version SSOT and not a git-tracked source of truth.**
 
+### Version selection (Semantic Versioning)
+
+Use `MAJOR.MINOR.PATCH` for releases:
+
+- Increment **MAJOR** only for a breaking public contract change that requires operator or integrator migration.
+- Increment **MINOR** for backward-compatible, user-visible functionality, including a new public CLI command.
+- Increment **PATCH** for backward-compatible bug fixes, documentation-only corrections, and internal changes that do not add public functionality.
+
 ### Practical rules
 
-- When cutting a new release, bump `project.version` in `pyproject.toml` and move the current changelog content from `## [Unreleased]` into a dated release heading.
+- When cutting a new release, select the version under the policy above, bump `project.version` in `pyproject.toml`, and move the current changelog content from `## [Unreleased]` into a dated release heading.
 - Leave a fresh empty `## [Unreleased]` section at the top after closing a release.
 - Do not manually treat `prompt_manager.egg-info/PKG-INFO` as canonical project state. It reflects the local installed/editable package metadata and may be stale until refreshed.
 - If the GUI or maintenance surfaces show an old version, refresh the editable install metadata locally:
