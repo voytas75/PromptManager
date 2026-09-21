@@ -49,6 +49,7 @@ from core import (
     snapshot_dataset_rows,
 )
 from core.catalog_check import run_catalog_check
+from core.prompt_comparison import compare_prompts
 from core.prompt_testing import (
     PromptTestSuiteError,
     failed_suite_report,
@@ -1808,6 +1809,102 @@ def run_prompt_restore_version(
     return 0
 
 
+def _format_compare_value(value: object) -> str:
+    """Render one compact stable comparison value for text output."""
+    if value in (None, "", [], {}):
+        return "(none)"
+    if isinstance(value, list):
+        return ", ".join(str(item) for item in value)
+    return str(value)
+
+
+def _emit_prompt_comparison(report: object, *, json_output: bool) -> None:
+    """Render one current-asset comparison without triggering providers or mutation."""
+    payload = report.to_record()
+    if json_output:
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return
+    left = payload["left"]
+    right = payload["right"]
+    state = payload["state"]
+    metadata_differences = payload["metadata_differences"]
+    variables = payload["variables"]
+    lineage = payload["lineage"]
+    counters = payload["operational_counters"]
+    body_diff = payload["body_diff"]
+    print("Prompt comparison")
+    print(f"Left:  {left['name']} ({left['id']})")
+    print(f"Right: {right['name']} ({right['id']})")
+    print("\nState")
+    for side in ("left", "right"):
+        values = state[side]
+        print(
+            f"{side}: version={values['version']} source={values['source']} "
+            f"active={values['is_active']} modified={values['last_modified']}"
+        )
+    print("\nMetadata differences")
+    if metadata_differences:
+        for field, values in metadata_differences.items():
+            print(
+                f"{field}: {_format_compare_value(values['left'])} -> "
+                f"{_format_compare_value(values['right'])}"
+            )
+    else:
+        print("(none)")
+    print("\nTemplate variables")
+    print(f"shared: {_format_compare_value(variables['shared'])}")
+    print(f"left only: {_format_compare_value(variables['left_only'])}")
+    print(f"right only: {_format_compare_value(variables['right_only'])}")
+    for error in variables["errors"]:
+        print(f"{error['side']} error: {error['message']}")
+    print("\nLineage")
+    print(f"relationship: {lineage['relationship']}")
+    print("\nOperational counters")
+    for side in ("left", "right"):
+        values = counters[side]
+        print(
+            f"{side}: usage={values['usage_count']} ratings={values['rating_count']} "
+            f"average_rating={_format_compare_value(values['average_rating'])} "
+            f"quality_score={_format_compare_value(values['quality_score'])}"
+        )
+    print("\nBody diff")
+    print(body_diff or "(none)")
+
+
+def run_prompt_compare(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    """Compare two current prompt assets using local data only."""
+    if manager is None:
+        raise ValueError("Prompt Manager is required for prompt comparison.")
+    left_raw = str(args.left_prompt_id or "").strip()
+    right_raw = str(args.right_prompt_id or "").strip()
+    left, left_code, left_error = _resolve_prompt_reference(manager, left_raw)
+    if left is None:
+        print_and_log(logger, logging.ERROR, left_error or f"Prompt not found: {left_raw}")
+        return left_code
+    right, right_code, right_error = _resolve_prompt_reference(manager, right_raw)
+    if right is None:
+        print_and_log(logger, logging.ERROR, right_error or f"Prompt not found: {right_raw}")
+        return right_code
+    try:
+        left_parent = manager.get_prompt_parent_fork(left.id)
+        right_parent = manager.get_prompt_parent_fork(right.id)
+        report = compare_prompts(
+            left,
+            right,
+            left_parent_id=str(left_parent.source_prompt_id) if left_parent else None,
+            right_parent_id=str(right_parent.source_prompt_id) if right_parent else None,
+        )
+    except Exception as exc:  # pragma: no cover - surfaced to CLI
+        print_and_log(logger, logging.ERROR, f"Unable to compare prompts: {exc}")
+        return 7
+    _emit_prompt_comparison(report, json_output=bool(getattr(args, "json", False)))
+    return 0
+
+
 def run_prompt_version_diff(
     manager: PromptManager | None,
     args: argparse.Namespace,
@@ -2346,6 +2443,7 @@ COMMAND_SPECS: dict[str | None, CommandSpec] = {
     "prompt-restore-version": CommandSpec(run_prompt_restore_version),
     "prompt-version-diff": CommandSpec(run_prompt_version_diff),
     "prompt-version-list": CommandSpec(run_prompt_version_list),
+    "prompt-compare": CommandSpec(run_prompt_compare),
     "prompt-render": CommandSpec(run_prompt_render),
     "prompt-validate": CommandSpec(run_prompt_validate),
     "prompt-test": CommandSpec(run_prompt_test),

@@ -6,6 +6,8 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Added
 
+- Added `prompt-compare <left> <right> [--json]`, a deterministic provider-free comparison of two current prompt assets. It reports selected metadata/state differences, unified body diff, Jinja variable sets and parse findings, direct fork lineage direction, and persisted usage/rating/quality counters without rendering, providers, embeddings, history reads, or mutations.
+
 - Added `prompt-test <uuid-or-exact-name> --suite PATH [--json]`, a deterministic provider-free regression runner for local Jinja prompt templates. JSON suites define unique case IDs, variable maps, and exact expected output; results report only case status/reasons by default, without model calls, persistence, or prompt-body disclosure.
 
 - Added `prompt-validate <uuid-or-exact-name> [--json]`, a deterministic provider-free check of one persisted prompt. It reports detected template variables and validates blank name/description, empty body, Jinja syntax, local related-prompt references, and blank or duplicate tags without rendering, provider calls, embedding access, or mutation.

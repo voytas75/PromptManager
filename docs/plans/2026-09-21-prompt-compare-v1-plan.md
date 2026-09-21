@@ -1,6 +1,6 @@
 # PromptManager — `prompt-compare` v1 plan
 
-**Status:** proposed / not implemented
+**Status:** completed — 2026-09-21
 **Owner:** PromptManager Team
 
 ## Decision
@@ -180,6 +180,26 @@ Then run the full project suite before commit.
 - Text and JSON expose current asset differences, variables, direct lineage, and persisted counters without model/provider access.
 - `prompt-version-diff`, `prompt-validate`, and `prompt-history` retain their separate responsibilities.
 - No new persistence schema or public execution-analytics facade is introduced.
+
+## Completion update
+
+Delivered v1:
+
+- Added `core/prompt_comparison.py`, a typed provider-free report builder for two current prompt assets.
+- Added `prompt-compare <left> <right> [--json]`, resolving both operands through the existing UUID-or-unique-exact-name contract.
+- Added stable state, selected metadata differences, unified body diff, Jinja variable sets and parse findings, direct parent-child lineage direction, and persisted operational counters.
+- Text mode uses bounded sections with `(none)` for empty values; JSON provides the documented stable top-level payload.
+- No provider/model call, template rendering, embedding access, mutation, activity event, storage schema, or public execution-analytics facade was added.
+
+Verified:
+
+```bash
+.venv/bin/pytest tests/test_prompt_comparison.py \
+  tests/test_main_entry.py::test_prompt_compare_command_reports_current_differences_and_lineage_as_json -q
+# 4 passed
+```
+
+Deferred remains unchanged: dependency/impact analysis, version-snapshot selection, provider evaluation, history metrics, semantic similarity, and opaque extension/embedding comparison.
 
 ## Strongest alternative and decision trigger
 

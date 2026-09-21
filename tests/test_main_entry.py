@@ -2464,6 +2464,100 @@ def test_prompt_version_list_command_resolves_exact_name_and_not_found(
     assert missing_manager.closed is True
 
 
+def test_prompt_compare_command_reports_current_differences_and_lineage_as_json(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Compare two current prompt assets without provider or history access."""
+    left_id = uuid.uuid4()
+    right_id = uuid.uuid4()
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-compare", str(left_id), str(right_id), "--json"],
+    )
+    settings = _DummySettings()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    manager = _DummyManager()
+    left = Prompt(
+        id=left_id,
+        name="Base triage",
+        description="Triage an incident.",
+        category="Operations",
+        tags=["ci"],
+        context="Review {{ repository }}.",
+        usage_count=4,
+    )
+    right = Prompt(
+        id=right_id,
+        name="Fork triage",
+        description="Triage an incident with ownership.",
+        category="Operations",
+        tags=["ci", "incident"],
+        context="Review {{ repository }} for {{ owner }}.",
+        usage_count=1,
+    )
+    manager.repository.store.extend([left, right])
+    manager.fork_lineage = PromptForkLink(
+        id=11,
+        source_prompt_id=left_id,
+        child_prompt_id=right_id,
+        created_at=datetime(2026, 9, 21, 12, 0, tzinfo=UTC),
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["left"] == {"id": str(left_id), "name": "Base triage"}
+    assert output["right"] == {"id": str(right_id), "name": "Fork triage"}
+    assert output["metadata_differences"]["tags"] == {
+        "left": ["ci"],
+        "right": ["ci", "incident"],
+    }
+    assert output["variables"]["right_only"] == ["owner"]
+    assert output["lineage"] == {"relationship": "right_is_child_of_left"}
+    assert output["operational_counters"]["left"]["usage_count"] == 4
+    assert "--- Base triage" in output["body_diff"]
+    assert manager.closed is True
+
+
+def test_prompt_compare_command_reports_no_difference_text_sections(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Keep the compact text comparison readable for equal prompt inputs."""
+    prompt_id = uuid.uuid4()
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-compare", str(prompt_id), str(prompt_id)],
+    )
+    settings = _DummySettings()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    manager = _DummyManager()
+    manager.repository.store.append(
+        Prompt(
+            id=prompt_id,
+            name="Same prompt",
+            description="Compare an asset to itself.",
+            category="Operations",
+            context="Review {{ repository }}.",
+        )
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "Prompt comparison" in output
+    assert "Metadata differences\n(none)" in output
+    assert "shared: repository" in output
+    assert "relationship: none" in output
+    assert "Body diff\n(none)" in output
+    assert manager.closed is True
+
+
 def test_prompt_test_command_reports_mixed_fixture_results_as_json(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

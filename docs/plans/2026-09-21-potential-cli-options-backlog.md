@@ -73,8 +73,9 @@ This is an idea backlog, not an active roadmap. Each candidate requires code/tes
 
 ### Comparison and maintenance
 
-- **`prompt-compare <id1> <id2>`**
-  - Operational comparison of metadata, variables, usage, models, evaluations, and performance; complements text-level `prompt-version-diff`.
+- **`prompt-compare <id1> <id2>`** — delivered in [`2026-09-21-prompt-compare-v1-plan.md`](2026-09-21-prompt-compare-v1-plan.md)
+  - Read-only current-asset comparison of state, selected metadata, Jinja variables, direct lineage, persisted operational counters, and unified prompt-body diff.
+  - Version snapshots, history/provider metrics, dependency impact, embeddings, and semantic comparison remain separate deferred concerns.
 
 - **`prompt-gc --dry-run`**
   - Detect orphaned embeddings, stale artifacts, dangling lineage references, orphaned records, unused scenarios, and unused chains.

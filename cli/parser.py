@@ -37,6 +37,7 @@ ROOT_COMMAND_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "prompt-restore-version",
             "prompt-version-diff",
             "prompt-version-list",
+            "prompt-compare",
             "prompt-render",
             "prompt-validate",
             "prompt-test",
@@ -686,6 +687,26 @@ def parse_args() -> argparse.Namespace:
         "--json",
         action="store_true",
         help="Render prompt version history as structured JSON.",
+    )
+
+    prompt_compare_parser = subparsers.add_parser(
+        "prompt-compare",
+        help="Compare two current prompts without rendering or calling a model.",
+    )
+    prompt_compare_parser.add_argument(
+        "left_prompt_id",
+        type=str,
+        help="Left prompt UUID or exact prompt name.",
+    )
+    prompt_compare_parser.add_argument(
+        "right_prompt_id",
+        type=str,
+        help="Right prompt UUID or exact prompt name.",
+    )
+    prompt_compare_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit deterministic structured comparison data.",
     )
 
     prompt_render_parser = subparsers.add_parser(
