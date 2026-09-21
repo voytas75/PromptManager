@@ -6,6 +6,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Added
 
+- Added `prompt-template-list [--json]`, a manager-free read-only view of all effective built-in LiteLLM workflow templates. Text output uses numbered Unicode-bordered blocks with provenance, metadata, and wrapped body lines; JSON exposes the complete ordered records.
 - Added `prompt-lint <uuid-or-exact-name> [--json]`, a deterministic provider-free advisory check for short descriptions, missing action cues, unstructured long bodies, repeated instruction lines, and undocumented template-input context. It is read-only and non-blocking; technical validity remains owned by `prompt-validate`.
 
 ## [0.23.0] - 2026-09-21

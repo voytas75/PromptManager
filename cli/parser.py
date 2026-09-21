@@ -42,6 +42,7 @@ ROOT_COMMAND_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "prompt-validate",
             "prompt-lint",
             "prompt-test",
+            "prompt-template-list",
         ),
     ),
     (
@@ -792,6 +793,16 @@ def parse_args() -> argparse.Namespace:
         "--json",
         action="store_true",
         help="Emit deterministic structured test results.",
+    )
+
+    prompt_template_list_parser = subparsers.add_parser(
+        "prompt-template-list",
+        help="Show all effective built-in workflow templates without running a model.",
+    )
+    prompt_template_list_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit complete effective template records as structured JSON.",
     )
 
     suggest_parser = subparsers.add_parser(

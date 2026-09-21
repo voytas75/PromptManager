@@ -2820,6 +2820,38 @@ def test_prompt_lint_command_reports_missing_prompt_as_structured_error(
     assert manager.closed is True
 
 
+def test_prompt_template_list_command_shows_effective_templates_without_manager(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """List all built-in templates using settings only, without service initialization."""
+    monkeypatch.setattr(sys, "argv", ["prompt-manager", "prompt-template-list", "--json"])
+    settings = _DummySettings()
+    settings.prompt_templates = {"name_generation": "Use safe compact titles."}
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    _patch_main(
+        monkeypatch,
+        "build_prompt_manager",
+        pytest.fail,
+    )
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    output = json.loads(capsys.readouterr().out)
+    assert [template["key"] for template in output["templates"]] == [
+        "name_generation",
+        "description_generation",
+        "scenario_generation",
+        "prompt_engineering",
+        "category_generation",
+        "chain_summary",
+    ]
+    assert output["templates"][0]["source"] == "override"
+    assert output["templates"][0]["text"] == "Use safe compact titles."
+    assert output["templates"][1]["source"] == "default"
+
+
 def test_prompt_render_command_renders_prompt_with_json_variables(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

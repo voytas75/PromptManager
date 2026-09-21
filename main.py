@@ -217,6 +217,7 @@ def main() -> int:
         return 2
 
     spec = COMMAND_SPECS.get(command)
+    args._settings = settings
 
     manager = None
     manager_required = spec is None or spec.requires_manager

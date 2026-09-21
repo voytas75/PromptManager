@@ -51,6 +51,7 @@ from core import (
 from core.catalog_check import run_catalog_check
 from core.prompt_comparison import compare_prompts
 from core.prompt_linting import lint_prompt
+from core.prompt_template_listing import list_effective_prompt_templates
 from core.prompt_testing import (
     PromptTestSuiteError,
     failed_suite_report,
@@ -73,6 +74,7 @@ from .utils import (
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from core.prompt_linting import PromptLintReport
     from core.prompt_manager import PromptManager
+    from core.prompt_template_listing import PromptTemplateRecord
     from core.prompt_testing import PromptTestReport
     from core.prompt_validation import PromptValidationReport
     from models.prompt_model import Prompt, PromptForkLink
@@ -2222,6 +2224,71 @@ def run_prompt_lint(
     return 0
 
 
+def _prompt_template_overrides_from_settings(settings: object) -> dict[str, object]:
+    """Return the validated template override mapping without exposing other settings."""
+    configured = getattr(settings, "prompt_templates", None)
+    if configured is None:
+        return {}
+    configured_mapping = _coerce_mapping(configured)
+    if configured_mapping is not None:
+        return dict(configured_mapping)
+    model_dump = getattr(configured, "model_dump", None)
+    if callable(model_dump):
+        payload_mapping = _coerce_mapping(model_dump(exclude_none=True))
+        if payload_mapping is not None:
+            return dict(payload_mapping)
+    return {}
+
+
+def _emit_prompt_template_list(
+    templates: tuple[PromptTemplateRecord, ...],
+    *,
+    json_output: bool,
+) -> None:
+    """Render full template text in deliberately bounded, readable terminal blocks."""
+    if json_output:
+        payload = {"templates": [template.to_record() for template in templates]}
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return
+
+    print(f"Effective workflow templates: {len(templates)}")
+    for index, template in enumerate(templates, start=1):
+        title = f" {index}/{len(templates)} {template.label} "
+        print(f"\n╔{'═' * 3}{title}{'═' * max(3, 78 - len(title))}╗")
+        print(f"║ key: {template.key}")
+        print(f"║ source: {template.source}")
+        print(f"║ characters: {template.characters} | lines: {template.lines}")
+        print("║ description:")
+        for description_line in textwrap.wrap(template.description, width=70) or [""]:
+            print(f"║   {description_line}")
+        print("╟─ template ─────────────────────────────────────────────────────────────────")
+        for line_number, line in enumerate(template.text.splitlines() or [""], start=1):
+            wrapped_lines = textwrap.wrap(
+                line,
+                width=72,
+                replace_whitespace=False,
+                drop_whitespace=False,
+            ) or [""]
+            for offset, wrapped_line in enumerate(wrapped_lines):
+                prefix = f"║ {line_number:>3} │ " if offset == 0 else "║     │ "
+                print(f"{prefix}{wrapped_line}")
+        print("╚══════════════════════════════════════════════════════════════════════════════╝")
+
+
+def run_prompt_template_list(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    """Show effective built-in workflow templates without manager or provider access."""
+    del manager, logger
+    settings = getattr(args, "_settings", None)
+    overrides = _prompt_template_overrides_from_settings(settings)
+    templates = list_effective_prompt_templates(overrides)
+    _emit_prompt_template_list(templates, json_output=bool(getattr(args, "json", False)))
+    return 0
+
+
 def _prompt_render_payload(
     *,
     ok: bool,
@@ -2536,6 +2603,7 @@ COMMAND_SPECS: dict[str | None, CommandSpec] = {
     "prompt-validate": CommandSpec(run_prompt_validate),
     "prompt-lint": CommandSpec(run_prompt_lint),
     "prompt-test": CommandSpec(run_prompt_test),
+    "prompt-template-list": CommandSpec(run_prompt_template_list, requires_manager=False),
     "suggest": CommandSpec(run_suggest),
     "usage-report": CommandSpec(run_usage_report),
     "history-analytics": CommandSpec(run_history_analytics),
