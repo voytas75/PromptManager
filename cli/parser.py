@@ -21,6 +21,7 @@ ROOT_COMMAND_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
         (
             "catalog-export",
             "catalog-import",
+            "catalog-check",
             "prompt-add",
             "prompt-show",
             "prompt-random",
@@ -457,6 +458,16 @@ def parse_args() -> argparse.Namespace:
         "--no-overwrite",
         action="store_true",
         help="Skip updates when a prompt with the same name already exists.",
+    )
+
+    catalog_check_parser = subparsers.add_parser(
+        "catalog-check",
+        help="Run deterministic read-only integrity checks across prompts and chains.",
+    )
+    catalog_check_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Render catalog-check results as structured JSON.",
     )
 
     prompt_show_parser = subparsers.add_parser(

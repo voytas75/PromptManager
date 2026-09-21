@@ -143,6 +143,7 @@ class _DummyManager:
         self.fork_lineage: PromptForkLink | None = None
         self.fork_children: list[PromptForkLink] = []
         self.fork_lineage_error: Exception | None = None
+        self.prompt_chains: list[object] = []
 
     def close(self) -> None:
         self.closed = True
@@ -284,6 +285,9 @@ class _DummyManager:
         if since is None:
             return self.token_usage_totals_all
         return self.token_usage_totals_window
+
+    def list_prompt_chains(self, include_inactive: bool = False) -> list[object]:  # noqa: ARG002
+        return list(self.prompt_chains)
 
     def create_prompt(
         self,
@@ -949,6 +953,107 @@ def test_suggest_command_outputs_results(
     assert "Top 1 suggestions" in output
     assert "Debug Sentinel" in output
     assert manager.closed is True
+
+
+def test_catalog_check_reports_integrity_issues_and_json_payload(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Surface deterministic catalog integrity failures without changing stored assets."""
+    first_id = uuid.uuid4()
+    missing_related_id = uuid.uuid4()
+    missing_chain_prompt_id = uuid.uuid4()
+    manager = _DummyManager()
+    manager.repository.store.extend(
+        [
+            Prompt(
+                id=first_id,
+                name="Duplicate name",
+                description="First copy.",
+                category="Testing",
+                context="Same body",
+                related_prompts=[str(missing_related_id)],
+            ),
+            Prompt(
+                id=uuid.uuid4(),
+                name="Duplicate name",
+                description="Second copy.",
+                category="Testing",
+                context="Same body",
+            ),
+            Prompt(
+                id=uuid.uuid4(),
+                name="Invalid template",
+                description="Broken Jinja body.",
+                category="Testing",
+                context="{% if broken %}",
+                ext4=[0.1] * 32,
+            ),
+        ]
+    )
+    manager.prompt_chains = [
+        SimpleNamespace(
+            id=uuid.uuid4(),
+            name="Broken chain",
+            steps=[SimpleNamespace(prompt_id=missing_chain_prompt_id)],
+        )
+    ]
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "catalog-check"])
+    assert main.main() == 5
+    text_output = capsys.readouterr().out
+    assert "Catalog check: prompts=3 chains=1 errors=3 warnings=3" in text_output
+    assert "CAT001 warning" in text_output
+    assert "CAT002 warning" in text_output
+    assert "CAT003 error" in text_output
+    assert "CAT004 error" in text_output
+    assert "CAT005 warning" in text_output
+    assert "CAT006 error" in text_output
+
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "catalog-check", "--json"])
+    assert main.main() == 5
+    payload = cast("dict[str, object]", json.loads(capsys.readouterr().out))
+    assert payload["summary"] == {"prompts": 3, "chains": 1, "errors": 3, "warnings": 3}
+    issues = cast("list[dict[str, object]]", payload["issues"])
+    assert {issue["code"] for issue in issues} == {
+        "CAT001",
+        "CAT002",
+        "CAT003",
+        "CAT004",
+        "CAT005",
+        "CAT006",
+    }
+
+
+def test_catalog_check_reports_a_clean_catalog(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    prompt = Prompt(
+        id=uuid.uuid4(),
+        name="Valid prompt",
+        description="A valid prompt asset.",
+        category="Testing",
+        context="Hello {{ name }}",
+        ext4=[0.1] * 32,
+    )
+    manager = _DummyManager()
+    manager.repository.store.append(prompt)
+    manager.prompt_chains = [
+        SimpleNamespace(
+            id=uuid.uuid4(),
+            name="Valid chain",
+            steps=[SimpleNamespace(prompt_id=prompt.id)],
+        )
+    ]
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "catalog-check"])
+
+    assert main.main() == 0
+    assert "Catalog check: prompts=1 chains=1 errors=0 warnings=0" in capsys.readouterr().out
 
 
 def test_prompt_random_command_displays_one_repository_prompt(

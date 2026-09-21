@@ -48,6 +48,7 @@ from core import (
     import_prompt_catalog,
     snapshot_dataset_rows,
 )
+from core.catalog_check import run_catalog_check
 from core.templating import TemplateRenderer
 from models.prompt_chain_model import (
     chain_from_payload,
@@ -144,6 +145,39 @@ def run_catalog_export(
     message = f"Prompt catalogue exported to {resolved} ({fmt})"
     print_and_log(logger, logging.INFO, message)
     return 0
+
+
+def run_catalog_check_command(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    """Run deterministic integrity checks over stored prompts and chains."""
+    if manager is None:
+        raise ValueError("Prompt Manager is required for catalog checks.")
+    try:
+        prompts = manager.repository.list()
+        chains = manager.list_prompt_chains(include_inactive=True)
+        report = run_catalog_check(prompts, chains)
+    except Exception as exc:  # pragma: no cover - surfaced to CLI
+        print_and_log(logger, logging.ERROR, f"Unable to run catalog check: {exc}")
+        return 6
+
+    if bool(getattr(args, "json", False)):
+        print(json.dumps(report.to_record(), ensure_ascii=False, indent=2))
+    else:
+        print(
+            "Catalog check: "
+            f"prompts={report.prompt_count} chains={report.chain_count} "
+            f"errors={report.error_count} warnings={report.warning_count}"
+        )
+        for issue in report.issues:
+            targets = ", ".join(issue.prompt_ids)
+            chain = f" chain={issue.chain_id}" if issue.chain_id else ""
+            target_text = f" prompts={targets}" if targets else ""
+            print(f"{issue.code} {issue.severity}{chain}{target_text}: {issue.message}")
+
+    return 5 if report.error_count else 0
 
 
 def run_catalog_import(
@@ -2172,6 +2206,7 @@ def run_prompt_history(
 COMMAND_SPECS: dict[str | None, CommandSpec] = {
     "catalog-export": CommandSpec(run_catalog_export),
     "catalog-import": CommandSpec(run_catalog_import),
+    "catalog-check": CommandSpec(run_catalog_check_command),
     "prompt-add": CommandSpec(run_catalog_import),
     "prompt-show": CommandSpec(run_prompt_show),
     "prompt-random": CommandSpec(run_prompt_random),

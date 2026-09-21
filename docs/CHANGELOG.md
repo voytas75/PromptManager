@@ -6,6 +6,8 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ### Added
 
+- Added `catalog-check [--json]`, a deterministic read-only catalog-integrity pass for prompts and chains. It reports duplicate exact names/bodies, invalid template syntax, broken related-prompt references, missing stored embeddings, and chain steps referencing missing prompts; error findings return a nonzero result while warnings remain non-blocking.
+
 - Added `prompt-random`, a read-only CLI command that displays one randomly selected local prompt through the existing readable prompt-detail view; it makes no provider calls or repository changes and reports a clear empty-catalog response.
 
 - Added a local durable prompt activity ledger for successful asset mutations: `created`, `updated`, `forked`, `restored`, and `deleted` events now retain prompt ID, UTC timestamp, and CLI/GUI origin without storing prompt bodies. Catalog import, scenario refresh, fork, and version restore explicitly record CLI origin; existing GUI domain paths use the GUI default. Search, filters, reads, and keystrokes remain untracked.
