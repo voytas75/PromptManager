@@ -389,9 +389,11 @@ def test_open_prompt_in_workspace_keeps_handoff_cues_action_local(
 
 
 def test_copy_prompt_to_clipboard_copies_the_prompt_body(
+    qt_app: QApplication,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Clipboard copy should place only the stored prompt body on the clipboard."""
+    del qt_app
     clipboard = _DummyClipboard()
     monkeypatch.setattr("PySide6.QtGui.QGuiApplication.clipboard", lambda: clipboard)
     status_messages: list[tuple[str, int]] = []
