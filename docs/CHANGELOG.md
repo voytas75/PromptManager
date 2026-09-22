@@ -10,6 +10,15 @@ All notable changes to **Prompt Manager** will be documented in this file.
 - Added `prompt-template-list [--json]`, a manager-free read-only view of all effective built-in LiteLLM workflow templates. Text output uses numbered Unicode-bordered blocks with provenance, metadata, and wrapped body lines; JSON exposes the complete ordered records.
 - Added `prompt-lint <uuid-or-exact-name> [--json]`, a deterministic provider-free advisory check for short descriptions, missing action cues, unstructured long bodies, repeated instruction lines, and undocumented template-input context. It is read-only and non-blocking; technical validity remains owned by `prompt-validate`.
 
+### Fixed
+
+- Reconciled `uv.lock` with `pyproject.toml` release metadata so the editable `prompt-manager` lock entry now reports `0.23.0`; `uv lock --check` is again a reproducible environment gate.
+
+### Changed
+
+- Reconciled the active status and near-term plan after the 2026-09-20–22 CLI delivery set. The delivered deterministic CLI tools are recorded as closed asset-supporting work; new CLI/provider/chain/integration expansion remains blocked pending a separate product decision.
+- Clarified the developer quality contract: `pyright main.py config models` is the blocking CI scope, while full configured strict Pyright is a non-blocking debt scan until a separately approved expansion is green.
+
 ## [0.23.0] - 2026-09-21
 
 ### Added

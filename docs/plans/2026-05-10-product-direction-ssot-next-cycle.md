@@ -2,7 +2,7 @@
 
 Status: active
 Owner: Wojtek / Prompt Manager Team
-Updated: 2026-05-17
+Updated: 2026-09-22
 Canonical product SSOT: `docs/product-ssot.md`
 Status/history sink: `docs/STATUS.md`
 
@@ -42,6 +42,12 @@ So the near-term plan should stay focused on:
 - compact trust support.
 
 Closed-slice history belongs in `docs/STATUS.md`, not here.
+
+### September reconciliation
+
+The 2026-09-20–22 CLI delivery set is closed supporting work, not a new product center. `catalog-check`, `prompt-validate`, `prompt-test`, `prompt-compare`, `prompt-lint`, `prompt-template-list`, and tag operations remain asset-supporting because they inspect, validate, compare, or organize existing prompt records without provider calls by default.
+
+Do not extend this set automatically. The only active follow-up priority after the audit is controlled maintenance of delivery trust: keep the lockfile reproducible, keep the CI type-checking contract truthful, and select the next user-visible slice from retrieval → inspect → reuse/refine. Provider-backed evaluation, dependency/impact graphs, broad chain work, and new integration surfaces remain separate decisions.
 
 ---
 

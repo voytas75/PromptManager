@@ -2,7 +2,7 @@
 
 Status: active
 Owner: Wojtek / Prompt Manager Team
-Updated: 2026-09-20
+Updated: 2026-09-22
 Canonical product SSOT: `docs/product-ssot.md`
 Canonical near-term plan: `docs/plans/2026-05-10-product-direction-ssot-next-cycle.md`
 
@@ -99,39 +99,37 @@ If not, it should not lead the next cycle.
 
 ---
 
-## Current verified checkpoint — 2026-09-20
+## Current verified checkpoint — 2026-09-22
 
 **Revision and delivery**
-- Current delivered local and remote `master`: `e218e3796e9b9193561e18b1a9f3971b8be05686`.
-- Worktree was clean and `HEAD...origin/master` was `0 / 0` at this checkpoint.
-- Delivered CLI contract commits in the current line:
-  - `156b046` — help/import-example contract alignment.
-  - `d81507a` — semantic natural-language `prompt-find`.
-  - `d443e8b` — bounded `prompt-show --json` with `--full` opt-in.
-  - `71562e7` — operational documentation currentness reconciliation.
-  - `6524dc3` — query-first raw semantic `prompt-find` ranking repair.
-  - `ab88829` — readable, copy-friendly text `prompt-show`.
-  - `e218e37` — grouped root CLI help card.
-- Exact-SHA Quality Gates for `e218e37` succeeded: Ruff autofix/format/verify, CI-scope Pyright, pytest with coverage, and clean-tree check.
+- Current local `master`: `88ebff296ce084ea82d6d0e5be4c9259bedba42b`; the worktree was clean and `master...origin/master` was `0 / 0` immediately before this audit-closeout slice.
+- Delivered after the prior `e218e37` checkpoint: catalog integrity checks, random prompt reads, prompt validation, deterministic template tests, prompt comparison, linting, effective template listing, tag operations, release `0.23.0`, and the Qt clipboard-test fix.
+- This is a closed, provider-free supporting CLI set. It does not change the asset-first product center: each command organizes, inspects, validates, or compares persisted prompt assets.
 
-**Current CLI operational contracts**
+**Current operational contracts**
+- `catalog-check`, `prompt-validate`, `prompt-test`, `prompt-compare`, `prompt-lint`, and `prompt-template-list` are deterministic/provider-free by contract; `tag-list` and `tag-show` are read-only, and `prompt-tag` keeps an explicit non-mutating `--dry-run`.
 - `prompt-find <query>` sends the original natural-language query to raw semantic retrieval; explicit category/tag/source/active filters apply after ranking. Personalized, intent-hinted ranking remains in `suggest` and GUI recommendations.
-- Text `prompt-show <uuid-or-name>` is a readable operator view: bounded metadata/description sections and a blank-line-separated `<prompt_body>` / `</prompt_body>` copy block for non-empty context.
-- `prompt-show <uuid-or-name> --json` omits the raw `ext4` embedding and returns bounded embedding presence/dimension metadata.
-- `prompt-show <uuid-or-name> --json --full` returns the complete persisted record including `ext4`; `--full` without `--json` is rejected.
-- Root `--help` is a grouped command card with compact `COMMAND` usage; use `<command> --help` for authoritative command options.
+- Text `prompt-show <uuid-or-name>` is a readable operator view with a blank-line-separated `<prompt_body>` / `</prompt_body>` copy block for non-empty context. Its default JSON form omits raw `ext4`; `--json --full` is the explicit complete-record opt-in.
+- Root `--help` remains a grouped command card; use `<command> --help` for authoritative options.
 
 **Current local verification**
-- Last full local gate for this delivered line: `842 passed, 1 skipped`, coverage `80.39%`; Ruff/format and CI-scope Pyright passed.
-- The stale local `PROMPT_MANAGER_CONFIG_JSON` override is an environment condition, not a repository regression: an explicit missing config path intentionally fails closed.
+- Full provider-free gate at this checkpoint: `873 passed, 1 skipped`, core coverage `81.63%`; `ruff check .`, `ruff format --check .`, and CI-scope `pyright main.py config models` passed.
+- `uv.lock` has been reconciled to package version `0.23.0`; `uv lock --check` passes after the lock-only update.
+- The blocking CI type gate is intentionally `pyright main.py config models`, matching `.github/workflows/quality-gates.yml` and `docs/README-DEV.md`. Full configured strict Pyright remains a non-blocking debt scan; at this checkpoint it reports `283 errors`, chiefly outside the CI scope. It must not be described as green or as CI parity.
+- The stale local `PROMPT_MANAGER_CONFIG_JSON` override remains an environment condition, not a repository regression: an explicit missing config path intentionally fails closed.
+
+**Current next slice**
+1. Return to the product SSOT priority and probe one current retrieval → inspect → reuse/refine hesitation seam.
+2. Do not add another CLI, provider, chain, or integration surface without a separate product decision.
+3. Treat Pyright expansion and Chroma/Dependabot review as separate, explicitly scoped maintenance work.
 
 Historical checkpoints below retain their original revision-specific evidence.
 
 ---
 
-## Historical checkpoint — 2026-09-03
+## Historical verified checkpoint — 2026-09-20
 
-The following ledger records the 2026-09-03 state and does not describe current `master`.
+The following ledger records the 2026-09-20 state and does not describe current `master`.
 
 ## Most recent delivered execution ledger at that checkpoint
 
