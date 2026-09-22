@@ -1,6 +1,7 @@
 """Minimal dialog and helpers for quick prompt capture.
 
 Updates:
+  v0.1.7 - 2026-09-22 - Add explicit clipboard-to-editable-draft capture.
   v0.1.6 - 2026-04-12 - Strip one outer `User:` wrapper only for clearly
   single-turn quick-capture input.
   v0.1.5 - 2026-04-11 - Unwrap one obvious outer markdown blockquote from quick-capture bodies.
@@ -18,14 +19,17 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
     QPlainTextEdit,
+    QPushButton,
     QVBoxLayout,
     QWidget,
 )
@@ -232,6 +236,17 @@ class QuickCaptureDialog(QDialog):
         self._entry_guidance_label.setWordWrap(True)
         layout.addWidget(self._entry_guidance_label)
 
+        clipboard_row = QHBoxLayout()
+        self._clipboard_button = QPushButton("Paste from Clipboard", self)
+        self._clipboard_button.setObjectName("quickCaptureClipboardButton")
+        self._clipboard_button.setToolTip(
+            "Paste the current clipboard text into this editable draft preview."
+        )
+        self._clipboard_button.clicked.connect(self._paste_clipboard_text)  # type: ignore[arg-type]
+        clipboard_row.addWidget(self._clipboard_button)
+        clipboard_row.addStretch(1)
+        layout.addLayout(clipboard_row)
+
         self._title_input = QLineEdit(self)
         self._title_input.setObjectName("quickCaptureTitleInput")
         self._title_input.setPlaceholderText(
@@ -275,6 +290,25 @@ class QuickCaptureDialog(QDialog):
         buttons.rejected.connect(self.reject)  # type: ignore[arg-type]
         layout.addWidget(buttons)
 
+        self._body_input.setFocus()
+
+    def _paste_clipboard_text(self) -> None:
+        """Place explicit clipboard content into the editable draft preview."""
+        clipboard_text = QGuiApplication.clipboard().text()
+        if not clipboard_text.strip():
+            QMessageBox.information(
+                self,
+                "Clipboard is empty",
+                "Copy prompt or query text before creating a draft preview.",
+            )
+            return
+        self._body_input.setPlainText(clipboard_text)
+        if not self._source_input.text().strip():
+            self._source_input.setText("clipboard")
+        self._entry_guidance_label.setText(
+            "Clipboard text is ready as an editable draft preview. "
+            "Review or edit before saving the draft."
+        )
         self._body_input.setFocus()
 
     def _on_accept(self) -> None:

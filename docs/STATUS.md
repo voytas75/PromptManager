@@ -120,8 +120,8 @@ If not, it should not lead the next cycle.
 - The stale local `PROMPT_MANAGER_CONFIG_JSON` override remains an environment condition, not a repository regression: an explicit missing config path intentionally fails closed.
 
 **Current next slice**
-1. Active product sequence: `docs/plans/2026-09-22-instant-fit-judgment-v1.md` records Stage A (Instant Fit Judgment), then intentional capture continuity, baseline/variant learning, and local portability/calm trust.
-2. Stage A is in progress across GUI and CLI: show only truthful local fit evidence from existing usage/rating aggregates; keep JSON records, ranking, persistence, and provider configuration unchanged.
+1. Active product sequence: `docs/plans/2026-09-22-instant-fit-judgment-v1.md` records the completed Stage A; `docs/plans/2026-09-22-intentional-capture-continuity-v1.md` is the active Stage B execution ledger.
+2. Stage B adds only an explicit, operator-triggered Clipboard → editable Quick Capture draft preview; background watching, global hotkeys, automatic saves, providers, persistence changes, and a new capture flow remain out of scope.
 3. Do not add another CLI, provider, chain, or integration surface without a separate product decision.
 4. Treat Pyright expansion and Chroma/Dependabot review as separate, explicitly scoped maintenance work.
 

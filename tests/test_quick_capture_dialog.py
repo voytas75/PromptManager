@@ -17,7 +17,7 @@ from typing import cast
 import pytest
 
 pytest.importorskip("PySide6")
-from PySide6.QtWidgets import QApplication, QLabel, QLineEdit, QPlainTextEdit
+from PySide6.QtWidgets import QApplication, QLabel, QLineEdit, QPlainTextEdit, QPushButton
 
 from gui.dialogs.quick_capture import (
     QuickCaptureDialog,
@@ -50,6 +50,108 @@ def test_quick_capture_dialog_shows_raw_input_entry_guidance(qt_app: QApplicatio
         "Paste a raw prompt or query. PromptManager only cleans obvious outer wrappers "
         "before saving the draft."
     )
+
+
+def test_quick_capture_dialog_pastes_clipboard_text_as_an_editable_draft_preview(
+    qt_app: QApplication,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An explicit clipboard action should fill the draft preview without a background watcher."""
+    clipboard_text = "Prompt: Summarize the deployment risks for the handoff."
+
+    class _ClipboardStub:
+        def text(self) -> str:
+            return clipboard_text
+
+    monkeypatch.setattr(
+        "gui.dialogs.quick_capture.QGuiApplication.clipboard",
+        lambda: _ClipboardStub(),
+    )
+    dialog = QuickCaptureDialog()
+    body_input = dialog.findChild(QPlainTextEdit, "quickCaptureBodyInput")
+    source_input = dialog.findChild(QLineEdit, "quickCaptureSourceInput")
+    clipboard_button = dialog.findChild(QPushButton, "quickCaptureClipboardButton")
+    guidance_label = dialog.findChild(QLabel, "quickCaptureEntryGuidanceLabel")
+
+    assert body_input is not None
+    assert source_input is not None
+    assert clipboard_button is not None
+    assert guidance_label is not None
+
+    clipboard_button.click()
+
+    assert body_input.toPlainText() == clipboard_text
+    assert source_input.text() == "clipboard"
+    assert "Review or edit before saving the draft." in guidance_label.text()
+    draft = dialog.build_draft()
+    assert draft is not None
+    prompt = draft.to_prompt()
+    assert prompt.name == "Summarize the deployment risks for the handoff."
+    assert prompt.source == "clipboard"
+
+
+def test_quick_capture_dialog_preserves_manual_provenance_when_pasting_clipboard_text(
+    qt_app: QApplication,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Clipboard capture should not overwrite provenance the operator already chose."""
+
+    class _ClipboardStub:
+        def text(self) -> str:
+            return "Summarize deployment risks."
+
+    monkeypatch.setattr(
+        "gui.dialogs.quick_capture.QGuiApplication.clipboard",
+        lambda: _ClipboardStub(),
+    )
+    dialog = QuickCaptureDialog()
+    source_input = dialog.findChild(QLineEdit, "quickCaptureSourceInput")
+    clipboard_button = dialog.findChild(QPushButton, "quickCaptureClipboardButton")
+
+    assert source_input is not None
+    assert clipboard_button is not None
+    source_input.setText("release notes")
+    clipboard_button.click()
+
+    assert source_input.text() == "release notes"
+
+
+def test_quick_capture_dialog_keeps_existing_draft_preview_when_clipboard_is_empty(
+    qt_app: QApplication,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An empty clipboard should be explained without discarding typed draft text."""
+
+    class _ClipboardStub:
+        def text(self) -> str:
+            return "   "
+
+    messages: list[tuple[str, str]] = []
+
+    def _show_information(_parent: object, title: str, text: str) -> None:
+        messages.append((title, text))
+
+    monkeypatch.setattr(
+        "gui.dialogs.quick_capture.QGuiApplication.clipboard",
+        lambda: _ClipboardStub(),
+    )
+    monkeypatch.setattr(
+        "gui.dialogs.quick_capture.QMessageBox.information",
+        _show_information,
+    )
+    dialog = QuickCaptureDialog()
+    body_input = dialog.findChild(QPlainTextEdit, "quickCaptureBodyInput")
+    clipboard_button = dialog.findChild(QPushButton, "quickCaptureClipboardButton")
+
+    assert body_input is not None
+    assert clipboard_button is not None
+    body_input.setPlainText("Keep this typed draft.")
+    clipboard_button.click()
+
+    assert body_input.toPlainText() == "Keep this typed draft."
+    assert messages == [
+        ("Clipboard is empty", "Copy prompt or query text before creating a draft preview.")
+    ]
 
 
 def test_quick_capture_dialog_builds_source_provenance_draft(qt_app: QApplication) -> None:
