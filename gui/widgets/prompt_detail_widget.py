@@ -45,6 +45,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.instant_fit import build_prompt_fit_summary
 from core.templating import TemplateRenderer
 
 from ..prompt_preview import build_prompt_source_cue
@@ -139,6 +140,11 @@ class PromptDetailWidget(QWidget):
         self._reuse_signal_label.setWordWrap(True)
         self._reuse_signal_label.setTextFormat(Qt.TextFormat.RichText)
         self._reuse_signal_label.setVisible(False)
+        self._fit_judgment_label = QLabel("", content)
+        self._fit_judgment_label.setObjectName("promptFitJudgment")
+        self._fit_judgment_label.setWordWrap(True)
+        self._fit_judgment_label.setTextFormat(Qt.TextFormat.RichText)
+        self._fit_judgment_label.setVisible(False)
         self._template_variable_cue_label = QLabel("", content)
         self._template_variable_cue_label.setObjectName("promptTemplateVariableCue")
         self._template_variable_cue_label.setWordWrap(True)
@@ -198,6 +204,8 @@ class PromptDetailWidget(QWidget):
         content_layout.addWidget(self._usage_cue_label)
         content_layout.addSpacing(4)
         content_layout.addWidget(self._reuse_signal_label)
+        content_layout.addSpacing(4)
+        content_layout.addWidget(self._fit_judgment_label)
         content_layout.addSpacing(4)
         content_layout.addWidget(self._template_variable_cue_label)
         content_layout.addSpacing(4)
@@ -437,6 +445,10 @@ class PromptDetailWidget(QWidget):
         else:
             self._reuse_signal_label.clear()
             self._reuse_signal_label.setVisible(False)
+        self._fit_judgment_label.setText(
+            self._format_label_value("Fit", build_prompt_fit_summary(prompt), multiline=True)
+        )
+        self._fit_judgment_label.setVisible(True)
         template_variable_cue = self._resolve_template_variable_cue(prompt)
         if template_variable_cue:
             self._template_variable_cue_label.setText(
@@ -897,6 +909,7 @@ class PromptDetailWidget(QWidget):
             self._meta_label,
             self._usage_cue_label,
             self._reuse_signal_label,
+            self._fit_judgment_label,
             self._template_variable_cue_label,
             self._workspace_handoff_cue_label,
             self._description,
@@ -929,6 +942,8 @@ class PromptDetailWidget(QWidget):
         self._usage_cue_label.setVisible(False)
         self._reuse_signal_label.clear()
         self._reuse_signal_label.setVisible(False)
+        self._fit_judgment_label.clear()
+        self._fit_judgment_label.setVisible(False)
         self._template_variable_cue_label.clear()
         self._template_variable_cue_label.setVisible(False)
         self._workspace_handoff_cue_label.clear()

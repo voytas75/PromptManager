@@ -332,7 +332,7 @@ class WorkspaceHistoryController:
         return build_validation_freshness_summary(entry)
 
     def _list_execution_history(self, prompt: Prompt, *, limit: int = 1) -> list[object]:
-        list_history = getattr(self._manager, "list_execution_history", None)
+        list_history = getattr(self._manager, "list_executions_for_prompt", None)
         if not callable(list_history):
             return []
         try:

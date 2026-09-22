@@ -120,9 +120,10 @@ If not, it should not lead the next cycle.
 - The stale local `PROMPT_MANAGER_CONFIG_JSON` override remains an environment condition, not a repository regression: an explicit missing config path intentionally fails closed.
 
 **Current next slice**
-1. The provider-free retrieval → inspect probe found no decision-surface regression; its immediate friction correction is quiet startup for `catalog-check`, `prompt-show`, and `prompt-find` when LiteLLM is unconfigured.
-2. Do not add another CLI, provider, chain, or integration surface without a separate product decision.
-3. Treat Pyright expansion and Chroma/Dependabot review as separate, explicitly scoped maintenance work.
+1. Active product sequence: `docs/plans/2026-09-22-instant-fit-judgment-v1.md` records Stage A (Instant Fit Judgment), then intentional capture continuity, baseline/variant learning, and local portability/calm trust.
+2. Stage A is in progress across GUI and CLI: show only truthful local fit evidence from existing usage/rating aggregates; keep JSON records, ranking, persistence, and provider configuration unchanged.
+3. Do not add another CLI, provider, chain, or integration surface without a separate product decision.
+4. Treat Pyright expansion and Chroma/Dependabot review as separate, explicitly scoped maintenance work.
 
 Historical checkpoints below retain their original revision-specific evidence.
 

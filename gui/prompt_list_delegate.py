@@ -24,7 +24,7 @@ from PySide6.QtWidgets import QApplication, QStyle, QStyledItemDelegate, QStyleO
 
 from .prompt_list_model import PromptListModel
 
-type IndexLike = QModelIndex | _QPersistentModelIndex
+IndexLike = QModelIndex | _QPersistentModelIndex
 
 
 class PromptListDelegate(QStyledItemDelegate):
@@ -50,6 +50,11 @@ class PromptListDelegate(QStyledItemDelegate):
         return PromptListDelegate._data_as_text(index, PromptListModel.HandoffCueRole)
 
     @staticmethod
+    def fit_cue_text(index: IndexLike) -> str | None:
+        """Public helper exposing the visible row fit evidence for bounded tests."""
+        return PromptListDelegate._data_as_text(index, PromptListModel.FitCueRole)
+
+    @staticmethod
     def build_text_runs(
         text: str,
         spans: tuple[tuple[int, int], ...],
@@ -63,9 +68,11 @@ class PromptListDelegate(QStyledItemDelegate):
         option: QStyleOptionViewItem,
         index: IndexLike,
     ) -> None:
-        """Draw the standard row plus bounded preview and handoff cue lines when available."""
+        """Draw the standard row plus bounded preview, fit, and action cues when available."""
         preview = self._data_as_text(index, PromptListModel.PreviewRole)
-        handoff_cue = self.handoff_cue_text(index)
+        fit_cue = self.fit_cue_text(index)
+        action_cue = self.handoff_cue_text(index)
+        cue_lines = tuple(cue for cue in (fit_cue, action_cue) if cue)
         title_spans = self._coerce_match_spans(
             cast("object", index.data(PromptListModel.TitleMatchRole))
         )
@@ -73,7 +80,7 @@ class PromptListDelegate(QStyledItemDelegate):
             cast("object", index.data(PromptListModel.PreviewMatchRole))
         )
         has_preview = preview is not None
-        has_handoff_cue = handoff_cue is not None
+        has_handoff_cue = bool(cue_lines)
         if not has_preview and not title_spans and not has_handoff_cue:
             super().paint(painter, option, index)
             return
@@ -150,20 +157,22 @@ class PromptListDelegate(QStyledItemDelegate):
                 preview_spans,
             )
 
-        if has_handoff_cue:
-            handoff_text, handoff_spans = self._elide_text_and_spans(
-                handoff_cue,
+        for cue_index, cue in enumerate(cue_lines):
+            cue_rect = QRect(handoff_rect)
+            cue_rect.translate(0, cue_index * (handoff_metrics.height() + self._LINE_SPACING))
+            cue_text, cue_spans = self._elide_text_and_spans(
+                cue,
                 (),
                 handoff_metrics,
-                handoff_rect.width(),
+                cue_rect.width(),
             )
             self._draw_text_runs(
                 painter,
-                handoff_rect,
+                cue_rect,
                 handoff_font,
                 self._handoff_cue_color(item_option_any.palette, item_option_any.state),
-                handoff_text,
-                handoff_spans,
+                cue_text,
+                cue_spans,
             )
         painter.restore()
 
@@ -172,13 +181,14 @@ class PromptListDelegate(QStyledItemDelegate):
         option: QStyleOptionViewItem,
         index: IndexLike,
     ) -> QSize:
-        """Return a taller row height when preview text or a visible handoff cue is available."""
+        """Return a taller row height when preview text or a visible fit/action cue is available."""
         base_size = super().sizeHint(option, index)
         preview = self._data_as_text(index, PromptListModel.PreviewRole)
-        handoff_cue = self.handoff_cue_text(index)
+        fit_cue = self.fit_cue_text(index)
+        action_cue = self.handoff_cue_text(index)
+        cue_lines = tuple(cue for cue in (fit_cue, action_cue) if cue)
         has_preview = preview is not None
-        has_handoff_cue = handoff_cue is not None
-        if not has_preview and not has_handoff_cue:
+        if not has_preview and not cue_lines:
             return base_size
 
         option_any = cast("Any", option)
@@ -188,7 +198,7 @@ class PromptListDelegate(QStyledItemDelegate):
         if has_preview:
             preview_metrics = QFontMetrics(self._preview_font(title_font))
             height += self._LINE_SPACING + preview_metrics.height()
-        if has_handoff_cue:
+        for _ in cue_lines:
             handoff_metrics = QFontMetrics(self._handoff_cue_font(title_font))
             height += self._LINE_SPACING + handoff_metrics.height()
         return QSize(base_size.width(), max(base_size.height(), height))

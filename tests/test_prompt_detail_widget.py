@@ -94,6 +94,10 @@ def _reuse_signal_label(widget: PromptDetailWidget) -> QLabel:
     return _required_label(widget, "promptReuseSignalCue")
 
 
+def _fit_judgment_label(widget: PromptDetailWidget) -> QLabel:
+    return _required_label(widget, "promptFitJudgment")
+
+
 def _workspace_handoff_cue_label(widget: PromptDetailWidget) -> QLabel:
     return _required_label(widget, "promptWorkspaceHandoffCue")
 
@@ -179,6 +183,51 @@ def test_prompt_detail_widget_renders_last_run_summary_label(
     assert "gpt-4o-mini" in summary_text
     assert "Validation freshness: recent" in summary_text
     assert "Comparison readiness: limited" in summary_text
+
+
+def test_prompt_detail_widget_renders_truthful_fit_judgment_from_prompt_aggregates(
+    qt_app: QApplication,
+) -> None:
+    """Detail should summarize persisted reuse evidence without deriving a synthetic score."""
+    prompt = Prompt(
+        id=uuid.uuid4(),
+        name="Incident triage",
+        description="Triage an incident.",
+        category="Ops",
+        usage_count=12,
+        rating_count=3,
+        quality_score=8.4,
+    )
+    widget = PromptDetailWidget()
+
+    widget.show()
+    widget.display_prompt(prompt)
+    qt_app.processEvents()
+
+    label = _fit_judgment_label(widget)
+    assert label.isVisible()
+    assert "Used 12× · Rated 8.4/10" in label.text()
+
+
+def test_prompt_detail_widget_marks_new_prompt_without_fit_evidence(
+    qt_app: QApplication,
+) -> None:
+    """Detail should make the evidence gap explicit for a prompt with no runs or ratings."""
+    prompt = Prompt(
+        id=uuid.uuid4(),
+        name="New incident triage",
+        description="Triage an incident.",
+        category="Ops",
+    )
+    widget = PromptDetailWidget()
+
+    widget.show()
+    widget.display_prompt(prompt)
+    qt_app.processEvents()
+
+    label = _fit_judgment_label(widget)
+    assert label.isVisible()
+    assert "No run evidence yet" in label.text()
 
 
 def test_prompt_detail_widget_hides_last_run_summary_when_empty(

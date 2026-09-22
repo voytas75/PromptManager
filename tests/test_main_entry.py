@@ -1160,6 +1160,62 @@ def test_prompt_show_command_outputs_prompt_details(
     assert manager.closed is True
 
 
+def test_prompt_show_command_outputs_compact_fit_evidence_in_text_mode(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Text prompt-show should make persisted fit evidence readable before the prompt body."""
+    prompt_id = uuid.uuid4()
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-show", str(prompt_id)])
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    manager = _DummyManager()
+    manager.repository.store.append(
+        Prompt(
+            id=prompt_id,
+            name="CI Failure Triage",
+            description="Summarise the first-pass diagnosis.",
+            category="Debugging",
+            usage_count=12,
+            rating_count=3,
+            quality_score=8.4,
+        )
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    assert main.main() == 0
+
+    assert "Fit:      Used 12× · Rated 8.4/10" in capsys.readouterr().out
+
+
+def test_prompt_find_command_outputs_compact_fit_evidence_in_text_mode(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Text prompt-find should include fit evidence without changing JSON result records."""
+    prompt_id = uuid.uuid4()
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-find", "triage"])
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    manager = _DummyManager()
+    prompt = Prompt(
+        id=prompt_id,
+        name="CI Failure Triage",
+        description="Summarise the first-pass diagnosis.",
+        category="Debugging",
+        usage_count=12,
+        rating_count=3,
+        quality_score=8.4,
+    )
+    manager.repository.store.append(prompt)
+    manager.search_response = [prompt]
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    assert main.main() == 0
+
+    assert f"{prompt_id} | CI Failure Triage | [Debugging] | - | Used 12× · Rated 8.4/10" in (
+        capsys.readouterr().out
+    )
+
+
 def test_prompt_show_command_falls_back_to_exact_name(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

@@ -184,6 +184,45 @@ def test_prompt_list_model_exposes_title_match_handoff_cue_for_immediate_reuse(
     assert index.data(PromptListModel.HandoffCueRole) == "Ready to reuse"
 
 
+def test_prompt_list_model_exposes_compact_fit_evidence_from_existing_aggregates(
+    qt_app: QApplication,
+) -> None:
+    """A result row should expose only persisted, operator-readable fit evidence."""
+    prompt = _build_prompt(
+        description="Reusable incident handoff prompt for routine operator transitions.",
+    )
+    prompt.usage_count = 12
+    prompt.rating_count = 3
+    prompt.quality_score = 8.4
+    model = PromptListModel([prompt])
+
+    index = model.index(0, 0)
+
+    assert index.data(PromptListModel.FitCueRole) == "Used 12× · Rated 8.4/10"
+
+
+def test_prompt_list_model_marks_missing_fit_evidence_without_inventing_a_score(
+    qt_app: QApplication,
+) -> None:
+    """A new asset should surface its evidence gap instead of a fabricated confidence value."""
+    model = PromptListModel([_build_prompt()])
+
+    assert model.index(0, 0).data(PromptListModel.FitCueRole) == "No run evidence yet"
+
+
+def test_prompt_list_model_keeps_incomplete_rating_evidence_explicit(
+    qt_app: QApplication,
+) -> None:
+    """A missing persisted score must not be rendered as an invented rating."""
+    prompt = _build_prompt()
+    prompt.rating_count = 2
+    model = PromptListModel([prompt])
+
+    assert (
+        model.index(0, 0).data(PromptListModel.FitCueRole) == "Rating recorded · score unavailable"
+    )
+
+
 def test_prompt_list_model_hides_title_reuse_handoff_for_captured_draft(
     qt_app: QApplication,
 ) -> None:

@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QAbstractListModel, QModelIndex, QObject, QPersistentModelIndex, Qt
 
+from core.instant_fit import build_prompt_fit_summary
+
 from .prompt_preview import (
     PREVIEW_MAX_LENGTH,
     build_prompt_preview,
@@ -40,6 +42,7 @@ class PromptListModel(QAbstractListModel):
     PreviewMatchRole = int(Qt.ItemDataRole.UserRole) + 3
     MatchReasonRole = int(Qt.ItemDataRole.UserRole) + 4
     HandoffCueRole = int(Qt.ItemDataRole.UserRole) + 5
+    FitCueRole = int(Qt.ItemDataRole.UserRole) + 6
     PreviewMaxLength = PREVIEW_MAX_LENGTH
 
     def __init__(
@@ -81,6 +84,8 @@ class PromptListModel(QAbstractListModel):
             return self._match_reason_text(prompt)
         if role == self.HandoffCueRole:
             return self._handoff_cue_text(prompt)
+        if role == self.FitCueRole:
+            return build_prompt_fit_summary(prompt)
         if role == self.TitleMatchRole:
             return self._match_ranges(self._display_text(prompt))
         if role == self.PreviewMatchRole:
@@ -117,6 +122,7 @@ class PromptListModel(QAbstractListModel):
                 self.PreviewRole,
                 self.MatchReasonRole,
                 self.HandoffCueRole,
+                self.FitCueRole,
                 self.TitleMatchRole,
                 self.PreviewMatchRole,
             ],

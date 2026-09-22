@@ -85,7 +85,7 @@ class _ManagerStub:
         assert prompt_id == self._parent_prompt.id
         return self._parent_prompt
 
-    def list_execution_history(
+    def list_executions_for_prompt(
         self,
         prompt_id: uuid.UUID,
         *,

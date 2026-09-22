@@ -51,6 +51,7 @@ from core import (
     snapshot_dataset_rows,
 )
 from core.catalog_check import run_catalog_check
+from core.instant_fit import build_prompt_fit_summary
 from core.prompt_comparison import compare_prompts
 from core.prompt_linting import lint_prompt
 from core.prompt_tagging import (
@@ -1499,6 +1500,7 @@ def _format_prompt_show_text(prompt: Prompt) -> str:
         f"Tags:     {tags}",
         f"Source:   {prompt.source or '-'}",
         f"Status:   {'active' if prompt.is_active else 'inactive'}",
+        f"Fit:      {build_prompt_fit_summary(prompt)}",
     ]
     if description:
         lines.extend(["", "Description", "-----------"])
@@ -1635,7 +1637,10 @@ def run_prompt_find(
     lines = []
     for prompt in matches:
         tags = ", ".join(prompt.tags) if prompt.tags else "-"
-        lines.append(f"{prompt.id} | {prompt.name} | [{prompt.category}] | {tags}")
+        lines.append(
+            f"{prompt.id} | {prompt.name} | [{prompt.category}] | {tags} | "
+            f"{build_prompt_fit_summary(prompt)}"
+        )
     print("\n".join(lines))
     return 0
 

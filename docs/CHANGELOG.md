@@ -13,6 +13,7 @@ All notable changes to **Prompt Manager** will be documented in this file.
 ### Fixed
 
 - Local read-only catalog commands `catalog-check`, `prompt-show`, and `prompt-find` now keep LiteLLM offline availability state without emitting startup warnings. Their text output remains operator-focused, and `catalog-check --json` now remains parseable JSON when no LLM model is configured; generation and execution paths retain their offline guidance.
+- Added the provider-free **Instant Fit Judgment v1** cue across the existing retrieval → inspect path: GUI result rows and detail, plus text-mode `prompt-find` and `prompt-show`, now show only persisted usage/rating evidence or an explicit `No run evidence yet`. JSON shapes, ranking, persistence, and provider configuration remain unchanged. The GUI history controller now reads the canonical `list_executions_for_prompt()` seam rather than a non-production method name.
 - Reconciled `uv.lock` with `pyproject.toml` release metadata so the editable `prompt-manager` lock entry now reports `0.23.0`; `uv lock --check` is again a reproducible environment gate.
 
 ### Changed
