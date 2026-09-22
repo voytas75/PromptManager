@@ -1,6 +1,7 @@
 """Factories for constructing PromptManager instances from validated settings.
 
 Updates:
+  v0.8.9 - 2026-09-22 - Allow CLI startup to suppress offline LiteLLM announcements.
   v0.8.8 - 2025-12-09 - Handle Redis cache availability gracefully and surface status in settings.
   v0.8.7 - 2025-12-09 - Handle missing LiteLLM embedding credentials and clarify offline guidance.
   v0.8.6 - 2025-12-09 - Treat missing API base/version as offline for Azure LiteLLM models.
@@ -246,6 +247,7 @@ def build_prompt_manager(
     enable_background_sync: bool = True,
     notification_center: NotificationCenter | None = None,
     prompt_engineer: PromptEngineer | None = None,
+    announce_offline_llm: bool = True,
 ) -> PromptManager:
     """Return a PromptManager configured from validated settings."""
     redis_reason: str | None = None
@@ -420,10 +422,14 @@ def build_prompt_manager(
     if redis_reason:
         factory_logger.info(redis_reason)
     llm_ready, llm_reason = _determine_llm_status(settings)
-    if not llm_ready and llm_reason:
+    if announce_offline_llm and not llm_ready and llm_reason:
         factory_logger.warning(llm_reason)
     if hasattr(manager, "set_llm_status"):
-        manager.set_llm_status(llm_ready, reason=llm_reason, notify=not llm_ready)
+        manager.set_llm_status(
+            llm_ready,
+            reason=llm_reason,
+            notify=announce_offline_llm and not llm_ready,
+        )
     return manager
 
 

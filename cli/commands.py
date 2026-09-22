@@ -1,6 +1,7 @@
 """CLI command handlers for Prompt Manager.
 
 Updates:
+  v0.34.0 - 2026-09-22 - Mark quiet local catalog commands at startup.
   v0.33.9 - 2026-04-29 - Add prompt-history JSON output for structured execution evidence reads.
   v0.33.8 - 2026-04-29 - Add prompt-history CLI command for per-prompt execution evidence.
   v0.33.7 - 2026-04-29 - Add prompt-find source and active filters
@@ -97,6 +98,7 @@ class CommandSpec:
 
     handler: CommandHandler
     requires_manager: bool = True
+    announce_offline_llm: bool = True
 
 
 def _coerce_mapping(value: object) -> dict[str, Any] | None:
@@ -2778,11 +2780,11 @@ def run_prompt_history(
 COMMAND_SPECS: dict[str | None, CommandSpec] = {
     "catalog-export": CommandSpec(run_catalog_export),
     "catalog-import": CommandSpec(run_catalog_import),
-    "catalog-check": CommandSpec(run_catalog_check_command),
+    "catalog-check": CommandSpec(run_catalog_check_command, announce_offline_llm=False),
     "prompt-add": CommandSpec(run_catalog_import),
-    "prompt-show": CommandSpec(run_prompt_show),
+    "prompt-show": CommandSpec(run_prompt_show, announce_offline_llm=False),
     "prompt-random": CommandSpec(run_prompt_random),
-    "prompt-find": CommandSpec(run_prompt_find),
+    "prompt-find": CommandSpec(run_prompt_find, announce_offline_llm=False),
     "tag-list": CommandSpec(run_tag_list),
     "tag-show": CommandSpec(run_tag_show),
     "prompt-tag": CommandSpec(run_prompt_tag),

@@ -108,6 +108,7 @@ If not, it should not lead the next cycle.
 
 **Current operational contracts**
 - `catalog-check`, `prompt-validate`, `prompt-test`, `prompt-compare`, `prompt-lint`, and `prompt-template-list` are deterministic/provider-free by contract; `tag-list` and `tag-show` are read-only, and `prompt-tag` keeps an explicit non-mutating `--dry-run`.
+- `catalog-check`, `prompt-show`, and `prompt-find` preserve LiteLLM availability state but suppress startup offline announcements because they remain useful local catalog operations without a configured model; `catalog-check --json` therefore emits a parseable JSON document. LLM-backed execution and generation paths retain offline guidance.
 - `prompt-find <query>` sends the original natural-language query to raw semantic retrieval; explicit category/tag/source/active filters apply after ranking. Personalized, intent-hinted ranking remains in `suggest` and GUI recommendations.
 - Text `prompt-show <uuid-or-name>` is a readable operator view with a blank-line-separated `<prompt_body>` / `</prompt_body>` copy block for non-empty context. Its default JSON form omits raw `ext4`; `--json --full` is the explicit complete-record opt-in.
 - Root `--help` remains a grouped command card; use `<command> --help` for authoritative options.
@@ -119,7 +120,7 @@ If not, it should not lead the next cycle.
 - The stale local `PROMPT_MANAGER_CONFIG_JSON` override remains an environment condition, not a repository regression: an explicit missing config path intentionally fails closed.
 
 **Current next slice**
-1. Return to the product SSOT priority and probe one current retrieval → inspect → reuse/refine hesitation seam.
+1. The provider-free retrieval → inspect probe found no decision-surface regression; its immediate friction correction is quiet startup for `catalog-check`, `prompt-show`, and `prompt-find` when LiteLLM is unconfigured.
 2. Do not add another CLI, provider, chain, or integration surface without a separate product decision.
 3. Treat Pyright expansion and Chroma/Dependabot review as separate, explicitly scoped maintenance work.
 

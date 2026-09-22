@@ -1,6 +1,7 @@
 """Lightweight integration checks for main module.
 
 Updates:
+  v0.5.6 - 2026-09-22 - Cover quiet LiteLLM startup for local catalog commands.
   v0.5.5 - 2025-12-10 - Cover LiteLLM logging toggle helper.
   v0.5.4 - 2025-12-09 - Offer to create config/config.json during first-run tests.
   v0.5.3 - 2025-12-08 - Include token usage aggregates in execution analytics helper.
@@ -405,8 +406,13 @@ def _build_dummy_snapshot() -> SimpleNamespace:
     )
 
 
-def _build_manager_with(manager: _DummyManager):
-    def _builder(_settings: object) -> _DummyManager:
+def _build_manager_with(
+    manager: _DummyManager,
+    captured_kwargs: dict[str, object] | None = None,
+):
+    def _builder(_settings: object, **kwargs: object) -> _DummyManager:
+        if captured_kwargs is not None:
+            captured_kwargs.update(kwargs)
         return manager
 
     return _builder
@@ -1247,6 +1253,34 @@ def test_prompt_find_command_lists_matching_prompts(
     assert f"{matching_id} | CI Failure Triage | [Debugging] | ci, triage" in output
     assert "Release Notes Writer" not in output
     assert manager.closed is True
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        ["catalog-check"],
+        ["prompt-show", "Example"],
+        ["prompt-find", "triage"],
+    ],
+)
+def test_main_sets_offline_llm_announcement_by_command_capability(
+    monkeypatch: pytest.MonkeyPatch,
+    command: list[str],
+) -> None:
+    """Read-only catalog commands should not announce unavailable LiteLLM at startup."""
+
+    monkeypatch.setattr("sys.argv", ["prompt-manager", *command])
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    captured_kwargs: dict[str, object] = {}
+    _patch_main(
+        monkeypatch,
+        "build_prompt_manager",
+        _build_manager_with(_DummyManager(), captured_kwargs),
+    )
+
+    main.main()
+
+    assert captured_kwargs["announce_offline_llm"] is False
 
 
 def test_prompt_find_command_uses_ranked_natural_language_suggestions(

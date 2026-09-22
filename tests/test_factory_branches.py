@@ -1,6 +1,7 @@
 """Branch coverage tests for core.factory helpers.
 
 Updates:
+  v0.1.4 - 2026-09-22 - Cover optional LiteLLM startup announcements.
   v0.1.3 - 2025-12-10 - Cover LiteLLM offline guidance and embedding readiness paths.
   v0.1.2 - 2025-12-08 - Allow description generator defaults in dependency forwarding test.
   v0.1.1 - 2025-12-08 - Use real settings objects and typed casts for Pyright.
@@ -175,6 +176,47 @@ def test_build_prompt_manager_forwards_dependencies(monkeypatch: pytest.MonkeyPa
     assert manager.kwargs["chroma_client"] == "chroma"
     assert manager.kwargs["embedding_function"] == "embed"
     assert manager.kwargs["description_generator"] is not None
+
+
+@pytest.mark.parametrize("announce_offline_llm", [False, True])
+def test_build_prompt_manager_preserves_llm_status_when_announcement_is_optional(
+    monkeypatch: pytest.MonkeyPatch,
+    announce_offline_llm: bool,
+) -> None:
+    """Offline manager state must remain available when startup announcements are muted."""
+
+    class _PromptManager:
+        def __init__(self, **_kwargs: object) -> None:
+            self.llm_status: tuple[bool, str | None, bool] | None = None
+
+        def set_redis_status(self, _available: bool, *, reason: str | None = None) -> None:
+            del reason
+
+        def set_llm_status(
+            self,
+            available: bool,
+            *,
+            reason: str | None = None,
+            notify: bool = False,
+        ) -> None:
+            self.llm_status = (available, reason, notify)
+
+    monkeypatch.setattr("core.factory.PromptManager", _PromptManager)
+    monkeypatch.setattr("core.factory._resolve_redis_client", _return_existing_redis_client)
+
+    manager = cast(
+        "_PromptManager",
+        build_prompt_manager(
+            _make_settings(redis_dsn=None),
+            announce_offline_llm=announce_offline_llm,
+        ),
+    )
+
+    assert manager.llm_status is not None
+    available, reason, notified = manager.llm_status
+    assert available is False
+    assert reason is not None
+    assert notified is announce_offline_llm
 
 
 def test_build_prompt_manager_uses_passthrough_redis_client(

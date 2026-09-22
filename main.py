@@ -1,6 +1,7 @@
 """Application entry point for Prompt Manager.
 
 Updates:
+  v0.9.4 - 2026-09-22 - Keep local catalog commands quiet when LiteLLM is offline.
   v0.9.3 - 2025-12-10 - Apply LiteLLM logging toggle from settings.
   v0.9.2 - 2025-12-09 - Offer to create config/config.json from template when missing.
   v0.9.1 - 2025-12-05 - Remove duplicate COMMAND_SPECS import flagged by Ruff.
@@ -70,9 +71,11 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
 def _initialise_manager(
     settings: PromptManagerSettings,
     logger: logging.Logger,
+    *,
+    announce_offline_llm: bool = True,
 ) -> PromptManager | None:
     try:
-        return build_prompt_manager(settings)
+        return build_prompt_manager(settings, announce_offline_llm=announce_offline_llm)
     except Exception as exc:  # pragma: no cover - surfaced to CLI
         logger.error("Failed to initialise services: %s", exc)
         return None
@@ -222,7 +225,8 @@ def main() -> int:
     manager = None
     manager_required = spec is None or spec.requires_manager
     if manager_required:
-        manager = _initialise_manager(settings, logger)
+        announce_offline_llm = spec is None or spec.announce_offline_llm
+        manager = _initialise_manager(settings, logger, announce_offline_llm=announce_offline_llm)
         if manager is None:
             return 3
 
