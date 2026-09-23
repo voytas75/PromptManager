@@ -99,7 +99,17 @@ If not, it should not lead the next cycle.
 
 ---
 
-## Current verified checkpoint — 2026-09-23
+## Current implementation checkpoint — 2026-09-23
+
+**Active local slice — compact `prompt-find --json` v1**
+- `prompt-find --json` now follows the established `prompt-show` JSON contract: it omits raw `ext4` vectors and exposes bounded `embedding.present` / `embedding.dimensions` metadata.
+- `prompt-find --json --full` is the explicit complete-record opt-in and retains `ext4`; `--full` without `--json` is parser-invalid.
+- Scope is provider-free and read-only: no changes to semantic ranking, filters, persistence, embedding generation, or the stored `Prompt.to_record()` model.
+- Release metadata advances to patch version `0.23.2`; verification results are recorded in the accompanying execution ledger before release closeout.
+
+---
+
+## Historical verified checkpoint — 2026-09-23
 
 **Revision and delivery status**
 - Current local `master` is based on `87f2a1e291122014ec2f17c414a5dcf2428f4921` before the uncommitted 0.23.1 release-closeout slice; `master...origin/master` is `0 / 0`.

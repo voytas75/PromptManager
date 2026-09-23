@@ -1408,7 +1408,7 @@ def test_prompt_find_command_uses_ranked_natural_language_suggestions(
     assert manager.closed is True
 
 
-def test_prompt_find_command_outputs_json_payload(
+def test_prompt_find_command_outputs_compact_json_payload(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -1428,6 +1428,7 @@ def test_prompt_find_command_outputs_json_payload(
                 context="Inspect logs, isolate the first failing step, and propose next checks.",
                 is_active=True,
                 source="catalog",
+                ext4=[0.1, 0.2, 0.3],
             ),
             Prompt(
                 id=uuid.uuid4(),
@@ -1455,7 +1456,47 @@ def test_prompt_find_command_outputs_json_payload(
     assert output[0]["name"] == "CI Failure Triage"
     assert output[0]["tags"] == ["ci", "triage"]
     assert output[0]["source"] == "catalog"
+    assert "ext4" not in output[0]
+    assert output[0]["embedding"] == {"present": True, "dimensions": 3}
     assert manager.closed is True
+
+
+def test_prompt_find_command_full_json_includes_embedding_vector(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    prompt_id = uuid.uuid4()
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-find", "triage", "--json", "--full"],
+    )
+    _patch_main(monkeypatch, "load_settings", _DummySettings)
+    manager = _DummyManager()
+    matching_prompt = Prompt(
+        id=prompt_id,
+        name="Embedding Search Result",
+        description="Return the complete record only on explicit request.",
+        category="Testing",
+        ext4=[0.1, 0.2, 0.3],
+    )
+    manager.repository.store.append(matching_prompt)
+    manager.search_response = [matching_prompt]
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    assert main.main() == 0
+
+    output = cast("list[dict[str, object]]", json.loads(capsys.readouterr().out))
+    assert output == [matching_prompt.to_record()]
+    assert manager.closed is True
+
+
+def test_prompt_find_rejects_full_without_json(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-find", "triage", "--full"])
+
+    with pytest.raises(SystemExit) as excinfo:
+        parse_args()
+
+    assert excinfo.value.code == 2
 
 
 def test_prompt_find_command_preserves_raw_semantic_order(

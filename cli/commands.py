@@ -1521,6 +1521,20 @@ def _format_prompt_show_text(prompt: Prompt) -> str:
     return "\n".join(lines)
 
 
+def _prompt_json_payload(prompt: Prompt, *, full: bool) -> dict[str, object]:
+    """Return a bounded prompt JSON record unless the full record is requested."""
+    payload = prompt.to_record()
+    if full:
+        return payload
+    payload.pop("ext4", None)
+    embedding = prompt.ext4
+    payload["embedding"] = {
+        "present": embedding is not None,
+        "dimensions": len(embedding) if embedding is not None else 0,
+    }
+    return payload
+
+
 def run_prompt_random(
     manager: PromptManager | None,
     args: argparse.Namespace,
@@ -1556,16 +1570,7 @@ def run_prompt_show(
         return exit_code
 
     if bool(getattr(args, "json", False)):
-        if bool(getattr(args, "full", False)):
-            payload = prompt.to_record()
-        else:
-            payload = prompt.to_record()
-            payload.pop("ext4", None)
-            embedding = prompt.ext4
-            payload["embedding"] = {
-                "present": embedding is not None,
-                "dimensions": len(embedding) if embedding is not None else 0,
-            }
+        payload = _prompt_json_payload(prompt, full=bool(getattr(args, "full", False)))
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
 
@@ -1609,7 +1614,7 @@ def run_prompt_find(
         print_and_log(logger, logging.ERROR, f"Failed to find prompts: {exc}")
         return 6
 
-    matches = []
+    matches: list[Prompt] = []
     for prompt in prompts:
         if category_filter and category_filter != str(prompt.category or "").strip().lower():
             continue
@@ -1630,7 +1635,8 @@ def run_prompt_find(
         return 0
 
     if bool(getattr(args, "json", False)):
-        payload = [prompt.to_record() for prompt in matches]
+        full = bool(getattr(args, "full", False))
+        payload = [_prompt_json_payload(prompt, full=full) for prompt in matches]
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
 

@@ -4,6 +4,12 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ## [Unreleased]
 
+## [0.23.2] - 2026-09-23
+
+### Fixed
+
+- Aligned `prompt-find` structured output with the existing bounded `prompt-show` contract. Default `prompt-find --json` now omits raw `ext4` embedding vectors and reports their presence and dimension only; `prompt-find --json --full` explicitly returns complete stored records including `ext4`, while `--full` without `--json` is rejected.
+
 ## [0.23.1] - 2026-09-23
 
 ### Fixed
