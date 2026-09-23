@@ -9,7 +9,7 @@ import pytest
 from gui.settings_dialog import SettingsDialog
 
 pytest.importorskip("PySide6")
-from PySide6.QtWidgets import QApplication, QLabel
+from PySide6.QtWidgets import QApplication, QLabel, QVBoxLayout
 
 EXPECTED_DIAGNOSTICS_STYLE_SNIPPETS = (
     "background-color: #fff6db",
@@ -93,5 +93,17 @@ def test_settings_dialog_renders_readable_redis_banner(qt_app: QApplication) -> 
         assert "Redis caching enabled via redis://localhost:6379/0" in redis_banner.text()
         for snippet in EXPECTED_REDIS_READY_STYLE_SNIPPETS:
             assert snippet in redis_banner.styleSheet()
+    finally:
+        dialog.deleteLater()
+
+
+def test_settings_dialog_uses_one_named_top_level_layout(qt_app: QApplication) -> None:
+    """The dialog must not attach competing layouts to the same widget."""
+    dialog = SettingsDialog()
+
+    try:
+        layout = dialog.layout()
+        assert isinstance(layout, QVBoxLayout)
+        assert layout.objectName() == "settingsDialogMainLayout"
     finally:
         dialog.deleteLater()

@@ -29,7 +29,7 @@ _MISSING_PYSIDE6_MESSAGE = (
 )
 
 try:
-    from .application import create_qapplication, launch_prompt_manager
+    from .application import GuiRuntimeError, create_qapplication, launch_prompt_manager
 except ModuleNotFoundError as exc:  # pragma: no cover - exercised via main unit tests
     if exc.name != "PySide6":
         raise
@@ -47,4 +47,4 @@ except ModuleNotFoundError as exc:  # pragma: no cover - exercised via main unit
     launch_prompt_manager = _raise_launch_prompt_manager
 
 
-__all__ = ["create_qapplication", "launch_prompt_manager", "GuiDependencyError"]
+__all__ = ["create_qapplication", "launch_prompt_manager", "GuiDependencyError", "GuiRuntimeError"]

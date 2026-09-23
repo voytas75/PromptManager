@@ -13,7 +13,10 @@ from __future__ import annotations
 
 import logging
 import os
+import re
+import subprocess
 import sys
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from PySide6.QtCore import Qt
@@ -35,7 +38,79 @@ if TYPE_CHECKING:
     from core import PromptManager
 
 _DISPLAY_ENV_VARS = ("DISPLAY", "WAYLAND_DISPLAY", "MIR_SOCKET")
+_XCB_MISSING_LIBRARY_PATTERN = re.compile(r"^\s*(\S+)\s+=>\s+not found\s*$", re.MULTILINE)
+_XCB_RUNTIME_PACKAGES = "libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxkbcommon-x11-0"
 logger = logging.getLogger("prompt_manager.gui.application")
+
+
+class GuiRuntimeError(RuntimeError):
+    """Raised when the local desktop environment cannot start the Qt GUI."""
+
+
+def _xcb_platform_plugin_path() -> Path | None:
+    """Return PySide6's bundled Linux xcb platform plugin when available."""
+    try:
+        import PySide6
+    except ModuleNotFoundError:  # pragma: no cover - handled by gui package fallback
+        return None
+    package_file = getattr(PySide6, "__file__", None)
+    if not isinstance(package_file, str):
+        return None
+    plugin_path = (
+        Path(package_file).resolve().parent / "Qt" / "plugins" / "platforms" / "libqxcb.so"
+    )
+    return plugin_path if plugin_path.is_file() else None
+
+
+def linux_xcb_runtime_issues(env: MutableMapping[str, str] | None = None) -> list[str]:
+    """Return unresolved xcb-plugin libraries before Qt can abort the process.
+
+    Qt terminates the process when an xcb plugin dependency is absent, which makes
+    the normal Python launcher error handling unreachable. The probe is Linux-only
+    and deliberately skips explicit non-xcb platforms and Wayland sessions.
+    """
+    environment = os.environ if env is None else env
+    if not sys.platform.startswith("linux"):
+        return []
+    requested_platform = environment.get("QT_QPA_PLATFORM", "").strip().lower()
+    if requested_platform and requested_platform != "xcb":
+        return []
+    no_x11_display = not environment.get("DISPLAY")
+    if not requested_platform and (environment.get("WAYLAND_DISPLAY") or no_x11_display):
+        return []
+
+    plugin_path = _xcb_platform_plugin_path()
+    if plugin_path is None:
+        return []
+    try:
+        result = subprocess.run(
+            ("ldd", str(plugin_path)),
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+
+    missing: list[str] = []
+    for library in _XCB_MISSING_LIBRARY_PATTERN.findall(result.stdout):
+        if library not in missing:
+            missing.append(library)
+    return missing
+
+
+def ensure_gui_runtime(env: MutableMapping[str, str] | None = None) -> None:
+    """Fail closed with actionable guidance before Qt loads an incomplete xcb plugin."""
+    missing_libraries = linux_xcb_runtime_issues(env)
+    if not missing_libraries:
+        return
+    missing = ", ".join(missing_libraries)
+    raise GuiRuntimeError(
+        "PromptManager GUI cannot start because the Qt xcb plugin is missing: "
+        f"{missing}. On Ubuntu/Debian install the Qt X11 runtime libraries with: "
+        f"sudo apt install {_XCB_RUNTIME_PACKAGES}"
+    )
 
 
 def _should_force_offscreen(env: MutableMapping[str, str]) -> bool:
@@ -71,6 +146,8 @@ def create_qapplication(argv: Sequence[str] | None = None) -> QApplication:
     if _should_force_offscreen(os.environ):
         # Allow running in headless environments by defaulting to the offscreen plugin.
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+    ensure_gui_runtime()
 
     _set_application_attribute("AA_EnableHighDpiScaling", True)
     _set_application_attribute("AA_UseHighDpiPixmaps", True)

@@ -196,6 +196,17 @@ python -m main
 uv run python -m main
 ```
 
+### Linux / WSL GUI prerequisites
+
+On Linux and WSL, Qt needs system X11 runtime libraries in addition to the Python environment. If PromptManager reports a missing `xcb` plugin library, install the runtime dependencies once:
+
+```bash
+sudo apt update
+sudo apt install -y libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxkbcommon-x11-0
+```
+
+PromptManager checks the bundled Qt `xcb` plugin before GUI startup and reports unresolved libraries with this command. No `sudo`, package installation, or configuration change is attempted by the application.
+
 ## Minimal local setup
 
 PromptManager works best as a **local-first desktop tool**:

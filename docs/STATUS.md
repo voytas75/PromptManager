@@ -114,7 +114,8 @@ If not, it should not lead the next cycle.
 - Root `--help` remains a grouped command card; use `<command> --help` for authoritative options.
 
 **Current local verification**
-- Full provider-free gate at this checkpoint: `873 passed, 1 skipped`, core coverage `81.63%`; `ruff check .`, `ruff format --check .`, and CI-scope `pyright main.py config models` passed.
+- Full provider-free gate at the Linux/WSL GUI startup reliability checkpoint: `892 passed, 1 skipped`, core coverage `81.68%`; `ruff check .`, `ruff format --check .`, and CI-scope `pyright main.py config models` passed.
+- Linux/WSL GUI startup now preflights PySide6's bundled `xcb` plugin before Qt can abort the process: unresolved system libraries produce controlled Ubuntu/Debian recovery guidance, without `sudo`, package installation, or host mutation. The duplicate `SettingsDialog` top-level layout warning is removed. Ledger: `docs/plans/2026-09-22-linux-wsl-gui-startup-reliability-v1.md`.
 - `uv.lock` has been reconciled to package version `0.23.0`; `uv lock --check` passes after the lock-only update.
 - The blocking CI type gate is intentionally `pyright main.py config models`, matching `.github/workflows/quality-gates.yml` and `docs/README-DEV.md`. Full configured strict Pyright remains a non-blocking debt scan; at this checkpoint it reports `283 errors`, chiefly outside the CI scope. It must not be described as green or as CI parity.
 - The stale local `PROMPT_MANAGER_CONFIG_JSON` override remains an environment condition, not a repository regression: an explicit missing config path intentionally fails closed.

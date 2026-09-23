@@ -71,10 +71,17 @@ def run_default_mode(
     ):
         dependency_error_type = RuntimeError
 
+    runtime_error_type = getattr(gui_module, "GuiRuntimeError", None)
+    if not isinstance(runtime_error_type, type) or not issubclass(
+        runtime_error_type, BaseException
+    ):
+        runtime_error_type = None
+
     try:
         return launch_callable(manager, settings)
     except Exception as exc:  # pragma: no cover - GUI runtime error path
-        if isinstance(exc, dependency_error_type):
+        is_runtime_error = runtime_error_type is not None and isinstance(exc, runtime_error_type)
+        if isinstance(exc, dependency_error_type) or is_runtime_error:
             logger.error("Unable to start GUI: %s", exc)
             return 4
         logger.error("Unexpected error while starting GUI: %s", exc)

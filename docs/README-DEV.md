@@ -274,6 +274,7 @@ This keeps repo truth and runtime-visible package metadata aligned without prete
   # or, from a checkout
   uv run python -m main --no-gui --print-settings
   ```
+- On Linux/WSL, the GUI preflight inspects PySide6's bundled `xcb` plugin before constructing `QApplication`. If it reports unresolved system libraries, install the listed runtime dependencies (Ubuntu/Debian: `sudo apt install libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxkbcommon-x11-0`) and retry. The preflight never invokes `sudo` or mutates the host.
 
 Key UI capabilities:
 - List/search/detail panes with CRUD operations, diff viewer, fork lineage, and scroll-safe prompt bodies.

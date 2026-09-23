@@ -780,6 +780,38 @@ def test_main_returns_error_when_gui_dependency_missing(
     assert manager.closed is True
 
 
+def test_main_returns_error_when_gui_runtime_preflight_fails(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A preflight failure should remain a controlled launcher error."""
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "--gui"])
+    manager = _DummyManager()
+    settings = _DummySettings()
+    settings.litellm_model = "azure/gpt-4o-mini"
+    settings.litellm_api_key = "secret-key"
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    class _GuiRuntimeError(RuntimeError):
+        pass
+
+    def _raise(_: object, __: object | None = None) -> int:
+        raise _GuiRuntimeError("libxcb-icccm.so.4 is missing")
+
+    gui_stub = types.SimpleNamespace(
+        launch_prompt_manager=_raise,
+        GuiDependencyError=RuntimeError,
+        GuiRuntimeError=_GuiRuntimeError,
+    )
+    monkeypatch.setitem(sys.modules, "gui", gui_stub)
+
+    exit_code = main.main()
+
+    assert exit_code == 4
+    assert "libxcb-icccm.so.4 is missing" in capsys.readouterr().out
+    assert manager.closed is True
+
+
 def test_main_runs_embedding_diagnostics(
     monkeypatch: pytest.MonkeyPatch, capsys: CaptureFixture[str]
 ) -> None:

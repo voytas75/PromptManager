@@ -388,9 +388,8 @@ class SettingsDialog(QDialog):
         border_color.setAlpha(255)
 
         main_layout = QVBoxLayout(self)
-
-        outer_layout = QVBoxLayout(self)
-        outer_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setObjectName("settingsDialogMainLayout")
+        main_layout.setContentsMargins(0, 0, 0, 0)
         container = QFrame(self)
         container.setObjectName("settingsContainer")
         container.setStyleSheet(
@@ -400,8 +399,7 @@ class SettingsDialog(QDialog):
         )
         layout = QVBoxLayout(container)
         layout.setContentsMargins(12, 12, 12, 12)
-        outer_layout.addWidget(container)
-        main_layout.addLayout(outer_layout)
+        main_layout.addWidget(container)
 
         diagnostics_banner = self._build_diagnostics_banner(container)
         if diagnostics_banner is not None:
