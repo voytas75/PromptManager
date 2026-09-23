@@ -118,14 +118,22 @@ class _DraftPromoteDialogStub:
         return self.dialog_code
 
 
+def _empty_prompt_lists() -> list[list[Prompt]]:
+    """Return a typed empty collection for captured similarity candidates."""
+    return []
+
+
+def _empty_boolean_list() -> list[bool]:
+    """Return a typed empty collection for similarity-check availability records."""
+    return []
+
+
 @dataclass
 class _DraftPromoteDialogFactoryStub:
     dialog: _DraftPromoteDialogStub
     built_prompts: list[Prompt]
-    built_similar_prompts: list[list[Prompt]] = field(
-        default_factory=lambda: cast("list[list[Prompt]]", [])
-    )
-    similarity_check_availability: list[bool] = field(default_factory=list)
+    built_similar_prompts: list[list[Prompt]] = field(default_factory=_empty_prompt_lists)
+    similarity_check_availability: list[bool] = field(default_factory=_empty_boolean_list)
 
     def build(
         self,
@@ -550,10 +558,10 @@ def test_promote_draft_marks_similarity_check_unavailable_after_search_error(
         source="",
         description="",
     )
-    promote_factory = cast(
-        "DraftPromoteDialogFactory",
-        _DraftPromoteDialogFactoryStub(_DraftPromoteDialogStub(result_prompt=promoted), []),
+    promote_factory_stub = _DraftPromoteDialogFactoryStub(
+        _DraftPromoteDialogStub(result_prompt=promoted), []
     )
+    promote_factory = cast("DraftPromoteDialogFactory", promote_factory_stub)
     dialog_factory = cast(
         "PromptDialogFactory",
         _DialogFactoryStub(_DialogStub(delete_requested=False), []),
@@ -577,8 +585,8 @@ def test_promote_draft_marks_similarity_check_unavailable_after_search_error(
 
     flow.promote_draft_prompt(original)
 
-    assert promote_factory.built_similar_prompts == [[]]
-    assert promote_factory.similarity_check_availability == [False]
+    assert promote_factory_stub.built_similar_prompts == [[]]
+    assert promote_factory_stub.similarity_check_availability == [False]
     assert manager.updated_prompts == [promoted]
 
 

@@ -108,7 +108,11 @@ class MainWindowBootstrapper:
         self._error_callback = error_callback
         self._share_result_button_supplier = share_result_button_supplier
         self._execution_controller_supplier = execution_controller_supplier
-        self._share_toast_callback = lambda message: toast_callback(message, 4000)
+        self._share_toast_callback: Callable[[str], None] = self._show_share_toast
+
+    def _show_share_toast(self, message: str) -> None:
+        """Adapt shared-content notices to the standard timed toast callback."""
+        self._toast_callback(message, 4000)
 
     def bootstrap(self) -> BootstrapResult:
         """Instantiate widgets, controllers, and services shared across the GUI."""

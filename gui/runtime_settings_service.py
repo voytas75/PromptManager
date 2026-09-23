@@ -524,7 +524,8 @@ class RuntimeSettingsService:
         inference_workflows: list[str] = []
         has_custom_routing = False
         if isinstance(routing_map, dict):
-            for workflow, route in routing_map.items():
+            routing_items = cast("dict[object, object]", routing_map)
+            for workflow, route in routing_items.items():
                 workflow_text = str(workflow).strip()
                 route_text = str(route).strip().lower()
                 if workflow_text:

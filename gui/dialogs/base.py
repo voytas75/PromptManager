@@ -15,7 +15,7 @@ import textwrap
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any, NamedTuple
 
-from PySide6.QtCore import QEvent, Qt, Signal
+from PySide6.QtCore import QEvent, QObject, Qt, Signal
 from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import QPlainTextEdit, QSizePolicy, QToolButton, QVBoxLayout, QWidget
 
@@ -170,7 +170,7 @@ class CollapsibleTextSection(QWidget):
         """Force the editor into a specific expanded state."""
         self._set_expanded(expanded, focus=expanded)
 
-    def eventFilter(self, obj, event):  # type: ignore[override]
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
         """Collapse the editor when focus leaves and the field is empty."""
         if obj is self._editor and event.type() == QEvent.Type.FocusOut:
             if not self._editor.toPlainText().strip():

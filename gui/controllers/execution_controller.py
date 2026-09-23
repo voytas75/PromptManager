@@ -894,7 +894,10 @@ class ExecutionController:
             summary_text = str(summary).strip()
             if summary_text:
                 segments.append(summary_text)
-        highlights = getattr(document, "highlights", None) or []
+        raw_highlights = getattr(document, "highlights", None)
+        highlights: list[object] = []
+        if isinstance(raw_highlights, list):
+            highlights = cast("list[object]", raw_highlights)
         for entry in highlights:
             highlight_text = str(entry or "").strip()
             if highlight_text:
@@ -1055,7 +1058,7 @@ class ExecutionController:
             executed_at = history_entry.executed_at.astimezone()
             meta_parts.append(f"Logged: {executed_at.strftime('%Y-%m-%d %H:%M:%S %Z')}")
         usage_source: Mapping[str, Any] | None = outcome.result.usage
-        if usage_source is None and history_entry is not None:
+        if not usage_source and history_entry is not None:
             metadata = history_entry.metadata
             if isinstance(metadata, Mapping):
                 usage_source = cast("Mapping[str, Any] | None", metadata.get("usage"))
@@ -1098,8 +1101,6 @@ class ExecutionController:
         if not chunk:
             return
         self._raw_result_text += chunk
-        if self._result_text is None:
-            return
         if self._is_markdown_render_enabled():
             self._result_text.setMarkdown(self._raw_result_text)
             cursor = self._result_text.textCursor()
@@ -1112,8 +1113,6 @@ class ExecutionController:
         self._result_text.setTextCursor(cursor)
 
     def _refresh_result_text_display(self) -> None:
-        if self._result_text is None:
-            return
         content = self._raw_result_text
         if self._is_markdown_render_enabled():
             self._result_text.setMarkdown(content)
@@ -1335,34 +1334,28 @@ class ExecutionController:
         return candidate or default
 
     def _apply_font_preferences(self) -> None:
-        if self._result_text is not None:
-            output_font = QFont(self._result_text.font())
-            output_font.setFamily(
-                self._preferred_font_family(
-                    "prompt_output_font_family", DEFAULT_PROMPT_OUTPUT_FONT_FAMILY
-                )
+        output_font = QFont(self._result_text.font())
+        output_font.setFamily(
+            self._preferred_font_family(
+                "prompt_output_font_family", DEFAULT_PROMPT_OUTPUT_FONT_FAMILY
             )
-            output_font.setPointSize(
-                self._preferred_font_size(
-                    "prompt_output_font_size", DEFAULT_PROMPT_OUTPUT_FONT_SIZE
-                )
-            )
-            self._result_text.setFont(output_font)
-            output_color = self._preferred_font_color(
-                "prompt_output_font_color", DEFAULT_PROMPT_OUTPUT_FONT_COLOR
-            )
-            self._result_text.setStyleSheet(f"color: {output_color};")
-        if self._chat_history_view is not None:
-            chat_font = QFont(self._chat_history_view.font())
-            chat_font.setFamily(
-                self._preferred_font_family("chat_font_family", DEFAULT_CHAT_FONT_FAMILY)
-            )
-            chat_font.setPointSize(
-                self._preferred_font_size("chat_font_size", DEFAULT_CHAT_FONT_SIZE)
-            )
-            self._chat_history_view.setFont(chat_font)
-            chat_color = self._preferred_font_color("chat_font_color", DEFAULT_CHAT_FONT_COLOR)
-            self._chat_history_view.setStyleSheet(f"color: {chat_color};")
+        )
+        output_font.setPointSize(
+            self._preferred_font_size("prompt_output_font_size", DEFAULT_PROMPT_OUTPUT_FONT_SIZE)
+        )
+        self._result_text.setFont(output_font)
+        output_color = self._preferred_font_color(
+            "prompt_output_font_color", DEFAULT_PROMPT_OUTPUT_FONT_COLOR
+        )
+        self._result_text.setStyleSheet(f"color: {output_color};")
+        chat_font = QFont(self._chat_history_view.font())
+        chat_font.setFamily(
+            self._preferred_font_family("chat_font_family", DEFAULT_CHAT_FONT_FAMILY)
+        )
+        chat_font.setPointSize(self._preferred_font_size("chat_font_size", DEFAULT_CHAT_FONT_SIZE))
+        self._chat_history_view.setFont(chat_font)
+        chat_color = self._preferred_font_color("chat_font_color", DEFAULT_CHAT_FONT_COLOR)
+        self._chat_history_view.setStyleSheet(f"color: {chat_color};")
 
     def _chat_user_colour(self) -> str:
         fallback = DEFAULT_CHAT_USER_BUBBLE_COLOR
@@ -1379,7 +1372,8 @@ class ExecutionController:
     def _chat_palette_colour(self, role: str, fallback: str) -> str:
         palette_value = self._runtime_settings.get("chat_colors")
         if isinstance(palette_value, dict):
-            candidate_value = palette_value.get(role)
+            palette = cast("dict[str, object]", palette_value)
+            candidate_value = palette.get(role)
             if isinstance(candidate_value, str):
                 candidate = QColor(candidate_value)
                 if candidate.isValid():

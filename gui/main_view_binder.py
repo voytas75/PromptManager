@@ -106,10 +106,9 @@ def bind_main_view(
     window._tab_widget = components.tab_widget
 
     main_splitter = components.main_splitter
-    if main_splitter is not None:
-        main_splitter.splitterMoved.connect(  # type: ignore[arg-type]
-            lambda *_: config.layout_controller.handle_main_splitter_moved()
-        )
+    main_splitter.splitterMoved.connect(  # type: ignore[arg-type]
+        config.layout_controller.handle_main_splitter_moved
+    )
     config.layout_controller.configure(
         main_splitter=main_splitter,
         list_splitter=components.list_splitter,

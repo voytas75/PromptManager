@@ -397,7 +397,7 @@ class PromptListPresenter:
         self,
         message: str,
         func: Callable[..., PromptLoadResult],
-        *args,
+        *args: object,
     ) -> PromptLoadResult:
         toolbar = self._toolbar
         if toolbar is not None:

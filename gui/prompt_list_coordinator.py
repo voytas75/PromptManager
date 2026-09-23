@@ -220,7 +220,7 @@ class PromptListCoordinator:
     @staticmethod
     def _prompt_average_rating(prompt: Prompt) -> float:
         """Return the average rating for a prompt, defaulting to zero."""
-        if prompt.rating_count and prompt.rating_sum is not None:
+        if prompt.rating_count:
             try:
                 return float(prompt.rating_sum) / float(prompt.rating_count)
             except ZeroDivisionError:  # pragma: no cover - defensive

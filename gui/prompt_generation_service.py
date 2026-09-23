@@ -17,11 +17,11 @@ from core import IntentLabel, PromptManager, PromptManagerError
 from .catalog_workflow_controller import CatalogWorkflowController
 from .language_tools import detect_language
 from .prompt_editor_flow import (
+    DeletePromptCallable,
     DraftPromoteDialogFactory,
     PromptDialogFactory,
     PromptEditorFlow,
     QuickCaptureDialogFactory,
-    _DeletePromptCallable,
 )
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
@@ -75,7 +75,7 @@ class PromptGenerationService:
         load_prompts: LoadPromptsCallable,
         current_search_text: Callable[[], str],
         select_prompt: Callable[[UUID], None],
-        delete_prompt: _DeletePromptCallable,
+        delete_prompt: DeletePromptCallable,
         status_callback: Callable[[str, int], None],
         error_callback: Callable[[str, str], None],
         current_prompt_supplier: Callable[[], Prompt | None],

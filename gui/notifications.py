@@ -11,7 +11,7 @@ Updates:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtGui import QClipboard, QGuiApplication
@@ -85,7 +85,7 @@ class NotificationHistoryDialog(QDialog):
         layout.addWidget(button_box)
 
     def _copy_selected(self) -> None:
-        selected = self._list.currentItem()
+        selected = cast("QListWidgetItem | None", self._list.currentItem())
         if selected is None:
             return
         notification: Notification = selected.data(Qt.ItemDataRole.UserRole)

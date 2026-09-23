@@ -32,7 +32,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
     PromptRefiner = Callable[..., PromptRefinement] | None
 
 
-class _DeletePromptCallable(Protocol):
+class DeletePromptCallable(Protocol):
     def __call__(self, prompt: Prompt, *, skip_confirmation: bool = False) -> None:
         """Delete *prompt* with optional confirmation overrides."""
 
@@ -145,7 +145,7 @@ class PromptEditorFlow:
         load_prompts: Callable[[str], None],
         current_search_text: Callable[[], str],
         select_prompt: Callable[[UUID], None],
-        delete_prompt: _DeletePromptCallable,
+        delete_prompt: DeletePromptCallable,
         status_callback: Callable[[str, int], None],
         error_callback: Callable[[str, str], None],
     ) -> None:

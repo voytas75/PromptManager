@@ -18,7 +18,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from collections.abc import Callable
     from uuid import UUID
 
-    from PySide6.QtWidgets import QMainWindow, QPushButton, QWidget
+    from PySide6.QtWidgets import QMainWindow, QPushButton
 
     from config import PromptManagerSettings
     from core import PromptManager
@@ -26,7 +26,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
 
     from .controllers.execution_controller import ExecutionController
     from .main_window_bootstrapper import BootstrapResult
-    from .prompt_editor_flow import _DeletePromptCallable
+    from .prompt_editor_flow import DeletePromptCallable
     from .prompt_list_presenter import PromptListPresenter
     from .widgets import PromptFilterPanel
 else:  # pragma: no cover - runtime placeholders for type-only imports
@@ -59,7 +59,7 @@ class PromptGenerationHooks:
     load_prompts: LoadPromptsCallable
     current_search_text: Callable[[], str]
     select_prompt: Callable[[UUID], None]
-    delete_prompt: _DeletePromptCallable
+    delete_prompt: DeletePromptCallable
     status_callback: Callable[[str, int], None]
     error_callback: Callable[[str, str], None]
     current_prompt_supplier: Callable[[], Prompt | None]

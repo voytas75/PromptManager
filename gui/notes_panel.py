@@ -7,7 +7,7 @@ Updates: v0.1.0 - 2025-12-06 - Initial implementation with CRUD actions.
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QGuiApplication
@@ -120,7 +120,7 @@ class NotesPanel(QWidget):
             self._list.setCurrentRow(0)
 
     def _selected_note(self) -> PromptNote | None:
-        item = self._list.currentItem()
+        item = cast("QListWidgetItem | None", self._list.currentItem())
         if item is None:
             return None
         raw_id = item.data(Qt.ItemDataRole.UserRole)
@@ -221,7 +221,7 @@ class NotesPanel(QWidget):
         )
         if not path:
             return
-        lines = []
+        lines: list[str] = []
         for note in self._notes:
             lines.append("---")
             lines.append(f"Created: {note.created_at.isoformat()}")

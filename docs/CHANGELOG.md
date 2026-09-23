@@ -4,7 +4,17 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ## [Unreleased]
 
-### Added
+## [0.23.1] - 2026-09-23
+
+### Fixed
+
+- Removed the remaining full configured strict-Pyright findings across GUI adapter boundaries and typed test doubles. Runtime behavior, persistence, provider paths, and CLI JSON contracts are unchanged; the full configured strict scan now passes locally alongside Ruff and the provider-free test suite.
+
+### Changed
+
+- Promoted full configured strict Pyright to an explicit local requirement for the 0.23.1 release closeout while preserving the current GitHub CI type scope (`pyright main.py config models`) until that workflow is deliberately expanded.
+
+## [0.23.0] - 2026-09-21
 
 - Added an explicit **Paste from Clipboard** action inside Quick Capture. It reads clipboard text only after the operator clicks, places it in the existing editable draft preview, uses `clipboard` only for blank provenance, and preserves typed text when the clipboard is empty. It adds no background watcher, global hotkey, automatic save, provider call, or persistence change.
 - Added deterministic local tag convenience commands: `tag-list [--json]`, `tag-show <tag> [--json]`, and idempotent `prompt-tag <uuid-or-exact-name> add|remove <tag> [--dry-run] [--json]`. Tag aggregation and membership are case-insensitive; changed writes delegate to the existing lifecycle with `origin="cli"`, while previews do not mutate state.

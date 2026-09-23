@@ -15,7 +15,7 @@ from __future__ import annotations
 import csv
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -312,7 +312,8 @@ class HistoryPanel(QWidget):
         if execution.metadata:
             raw_conversation = execution.metadata.get("conversation")
             if isinstance(raw_conversation, list):
-                conversation_lines = self._format_conversation(raw_conversation)
+                conversation = cast("list[object]", raw_conversation)
+                conversation_lines = self._format_conversation(conversation)
         if conversation_lines:
             detail_lines.append("")
             detail_lines.append("Conversation:")
@@ -442,14 +443,15 @@ class HistoryPanel(QWidget):
         return len(self._rows)
 
     @staticmethod
-    def _format_conversation(messages: list[Any]) -> list[str]:
+    def _format_conversation(messages: list[object]) -> list[str]:
         """Convert stored chat messages into plain text lines."""
         lines: list[str] = []
         for message in messages:
             if not isinstance(message, dict):
                 continue
-            role = str(message.get("role", "")).strip().lower()
-            content = str(message.get("content", "") or "")
+            entry = cast("dict[str, object]", message)
+            role = str(entry.get("role", "")).strip().lower()
+            content = str(entry.get("content", "") or "")
             if role == "user":
                 speaker = "You"
             elif role == "assistant":
@@ -457,7 +459,7 @@ class HistoryPanel(QWidget):
             elif role == "system":
                 speaker = "System"
             else:
-                speaker = str(message.get("role", "Message"))
+                speaker = str(entry.get("role", "Message"))
             lines.append(f"{speaker}:")
             if content:
                 lines.extend(content.splitlines())
@@ -473,13 +475,15 @@ class HistoryPanel(QWidget):
         """Extract prompt/completion/total tokens from metadata."""
         if not isinstance(metadata, dict):
             return (0, 0, 0)
-        usage = metadata.get("usage")
+        metadata_record = cast("dict[str, object]", metadata)
+        usage = metadata_record.get("usage")
         if not isinstance(usage, dict):
             return (0, 0, 0)
+        usage_record = cast("dict[str, object]", usage)
         return (
-            HistoryPanel._coerce_int(usage.get("prompt_tokens")),
-            HistoryPanel._coerce_int(usage.get("completion_tokens")),
-            HistoryPanel._coerce_int(usage.get("total_tokens")),
+            HistoryPanel._coerce_int(usage_record.get("prompt_tokens")),
+            HistoryPanel._coerce_int(usage_record.get("completion_tokens")),
+            HistoryPanel._coerce_int(usage_record.get("total_tokens")),
         )
 
     @staticmethod

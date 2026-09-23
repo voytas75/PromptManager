@@ -19,7 +19,7 @@ Updates:
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from jinja2 import TemplateSyntaxError
 from PySide6.QtCore import QSettings, Qt, Signal
@@ -475,7 +475,8 @@ class TemplatePreviewWidget(QWidget):
         self._suspend_persist = True
         try:
             if isinstance(variables, dict):
-                for name, value in variables.items():
+                variable_values = cast("dict[str, object]", variables)
+                for name, value in variable_values.items():
                     widget = self._variable_inputs.get(name)
                     if widget is not None:
                         widget.setPlainText(str(value))

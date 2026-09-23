@@ -35,7 +35,7 @@ class _ChainCliManagerStub:
         self.chain = _make_chain()
         self.saved_chains: list[PromptChain] = []
         self.run_mode = "success"
-        self._recent_runs: list[dict[str, str | None]] = []
+        self.recent_runs: list[dict[str, str | None]] = []
 
     def get_prompt_chain(self, chain_id: uuid.UUID) -> PromptChain:
         if chain_id != self.chain.id:
@@ -49,7 +49,7 @@ class _ChainCliManagerStub:
 
     def list_recent_prompt_chain_runs(self, *, limit: int = 20) -> list[dict[str, str | None]]:
         safe_limit = max(1, int(limit or 20))
-        return list(self._recent_runs[:safe_limit])
+        return list(self.recent_runs[:safe_limit])
 
     def run_prompt_chain(
         self,
@@ -238,7 +238,7 @@ def test_prompt_chain_history_supports_json_output(
     """Recent history JSON output should be deterministic and bounded."""
 
     manager = _ChainCliManagerStub()
-    manager._recent_runs = [
+    manager.recent_runs = [
         {
             "chain_id": str(manager.chain.id),
             "chain_name": manager.chain.name,
@@ -262,7 +262,7 @@ def test_prompt_chain_history_supports_json_output(
 
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload == manager._recent_runs
+    assert payload == manager.recent_runs
 
 
 def test_prompt_chain_history_supports_chain_filtering_text_output(
@@ -272,7 +272,7 @@ def test_prompt_chain_history_supports_chain_filtering_text_output(
 
     manager = _ChainCliManagerStub()
     other_chain_id = uuid.uuid4()
-    manager._recent_runs = [
+    manager.recent_runs = [
         {
             "chain_id": str(other_chain_id),
             "chain_name": "Other Chain",

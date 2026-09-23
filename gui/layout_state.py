@@ -13,7 +13,7 @@ import logging
 from collections import deque
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from PySide6.QtCore import QByteArray
 
@@ -88,7 +88,7 @@ def _load_execute_context_history(
     if not isinstance(payload, list):
         return []
     entries: list[str] = []
-    for entry in payload:
+    for entry in cast("list[object]", payload):
         candidate = str(entry)
         if not candidate.strip() or candidate in entries:
             continue
@@ -365,10 +365,12 @@ class WindowStateManager:
             stored = self._settings.value(key)
             if stored is None:
                 continue
+            parts: list[Any] = []
             if isinstance(stored, str):
                 parts = [segment for segment in stored.split(",") if segment]
             else:
-                parts = list(stored) if isinstance(stored, (list, tuple)) else []
+                if isinstance(stored, (list, tuple)):
+                    parts = list(cast("list[Any] | tuple[Any, ...]", stored))
             try:
                 sizes = [int(part) for part in parts]
             except (TypeError, ValueError):

@@ -6,8 +6,13 @@ Updates:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QPlainTextEdit
+
+if TYPE_CHECKING:
+    from PySide6.QtGui import QMouseEvent
 
 from .utils import variable_at_cursor
 
@@ -19,7 +24,7 @@ class WorkbenchPromptEditor(QPlainTextEdit):
 
     variableActivated = Signal(str)
 
-    def mouseDoubleClickEvent(self, event) -> None:  # type: ignore[override]
+    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
         """Emit the variable token under the cursor when the user double-clicks."""
         super().mouseDoubleClickEvent(event)
         name = variable_at_cursor(self.cursorForPosition(event.position().toPoint()))

@@ -32,11 +32,11 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
     class _ResetHost(Protocol):
         maintenance_applied: Any
 
-        def _refresh_catalogue_stats(self) -> None: ...
+        def refresh_catalogue_stats(self) -> None: ...
 
-        def _refresh_storage_info(self) -> None: ...
+        def refresh_storage_info(self) -> None: ...
 
-        def _refresh_chroma_info(self) -> None: ...
+        def refresh_chroma_info(self) -> None: ...
 
 
 class ResetMaintenanceMixin:
@@ -50,6 +50,18 @@ class ResetMaintenanceMixin:
 
     def _maintenance_host(self) -> _ResetHost:
         return cast("_ResetHost", self)
+
+    def refresh_catalogue_stats(self) -> None:
+        """Expose catalogue refresh through the maintenance host protocol."""
+        cast("Any", self)._refresh_catalogue_stats()
+
+    def refresh_storage_info(self) -> None:
+        """Expose storage refresh through the maintenance host protocol."""
+        cast("Any", self)._refresh_storage_info()
+
+    def refresh_chroma_info(self) -> None:
+        """Expose vector-store refresh through the maintenance host protocol."""
+        cast("Any", self)._refresh_chroma_info()
 
     def _build_reset_tab(self, parent: QWidget) -> QWidget:
         reset_tab = QWidget(parent)
@@ -217,8 +229,8 @@ class ResetMaintenanceMixin:
             "Prompt database cleared",
             "All prompts and execution history have been removed.",
         )
-        host._refresh_catalogue_stats()
-        host._refresh_storage_info()
+        host.refresh_catalogue_stats()
+        host.refresh_storage_info()
         host.maintenance_applied.emit("Prompt database cleared.")
 
     def _on_reset_chroma_clicked(self) -> None:
@@ -240,7 +252,7 @@ class ResetMaintenanceMixin:
             "Embedding store cleared",
             "All stored embeddings have been removed.",
         )
-        host._refresh_chroma_info()
+        host.refresh_chroma_info()
         host.maintenance_applied.emit("Embedding store cleared.")
 
     def _on_reset_session_tokens_clicked(self) -> None:
@@ -303,7 +315,7 @@ class ResetMaintenanceMixin:
             "Application data reset",
             "Prompt data, embeddings, and usage logs have been cleared.",
         )
-        host._refresh_catalogue_stats()
-        host._refresh_storage_info()
-        host._refresh_chroma_info()
+        host.refresh_catalogue_stats()
+        host.refresh_storage_info()
+        host.refresh_chroma_info()
         host.maintenance_applied.emit("Application data reset.")

@@ -264,20 +264,24 @@ class SettingsDialog(QDialog):
         """Build a compact configuration summary banner when diagnostics are available."""
         if not self._config_diagnostics:
             return None
-        summary_status = str(self._config_diagnostics.get("summary_status") or "OK").upper()
-        raw_items = self._config_diagnostics.get("items")
-        items = raw_items if isinstance(raw_items, list) else []
+        diagnostics = cast("dict[str, object]", self._config_diagnostics)
+        summary_status = str(diagnostics.get("summary_status") or "OK").upper()
+        raw_items = diagnostics.get("items")
+        items: list[object] = cast("list[object]", raw_items) if isinstance(raw_items, list) else []
         lines = [f"Configuration summary — {summary_status}"]
         for item in items:
             if not isinstance(item, dict):
                 continue
-            status = str(item.get("status") or "OK").upper()
-            label = str(item.get("label") or "Item")
-            detail = str(item.get("detail") or "n/a")
-            source = str(item.get("source") or "unknown")
+            diagnostic_item = cast("dict[str, object]", item)
+            status = str(diagnostic_item.get("status") or "OK").upper()
+            label = str(diagnostic_item.get("label") or "Item")
+            detail = str(diagnostic_item.get("detail") or "n/a")
+            source = str(diagnostic_item.get("source") or "unknown")
             lines.append(f"{status} | {label}: {detail} ({source})")
-        raw_next_steps = self._config_diagnostics.get("next_steps")
-        next_steps = raw_next_steps if isinstance(raw_next_steps, list) else []
+        raw_next_steps = diagnostics.get("next_steps")
+        next_steps: list[object] = (
+            cast("list[object]", raw_next_steps) if isinstance(raw_next_steps, list) else []
+        )
         if next_steps:
             lines.append("")
             lines.append("Next steps:")

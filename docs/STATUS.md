@@ -2,7 +2,7 @@
 
 Status: active
 Owner: Wojtek / Prompt Manager Team
-Updated: 2026-09-22
+Updated: 2026-09-23
 Canonical product SSOT: `docs/product-ssot.md`
 Canonical near-term plan: `docs/plans/2026-05-10-product-direction-ssot-next-cycle.md`
 
@@ -96,6 +96,24 @@ Before selecting the next slice, confirm:
 5. it keeps PromptManager asset-first.
 
 If not, it should not lead the next cycle.
+
+---
+
+## Current verified checkpoint — 2026-09-23
+
+**Revision and delivery status**
+- Current local `master` is based on `87f2a1e291122014ec2f17c414a5dcf2428f4921` before the uncommitted 0.23.1 release-closeout slice; `master...origin/master` is `0 / 0`.
+- The working slice removes the remaining configured strict-Pyright debt without intended runtime, persistence, provider, or CLI-JSON contract changes. The local release candidate has `0 errors, 0 warnings, 0 informations` for full configured `pyright`.
+
+**Current local verification**
+- Full provider-free release gate: `892 passed, 1 skipped`, core coverage `81.68%`; `ruff check .`, `ruff format --check .`, CI-scope `pyright main.py config models`, full configured `pyright`, `uv lock --check`, and `git diff --check` all pass.
+- The production cleanup keeps dynamic Qt/config/data boundaries typed locally with narrowed values, `cast`, typed callbacks, and small protocol adapters. Tests received only typing-stub cleanup; no user-facing behavior changed.
+- GitHub CI still enforces the existing stable type subset. The full strict scan is verified locally for this release but is not described as CI parity until the workflow changes separately.
+
+**Current release action**
+1. Commit the verified strict-typing closeout and documentation sync.
+2. Publish it as patch release `0.23.1` after updating package metadata, lockfile, and changelog.
+3. Verify remote SHA parity and the exact-SHA Quality Gates result.
 
 ---
 

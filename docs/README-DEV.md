@@ -14,7 +14,7 @@ PromptManager is a PySide6 desktop application for managing reusable AI prompts 
 
 ## Toolchain & Quality Gates
 
-- **Python**: 3.13+. GitHub blocks merges on `pyright main.py config models`, the stable typed-entrypoint+model gate. The full configured strict scope (`main.py`, `core/`, `config/`, `gui/`, `models/`, and `tests/`) is an explicit non-blocking debt scan until a separately approved expansion proves it green; do not call it CI parity. Annotations remain mandatory for new or touched code (no `type: ignore` in `core/`).
+- **Python**: 3.13+. GitHub blocks merges on `pyright main.py config models`, the stable typed-entrypoint+model gate. The full configured strict scope (`main.py`, `core/`, `config/`, `gui/`, `models/`, and `tests/`) is also required for the 0.23.1 release closeout and currently passes locally; do not call it CI parity until the workflow is deliberately expanded. Annotations remain mandatory for new or touched code (no `type: ignore` in `core/`).
 - **Formatting/Linting**: `ruff check --fix .` followed by `ruff format .` (line length 100). Import ordering follows ruff/isort (builtin → stdlib → third-party → local).
 - **Testing**: `pytest -n auto --cov=core --cov-report=term-missing --cov-fail-under=80` with `pytest-asyncio`, `pytest-cov`, and `hypothesis` for parsing/generation code. Under `uv`, prefer `uv sync --extra dev` first, then `uv run pytest ...`, or use one-shot `uv run --extra dev pytest ...`. Mock all external HTTP/DB calls (`respx`, `vcrpy`, `pytest-mock`).
 - **Automation**: `nox -s format lint typecheck test` is a broader local quality run: its Pyright session checks the full configured scope. The exact GitHub release gate remains `.github/workflows/quality-gates.yml`, including `pyright main.py config models`; do not call the Nox run strict CI parity.
@@ -53,10 +53,10 @@ Treat quality checks as three separate layers:
      - full pytest when the slice touches shared runtime flows or broad integration seams.
    - Goal: prove the local slice is safe without pretending all historical debt is part of the same decision.
 
-3. **Debt scans / expansion probes (non-blocking unless explicitly promoted)**
-   - Commands such as full `pyright`, `pyright gui --stats`, or `pyright tests --stats` are debt-radar tools. At the 2026-09-22 audit checkpoint, full configured strict Pyright reports 283 errors and is therefore not a release claim.
-   - Use them to choose the next cleanup slice, measure trend, and validate roadmap expansion.
-   - They are not the default pre-commit gate unless the workflow is explicitly expanded and docs are updated in the same cycle.
+3. **Debt scans / expansion probes (required only when explicitly promoted)**
+   - Commands such as full `pyright`, `pyright gui --stats`, or `pyright tests --stats` are debt-radar tools by default.
+   - For the explicitly promoted 0.23.1 release closeout, the full configured strict Pyright scan is required and passes locally with zero errors.
+   - The scan remains distinct from CI parity until `.github/workflows/quality-gates.yml` is deliberately expanded.
 
 Operational rule: when touching a file that already carries strict-typing debt, do not widen the debt casually; prefer making the touched file flatter or at least not measurably worse.
 
