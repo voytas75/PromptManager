@@ -2695,8 +2695,8 @@ def run_prompt_history(
         return f"{value:.1f}{suffix}"
 
     if bool(getattr(args, "json", False)):
-        payload = {
-            "prompt": prompt.to_record(),
+        payload: dict[str, Any] = {
+            "prompt": _prompt_json_payload(prompt, full=bool(getattr(args, "full", False))),
             "analytics": {
                 "prompt_id": str(analytics.prompt_id),
                 "name": analytics.name,

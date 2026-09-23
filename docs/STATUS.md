@@ -101,11 +101,11 @@ If not, it should not lead the next cycle.
 
 ## Current implementation checkpoint — 2026-09-23
 
-**Active local slice — compact `prompt-find --json` v1**
-- `prompt-find --json` now follows the established `prompt-show` JSON contract: it omits raw `ext4` vectors and exposes bounded `embedding.present` / `embedding.dimensions` metadata.
-- `prompt-find --json --full` is the explicit complete-record opt-in and retains `ext4`; `--full` without `--json` is parser-invalid.
-- Scope is provider-free and read-only: no changes to semantic ranking, filters, persistence, embedding generation, or the stored `Prompt.to_record()` model.
-- Release metadata advances to patch version `0.23.2`; verification results are recorded in the accompanying execution ledger before release closeout.
+**Active local slice — compact prompt-read JSON v2**
+- `prompt-show`, `prompt-find`, and `prompt-history` now share one compact/full prompt-record contract for their JSON views: default JSON omits raw `ext4` and exposes bounded `embedding.present` / `embedding.dimensions` metadata.
+- `--json --full` is the explicit complete-record opt-in and retains `ext4`; `--full` without `--json` is parser-invalid for all three commands.
+- Scope is provider-free and read-only: prompt-history execution entries, semantic ranking, filters, persistence, embedding generation, and the stored `Prompt.to_record()` model remain unchanged.
+- Release metadata advances to patch version `0.23.3`; verification results are recorded in the accompanying execution ledger before release closeout.
 
 ---
 

@@ -1928,7 +1928,7 @@ def test_prompt_history_command_outputs_recent_execution_summary(
     assert manager.closed is True
 
 
-def test_prompt_history_command_outputs_json_payload(
+def test_prompt_history_command_outputs_compact_json_payload(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -1950,6 +1950,7 @@ def test_prompt_history_command_outputs_json_payload(
             context="Inspect logs, isolate the first failing step, and propose next checks.",
             is_active=True,
             source="catalog",
+            ext4=[0.1, 0.2, 0.3],
         )
     )
     manager.prompt_executions = [
@@ -1989,12 +1990,53 @@ def test_prompt_history_command_outputs_json_payload(
     output = json.loads(capsys.readouterr().out)
     assert output["prompt"]["id"] == str(prompt_id)
     assert output["prompt"]["name"] == "CI Failure Triage"
+    assert "ext4" not in output["prompt"]
+    assert output["prompt"]["embedding"] == {"present": True, "dimensions": 3}
     assert output["analytics"]["total_runs"] == 1
     assert output["analytics"]["decision_summary"] == "Keep prompt for baseline incident triage."
     assert len(output["executions"]) == 1
     assert output["executions"][0]["status"] == "success"
     assert output["executions"][0]["metadata"]["model"] == "gpt-fast"
     assert manager.closed is True
+
+
+def test_prompt_history_command_full_json_includes_embedding_vector(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    prompt_id = uuid.uuid4()
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-history", str(prompt_id), "--json", "--full"],
+    )
+    _patch_main(monkeypatch, "load_settings", _DummySettings)
+    manager = _DummyManager()
+    prompt = Prompt(
+        id=prompt_id,
+        name="Embedding History Result",
+        description="Return the complete nested record only on explicit request.",
+        category="Testing",
+        ext4=[0.1, 0.2, 0.3],
+    )
+    manager.repository.store.append(prompt)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    assert main.main() == 0
+
+    output = json.loads(capsys.readouterr().out)
+    assert output["prompt"] == prompt.to_record()
+    assert output["analytics"] is None
+    assert output["executions"] == []
+    assert manager.closed is True
+
+
+def test_prompt_history_rejects_full_without_json(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-history", "example", "--full"])
+
+    with pytest.raises(SystemExit) as excinfo:
+        parse_args()
+
+    assert excinfo.value.code == 2
 
 
 def test_prompt_history_command_filters_by_status_and_window_days(

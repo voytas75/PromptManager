@@ -644,6 +644,14 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Render prompt history as structured JSON.",
     )
+    prompt_history_parser.add_argument(
+        "--full",
+        action="store_true",
+        help=(
+            "Include the complete stored prompt record, including its embedding vector "
+            "(requires --json)."
+        ),
+    )
 
     prompt_lineage_parser = subparsers.add_parser(
         "prompt-lineage",
@@ -1214,7 +1222,11 @@ def parse_args() -> argparse.Namespace:
     )
 
     args = parser.parse_args()
-    is_compact_prompt_read = getattr(args, "command", None) in {"prompt-find", "prompt-show"}
+    is_compact_prompt_read = getattr(args, "command", None) in {
+        "prompt-find",
+        "prompt-history",
+        "prompt-show",
+    }
     if is_compact_prompt_read and args.full and not args.json:
         parser.error(f"{args.command} --full requires --json.")
     _normalise_prompt_add_args(args, parser)

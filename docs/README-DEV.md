@@ -336,7 +336,7 @@ The installed wheel exposes `prompt-manager`; the `python -m main` forms below r
 | `python -m main tag-list [--json]` | List each distinct logical prompt tag with total and active-prompt counts. Aggregation is local, deterministic, case-insensitive, and read-only. |
 | `python -m main tag-show <tag> [--json]` | Show compact records for prompts with one exact logical tag, case-insensitively. A missing tag is a successful empty read. |
 | `python -m main prompt-tag <prompt-id-or-name> add\|remove <tag> [--dry-run] [--json]` | Add or remove one non-blank prompt tag through the normal prompt lifecycle. Membership is case-insensitive and idempotent; `--dry-run` previews without writing. |
-| `python -m main prompt-history <prompt-id-or-name> [--limit N] [--status success\|failed] [--window-days N] [--json]` | Inspect bounded read-only execution evidence for one uniquely resolved prompt. |
+| `python -m main prompt-history <prompt-id-or-name> [--limit N] [--status success\|failed] [--window-days N] [--json] [--full]` | Inspect bounded read-only execution evidence for one uniquely resolved prompt. Default `--json` emits a compact prompt record without raw `ext4`; `--json --full` emits the complete stored prompt record including its embedding vector. Execution records are unchanged. |
 | `python -m main suggest "search query"` | Run semantic retrieval and print top matches with intent metadata. |
 | `python -m main usage-report [--path <file>]` | Summarize anonymized GUI analytics (counts, intents, recommendations). |
 | `python -m main history-analytics [--window-days N --limit M --trend-window K]` | Display execution success rates, durations, ratings, and window/overall token totals for recent prompts. |

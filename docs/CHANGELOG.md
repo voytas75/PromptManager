@@ -4,6 +4,12 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ## [Unreleased]
 
+## [0.23.3] - 2026-09-23
+
+### Fixed
+
+- Extended the bounded prompt JSON contract to `prompt-history`. Default `prompt-history --json` now omits the nested prompt's raw `ext4` vector and reports embedding presence/dimension; `prompt-history --json --full` explicitly includes the complete prompt record. Execution history payloads remain unchanged, and `--full` requires `--json`.
+
 ## [0.23.2] - 2026-09-23
 
 ### Fixed
