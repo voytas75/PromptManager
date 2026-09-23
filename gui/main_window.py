@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -208,14 +208,14 @@ class MainWindow(QMainWindow):
         self._template_preview_handler: TemplatePreviewHandler | None = None
         self._workspace_insight_controller: WorkspaceInsightController | None = None
 
-        self._prompt_actions_bridge = PromptActionsBridge(
+        self._prompt_actions_bridge: Any = PromptActionsBridge(
             handler_supplier=lambda: self._prompt_actions_handler,
             close_fallback=self._close_window,
         )
-        self._workspace_input_bridge = WorkspaceInputBridge(
+        self._workspace_input_bridge: Any = WorkspaceInputBridge(
             handler_supplier=lambda: self._workspace_input_handler,
         )
-        self._template_preview_bridge = TemplatePreviewBridge(
+        self._template_preview_bridge: Any = TemplatePreviewBridge(
             handler_supplier=lambda: self._template_preview_handler,
         )
 
@@ -272,17 +272,6 @@ class MainWindow(QMainWindow):
             favorite_toggled_requested=self._prompt_actions_bridge.toggle_favorite_prompt,
             share_requested=self._prompt_actions_bridge.share_prompt,
         )
-
-        def _execute_prompt_from_dialog(
-            prompt: Prompt,
-            dialog: QWidget | None,
-            context: str | None,
-        ) -> None:
-            self._prompt_actions_bridge.execute_prompt_as_context(
-                prompt,
-                parent=dialog,
-                context_override=context,
-            )
 
         composition = build_main_window_composition(
             parent=self,

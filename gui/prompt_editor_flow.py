@@ -11,7 +11,7 @@ Updates:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, cast
 
 from PySide6.QtWidgets import QDialog, QWidget
 
@@ -26,7 +26,10 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from collections.abc import Callable, Sequence
     from uuid import UUID
 
+    from core.prompt_engineering import PromptRefinement
     from models.prompt_model import Prompt
+
+    PromptRefiner = Callable[..., PromptRefinement] | None
 
 
 class _DeletePromptCallable(Protocol):
@@ -46,8 +49,8 @@ class PromptDialogFactory:
         category_generator: Callable[[str], str],
         tags_generator: Callable[[str], list[str]],
         scenario_generator: Callable[[str], list[str]],
-        prompt_engineer,
-        structure_refiner,
+        prompt_engineer: PromptRefiner,
+        structure_refiner: PromptRefiner,
         version_history_handler: Callable[[Prompt | None], None],
         execute_context_handler: Callable[[Prompt, str, QWidget | None], None],
     ) -> None:
@@ -241,9 +244,11 @@ class PromptEditorFlow:
     def edit_prompt(self, prompt: Prompt) -> None:
         """Show the edit dialog for *prompt* and persist any changes."""
         dialog = self._dialog_factory.build(self._parent, prompt)
-        dialog.applied.connect(  # type: ignore[arg-type]
-            lambda updated_prompt: self._handle_prompt_applied(updated_prompt, dialog)
-        )
+
+        def _handle_applied(updated_prompt: object) -> None:
+            self._handle_prompt_applied(cast("Prompt", updated_prompt), dialog)
+
+        dialog.applied.connect(_handle_applied)  # type: ignore[arg-type]
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         if dialog.delete_requested:
@@ -295,9 +300,11 @@ class PromptEditorFlow:
 
         dialog = self._dialog_factory.build(self._parent, forked)
         dialog.setWindowTitle("Edit Forked Prompt")
-        dialog.applied.connect(  # type: ignore[arg-type]
-            lambda updated_prompt: self._handle_prompt_applied(updated_prompt, dialog)
-        )
+
+        def _handle_applied(updated_prompt: object) -> None:
+            self._handle_prompt_applied(cast("Prompt", updated_prompt), dialog)
+
+        dialog.applied.connect(_handle_applied)  # type: ignore[arg-type]
         if dialog.exec() == QDialog.DialogCode.Accepted and dialog.result_prompt is not None:
             try:
                 forked = self._manager.update_prompt(dialog.result_prompt)

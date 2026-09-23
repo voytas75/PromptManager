@@ -10,7 +10,7 @@ Updates:
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QGuiApplication
@@ -123,7 +123,7 @@ class ResponseStylesPanel(QWidget):
             self._list.setCurrentRow(0)
 
     def _selected_style(self) -> ResponseStyle | None:
-        item = self._list.currentItem()
+        item = cast("QListWidgetItem | None", self._list.currentItem())
         if item is None:
             return None
         raw_id = item.data(Qt.ItemDataRole.UserRole)
@@ -268,7 +268,7 @@ class ResponseStylesPanel(QWidget):
         )
         if not path:
             return
-        lines = []
+        lines: list[str] = []
         for style in self._styles:
             lines.append("---")
             lines.append(f"Name: {style.name}")

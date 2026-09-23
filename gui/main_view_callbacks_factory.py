@@ -13,7 +13,7 @@ Updates:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from .main_view_builder import MainViewCallbacks
 
@@ -25,10 +25,10 @@ else:  # pragma: no cover - runtime placeholders for type-only imports
 
 def build_main_view_callbacks(window: MainWindow) -> MainViewCallbacks:
     """Return callbacks wired to the window's handlers."""
-    prompt_search = window._prompt_search_controller  # type: ignore[attr-defined]
-    prompt_actions = window._prompt_actions_bridge  # type: ignore[attr-defined]
-    workspace_input = window._workspace_input_bridge  # type: ignore[attr-defined]
-    template_preview = window._template_preview_bridge  # type: ignore[attr-defined]
+    prompt_search = cast("Any", window._prompt_search_controller)  # type: ignore[attr-defined]
+    prompt_actions = cast("Any", window._prompt_actions_bridge)  # type: ignore[attr-defined]
+    workspace_input = cast("Any", window._workspace_input_bridge)  # type: ignore[attr-defined]
+    template_preview = cast("Any", window._template_preview_bridge)  # type: ignore[attr-defined]
     return MainViewCallbacks(
         search_requested=lambda text=None: prompt_search.search_requested(text, use_indicator=True),
         search_text_changed=prompt_search.search_changed,

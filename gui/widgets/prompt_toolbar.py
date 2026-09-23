@@ -85,17 +85,11 @@ class PromptToolbar(QWidget):
 
         self._new_button_menu = QMenu(self._new_button)
         quick_capture_action = self._new_button_menu.addAction("Quick Capture…")
-        quick_capture_action.triggered.connect(  # pragma: no cover
-            lambda *_: self.quick_capture_requested.emit()
-        )
+        quick_capture_action.triggered.connect(self._emit_quick_capture_requested)  # type: ignore[arg-type]
         new_prompt_action = self._new_button_menu.addAction("New Prompt…")
-        new_prompt_action.triggered.connect(  # pragma: no cover
-            lambda *_: self.add_requested.emit()
-        )
+        new_prompt_action.triggered.connect(self._emit_add_requested)  # type: ignore[arg-type]
         workbench_action = self._new_button_menu.addAction("Workbench Session…")
-        workbench_action.triggered.connect(  # pragma: no cover
-            lambda *_: self.workbench_requested.emit()
-        )
+        workbench_action.triggered.connect(self._emit_workbench_requested)  # type: ignore[arg-type]
         self._new_button.setMenu(self._new_button_menu)
 
         self._info_button = QPushButton("Info", self)
@@ -111,22 +105,16 @@ class PromptToolbar(QWidget):
 
         settings_menu = QMenu(self._settings_button)
         settings_action = settings_menu.addAction("Settings…")
-        settings_action.triggered.connect(  # pragma: no cover
-            lambda *_: self.settings_requested.emit()
-        )
+        settings_action.triggered.connect(self._emit_settings_requested)  # type: ignore[arg-type]
         settings_menu.addSeparator()
         import_action = settings_menu.addAction("Import Catalog…")
-        import_action.triggered.connect(lambda *_: self.import_requested.emit())  # pragma: no cover
+        import_action.triggered.connect(self._emit_import_requested)  # type: ignore[arg-type]
         export_action = settings_menu.addAction("Export Catalog…")
-        export_action.triggered.connect(lambda *_: self.export_requested.emit())  # pragma: no cover
+        export_action.triggered.connect(self._emit_export_requested)  # type: ignore[arg-type]
         maintenance_action = settings_menu.addAction("Maintenance…")
-        maintenance_action.triggered.connect(  # pragma: no cover
-            lambda *_: self.maintenance_requested.emit()
-        )
+        maintenance_action.triggered.connect(self._emit_maintenance_requested)  # type: ignore[arg-type]
         notifications_action = settings_menu.addAction("Notifications…")
-        notifications_action.triggered.connect(  # pragma: no cover
-            lambda *_: self.notifications_requested.emit()
-        )
+        notifications_action.triggered.connect(self._emit_notifications_requested)  # type: ignore[arg-type]
         self._settings_button.setMenu(settings_menu)
 
         self._exit_button = QToolButton(self)
@@ -169,3 +157,27 @@ class PromptToolbar(QWidget):
 
     def _emit_search_request(self) -> None:
         self.search_requested.emit(self.search_text())
+
+    def _emit_quick_capture_requested(self) -> None:
+        self.quick_capture_requested.emit()
+
+    def _emit_add_requested(self) -> None:
+        self.add_requested.emit()
+
+    def _emit_workbench_requested(self) -> None:
+        self.workbench_requested.emit()
+
+    def _emit_settings_requested(self) -> None:
+        self.settings_requested.emit()
+
+    def _emit_import_requested(self) -> None:
+        self.import_requested.emit()
+
+    def _emit_export_requested(self) -> None:
+        self.export_requested.emit()
+
+    def _emit_maintenance_requested(self) -> None:
+        self.maintenance_requested.emit()
+
+    def _emit_notifications_requested(self) -> None:
+        self.notifications_requested.emit()

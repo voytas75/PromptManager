@@ -9,11 +9,11 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence, QShortcut, QTextCursor
-from PySide6.QtWidgets import QDialog, QPlainTextEdit, QPushButton
+from PySide6.QtWidgets import QDialog, QPlainTextEdit, QPushButton, QWidget
 
 from core import PromptManager, RepositoryError
 
@@ -36,7 +36,7 @@ class QuickActionController:
     def __init__(
         self,
         *,
-        parent,
+        parent: QWidget,
         manager: PromptManager,
         presenter: PromptListPresenter,
         detail_widget: PromptDetailWidget,
@@ -258,7 +258,11 @@ class QuickActionController:
 
         data: Iterable[dict[str, object]]
         if isinstance(custom_actions, list):
-            data = [entry for entry in custom_actions if isinstance(entry, dict)]
+            data = [
+                cast("dict[str, object]", entry)
+                for entry in cast("list[object]", custom_actions)
+                if isinstance(entry, dict)
+            ]
         else:
             logger.warning("Ignoring invalid quick_actions settings value: %s", custom_actions)
             return list(actions_by_id.values())

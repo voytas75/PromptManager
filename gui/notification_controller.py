@@ -9,14 +9,18 @@ from __future__ import annotations
 from collections import deque
 from typing import TYPE_CHECKING
 
-from core.notifications import Notification, NotificationStatus
+from core.notifications import Notification, NotificationCenter, NotificationStatus
 
 from .notifications import BackgroundTaskCenterDialog, QtNotificationBridge
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Callable, Iterable
 
     from PySide6.QtWidgets import QLabel, QWidget
+
+
+def _noop_notification_callback(_: str, __: int) -> None:
+    """Replace UI callbacks after shutdown without widening their callable type."""
 
 
 class NotificationController:
@@ -27,9 +31,9 @@ class NotificationController:
         *,
         parent: QWidget,
         indicator: QLabel,
-        notification_center,
-        status_callback,
-        toast_callback,
+        notification_center: NotificationCenter,
+        status_callback: Callable[[str, int], None],
+        toast_callback: Callable[[str, int], None],
     ) -> None:
         """Bind Qt widgets to the shared notification center."""
         self._parent = parent
@@ -64,8 +68,8 @@ class NotificationController:
         if self._task_center_dialog is not None:
             self._task_center_dialog.close()
         self._bridge.close()
-        self._toast_callback = lambda *_: None
-        self._status_callback = lambda *_: None
+        self._toast_callback = _noop_notification_callback
+        self._status_callback = _noop_notification_callback
 
     def _handle_notification(self, notification: Notification) -> None:
         self._history.append(notification)
