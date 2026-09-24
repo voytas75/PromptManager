@@ -409,9 +409,18 @@ def parse_args() -> argparse.Namespace:
         "--details", action="store_true", help="Show sanitized source and configuration detail."
     )
     embeddings_doctor = doctor_subparsers.add_parser(
-        "embeddings", help="Inspect embedding readiness offline; no provider call or vector writes."
+        "embeddings", help="Inspect embeddings offline or probe explicitly with --live."
     )
     embeddings_doctor.add_argument("--json", action="store_true", dest="doctor_json")
+    embeddings_doctor.add_argument(
+        "--live",
+        action="store_true",
+        dest="doctor_live",
+        help=(
+            "Send one synthetic text to the configured provider (network and cost possible); "
+            "no vector-store writes."
+        ),
+    )
     analytics_doctor = doctor_subparsers.add_parser(
         "analytics",
         help="Report local execution counts without probes; writes only with --export-csv.",

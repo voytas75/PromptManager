@@ -19,6 +19,7 @@ def main() -> int:
             ),
             command=args.doctor_command,
             details=bool(getattr(args, "details", False)),
+            live=bool(getattr(args, "doctor_live", False)),
             export_csv=getattr(args, "export_csv", None),
             action=getattr(args, "doctor_action", None),
             reference=getattr(args, "reference", None),

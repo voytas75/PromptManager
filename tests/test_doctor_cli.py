@@ -562,6 +562,103 @@ def test_doctor_embeddings_offline_does_not_probe_or_create_state(tmp_path: Path
     assert set(tmp_path.iterdir()) == {config}
 
 
+def test_doctor_embeddings_live_probe_is_bounded_and_sanitized(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from types import SimpleNamespace
+
+    from cli import doctor
+    from core import litellm_adapter
+
+    marker = "private-provider-response"
+    requests: list[dict[str, object]] = []
+
+    def fake_embedding(**kwargs: object) -> dict[str, object]:
+        requests.append(kwargs)
+        return {"data": [{"embedding": [0.1, 0.2, 0.3]}], "id": marker}
+
+    monkeypatch.setattr(litellm_adapter, "get_embedding", lambda: (fake_embedding, Exception))
+    settings = SimpleNamespace(
+        embedding_backend="litellm",
+        embedding_model="azure/synthetic-embedding",
+        litellm_api_key="private-key",
+        litellm_api_base="https://example.openai.azure.com/",
+        litellm_api_version="2024-01-01",
+        embedding_device=None,
+    )
+    monkeypatch.setattr(doctor, "load_settings", lambda: settings)
+    monkeypatch.setattr(doctor, "_config_source", lambda: (True, True))
+
+    assert doctor.run_doctor(command="embeddings", json_output=True) == 0
+    offline_output = capsys.readouterr()
+    assert offline_output.err == ""
+    assert json.loads(offline_output.out)["checks"][-1]["code"] == "EMBEDDING_NOT_PROBED"
+    assert requests == []
+    assert doctor.run_doctor(command="embeddings", json_output=True, live=True) == 0
+    live_output = capsys.readouterr()
+    assert live_output.err == ""
+    live = json.loads(live_output.out)
+    assert live["checks"][-1]["code"] == "EMBEDDING_BACKEND_REACHABLE"
+    assert live["probe"] == {
+        "performed": True,
+        "backend_dimension": 3,
+        "vector_index": "not_inspected",
+    }
+    assert len(requests) == 1
+    assert requests[0]["input"] == ["Prompt Manager diagnostics probe"]
+    assert requests[0]["timeout"] == 15
+    assert requests[0]["num_retries"] == 0
+    assert requests[0]["api_version"] == "2024-01-01"
+    assert marker not in live_output.out
+    assert "private-key" not in live_output.out
+
+
+def test_doctor_embeddings_live_failure_is_sanitized_without_retry(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from types import SimpleNamespace
+
+    from cli import doctor
+    from core import litellm_adapter
+
+    requests: list[dict[str, object]] = []
+
+    def failing_embedding(**kwargs: object) -> object:
+        requests.append(kwargs)
+        raise RuntimeError("private-key https://private-host.example/failure")
+
+    monkeypatch.setattr(litellm_adapter, "get_embedding", lambda: (failing_embedding, Exception))
+    settings = SimpleNamespace(
+        embedding_backend="litellm",
+        embedding_model="azure/synthetic-embedding",
+        litellm_api_key="private-key",
+        litellm_api_base="https://example.openai.azure.com/",
+        litellm_api_version="2024-01-01",
+        embedding_device=None,
+    )
+    monkeypatch.setattr(doctor, "load_settings", lambda: settings)
+    monkeypatch.setattr(doctor, "_config_source", lambda: (True, True))
+    assert doctor.run_doctor(command="embeddings", json_output=True, live=True) == 1
+    output = capsys.readouterr()
+    assert output.err == ""
+    assert json.loads(output.out)["checks"][-1]["code"] == "EMBEDDING_PROBE_FAILED"
+    assert json.loads(output.out)["next_step"] == (
+        "Check provider configuration and availability before a new approved probe"
+    )
+    assert "private-" not in output.out
+    assert len(requests) == 1
+
+
+def test_doctor_embeddings_live_help_warns_of_provider_cost(tmp_path: Path) -> None:
+    for invoke in (_invoke, _console_invoke):
+        result = invoke(tmp_path, None, "embeddings", "--help")
+        assert result.returncode == 0, result.stderr
+        assert "--live" in result.stdout
+        assert "cost" in result.stdout.lower()
+
+
 def test_doctor_config_invalid_explicit_source_is_diagnosed(tmp_path: Path) -> None:
     missing = tmp_path / "absent.json"
     result = _invoke(tmp_path, missing, "config", "--json")

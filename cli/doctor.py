@@ -306,7 +306,85 @@ def _diagnose_catalog() -> dict[str, object]:
     }
 
 
-def _diagnose_focused(command: str, *, details: bool) -> dict[str, object]:
+def _live_embedding_check(settings: PromptManagerSettings) -> tuple[Check, int | None]:
+    """Probe only the configured remote backend with one synthetic embedding request."""
+    import math
+
+    from core.embedding import LiteLLMEmbeddingFunction
+    from core.litellm_adapter import get_embedding
+
+    backend = (settings.embedding_backend or "deterministic").strip().lower()
+    if backend not in {"litellm", "openai"}:
+        return (
+            Check(
+                "search_embeddings",
+                "SKIP",
+                "EMBEDDING_LIVE_UNSUPPORTED",
+                "Live probe supports LiteLLM only; vector index not inspected",
+                "Use the offline readiness check for this backend",
+            ),
+            None,
+        )
+    if _embedding_check(settings).code == "EMBEDDING_NOT_CONFIGURED":
+        return (
+            Check(
+                "search_embeddings",
+                "WARN",
+                "EMBEDDING_NOT_CONFIGURED",
+                "Embedding backend configuration incomplete; no probe was run",
+                "Configure embedding credentials and model before retrying",
+            ),
+            None,
+        )
+    try:
+        embedding, _ = get_embedding()
+        request: dict[str, object] = {
+            "model": settings.embedding_model,
+            "input": ["Prompt Manager diagnostics probe"],
+            "api_key": settings.litellm_api_key,
+            "timeout": 15,
+            "num_retries": 0,
+        }
+        if settings.litellm_api_base:
+            request["api_base"] = settings.litellm_api_base
+        if settings.litellm_api_version:
+            request["api_version"] = settings.litellm_api_version
+        response = embedding(**request)
+        payload = LiteLLMEmbeddingFunction._extract_payload(response)  # pyright: ignore[reportPrivateUsage]
+        data = LiteLLMEmbeddingFunction._extract_data_array(payload)  # pyright: ignore[reportPrivateUsage]
+        if len(data) != 1:
+            raise ValueError("Unexpected embedding count")
+        vector = LiteLLMEmbeddingFunction._extract_embedding_vector(data[0], 0)  # pyright: ignore[reportPrivateUsage]
+        if not vector or any(
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+            for value in vector
+        ):
+            raise ValueError("Invalid embedding vector")
+    except Exception:  # provider exceptions can include credentials and raw response text
+        return (
+            Check(
+                "search_embeddings",
+                "FAIL",
+                "EMBEDDING_PROBE_FAILED",
+                "Embedding probe failed; vector index not inspected",
+                "Check provider configuration and availability before a new approved probe",
+            ),
+            None,
+        )
+    return (
+        Check(
+            "search_embeddings",
+            "OK",
+            "EMBEDDING_BACKEND_REACHABLE",
+            "Embedding backend returned a usable vector; vector index not inspected",
+        ),
+        len(vector),
+    )
+
+
+def _diagnose_focused(command: str, *, details: bool, live: bool = False) -> dict[str, object]:
     """Diagnose only the requested capability; never open the catalog here."""
     explicit, exists = _config_source()
     settings_logger = logging.getLogger("prompt_manager.settings")
@@ -335,16 +413,21 @@ def _diagnose_focused(command: str, *, details: bool) -> dict[str, object]:
         )
     else:
         config = Check("config", "OK", "CONFIG_VALID", "Effective settings valid")
+    live_check, dimension = (
+        _live_embedding_check(settings)
+        if live and command == "embeddings" and settings is not None
+        else (None, None)
+    )
     selected = (
         config
         if command == "config"
         else (
-            _embedding_check(settings)
+            live_check or _embedding_check(settings)
             if settings is not None
             else Check("search_embeddings", "SKIP", "CONFIG_REQUIRED", "Embedding settings unknown")
         )
     )
-    required_failed = config.status == "FAIL"
+    required_failed = config.status == "FAIL" or selected.status == "FAIL"
     status: Status = (
         "FAIL"
         if required_failed
@@ -360,7 +443,7 @@ def _diagnose_focused(command: str, *, details: bool) -> dict[str, object]:
         "checks": [asdict(config), asdict(selected)]
         if command == "embeddings"
         else [asdict(config)],
-        "next_step": config.next_step if required_failed else selected.next_step,
+        "next_step": config.next_step if config.status == "FAIL" else selected.next_step,
     }
     if command == "config" and details and settings is not None:
         # Only allowlisted constant labels and booleans: config paths, DSNs,
@@ -371,6 +454,12 @@ def _diagnose_focused(command: str, *, details: bool) -> dict[str, object]:
             "credential_present": bool(settings.litellm_api_key),
             "database_path_configured": bool(settings.db_path),
             "vector_path_configured": bool(settings.chroma_path),
+        }
+    if command == "embeddings" and live:
+        report["probe"] = {
+            "performed": dimension is not None or selected.code == "EMBEDDING_PROBE_FAILED",
+            "backend_dimension": dimension,
+            "vector_index": "not_inspected",
         }
     return report
 
@@ -580,6 +669,7 @@ def run_doctor(
     json_output: bool = False,
     command: str | None = None,
     details: bool = False,
+    live: bool = False,
     export_csv: Path | None = None,
     action: str | None = None,
     reference: str | None = None,
@@ -623,7 +713,7 @@ def run_doctor(
                 print(f"Next: {asset['next_step']}")
             return 0 if asset["ok"] else 1
         if command in {"config", "embeddings"}:
-            focused = _diagnose_focused(command, details=details)
+            focused = _diagnose_focused(command, details=details, live=live)
             if json_output:
                 print(json.dumps(focused, ensure_ascii=False))
             else:
