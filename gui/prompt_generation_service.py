@@ -114,8 +114,10 @@ class PromptGenerationService:
 
         dialog_factory = PromptDialogFactory(
             manager=self._manager,
-            name_generator=self.generate_prompt_name,
-            description_generator=self.generate_prompt_description,
+            name_generator=self.generate_prompt_name if self._manager.llm_available else None,
+            description_generator=(
+                self.generate_prompt_description if self._manager.llm_available else None
+            ),
             category_generator=self.generate_prompt_category,
             tags_generator=self.generate_prompt_tags,
             scenario_generator=self.generate_prompt_scenarios,

@@ -32,7 +32,12 @@ from PySide6.QtWidgets import (
 
 from models.prompt_model import Prompt
 
-from ..base import CollapsibleTextSection, strip_scenarios_metadata
+from ..base import (
+    CollapsibleTextSection,
+    fallback_generate_description,
+    fallback_suggest_prompt_name,
+    strip_scenarios_metadata,
+)
 from ..draft_promote import is_prompt_draft
 from .mixins import (
     PromptDialogCategoryMixin,
@@ -137,7 +142,10 @@ class PromptDialog(
         self._name_input = QLineEdit(self)
         self._name_input.setObjectName("promptDialogNameInput")
         self._generate_name_button = QPushButton("Generate", self)
-        self._generate_name_button.setToolTip("Suggest a name based on the context field.")
+        self._generate_name_button.setToolTip(
+            "Suggest a name from the prompt body on click. A configured model may contact "
+            "a provider and incur cost; automatic suggestions use local text only."
+        )
         self._generate_name_button.clicked.connect(self._on_generate_name_clicked)  # type: ignore[arg-type]
         name_container = QWidget(self)
         name_container_layout = QHBoxLayout(name_container)
@@ -292,7 +300,22 @@ class PromptDialog(
         self._execute_context_button.clicked.connect(self._on_execute_context_clicked)  # type: ignore[arg-type]
         refine_row_layout.addWidget(self._execute_context_button)
         form_layout.addRow("", refine_row)
-        form_layout.addRow("Description", self._description_input)
+        description_container = QWidget(self)
+        description_layout = QVBoxLayout(description_container)
+        description_layout.setContentsMargins(0, 0, 0, 0)
+        description_layout.setSpacing(4)
+        description_layout.addWidget(self._description_input)
+        generate_description_button = QPushButton("Generate description", self)
+        generate_description_button.setObjectName("promptDialogGenerateDescriptionButton")
+        generate_description_button.setToolTip(
+            "Generate from the prompt body on click. A configured model may contact a provider "
+            "and incur cost; otherwise a local excerpt is used. Never runs automatically."
+        )
+        generate_description_button.clicked.connect(self._on_generate_description_clicked)  # type: ignore[arg-type]
+        description_layout.addWidget(
+            generate_description_button, alignment=Qt.AlignmentFlag.AlignRight
+        )
+        form_layout.addRow("Description", description_container)
         self._scenarios_input = QPlainTextEdit(self)
         self._scenarios_input.setPlaceholderText("One scenario per line…")
         self._scenarios_input.setFixedHeight(90)
@@ -356,7 +379,7 @@ class PromptDialog(
             delete_button.clicked.connect(self._on_delete_clicked)  # type: ignore[arg-type]
             self._delete_button = delete_button
         main_layout.addWidget(self._buttons)
-        self._context_input.textChanged.connect(self._on_context_changed)  # type: ignore[arg-type]
+        self._context_input.textChanged.connect(self._refresh_execute_context_button)  # type: ignore[arg-type]
         self._update_version_controls(self._source_prompt.version if self._source_prompt else None)
         self._refresh_execute_context_button()
 
@@ -473,13 +496,13 @@ class PromptDialog(
         description = self._description_input.toPlainText().strip()
 
         if not name and context_text:
-            generated_name = self._generate_name(context_text)
+            generated_name = fallback_suggest_prompt_name(context_text)
             if generated_name:
                 name = generated_name
                 self._name_input.setText(generated_name)
 
         if not description and context_text:
-            generated_description = self._generate_description(context_text)
+            generated_description = fallback_generate_description(context_text)
             if generated_description:
                 description = generated_description
                 self._description_input.setPlainText(generated_description)

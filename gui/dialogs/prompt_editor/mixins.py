@@ -102,12 +102,23 @@ class _PromptDialogAssistMixin:
         return cast("_TaskResult", indicator.run(func, *args, **kwargs))
 
     def _on_generate_name_clicked(self) -> None:
-        """Generate a prompt name from the context field."""
+        """Generate a prompt name from the context field on request."""
+        context = self._context_input.toPlainText()
+        if self._name_generator is not None and context.strip():
+            consent = QMessageBox.question(
+                self._widget_parent(),
+                "Generate name with model?",
+                "This may send the prompt body to a configured provider and incur cost. Continue?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if consent != QMessageBox.StandardButton.Yes:
+                return
         try:
             suggestion = self._run_with_indicator(
                 "Generating prompt name…",
                 self._generate_name,
-                self._context_input.toPlainText(),
+                context,
             )
         except NameGenerationError as exc:
             QMessageBox.warning(self._widget_parent(), "Name generation failed", str(exc))
@@ -115,24 +126,8 @@ class _PromptDialogAssistMixin:
         if suggestion:
             self._name_input.setText(suggestion)
 
-    def _on_context_changed(self) -> None:
-        """Auto-suggest a prompt name when none has been supplied."""
-        if getattr(self, "_source_prompt", None) is not None:
-            return
-        if self._name_generator is None:
-            return
-        current_name = self._name_input.text().strip()
-        if current_name:
-            return
-        try:
-            suggestion = self._generate_name(self._context_input.toPlainText())
-        except NameGenerationError:
-            return
-        if suggestion:
-            self._name_input.setText(suggestion)
-
     def _generate_name(self, context: str) -> str:
-        """Generate a prompt name using LiteLLM when configured."""
+        """Generate a name using LiteLLM when explicitly requested and configured."""
         context = context.strip()
         if not context:
             return ""
@@ -155,6 +150,36 @@ class _PromptDialogAssistMixin:
                     exc_info=exc,
                 )
             return fallback_suggest_prompt_name(context)
+
+    def _on_generate_description_clicked(self) -> None:
+        """Generate a reviewable description only on explicit request."""
+        context = self._context_input.toPlainText()
+        if not context.strip():
+            QMessageBox.information(
+                self._widget_parent(),
+                "Prompt body required",
+                "Provide a prompt body before generating a description.",
+            )
+            return
+        if self._description_generator is not None:
+            consent = QMessageBox.question(
+                self._widget_parent(),
+                "Generate description with model?",
+                "This may send the prompt body to a configured provider and incur cost. Continue?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if consent != QMessageBox.StandardButton.Yes:
+                return
+        try:
+            suggestion = self._run_with_indicator(
+                "Generating prompt description…", self._generate_description, context
+            )
+        except DescriptionGenerationError as exc:
+            QMessageBox.warning(self._widget_parent(), "Description generation failed", str(exc))
+            return
+        if suggestion:
+            self._description_input.setPlainText(suggestion)
 
     def _generate_description(self, context: str) -> str:
         """Generate a description using LiteLLM when configured."""

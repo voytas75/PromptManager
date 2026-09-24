@@ -100,7 +100,7 @@ export PROMPT_MANAGER_LITELLM_MODEL="gpt-4o-mini"
 export PROMPT_MANAGER_LITELLM_API_KEY="sk-***"
 ```
 
-If you skip this step, PromptManager can still start its GUI for local cataloguing, editing, and reuse; prompt execution stays unavailable until a model and API key are configured. For fully provider-free search and indexing, select `embedding_backend: "deterministic"` in your JSON settings (the example config defaults to LiteLLM embeddings).
+If you skip this step, PromptManager can still start its GUI for local cataloguing, editing, and reuse; prompt execution stays unavailable until a model and API key are configured. In **Create/Edit Prompt**, you can enter a description yourself or click **Generate description** to preview a suggestion. Without a configured model the suggestion is a local excerpt; with one, the dialog asks before sending the body to the provider (possible cost). Saving with a blank description uses only a local body excerpt; a blank name is suggested locally from the full body at save, not from the first keystroke. For fully provider-free search and indexing, select `embedding_backend: "deterministic"` in your JSON settings (the example config defaults to LiteLLM embeddings).
 
 ### 3. Check local readiness
 

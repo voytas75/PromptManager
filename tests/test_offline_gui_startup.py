@@ -49,9 +49,10 @@ import traceback
 from unittest.mock import patch
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QGuiApplication
-from PySide6.QtWidgets import QApplication, QDialog, QPlainTextEdit
+from PySide6.QtWidgets import QApplication, QDialog, QLineEdit, QPlainTextEdit, QPushButton
 import main
 from gui.main_window import MainWindow
+from gui.dialogs import PromptDialog
 from gui.dialogs.quick_capture import QuickCaptureDialog
 from gui.dialogs.recent_prompts import RecentPromptsDialog
 from models.prompt_model import Prompt
@@ -67,6 +68,26 @@ def verify():
         flow = window._prompt_editor_flow
         assert flow is not None
 
+        def accept_created(dialog):
+            body = dialog.findChild(QPlainTextEdit, "promptDialogContextInput")
+            description = dialog.findChild(QPlainTextEdit, "promptDialogDescriptionInput")
+            generate = dialog.findChild(QPushButton, "promptDialogGenerateDescriptionButton")
+            name = dialog.findChild(QLineEdit, "promptDialogNameInput")
+            assert body is not None and description is not None and generate is not None
+            assert name is not None
+            body.setPlainText("Review the handoff checklist before release.")
+            assert not name.text() and not description.toPlainText()
+            generate.click()
+            assert description.toPlainText() == "Review the handoff checklist before release."
+            dialog._on_accept()
+            return QDialog.DialogCode.Accepted
+
+        with patch.object(PromptDialog, "exec", accept_created):
+            flow.create_prompt()
+        created = manager.repository.list()
+        assert len(created) == 1
+        assert created[0].description == "Review the handoff checklist before release."
+
         def accept_capture(dialog):
             body = dialog.findChild(QPlainTextEdit, "quickCaptureBodyInput")
             assert body is not None
@@ -78,8 +99,8 @@ def verify():
             with patch.object(flow, "edit_prompt", lambda _: None):
                 flow.quick_capture_prompt()
         prompts = manager.repository.list()
-        assert len(prompts) == 1
-        prompt = prompts[0]
+        assert len(prompts) == 2
+        prompt = next(item for item in prompts if (item.ext2 or {}).get("capture_state") == "draft")
         assert prompt.context == "Write a compact review of this draft."
         assert (prompt.ext2 or {}).get("capture_state") == "draft"
         assert window._current_prompt() is not None
@@ -112,7 +133,7 @@ def verify():
         assert window._detail_widget.current_prompt().id == hidden.id
         assert window._toolbar.search_text() == ""
         assert window._filter_panel.is_sort_enabled()
-        assert len(window._model.prompts()) == 2
+        assert len(window._model.prompts()) == 3
         controller = window._execution_controller
         assert controller is not None
         messages = []

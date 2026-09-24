@@ -278,6 +278,7 @@ This keeps repo truth and runtime-visible package metadata aligned without prete
 
 Key UI capabilities:
 - List/search/detail panes with CRUD operations, diff viewer, fork lineage, and scroll-safe prompt bodies.
+- In the Create/Edit Prompt dialog, a description can be entered manually or requested with **Generate description**. Without a model this shows a local excerpt; with a configured model it prompts before a provider/cost-bearing call. Saving a blank description (including after clearing one in Edit) uses only a local excerpt from the body. A blank name is suggested locally from the complete body at save, not from the first keystroke; explicit **Generate** for a name prompts before a configured model call. CLI `prompt-add` still requires an explicit description and does not run these GUI helpers.
 - Workspace under the toolbar supports Detect Need, Suggest Prompt, Copy Prompt flows, language auto-detection, and quick clearing.
 - Enhanced Prompt Workbench (🆕 toolbar button) launches a modal surface with a guided wizard, block palette, Template Preview integration, LiteLLM Brainstorm/Peek/Run Once helpers, variable dialogs, and export-to-repository wiring so teams can iterate on drafts without touching the main catalogue view.
 - Workspace result metadata surfaces per-run token usage, and a dedicated label keeps running session totals alongside all-time totals fetched from history so authors immediately see spend.
