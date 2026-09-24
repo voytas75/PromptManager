@@ -120,6 +120,21 @@ class PromptListPresenter:
         self._set_active_search_text(active_search_text)
         self._apply_prompt_load_result(result)
 
+    def load_catalog_for_recent(self) -> list[Prompt] | None:
+        """Read the full catalog without changing the current list or detail."""
+        try:
+            return list(self._manager.repository.list())
+        except RepositoryError as exc:
+            self._callbacks.show_error("Unable to load prompts", str(exc))
+            return None
+
+    def display_catalog_for_recent(self, prompts: Sequence[Prompt], prompt_id: UUID) -> None:
+        """Select a recent prompt from an already-read, unfiltered catalog."""
+        self._pending_category_slug = None
+        self._pending_tag_value = None
+        self._pending_quality_value = None
+        self.display_prompt_collection(prompts, preserve_order=False, selected_prompt_id=prompt_id)
+
     def refresh_filtered_view(self, *, preserve_order: bool | None = None) -> None:
         """Re-render the list after filter changes."""
         filtered = self._coordinator.apply_filters(self._filter_panel, self._current_prompts)

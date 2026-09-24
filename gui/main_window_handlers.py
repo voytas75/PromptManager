@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import QDialog, QMessageBox
 
-from core import PromptManager, PromptNotFoundError, PromptStorageError
+from core import PromptManager, PromptNotFoundError, PromptStorageError, RepositoryError
 
 from .dialogs.recent_prompts import recent_prompts
 
@@ -54,6 +54,7 @@ class PromptActionsHandler:
         parent: QWidget,
         manager: PromptManager,
         model_prompts_supplier: Callable[[], Sequence[Prompt]],
+        recent_catalog_prompts_supplier: Callable[[], Sequence[Prompt]],
         current_prompt_supplier: Callable[[], Prompt | None],
         detail_widget: PromptDetailWidget,
         prompt_search_controller: PromptSearchController,
@@ -65,6 +66,7 @@ class PromptActionsHandler:
         share_workflow_supplier: Callable[[], ShareWorkflowCoordinator | None],
         recent_prompts_dialog_factory: RecentPromptsDialogFactory,
         select_prompt: Callable[[UUID], None],
+        reveal_recent_prompt: Callable[[UUID], None],
         load_prompts: Callable[[str], None],
         current_search_text: Callable[[], str],
         status_callback: Callable[[str, int], None],
@@ -74,6 +76,7 @@ class PromptActionsHandler:
         self._parent = parent
         self._manager = manager
         self._model_prompts_supplier = model_prompts_supplier
+        self._recent_catalog_prompts_supplier = recent_catalog_prompts_supplier
         self._current_prompt_supplier = current_prompt_supplier
         self._detail_widget = detail_widget
         self._prompt_search_controller = prompt_search_controller
@@ -85,6 +88,7 @@ class PromptActionsHandler:
         self._share_workflow_supplier = share_workflow_supplier
         self._recent_prompts_dialog_factory = recent_prompts_dialog_factory
         self._select_prompt = select_prompt
+        self._reveal_recent_prompt = reveal_recent_prompt
         self._load_prompts = load_prompts
         self._current_search_text = current_search_text
         self._status_callback = status_callback
@@ -130,8 +134,12 @@ class PromptActionsHandler:
         flow.promote_draft_prompt(target)
 
     def open_recent_prompts(self) -> None:
-        """Display recent prompts and reopen the selected entry in the detail flow."""
-        prompts = recent_prompts(self._model_prompts_supplier())
+        """Display catalog-wide recent prompts and reveal the selected detail."""
+        try:
+            prompts = recent_prompts(self._recent_catalog_prompts_supplier())
+        except RepositoryError as exc:
+            QMessageBox.critical(self._parent, "Unable to load prompts", str(exc))
+            return
         if not prompts:
             self._status_callback("No recent prompts available.", 3000)
             return
@@ -141,7 +149,7 @@ class PromptActionsHandler:
         selected_prompt_id = dialog.selected_prompt_id
         if selected_prompt_id is None:
             return
-        self._select_prompt(selected_prompt_id)
+        self._reveal_recent_prompt(selected_prompt_id)
 
     def edit_prompt(self, prompt: Prompt | None = None) -> None:
         """Edit *prompt* or the currently selected prompt when omitted."""

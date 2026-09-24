@@ -453,6 +453,7 @@ class MainWindow(QMainWindow):
             parent=self,
             manager=self._manager,
             model_prompts_supplier=lambda: self._model.prompts(),
+            recent_catalog_prompts_supplier=lambda: self._manager.repository.list(),
             current_prompt_supplier=self._current_prompt,
             detail_widget=self._detail_widget,
             prompt_search_controller=self._prompt_search_controller,
@@ -464,6 +465,7 @@ class MainWindow(QMainWindow):
             share_workflow_supplier=lambda: self._share_workflow,
             recent_prompts_dialog_factory=RecentPromptsDialogFactory(),
             select_prompt=self._select_prompt,
+            reveal_recent_prompt=self._reveal_recent_prompt,
             load_prompts=self._load_prompts,
             current_search_text=self._current_search_text,
             status_callback=self._show_status_message,
@@ -734,6 +736,28 @@ class MainWindow(QMainWindow):
         if controller is None:
             return
         controller.select_prompt(prompt_id)
+
+    def _reveal_recent_prompt(self, prompt_id: UUID) -> None:
+        """Select a recent prompt, restoring the full list only if it is hidden."""
+        if any(prompt.id == prompt_id for prompt in self._model.prompts()):
+            self._select_prompt(prompt_id)
+            return
+        presenter = self._prompt_presenter
+        if presenter is None:
+            return
+        catalog_prompts = presenter.load_catalog_for_recent()
+        if catalog_prompts is None:
+            return
+        if not any(prompt.id == prompt_id for prompt in catalog_prompts):
+            self._show_status_message("The selected prompt is no longer in the catalogue.", 4000)
+            return
+        self._toolbar.set_search_text("", block_signals=True)
+        self._filter_panel.clear_narrowing()
+        self._filter_panel.set_active_search_text("")
+        self._filter_panel.set_sort_enabled(True)
+        self._prompt_search_controller.reset_search_state()
+        presenter.display_catalog_for_recent(catalog_prompts, prompt_id)
+        self._layout_controller.persist_filter_preferences()
 
     def _on_notifications_clicked(self) -> None:
         if self._notification_controller is None:

@@ -194,6 +194,19 @@ class PromptFilterPanel(QWidget):
         self._update_favorites_visibility_label()
         self._update_active_narrowing_summary_label()
 
+    def clear_narrowing(self) -> None:
+        """Clear local filters without emitting intermediate list reloads."""
+        for combo in (self._category_combo, self._tag_combo):
+            previous = combo.blockSignals(True)
+            try:
+                combo.setCurrentIndex(0)
+            finally:
+                combo.blockSignals(previous)
+        self.set_favorites_only(False)
+        self.set_min_quality(0.0)
+        self._update_tag_visibility_label()
+        self._update_active_narrowing_summary_label()
+
     def min_quality(self) -> float:
         """Return the minimum quality threshold."""
         return float(self._quality_spin.value())

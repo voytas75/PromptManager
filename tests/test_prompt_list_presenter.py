@@ -16,6 +16,7 @@ import pytest
 from gui.prompt_list_coordinator import PromptListCoordinator
 from gui.prompt_list_model import PromptListModel
 from gui.prompt_list_presenter import PromptListCallbacks, PromptListPresenter
+from gui.widgets.prompt_filter_panel import PromptFilterPanel
 from models.prompt_model import Prompt
 
 try:
@@ -182,6 +183,40 @@ def _build_presenter(
         parent=_ParentStub(),
     )
     return presenter, callbacks
+
+
+def test_recent_handoff_does_not_restore_pending_filter_that_hides_target(
+    qt_app: QApplication,
+) -> None:
+    """A cached startup filter must not obscure a hidden prompt reopened via Recent."""
+    target = _prompt("Hidden target")
+    tagged = _prompt("Tagged alternative")
+    tagged.tags = ["ops"]
+    manager = _ManagerStub([target, tagged], [])
+    panel = PromptFilterPanel(sort_options=[])
+    model = PromptListModel()
+    callbacks = _CallbackRecorder.create()
+    presenter = PromptListPresenter(
+        manager=cast("Any", manager),
+        coordinator=PromptListCoordinator(cast("Any", manager)),
+        model=model,
+        detail_widget=cast("Any", _DetailWidgetStub()),
+        list_view=cast("Any", _ListViewStub()),
+        filter_panel=panel,
+        toolbar=None,
+        callbacks=callbacks.build(),
+        parent=_ParentStub(),
+    )
+    presenter.set_pending_filter_preferences(category_slug="ops", tag="ops", min_quality=9.0)
+    panel.clear_narrowing()
+
+    presenter.display_catalog_for_recent([target, tagged], target.id)
+
+    assert panel.tag_value() is None
+    assert panel.category_slug() is None
+    assert panel.min_quality() == 0.0
+    assert [prompt.id for prompt in model.prompts()] == [target.id, tagged.id]
+    assert callbacks.selected_ids == [target.id]
 
 
 def test_show_similar_prompts_surfaces_recommendation_state_cue(qt_app: QApplication) -> None:

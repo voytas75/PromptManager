@@ -53,6 +53,9 @@ from PySide6.QtWidgets import QApplication, QDialog, QPlainTextEdit
 import main
 from gui.main_window import MainWindow
 from gui.dialogs.quick_capture import QuickCaptureDialog
+from gui.dialogs.recent_prompts import RecentPromptsDialog
+from models.prompt_model import Prompt
+from uuid import uuid4
 
 errors = []
 
@@ -84,6 +87,32 @@ def verify():
         assert QGuiApplication.clipboard().text() == prompt.context
         window._prompt_actions_bridge.open_prompt_in_workspace()
         assert window._query_input.toPlainText() == prompt.context
+        hidden = Prompt(
+            id=uuid4(), name="Recent outside search", description="Offline reuse",
+            category="General", context="Recent body",
+        )
+        manager.repository.add(hidden)
+        window._load_prompts()
+        window._toolbar.set_search_text("capture")
+        with patch.object(manager, "search_prompts", return_value=[prompt]):
+            window._prompt_search_controller.search_requested("capture", use_indicator=False)
+        assert [item.id for item in window._model.prompts()] == [prompt.id]
+        observed_recent = []
+
+        def accept_recent(dialog):
+            observed_recent.extend(item.id for item in dialog._prompts)
+            dialog._selected_prompt_id = hidden.id
+            return QDialog.DialogCode.Accepted
+
+        with patch.object(RecentPromptsDialog, "exec", accept_recent):
+            window._prompt_actions_handler.open_recent_prompts()
+        assert hidden.id in observed_recent
+        assert window._current_prompt() is not None
+        assert window._current_prompt().id == hidden.id
+        assert window._detail_widget.current_prompt().id == hidden.id
+        assert window._toolbar.search_text() == ""
+        assert window._filter_panel.is_sort_enabled()
+        assert len(window._model.prompts()) == 2
         controller = window._execution_controller
         assert controller is not None
         messages = []

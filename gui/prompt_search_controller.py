@@ -130,6 +130,10 @@ class PromptSearchController:
     # ------------------------------------------------------------------
     # Search orchestration
     # ------------------------------------------------------------------
+    def reset_search_state(self) -> None:
+        """Mark the active search as cleared after a successful catalog handoff."""
+        self._search_active = False
+
     def search_changed(self, text: str) -> None:
         """Handle inline search edits triggered by the toolbar."""
         if text.strip():
