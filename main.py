@@ -23,6 +23,17 @@ from importlib.resources import files
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+# Diagnose before importing core/GUI: their LiteLLM import can load .env and
+# change the selected configuration before a read-only check even begins.
+if __name__ == "__main__":
+    from cli.parser import parse_args as _early_parse_args
+
+    _early_args = _early_parse_args()
+    if getattr(_early_args, "command", None) == "doctor":
+        from cli.doctor import run_doctor as _early_run_doctor
+
+        raise SystemExit(_early_run_doctor(json_output=bool(_early_args.json)))
+
 try:
     from config import load_settings
 except (ImportError, AttributeError):  # pragma: no cover - fallback for test stubs
@@ -154,6 +165,10 @@ def _prompt_create_default_config(logger: logging.Logger) -> bool:
 def main() -> int:
     """Entrypoint that wires settings, services, and CLI commands."""
     args = parse_args()
+    if getattr(args, "command", None) == "doctor":
+        from cli.doctor import run_doctor
+
+        return run_doctor(json_output=bool(args.json))
     _runtime_setup_logging(args.logging_config)
 
     logger = logging.getLogger("prompt_manager.main")

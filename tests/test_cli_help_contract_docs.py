@@ -47,7 +47,7 @@ def test_built_wheel_exposes_console_entrypoint_and_runtime_modules() -> None:
     """The wheel must contain the documented console front door and its imports."""
     pyproject = (REPOSITORY_ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
-    assert 'prompt-manager = "main:main"' in pyproject
+    assert 'prompt-manager = "cli.entrypoint:main"' in pyproject
     assert 'py-modules = ["main", "prompt_templates"]' in pyproject
     assert 'include = ["cli*", "config*", "core*", "gui*", "models*"]' in pyproject
     assert '"config" = ["config.template.json"]' in pyproject

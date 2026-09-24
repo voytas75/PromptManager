@@ -4,6 +4,9 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Added `doctor [--json]` as a provider-free, read-only CLI readiness check for effective settings and existing SQLite metadata; model and embedding connectivity remain explicitly unprobed. Both `python -m main` and the installed `prompt-manager` route to it before provider imports. Existing detailed diagnostics and their output contracts remain unchanged; nested `doctor` subcommands are planned, not yet available.
+
 ### Fixed
 - The GUI tag filter now uses the CLI's case-insensitive logical-tag catalog: case variants appear once, selecting either spelling finds all matching prompts, and a spelling change does not discard the active filter. Stored tag spelling and prompt detail remain unchanged.
 - Clarified that `Promote Draft` replaces the complete comma-separated tag list, while CLI `prompt-tag` adds or removes one tag at a time.

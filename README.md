@@ -102,19 +102,22 @@ export PROMPT_MANAGER_LITELLM_API_KEY="sk-***"
 
 If you skip this step, PromptManager can still start its GUI for local cataloguing, editing, and reuse; prompt execution stays unavailable until a model and API key are configured. For fully provider-free search and indexing, select `embedding_backend: "deterministic"` in your JSON settings (the example config defaults to LiteLLM embeddings).
 
-### 3. Validate configuration
+### 3. Check local readiness
 
-The installed application command is `prompt-manager`:
+The installed application command is `prompt-manager`. Start with a provider-free, read-only check:
+
+```bash
+prompt-manager doctor
+prompt-manager doctor --json
+```
+
+`doctor` reports whether effective settings and existing SQLite catalog metadata can be read, and marks embedding and model access as unprobed; it does not create files, repair data, or call a provider. A missing model/API key warns without failing the local catalog. When a live SQLite WAL has pending data, the shallow read-only check fails closed rather than claiming a current snapshot. For detailed configuration and the existing specialist checks, use:
 
 ```bash
 prompt-manager --no-gui --print-settings
 ```
 
-When working from a repository checkout, the existing module invocation remains supported:
-
-```bash
-uv run python -m main --no-gui --print-settings
-```
+When working from a repository checkout, the equivalent module command is `python -m main doctor` (and `uv run python -m main doctor` when using uv). Nested `doctor` subcommands are not available yet; `catalog-check`, `diagnostics`, and prompt/chain validators remain supported.
 
 ### 4. Add a prompt from JSON, inline fields, stdin, or an input file (optional)
 

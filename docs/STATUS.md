@@ -2,7 +2,7 @@
 
 Status: active
 Owner: Wojtek / Prompt Manager Team
-Updated: 2026-09-23
+Updated: 2026-09-24
 Canonical product SSOT: `docs/product-ssot.md`
 Canonical near-term plan: `docs/plans/2026-05-10-product-direction-ssot-next-cycle.md`
 
@@ -21,6 +21,8 @@ Do not use this file as a second product SSOT or a competing roadmap.
 ---
 
 ## Current product posture
+
+- Bounded CLI trust support: `doctor [--json]` has a locally verified, shallow, read-only/provider-free entry path for config and existing SQLite metadata. Record-level catalog audit and nested `doctor` commands remain pending under `docs/plans/2026-09-24-doctor-cli-contract-and-migration-v1.md`; legacy detailed commands remain available. Remote delivery and exact-SHA CI are still to verify.
 
 PromptManager remains:
 

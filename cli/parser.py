@@ -72,6 +72,7 @@ ROOT_COMMAND_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
     (
         "Operations and diagnostics",
         (
+            "doctor",
             "reembed",
             "benchmark",
             "diagnostics",
@@ -349,6 +350,17 @@ def parse_args() -> argparse.Namespace:
 
     subparsers = parser.add_subparsers(dest="command")
     parser.subparsers_action = subparsers
+
+    doctor_parser = subparsers.add_parser(
+        "doctor",
+        help="Read-only, provider-free health check (no writes or network).",
+        description=(
+            "Inspect local readiness without creating files, contacting providers or changing data."
+        ),
+    )
+    doctor_parser.add_argument(
+        "--json", action="store_true", help="Emit a single versioned JSON diagnosis."
+    )
 
     export_parser = subparsers.add_parser(
         "catalog-export",

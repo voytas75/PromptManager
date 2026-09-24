@@ -322,10 +322,11 @@ Every log entry also stores structured context metadata (prompt snapshot, execut
 
 ## CLI Utilities
 
-The installed wheel exposes `prompt-manager`; the `python -m main` forms below remain the equivalent repository-checkout commands.
+The installed wheel exposes `prompt-manager`; the `python -m main` forms below remain the equivalent repository-checkout commands. `doctor` currently provides only a shallow local readiness check; detailed checks are still the existing standalone commands. The planned nested `doctor` routes are not implemented yet.
 
 | Command | Purpose |
 | --- | --- |
+| `python -m main doctor [--json]` | Bounded read-only, provider-free readiness check for effective config, existing SQLite metadata, and unprobed embedding/model configuration. Missing first-run files and optional model settings warn; it neither repairs nor audits prompt records/Chroma. Exit 0 for completed OK/WARN, 1 for required FAIL, 2 for invalid usage, 3 for unexpected inspection error. Installed equivalent: `prompt-manager doctor [--json]`. |
 | `python -m main catalog-export <path> [--format json\|yaml]` | Export prompts; YAML requires PyYAML (already bundled). |
 | `python -m main catalog-import <path> [--dry-run] [--no-overwrite]` | Create or update prompts from a JSON catalogue file or directory. |
 | `python -m main catalog-check [--json]` | Run a read-only, provider-free integrity pass over stored prompts and chains; reports duplicate names/bodies, invalid templates or references, missing stored embeddings, and broken chain prompt references. |

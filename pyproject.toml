@@ -35,7 +35,7 @@ dependencies = [
 ]
 
 [project.scripts]
-prompt-manager = "main:main"
+prompt-manager = "cli.entrypoint:main"
 
 [project.optional-dependencies]
 dev = [
