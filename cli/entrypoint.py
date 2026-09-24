@@ -27,6 +27,11 @@ def main() -> int:
             path=getattr(args, "path", None),
         )
 
+    if getattr(args, "command", None) == "prompt-edit":
+        from cli.prompt_edit import run_prompt_edit
+
+        return run_prompt_edit(args)
+
     from main import main as application_main
 
     return application_main()

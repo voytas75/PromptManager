@@ -199,6 +199,10 @@ def main() -> int:
             suite=getattr(args, "suite", None),
             path=getattr(args, "path", None),
         )
+    if getattr(args, "command", None) == "prompt-edit":
+        from cli.prompt_edit import run_prompt_edit
+
+        return run_prompt_edit(args)
     _runtime_setup_logging(args.logging_config)
 
     logger = logging.getLogger("prompt_manager.main")

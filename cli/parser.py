@@ -24,6 +24,7 @@ ROOT_COMMAND_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "catalog-check",
             "prompt-add",
             "prompt-show",
+            "prompt-edit",
             "prompt-random",
             "prompt-find",
             "tag-list",
@@ -737,6 +738,34 @@ def parse_args() -> argparse.Namespace:
         "--json",
         action="store_true",
         help="Render the tag change summary as structured JSON.",
+    )
+
+    prompt_edit_parser = subparsers.add_parser(
+        "prompt-edit",
+        help="Preview or explicitly apply a guarded prompt-attribute change.",
+        description="Edit one allowlisted prompt field; no provider or vector-index access.",
+    )
+    prompt_edit_parser.add_argument(
+        "prompt_id", help="Existing prompt UUID (names are not accepted)."
+    )
+    prompt_edit_parser.add_argument("action", choices=("set",))
+    prompt_edit_parser.add_argument(
+        "--attr", required=True, help="Field to edit (v1: related_prompts)."
+    )
+    prompt_edit_parser.add_argument("--value", required=True, help="New value as JSON (e.g. '[]').")
+    prompt_edit_parser.add_argument(
+        "--expect-value", help="Current value as JSON; required with --apply."
+    )
+    prompt_edit_parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="Write only after an atomic expected-value check; requires --backup-to.",
+    )
+    prompt_edit_parser.add_argument(
+        "--backup-to", type=Path, help="New, non-existing SQLite backup path required with --apply."
+    )
+    prompt_edit_parser.add_argument(
+        "--json", action="store_true", help="Emit one JSON result on stdout (errors on stderr)."
     )
 
     prompt_history_parser = subparsers.add_parser(
