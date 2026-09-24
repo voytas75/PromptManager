@@ -1,6 +1,6 @@
 # Short search state continuity v1
 
-Status: locally verified; remote delivery not requested
+Status: locally committed as `52f7cddca47f057d185ebe2b50d47abd2730c950`; remote delivery not requested
 Owner: Wojtek / Prompt Manager Team
 Canonical plan: `docs/plans/2026-05-10-product-direction-ssot-next-cycle.md`
 
@@ -22,4 +22,4 @@ On the existing prompt-library toolbar, a one-character search request did not l
 
 ## Next decision
 
-After a verified local commit, choose the next user-visible asset-loop hesitation only on fresh evidence. Remote push/CI remain a separate delivery decision; do not multiply list-side guidance by default.
+After local commit `52f7cdd`, choose the next user-visible asset-loop hesitation only on fresh evidence. Remote push/CI remain a separate delivery decision; do not multiply list-side guidance by default.

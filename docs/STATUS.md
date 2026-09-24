@@ -165,7 +165,7 @@ If not, it should not lead the next cycle.
 
 **Latest asset-loop slice — short search state continuity (locally verified; remote delivery not requested)**
 - A non-empty one-character toolbar search request now returns before changing active search, filter summary, or sort availability. Because no results were loaded, previously displayed results retain their own cues rather than being mislabeled as matches for the short text.
-- Focused RED reproduced the stale-cue state; GREEN panel/controller suite: `14 passed`, and the complete suite: `958 passed, 1 skipped`, core coverage 80.97%, Ruff, format, strict Pyright, lock and diff check clean. Local commit to verify; remote CI not verified. Ledger: `docs/plans/2026-09-24-short-search-state-continuity-v1.md`.
+- Focused RED reproduced the stale-cue state; GREEN panel/controller suite: `14 passed`, and the complete suite: `958 passed, 1 skipped`, core coverage 80.97%, Ruff, format, strict Pyright, lock and diff check clean. Local behavior commit `52f7cdd`; remote CI not verified. Ledger: `docs/plans/2026-09-24-short-search-state-continuity-v1.md`.
 
 **Next product slice:** choose another concrete find → inspect → reuse/refine hesitation only after this local slice's full gates and checkpoint. Do not reopen delivered wording by default.
 
