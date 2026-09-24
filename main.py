@@ -21,7 +21,7 @@ import os
 import sys
 from importlib.resources import files
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 try:
     from config import load_settings
@@ -46,7 +46,6 @@ from core import (
     import_prompt_catalog as _core_import_prompt_catalog,
     snapshot_dataset_rows as _core_snapshot_dataset_rows,
 )
-from gui.runtime_settings_service import build_config_diagnostics_items
 
 # Backwards-compatible re-exports for tests/legacy entry points.
 build_analytics_snapshot = _core_build_analytics_snapshot
@@ -152,36 +151,6 @@ def _prompt_create_default_config(logger: logging.Logger) -> bool:
     return True
 
 
-def _blocking_runtime_issues(settings: PromptManagerSettings) -> list[str]:
-    """Return critical runtime issues that should block normal startup."""
-    diagnostics = build_config_diagnostics_items(
-        litellm_model=getattr(settings, "litellm_model", None),
-        litellm_inference_model=getattr(settings, "litellm_inference_model", None),
-        litellm_api_key=getattr(settings, "litellm_api_key", None),
-        embedding_backend=getattr(settings, "embedding_backend", None),
-        embedding_model=getattr(settings, "embedding_model", None),
-        litellm_tts_model=getattr(settings, "litellm_tts_model", None),
-        redis_status=None,
-    )
-    issues: list[str] = []
-    raw_items = diagnostics.get("items")
-    items = cast("list[object]", raw_items) if isinstance(raw_items, list) else []
-    for raw_item in items:
-        if not isinstance(raw_item, dict):
-            continue
-        item = cast("dict[str, Any]", raw_item)
-        label = str(item.get("label") or "").strip()
-        status = str(item.get("status") or "").upper()
-        detail = str(item.get("detail") or "").strip()
-        if status != "FAIL":
-            continue
-        if label == "Fast model" and detail == "missing":
-            issues.append("LiteLLM fast model is missing.")
-        elif label == "API key" and detail == "missing":
-            issues.append("LiteLLM API key is missing.")
-    return issues
-
-
 def main() -> int:
     """Entrypoint that wires settings, services, and CLI commands."""
     args = parse_args()
@@ -210,15 +179,7 @@ def main() -> int:
         print_settings_summary(settings)
         return 0
 
-    blocking_issues = _blocking_runtime_issues(settings)
     command = getattr(args, "command", None)
-    if blocking_issues and command is None:
-        print("Blocking configuration issues:")
-        for issue in blocking_issues:
-            print(f"- {issue}")
-        print("Run with --print-settings to inspect the effective configuration.")
-        return 2
-
     spec = COMMAND_SPECS.get(command)
     args._settings = settings
 

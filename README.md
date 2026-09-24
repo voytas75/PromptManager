@@ -100,7 +100,7 @@ export PROMPT_MANAGER_LITELLM_MODEL="gpt-4o-mini"
 export PROMPT_MANAGER_LITELLM_API_KEY="sk-***"
 ```
 
-If you skip this step, PromptManager can still be used for local cataloguing, editing, and offline workflows.
+If you skip this step, PromptManager can still start its GUI for local cataloguing, editing, and reuse; prompt execution stays unavailable until a model and API key are configured. For fully provider-free search and indexing, select `embedding_backend: "deterministic"` in your JSON settings (the example config defaults to LiteLLM embeddings).
 
 ### 3. Validate configuration
 

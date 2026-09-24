@@ -647,29 +647,39 @@ def test_main_returns_error_when_manager_init_fails(
     assert "Failed to initialise services" in capsys.readouterr().out
 
 
-def test_main_blocks_default_startup_when_critical_runtime_state_is_invalid(
+def test_main_allows_local_startup_without_litellm(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setattr("sys.argv", ["prompt-manager", "--no-gui"])
     settings = _DummySettings()
     _patch_main(monkeypatch, "load_settings", lambda: settings)
+    manager = _DummyManager()
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
 
-    build_calls = {"count": 0}
+    assert main.main() == 0
+    assert "Prompt Manager ready" in capsys.readouterr().out
+    assert manager.closed is True
 
-    def _should_not_run(_: _DummySettings) -> _DummyManager:
-        build_calls["count"] += 1
-        return _DummyManager()
 
-    _patch_main(monkeypatch, "build_prompt_manager", _should_not_run)
+def test_main_launches_gui_without_litellm(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager"])
+    settings = _DummySettings()
+    manager = _DummyManager()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+    launched: list[object] = []
 
-    exit_code = main.main()
+    def _launch(active: object, *_: object) -> int:
+        launched.append(active)
+        return 0
 
-    assert exit_code == 2
-    output = capsys.readouterr().out
-    assert "Blocking configuration issues:" in output
-    assert "- LiteLLM fast model is missing." in output
-    assert "- LiteLLM API key is missing." in output
-    assert build_calls["count"] == 0
+    _patch_main(monkeypatch, "run_default_mode", _launch)
+
+    assert main.main() == 0
+    assert launched == [manager]
+    assert manager.closed is True
 
 
 def test_main_allows_print_settings_even_when_runtime_state_is_blocking(

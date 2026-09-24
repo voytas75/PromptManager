@@ -4,6 +4,9 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- Local GUI startup no longer requires a LiteLLM fast model or API key. Invalid settings and unavailable local services still fail during configuration/service initialization; model execution remains unavailable with clear guidance until configured. Provider-free GUI capture, catalog, copy, and workspace handoff work with deterministic embeddings.
+
 ## [0.23.3] - 2026-09-23
 
 ### Fixed

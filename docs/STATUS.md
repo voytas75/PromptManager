@@ -99,6 +99,15 @@ If not, it should not lead the next cycle.
 
 ---
 
+## Current implementation checkpoint — 2026-09-24
+
+**Local-first GUI startup — bounded correction**
+- Removed the default-mode gate that treated absent LiteLLM model/key as a blocker for opening the local GUI. Settings validation and local service initialization still own critical failures; diagnostics continue to report model availability, and execution stays guarded when offline.
+- Added an isolated provider-free GUI operator-path regression: real entrypoint and Qt window, Quick Capture draft saved to temporary SQLite/ChromaDB, detail selection, Copy Prompt, Open in Workspace, and a refused model run.
+- Verification: focused entrypoint/diagnostics tests and a real isolated offscreen GUI operator-path test; full provider-free gate `898 passed, 1 skipped` with core coverage `81.68%`; `ruff check .`, `ruff format --check .`, full configured strict `pyright`, `uv lock --check`, and `git diff --check` passed. See `docs/plans/2026-09-24-local-first-gui-offline-startup-v1.md` for the bounded ledger. No provider API, user database, or Windows checkout was exercised.
+
+---
+
 ## Current implementation checkpoint — 2026-09-23
 
 **Active local slice — compact prompt-read JSON v2**
