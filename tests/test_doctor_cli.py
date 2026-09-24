@@ -331,6 +331,76 @@ def test_doctor_catalog_reports_issues_without_exposing_prompt_text(tmp_path: Pa
     assert not (tmp_path / "chroma").exists()
 
 
+def test_doctor_catalog_text_is_readable_without_json_flag(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    db = tmp_path / "catalog.db"
+    repository = PromptRepository(str(db))
+    prompt_id = uuid4()
+    repository.add(
+        Prompt(
+            id=prompt_id,
+            name="synthetic-private-title",
+            description="example",
+            category="Test",
+            context="{% if synthetic-private-body %}",
+            related_prompts=[str(uuid4())],
+        )
+    )
+    before = db.read_bytes()
+
+    result = _console_invoke(tmp_path, config, "catalog")
+
+    assert result.returncode == 1, result.stderr
+    assert result.stderr == ""
+    assert "Doctor catalog: FAIL (CATALOG_ISSUES)" in result.stdout
+    assert "Catalog: 1 prompt, 0 chains, 2 errors, 1 warning" in result.stdout
+    assert "Issues:" in result.stdout
+    for code in ("CAT003", "CAT004"):
+        assert f"ERROR {code}" in result.stdout
+    assert "WARNING CAT005" in result.stdout
+    assert f"prompt IDs: {prompt_id}" in result.stdout
+    assert "Next: Review reported catalog issue codes" in result.stdout
+    assert '"summary"' not in result.stdout
+    assert '"issues"' not in result.stdout
+    assert "synthetic-private" not in result.stdout
+    assert db.read_bytes() == before
+    assert not (tmp_path / "chroma").exists()
+
+
+def test_doctor_catalog_text_first_run_is_readable_and_read_only(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+
+    result = _console_invoke(tmp_path, config, "catalog")
+
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    assert "Doctor catalog: WARN (DB_NOT_CREATED)" in result.stdout
+    assert "Catalog: 0 prompts, 0 chains, 0 errors, 0 warnings" in result.stdout
+    assert "Issues:" not in result.stdout
+    assert "Next: Start PromptManager to create the local catalog" in result.stdout
+    assert '"summary"' not in result.stdout
+    assert set(tmp_path.iterdir()) == {config}
+
+
+def test_doctor_catalog_text_clean_existing_database_has_no_issues(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    db = tmp_path / "catalog.db"
+    PromptRepository(str(db))
+    before = db.read_bytes()
+
+    result = _invoke(tmp_path, config, "catalog")
+
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    assert result.stdout.splitlines() == [
+        "Doctor catalog: OK (CATALOG_CHECKED)",
+        "Catalog: 0 prompts, 0 chains, 0 errors, 0 warnings",
+        "Next: Catalog records passed",
+    ]
+    assert db.read_bytes() == before
+    assert not (tmp_path / "chroma").exists()
+
+
 def test_doctor_catalog_missing_database_and_help_are_read_only(tmp_path: Path) -> None:
     config = _config(tmp_path)
     missing = _console_invoke(tmp_path, config, "catalog", "--json")
@@ -419,6 +489,51 @@ def test_doctor_catalog_corrupt_db_fails_without_mutation(tmp_path: Path) -> Non
     assert result.stderr == ""
     assert json.loads(result.stdout)["code"] == "DB_UNREADABLE"
     assert {path.name: path.read_bytes() for path in tmp_path.iterdir()} == before
+
+
+def test_doctor_catalog_text_unreadable_db_has_no_fake_summary(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    db = tmp_path / "catalog.db"
+    db.write_bytes(b"corrupt database")
+
+    result = _invoke(tmp_path, config, "catalog")
+
+    assert result.returncode == 1, result.stderr
+    assert result.stderr == ""
+    assert result.stdout.splitlines() == [
+        "Doctor catalog: FAIL (DB_UNREADABLE)",
+        "Next: Check the existing catalog and retry after closing writers",
+    ]
+    assert db.read_bytes() == b"corrupt database"
+
+
+def test_doctor_catalog_text_bounds_long_id_lists_and_keeps_chain_id(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from cli.doctor import _print_catalog_text_report  # pyright: ignore[reportPrivateUsage]
+
+    prompt_ids = [str(uuid4()) for _ in range(12)]
+    _print_catalog_text_report(
+        {
+            "summary": {"prompts": 12, "chains": 1, "errors": 1, "warnings": 0},
+            "issues": [
+                {
+                    "code": "CAT006",
+                    "severity": "error",
+                    "chain_id": "synthetic-chain-id",
+                    "prompt_ids": prompt_ids,
+                }
+            ],
+        }
+    )
+
+    output = capsys.readouterr().out
+    assert "chain ID: synthetic-chain-id" in output
+    assert "(+2 more; use --json for all IDs)" in output
+    assert prompt_ids[0] in output
+    assert prompt_ids[9] in output
+    assert prompt_ids[10] not in output
+    assert prompt_ids[11] not in output
 
 
 def test_doctor_catalog_nonempty_wal_fails_closed_without_sidecar_changes(tmp_path: Path) -> None:

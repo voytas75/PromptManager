@@ -760,6 +760,51 @@ def _diagnose_chain(path: Path) -> dict[str, object]:
     return _asset_report(command, "CHAIN_VALID", summary={"step_count": len(chain.steps)})
 
 
+_CATALOG_ISSUE_LABELS = {
+    "CAT001": "Duplicate exact prompt name",
+    "CAT002": "Duplicate normalized prompt body",
+    "CAT003": "Invalid template syntax",
+    "CAT004": "Invalid related prompt reference",
+    "CAT005": "Missing stored embedding vector",
+    "CAT006": "Chain references missing prompt steps",
+}
+
+
+def _print_catalog_text_report(report: dict[str, object]) -> None:
+    """Show sanitized catalog counts and findings without embedding raw JSON."""
+    summary = cast("dict[str, int]", report["summary"])
+    counts = (
+        ("prompts", "prompt"),
+        ("chains", "chain"),
+        ("errors", "error"),
+        ("warnings", "warning"),
+    )
+    print(
+        "Catalog: "
+        + ", ".join(
+            f"{summary[key]} {label}{'' if summary[key] == 1 else 's'}" for key, label in counts
+        )
+    )
+    issues = cast("list[dict[str, object]]", report["issues"])
+    if not issues:
+        return
+    print("Issues:")
+    for issue in issues:
+        code = str(issue["code"])
+        label = _CATALOG_ISSUE_LABELS.get(code, "Catalog finding")
+        line = f"  - {str(issue['severity']).upper()} {code}: {label}"
+        chain_id = issue["chain_id"]
+        if chain_id is not None:
+            line += f"; chain ID: {chain_id}"
+        prompt_ids = cast("list[str] | tuple[str, ...]", issue["prompt_ids"])
+        if prompt_ids:
+            shown = prompt_ids[:10]
+            line += f"; prompt IDs: {', '.join(shown)}"
+            if len(prompt_ids) > len(shown):
+                line += f" (+{len(prompt_ids) - len(shown)} more; use --json for all IDs)"
+        print(line)
+
+
 def run_doctor(
     *,
     json_output: bool = False,
@@ -791,7 +836,7 @@ def run_doctor(
             else:
                 print(f"Doctor catalog: {catalog_report['status']} ({catalog_report['code']})")
                 if catalog_report["report"] is not None:
-                    print(json.dumps(catalog_report["report"], ensure_ascii=False))
+                    _print_catalog_text_report(cast("dict[str, object]", catalog_report["report"]))
                 print(f"Next: {catalog_report['next_step']}")
             return 0 if catalog_report["ok"] else 1
         if command == "analytics":

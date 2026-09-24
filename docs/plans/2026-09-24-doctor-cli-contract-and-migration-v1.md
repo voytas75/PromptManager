@@ -97,6 +97,12 @@ The new route must not simply invoke the old CLI handler when doing so would bui
 
 For each slice: focused tests → real isolated CLI (stdout/stderr/exit captured) → `.venv/bin/ruff check .` → `.venv/bin/ruff format --check .` → full configured `.venv/bin/pyright` → `.venv/bin/pytest -q -n auto --cov=core --cov-report=term --cov-fail-under=80` → `uv lock --check` and `git diff --check`. Refresh this ledger with Implemented/Verified and current next slice after each completed stage. No live provider acceptance without a separate explicit budget/approval for `--live`.
 
+## Text-output follow-up (2026-09-24, locally verified)
+
+`doctor catalog` previously embedded the complete report object as an inline JSON line even without `--json`. The bounded correction changes only the text renderer in `cli/doctor.py`: show counts and sanitized `CAT001–CAT006` issue lines (severity, generic label, chain/prompt IDs); show at most ten prompt IDs per issue and direct the operator to `--json` for the rest. Retain the single-document `--json` envelope, diagnostic/exit semantics, immutable SQLite reader, and legacy `catalog-check` untouched. No provider call or production catalog mutation.
+
+RED: isolated installed CLI tests reproduced mixed text/JSON on an issue-bearing catalog and missing first-run DB. GREEN: targeted catalog tests `18 passed`; nearby doctor/help/entry tests `191 passed` before the final clean-catalog guard; final full provider-free suite `992 passed, 1 skipped`, core coverage `81.66%`; Ruff lint/format, full configured strict Pyright, `uv lock --check`, and `git diff --check` passed. An installed-CLI probe on a temporary synthetic catalog returned readable text, the same JSON counts/codes under `--json`, exit 1, unchanged DB bytes, and no Chroma directory. This is a local result, not a remote delivery or CI claim.
+
 ## Stop conditions and decision trigger
 
 Stop if `doctor` construction creates files/collections, normalizes user data, prompts at a TTY, prints credentials, or invokes a provider without explicit `--live`. Stop if an alias's exit/output changes silently. Prefer the smaller alternative — keep old commands and add only a router/landing `doctor` — if read-only catalog loading requires invasive persistence changes or nested argparse adapters duplicate domain logic. Observable trigger: an isolated no-mutation test or alias parity test cannot pass without widening scope.
