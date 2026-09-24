@@ -1,6 +1,6 @@
 # GUI description generation continuity v1
 
-Status: locally verified; remote delivery and exact-SHA CI to verify
+Status: delivered; behavior SHA `8c8b19a10934e49419604aff11d41c95a5b82039` verified on `origin/master`
 Owner: PromptManager Team
 Canonical near-term plan: `docs/plans/2026-05-10-product-direction-ssot-next-cycle.md`
 
@@ -22,7 +22,8 @@ The Create Prompt dialog has an editable Description field and a wired descripti
 - GREEN focused GUI/flow/offline-startup tests after name and edit fixes: 21 passed; real offline entrypoint saves a prompt with explicit local description generation and preserves Quick Capture and Recent tests. Full local suite: 987 passed, 1 skipped, core coverage 81.66%; repo-wide Ruff lint/format, full strict Pyright, `uv lock --check`, `git diff --check`, and scratch wheel build passed.
 - Independent read-only review found the first-character name blocker (`R` for an incrementally typed body). A RED typing-sequence regression confirmed it; the suggestion is now deferred until save. An edit-path test confirms clearing a saved description leads to local replacement without mutating the original prompt. Replacement read-only review found no blocker in this scoped change; focused review suite: 22 passed. No live provider call.
 - Boundary: name/description generation on Save is provider-free, but the existing `create_prompt`/update lifecycle may call a configured provider for category insight and embeddings. This slice does **not** promise provider-free persistence overall; the offline integration test uses deterministic embeddings.
+- Remote delivery: local `HEAD`, fetched `origin/master` and live `master` matched `8c8b19a10934e49419604aff11d41c95a5b82039` after push. Exact-SHA [Quality Gates 36035818349](https://github.com/voytas75/PromptManager/actions/runs/36035818349) completed successfully, including Ruff, Pyright, pytest and clean-tree checks. No live provider probe was performed. The GitHub push banner listed eight existing security alerts; dependency/security remediation is out of this slice.
 
 ## Next decision
 
-Locally verified (987 passed, 1 skipped; core coverage 81.66%; Ruff, strict Pyright, lock, diff check, and wheel). Independent replacement review found no blocker. Only name/description generation on Save is provider-free; existing category/embedding persistence may still contact a configured provider. Publication was authorized; exact-SHA remote delivery/CI remain to verify. CLI generation remains a separate decision, not silently added to `prompt-add`.
+Delivered with passing exact-SHA CI. Only name/description generation on Save is provider-free; existing category/embedding persistence may still contact a configured provider. CLI generation remains a separate decision, not silently added to `prompt-add`.
