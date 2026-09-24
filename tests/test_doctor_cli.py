@@ -704,6 +704,201 @@ def test_doctor_config_detail_source_precedence_without_secret_values(tmp_path: 
     assert set(tmp_path.iterdir()) == {config, dotenv}
 
 
+def test_doctor_index_reads_exact_ids_without_provider_or_writes(tmp_path: Path) -> None:
+    from core.repository.read_only_index import read_index_metadata_ids
+
+    chroma = tmp_path / "chroma"
+    from chromadb import PersistentClient
+    from chromadb.config import Settings
+
+    client = PersistentClient(
+        path=str(chroma),
+        settings=Settings(
+            anonymized_telemetry=False, is_persistent=True, persist_directory=str(chroma)
+        ),
+    )
+    collection = client.get_or_create_collection(name="prompt_manager")
+    collection.add(ids=["synthetic-a", "synthetic-b"], embeddings=[[0.1, 0.2], [0.3, 0.4]])
+    before = {
+        path.relative_to(chroma): path.read_bytes() for path in chroma.rglob("*") if path.is_file()
+    }
+    assert read_index_metadata_ids(chroma) == {"synthetic-a", "synthetic-b"}
+    assert {
+        path.relative_to(chroma): path.read_bytes() for path in chroma.rglob("*") if path.is_file()
+    } == before
+
+
+def test_doctor_index_reports_metadata_parity_without_claiming_vector_health(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from types import SimpleNamespace
+
+    from cli import doctor
+
+    db = tmp_path / "catalog.db"
+    repository = PromptRepository(str(db))
+    prompt_id = uuid4()
+    repository.add(
+        Prompt(
+            id=prompt_id,
+            name="private-name",
+            description="private-description",
+            category="Test",
+            context="private-context",
+            ext4=[0.1, 0.2],
+        )
+    )
+    monkeypatch.setattr(
+        doctor,
+        "load_settings",
+        lambda: SimpleNamespace(db_path=db, chroma_path=tmp_path / "chroma"),
+    )
+    chroma = tmp_path / "chroma"
+    from chromadb import PersistentClient
+    from chromadb.config import Settings
+
+    client = PersistentClient(
+        path=str(chroma),
+        settings=Settings(
+            anonymized_telemetry=False, is_persistent=True, persist_directory=str(chroma)
+        ),
+    )
+    collection = client.get_or_create_collection(name="prompt_manager")
+    collection.add(ids=[str(prompt_id)], embeddings=[[0.1, 0.2]])
+    before = {p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    assert doctor.run_doctor(command="index", json_output=True) == 0
+    output = capsys.readouterr()
+    report = json.loads(output.out)
+    assert output.err == ""
+    assert report["code"] == "INDEX_METADATA_MATCH"
+    assert report["status"] == "WARN"
+    assert report["report"]["matching_ids"] == 1
+    assert report["report"]["vector_index"] == "not_verified"
+    assert report["report"]["observation"] == "best_effort_no_shared_snapshot"
+    assert "private-" not in output.out
+    assert {
+        p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()
+    } == before
+    collection.add(ids=["unmatched-id"], embeddings=[[0.2, 0.3]])
+    assert doctor.run_doctor(command="index", json_output=True) == 1
+    mismatch = json.loads(capsys.readouterr().out)
+    assert mismatch["code"] == "INDEX_METADATA_MISMATCH"
+    assert mismatch["report"]["observation"] == "best_effort_no_shared_snapshot"
+    assert "Close catalog/index writers" in mismatch["next_step"]
+    assert mismatch["report"]["extra_index_ids"] == 1
+    assert "unmatched-id" not in json.dumps(mismatch)
+
+
+def test_doctor_index_reports_missing_metadata_id_not_just_equal_counts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from types import SimpleNamespace
+
+    from cli import doctor
+
+    db = tmp_path / "catalog.db"
+    repository = PromptRepository(str(db))
+    prompt_id = uuid4()
+    repository.add(
+        Prompt(
+            id=prompt_id,
+            name="private-name",
+            description="private-description",
+            category="Test",
+            context="private-context",
+            ext4=[0.1, 0.2],
+        )
+    )
+    chroma = tmp_path / "chroma"
+    from chromadb import PersistentClient
+    from chromadb.config import Settings
+
+    client = PersistentClient(
+        path=str(chroma),
+        settings=Settings(anonymized_telemetry=False, is_persistent=True),
+    )
+    collection = client.get_or_create_collection(name="prompt_manager")
+    collection.add(ids=["different-id"], embeddings=[[0.1, 0.2]])
+    monkeypatch.setattr(
+        doctor,
+        "load_settings",
+        lambda: SimpleNamespace(db_path=db, chroma_path=chroma),
+    )
+    assert doctor.run_doctor(command="index", json_output=True) == 1
+    result = json.loads(capsys.readouterr().out)
+    assert result["report"]["catalog_embedded"] == 1
+    assert result["report"]["index_metadata"] == 1
+    assert result["report"]["matching_ids"] == 0
+    assert result["report"]["missing_index_ids"] == 1
+    assert result["report"]["extra_index_ids"] == 1
+    assert "different-id" not in json.dumps(result)
+
+
+def test_doctor_index_rejects_pending_wal_and_unknown_schema_without_writes(
+    tmp_path: Path,
+) -> None:
+    from core.repository.read_only_index import IndexReadError, read_index_metadata_ids
+
+    chroma = tmp_path / "chroma"
+    chroma.mkdir()
+    db = chroma / "chroma.sqlite3"
+    with sqlite3.connect(db) as connection:
+        connection.execute("CREATE TABLE unknown_schema (id TEXT)")
+    before = db.read_bytes()
+    with pytest.raises(IndexReadError):
+        read_index_metadata_ids(chroma)
+    assert db.read_bytes() == before
+    wal = Path(f"{db}-wal")
+    wal.write_bytes(b"pending-private-data")
+    with pytest.raises(IndexReadError):
+        read_index_metadata_ids(chroma)
+    assert db.read_bytes() == before
+    assert wal.read_bytes() == b"pending-private-data"
+
+
+def test_doctor_index_real_cli_does_not_create_missing_store(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    result = _console_invoke(tmp_path, config, "index", "--json")
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["code"] == "DB_NOT_CREATED"
+    assert set(tmp_path.iterdir()) == {config}
+
+
+def test_doctor_index_missing_index_is_unverified_without_creating_it(
+    tmp_path: Path,
+) -> None:
+    config = _config(tmp_path)
+    PromptRepository(str(tmp_path / "catalog.db"))
+    before = {p.name: p.read_bytes() for p in tmp_path.iterdir() if p.is_file()}
+    for invoke in (_invoke, _console_invoke):
+        result = invoke(tmp_path, config, "index", "--json")
+        assert result.returncode == 0, result.stderr
+        assert result.stderr == ""
+        report = json.loads(result.stdout)
+        assert report["code"] == "INDEX_NOT_CREATED"
+        assert report["report"] is None
+        assert not (tmp_path / "chroma").exists()
+        assert {p.name: p.read_bytes() for p in tmp_path.iterdir() if p.is_file()} == before
+
+
+def test_doctor_index_unreadable_catalog_skips_existing_index(
+    tmp_path: Path,
+) -> None:
+    config = _config(tmp_path)
+    (tmp_path / "catalog.db").write_bytes(b"not sqlite")
+    chroma = tmp_path / "chroma"
+    chroma.mkdir()
+    (chroma / "chroma.sqlite3").write_bytes(b"private-index")
+    before = {p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    result = _console_invoke(tmp_path, config, "index", "--json")
+    assert result.returncode == 1, result.stderr
+    assert result.stderr == ""
+    assert json.loads(result.stdout)["code"] == "DB_UNREADABLE"
+    assert {
+        p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()
+    } == before
+
+
 def test_doctor_analytics_reads_aggregate_without_probe_or_writes(tmp_path: Path) -> None:
     config = _config(tmp_path)
     db = tmp_path / "catalog.db"

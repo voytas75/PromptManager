@@ -401,6 +401,15 @@ def parse_args() -> argparse.Namespace:
         dest="catalog_json",
         help="Emit sanitized catalog codes and counts as JSON.",
     )
+    index_doctor = doctor_subparsers.add_parser(
+        "index",
+        help="Compare stored prompt IDs with Chroma SQLite metadata without writers or providers.",
+        description=(
+            "Read-only exact-ID metadata comparison. Does not inspect HNSW vector files, "
+            "query search, contact a provider, or repair data."
+        ),
+    )
+    index_doctor.add_argument("--json", action="store_true", dest="doctor_json")
     config_doctor = doctor_subparsers.add_parser(
         "config",
         help="Inspect effective settings without disclosing secrets or contacting providers.",

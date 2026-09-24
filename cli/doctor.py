@@ -464,6 +464,88 @@ def _diagnose_focused(command: str, *, details: bool, live: bool = False) -> dic
     return report
 
 
+def _diagnose_index() -> dict[str, object]:
+    """Compare exact stored prompt IDs with Chroma metadata IDs, never HNSW."""
+    from core.repository.read_only_catalog import CatalogReadError, read_existing_catalog
+    from core.repository.read_only_index import IndexReadError, read_index_metadata_ids
+
+    settings_logger = logging.getLogger("prompt_manager.settings")
+    previous_level = settings_logger.level
+    settings_logger.setLevel(logging.ERROR)
+    try:
+        settings = load_settings()
+    except SettingsError:
+        settings = None
+    finally:
+        settings_logger.setLevel(previous_level)
+
+    result: dict[str, object] = {
+        "schema_version": 1,
+        "command": "doctor index",
+        "ok": False,
+        "status": "FAIL",
+        "code": "CONFIG_INVALID",
+        "report": None,
+        "next_step": "Check the selected configuration file and settings",
+    }
+    if settings is None:
+        return result
+    if not settings.db_path.exists():
+        result.update(
+            ok=True,
+            status="WARN",
+            code="DB_NOT_CREATED",
+            next_step="Start PromptManager to create the local catalog",
+        )
+        return result
+    try:
+        prompts, _ = read_existing_catalog(settings.db_path)
+    except CatalogReadError:
+        result.update(code="DB_UNREADABLE", next_step="Check the existing catalog")
+        return result
+    if not settings.chroma_path.exists():
+        result.update(
+            ok=True,
+            status="WARN",
+            code="INDEX_NOT_CREATED",
+            next_step="Index metadata not available; no consistency claim",
+        )
+        return result
+    try:
+        index_ids = read_index_metadata_ids(settings.chroma_path)
+    except IndexReadError:
+        result.update(
+            code="INDEX_UNREADABLE",
+            next_step="Check existing index metadata without starting a writer",
+        )
+        return result
+    expected_ids = {str(prompt.id) for prompt in prompts if prompt.ext4}
+    missing = expected_ids - index_ids
+    extra = index_ids - expected_ids
+    result["report"] = {
+        "catalog_embedded": len(expected_ids),
+        "index_metadata": len(index_ids),
+        "matching_ids": len(expected_ids & index_ids),
+        "missing_index_ids": len(missing),
+        "extra_index_ids": len(extra),
+        "vector_index": "not_verified",
+        "observation": "best_effort_no_shared_snapshot",
+    }
+    if missing or extra:
+        result.update(
+            code="INDEX_METADATA_MISMATCH",
+            next_step="Close catalog/index writers and repeat before considering explicit repair",
+        )
+    else:
+        result.update(
+            ok=True,
+            status="WARN",
+            code="INDEX_METADATA_MATCH",
+            next_step="Best-effort metadata match; vector index and search remain unverified",
+        )
+    return result
+
+
 def _diagnose_analytics(export_csv: Path | None, *, live: bool = False) -> dict[str, object]:
     """Summarize stored counts; only an explicit live request probes the backend."""
     from core.repository.read_only_analytics import read_execution_counts
@@ -692,6 +774,16 @@ def run_doctor(
 ) -> int:
     """Emit a sanitized report or bounded unexpected error without creating state."""
     try:
+        if command == "index":
+            index_report = _diagnose_index()
+            if json_output:
+                print(json.dumps(index_report, ensure_ascii=False))
+            else:
+                print(f"Doctor index metadata: {index_report['status']} ({index_report['code']})")
+                if index_report["report"] is not None:
+                    print(json.dumps(index_report["report"], ensure_ascii=False))
+                print(f"Next: {index_report['next_step']}")
+            return 0 if index_report["ok"] else 1
         if command == "catalog":
             catalog_report = _diagnose_catalog()
             if json_output:

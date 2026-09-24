@@ -101,7 +101,7 @@ Focus on bounded work that improves:
 Constraint:
 - trust work should support the active operator seam, not replace it as the roadmap center.
 
-Selected supporting CLI contract: `docs/plans/2026-09-24-doctor-cli-contract-and-migration-v1.md`. The default `doctor` and its nested read-only diagnostics are delivered; `doctor embeddings --live` is an explicit, separately accepted backend probe, while standalone commands remain supported. This pointer does not reorder the asset-loop priorities above.
+Selected supporting CLI contract: `docs/plans/2026-09-24-doctor-cli-contract-and-migration-v1.md`. The default `doctor` and its nested read-only diagnostics are delivered; `doctor embeddings --live` and `doctor analytics --live` are explicit, separately accepted backend probes, while the local `doctor index` metadata-only slice is under verification. Standalone legacy commands remain supported. This pointer does not reorder the asset-loop priorities above.
 
 ### 5. Keep structured runs and prompt-chain work subordinate
 This remains valid only when it improves asset-to-run-to-refine clarity.
