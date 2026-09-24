@@ -86,7 +86,7 @@ These later slice families are also treated as delivered history rather than act
 - workspace compare-duration clarity
 - workspace one-run action clarity
 
-Primary historical reference: `docs/plans/2026-05-10-product-direction-ssot-next-cycle.md`
+These delivered slices are historical; `docs/plans/2026-05-10-product-direction-ssot-next-cycle.md` remains the active near-term planning authority, not a historical plan.
 
 ---
 
@@ -116,49 +116,53 @@ If not, it should not lead the next cycle.
 
 ---
 
-## Current implementation checkpoint — 2026-09-23
+## Historical implementation checkpoint — 2026-09-23
 
-**Active local slice — compact prompt-read JSON v2**
+**Then-active local slice — compact prompt-read JSON v2 (subsequently delivered)**
 - `prompt-show`, `prompt-find`, and `prompt-history` now share one compact/full prompt-record contract for their JSON views: default JSON omits raw `ext4` and exposes bounded `embedding.present` / `embedding.dimensions` metadata.
 - `--json --full` is the explicit complete-record opt-in and retains `ext4`; `--full` without `--json` is parser-invalid for all three commands.
 - Scope is provider-free and read-only: prompt-history execution entries, semantic ranking, filters, persistence, embedding generation, and the stored `Prompt.to_record()` model remain unchanged.
-- Release metadata advances to patch version `0.23.3`; verification results are recorded in the accompanying execution ledger before release closeout.
+- At that checkpoint, release metadata advanced to patch version `0.23.3`; subsequent release history is recorded in `docs/CHANGELOG.md`. This is not a pending release action.
 
 ---
 
 ## Historical verified checkpoint — 2026-09-23
 
-**Revision and delivery status**
-- Current local `master` is based on `87f2a1e291122014ec2f17c414a5dcf2428f4921` before the uncommitted 0.23.1 release-closeout slice; `master...origin/master` is `0 / 0`.
-- The working slice removes the remaining configured strict-Pyright debt without intended runtime, persistence, provider, or CLI-JSON contract changes. The local release candidate has `0 errors, 0 warnings, 0 informations` for full configured `pyright`.
+The statements below record the then-current pre-`0.23.1` state; they are not instructions or the state of today's `master`.
 
-**Current local verification**
+**Revision and delivery status**
+- Then-current local `master` was based on `87f2a1e291122014ec2f17c414a5dcf2428f4921` before the uncommitted 0.23.1 release-closeout slice; `master...origin/master` was `0 / 0` at that checkpoint.
+- The then-working slice removed the remaining configured strict-Pyright debt without intended runtime, persistence, provider, or CLI-JSON contract changes. The local release candidate had `0 errors, 0 warnings, 0 informations` for full configured `pyright`.
+
+**Local verification at the pre-0.23.1 checkpoint**
 - Full provider-free release gate: `892 passed, 1 skipped`, core coverage `81.68%`; `ruff check .`, `ruff format --check .`, CI-scope `pyright main.py config models`, full configured `pyright`, `uv lock --check`, and `git diff --check` all pass.
 - The production cleanup keeps dynamic Qt/config/data boundaries typed locally with narrowed values, `cast`, typed callbacks, and small protocol adapters. Tests received only typing-stub cleanup; no user-facing behavior changed.
 - GitHub CI still enforces the existing stable type subset. The full strict scan is verified locally for this release but is not described as CI parity until the workflow changes separately.
 
-**Current release action**
+**Then-planned release actions (closed; not a current to-do)**
 1. Commit the verified strict-typing closeout and documentation sync.
 2. Publish it as patch release `0.23.1` after updating package metadata, lockfile, and changelog.
 3. Verify remote SHA parity and the exact-SHA Quality Gates result.
 
+Release `0.23.1` is listed in `docs/CHANGELOG.md`; current package version is `0.23.3` at the 2026-09-24 documentation audit. Use the current release metadata and ledger rather than re-running this historical checklist.
+
 ---
 
-## Current verified checkpoint — 2026-09-22
+## Historical verified checkpoint — 2026-09-22
 
 **Revision and delivery**
-- Current local `master`: `88ebff296ce084ea82d6d0e5be4c9259bedba42b`; the worktree was clean and `master...origin/master` was `0 / 0` immediately before this audit-closeout slice.
+- Then-current local `master`: `88ebff296ce084ea82d6d0e5be4c9259bedba42b`; the worktree was clean and `master...origin/master` was `0 / 0` immediately before that audit-closeout slice.
 - Delivered after the prior `e218e37` checkpoint: catalog integrity checks, random prompt reads, prompt validation, deterministic template tests, prompt comparison, linting, effective template listing, tag operations, release `0.23.0`, and the Qt clipboard-test fix.
 - This is a closed, provider-free supporting CLI set. It does not change the asset-first product center: each command organizes, inspects, validates, or compares persisted prompt assets.
 
-**Current operational contracts**
+**Operational contracts at that checkpoint**
 - `catalog-check`, `prompt-validate`, `prompt-test`, `prompt-compare`, `prompt-lint`, and `prompt-template-list` are deterministic/provider-free by contract; `tag-list` and `tag-show` are read-only, and `prompt-tag` keeps an explicit non-mutating `--dry-run`.
 - `catalog-check`, `prompt-show`, and `prompt-find` preserve LiteLLM availability state but suppress startup offline announcements because they remain useful local catalog operations without a configured model; `catalog-check --json` therefore emits a parseable JSON document. LLM-backed execution and generation paths retain offline guidance.
 - `prompt-find <query>` sends the original natural-language query to raw semantic retrieval; explicit category/tag/source/active filters apply after ranking. Personalized, intent-hinted ranking remains in `suggest` and GUI recommendations.
 - Text `prompt-show <uuid-or-name>` is a readable operator view with a blank-line-separated `<prompt_body>` / `</prompt_body>` copy block for non-empty context. Its default JSON form omits raw `ext4`; `--json --full` is the explicit complete-record opt-in.
 - Root `--help` remains a grouped command card; use `<command> --help` for authoritative options.
 
-**Current local verification**
+**Local verification at that checkpoint**
 - Full provider-free gate at the Linux/WSL GUI startup reliability checkpoint: `892 passed, 1 skipped`, core coverage `81.68%`; `ruff check .`, `ruff format --check .`, and CI-scope `pyright main.py config models` passed.
 - Linux/WSL GUI startup now preflights PySide6's bundled `xcb` plugin before Qt can abort the process: unresolved system libraries produce controlled Ubuntu/Debian recovery guidance, without `sudo`, package installation, or host mutation. The duplicate `SettingsDialog` top-level layout warning is removed. Ledger: `docs/plans/2026-09-22-linux-wsl-gui-startup-reliability-v1.md`.
 - `uv.lock` has been reconciled to package version `0.23.0`; `uv lock --check` passes after the lock-only update.

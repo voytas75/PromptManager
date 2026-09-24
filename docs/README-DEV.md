@@ -1,6 +1,6 @@
 # PromptManager – Developer Guide
 
-PromptManager is a PySide6 desktop application for managing reusable AI prompts with SQLite persistence, optional Redis caching, and ChromaDB-powered semantic retrieval. This document captures the engineering conventions, environment expectations, and deep technical workflows required to extend the project safely.
+PromptManager is a PySide6 desktop application for managing reusable AI prompts with SQLite persistence, optional Redis caching, and ChromaDB-powered semantic retrieval. This is the deep technical/operational reference; [`README-DEV.md`](../README-DEV.md) is the short onboarding entry point. This document does not supersede the product SSOT or the active near-term plan.
 
 ## Current Status
 
@@ -14,10 +14,10 @@ PromptManager is a PySide6 desktop application for managing reusable AI prompts 
 
 ## Toolchain & Quality Gates
 
-- **Python**: 3.13+. GitHub blocks merges on `pyright main.py config models`, the stable typed-entrypoint+model gate. The full configured strict scope (`main.py`, `core/`, `config/`, `gui/`, `models/`, and `tests/`) is also required for the 0.23.1 release closeout and currently passes locally; do not call it CI parity until the workflow is deliberately expanded. Annotations remain mandatory for new or touched code (no `type: ignore` in `core/`).
+- **Python**: 3.13+. The GitHub Quality Gates workflow runs `pyright main.py config models` as its type-check step; branch-protection/required-check settings are separate and must be verified before saying it blocks merges. The full configured strict scope (`main.py`, `core/`, `config/`, `gui/`, `models/`, and `tests/`) was verified locally for the historical 0.23.1 release closeout. Use full strict Pyright locally for broad changes where appropriate, but do not call it exact CI parity unless the workflow is deliberately expanded. Annotations remain mandatory for new or touched code (no `type: ignore` in `core/`).
 - **Formatting/Linting**: `ruff check --fix .` followed by `ruff format .` (line length 100). Import ordering follows ruff/isort (builtin → stdlib → third-party → local).
 - **Testing**: `pytest -n auto --cov=core --cov-report=term-missing --cov-fail-under=80` with `pytest-asyncio`, `pytest-cov`, and `hypothesis` for parsing/generation code. Under `uv`, prefer `uv sync --extra dev` first, then `uv run pytest ...`, or use one-shot `uv run --extra dev pytest ...`. Mock all external HTTP/DB calls (`respx`, `vcrpy`, `pytest-mock`).
-- **Automation**: `nox -s format lint typecheck test` is a broader local quality run: its Pyright session checks the full configured scope. The exact GitHub release gate remains `.github/workflows/quality-gates.yml`, including `pyright main.py config models`; do not call the Nox run strict CI parity.
+- **Automation**: If you separately install `nox` (not included in the `dev` extra), `nox -s format lint typecheck test` is a broader local quality run: its Pyright session checks the full configured scope. The GitHub workflow is `.github/workflows/quality-gates.yml`, including `pyright main.py config models`; Nox is not exact CI parity.
 - **Security & Resilience**: wrap external I/O in timeouts, provide custom exception hierarchy, never use bare `except`, and include actionable context plus retries with exponential backoff where transient failures may occur.
 
 ### What moved out of AGENTS.md
@@ -34,9 +34,9 @@ High-value conventions that still apply:
 
 Treat quality checks as three separate layers:
 
-1. **Release / merge gate (must stay green)**
-   - This is the blocking GitHub workflow in `.github/workflows/quality-gates.yml`.
-   - Current enforced scope is:
+1. **GitHub workflow checks (should stay green)**
+   - `.github/workflows/quality-gates.yml` runs on push and pull requests; branch protection / required-check status must be checked in GitHub separately.
+   - Current workflow scope is:
      - `ruff check --fix .`
      - `ruff format .`
      - `ruff check .` + `ruff format --check .`
@@ -55,15 +55,15 @@ Treat quality checks as three separate layers:
 
 3. **Debt scans / expansion probes (required only when explicitly promoted)**
    - Commands such as full `pyright`, `pyright gui --stats`, or `pyright tests --stats` are debt-radar tools by default.
-   - For the explicitly promoted 0.23.1 release closeout, the full configured strict Pyright scan is required and passes locally with zero errors.
+   - For the completed 0.23.1 release closeout, the full configured strict Pyright scan was required and passed locally with zero errors; this is historical verification, not a pending release action.
    - The scan remains distinct from CI parity until `.github/workflows/quality-gates.yml` is deliberately expanded.
 
 Operational rule: when touching a file that already carries strict-typing debt, do not widen the debt casually; prefer making the touched file flatter or at least not measurably worse.
 
 ### Release hardening baseline (Beta → stable)
 
-- This baseline is non-negotiable for merges: strict Ruff/Pyright/Pytest+coverage gates, fail-fast settings validation, and external I/O resilience (timeouts + bounded retries + deterministic mocking).
-- CI uses `.github/workflows/quality-gates.yml`; use its individual `.venv/bin/ruff`, `.venv/bin/pyright main.py config models`, and `.venv/bin/pytest ...` invocations for exact local parity. `nox -s all` is a broader local quality run because it invokes full configured Pyright. For `uv`-driven local parity, sync dev extras first with `uv sync --extra dev`.
+- Keep the repository's Ruff, CI-scope Pyright, and pytest+coverage checks green for delivery; fail-fast settings validation and resilient external I/O remain engineering expectations. Whether checks block merges depends on GitHub branch protection, not on the workflow file alone.
+- CI uses `.github/workflows/quality-gates.yml` with `pip install -e .[dev]`; run its individual `.venv/bin/ruff`, `.venv/bin/pyright main.py config models`, and `.venv/bin/pytest ...` invocations for comparable checks. `uv sync --extra dev` installs from the tracked lockfile and is useful for reproducibility, but is **not** exact dependency-install parity with CI. `nox -s all` requires separately installed Nox and runs a broader full-Pyright check.
 - Validate settings early during development with `python -m main --no-gui --print-settings` or `python scripts/validate_settings.py`; configuration failures must be actionable and stop execution.
 - For HTTP I/O, prefer `httpx.AsyncClient(timeout=...)` plus retry helpers (e.g., `core.retry.async_retry`) and mock calls in tests with `httpx.MockTransport`, `respx`, or `vcrpy` (no live external calls in CI).
 
@@ -79,8 +79,8 @@ source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install -e .[dev]
 
-# Optional developer extras
-pip install ruff pytest pyright nox
+# Optional Nox command wrapper (separate from the project's dev extra)
+python -m pip install nox
 nox -s all
 ```
 
@@ -98,17 +98,17 @@ uv run pytest -n auto --cov=core --cov-report=term-missing --cov-fail-under=80
 uv run --extra dev pytest -n auto --cov=core --cov-report=term-missing --cov-fail-under=80
 ```
 
-Do not assume plain `uv run pytest` will work in a freshly created environment, because `pytest` lives in the optional `dev` extra rather than in the base runtime dependencies.
+Do not assume plain `uv run pytest` will work in a freshly created environment, because `pytest` lives in the optional `dev` extra rather than in the base runtime dependencies. `uv sync --extra dev` uses `uv.lock`; CI installs via pip instead, so the two dependency resolutions are not identical by contract. Nox is also outside the dev extra; install it separately before using the Nox commands below.
 
 1. Copy `.env.example` to `.env` for a safe local starting point.
-2. Copy `config/config.template.json` to `config/config.json` for non-secret defaults.
-3. Export environment variables for anything secret or machine-specific (see below). Environment variables override JSON, which overrides built-in defaults.
+2. If you copy `config/config.template.json` to `config/config.json` for non-secret defaults, check its `embedding_backend` before indexing or search: the template selects `litellm` and, as JSON outranks `.env`, overrides `.env.example`'s `deterministic` choice. For provider-free indexing/search set `"embedding_backend": "deterministic"` **in that JSON** (or leave the template uncopied and confirm the effective setting). Do not infer provider-free behavior from `.env` alone after copying the template.
+3. Export environment variables for secrets or machine-specific settings (see below). For overlapping application settings, explicit constructor overrides take precedence, then JSON configuration, then canonical environment variables, then provider aliases, then file secrets. A value in JSON can therefore override a corresponding environment variable; inspect the effective source before assuming an env change took effect.
    - Set `PROMPT_MANAGER_ENV_FILE` if you want to load a different dotenv path.
-4. Run `python -m main --no-gui --print-settings` (or `uv run python -m main --no-gui --print-settings`) to verify filesystem paths, Redis, LiteLLM, and ChromaDB connectivity before coding.
+4. Run `python -m main --no-gui --print-settings` (or `uv run python -m main --no-gui --print-settings`) to inspect validated effective settings and reported path state before coding. This command does not initialize the manager or prove path writability or Redis, LiteLLM, or ChromaDB connectivity. Use the bounded, provider-free `doctor` subcommands for local inspections; live backend probes require explicit `--live` and may incur cost.
 
 ## Configuration & Environment Variables
 
-All settings are defined via `pydantic-settings` in `config/settings.py`. Provide values through environment variables (preferred) or JSON. Key variables:
+All settings are defined via `pydantic-settings` in `config/settings.py`. Use JSON for overlapping application settings (it takes precedence over environment variables) and environment variables for secrets or values not set in JSON. Key variables:
 
 | Variable | Description | Example |
 | --- | --- | --- |
@@ -143,10 +143,9 @@ All settings are defined via `pydantic-settings` in `config/settings.py`. Provid
 | `PROMPT_MANAGER_PRIVATEBIN_COMPRESSION` | Compression method before encryption (`zlib` or `none`) | `zlib` |
 | `PROMPT_MANAGER_PRIVATEBIN_BURN_AFTER_READING` | Delete PrivateBin pastes immediately after the first read (`true`/`false`) | `false` |
 | `PROMPT_MANAGER_PRIVATEBIN_OPEN_DISCUSSION` | Allow comments/discussion threads on new PrivateBin pastes (`true`/`false`) | `false` |
-| `PROMPT_MANAGER_EMBEDDING_BACKEND` | `litellm`, `sentence-transformers`, or `deterministic` | `sentence-transformers` |
+| `PROMPT_MANAGER_EMBEDDING_BACKEND` | `litellm`, `sentence-transformers` (requires optional package), or `deterministic` | `litellm` (built-in default; `.env.example` selects `deterministic`) |
 | `PROMPT_MANAGER_EMBEDDING_MODEL` | Embedding model identifier | `text-embedding-3-large` |
 | `PROMPT_MANAGER_EMBEDDING_DEVICE` | Device hint for local embeddings | `cuda` |
-| `PROMPT_MANAGER_CHROMA_TELEMETRY` | Opt-in flag for Chroma telemetry (`1` to enable) | `0` |
 | `PROMPT_MANAGER_PROMPT_OUTPUT_FONT_FAMILY` | Workspace output font family | `JetBrains Mono` |
 | `PROMPT_MANAGER_PROMPT_OUTPUT_FONT_SIZE` | Workspace output font size (pt) | `13` |
 | `PROMPT_MANAGER_PROMPT_OUTPUT_FONT_COLOR` | Workspace output font colour (hex) | `#B5CFED` |
@@ -228,11 +227,11 @@ This keeps repo truth and runtime-visible package metadata aligned without prete
    ```bash
    python -m main --no-gui --print-settings
    ```
-   This command checks JSON + env precedence, path writability, Redis connectivity (if configured), and masks API keys.
+   This prints the validated effective settings, source/precedence labels, and reported path state with credentials masked. It does not initialize services, test path writability, or verify Redis, LiteLLM, or ChromaDB connectivity.
 
 2. **Initialize databases**
    - Ensure `data/` is writable; SQLite and ChromaDB directories are created automatically.
-   - Run `python -m main reembed` whenever you change embedding backends to rebuild vectors consistently.
+   - If you decide to change embedding backends, first stop all writers and make a consistent, restorable backup of SQLite and Chroma data; verify the backup before proceeding. **Create Backup Snapshot** alone is not proof of a consistent SQLite backup while WAL writes are pending (see Maintenance below). Then plan `python -m main reembed` deliberately. This command **resets the Chroma collection before rebuilding**; individual embedding failures may leave a partial index. A configured remote embedding backend can send stored prompt content to a provider and incur cost. Confirm the effective backend and review the command result before relying on search again; do not use it as a routine first-run check.
 
 3. **Seed prompts (optional)**
    - Use `python -m main catalog-export data/catalog.json` to snapshot the current library.
@@ -243,9 +242,9 @@ This keeps repo truth and runtime-visible package metadata aligned without prete
 - Every prompt's searchable document concatenates: name, description, category, tags, context, example input/output, and stored scenarios.
 - Embeddings are produced via the configured backend:
   - `litellm`: delegates to provider embeddings (default `text-embedding-3-large`).
-  - `sentence-transformers`: runs locally; set `PROMPT_MANAGER_EMBEDDING_DEVICE` for GPU.
+  - `sentence-transformers`: runs locally when the optional `sentence-transformers` package and model are installed; it is not included in the base or `dev` dependency set. Set `PROMPT_MANAGER_EMBEDDING_DEVICE` for GPU if available.
   - `deterministic`: offline hashing for smoke tests.
-- If LiteLLM embeddings are selected without `PROMPT_MANAGER_LITELLM_API_KEY` (and `PROMPT_MANAGER_LITELLM_API_BASE` + `PROMPT_MANAGER_LITELLM_API_VERSION` for Azure models), the app logs a guidance message and falls back to deterministic embeddings until credentials are provided.
+- LiteLLM embedding readiness and actual calls are distinct: missing credentials can be reported as a readiness issue, but this does not guarantee deterministic fallback. An available LiteLLM embedding function may still be selected and fail on use; choose `embedding_backend: "deterministic"` explicitly in JSON when provider-free indexing and search are required. A deterministic fallback is used when the LiteLLM embedding function itself is unavailable.
 - Search queries embed the entire user phrase and ask ChromaDB for nearest neighbours; results are already cosine-ranked and displayed as-is in the GUI.
 - The GUI shows similarity scores (`[0.91]`) when search is active; the sort dropdown is disabled to preserve ranking integrity.
 - When a provider (Exa, Tavily, Serper, SerpApi, or Google Programmable Search) is configured, the workspace and Chain tab expose a “Use web search” checkbox (checked by default). Leaving it on runs a provider query (prompt metadata + user input) before execution and injects every available summary/highlight into the request body (source links included); if the aggregate context exceeds ~5,000 words, the fast LiteLLM model condenses it before prepending. Unchecking the box (or running `prompt-chain-run --no-web-search`) forces offline-only runs.
@@ -282,7 +281,7 @@ Key UI capabilities:
 - Workspace under the toolbar supports Detect Need, Suggest Prompt, Copy Prompt flows, language auto-detection, and quick clearing.
 - Enhanced Prompt Workbench (🆕 toolbar button) launches a modal surface with a guided wizard, block palette, Template Preview integration, LiteLLM Brainstorm/Peek/Run Once helpers, variable dialogs, and export-to-repository wiring so teams can iterate on drafts without touching the main catalogue view.
 - Workspace result metadata surfaces per-run token usage, and a dedicated label keeps running session totals alongside all-time totals fetched from history so authors immediately see spend.
-- Token rollup roadmap for per-query, per-session, and global scopes lives in `docs/token_usage_plan.md`; align upcoming UI/CLI work with that plan.
+- A historical token rollup proposal lives in [`docs/token_usage_plan.md`](token_usage_plan.md). It is not the active UI/CLI roadmap; select new work from the [near-term product plan](plans/2026-05-10-product-direction-ssot-next-cycle.md) after validating a current operator need.
 - The GUI forces Qt's **Fusion** style at startup (see `gui/application.py`) so the palette-driven theming looks identical on Windows/macOS/Linux. If you experiment with alternative styles, verify Guided mode and the Link Variable dialog still use the dark palette before committing.
 - Workspace appearance controls (font family/size/colour for output and chat panes) are configurable via settings or env vars and apply at runtime; tooltips for the “Use web search” toggle reflect the active provider (Exa, Tavily, Serper, SerpApi, Google, or Random).
 - Guided wizard now uses a custom-styled dialog (not `QWizard`) to avoid native theme overrides; adjust `GuidedPromptWizard` inside `gui/workbench/workbench_window.py` when changing layout, palette, or button flow.
@@ -351,7 +350,7 @@ The installed wheel exposes `prompt-manager`; the `python -m main` forms below r
 | `python -m main suggest "search query"` | Run semantic retrieval and print top matches with intent metadata. |
 | `python -m main usage-report [--path <file>]` | Summarize anonymized GUI analytics (counts, intents, recommendations). |
 | `python -m main history-analytics [--window-days N --limit M --trend-window K]` | Display execution success rates, durations, ratings, and window/overall token totals for recent prompts. |
-| `python -m main reembed` | Rebuild the ChromaDB vector store after backend/model changes or corruption. |
+| `python -m main reembed` | Reset the ChromaDB collection and rebuild embeddings. Back up SQLite and Chroma first; rebuild may partially fail, and remote embedding providers may receive prompt text and incur cost. |
 | `python -m main benchmark --prompt <uuid> [--model <id>] --request "…"` | Execute one or more prompts across configured LiteLLM models and compare duration/token usage alongside history stats. |
 | `python -m main refresh-scenarios <uuid> [--max-scenarios N]` | Regenerate and persist scenario lists for a prompt via LiteLLM or the heuristic fallback. |
 | `python -m main diagnostics <embeddings\|analytics> [options]` | Run embedding health checks or aggregated analytics diagnostics; `diagnostics <target> --help` lists target options. |
@@ -417,19 +416,19 @@ These commands share the same validation logic as the GUI; pass explicit paths a
 
 - **Unit/Integration Tests**: `pytest -n auto --cov=core --cov-report=term-missing --cov-fail-under=80`.
 - **Property-Based Tests**: Use `hypothesis` for prompt parsing, token-length sensitive logic, and JSON import/export features.
-- **Type Checking**: GitHub currently enforces `pyright main.py config models` with zero errors/warnings/informations. Treat full-repo `pyright` and broad strict coverage for `core/`, `gui/`, and `tests/` as expansion/debt-reduction work unless and until CI scope is explicitly widened.
+- **Type Checking**: The GitHub workflow runs `pyright main.py config models` with zero errors/warnings/informations. Full configured `pyright` is a separate local check; its 0.23.1 release-closeout result is historical, not an outstanding prerequisite. Do not infer branch-protection requirements from the workflow YAML alone.
 - **Static Analysis**: `ruff check --fix .` (lint + autofix) followed by `ruff format --check .`.
 - **Recommended workflow**:
-  - before merge / push confidence check: `nox -s format lint typecheck test`
+  - before merge / push confidence check: run the individual workflow checks above; optionally run `nox -s format lint typecheck test` after installing Nox separately
   - during bounded feature work: targeted pytest + narrow Pyright on touched files first, then broaden only when the slice crosses shared seams
-  - for roadmap/debt review: use `pyright`, `pyright gui --stats`, and `pyright tests --stats` as non-blocking inventory tools
+  - for roadmap/debt review: use `pyright`, `pyright gui --stats`, and `pyright tests --stats` as separately scoped inventory tools when they are not part of the chosen slice gate
 
 ## Maintenance, Telemetry & Analytics
 
 - **Maintenance dialog**: Provides buttons to clear SQLite prompts, wipe ChromaDB embeddings, or reset all application data (usage logs, cache) with confirmation prompts and logging.
-- **Snapshot backups**: Use the **Create Backup Snapshot** button in the maintenance dialog to zip the SQLite database, Chroma persistence directory, and a JSON manifest before running destructive tasks; the archive path is user-selected so it can be stored outside the project tree.
+- **Snapshot backups**: **Create Backup Snapshot** in Maintenance zips the main SQLite file, Chroma directory, and a manifest to a user-selected path. It does not use SQLite's online-backup API, checkpoint/copy the SQLite WAL, or take an atomic cross-store snapshot. With active writers it may omit committed WAL data or capture inconsistent state. Do not rely on this GUI archive alone as a verified pre-`reembed` backup: stop all writers, obtain a consistent SQLite + Chroma copy, and verify restore before any destructive operation. An online-safe snapshot implementation would be a separate code change.
 - **Category health panel**: Review per-category prompt counts, active prompt ratios, recent execution timestamps, and success rates directly inside the maintenance dialog; use the Refresh button after batch edits.
-- **Telemetry**: ChromaDB anonymized telemetry is disabled (`anonymized_telemetry=False`). Set `PROMPT_MANAGER_CHROMA_TELEMETRY=1` to opt in or adjust `core/prompt_manager.py` if you need different defaults.
+- **Telemetry**: ChromaDB anonymized telemetry is disabled in `core/prompt_manager/backends.py` (`anonymized_telemetry=False`). There is no supported `PROMPT_MANAGER_CHROMA_TELEMETRY` environment toggle in this implementation; changing telemetry behavior requires a separately scoped code/policy decision.
 - **Usage analytics**: GUI intent workspace interactions are logged to `data/logs/intent_usage.jsonl` (timestamp, hashed query metadata, detected intents, top prompts). Disable via `gui.usage_logger.IntentUsageLogger` instantiation or by clearing the log path.
 - **Analytics dashboard**: The GUI **Analytics** tab (and `python -m main diagnostics analytics`) pulls execution history, benchmark metadata, embeddings health, and intent usage logs into configurable charts. Set the window/prompt limits via the panel controls or CLI flags (`--window-days`, `--prompt-limit`), choose datasets (`usage`, `model_costs`, `benchmark`, `intent`, `embedding`), and export any dataset with `--export-csv` or the tab's **Export CSV** button for downstream BI tooling. A dedicated token summary above the dashboard mirrors the current window totals plus overall history so teams can reconcile spend while pivoting between datasets.
 

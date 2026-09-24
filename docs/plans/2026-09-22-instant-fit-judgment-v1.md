@@ -1,6 +1,6 @@
 # PromptManager — Instant Fit Judgment v1
 
-Status: in progress
+Status: completed (2026-09-22; historical Stage A execution ledger, not an active next slice)
 Owner: Wojtek / Prompt Manager Team
 Updated: 2026-09-22
 Canonical product SSOT: `docs/product-ssot.md`

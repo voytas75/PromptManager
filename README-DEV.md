@@ -1,6 +1,6 @@
 # README-DEV
 
-Practical developer onboarding for PromptManager.
+Practical, short developer onboarding for PromptManager. For detailed engineering, CLI, maintenance, and quality-gate contracts, see [`docs/README-DEV.md`](docs/README-DEV.md); product direction and near-term priority remain owned by [`docs/product-ssot.md`](docs/product-ssot.md) and its [active plan](docs/plans/2026-05-10-product-direction-ssot-next-cycle.md).
 
 This file exists to keep the main `README.md` focused on project introduction, what the product does, and how to get started.
 
@@ -63,8 +63,12 @@ PromptManager also supports JSON configuration via:
 - `config/config.json`
 - `PROMPT_MANAGER_CONFIG_JSON`
 
+If you copy `config/config.template.json` to `config/config.json`, its LiteLLM embedding setting overrides the deterministic setting in the copied `.env.example`. For provider-free indexing/search, set `"embedding_backend": "deterministic"` in the JSON and confirm the effective value before use.
+
 Important config note:
 - if settings look wrong, verify whether `PROMPT_MANAGER_CONFIG_JSON` is overriding `config/config.json`
+- if the path is explicitly exported to a missing file, settings fail closed; copying `.env.example` alone does not make its suggested path an explicit exported override
+- for overlapping values, JSON takes precedence over canonical environment variables; inspect the effective settings rather than assuming an env change overrides JSON
 
 Inspect effective configuration:
 
@@ -73,6 +77,7 @@ python -m main --no-gui --print-settings
 ```
 
 The CLI summary is trust-first: it starts with the `Diagnostics` block (`Overall status`, source/precedence labels, and `Next steps` when needed) before lower-level path and provider sections.
+It summarizes validated configuration and reported path state; it does not test path writability or Redis, LiteLLM, or ChromaDB connectivity. `doctor` offers bounded provider-free local checks; explicit `--live` probes can contact a provider and incur cost.
 
 Launch the GUI:
 
@@ -117,6 +122,8 @@ python -m main --no-gui --print-settings
 ```bash
 .venv/bin/pyright
 ```
+
+This is the full configured strict local check. The GitHub Quality Gates workflow currently runs the narrower `.venv/bin/pyright main.py config models`; see [`docs/README-DEV.md`](docs/README-DEV.md) for the distinction. The workflow's existence alone does not prove GitHub branch protection is enabled.
 
 ## 6. Quality gates used by the repo
 
