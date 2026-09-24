@@ -11,13 +11,27 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 
+import pytest
+
+pytest.importorskip("PySide6")
+
+from PySide6.QtWidgets import QApplication, QComboBox
+
 from core import PromptManagerError
 
 if TYPE_CHECKING:
     from core import PromptManager
-    from gui.widgets import PromptFilterPanel
 from gui.prompt_list_coordinator import PromptListCoordinator
+from gui.widgets.prompt_filter_panel import PromptFilterPanel
 from models.prompt_model import Prompt
+
+
+@pytest.fixture
+def qt_app() -> QApplication:
+    app = QApplication.instance()
+    if isinstance(app, QApplication):
+        return app
+    return QApplication([])
 
 
 class _ManagerStub:
@@ -78,7 +92,7 @@ def _panel_stub(panel: _FilterPanelStub) -> PromptFilterPanel:
     return cast("PromptFilterPanel", cast("Any", panel))
 
 
-def _prompt(name: str, *, is_favorite: bool) -> Prompt:
+def _prompt(name: str, *, is_favorite: bool, tags: list[str] | None = None) -> Prompt:
     return Prompt(
         id=uuid.uuid4(),
         name=name,
@@ -86,6 +100,7 @@ def _prompt(name: str, *, is_favorite: bool) -> Prompt:
         category="General",
         context=f"{name} body",
         is_favorite=is_favorite,
+        tags=tags or [],
         created_at=datetime(2026, 4, 12, 12, 0, tzinfo=UTC),
         last_modified=datetime(2026, 4, 12, 12, 0, tzinfo=UTC),
     )
@@ -176,3 +191,51 @@ def test_apply_filters_leaves_existing_results_unchanged_when_favorites_disabled
     filtered = coordinator.apply_filters(_panel_stub(panel), prompts)
 
     assert [prompt.name for prompt in filtered] == ["Alpha", "Beta"]
+
+
+def test_gui_tag_filter_uses_one_logical_tag_for_mixed_case_prompts(
+    qt_app: QApplication,
+) -> None:
+    """CLI-equivalent logical tags should show once and find both prompt spellings."""
+    coordinator = _build_coordinator(_ManagerStub())
+    prompts = [
+        _prompt("Promoted", is_favorite=False, tags=["Ops", "ops", "Review"]),
+        _prompt("CLI-tagged", is_favorite=False, tags=["ops"]),
+        _prompt("Other", is_favorite=False, tags=["CI"]),
+    ]
+    panel = PromptFilterPanel(sort_options=[])
+
+    pending_category, pending_tag = coordinator.populate_filters(
+        panel, prompts, pending_category_slug=None, pending_tag_value="ops"
+    )
+    combo = panel.findChild(QComboBox, "tagFilterCombo")
+    assert combo is not None
+    assert [combo.itemText(index) for index in range(combo.count())] == [
+        "All tags",
+        "CI",
+        "Ops",
+        "Review",
+    ]
+    assert panel.tag_value() == "Ops"
+    assert pending_category is None
+    assert pending_tag is None
+    assert [prompt.name for prompt in coordinator.apply_filters(panel, prompts)] == [
+        "Promoted",
+        "CLI-tagged",
+    ]
+
+
+def test_gui_tag_filter_preserves_selection_after_spelling_changes(
+    qt_app: QApplication,
+) -> None:
+    """A refresh from CLI spelling to promoted spelling must keep the logical selection."""
+    coordinator = _build_coordinator(_ManagerStub())
+    panel = PromptFilterPanel(sort_options=[])
+    before = [_prompt("First", is_favorite=False, tags=["ops"])]
+    after = [_prompt("Second", is_favorite=False, tags=["Ops"])]
+    coordinator.populate_filters(panel, before, pending_category_slug=None, pending_tag_value="ops")
+
+    coordinator.populate_filters(panel, after, pending_category_slug=None, pending_tag_value=None)
+
+    assert panel.tag_value() == "Ops"
+    assert [prompt.name for prompt in coordinator.apply_filters(panel, after)] == ["Second"]

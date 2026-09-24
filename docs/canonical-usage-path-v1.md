@@ -34,6 +34,8 @@ If the captured item is worth keeping, use **`Promote Draft`** from the detail v
 Expected result:
 - the draft becomes a normal reusable prompt asset
 - title, category, tags, source, and note can be cleaned up without leaving the existing detail flow
+- the **Tags** field accepts comma-separated names (for example `Ops, Review`); on promotion it replaces the draft's full tag list, including when cleared. Unlike CLI `prompt-tag <prompt> add|remove <tag>`, it does not mutate one tag at a time
+- existing tag spellings are displayed as saved; the catalog tag filter and CLI tag commands treat case variants such as `Ops` and `ops` as one logical tag. No stored tags are renamed automatically
 - similar or duplicate cues may appear, but the operator stays in control
 
 ### 3. Reopen it later with `Recent` or search

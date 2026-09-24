@@ -11,6 +11,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 from core import PromptManager, PromptManagerError
+from core.prompt_tagging import build_tag_catalog
 from models.category_model import slugify_category
 
 if TYPE_CHECKING:
@@ -100,10 +101,13 @@ class PromptListCoordinator:
         if target_category and panel.category_slug() == target_category:
             pending_category_slug = None
 
-        tags = sorted({tag for prompt in prompts for tag in prompt.tags})
+        tags = sorted(
+            (record.tag for record in build_tag_catalog(prompts)),
+            key=lambda tag: (tag.casefold(), tag),
+        )
         target_tag = panel.tag_value() or pending_tag_value
         panel.set_tags(tags, target_tag)
-        if target_tag and panel.tag_value() == target_tag:
+        if target_tag and (panel.tag_value() or "").casefold() == target_tag.strip().casefold():
             pending_tag_value = None
 
         return pending_category_slug, pending_tag_value
@@ -128,7 +132,10 @@ class PromptListCoordinator:
                 prompt_slug = self._prompt_category_slug(prompt)
                 if prompt_slug != selected_category:
                     continue
-            if selected_tag and selected_tag not in prompt.tags:
+            if selected_tag and not any(
+                tag.strip().casefold() == selected_tag.strip().casefold()
+                for tag in prompt.tags or []
+            ):
                 continue
             if favorites_only and not prompt.is_favorite:
                 continue

@@ -5,6 +5,8 @@ All notable changes to **Prompt Manager** will be documented in this file.
 ## [Unreleased]
 
 ### Fixed
+- The GUI tag filter now uses the CLI's case-insensitive logical-tag catalog: case variants appear once, selecting either spelling finds all matching prompts, and a spelling change does not discard the active filter. Stored tag spelling and prompt detail remain unchanged.
+- Clarified that `Promote Draft` replaces the complete comma-separated tag list, while CLI `prompt-tag` adds or removes one tag at a time.
 - Local GUI startup no longer requires a LiteLLM fast model or API key. Invalid settings and unavailable local services still fail during configuration/service initialization; model execution remains unavailable with clear guidance until configured. Provider-free GUI capture, catalog, copy, and workspace handoff work with deterministic embeddings.
 
 ## [0.23.3] - 2026-09-23

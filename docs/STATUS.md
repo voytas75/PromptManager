@@ -101,6 +101,10 @@ If not, it should not lead the next cycle.
 
 ## Current implementation checkpoint — 2026-09-24
 
+**GUI/CLI tag parity — bounded correction**
+- Promoted draft tags remain a comma-separated full-list replacement; CLI `prompt-tag` changes one tag. Both routes retain saved spelling. The GUI tag dropdown now uses the canonical CLI logical-tag catalog (case-insensitive, one option per tag), and selection/filter matching survive spelling changes.
+- Focused regression covers case variants across prompts and refresh selection. No stored tag rewrite, provider call, or user database change. Verification and delivery state: `docs/plans/2026-09-24-gui-cli-tag-parity-v1.md`.
+
 **Local-first GUI startup — bounded correction**
 - Removed the default-mode gate that treated absent LiteLLM model/key as a blocker for opening the local GUI. Settings validation and local service initialization still own critical failures; diagnostics continue to report model availability, and execution stays guarded when offline.
 - Added an isolated provider-free GUI operator-path regression: real entrypoint and Qt window, Quick Capture draft saved to temporary SQLite/ChromaDB, detail selection, Copy Prompt, Open in Workspace, and a refused model run.

@@ -139,8 +139,19 @@ class PromptFilterPanel(QWidget):
             for tag in tags:
                 self._tag_combo.addItem(tag, tag)
             target = selected_tag or ""
-            index = self._tag_combo.findData(target) if target else 0
-            self._tag_combo.setCurrentIndex(index if index != -1 else 0)
+            if target:
+                target_key = target.strip().casefold()
+                index = next(
+                    (
+                        index
+                        for index in range(1, self._tag_combo.count())
+                        if self._tag_combo.itemData(index).casefold() == target_key
+                    ),
+                    0,
+                )
+            else:
+                index = 0
+            self._tag_combo.setCurrentIndex(index)
         finally:
             self._tag_combo.blockSignals(False)
         self._update_tag_visibility_label()
