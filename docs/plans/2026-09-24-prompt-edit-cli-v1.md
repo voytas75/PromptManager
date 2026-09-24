@@ -1,6 +1,6 @@
 # PromptManager — controlled `prompt-edit` CLI v1
 
-Status: locally verified; delivery approved, pending remote verification; no user catalog mutated
+Status: implemented and published on `origin/master`; exact-SHA Quality Gates confirmed; no user catalog mutated
 Product authority: `docs/product-ssot.md` (prompt metadata and controlled automation)
 Related diagnostic contract: `docs/plans/2026-09-24-doctor-cli-contract-and-migration-v1.md`
 
@@ -42,7 +42,8 @@ prompt-manager prompt-edit <prompt-uuid> set \
 1. Verified normal `update_prompt` may write the whole row (and version a changed body), whereas CLI metadata maintenance needs one column. A scratch SQLite probe showed backing up from the same connection under `BEGIN IMMEDIATE` blocks; using a second read connection while holding the write lock succeeded. No provider/index bootstrap is needed for this CLI path.
 2. Added real-process tests before implementation (RED: `prompt-edit` initially rejected by parser). Tests now cover console script + `python -m main` help, JSON/text preview, apply/backup/readback/doctor, valid target UUID, stale expectation, invalid list/unsupported field, missing catalog/ID, backup collision, no-op and pending WAL. A test checks no version/activity additions and unchanged description/body.
 3. Implemented `cli/prompt_edit.py`, dedicated parser/dispatch in installed console script and module entry point, without routing through the manager. First and only allowlisted field is `related_prompts`. The existing `doctor` code remains unchanged.
-4. Final provider-free full suite after guard and test refinements: `998 passed, 1 skipped`, core coverage `81.66%` (`QT_QPA_PLATFORM=offscreen .venv/bin/pytest -n auto --cov=core --cov-report=term-missing --cov-fail-under=80`). Ruff lint+format, full strict Pyright, `uv lock --check` and `git diff --check` passed. Real-process tests use the installed console script and disposable catalog; no real user catalog was edited. Commit/push and exact-SHA CI: **to verify**.
+4. Final provider-free full suite after guard and test refinements: `998 passed, 1 skipped`, core coverage `81.66%` (`QT_QPA_PLATFORM=offscreen .venv/bin/pytest -n auto --cov=core --cov-report=term-missing --cov-fail-under=80`). Ruff lint+format, full strict Pyright, `uv lock --check` and `git diff --check` passed. Real-process tests use the installed console script and disposable catalog; no real user catalog was edited.
+5. Delivered feature commit `2cc3e4c14f1e526196ef05cdc85026cea230f8c2` to `origin/master`; local `HEAD`, tracking branch and remote SHA matched. Exact-SHA GitHub Quality Gates [run 36063036058](https://github.com/voytas75/PromptManager/actions/runs/36063036058) succeeded (Ruff, Pyright, Pytest and clean tree). This ledger-only closeout commit and its CI: **to verify**.
 
 ## Done and stop conditions
 
