@@ -152,6 +152,10 @@ class PromptSearchController:
 
     def _handle_search_request(self, text: str, *, use_indicator: bool) -> None:
         stripped = text.strip()
+        # A short request does not fetch results; leave the last loaded view's
+        # search and sort cues untouched rather than attributing it to new text.
+        if text and len(stripped) < 2:
+            return
         self._search_active = bool(stripped)
 
         panel = self._filter_panel_supplier()
@@ -159,8 +163,6 @@ class PromptSearchController:
             panel.set_active_search_text(stripped)
             panel.set_sort_enabled(not self._search_active)
 
-        if text and len(stripped) < 2:
-            return
         self._load_prompts(text, use_indicator=use_indicator)
 
 

@@ -318,6 +318,51 @@ def test_filter_panel_search_summary_uses_live_query_text_and_resets_when_search
     assert summary.text() == "Showing all prompts"
 
 
+def test_short_search_request_keeps_last_loaded_search_state(
+    qt_app: QApplication,
+) -> None:
+    """An unsubmitted one-character query cannot label old results as its own."""
+    panel = _build_panel()
+    loads: list[str] = []
+
+    def load_prompts(search_text: str = "", *, use_indicator: bool = False) -> None:
+        del use_indicator
+        loads.append(search_text)
+
+    controller = PromptSearchController(
+        parent=panel,
+        manager=_build_manager_stub(),
+        presenter_supplier=_presenter_supplier(_PresenterStub()),
+        filter_panel_supplier=lambda: panel,
+        layout_controller=_layout_controller_stub(_LayoutControllerStub()),
+        load_prompts=load_prompts,
+        current_search_text=lambda: "",
+        select_prompt=lambda _prompt_id: None,
+    )
+    summary = panel.findChild(QLabel, "activeNarrowingSummaryLabel")
+    assert summary is not None
+
+    controller.search_requested("x", use_indicator=False)
+    assert loads == []
+    assert panel.is_sort_enabled()
+    assert summary.text() == "Showing all prompts"
+
+    controller.search_requested("incident", use_indicator=False)
+    assert loads == ["incident"]
+    assert not panel.is_sort_enabled()
+    assert summary.text() == "Showing prompts narrowed by search: incident"
+
+    controller.search_requested("z", use_indicator=False)
+    assert loads == ["incident"]
+    assert not panel.is_sort_enabled()
+    assert summary.text() == "Showing prompts narrowed by search: incident"
+
+    controller.search_changed("")
+    assert loads == ["incident", ""]
+    assert panel.is_sort_enabled()
+    assert summary.text() == "Showing all prompts"
+
+
 def test_filter_panel_reset_restores_neutral_summary_after_search_and_filters_clear(
     qt_app: QApplication,
 ) -> None:

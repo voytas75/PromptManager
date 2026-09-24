@@ -163,11 +163,17 @@ If not, it should not lead the next cycle.
 - The blocking CI type gate is intentionally `pyright main.py config models`, matching `.github/workflows/quality-gates.yml` and `docs/README-DEV.md`. Full configured strict Pyright remains a non-blocking debt scan; at this checkpoint it reports `283 errors`, chiefly outside the CI scope. It must not be described as green or as CI parity.
 - The stale local `PROMPT_MANAGER_CONFIG_JSON` override remains an environment condition, not a repository regression: an explicit missing config path intentionally fails closed.
 
-**Current next slice**
-1. Active product sequence: `docs/plans/2026-09-22-instant-fit-judgment-v1.md` records the completed Stage A; `docs/plans/2026-09-22-intentional-capture-continuity-v1.md` is the active Stage B execution ledger.
-2. Stage B adds only an explicit, operator-triggered Clipboard → editable Quick Capture draft preview; background watching, global hotkeys, automatic saves, providers, persistence changes, and a new capture flow remain out of scope.
-3. Do not add another CLI, provider, chain, or integration surface without a separate product decision.
-4. Treat Pyright expansion and Chroma/Dependabot review as separate, explicitly scoped maintenance work.
+**Latest asset-loop slice — short search state continuity (locally verified; remote delivery not requested)**
+- A non-empty one-character toolbar search request now returns before changing active search, filter summary, or sort availability. Because no results were loaded, previously displayed results retain their own cues rather than being mislabeled as matches for the short text.
+- Focused RED reproduced the stale-cue state; GREEN panel/controller suite: `14 passed`, and the complete suite: `958 passed, 1 skipped`, core coverage 80.97%, Ruff, format, strict Pyright, lock and diff check clean. Local commit to verify; remote CI not verified. Ledger: `docs/plans/2026-09-24-short-search-state-continuity-v1.md`.
+
+**Next product slice:** choose another concrete find → inspect → reuse/refine hesitation only after this local slice's full gates and checkpoint. Do not reopen delivered wording by default.
+
+**Older 2026-09-22 checkpoint (closed)**
+1. `docs/plans/2026-09-22-instant-fit-judgment-v1.md` (Stage A) and `docs/plans/2026-09-22-intentional-capture-continuity-v1.md` (Stage B) are completed ledgers, not the active next item.
+2. Stage B delivered the explicit Clipboard → editable Quick Capture draft preview. Background watching, global hotkeys, automatic saves, providers, persistence changes, and a new capture flow remain out of scope.
+3. Another CLI, provider, chain, or integration surface needs a separate product decision.
+4. Pyright expansion and Chroma/Dependabot review remain separately scoped maintenance work.
 
 Historical checkpoints below retain their original revision-specific evidence.
 
