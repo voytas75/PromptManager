@@ -13,7 +13,7 @@ import tempfile
 import textwrap
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, NoReturn, cast
 
 ROOT_COMMAND_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
     (
@@ -85,7 +85,29 @@ _ROOT_HELP_COMMAND_COLUMN = 34
 _ROOT_HELP_OPTION_COLUMN = 34
 
 
-class _RootHelpParser(argparse.ArgumentParser):
+class _DoctorUsageParser(argparse.ArgumentParser):
+    """Hide user-supplied argument text in doctor JSON parse failures."""
+
+    def error(self, message: str) -> NoReturn:
+        arguments = sys.argv[1:]
+        if "doctor" in arguments and "--json" in arguments[arguments.index("doctor") + 1 :]:
+            print(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "error": {
+                            "code": "INVALID_USAGE",
+                            "message": "Invalid doctor command or arguments",
+                        },
+                    }
+                ),
+                file=sys.stderr,
+            )
+            self.exit(2)
+        super().error(message)
+
+
+class _RootHelpParser(_DoctorUsageParser):
     """Render a grouped root help card without changing subcommand parsers."""
 
     subparsers_action: argparse._SubParsersAction[Any] | None = None  # pyright: ignore[reportPrivateUsage]
@@ -348,19 +370,84 @@ def parse_args() -> argparse.Namespace:
         help="Skip launching the GUI and exit once services are initialised.",
     )
 
-    subparsers = parser.add_subparsers(dest="command")
+    subparsers = parser.add_subparsers(dest="command", parser_class=_DoctorUsageParser)
     parser.subparsers_action = subparsers
 
     doctor_parser = subparsers.add_parser(
         "doctor",
-        help="Read-only, provider-free health check (no writes or network).",
+        help="Provider-free checks; read-only except explicit analytics CSV export.",
         description=(
-            "Inspect local readiness without creating files, contacting providers or changing data."
+            "Inspect local readiness without contacting providers or changing data. "
+            "Only analytics --export-csv PATH creates a new file."
         ),
     )
     doctor_parser.add_argument(
         "--json", action="store_true", help="Emit a single versioned JSON diagnosis."
     )
+    doctor_subparsers = doctor_parser.add_subparsers(
+        dest="doctor_command", parser_class=_DoctorUsageParser
+    )
+    catalog_doctor = doctor_subparsers.add_parser(
+        "catalog",
+        help="Audit existing prompt and chain records without providers or writes.",
+        description=(
+            "Read-only catalog integrity audit. Does not inspect the vector index or repair data."
+        ),
+    )
+    catalog_doctor.add_argument(
+        "--json",
+        action="store_true",
+        dest="catalog_json",
+        help="Emit sanitized catalog codes and counts as JSON.",
+    )
+    config_doctor = doctor_subparsers.add_parser(
+        "config",
+        help="Inspect effective settings without disclosing secrets or contacting providers.",
+    )
+    config_doctor.add_argument("--json", action="store_true", dest="doctor_json")
+    config_doctor.add_argument(
+        "--details", action="store_true", help="Show sanitized source and configuration detail."
+    )
+    embeddings_doctor = doctor_subparsers.add_parser(
+        "embeddings", help="Inspect embedding readiness offline; no provider call or vector writes."
+    )
+    embeddings_doctor.add_argument("--json", action="store_true", dest="doctor_json")
+    analytics_doctor = doctor_subparsers.add_parser(
+        "analytics",
+        help="Report local execution counts without probes; writes only with --export-csv.",
+    )
+    analytics_doctor.add_argument("--json", action="store_true", dest="doctor_json")
+    analytics_doctor.add_argument(
+        "--export-csv",
+        type=Path,
+        default=None,
+        help="Explicitly create a CSV summary at PATH (refuses to overwrite an existing file).",
+    )
+    prompt_doctor = doctor_subparsers.add_parser(
+        "prompt", help="Validate, lint, or test one stored prompt without providers or writes."
+    )
+    prompt_doctor.add_argument(
+        "reference", help="Prompt UUID or exact name (ambiguous names fail)."
+    )
+    prompt_checks = prompt_doctor.add_subparsers(
+        dest="doctor_action", required=True, parser_class=_DoctorUsageParser
+    )
+    for action in ("validate", "lint", "test"):
+        action_parser = prompt_checks.add_parser(action, help=f"Run local prompt {action} checks.")
+        action_parser.add_argument("--json", action="store_true", dest="doctor_json")
+        if action == "test":
+            action_parser.add_argument(
+                "--suite", type=Path, required=True, help="Local JSON fixture suite to run."
+            )
+    chain_doctor = doctor_subparsers.add_parser(
+        "chain", help="Validate a local chain definition without persistence or providers."
+    )
+    chain_doctor.add_argument("path", type=Path, help="JSON chain definition file.")
+    chain_checks = chain_doctor.add_subparsers(
+        dest="doctor_action", required=True, parser_class=_DoctorUsageParser
+    )
+    chain_validate = chain_checks.add_parser("validate", help="Validate local chain structure.")
+    chain_validate.add_argument("--json", action="store_true", dest="doctor_json")
 
     export_parser = subparsers.add_parser(
         "catalog-export",

@@ -25,6 +25,8 @@ def _parser_command_names() -> set[str]:
             continue
         if not isinstance(node.func, ast.Attribute) or node.func.attr != "add_parser":
             continue
+        if not isinstance(node.func.value, ast.Name) or node.func.value.id != "subparsers":
+            continue
         if not node.args:
             continue
         first_argument = node.args[0]

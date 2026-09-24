@@ -32,7 +32,22 @@ if __name__ == "__main__":
     if getattr(_early_args, "command", None) == "doctor":
         from cli.doctor import run_doctor as _early_run_doctor
 
-        raise SystemExit(_early_run_doctor(json_output=bool(_early_args.json)))
+        raise SystemExit(
+            _early_run_doctor(
+                json_output=bool(
+                    _early_args.json
+                    or getattr(_early_args, "catalog_json", False)
+                    or getattr(_early_args, "doctor_json", False)
+                ),
+                command=_early_args.doctor_command,
+                details=bool(getattr(_early_args, "details", False)),
+                export_csv=getattr(_early_args, "export_csv", None),
+                action=getattr(_early_args, "doctor_action", None),
+                reference=getattr(_early_args, "reference", None),
+                suite=getattr(_early_args, "suite", None),
+                path=getattr(_early_args, "path", None),
+            )
+        )
 
 try:
     from config import load_settings
@@ -168,7 +183,20 @@ def main() -> int:
     if getattr(args, "command", None) == "doctor":
         from cli.doctor import run_doctor
 
-        return run_doctor(json_output=bool(args.json))
+        return run_doctor(
+            json_output=bool(
+                args.json
+                or getattr(args, "catalog_json", False)
+                or getattr(args, "doctor_json", False)
+            ),
+            command=args.doctor_command,
+            details=bool(getattr(args, "details", False)),
+            export_csv=getattr(args, "export_csv", None),
+            action=getattr(args, "doctor_action", None),
+            reference=getattr(args, "reference", None),
+            suite=getattr(args, "suite", None),
+            path=getattr(args, "path", None),
+        )
     _runtime_setup_logging(args.logging_config)
 
     logger = logging.getLogger("prompt_manager.main")

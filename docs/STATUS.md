@@ -22,7 +22,7 @@ Do not use this file as a second product SSOT or a competing roadmap.
 
 ## Current product posture
 
-- Bounded CLI trust support: `doctor [--json]` has a locally verified, shallow, read-only/provider-free entry path for config and existing SQLite metadata. Record-level catalog audit and nested `doctor` commands remain pending under `docs/plans/2026-09-24-doctor-cli-contract-and-migration-v1.md`; legacy detailed commands remain available. Remote delivery and exact-SHA CI are still to verify.
+- Bounded CLI trust support: stage 1 `doctor [--json]` shipped as `7487bbf` with exact-SHA Quality Gates success. Locally verified stages 2–5 add `doctor catalog`, offline config/embedding readiness, a local analytics counts report, targeted prompt/chain validators and synced help/docs; immutable reads and sanitized results. CSV is written only when explicitly requested; live providers were not called. Legacy commands remain available. Commit/push and remote CI for stages 2–5 remain to verify under `docs/plans/2026-09-24-doctor-cli-contract-and-migration-v1.md`.
 
 PromptManager remains:
 

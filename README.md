@@ -109,6 +109,10 @@ The installed application command is `prompt-manager`. Start with a provider-fre
 ```bash
 prompt-manager doctor
 prompt-manager doctor --json
+prompt-manager doctor catalog --json
+prompt-manager doctor config --details
+prompt-manager doctor embeddings --json
+prompt-manager doctor analytics --json
 ```
 
 `doctor` reports whether effective settings and existing SQLite catalog metadata can be read, and marks embedding and model access as unprobed; it does not create files, repair data, or call a provider. A missing model/API key warns without failing the local catalog. When a live SQLite WAL has pending data, the shallow read-only check fails closed rather than claiming a current snapshot. For detailed configuration and the existing specialist checks, use:
@@ -117,7 +121,7 @@ prompt-manager doctor --json
 prompt-manager --no-gui --print-settings
 ```
 
-When working from a repository checkout, the equivalent module command is `python -m main doctor` (and `uv run python -m main doctor` when using uv). Nested `doctor` subcommands are not available yet; `catalog-check`, `diagnostics`, and prompt/chain validators remain supported.
+`doctor catalog` audits existing prompt/chain records without repairing them or contacting providers; it reports codes and counts, not prompt bodies. It refuses pending WAL data rather than silently reading an old snapshot. `doctor config --details` shows only allowlisted source/availability flags (no credentials, DSNs, or raw paths). `doctor embeddings` reports offline configuration readiness, not actual connectivity. `doctor analytics` is a **report, not health**: it counts local executions and never probes providers. It writes a CSV only if `--export-csv PATH` is given, and refuses to overwrite. For a single stored prompt, `doctor prompt <uuid-or-exact-name> validate|lint|test` runs bounded, sanitized local checks; `test` requires `--suite PATH`. `doctor chain <definition-file> validate` checks a local JSON definition. When working from a repository checkout, the equivalent module command is `python -m main doctor` (or `uv run python -m main doctor`). Live probes remain planned; `catalog-check`, `diagnostics`, and existing prompt/chain validator aliases remain supported.
 
 ### 4. Add a prompt from JSON, inline fields, stdin, or an input file (optional)
 

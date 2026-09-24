@@ -15,7 +15,16 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any, cast
 
-from jinja2 import Environment, StrictUndefined, Template, TemplateSyntaxError, UndefinedError, meta
+from jinja2 import (
+    Environment,
+    StrictUndefined,
+    Template,
+    TemplateSyntaxError,
+    UndefinedError,
+    meta,
+    nodes,
+)
+from jinja2.sandbox import SandboxedEnvironment
 from jsonschema import Draft202012Validator, exceptions as jsonschema_exceptions
 from pydantic import BaseModel, Field, ValidationError, create_model
 
@@ -180,6 +189,63 @@ class TemplateRenderer:
             return {match.group("name")}
         stripped = message.strip().strip("'")
         return {stripped} if stripped else set()
+
+
+class DoctorFixtureRenderer(TemplateRenderer):
+    """Allow only bounded literal text and scalar variable substitution in doctor."""
+
+    _MAX_INPUT = 8192
+    _MAX_OUTPUT = 16384
+
+    def __init__(self) -> None:
+        """Keep only data-only filters and no built-in Jinja globals."""
+        super().__init__()
+        sandbox = SandboxedEnvironment(
+            undefined=StrictUndefined,
+            autoescape=False,
+            trim_blocks=True,
+            lstrip_blocks=True,
+        )
+        sandbox.globals.clear()
+        sandbox.filters.update(self._env.filters)
+        self._env = sandbox
+
+    def render(self, template_text: str, variables: Mapping[str, Any]) -> TemplateRenderResult:
+        """Reject executable Jinja expressions and oversized fixture expansion."""
+        rejected = TemplateRenderResult(
+            rendered_text="", errors=["Unsupported doctor fixture template"]
+        )
+        if len(template_text) > self._MAX_INPUT or len(variables) > 32:
+            return rejected
+        if any(
+            not isinstance(value, (str, int, float, bool, type(None)))
+            or len(str(value)) > self._MAX_INPUT
+            for value in variables.values()
+        ):
+            return rejected
+        try:
+            syntax = self._env.parse(template_text)
+        except TemplateSyntaxError:
+            return rejected
+        length = 0
+        for statement in syntax.body:
+            if not isinstance(statement, nodes.Output):
+                return rejected
+            for part in statement.nodes:
+                if isinstance(part, nodes.TemplateData):
+                    length += len(part.data)
+                elif isinstance(part, nodes.Name) and part.ctx == "load":
+                    if part.name not in variables:
+                        return rejected
+                    length += len(str(variables[part.name]))
+                else:
+                    return rejected
+                if length > self._MAX_OUTPUT:
+                    return rejected
+        result = super().render(template_text, variables)
+        if len(result.rendered_text) > self._MAX_OUTPUT:
+            return rejected
+        return result
 
 
 class SchemaValidationMode(Enum):
@@ -382,6 +448,7 @@ class SchemaValidator:
 
 __all__ = [
     "TemplateRenderer",
+    "DoctorFixtureRenderer",
     "TemplateRenderResult",
     "SchemaValidator",
     "SchemaValidationResult",
