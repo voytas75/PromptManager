@@ -1,6 +1,6 @@
 # PromptManager — documentation claim closeout v1
 
-Status: completed locally; delivery authorized, exact-SHA CI pending
+Status: delivered; correction commit exact-SHA CI verified
 Date: 2026-09-24
 Baseline: `603856c34312103e919af2e48e15e3dc3c2daa32` on clean `master...origin/master`
 Product authority: `docs/product-ssot.md`
@@ -26,10 +26,11 @@ Close the three confirmed documentation findings from the read-only audit withou
 - 2026-09-24 — Independent review found two in-scope corrections before closeout: the guide conflated workspace-only web-context condensation with the Chain path, and this ledger called `Unreleased` a release heading. Both are corrected against `gui/controllers/execution_controller.py` and `core/prompt_manager/chains.py`; final verification below. Historical `0.22.3` changelog wording remains a dated record, not active guidance.
 - 2026-09-24 — Item 4 completed locally: focused provider-free `QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q tests/test_cli_help_contract_docs.py tests/test_prompt_chain_cli.py tests/test_offline_gui_startup.py` passed (31 tests). Final claim assertions confirmed the CLI/chain execution boundary, workspace-only web-context condensation, current authority pointers, unchanged nonblank `0.23.0` release content, and 80 unique numbered release headings plus `Unreleased`. All 22 Markdown/HTML links or images in the four changed files resolve; `git diff --check` passed. Exact inventory: three modified Markdown files (`docs/README-DEV.md`, `docs/session-restart-brief-2026-04-06-slice-guidelines.md`, `docs/CHANGELOG.md`) and this one untracked ledger. No application code or tests changed.
 - 2026-09-24 — User separately authorized commit and push. Delivery and exact-SHA CI are pending verification; no remote success is implied by this note.
+- 2026-09-24 — Delivery verification: correction plus this ledger were committed as `844f4408bc2ebcb4875e62eabf4f23baeb78ba30` and pushed to `origin/master`. After fetch, local `HEAD`, tracking `origin/master`, and `git ls-remote --heads origin master` matched. Exact-SHA [Quality Gates 36051828037](https://github.com/voytas75/PromptManager/actions/runs/36051828037) completed successfully, including Ruff, CI-scope Pyright, pytest and clean-tree checks. This status update is a separate documentation-only closeout; its own remote SHA/CI are to verify after publication.
 
 ## Completion / next decision
 
-All four items are complete locally. The independent review's in-scope findings were reconciled and the final claims and changed-file inventory rechecked. Historical `docs/CHANGELOG.md` text under `0.22.3` still records its then-current “offline-only” wording; it is not current operator guidance. Commit/push have been authorized; delivery and exact-SHA CI remain to verify.
+All four items are delivered and verified at correction commit `844f4408bc2ebcb4875e62eabf4f23baeb78ba30`. The independent review's in-scope findings were reconciled and the final claims and changed-file inventory rechecked. Historical `docs/CHANGELOG.md` text under `0.22.3` still records its then-current “offline-only” wording; it is not current operator guidance. Closeout-commit delivery and CI are checked separately.
 
 Separate follow-up candidates, **not authorized by this slice**:
 - First-run guides: distinguish provider-free `doctor` from headless `--print-settings`/GUI startup requiring an existing JSON config (isolated `.env.example`-only non-interactive `--print-settings` exited 2; with copied JSON config exited 0). Also disclose the template's JSON-over-env model/embedding selections in the main README.
