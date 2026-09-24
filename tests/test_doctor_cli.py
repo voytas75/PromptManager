@@ -738,6 +738,224 @@ def test_doctor_analytics_reads_aggregate_without_probe_or_writes(tmp_path: Path
         } == before
 
 
+def test_doctor_analytics_live_uses_one_bounded_probe_and_keeps_counts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from types import SimpleNamespace
+
+    from cli import doctor
+    from core import litellm_adapter
+
+    db = tmp_path / "catalog.db"
+    PromptRepository(str(db))
+    requests: list[dict[str, object]] = []
+
+    def embedding(**kwargs: object) -> dict[str, object]:
+        requests.append(kwargs)
+        return {"data": [{"embedding": [0.2, 0.3, 0.4]}]}
+
+    monkeypatch.setattr(litellm_adapter, "get_embedding", lambda: (embedding, Exception))
+    monkeypatch.setattr(
+        doctor,
+        "load_settings",
+        lambda: SimpleNamespace(
+            db_path=db,
+            embedding_backend="litellm",
+            embedding_model="azure/synthetic-embedding",
+            litellm_api_key="private-key",
+            litellm_api_base="https://example.openai.azure.com/",
+            litellm_api_version="2024-01-01",
+            embedding_device=None,
+        ),
+    )
+    assert doctor.run_doctor(command="analytics", json_output=True) == 0
+    offline = json.loads(capsys.readouterr().out)
+    assert "probe" not in offline
+    assert requests == []
+    assert doctor.run_doctor(command="analytics", json_output=True, live=True) == 0
+    output = capsys.readouterr()
+    assert output.err == ""
+    result = json.loads(output.out)
+    assert result["kind"] == "report_not_health"
+    assert result["report"] == {"total_runs": 0, "success_runs": 0}
+    assert result["probe"] == {
+        "performed": True,
+        "backend_dimension": 3,
+        "vector_index": "not_inspected",
+        "code": "EMBEDDING_BACKEND_REACHABLE",
+        "status": "OK",
+    }
+    assert len(requests) == 1
+    assert requests[0]["timeout"] == 15
+    assert requests[0]["num_retries"] == 0
+    assert "private-key" not in output.out
+
+
+def test_doctor_analytics_live_failed_preflight_never_calls_provider(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from types import SimpleNamespace
+
+    from cli import doctor
+
+    db = tmp_path / "catalog.db"
+    PromptRepository(str(db))
+    monkeypatch.setattr(doctor, "load_settings", lambda: SimpleNamespace(db_path=db))
+
+    def unexpected_probe(_settings: object) -> tuple[object, None]:
+        pytest.fail("Unexpected live probe")
+
+    monkeypatch.setattr(doctor, "_live_embedding_check", unexpected_probe)
+    existing = tmp_path / "existing.csv"
+    existing.write_text("preserve", encoding="utf-8")
+    assert (
+        doctor.run_doctor(command="analytics", live=True, json_output=True, export_csv=existing)
+        == 1
+    )
+    assert json.loads(capsys.readouterr().out)["code"] == "EXPORT_EXISTS"
+    assert existing.read_text(encoding="utf-8") == "preserve"
+    db.write_bytes(b"not sqlite")
+    assert doctor.run_doctor(command="analytics", live=True, json_output=True) == 1
+    assert json.loads(capsys.readouterr().out)["code"] == "DB_UNREADABLE"
+    db.unlink()
+    assert doctor.run_doctor(command="analytics", live=True, json_output=True) == 0
+    first_run = json.loads(capsys.readouterr().out)
+    assert first_run["code"] == "DB_NOT_CREATED"
+    assert "probe" not in first_run
+
+
+def test_doctor_analytics_live_help_warns_of_provider_cost(tmp_path: Path) -> None:
+    for invoke in (_invoke, _console_invoke):
+        for arguments in (("--help",), ("analytics", "--help")):
+            result = invoke(tmp_path, None, *arguments)
+            assert result.returncode == 0, result.stderr
+            assert "--live" in result.stdout
+            assert "provider" in result.stdout.lower()
+        leaf = invoke(tmp_path, None, "analytics", "--help")
+        assert "cost" in leaf.stdout.lower()
+
+
+@pytest.mark.parametrize("module", ["cli.entrypoint", "main"])
+def test_doctor_analytics_live_routes_through_entrypoint_without_network(
+    tmp_path: Path, module: str
+) -> None:
+    config = _config(tmp_path)
+    PromptRepository(str(tmp_path / "catalog.db"))
+    script = """
+import importlib
+import sys
+from types import SimpleNamespace
+from cli import doctor
+from core import litellm_adapter
+
+requests = []
+def embedding(**kwargs):
+    requests.append(kwargs)
+    return {"data": [{"embedding": [0.1, 0.2]}]}
+litellm_adapter.get_embedding = lambda: (embedding, Exception)
+doctor.load_settings = lambda: SimpleNamespace(
+    db_path=DB_PATH, embedding_backend="litellm",
+    embedding_model="synthetic", litellm_api_key="test-key",
+    litellm_api_base=None, litellm_api_version=None, embedding_device=None,
+)
+sys.argv = ["prompt-manager", "doctor", "analytics", "--live", "--json"]
+exit_code = importlib.import_module(MODULE).main()
+assert len(requests) == 1
+assert requests[0]["timeout"] == 15
+assert requests[0]["num_retries"] == 0
+raise SystemExit(exit_code)
+""".replace("DB_PATH", f"__import__('pathlib').Path({str(tmp_path / 'catalog.db')!r})").replace(
+        "MODULE", repr(module)
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=tmp_path,
+        env=_environment(tmp_path, config),
+        capture_output=True,
+        text=True,
+        timeout=40,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    report = json.loads(result.stdout)
+    assert report["probe"]["code"] == "EMBEDDING_BACKEND_REACHABLE"
+    assert report["report"] == {"total_runs": 0, "success_runs": 0}
+    assert "test-key" not in result.stdout
+
+
+def test_doctor_analytics_live_failure_is_sanitized_and_not_retried(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from types import SimpleNamespace
+
+    from cli import doctor
+    from core import litellm_adapter
+
+    db = tmp_path / "catalog.db"
+    PromptRepository(str(db))
+    requests: list[dict[str, object]] = []
+
+    def failing_embedding(**kwargs: object) -> object:
+        requests.append(kwargs)
+        raise RuntimeError("private-key https://private-host.example/failure")
+
+    monkeypatch.setattr(litellm_adapter, "get_embedding", lambda: (failing_embedding, Exception))
+    monkeypatch.setattr(
+        doctor,
+        "load_settings",
+        lambda: SimpleNamespace(
+            db_path=db,
+            embedding_backend="litellm",
+            embedding_model="azure/synthetic-embedding",
+            litellm_api_key="private-key",
+            litellm_api_base="https://example.openai.azure.com/",
+            litellm_api_version="2024-01-01",
+            embedding_device=None,
+        ),
+    )
+    assert doctor.run_doctor(command="analytics", json_output=True, live=True) == 1
+    output = capsys.readouterr()
+    assert output.err == ""
+    report = json.loads(output.out)
+    assert report["report"] == {"total_runs": 0, "success_runs": 0}
+    assert report["probe"]["code"] == "EMBEDDING_PROBE_FAILED"
+    assert report["probe"]["performed"] is True
+    assert report["code"] == "EMBEDDING_PROBE_FAILED"
+    assert report["status"] == "FAIL"
+    assert len(requests) == 1
+    assert requests[0]["num_retries"] == 0
+    assert "private-key" not in output.out
+    assert "private-host" not in output.out
+
+
+def test_doctor_analytics_live_unconfigured_backend_is_not_probed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from types import SimpleNamespace
+
+    from cli import doctor
+    from core import litellm_adapter
+
+    db = tmp_path / "catalog.db"
+    PromptRepository(str(db))
+    monkeypatch.setattr(
+        litellm_adapter,
+        "get_embedding",
+        lambda: pytest.fail("Provider import/call on unsupported backend"),
+    )
+    monkeypatch.setattr(
+        doctor,
+        "load_settings",
+        lambda: SimpleNamespace(db_path=db, embedding_backend="deterministic"),
+    )
+    assert doctor.run_doctor(command="analytics", json_output=True, live=True) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "WARN"
+    assert result["probe"]["performed"] is False
+    assert result["probe"]["code"] == "EMBEDDING_LIVE_UNSUPPORTED"
+
+
 def test_doctor_analytics_export_is_explicit_and_non_overwriting(tmp_path: Path) -> None:
     config = _config(tmp_path)
     PromptRepository(str(tmp_path / "catalog.db"))

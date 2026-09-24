@@ -375,10 +375,11 @@ def parse_args() -> argparse.Namespace:
 
     doctor_parser = subparsers.add_parser(
         "doctor",
-        help="Provider-free checks; read-only except explicit analytics CSV export.",
+        help="Offline by default; explicit --live probes may contact a provider.",
         description=(
-            "Inspect local readiness without contacting providers or changing data. "
-            "Only analytics --export-csv PATH creates a new file."
+            "Inspect local readiness without providers or changes by default. "
+            "Explicit embeddings/analytics --live may contact a paid provider; "
+            "only analytics --export-csv PATH creates a new file."
         ),
     )
     doctor_parser.add_argument(
@@ -423,9 +424,18 @@ def parse_args() -> argparse.Namespace:
     )
     analytics_doctor = doctor_subparsers.add_parser(
         "analytics",
-        help="Report local execution counts without probes; writes only with --export-csv.",
+        help="Report local counts; optional --live probes the embedding backend.",
     )
     analytics_doctor.add_argument("--json", action="store_true", dest="doctor_json")
+    analytics_doctor.add_argument(
+        "--live",
+        action="store_true",
+        dest="doctor_live",
+        help=(
+            "After a readable local report, send one synthetic text to the configured "
+            "provider (network and cost possible); no vector-store writes."
+        ),
+    )
     analytics_doctor.add_argument(
         "--export-csv",
         type=Path,

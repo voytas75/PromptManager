@@ -464,8 +464,8 @@ def _diagnose_focused(command: str, *, details: bool, live: bool = False) -> dic
     return report
 
 
-def _diagnose_analytics(export_csv: Path | None) -> dict[str, object]:
-    """Summarize stored execution counts without constructing manager/providers."""
+def _diagnose_analytics(export_csv: Path | None, *, live: bool = False) -> dict[str, object]:
+    """Summarize stored counts; only an explicit live request probes the backend."""
     from core.repository.read_only_analytics import read_execution_counts
     from core.repository.read_only_catalog import CatalogReadError
 
@@ -521,6 +521,20 @@ def _diagnose_analytics(export_csv: Path | None) -> dict[str, object]:
             )
         else:
             report["exported"] = True
+    if live and report["ok"] and code == "ANALYTICS_REPORTED":
+        assert settings is not None
+        check, dimension = _live_embedding_check(settings)
+        report["probe"] = {
+            "performed": dimension is not None or check.code == "EMBEDDING_PROBE_FAILED",
+            "backend_dimension": dimension,
+            "vector_index": "not_inspected",
+            "code": check.code,
+            "status": check.status,
+        }
+        if check.status == "FAIL":
+            report.update(ok=False, status="FAIL", code=check.code, next_step=check.next_step)
+        elif check.status in {"WARN", "SKIP"}:
+            report.update(status="WARN", code=check.code, next_step=check.next_step)
     return report
 
 
@@ -689,13 +703,17 @@ def run_doctor(
                 print(f"Next: {catalog_report['next_step']}")
             return 0 if catalog_report["ok"] else 1
         if command == "analytics":
-            analytics_report = _diagnose_analytics(export_csv)
+            analytics_report = _diagnose_analytics(export_csv, live=live)
             if json_output:
                 print(json.dumps(analytics_report, ensure_ascii=False))
             else:
                 print(f"Doctor analytics (report, not health): {analytics_report['status']}")
                 if analytics_report["report"] is not None:
                     print(json.dumps(analytics_report["report"], ensure_ascii=False))
+                if "probe" in analytics_report:
+                    probe = analytics_report["probe"]
+                    assert isinstance(probe, dict)
+                    print(f"Embedding probe: {probe['status']} ({probe['code']})")
                 print(f"Next: {analytics_report['next_step']}")
             return 0 if analytics_report["ok"] else 1
         if command in {"prompt", "chain"}:
