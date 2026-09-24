@@ -1,6 +1,6 @@
 # Short search state continuity v1
 
-Status: locally committed as `52f7cddca47f057d185ebe2b50d47abd2730c950`; remote delivery not requested
+Status: delivered as `52f7cddca47f057d185ebe2b50d47abd2730c950` plus checkpoint `796f8bb1dd1028c5d473481dee7ac81ff3e00dad`; exact-SHA Quality Gates [36012781306](https://github.com/voytas75/PromptManager/actions/runs/36012781306) succeeded
 Owner: Wojtek / Prompt Manager Team
 Canonical plan: `docs/plans/2026-05-10-product-direction-ssot-next-cycle.md`
 
@@ -18,8 +18,8 @@ On the existing prompt-library toolbar, a one-character search request did not l
 
 - RED: `QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q tests/test_prompt_filter_panel.py::test_short_search_request_keeps_last_loaded_search_state` failed because sort was disabled after a one-character request with no load.
 - GREEN: the focused panel/controller suite passed (`14 passed`); Ruff lint/format, narrow strict Pyright and `git diff --check` passed.
-- Full provider-free gates passed: `958 passed, 1 skipped`, core coverage 80.97%, Ruff lint/format, full strict Pyright, `uv lock --check`, `git diff --check`. Remote CI remains unverified; no push is authorized in this slice.
+- Full provider-free gates passed: `958 passed, 1 skipped`, core coverage 80.97%, Ruff lint/format, full strict Pyright, `uv lock --check`, `git diff --check`. Commits `52f7cdd` and `796f8bb` reached `origin/master`; exact-SHA Quality Gates run `36012781306` succeeded.
 
 ## Next decision
 
-After local commit `52f7cdd`, choose the next user-visible asset-loop hesitation only on fresh evidence. Remote push/CI remain a separate delivery decision; do not multiply list-side guidance by default.
+After delivered commit `52f7cdd` and verified checkpoint `796f8bb`, choose the next user-visible asset-loop hesitation only on fresh evidence; do not multiply list-side guidance by default.
