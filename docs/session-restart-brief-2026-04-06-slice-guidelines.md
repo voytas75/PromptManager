@@ -1,16 +1,12 @@
 # PromptManager — Session Restart Brief
 
 Date: 2026-04-06
-Status: active restart brief
-Purpose: po resecie sesji używać tego pliku jako krótkiego, bieżącego kontekstu dla dalszych prac nad bounded slice'ami.
+Status: historical restart brief (guardrails and then-current slice context; not a current planning authority)
+Purpose: zachować wytyczne i stan serii bounded slice'ów z 2026-04-06. Dla bieżącej decyzji czytaj najpierw [`product-ssot.md`](product-ssot.md), [aktywny plan near-term](plans/2026-05-10-product-direction-ssot-next-cycle.md) i [`STATUS.md`](STATUS.md).
 
 ## Jak używać tego pliku po resecie
 
-Jeśli Wojtek powoła się na ten plik, traktuj go jako:
-- bieżący restart point,
-- skrót aktualnego stanu slice'ów,
-- zestaw wytycznych do dalszej pracy,
-- dokument nadrzędny dla tej serii małych wdrożeń, chyba że nowszy brief go zastąpi.
+Jeśli Wojtek powoła się na ten plik, traktuj go jako historyczny kontekst i wytyczne małych wdrożeń. Jego datowane stany i rekomendacje nie zastępują bieżącego SSOT, planu near-term ani statusu. Zweryfikuj kandydata na następny slice w aktualnym kodzie i testach przed ponownym planowaniem.
 
 ## Product center / SSOT posture
 
@@ -37,8 +33,9 @@ Nie rozlewać scope'u w stronę:
 
 Przy kolejnych decyzjach i briefach najpierw czytać:
 - `docs/product-ssot.md`
-- `docs/product-boundary-alignment-audit-2026-04-04.md`
-- ten plik
+- `docs/plans/2026-05-10-product-direction-ssot-next-cycle.md`
+- `docs/STATUS.md`
+- ten plik i `docs/product-boundary-alignment-audit-2026-04-04.md` tylko jako historyczne odniesienia
 
 Jeśli potrzebny jest kontekst wdrożeniowy dla reuse lub nowszych bounded review:
 - `docs/implementation-review-2026-04-06-reuse-polish-v1.md`
@@ -167,13 +164,13 @@ W odpowiedzi końcowej zawsze podać:
 
 ## Next-session default posture
 
-Po resecie nie wracać do starych tematów z rozpędu.
+Historyczna wskazówka z tego briefu: po resecie nie wracać do starych tematów z rozpędu. Bieżący wybór slice'a wynika z aktywnego planu i świeżej weryfikacji kodu/testów.
 Najpierw:
-1. potwierdzić, że ten plik jest restart briefem,
-2. wskazać jeden sensowny następny bounded slice,
+1. potwierdzić, że ten plik jest historycznym restart briefem,
+2. sprawdzić aktywny plan i wskazać jeden sensowny następny bounded slice,
 3. dopiero potem iść w build brief / delegację / implementację.
 
-Current default after the delivered fork-clarity and README-positioning passes:
+Then-current default after the delivered fork-clarity and README-positioning passes (2026-04-06; not a current selection):
 - nie wracać domyślnie do `Compare / Fork Clarity`, bo bounded fork slices są już dowiezione,
 - nie wracać też do README bez wyraźnych prac zmieniających realną zawartość produktu,
 - jeśli nie ma silniejszego powodu produktowego, następne defaultowe decyzje powinny wracać do małych slice'ów w core loop, nie do docs cleanup.
@@ -185,9 +182,9 @@ Jeśli Wojtek napisze w stylu:
 - "użyj restart briefa z 2026-04-06"
 - "kontynuuj PromptManager z pliku restartowego"
 
-traktuj ten plik jako obowiązujący kontekst roboczy dla następnego małego slice'a.
+traktuj ten plik jako historyczny kontekst roboczy; aktualną kolejność i stan potwierdź w aktywnym planie, `docs/STATUS.md`, kodzie i testach.
 
 ## Intent of this file
 
-Ten dokument nie jest roadmapą.
-To jest restart point + guardrails dla następnego etapu małych wdrożeń.
+Ten dokument nie jest roadmapą ani bieżącym punktem restartu.
+To zachowany historyczny restart point i guardrails dla serii małych wdrożeń.

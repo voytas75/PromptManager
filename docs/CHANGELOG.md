@@ -61,8 +61,6 @@ All notable changes to **Prompt Manager** will be documented in this file.
 - Reconciled the active status and near-term plan after the 2026-09-20–22 CLI delivery set. The delivered deterministic CLI tools are recorded as closed asset-supporting work; new CLI/provider/chain/integration expansion remains blocked pending a separate product decision.
 - Clarified the developer quality contract: `pyright main.py config models` is the blocking CI scope, while full configured strict Pyright is a non-blocking debt scan until a separately approved expansion is green.
 
-## [0.23.0] - 2026-09-21
-
 ### Added
 
 - Added `prompt-compare <left> <right> [--json]`, a deterministic provider-free comparison of two current prompt assets. It reports selected metadata/state differences, unified body diff, Jinja variable sets and parse findings, direct fork lineage direction, and persisted usage/rating/quality counters without rendering, providers, embeddings, history reads, or mutations.
