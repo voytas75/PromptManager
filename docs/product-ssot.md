@@ -224,6 +224,17 @@ Execution is support for prompt assets, not the product center.
 
 Analytics should support curation, trust, and decision-making, not become a dashboard-first detour.
 
+Rating posture: retain the existing single, optional rating of a saved run and its
+prompt-level aggregate, but do not expand ratings into the primary way to choose,
+rank, or certify prompt assets. Human ratings may be sparse; an average based on
+one or a few runs is not an objective measure of general prompt quality. No
+automatic prompt-quality evaluator has been adopted as a trustworthy product
+contract. Prefer the existing **Favorite** action for the lightweight personal
+decision "I want to return to this prompt"; a favorite is not a quality score
+and must not become an implicit recommendation or ranking signal. Revisit
+evaluation expansion only if a validated, repeatable method demonstrably improves
+decisions on real prompts, not merely because a new scoring technology appears.
+
 ### 4. Automation surfaces
 - stronger CLI workflows
 - exportable or scriptable run operations
@@ -377,6 +388,8 @@ Examples:
 Constraint:
 - keep evaluation practical and decision-oriented
 - avoid bloated benchmarking dashboards
+- keep the optional single-rating posture above; these examples do not authorize
+  a new automatic score or rating-driven product track
 
 ### 9. Keep collaboration subordinate
 Sharing and broader multi-user features may grow later, but they must remain subordinate to:

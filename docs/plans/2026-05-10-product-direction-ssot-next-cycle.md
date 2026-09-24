@@ -41,6 +41,15 @@ So the near-term plan should stay focused on:
 - low-friction reuse/refinement,
 - compact trust support.
 
+Rating decision: do not select a rating/evaluation expansion as a next slice
+without stronger evidence. Keep the existing optional single run rating and
+aggregate, but expect sparse human input rather than designing a ranking around
+it. For a quick personal return-to-this-prompt decision, use the existing
+Favorite action/filter instead. Reconsider only if a repeatable evaluation method
+is validated on real prompts and materially improves reuse/refinement choices;
+see `docs/product-ssot.md` for the canonical semantics. This is a planning
+posture, not a request to remove existing rating functionality.
+
 Closed-slice history belongs in `docs/STATUS.md`, not here.
 
 ### September reconciliation

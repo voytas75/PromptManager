@@ -310,6 +310,7 @@ Key UI capabilities:
 - The History tab now includes a **Tokens** column plus detail/export fields that show prompt/completion/total numbers for each execution, and the summary footer aggregates the totals shown in the current filter window.
 - Continue conversations via **Continue Chat**; transcripts appear in the **Chat** tab and are persisted.
 - Save results with notes and optional 1–10 ratings; averages feed into quality filters.
+- Interpret the stored prompt `quality_score` as an average of optional saved-run ratings, not an automatically validated or universal prompt-quality measure; inspect `rating_count` before relying on it. Ratings remain a single optional signal, not a roadmap driver. The existing Favorite toggle/filter is a separate personal retrieval choice, not an inferred quality or ranking signal. Policy and revisit trigger: `docs/product-ssot.md`.
 - Programmatic access is available through `PromptManager.list_recent_executions()` and `PromptManager.list_executions_for_prompt(prompt_id)`.
 
 Every log entry also stores structured context metadata (prompt snapshot, executor model, streaming flag, request/response character counts, and optional prompt-part fingerprints). Inspect the metadata via the GUI history detail pane or fetch it directly from `PromptExecution.metadata` for downstream analytics.
