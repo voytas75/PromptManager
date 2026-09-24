@@ -167,10 +167,10 @@ If not, it should not lead the next cycle.
 - A non-empty one-character toolbar search request now returns before changing active search, filter summary, or sort availability. Because no results were loaded, previously displayed results retain their own cues rather than being mislabeled as matches for the short text.
 - Focused RED reproduced the stale-cue state; GREEN panel/controller suite: `14 passed`, and the complete suite: `958 passed, 1 skipped`, core coverage 80.97%, Ruff, format, strict Pyright, lock and diff check clean. Behavior commit `52f7cdd` and checkpoint `796f8bb` reached `origin/master`; exact-SHA Quality Gates [36012781306](https://github.com/voytas75/PromptManager/actions/runs/36012781306) succeeded. Ledger: `docs/plans/2026-09-24-short-search-state-continuity-v1.md`.
 
-**Latest asset-loop slice — Recent reopen across narrowed search (locally verified; delivery pending)**
+**Latest asset-loop slice — Recent reopen across narrowed search (delivered; exact-SHA CI verified)**
 - The Recent dialog now reads catalog-wide recent prompts even when search/filter results are narrowed. A hidden selection preloads the catalog, clears active and pending narrowing, then shows the full list and selects the prompt in detail; a visible selection retains the current view. A failed read leaves the old view unchanged. No provider, ranking, or prompt-record mutation.
 - Read-only reviews exposed three error/state blockers in successive candidates, each reproduced as RED and corrected. Final full local gate: 978 passed, 1 skipped, core coverage 81.66%, Ruff, strict Pyright, lock and diff check. Ledger: `docs/plans/2026-09-24-recent-reopen-search-continuity-v1.md`.
-- Delivery authorized; remote SHA and exact-SHA CI pending. Choose further asset-loop work only after fresh hesitation evidence.
+- Behavior commit `e8773fee4f9e51369aca9905d66b4726fea3e64d` reached `origin/master`; exact-SHA Quality Gates [36031535329](https://github.com/voytas75/PromptManager/actions/runs/36031535329) succeeded. Choose further asset-loop work only after fresh hesitation evidence.
 
 **Older 2026-09-22 checkpoint (closed)**
 1. `docs/plans/2026-09-22-instant-fit-judgment-v1.md` (Stage A) and `docs/plans/2026-09-22-intentional-capture-continuity-v1.md` (Stage B) are completed ledgers, not the active next item.
