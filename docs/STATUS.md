@@ -22,7 +22,7 @@ Do not use this file as a second product SSOT or a competing roadmap.
 
 ## Current product posture
 
-- Bounded CLI trust support: stage 1 `doctor [--json]` shipped as `7487bbf` with exact-SHA Quality Gates success. Locally verified stages 2–5 add `doctor catalog`, offline config/embedding readiness, a local analytics counts report, targeted prompt/chain validators and synced help/docs; immutable reads and sanitized results. CSV is written only when explicitly requested; live providers were not called. Legacy commands remain available. Commit/push and remote CI for stages 2–5 remain to verify under `docs/plans/2026-09-24-doctor-cli-contract-and-migration-v1.md`.
+- Bounded CLI trust support: stage 1 `doctor [--json]` shipped as `7487bbf`; stages 2–5 shipped as `4e8c28fbb262ca00ec519c5ca5f8bef9de629a55` on `origin/master`, with exact-SHA Quality Gates [36004718272](https://github.com/voytas75/PromptManager/actions/runs/36004718272) successful. The latter adds `doctor catalog`, offline config/embedding readiness, local analytics counts, targeted prompt/chain checks and synced help/docs. Reads remain immutable and reports sanitized; CSV is created only with an explicit destination. Locally: 954 passed, 1 skipped, core coverage 80.97%, Ruff/Pyright/lock green. Legacy commands remain available. No live provider probe or vector-index health claim; `--live` and alias retirement need separate decisions under `docs/plans/2026-09-24-doctor-cli-contract-and-migration-v1.md`.
 
 PromptManager remains:
 
