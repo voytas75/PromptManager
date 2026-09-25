@@ -391,8 +391,13 @@ class PromptListPresenter:
             self._callbacks.update_intent_hint(filtered)
             if self._active_search_text:
                 status_message = result.operator_state_label
-                if filtered and result.operator_state_label == "Showing search results":
-                    status_message = "Showing search results — inspect a prompt for reuse details."
+                if result.operator_state_label == "Showing search results":
+                    status_message = (
+                        "Showing search results — inspect a prompt for reuse details."
+                        if filtered
+                        else "Search found matches, but active filters hide them — "
+                        "adjust filters to inspect."
+                    )
                 self._callbacks.show_status(status_message, 4000)
             return
 

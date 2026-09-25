@@ -255,6 +255,45 @@ def test_show_similar_prompts_adds_bounded_inspect_handoff_cue(qt_app: QApplicat
     assert "inspect a prompt for reuse details" in callbacks.statuses[-1][0]
 
 
+class _FavoritesOnlyPanelStub(_FilterPanelStub):
+    def favorites_only(self) -> bool:
+        return True
+
+
+def test_search_matches_hidden_by_favorites_filter_explain_empty_view(
+    qt_app: QApplication,
+) -> None:
+    """Do not call search empty when matches exist but a local filter hides them."""
+    _ = qt_app
+    matching_prompt = _prompt("Incident triage")
+    matching_prompt.is_favorite = False
+    manager = _ManagerStub([matching_prompt], [matching_prompt])
+    model = PromptListModel()
+    detail = _DetailWidgetStub()
+    callbacks = _CallbackRecorder.create()
+    presenter = PromptListPresenter(
+        manager=cast("Any", manager),
+        coordinator=PromptListCoordinator(cast("Any", manager)),
+        model=model,
+        detail_widget=cast("Any", detail),
+        list_view=cast("Any", _ListViewStub()),
+        filter_panel=cast("Any", _FavoritesOnlyPanelStub()),
+        toolbar=None,
+        callbacks=callbacks.build(),
+        parent=_ParentStub(),
+    )
+
+    presenter.load_prompts("incident")
+
+    assert not model.prompts()
+    assert detail.cleared is True
+    assert callbacks.selected_ids == []
+    assert callbacks.statuses[-1] == (
+        "Search found matches, but active filters hide them — adjust filters to inspect.",
+        4000,
+    )
+
+
 def test_load_prompts_keeps_ordinary_search_status_calm_and_inspect_oriented(
     qt_app: QApplication,
 ) -> None:
