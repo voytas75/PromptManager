@@ -1640,7 +1640,7 @@ def run_prompt_find(
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
 
-    lines = []
+    lines: list[str] = []
     for prompt in matches:
         tags = ", ".join(prompt.tags) if prompt.tags else "-"
         lines.append(

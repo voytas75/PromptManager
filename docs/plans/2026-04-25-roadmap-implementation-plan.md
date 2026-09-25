@@ -4,13 +4,13 @@
 
 **Goal:** Przełożyć aktualny product SSOT PromptManager na sekwencję małych wdrożeń, które po każdym kroku aktualizują plan, docs i SSOT tylko wtedy, gdy stan produktu realnie się zmienił.
 
-**Architecture:** Plan jest kanonicznym dokumentem wykonawczym dla najbliższych prac roadmapowych. Każdy slice ma kończyć się trzema kontrolami: (1) kod i testy, (2) aktualizacja tego planu, (3) aktualizacja README / SSOT tylko wtedy, gdy zmienia się rzeczywisty stan produktu, język produktu albo priorytet roadmapy. Najpierw domykamy trust infrastructure, potem asset loop, potem structured runs, potem automation surfaces.
+**Architecture (historical execution record):** This plan records the completed 2026-04/05 roadmap slices and their verification. It is no longer the active execution authority: product priority is set by `docs/product-ssot.md`, near-term selection by `docs/plans/2026-05-10-product-direction-ssot-next-cycle.md`, and delivered status by `docs/STATUS.md`. The trust → asset → runs → automation order below describes the historical implementation sequence, not a new current priority.
 
 **Tech Stack:** Python 3.13, PySide6, pytest, PromptManager runtime settings stack, product docs under `docs/`.
 
 ---
 
-## Canonical workflow rule
+## Historical workflow rule (applied to the completed slices below)
 
 Po **każdej** implementacji wykonaj w tej kolejności:
 
@@ -60,11 +60,11 @@ Po **każdej** implementacji wykonaj w tej kolejności:
 - [x] compare recommendation cue distinguishes improved vs regressed candidates
 - [x] removed legacy `Safe to compare` next-action mapping after compare cue split
 
-### Next-cycle pointer
-- Canonical product roadmap and backlog priority now live in `docs/product-ssot.md`.
-- Supporting next-cycle direction note now lives in `docs/plans/2026-05-10-product-direction-ssot-next-cycle.md`.
-- The most recently delivered bounded execution ledger for the prior cycle path now lives in `docs/plans/2026-05-10-workspace-one-run-action-clarity-roadmap.md`.
-- The next active bounded execution ledger now lives in `docs/plans/2026-05-10-detail-edit-vs-fork-clarity-roadmap.md`.
+### Next-cycle pointer (historical roadmap; no longer active execution authority)
+- Canonical product roadmap and backlog priority live in `docs/product-ssot.md`.
+- The active near-term priority note is `docs/plans/2026-05-10-product-direction-ssot-next-cycle.md`; delivered-slice history lives in `docs/STATUS.md`.
+- `docs/plans/2026-05-10-workspace-one-run-action-clarity-roadmap.md` and `docs/plans/2026-05-10-detail-edit-vs-fork-clarity-roadmap.md` are delivered historical ledgers, not active successors.
+- The bounded follow-through on the 2026-09-25 project review is tracked in `docs/plans/2026-09-25-project-review-actions-v1.md`; it does not change product priorities.
 
 ---
 
