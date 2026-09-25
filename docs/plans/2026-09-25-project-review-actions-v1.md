@@ -1,6 +1,6 @@
 # PromptManager — działania po przeglądzie projektu (v1)
 
-Status: completed locally; no commit or push
+Status: delivered — commit `55e20cf7ba0874e93488c8f0a332def6092a53ec` on `origin/master`; exact-SHA Quality Gates [36130725473](https://github.com/voytas75/PromptManager/actions/runs/36130725473) successful.
 Date: 2026-09-25
 Product authority: `docs/product-ssot.md`
 Near-term priority authority: `docs/plans/2026-05-10-product-direction-ssot-next-cycle.md`
@@ -49,4 +49,4 @@ Strongest alternative: prioritize a newly reproduced find → inspect → reuse 
 
 ## Closure and next decision
 
-All three review actions are completed **locally**. The historical pointer is corrected, the smallest retrieval-owned CLI type cluster is green while 127 CLI errors remain outside the configured gate, and feature/complexity cuts are deliberately deferred for lack of a reproduced need. No new slice is authorized by this ledger. Choose any successor from the active near-term plan against fresh operator evidence; treat broader CLI typing, CI expansion, dependency changes, releases and user-data repair as separate scope decisions. The three changed files remain uncommitted; no remote or exact-SHA CI claim for these edits.
+All three review actions were completed locally and then delivered on `origin/master` as commit `55e20cf7ba0874e93488c8f0a332def6092a53ec`; exact-SHA Quality Gates [36130725473](https://github.com/voytas75/PromptManager/actions/runs/36130725473) succeeded. The historical pointer was corrected, the smallest retrieval-owned CLI type cluster became green while 127 CLI errors remain outside the configured gate, and feature/complexity cuts were deliberately deferred for lack of a reproduced need. No new slice was authorized by this v1 ledger. Choose a successor from the active near-term plan against fresh operator evidence; treat broader CLI typing, CI expansion, dependency changes, releases and user-data repair as separate scope decisions. The delivery correction and subsequent bounded follow-up are tracked separately in `docs/plans/2026-09-25-project-review-followup-v2.md`. The earlier `Implemented`/`Verified` notes above describe the pre-commit local checkpoints, not the final remote state.

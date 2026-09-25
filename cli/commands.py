@@ -363,7 +363,7 @@ def run_benchmark(
     print("\nBenchmark results\n-----------------")
     for run in report.runs:
         status = "ERROR" if run.error else "OK"
-        usage_parts = []
+        usage_parts: list[str] = []
         usage_map = run.usage if isinstance(run.usage, dict) else {}
         prompt_tokens = usage_map.get("prompt_tokens")
         completion_tokens = usage_map.get("completion_tokens")
