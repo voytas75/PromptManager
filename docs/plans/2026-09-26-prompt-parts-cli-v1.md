@@ -1,6 +1,6 @@
 # PromptManager — Prompt Parts CLI v1
 
-Status: implemented and verified locally; no commit/push. Product authority: `docs/product-ssot.md` (assets first, automation subordinate). Starting revision: `f306aa2`. Predecessor: `docs/plans/2026-09-26-prompt-parts-canonical-snippet-slice.md`.
+Status: delivered on `origin/master` as `0c7b37d0deef8c290bad284f51e5538d4677db6d`; exact-SHA Quality Gates [36265556771](https://github.com/voytas75/PromptManager/actions/runs/36265556771) succeeded. Product authority: `docs/product-ssot.md` (assets first, automation subordinate). Starting revision: `f306aa2`. Predecessor: `docs/plans/2026-09-26-prompt-parts-canonical-snippet-slice.md`.
 
 ## Goal and verified baseline
 
@@ -29,18 +29,20 @@ Illustrative output shapes: `{"ok":true,"parts":[{"id":"<uuid>","name":"System p
 
 No default read/write may create a missing DB, run migrations, initialize Chroma, import LiteLLM/GUI, call a provider, or load untrusted template code. Open the selected existing DB in SQLite `mode=ro` for reads, `mode=rw` for writes; validate the `response_styles` columns before a query. An older catalog lacking `snippet` fails closed with an actionable `CATALOG_MIGRATION_REQUIRED` error; migrate only through the already-supported repository/GUI startup on a backed-up catalog, never implicitly during a CLI read. Writes use parameterized SQL and explicitly checked transaction outcomes. Document SQLite/WAL behavior rather than claiming a cross-process snapshot that was not proven.
 
-## Ordered implementation slices (all complete locally)
+## Ordered implementation slices (delivered)
 
 1. **Read-only foundation — complete.** RED subprocess tests showed missing command; installed/module entrypoints, help, list/find/show, active filtering, duplicate names, literal wildcard matches, Unicode, JSON channels, missing DB and legacy schema now pass. `cli/prompt_part.py` opens existing SQLite with `mode=ro`, not through `PromptRepository.__init__`.
 2. **Create — complete.** RED tests for one exact source, invalid/oversized/invalid UTF-8, missing catalog; add→show and GUI/repository read-back preserve UUID, snippet (including trailing newline) and independent description. No schema or embedding changes.
 3. **Edit and delete — complete.** RED tests for omitted-field preservation, empty description, inactive flag, stale/invalid timestamp, malformed UUID, no-op, GUI update between CLI calls, locked writer, non-TTY delete refusal and confirmed delete. `BEGIN IMMEDIATE` and raw `last_modified` comparison happen under one writer lock. Only requested fields change; supporting/extension columns survive. Rejected mutations retain records.
-4. **Contract and closeout — complete locally.** Installed/module help, text/JSON and sanitized errors, malformed stored records, import-only provider boundary, and full add→list/find/show→edit→delete on isolated catalogs were exercised. `docs/README-DEV.md` and `docs/CHANGELOG.md` match the delivered command set. Full verification evidence follows. No product SSOT update, commit, push or Windows-native acceptance in this scope.
+4. **Contract and closeout — delivered.** Installed/module help, text/JSON and sanitized errors, malformed stored records, import-only provider boundary, and full add→list/find/show→edit→delete on isolated catalogs were exercised. `docs/README-DEV.md` and `docs/CHANGELOG.md` match the delivered command set. Full verification evidence follows. Product SSOT unchanged; publication and native Windows acceptance were verified subsequently.
 
 ## Local evidence and delivery boundary
 
 - `tests/test_prompt_part_cli.py` uses disposable SQLite catalogs and subprocesses for both entrypoints; 23 focused tests passed after a RED/GREEN cycle, including lifecycle and locked-writer cases.
 - Final post-change `QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q` — **1061 passed, 1 skipped**. `.venv/bin/ruff check .`, changed-file `.venv/bin/ruff format --check`, `.venv/bin/pyright` (0 errors), and `git diff --check` passed in the same gate command. Import-only check of `cli.prompt_part` found none of `litellm`, `chromadb`, `PySide6`, `gui`, `core.prompt_manager` loaded. No provider-backed live calls were made.
-- The actual user's GUI catalog was not mutated. External delivery (`git commit`/push/CI) and native Windows GUI acceptance remain to verify only if separately requested.
+- CLI delivery: `0c7b37d0deef8c290bad284f51e5538d4677db6d` reached `origin/master`; exact-SHA Quality Gates [36265556771](https://github.com/voytas75/PromptManager/actions/runs/36265556771) completed successfully. Windows checkout `D:\repos\PromptManager` was synchronized to that commit.
+- Native Windows CLI acceptance exercised installed and module entrypoints on a disposable SQLite backup: list/find/show, add (inline/file/stdin), edit, stale-write/confirmation rejection, confirmed delete and readback. The temporary catalog was removed; this was **not** interactive GUI acceptance or a Windows pytest run.
+- The selected Windows GUI catalog initially returned `CATALOG_MIGRATION_REQUIRED`. After a verified consistent backup and successful migration through the application repository path, both CLI entrypoints read its 13 parts. An independent backup-vs-live comparison found the existing rows unchanged across 12 tables (2116 rows), with only `response_styles.snippet` added and all 13 backfills verified. The designated backup was deleted only after those checks and a successful final readback. No test add/edit/delete was performed on the selected live catalog. These host-specific operations do not change the repository's CLI contract.
 
 ## Risks and stop conditions
 
