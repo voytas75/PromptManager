@@ -29,6 +29,10 @@ if __name__ == "__main__":
     from cli.parser import parse_args as _early_parse_args
 
     _early_args = _early_parse_args()
+    if getattr(_early_args, "command", None) == "note":
+        from cli.note import run_note as _early_run_note
+
+        raise SystemExit(_early_run_note(_early_args))
     if getattr(_early_args, "command", None) == "doctor":
         from cli.doctor import run_doctor as _early_run_doctor
 
@@ -203,6 +207,10 @@ def main() -> int:
         from cli.prompt_edit import run_prompt_edit
 
         return run_prompt_edit(args)
+    if getattr(args, "command", None) == "note":
+        from cli.note import run_note
+
+        return run_note(args)
     _runtime_setup_logging(args.logging_config)
 
     logger = logging.getLogger("prompt_manager.main")

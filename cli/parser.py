@@ -23,6 +23,7 @@ ROOT_COMMAND_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "catalog-import",
             "catalog-check",
             "prompt-add",
+            "note",
             "prompt-show",
             "prompt-edit",
             "prompt-random",
@@ -87,10 +88,33 @@ _ROOT_HELP_OPTION_COLUMN = 34
 
 
 class _DoctorUsageParser(argparse.ArgumentParser):
-    """Hide user-supplied argument text in doctor JSON parse failures."""
+    """Hide user-supplied argument text in doctor JSON and note parse failures."""
 
     def error(self, message: str) -> NoReturn:
+        """Sanitize scoped diagnostic JSON and all note usage failures."""
         arguments = sys.argv[1:]
+        command_names = {command for _, group in ROOT_COMMAND_GROUPS for command in group}
+        active_command = next((arg for arg in arguments if arg in command_names), None)
+        if active_command == "note":
+            if "--json" in arguments[arguments.index("note") + 1 :]:
+                print(
+                    json.dumps(
+                        {
+                            "ok": False,
+                            "error": {
+                                "code": "INVALID_USAGE",
+                                "message": "Invalid note command or arguments.",
+                            },
+                        }
+                    ),
+                    file=sys.stderr,
+                )
+            else:
+                print(
+                    "Note error (INVALID_USAGE): Invalid note command or arguments.",
+                    file=sys.stderr,
+                )
+            self.exit(2)
         if "doctor" in arguments and "--json" in arguments[arguments.index("doctor") + 1 :]:
             print(
                 json.dumps(
@@ -373,6 +397,61 @@ def parse_args() -> argparse.Namespace:
 
     subparsers = parser.add_subparsers(dest="command", parser_class=_DoctorUsageParser)
     parser.subparsers_action = subparsers
+
+    note_parser = subparsers.add_parser(
+        "note",
+        # Use the family parser for note's own parse errors; nested leaves inherit it.
+        # Other commands retain their existing parser/error contract.
+        help="Manage standalone notes stored alongside prompts (local SQLite only).",
+        description="List recent standalone notes or add, inspect, find, edit, and delete them.",
+    )
+    note_parser.add_argument("--limit", type=int, default=20, help="Recent notes to list (1–100).")
+    note_parser.add_argument("--json", action="store_true", help="Emit one JSON result.")
+    note_actions = note_parser.add_subparsers(dest="note_action", parser_class=_DoctorUsageParser)
+    add_note = note_actions.add_parser("add", help="Add a standalone note.")
+    add_note.add_argument(
+        "text", nargs="?", help="Note text; alternative to --body/--file/--from-stdin."
+    )
+    edit_note = note_actions.add_parser("edit", help="Replace one note's text by UUID.")
+    edit_note.add_argument("id", help="Full note UUID.")
+    edit_note.add_argument(
+        "text", nargs="?", help="Note text; alternative to --body/--file/--from-stdin."
+    )
+    for editor in (add_note, edit_note):
+        editor.add_argument("--body", help="Note text; alternative to positional text/file/stdin.")
+        editor.add_argument("--file", type=Path, help="Read UTF-8 note text from this file.")
+        editor.add_argument("--from-stdin", action="store_true", help="Read note text from stdin.")
+        editor.add_argument(
+            "--json", action="store_true", default=argparse.SUPPRESS, help="Emit one JSON result."
+        )
+    show_note = note_actions.add_parser("show", help="Display one note by full UUID.")
+    show_note.add_argument("id", help="Full note UUID.")
+    show_note.add_argument(
+        "--json", action="store_true", default=argparse.SUPPRESS, help="Emit one JSON result."
+    )
+    find_note = note_actions.add_parser(
+        "find", help="Find literal text in notes (ASCII-case-insensitive)."
+    )
+    find_note.add_argument("query", help="Literal text fragment to find.")
+    find_note.add_argument(
+        "--limit", type=int, default=argparse.SUPPRESS, help="Maximum matches (1–100)."
+    )
+    find_note.add_argument(
+        "--json", action="store_true", default=argparse.SUPPRESS, help="Emit one JSON result."
+    )
+    delete_note = note_actions.add_parser(
+        "delete", help="Permanently delete one note by full UUID."
+    )
+    delete_note.add_argument("id", help="Full note UUID.")
+    delete_note.add_argument(
+        "--yes", action="store_true", help="Confirm permanent deletion without a TTY."
+    )
+    delete_note.add_argument(
+        "--json",
+        action="store_true",
+        default=argparse.SUPPRESS,
+        help="Emit one JSON result (requires --yes).",
+    )
 
     doctor_parser = subparsers.add_parser(
         "doctor",
