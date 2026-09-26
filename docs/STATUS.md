@@ -20,14 +20,18 @@ Do not use this file as a second product SSOT or a competing roadmap.
 
 ---
 
-## Latest delivery and acceptance — Prompt Parts CLI v1
+## Latest delivery and acceptance — Prompt listing CLI v1
+
+- `prompt-list` adds bounded query-free listing with filters and compact JSON over the canonical prompt repository. Delivered on `origin/master` as `4bf4ca98d0b1ff118ca564b053244ee86316743a`; exact-SHA [Quality Gates 36272100058](https://github.com/voytas75/PromptManager/actions/runs/36272100058) passed. Local gates and post-fix independent review are green; contract and follow-up boundary: `docs/plans/2026-09-26-prompt-list-cli-v1.md`. No Windows acceptance was performed.
+
+## Prior delivery and acceptance — Prompt Parts CLI v1
 
 - The local `prompt-part` CLI shares the GUI's existing `response_styles` table and its canonical `snippet` field; it supports list/find/show/add/edit/confirmed-delete without implicit catalog bootstrap or migration. Delivered on `origin/master` as `0c7b37d0deef8c290bad284f51e5538d4677db6d`; exact-SHA [Quality Gates 36265556771](https://github.com/voytas75/PromptManager/actions/runs/36265556771) succeeded. Contract and local gates: `docs/plans/2026-09-26-prompt-parts-cli-v1.md`.
 - Native Windows CLI acceptance passed through both entrypoints on a disposable copy; the selected live Windows catalog was subsequently backed up, migrated to include `snippet`, and verified read-only (13 parts). The backup was removed after independent data comparison and successful final readback. No interactive GUI acceptance, Windows pytest suite, or live-catalog test CRUD is claimed.
 
-## Local verified CLI slice — query-free prompt listing
+## Follow-up boundary for prompt listing
 
-- `prompt-list` adds a bounded, filtered read surface over the canonical prompt repository. Local implementation, full gates and post-fix independent review are green; evidence and follow-up boundary are recorded in `docs/plans/2026-09-26-prompt-list-cli-v1.md`. Commit/push authorized; delivery and exact-SHA CI are separate checks. No Windows acceptance.
+- The verified delivery and remaining decision are recorded in `docs/plans/2026-09-26-prompt-list-cli-v1.md`; no additional raw-text capture alias is justified by the competitor review alone.
 
 ## Prior delivery and acceptance — standalone Notes CLI
 
