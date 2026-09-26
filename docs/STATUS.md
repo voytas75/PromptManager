@@ -2,7 +2,7 @@
 
 Status: active
 Owner: Wojtek / Prompt Manager Team
-Updated: 2026-09-24
+Updated: 2026-09-26
 Canonical product SSOT: `docs/product-ssot.md`
 Canonical near-term plan: `docs/plans/2026-05-10-product-direction-ssot-next-cycle.md`
 
@@ -19,6 +19,11 @@ Use it to record:
 Do not use this file as a second product SSOT or a competing roadmap.
 
 ---
+
+## Latest delivery and acceptance — standalone Notes CLI
+
+- The local `note` CLI shares the GUI's existing `prompt_notes` table; notes remain independent from prompt assets. Delivered on `origin/master` as `ea1b0231885fb43a0260a0c3bb812efd0628ffc2`; exact-SHA [Quality Gates 36235357930](https://github.com/voytas75/PromptManager/actions/runs/36235357930) succeeded.
+- Native Windows read-only checks found 35 notes; functional CRUD smoke passed on a SQLite-backup copy, readback found selected-catalog note rows and prompt count unchanged, and scratch was removed. This is not Windows pytest, interactive TTY, or GUI acceptance. Contract, local gates, and acceptance boundary: `docs/plans/2026-09-25-note-cli-v1.md`. No product-priority or SSOT change.
 
 ## Current product posture
 
