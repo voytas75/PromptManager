@@ -39,6 +39,10 @@ def main() -> int:
         from cli.draft import run_draft
 
         return run_draft(args)
+    if getattr(args, "command", None) == "prompt-part":
+        from cli.prompt_part import run_prompt_part
+
+        return run_prompt_part(args)
 
     from main import main as application_main
 

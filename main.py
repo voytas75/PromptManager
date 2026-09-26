@@ -37,6 +37,10 @@ if __name__ == "__main__":
         from cli.draft import run_draft as _early_run_draft
 
         raise SystemExit(_early_run_draft(_early_args))
+    if getattr(_early_args, "command", None) == "prompt-part":
+        from cli.prompt_part import run_prompt_part as _early_run_prompt_part
+
+        raise SystemExit(_early_run_prompt_part(_early_args))
     if getattr(_early_args, "command", None) == "doctor":
         from cli.doctor import run_doctor as _early_run_doctor
 
@@ -215,6 +219,10 @@ def main() -> int:
         from cli.note import run_note
 
         return run_note(args)
+    if getattr(args, "command", None) == "prompt-part":
+        from cli.prompt_part import run_prompt_part
+
+        return run_prompt_part(args)
     _runtime_setup_logging(args.logging_config)
 
     logger = logging.getLogger("prompt_manager.main")

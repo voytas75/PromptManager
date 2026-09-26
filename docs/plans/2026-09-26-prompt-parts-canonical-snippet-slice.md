@@ -24,4 +24,4 @@ Keep Prompt Parts as a local library for manual reuse. Make the fragment's own t
 
 ## Closure
 
-This implementation slice is complete. Further work on CLI access, structured export, or version-pinned references requires a separate product decision, based on actual fragment reuse and update needs. No successor slice is active here.
+This implementation slice is complete. The separate CLI v1 delivery is tracked in `docs/plans/2026-09-26-prompt-parts-cli-v1.md`; that plan does not alter this slice's original boundary. Structured export and version-pinned references remain separate product decisions.

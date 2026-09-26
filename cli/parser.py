@@ -25,6 +25,7 @@ ROOT_COMMAND_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "prompt-add",
             "note",
             "draft",
+            "prompt-part",
             "prompt-show",
             "prompt-edit",
             "prompt-random",
@@ -96,7 +97,7 @@ class _DoctorUsageParser(argparse.ArgumentParser):
         arguments = sys.argv[1:]
         command_names = {command for _, group in ROOT_COMMAND_GROUPS for command in group}
         active_command = next((arg for arg in arguments if arg in command_names), None)
-        if active_command in {"note", "draft"}:
+        if active_command in {"note", "draft", "prompt-part"}:
             if "--json" in arguments[arguments.index(active_command) + 1 :]:
                 print(
                     json.dumps(
@@ -399,6 +400,52 @@ def parse_args() -> argparse.Namespace:
 
     subparsers = parser.add_subparsers(dest="command", parser_class=_DoctorUsageParser)
     parser.subparsers_action = subparsers
+
+    part_parser = subparsers.add_parser(
+        "prompt-part",
+        help="List and inspect reusable prompt parts in the local SQLite catalog.",
+        description="List active prompt parts, search literal text or inspect a part by UUID.",
+    )
+    part_parser.add_argument("--limit", type=int, default=20, help="Maximum entries (1–100).")
+    part_parser.add_argument("--all", action="store_true", help="Include inactive parts.")
+    part_parser.add_argument("--json", action="store_true", help="Emit one JSON result.")
+    part_actions = part_parser.add_subparsers(dest="part_action", parser_class=_DoctorUsageParser)
+    show_part = part_actions.add_parser("show", help="Show one prompt part by full UUID.")
+    show_part.add_argument("id", help="Full canonical prompt part UUID.")
+    show_part.add_argument("--json", action="store_true", default=argparse.SUPPRESS)
+    find_part = part_actions.add_parser(
+        "find", help="Find literal text in name, type, description or snippet."
+    )
+    find_part.add_argument("query", help="Literal text (SQLite ASCII-case-insensitive LIKE).")
+    find_part.add_argument("--limit", type=int, default=argparse.SUPPRESS)
+    find_part.add_argument("--all", action="store_true", default=argparse.SUPPRESS)
+    find_part.add_argument("--json", action="store_true", default=argparse.SUPPRESS)
+    add_part = part_actions.add_parser("add", help="Save a reusable prompt part locally.")
+    add_part.add_argument("--name", required=True, help="Display name for this part.")
+    add_part.add_argument("--part", default="Response Style", help="Part classification label.")
+    add_part.add_argument("--description", default="", help="Optional usage description.")
+    add_part.add_argument("--body", help="Exact snippet text (max 1 MiB).")
+    add_part.add_argument("--file", type=Path, help="UTF-8 snippet file (max 1 MiB).")
+    add_part.add_argument("--from-stdin", action="store_true", help="Read snippet from stdin.")
+    add_part.add_argument("--json", action="store_true", default=argparse.SUPPRESS)
+    edit_part = part_actions.add_parser("edit", help="Edit selected prompt part by UUID.")
+    edit_part.add_argument("id", help="Full canonical prompt part UUID.")
+    edit_part.add_argument("--expect-modified", required=True, help="Exact last_modified token.")
+    edit_part.add_argument("--name", help="New display name.")
+    edit_part.add_argument("--part", help="New classification label.")
+    edit_part.add_argument("--description", help="New description; empty clears it.")
+    edit_part.add_argument("--body", help="New exact snippet text.")
+    edit_part.add_argument("--file", type=Path, help="UTF-8 snippet file.")
+    edit_part.add_argument("--from-stdin", action="store_true", help="Read new snippet from stdin.")
+    edit_status = edit_part.add_mutually_exclusive_group()
+    edit_status.add_argument("--active", action="store_true", help="Activate this part.")
+    edit_status.add_argument("--inactive", action="store_true", help="Deactivate this part.")
+    edit_part.add_argument("--json", action="store_true", default=argparse.SUPPRESS)
+    delete_part = part_actions.add_parser("delete", help="Permanently delete part by UUID.")
+    delete_part.add_argument("id", help="Full canonical prompt part UUID.")
+    delete_part.add_argument("--expect-modified", required=True, help="Exact last_modified token.")
+    delete_part.add_argument("--yes", action="store_true", help="Confirm permanent deletion.")
+    delete_part.add_argument("--json", action="store_true", default=argparse.SUPPRESS)
 
     note_parser = subparsers.add_parser(
         "note",
