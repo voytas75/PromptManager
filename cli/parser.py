@@ -24,6 +24,7 @@ ROOT_COMMAND_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "catalog-check",
             "prompt-add",
             "note",
+            "draft",
             "prompt-show",
             "prompt-edit",
             "prompt-random",
@@ -88,22 +89,22 @@ _ROOT_HELP_OPTION_COLUMN = 34
 
 
 class _DoctorUsageParser(argparse.ArgumentParser):
-    """Hide user-supplied argument text in doctor JSON and note parse failures."""
+    """Hide user-supplied argument text in scoped CLI parse failures."""
 
     def error(self, message: str) -> NoReturn:
-        """Sanitize scoped diagnostic JSON and all note usage failures."""
+        """Sanitize scoped diagnostic JSON and note/draft usage failures."""
         arguments = sys.argv[1:]
         command_names = {command for _, group in ROOT_COMMAND_GROUPS for command in group}
         active_command = next((arg for arg in arguments if arg in command_names), None)
-        if active_command == "note":
-            if "--json" in arguments[arguments.index("note") + 1 :]:
+        if active_command in {"note", "draft"}:
+            if "--json" in arguments[arguments.index(active_command) + 1 :]:
                 print(
                     json.dumps(
                         {
                             "ok": False,
                             "error": {
                                 "code": "INVALID_USAGE",
-                                "message": "Invalid note command or arguments.",
+                                "message": f"Invalid {active_command} command or arguments.",
                             },
                         }
                     ),
@@ -111,7 +112,8 @@ class _DoctorUsageParser(argparse.ArgumentParser):
                 )
             else:
                 print(
-                    "Note error (INVALID_USAGE): Invalid note command or arguments.",
+                    f"{active_command.title()} error (INVALID_USAGE): "
+                    f"Invalid {active_command} command or arguments.",
                     file=sys.stderr,
                 )
             self.exit(2)
@@ -452,6 +454,42 @@ def parse_args() -> argparse.Namespace:
         default=argparse.SUPPRESS,
         help="Emit one JSON result (requires --yes).",
     )
+
+    draft_parser = subparsers.add_parser(
+        "draft",
+        help="Manage draft prompts in the existing SQLite catalog without providers.",
+        description="List recent draft prompts or add, show, find, and delete them locally.",
+    )
+    draft_parser.add_argument("--limit", type=int, default=20, help="Recent drafts (1–100).")
+    draft_parser.add_argument("--json", action="store_true", help="Emit one JSON result.")
+    draft_actions = draft_parser.add_subparsers(
+        dest="draft_action", parser_class=_DoctorUsageParser
+    )
+    add_draft = draft_actions.add_parser("add", help="Capture a draft prompt without providers.")
+    add_draft.add_argument(
+        "text", nargs="?", help="Prompt body (alternative to --body/--file/--from-stdin)."
+    )
+    add_draft.add_argument("--body", help="Prompt body text.")
+    add_draft.add_argument("--file", type=Path, help="UTF-8 prompt body file (up to 1 MiB).")
+    add_draft.add_argument("--from-stdin", action="store_true", help="Read prompt body from stdin.")
+    add_draft.add_argument("--title", help="Optional draft title.")
+    add_draft.add_argument("--source", help="Optional provenance label.")
+    add_draft.add_argument("--json", action="store_true", default=argparse.SUPPRESS)
+    show_draft = draft_actions.add_parser("show", help="Show draft by full UUID.")
+    show_draft.add_argument("id", help="Full canonical draft UUID.")
+    show_draft.add_argument("--json", action="store_true", default=argparse.SUPPRESS)
+    find_draft = draft_actions.add_parser(
+        "find", help="Find literal text in draft title, description or body."
+    )
+    find_draft.add_argument("query", help="Literal text fragment (SQLite LIKE case rules).")
+    find_draft.add_argument(
+        "--limit", type=int, default=argparse.SUPPRESS, help="Maximum matches (1–100)."
+    )
+    find_draft.add_argument("--json", action="store_true", default=argparse.SUPPRESS)
+    delete_draft = draft_actions.add_parser("delete", help="Permanently delete draft by full UUID.")
+    delete_draft.add_argument("id", help="Full canonical draft UUID.")
+    delete_draft.add_argument("--yes", action="store_true", help="Confirm irreversible deletion.")
+    delete_draft.add_argument("--json", action="store_true", default=argparse.SUPPRESS)
 
     doctor_parser = subparsers.add_parser(
         "doctor",

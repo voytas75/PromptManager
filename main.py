@@ -33,6 +33,10 @@ if __name__ == "__main__":
         from cli.note import run_note as _early_run_note
 
         raise SystemExit(_early_run_note(_early_args))
+    if getattr(_early_args, "command", None) == "draft":
+        from cli.draft import run_draft as _early_run_draft
+
+        raise SystemExit(_early_run_draft(_early_args))
     if getattr(_early_args, "command", None) == "doctor":
         from cli.doctor import run_doctor as _early_run_doctor
 

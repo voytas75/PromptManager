@@ -35,6 +35,10 @@ def main() -> int:
         from cli.note import run_note
 
         return run_note(args)
+    if getattr(args, "command", None) == "draft":
+        from cli.draft import run_draft
+
+        return run_draft(args)
 
     from main import main as application_main
 
