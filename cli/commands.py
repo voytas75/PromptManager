@@ -1578,6 +1578,71 @@ def run_prompt_show(
     return 0
 
 
+def run_prompt_list(
+    manager: PromptManager | None,
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> int:
+    """Browse existing local prompt records without invoking semantic search."""
+    del logger
+    if manager is None:
+        raise ValueError("Prompt Manager is required for prompt listing.")
+    try:
+        # repository.list() orders with SQLite datetime(), which drops microseconds.
+        # Sort complete timestamps before filtering and limiting the result set.
+        prompts = sorted(
+            manager.repository.list(),
+            key=lambda prompt: (
+                prompt.last_modified.replace(tzinfo=UTC)
+                if prompt.last_modified.tzinfo is None
+                else prompt.last_modified,
+                str(prompt.id),
+            ),
+            reverse=True,
+        )
+        matches: list[Prompt] = []
+        category = str(args.category or "").strip().casefold()
+        tag = str(args.tag or "").strip().casefold()
+        source = str(args.source or "").strip().casefold()
+        active = args.active
+        for prompt in prompts:
+            if category and str(prompt.category or "").strip().casefold() != category:
+                continue
+            if tag and tag not in {value.strip().casefold() for value in prompt.tags}:
+                continue
+            if source and str(prompt.source or "").strip().casefold() != source:
+                continue
+            if active is not None and prompt.is_active != (active == "true"):
+                continue
+            matches.append(prompt)
+            if len(matches) >= args.limit:
+                break
+        if args.json:
+            rows = [
+                {
+                    "id": str(prompt.id),
+                    "name": prompt.name,
+                    "category": prompt.category,
+                    "tags": list(prompt.tags),
+                    "source": prompt.source,
+                    "active": prompt.is_active,
+                    "last_modified": prompt.last_modified.isoformat(),
+                }
+                for prompt in matches
+            ]
+            print(json.dumps(rows, ensure_ascii=False, indent=2))
+        elif matches:
+            for prompt in matches:
+                tags = ", ".join(prompt.tags) if prompt.tags else "-"
+                print(f"{prompt.id} | {prompt.name} | [{prompt.category}] | {tags}")
+        else:
+            print("No prompts matched. Add a prompt or adjust filters.")
+    except Exception:  # pragma: no cover - bounded CLI error boundary
+        print("Unable to list local prompts.", file=sys.stderr)
+        return 6
+    return 0
+
+
 def run_prompt_find(
     manager: PromptManager | None,
     args: argparse.Namespace,
@@ -2793,6 +2858,7 @@ COMMAND_SPECS: dict[str | None, CommandSpec] = {
     "catalog-import": CommandSpec(run_catalog_import),
     "catalog-check": CommandSpec(run_catalog_check_command, announce_offline_llm=False),
     "prompt-add": CommandSpec(run_catalog_import),
+    "prompt-list": CommandSpec(run_prompt_list, announce_offline_llm=False),
     "prompt-show": CommandSpec(run_prompt_show, announce_offline_llm=False),
     "prompt-random": CommandSpec(run_prompt_random),
     "prompt-find": CommandSpec(run_prompt_find, announce_offline_llm=False),

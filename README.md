@@ -188,6 +188,21 @@ Example JSON payload:
 
 A ready-to-run sample file is included at `examples/prompt-import-example.json`.
 
+To browse the local prompt catalog without a search query, use `prompt-list`:
+
+```bash
+prompt-manager prompt-list --limit 20
+prompt-manager prompt-list --tag diagnostics --active true --json
+prompt-manager prompt-show "Diagnostics Helper"
+```
+
+`prompt-list` filters the existing catalog before limiting results (1–100), in
+recently modified order; `--category`, `--tag`, and `--source` are exact,
+case-insensitive filters. JSON returns compact identity/metadata records rather
+than prompt bodies or embedding vectors; use `prompt-show` to inspect one prompt.
+Unlike semantic `prompt-find`, it does not generate a query embedding. It still
+uses the normal app manager and may initialize local catalog/index services.
+
 ### 5. Launch the app
 
 After installation, launch the desktop app with:

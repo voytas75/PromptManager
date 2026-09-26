@@ -25,6 +25,10 @@ Do not use this file as a second product SSOT or a competing roadmap.
 - The local `prompt-part` CLI shares the GUI's existing `response_styles` table and its canonical `snippet` field; it supports list/find/show/add/edit/confirmed-delete without implicit catalog bootstrap or migration. Delivered on `origin/master` as `0c7b37d0deef8c290bad284f51e5538d4677db6d`; exact-SHA [Quality Gates 36265556771](https://github.com/voytas75/PromptManager/actions/runs/36265556771) succeeded. Contract and local gates: `docs/plans/2026-09-26-prompt-parts-cli-v1.md`.
 - Native Windows CLI acceptance passed through both entrypoints on a disposable copy; the selected live Windows catalog was subsequently backed up, migrated to include `snippet`, and verified read-only (13 parts). The backup was removed after independent data comparison and successful final readback. No interactive GUI acceptance, Windows pytest suite, or live-catalog test CRUD is claimed.
 
+## Local verified CLI slice — query-free prompt listing
+
+- `prompt-list` adds a bounded, filtered read surface over the canonical prompt repository. Local implementation, full gates and post-fix independent review are green; evidence and follow-up boundary are recorded in `docs/plans/2026-09-26-prompt-list-cli-v1.md`. Commit/push authorized; delivery and exact-SHA CI are separate checks. No Windows acceptance.
+
 ## Prior delivery and acceptance — standalone Notes CLI
 
 - The local `note` CLI shares the GUI's existing `prompt_notes` table; notes remain independent from prompt assets. Delivered on `origin/master` as `ea1b0231885fb43a0260a0c3bb812efd0628ffc2`; exact-SHA [Quality Gates 36235357930](https://github.com/voytas75/PromptManager/actions/runs/36235357930) succeeded.

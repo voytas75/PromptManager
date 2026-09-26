@@ -26,6 +26,7 @@ ROOT_COMMAND_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "note",
             "draft",
             "prompt-part",
+            "prompt-list",
             "prompt-show",
             "prompt-edit",
             "prompt-random",
@@ -795,6 +796,30 @@ def parse_args() -> argparse.Namespace:
         help="Include the full persisted record, including the embedding vector (requires --json).",
     )
 
+    prompt_list_parser = subparsers.add_parser(
+        "prompt-list",
+        help="List recently modified local prompts without semantic search.",
+        description=(
+            "Browse the local catalog without a search query. Filters apply before the limit. "
+            "Use prompt-show to inspect a result."
+        ),
+    )
+    prompt_list_parser.add_argument(
+        "--limit",
+        type=int,
+        default=20,
+        help="Maximum results after filtering (1-100; default: 20).",
+    )
+    prompt_list_parser.add_argument("--category", help="Exact category filter (case-insensitive).")
+    prompt_list_parser.add_argument("--tag", help="Exact tag filter (case-insensitive).")
+    prompt_list_parser.add_argument("--source", help="Exact source filter (case-insensitive).")
+    prompt_list_parser.add_argument(
+        "--active", choices=("true", "false"), help="Filter by active state."
+    )
+    prompt_list_parser.add_argument(
+        "--json", action="store_true", help="Output compact result records as a JSON array."
+    )
+
     _ = subparsers.add_parser(
         "prompt-random",
         help="Display one randomly selected local prompt.",
@@ -1542,6 +1567,8 @@ def parse_args() -> argparse.Namespace:
     )
 
     args = parser.parse_args()
+    if args.command == "prompt-list" and not 1 <= args.limit <= 100:
+        parser.error("prompt-list --limit must be between 1 and 100.")
     is_compact_prompt_read = getattr(args, "command", None) in {
         "prompt-find",
         "prompt-history",

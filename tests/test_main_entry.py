@@ -1353,6 +1353,150 @@ def test_prompt_find_command_lists_matching_prompts(
     assert manager.closed is True
 
 
+def test_prompt_list_filters_before_limit_without_semantic_search(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "prompt-manager",
+            "prompt-list",
+            "--category",
+            "Analysis",
+            "--tag",
+            "triage",
+            "--limit",
+            "1",
+        ],
+    )
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    manager = _DummyManager()
+    now = datetime(2026, 9, 26, 12, 0, tzinfo=UTC)
+    first = Prompt(
+        id=uuid.uuid4(),
+        name="Unrelated",
+        description="x",
+        category="Analysis",
+        last_modified=now,
+    )
+    match = Prompt(
+        id=uuid.uuid4(),
+        name="Incident",
+        description="x",
+        category="analysis",
+        tags=["Triage"],
+        last_modified=now - timedelta(days=1),
+    )
+    later = Prompt(
+        id=uuid.uuid4(),
+        name="Other incident",
+        description="x",
+        category="Analysis",
+        tags=["triage"],
+        last_modified=now - timedelta(days=2),
+    )
+    manager.repository.store.extend([first, match, later])
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    assert main.main() == 0
+    output = capsys.readouterr().out
+    assert f"{match.id} | Incident | [analysis] | Triage" in output
+    assert "Unrelated" not in output and "Other incident" not in output
+    assert manager.search_calls == []
+    assert manager.closed is True
+
+
+def test_prompt_list_json_is_compact_and_empty_result_is_an_array(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-list", "--source", "catalog", "--active", "false", "--json"],
+    )
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    manager = _DummyManager()
+    prompt = Prompt(
+        id=uuid.uuid4(),
+        name="Inactive",
+        description="private description",
+        category="Research",
+        source="catalog",
+        context="private body",
+        ext4=[0.1, 0.2],
+        is_active=False,
+    )
+    manager.repository.store.extend(
+        [Prompt(id=uuid.uuid4(), name="Active", description="x", category="Research"), prompt]
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    assert main.main() == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result == [
+        {
+            "id": str(prompt.id),
+            "name": "Inactive",
+            "category": "Research",
+            "tags": [],
+            "source": "catalog",
+            "active": False,
+            "last_modified": prompt.last_modified.isoformat(),
+        },
+    ]
+
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-list", "--tag", "missing", "--json"])
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+    assert main.main() == 0
+    assert json.loads(capsys.readouterr().out) == []
+
+
+def test_prompt_list_empty_catalog_and_valid_limit_boundaries(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    manager = _DummyManager()
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+    for limit in (1, 100):
+        monkeypatch.setattr(
+            "sys.argv", ["prompt-manager", "prompt-list", "--limit", str(limit), "--json"]
+        )
+        assert main.main() == 0
+        assert json.loads(capsys.readouterr().out) == []
+
+
+@pytest.mark.parametrize("flags", [["--limit", "0"], ["--limit", "101"], ["--active", "maybe"]])
+def test_prompt_list_rejects_invalid_filters(
+    monkeypatch: pytest.MonkeyPatch, flags: list[str]
+) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-list", *flags])
+    with pytest.raises(SystemExit) as excinfo:
+        parse_args()
+    assert excinfo.value.code == 2
+
+
+def test_prompt_list_repository_error_has_bounded_diagnostic(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-list", "--json"])
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    manager = _DummyManager()
+
+    def _failed_list(limit: int | None = None) -> list[object]:
+        raise ValueError("private stored prompt body")
+
+    monkeypatch.setattr(manager.repository, "list", _failed_list)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+    assert main.main() == 6
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "private stored prompt body" not in captured.err
+    assert manager.closed is True
+
+
 @pytest.mark.parametrize(
     "command",
     [
