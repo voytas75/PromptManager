@@ -312,14 +312,13 @@ Key UI capabilities:
 - Interpret the stored prompt `quality_score` as an average of optional saved-run ratings, not an automatically validated or universal prompt-quality measure; inspect `rating_count` before relying on it. Ratings remain a single optional signal, not a roadmap driver. The existing Favorite toggle/filter is a separate personal retrieval choice, not an inferred quality or ranking signal. Policy and revisit trigger: `docs/product-ssot.md`.
 - Programmatic access is available through `PromptManager.list_recent_executions()` and `PromptManager.list_executions_for_prompt(prompt_id)`.
 
-Every log entry also stores structured context metadata (prompt snapshot, executor model, streaming flag, request/response character counts, and optional prompt-part fingerprints). Inspect the metadata via the GUI history detail pane or fetch it directly from `PromptExecution.metadata` for downstream analytics.
+Every log entry also stores structured context metadata (prompt snapshot, executor model, streaming flag, and request/response character counts). The metadata helper accepts an optional response-style payload, but the current execution path does not select or attach a saved Prompt Part. Inspect the metadata via the GUI history detail pane or fetch it directly from `PromptExecution.metadata` for downstream analytics.
 
 ## Prompt Parts Workflow
 
-- Capture reusable prompt segments (response styles, system instructions, output formatters, evaluation rubrics) from the **Prompt Parts** tab. The dialog records name, prompt part classification, description, tone, voice, format instructions, guidelines, tags, and illustrative examples; timestamps and versions are maintained automatically.
-- Entries are persisted in the `response_styles` table (now with a `prompt_part` column) and surfaced through `PromptManager.list_response_styles` (with `include_inactive` and `search` filters) alongside CRUD helpers.
-- GUI actions provide copy-to-clipboard, Markdown preview/export, and duplication capabilities so content writers can curate libraries without digging into SQLite.
-- When executions capture a prompt part, the metadata stores the part ID plus flattened instructions so downstream automations can reuse the formatting contract.
+- Capture reusable prompt segments (response styles, system instructions, output formatters, evaluation rubrics) from the **Prompt Parts** tab. The snippet has its own canonical text field, independent of description, optional formatting instructions and examples; blank supporting fields stay blank. The dialog also records name, classification, tone, voice, guidelines, tags, an editable version label, and active state; creation and modification timestamps are maintained automatically. The version label is not a revision history.
+- Entries are persisted in the `response_styles` table (`prompt_part` and `snippet` columns) and surfaced through `PromptManager.list_response_styles` (with `include_inactive` and `search` filters) alongside CRUD helpers. When opening an older database without `snippet`, the migration copies existing format instructions, or else description, into that field without changing the source fields; text that was lost on an earlier save cannot be recovered.
+- GUI actions provide copy-to-clipboard of the labeled detail, Markdown preview, and plain-text export. There is no part-specific CLI, duplication action, automatic insertion into prompts, or reference-based composition in this slice.
 
 ## CLI Utilities
 

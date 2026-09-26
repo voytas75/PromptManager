@@ -228,6 +228,7 @@ class RepositoryMaintenanceMixin:
                 name TEXT NOT NULL,
                 description TEXT NOT NULL,
                 prompt_part TEXT NOT NULL DEFAULT 'Response Style',
+                snippet TEXT NOT NULL DEFAULT '',
                 tone TEXT,
                 voice TEXT,
                 format_instructions TEXT,
@@ -258,6 +259,13 @@ class RepositoryMaintenanceMixin:
             conn.execute(
                 "UPDATE response_styles SET prompt_part = 'Response Style' "
                 "WHERE prompt_part IS NULL OR TRIM(prompt_part) = '';"
+            )
+        if "snippet" not in response_style_columns:
+            conn.execute("ALTER TABLE response_styles ADD COLUMN snippet TEXT NOT NULL DEFAULT '';")
+            conn.execute(
+                "UPDATE response_styles SET snippet = "
+                "CASE WHEN TRIM(COALESCE(format_instructions, '')) <> '' "
+                "THEN format_instructions ELSE description END"
             )
         conn.execute(
             """

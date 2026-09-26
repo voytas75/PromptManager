@@ -73,6 +73,7 @@ class ResponseStyle:
     name: str
     description: str
     prompt_part: str = "Response Style"
+    snippet: str = ""
     tone: str | None = None
     voice: str | None = None
     format_instructions: str | None = None
@@ -105,6 +106,7 @@ class ResponseStyle:
             "name": self.name,
             "description": self.description,
             "prompt_part": self.prompt_part,
+            "snippet": self.snippet,
             "tone": self.tone,
             "voice": self.voice,
             "format_instructions": self.format_instructions,
@@ -145,6 +147,7 @@ class ResponseStyle:
             name=str(data.get("name") or ""),
             description=str(data.get("description") or ""),
             prompt_part=str(data.get("prompt_part") or "Response Style"),
+            snippet=str(data.get("snippet") or ""),
             tone=str(data.get("tone") or "") or None,
             voice=str(data.get("voice") or "") or None,
             format_instructions=str(data.get("format_instructions") or "") or None,

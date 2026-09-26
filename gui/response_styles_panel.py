@@ -155,6 +155,7 @@ class ResponseStylesPanel(QWidget):
             f"Name: {style.name}",
             f"Prompt part: {style.prompt_part}",
             f"Description:\n{style.description or 'n/a'}",
+            f"Snippet:\n{style.snippet or 'n/a'}",
             "",
         ]
         lines.append(f"Tone: {style.tone or 'n/a'}")
@@ -273,6 +274,7 @@ class ResponseStylesPanel(QWidget):
             lines.append("---")
             lines.append(f"Name: {style.name}")
             lines.append(f"Prompt part: {style.prompt_part}")
+            lines.append(f"Snippet: {style.snippet}")
             lines.append(f"Description: {style.description}")
             lines.append(f"Tone: {style.tone or 'n/a'}")
             lines.append(f"Voice: {style.voice or 'n/a'}")

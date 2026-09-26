@@ -5,6 +5,7 @@ Updates: v0.1.0 - 2025-12-05 - Cover ResponseStyle dataclass and CRUD workflows.
 
 from __future__ import annotations
 
+import sqlite3
 import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
@@ -103,3 +104,42 @@ def test_repository_filters_and_search(tmp_path: Path) -> None:
     part_search = repo.list_response_styles(include_inactive=True, search="formatter")
     assert len(part_search) == 1
     assert part_search[0].name == "Active Style"
+
+
+def test_response_style_snippet_is_independent_of_supporting_fields(tmp_path: Path) -> None:
+    """The canonical fragment must survive a SQLite round trip unchanged."""
+    repo = PromptRepository(str(tmp_path / "repo.db"))
+    style = _make_response_style()
+    style.snippet = "Original system instruction"
+    repo.add_response_style(style)
+
+    loaded = repo.get_response_style(style.id)
+    assert loaded.snippet == "Original system instruction"
+    assert loaded.description == "Short, friendly summaries."
+    assert loaded.format_instructions == "Use bullet lists."
+    assert loaded.examples == ["Example response"]
+
+    loaded.snippet = "Revised system instruction"
+    repo.update_response_style(loaded)
+    assert repo.get_response_style(style.id).snippet == "Revised system instruction"
+
+
+def test_legacy_response_style_migration_preserves_original_fields(tmp_path: Path) -> None:
+    """Old records acquire the best available text exactly once on open."""
+    db = tmp_path / "legacy.db"
+    repo = PromptRepository(str(db))
+    formatted = _make_response_style("Formatted")
+    formatted.format_instructions = "  Keep spacing.\n  Follow this.  "
+    described = _make_response_style("Described")
+    described.format_instructions = None
+    repo.add_response_style(formatted)
+    repo.add_response_style(described)
+    with sqlite3.connect(db) as conn:
+        conn.execute("ALTER TABLE response_styles DROP COLUMN snippet")
+
+    migrated = PromptRepository(str(db))
+    assert migrated.get_response_style(formatted.id).snippet == formatted.format_instructions
+    assert migrated.get_response_style(described.id).snippet == described.description
+    assert migrated.get_response_style(described.id).format_instructions is None
+    reopened = PromptRepository(str(db))
+    assert reopened.get_response_style(formatted.id).snippet == formatted.format_instructions

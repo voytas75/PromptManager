@@ -36,9 +36,10 @@ class ResponseStylePayload(TypedDict):
     name: str
     description: str
     prompt_part: str
+    snippet: str
     tone: str | None
     voice: str | None
-    format_instructions: str
+    format_instructions: str | None
     guidelines: str | None
     tags: list[str]
     examples: list[str]
@@ -252,7 +253,7 @@ class ResponseStyleDialog(QDialog):
         """Populate dialog fields from an existing prompt part."""
         self._name_input.setText(style.name)
         self._description_input.setPlainText(style.description)
-        self._phrase_input.setPlainText(style.format_instructions or style.description)
+        self._phrase_input.setPlainText(style.snippet)
         self._prompt_part_input.setCurrentText(style.prompt_part)
         self._tone_input.setText(style.tone or "")
         self._voice_input.setText(style.voice or "")
@@ -277,16 +278,14 @@ class ResponseStyleDialog(QDialog):
         prompt_part = self._prompt_part_input.currentText().strip() or "Response Style"
         tone = self._tone_input.text().strip() or None
         voice = self._voice_input.text().strip() or None
-        format_instructions = self._format_input.toPlainText().strip() or phrase
+        format_instructions = self._format_input.toPlainText().strip() or None
         guidelines = self._guidelines_input.toPlainText().strip() or None
-        description = self._description_input.toPlainText().strip() or phrase
+        description = self._description_input.toPlainText().strip()
 
         tags = [tag.strip() for tag in self._tags_input.text().split(",") if tag.strip()]
         examples = [
             line.strip() for line in self._examples_input.toPlainText().splitlines() if line.strip()
         ]
-        if not examples:
-            examples = [phrase]
         version = self._version_input.text().strip() or "1.0"
         is_active = self._is_active_checkbox.isChecked()
         name = self._name_input.text().strip() or self._auto_generate_name(phrase)
@@ -295,6 +294,7 @@ class ResponseStyleDialog(QDialog):
             "name": name,
             "description": description,
             "prompt_part": prompt_part,
+            "snippet": phrase,
             "tone": tone,
             "voice": voice,
             "format_instructions": format_instructions,
