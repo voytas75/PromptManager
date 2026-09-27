@@ -1,6 +1,6 @@
 # PromptManager — prompt identity and relation lifecycle
 
-Status: S1–S3 locally verified; S4 impact UI deferred. Product authority: `docs/product-ssot.md`. Baseline: `master` at `7fb0e5c3c071d23a0553b6d87e136ec6adbecd7e` on 2026-09-27. This plan is not a second product SSOT.
+Status: S1–S3 delivered on `master`; S4 impact UI deferred. Product authority: `docs/product-ssot.md`. Baseline: `master` at `7fb0e5c3c071d23a0553b6d87e136ec6adbecd7e` on 2026-09-27. This plan is not a second product SSOT.
 
 ## Decision and boundary
 
@@ -75,6 +75,7 @@ Keep stable prompt UUIDs as relation targets; do not introduce source-version pi
 29. 2026-09-27 — Independent read-only S3 review reproduced two blockers on disposable data: an inactive later chain step was refused only after the first executor call, and a stale full-record manager edit generated an embedding and attempted Chroma upsert before SQLite refused. It also reproduced loss of retained inactive-step preview in the GUI editor. The earlier full gate no longer validates this corrected diff.
 30. 2026-09-27 — RED/GREEN offline regressions: preflight every chain step before the first web/model action while rechecking each step during execution; manager update compares canonical activity before embedding/index work, retaining the SQLite transactional guard; chain editor retains referenced inactive prompt detail for existing steps but filters new-step choices. Targeted chain, storage and GUI tests passed; scoped Ruff/Pyright passed. Updated product SSOT, developer CLI docs and changelog to state the bounded policy and race. Final full gate and delivery verification remain pending.
 31. 2026-09-27 — Final local gate on the repaired S1–S3 diff passed: Ruff check/format, configured Pyright, `uv lock --check`, `git diff --check`, headless provider-free pytest **1158 passed, 1 skipped**, core coverage **83.18%**. S3 locally verified after repairing all three review findings; external remote and exact-SHA CI remain to verify. No provider, real catalog, or Windows checkout operation.
+32. 2026-09-27 — Owner-approved S1–S3 code, tests, product SSOT, developer docs and this ledger committed as `fef7026a20d14457228f9449489645f8e9cd8a89` (`41` files; `1878` insertions, `69` deletions) and pushed to `origin/master` without force. Fresh fetch and live `ls-remote` matched local/tracking/live SHAs; worktree was clean. Exact-SHA GitHub Quality Gates [run 36335756125](https://github.com/voytas75/PromptManager/actions/runs/36335756125) completed successfully, including Ruff, Pyright, Pytest and clean-tree steps. This ledger closeout is a subsequent documentation-only commit, so its own remote/CI state must be checked separately. No Windows acceptance, provider invocation or real catalog repair is claimed.
 
 ## Current doubts / stop conditions
 
@@ -85,4 +86,4 @@ Keep stable prompt UUIDs as relation targets; do not introduce source-version pi
 
 ## Current recommended next slice
 
-Stage and review the exact S1–S3 delivery, then commit and push under the owner's instruction. S4 impact display is a separate optional slice, not a prerequisite for the approved asset-safety checkpoint. Record commit, remote SHA and exact-SHA CI only after verifying each; do not claim Windows acceptance or catalog repair.
+S1–S3 delivery is complete; verify the documentation-only ledger closeout SHA and its CI before reporting final delivery. S4 impact display is an optional next slice requiring a separate decision; Windows native acceptance and repair of legacy `CAT004`/`VAL005` catalog findings remain out of scope.
