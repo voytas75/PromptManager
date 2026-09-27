@@ -1067,6 +1067,65 @@ def test_prompt_chain_editor_prompt_tooltip_and_double_click(
     assert "Body text" in captured["text"]
 
 
+def test_chain_editor_preserves_existing_inactive_preview_without_new_step_choice(
+    qt_app: QApplication, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    active = _make_prompt_record(uuid.uuid4())
+    inactive = _make_prompt_record(uuid.uuid4())
+    inactive.name = "Retained inactive"
+    inactive.context = "Retained private body"
+    inactive.is_active = False
+    chain_id = uuid.uuid4()
+    chain = PromptChain(
+        id=chain_id,
+        name="Retained chain",
+        description="test",
+        steps=[PromptChainStep(uuid.uuid4(), chain_id, inactive.id, 1)],
+    )
+    editor = PromptChainEditorDialog(None, manager=None, prompts=[active, inactive], chain=chain)
+    item = _editor_steps_table(editor).item(0, 1)
+    assert item is not None and "Retained inactive" in item.text()
+    seen: list[str] = []
+
+    def capture(_parent: object, _title: str, body: str) -> QMessageBox.StandardButton:
+        seen.append(body)
+        return QMessageBox.StandardButton.Ok
+
+    monkeypatch.setattr("gui.dialogs.prompt_chain_editor.QMessageBox.information", capture)
+    editor.open_step_preview(item)
+    assert seen and "Retained private body" in seen[0]
+    new_step = PromptChainStepDialog(None, chain_id=chain_id, prompts=editor._prompts)  # type: ignore[reportPrivateUsage]
+    assert new_step.prompt_combo().findData(str(inactive.id)) == -1
+    assert new_step.prompt_combo().findData(str(active.id)) >= 0
+    existing_step = PromptChainStepDialog(
+        None,
+        chain_id=chain_id,
+        step=chain.steps[0],
+        prompts=editor._prompts,  # type: ignore[reportPrivateUsage]
+        current_prompt=inactive,
+    )
+    assert "Retained inactive" in existing_step.prompt_combo().currentText()
+    assert "Retained private body" in existing_step.prompt_preview_text()
+    assert "Inactive" in existing_step.prompt_preview_text()
+
+
+def test_chain_panel_loads_inactive_reference_for_existing_editor(
+    qt_app: QApplication,
+) -> None:
+    _dialog, panel, manager = _build_dialog()
+    inactive = manager._prompt_record  # type: ignore[reportPrivateUsage]
+    inactive.is_active = False
+    chain = manager._chains[0]  # type: ignore[reportPrivateUsage]
+    prompts = panel._prompts_for_existing_chain(chain)  # type: ignore[reportPrivateUsage]
+    assert [prompt.id for prompt in prompts] == [inactive.id]
+    assert prompts[0].is_active is False
+    editor = PromptChainEditorDialog(
+        None, manager=_as_prompt_manager(manager), prompts=prompts, chain=chain
+    )
+    row = _editor_steps_table(editor).item(0, 1)
+    assert row is not None and inactive.name in row.text()
+
+
 def test_prompt_chain_step_dialog_shows_selected_prompt_preview(
     qt_app: QApplication,
 ) -> None:

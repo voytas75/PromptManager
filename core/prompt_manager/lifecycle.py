@@ -20,11 +20,15 @@ from models.prompt_model import Prompt
 from ..embedding import EmbeddingGenerationError
 from ..exceptions import (
     PromptCacheError,
+    PromptDeletionBlockedError,
+    PromptDeletionPartialError,
     PromptManagerError,
     PromptNotFoundError,
     PromptStorageError,
 )
 from ..repository import RepositoryError, RepositoryNotFoundError
+from ..repository.prompt_dependencies import PromptDeleteBlockedError
+from ..repository.prompt_status import PromptStatusConflictError
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers only
     from collections.abc import Callable, Sequence
@@ -255,6 +259,8 @@ class PromptLifecycleMixin:
             raise PromptStorageError(
                 f"Failed to load prompt {prompt.id} for version comparison"
             ) from exc
+        if previous_prompt.is_active != prompt.is_active:
+            raise PromptStorageError("Prompt status changed; reload before editing")
 
         latest_version: PromptVersion | None = None
         has_version_history = True
@@ -374,6 +380,27 @@ class PromptLifecycleMixin:
             )
         return updated_prompt
 
+    def set_prompt_active(
+        self, prompt_id: UUID, *, active: bool, expect_active: bool
+    ) -> tuple[bool, str]:
+        """Change activity status without invoking embeddings or versioning."""
+        prompt_id = self._ensure_uuid(prompt_id)
+        try:
+            outcome = self._repository.set_prompt_active(
+                prompt_id, active=active, expect_active=expect_active
+            )
+        except (RepositoryNotFoundError, PromptStatusConflictError):
+            raise
+        except RepositoryError as exc:
+            raise PromptStorageError("Unable to update prompt activity state") from exc
+        try:
+            self._evict_cached_prompt(prompt_id)
+        except PromptCacheError as exc:
+            raise PromptCacheError(
+                "Activity state saved, but cache eviction failed; inspect cache before reuse"
+            ) from exc
+        return outcome
+
     def delete_prompt(
         self,
         prompt_id: UUID,
@@ -383,16 +410,61 @@ class PromptLifecycleMixin:
     ) -> None:
         """Remove a prompt from all data stores."""
         prompt_id = self._ensure_uuid(prompt_id)
-        try:
+        index_attempted = False
+
+        def delete_index() -> None:
+            nonlocal index_attempted
+            index_attempted = True
             self._as_prompt_manager().collection.delete(ids=[str(prompt_id)])
-        except ChromaError as exc:
-            raise PromptStorageError(f"Failed to delete prompt {prompt_id}") from exc
+
         try:
-            self._repository.delete(prompt_id)
+            delete_with_index = getattr(self._repository, "delete_with_index", None)
+            if delete_with_index is None:
+                # Injected repository doubles retain their original protocol.
+                inspect_dependencies = getattr(
+                    self._repository, "get_prompt_delete_dependencies", None
+                )
+                if inspect_dependencies is not None:
+                    dependencies = inspect_dependencies(prompt_id)
+                    if dependencies:
+                        raise PromptDeleteBlockedError(dependencies)
+                delete_index()
+                self._repository.delete(prompt_id)
+            else:
+                delete_with_index(prompt_id, delete_index)
         except RepositoryNotFoundError as exc:
+            if index_attempted:
+                raise PromptDeletionPartialError(
+                    "Prompt index may have changed while catalog deletion failed; "
+                    "inspect index and catalog."
+                ) from exc
             raise PromptNotFoundError(f"Prompt {prompt_id} not found") from exc
+        except PromptDeleteBlockedError as exc:
+            if index_attempted:
+                raise PromptDeletionPartialError(
+                    "Prompt index may have changed while catalog retained a referenced prompt; "
+                    "inspect index and catalog."
+                ) from exc
+            raise PromptDeletionBlockedError(str(exc)) from exc
+        except ChromaError as exc:
+            raise PromptDeletionPartialError(
+                "Prompt index may have changed while catalog deletion was not completed; "
+                "inspect index and catalog."
+            ) from exc
         except RepositoryError as exc:
+            if index_attempted:
+                raise PromptDeletionPartialError(
+                    "Prompt index may have changed while catalog deletion failed; "
+                    "inspect index and catalog."
+                ) from exc
             raise PromptStorageError(f"Failed to delete prompt {prompt_id} from SQLite") from exc
+        except Exception as exc:
+            if index_attempted:
+                raise PromptDeletionPartialError(
+                    "Prompt index may have changed while catalog deletion was not completed; "
+                    "inspect index and catalog."
+                ) from exc
+            raise
         try:
             self._evict_cached_prompt(prompt_id)
         except PromptCacheError:

@@ -215,7 +215,6 @@ class PromptChainMixin:
         web_search_limit: int = _CHAIN_WEB_SEARCH_RESULT_LIMIT,
     ) -> PromptChainRunResult:
         """Execute the specified prompt chain sequentially."""
-        host = cast("_PromptChainHost", self)
         chain = self.get_prompt_chain(chain_id)
         if not chain.is_active:
             raise PromptChainExecutionError(f"Prompt chain '{chain.name}' is inactive.")
@@ -229,6 +228,11 @@ class PromptChainMixin:
         raw_input = chain_input or ""
         if not raw_input.strip():
             raise PromptChainExecutionError("Prompt chain input must not be empty.")
+
+        # Admit the whole chain before the first search or model side effect.
+        # Recheck each step below because status can change during a run.
+        for step in chain.steps:
+            self._active_chain_step_prompt(chain, step)
 
         previous_response = raw_input
         outputs: dict[str, str] = {}
@@ -253,7 +257,7 @@ class PromptChainMixin:
                     raise PromptChainExecutionError(
                         f"Step {step.order_index} in '{chain.name}' received empty input."
                     )
-                prompt = host.get_prompt(step.prompt_id)
+                prompt = self._active_chain_step_prompt(chain, step)
                 step_output_key = f"step_{step.order_index}"
                 step_label = step.output_variable or step_output_key
                 request_text = self._maybe_enrich_with_web_search(
@@ -439,6 +443,22 @@ class PromptChainMixin:
         return list(records[:safe_limit])
 
     # Internal helpers ------------------------------------------------- #
+
+    def _active_chain_step_prompt(self, chain: PromptChain, step: PromptChainStep) -> Prompt:
+        """Read canonical state for a chain target, ignoring cached prompt copies."""
+        try:
+            prompt = self._repository.get(step.prompt_id)
+        except RepositoryNotFoundError as exc:
+            raise PromptChainExecutionError("Chain step prompt is no longer available.") from exc
+        except RepositoryError as exc:
+            raise PromptChainExecutionError(
+                "Unable to verify chain step prompt activity state."
+            ) from exc
+        if not prompt.is_active:
+            raise PromptChainExecutionError(
+                f"Step {step.order_index} in '{chain.name}' uses an inactive prompt."
+            )
+        return prompt
 
     def _maybe_enrich_with_web_search(
         self,

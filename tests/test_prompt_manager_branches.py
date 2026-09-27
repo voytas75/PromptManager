@@ -561,6 +561,17 @@ def test_suggest_prompts_falls_back_to_repository_list() -> None:
     assert suggestions.prompts == repository.list(limit=1)
 
 
+def test_suggest_prompts_fallback_filters_before_limit() -> None:
+    repository = _RecordingRepository()
+    inactive = _sample_prompt()
+    inactive.is_active = False
+    active = _sample_prompt()
+    repository.add(inactive)
+    repository.add(active)
+    manager = _build_manager(repository=repository)
+    assert [prompt.id for prompt in manager.suggest_prompts("", limit=1).prompts] == [active.id]
+
+
 def test_prompt_manager_falls_back_to_persistent_client(monkeypatch: pytest.MonkeyPatch) -> None:
     collection = _StubCollection()
     repository = _RecordingRepository()
@@ -685,6 +696,27 @@ def test_delete_prompt_logs_when_cache_evict_fails() -> None:
     assert collection.deleted_ids == [str(prompt.id)]
 
 
+def test_search_prompts_defaults_to_active_with_explicit_inactive_inclusion() -> None:
+    repository = _RecordingRepository()
+    active = _sample_prompt()
+    inactive = _sample_prompt()
+    inactive.is_active = False
+    repository.add(active)
+    repository.add(inactive)
+    collection = _StubCollection(
+        query_result={
+            "ids": [[str(inactive.id), str(active.id)]],
+            "documents": [[inactive.document, active.document]],
+            "metadatas": [[inactive.to_metadata(), active.to_metadata()]],
+        }
+    )
+    manager = _build_manager(repository=repository, collection=collection)
+    assert [prompt.id for prompt in manager.search_prompts("test", limit=2)] == [active.id]
+    assert [
+        prompt.id for prompt in manager.search_prompts("test", limit=2, include_inactive=True)
+    ] == [inactive.id, active.id]
+
+
 def test_search_prompts_handles_invalid_and_missing_entries() -> None:
     repository = _RecordingRepository()
     collection = _StubCollection()
@@ -705,8 +737,7 @@ def test_search_prompts_handles_invalid_and_missing_entries() -> None:
     }
 
     results = manager.search_prompts(query_text="hello", limit=2)
-    assert len(results) == 1
-    assert results[0].id == valid_prompt.id
+    assert results == []  # Chroma-only records cannot prove canonical activity state.
 
 
 def test_search_prompts_raises_when_repository_errors() -> None:
@@ -1106,7 +1137,8 @@ def test_delete_prompt_handles_repository_and_chroma_errors() -> None:
             raise RepositoryNotFoundError("missing")
 
     manager = _build_manager(repository=_MissingRepo())
-    with pytest.raises(PromptNotFoundError):
+    # The injected legacy repository cannot couple index + catalog deletion.
+    with pytest.raises(PromptStorageError, match="index may have changed"):
         manager.delete_prompt(uuid.uuid4())
 
     class _ErrorRepo(_RecordingRepository):
@@ -1114,7 +1146,7 @@ def test_delete_prompt_handles_repository_and_chroma_errors() -> None:
             raise RepositoryError("delete fail")
 
     manager_err = _build_manager(repository=_ErrorRepo())
-    with pytest.raises(PromptStorageError):
+    with pytest.raises(PromptStorageError, match="index may have changed"):
         manager_err.delete_prompt(uuid.uuid4())
 
     repo = _RecordingRepository()
@@ -1122,7 +1154,7 @@ def test_delete_prompt_handles_repository_and_chroma_errors() -> None:
     repo.add(prompt)
     collection = _StubCollection(delete_exception=_TestChromaError("delete"))
     manager_chroma = _build_manager(repository=repo, collection=collection)
-    with pytest.raises(PromptStorageError):
+    with pytest.raises(PromptStorageError, match="index may have changed"):
         manager_chroma.delete_prompt(prompt.id)
     assert manager_chroma.get_prompt(prompt.id).id == prompt.id
 

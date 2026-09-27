@@ -29,6 +29,7 @@ ROOT_COMMAND_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "prompt-list",
             "prompt-show",
             "prompt-edit",
+            "prompt-status",
             "prompt-random",
             "prompt-find",
             "tag-list",
@@ -98,7 +99,7 @@ class _DoctorUsageParser(argparse.ArgumentParser):
         arguments = sys.argv[1:]
         command_names = {command for _, group in ROOT_COMMAND_GROUPS for command in group}
         active_command = next((arg for arg in arguments if arg in command_names), None)
-        if active_command in {"note", "draft", "prompt-part"}:
+        if active_command in {"note", "draft", "prompt-part", "prompt-status"}:
             if "--json" in arguments[arguments.index(active_command) + 1 :]:
                 print(
                     json.dumps(
@@ -803,6 +804,19 @@ def parse_args() -> argparse.Namespace:
         help="Include the full persisted record, including the embedding vector (requires --json).",
     )
 
+    status_parser = subparsers.add_parser(
+        "prompt-status", help="Change one prompt's active state without rewriting its body."
+    )
+    status_parser.add_argument("prompt_id", help="Full canonical prompt UUID.")
+    status_parser.add_argument("status_action", choices=("activate", "deactivate"))
+    status_parser.add_argument(
+        "--expect-active",
+        choices=("true", "false"),
+        required=True,
+        help="Expected persisted state; reject stale updates.",
+    )
+    status_parser.add_argument("--json", action="store_true", help="Emit one bounded JSON result.")
+
     prompt_list_parser = subparsers.add_parser(
         "prompt-list",
         help="List recently modified local prompts without semantic search.",
@@ -821,7 +835,7 @@ def parse_args() -> argparse.Namespace:
     prompt_list_parser.add_argument("--tag", help="Exact tag filter (case-insensitive).")
     prompt_list_parser.add_argument("--source", help="Exact source filter (case-insensitive).")
     prompt_list_parser.add_argument(
-        "--active", choices=("true", "false"), help="Filter by active state."
+        "--active", choices=("true", "false"), help="Show active (default) or inactive prompts."
     )
     prompt_list_parser.add_argument(
         "--json", action="store_true", help="Output compact result records as a JSON array."
@@ -868,7 +882,7 @@ def parse_args() -> argparse.Namespace:
         "--active",
         type=str,
         default=None,
-        help="Require active state: true/false/yes/no/1/0.",
+        help="Show active (default) or inactive results: true/false/yes/no/1/0.",
     )
     prompt_find_parser.add_argument(
         "--json",

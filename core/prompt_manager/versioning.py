@@ -242,7 +242,22 @@ class PromptVersionMixin:
         origin: PromptActivityOrigin = "gui",
     ) -> Prompt:
         """Create a new prompt based on the referenced prompt."""
-        source_prompt = cast("Any", self).get_prompt(prompt_id)
+        try:
+            source_prompt = self._repository.get(prompt_id)
+        except RepositoryError as exc:
+            raise PromptVersionError("Unable to verify source prompt activity state") from exc
+        if not source_prompt.is_active:
+            raise PromptVersionError("Source prompt is inactive; activate it before forking")
+        # Fork compensation deletes an incomplete child; validate that cleanup
+        # can inspect the existing catalog before persisting a new child.
+        inspect_dependencies = getattr(self._repository, "get_prompt_delete_dependencies", None)
+        if inspect_dependencies is not None:
+            try:
+                inspect_dependencies(source_prompt.id)
+            except RepositoryError as exc:
+                raise PromptVersionError(
+                    "Cannot fork while catalog relations are invalid; inspect the catalog first"
+                ) from exc
         now = datetime.now(UTC)
         related_prompts = list(source_prompt.related_prompts)
         source_id_text = str(source_prompt.id)

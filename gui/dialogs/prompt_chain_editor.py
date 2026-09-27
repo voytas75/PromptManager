@@ -59,9 +59,9 @@ class PromptChainEditorDialog(QDialog):
         self._source_chain = chain
         self._chain_id = chain.id if chain else uuid.uuid4()
         self._result_chain: PromptChain | None = None
-        self._prompts: list[Prompt] = list(prompts or [])
+        self._prompts: list[Prompt] = [prompt for prompt in prompts or [] if prompt.is_active]
         self._prompt_lookup: dict[str, Prompt] = {
-            str(prompt.id): prompt for prompt in self._prompts
+            str(prompt.id): prompt for prompt in prompts or []
         }
         self.setWindowTitle("Edit Prompt Chain" if chain else "New Prompt Chain")
         self.resize(800, 640)
@@ -271,6 +271,7 @@ class PromptChainEditorDialog(QDialog):
             chain_id=self._chain_id,
             step=self._steps[row],
             prompts=self._prompts,
+            current_prompt=self._prompt_lookup.get(str(self._steps[row].prompt_id)),
         )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
@@ -437,13 +438,17 @@ class PromptChainStepDialog(QDialog):
         chain_id: uuid.UUID,
         step: PromptChainStep | None = None,
         prompts: list[Prompt] | None = None,
+        current_prompt: Prompt | None = None,
     ) -> None:
         """Prepare step editor inputs with optional preloaded data."""
         super().__init__(parent)
         self._chain_id = chain_id
         self._step = step
         self._result_step: PromptChainStep | None = None
-        self._prompt_options: list[Prompt] = list(prompts or [])
+        self._prompt_options: list[Prompt] = [
+            prompt for prompt in prompts or [] if prompt.is_active
+        ]
+        self._current_prompt = current_prompt if step is not None else None
         self.setWindowTitle("Edit Chain Step" if step else "Add Chain Step")
         self.resize(520, 360)
 
@@ -534,7 +539,12 @@ class PromptChainStepDialog(QDialog):
             if str(self._prompt_combo.itemData(index)) == target:
                 self._prompt_combo.setCurrentIndex(index)
                 return
-        fallback_label = f"Unknown ({target})"
+        retained = self._current_prompt
+        fallback_label = (
+            f"{retained.name} (inactive; existing step)"
+            if retained is not None and retained.id == prompt_id and not retained.is_active
+            else f"Unknown ({target})"
+        )
         self._prompt_combo.addItem(fallback_label, target)
         self._prompt_combo.setCurrentIndex(self._prompt_combo.count() - 1)
 
@@ -547,6 +557,9 @@ class PromptChainStepDialog(QDialog):
             (entry for entry in self._prompt_options if str(entry.id) == prompt_id_text),
             None,
         )
+        if prompt is None and self._current_prompt is not None:
+            if str(self._current_prompt.id) == prompt_id_text:
+                prompt = self._current_prompt
         if prompt is None:
             self._prompt_preview.setPlainText(
                 f"Prompt ID: {prompt_id_text}\n\nPrompt body not available in the current catalog."
@@ -556,6 +569,8 @@ class PromptChainStepDialog(QDialog):
         if len(body) > 1200:
             body = body[:1197].rstrip() + "…"
         preview_parts = [f"Prompt: {prompt.name}"]
+        if not prompt.is_active:
+            preview_parts.append("Inactive; retained for inspection, not executable.")
         if prompt.category:
             preview_parts.append(f"Category: {prompt.category}")
         preview_parts.append("")

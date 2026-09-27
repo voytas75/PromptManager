@@ -106,6 +106,20 @@ def _prompt(name: str, *, is_favorite: bool, tags: list[str] | None = None) -> P
     )
 
 
+def test_fetch_prompts_hides_inactive_from_default_and_search() -> None:
+    manager = _ManagerStub()
+    active = _prompt("Active", is_favorite=False)
+    inactive = _prompt("Inactive", is_favorite=False)
+    inactive.is_active = False
+    manager.repository = _RepositoryStub([inactive, active])
+    manager.search_results = [inactive, active]
+    coordinator = _build_coordinator(manager)
+    assert [prompt.id for prompt in coordinator.fetch_prompts("").all_prompts] == [active.id]
+    assert [prompt.id for prompt in coordinator.fetch_prompts("query").search_results or []] == [
+        active.id
+    ]
+
+
 def test_fetch_prompts_keeps_search_mode_for_no_match_results() -> None:
     """Active search with zero matches should stay distinct from the default full-catalog state."""
     manager = _ManagerStub()

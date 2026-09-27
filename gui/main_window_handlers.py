@@ -136,7 +136,9 @@ class PromptActionsHandler:
     def open_recent_prompts(self) -> None:
         """Display catalog-wide recent prompts and reveal the selected detail."""
         try:
-            prompts = recent_prompts(self._recent_catalog_prompts_supplier())
+            prompts = recent_prompts(
+                [prompt for prompt in self._recent_catalog_prompts_supplier() if prompt.is_active]
+            )
         except RepositoryError as exc:
             QMessageBox.critical(self._parent, "Unable to load prompts", str(exc))
             return

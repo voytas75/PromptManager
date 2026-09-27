@@ -54,6 +54,14 @@ class PromptStorageError(PromptManagerError):
     """Raised when interactions with persistent backends fail."""
 
 
+class PromptDeletionBlockedError(PromptStorageError):
+    """Prompt still has dependents and no deletion was attempted."""
+
+
+class PromptDeletionPartialError(PromptStorageError):
+    """A cross-store deletion may have changed the index while retaining SQLite."""
+
+
 class PromptCacheError(PromptManagerError):
     """Raised when Redis cache lookups or writes fail."""
 

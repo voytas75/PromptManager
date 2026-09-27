@@ -406,6 +406,37 @@ def test_prompt_version_roundtrip(tmp_path: Path) -> None:
         repo.get_prompt_version(9999)
 
 
+@pytest.mark.parametrize("versioned", [False, True])
+def test_stale_full_record_cannot_reactivate_inactive_prompt(
+    tmp_path: Path, versioned: bool
+) -> None:
+    """Status is changed only through the compare-and-set transition."""
+    repo = PromptRepository(str(tmp_path / "repo.db"))
+    item = _make_prompt("Status guarded")
+    repo.add(item)
+    stale = repo.get(item.id)
+    changed, _ = repo.set_prompt_active(item.id, active=False, expect_active=True)
+    assert changed
+    stale.description = "stale edit"
+    with pytest.raises(RepositoryError, match="status"):
+        if versioned:
+            repo.update_with_version(stale, commit_message="stale edit")
+        else:
+            repo.update(stale)
+    saved = repo.get(item.id)
+    assert saved.is_active is False and saved.description == item.description
+    assert repo.get_prompt_latest_version(item.id) is None
+
+    fresh = repo.get(item.id)
+    fresh.description = "valid edit"
+    if versioned:
+        repo.update_with_version(fresh, commit_message="valid edit")
+    else:
+        repo.update(fresh)
+    saved = repo.get(item.id)
+    assert saved.is_active is False and saved.description == "valid edit"
+
+
 def test_prompt_version_listing_helpers(tmp_path: Path) -> None:
     """List prompt versions in descending order with helper methods."""
     repo = PromptRepository(str(tmp_path / "repo.db"))

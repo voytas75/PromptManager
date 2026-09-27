@@ -18,6 +18,7 @@ import pytest
 from core import (
     PromptManager,
     PromptRepository,
+    PromptStorageError,
     RepositoryError,
     RepositoryNotFoundError,
 )
@@ -107,6 +108,43 @@ def _clone_prompt(prompt: Prompt) -> Prompt:
 
 def _clone_category(category: PromptCategory) -> PromptCategory:
     return PromptCategory.from_record(category.to_record())
+
+
+def test_stale_manager_edit_rejects_before_embedding_or_index(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = PromptRepository(str(tmp_path / "catalog.db"))
+    prompt = _make_prompt("Inactive edit")
+    repo.add(prompt)
+    stale = repo.get(prompt.id)
+    collection = _FakeCollection()
+    manager = PromptManager(
+        chroma_path=str(tmp_path / "chroma"),
+        db_path=str(tmp_path / "catalog.db"),
+        repository=repo,
+        chroma_client=_as_chroma_client(_FakeChromaClient(collection)),
+        enable_background_sync=False,
+    )
+    try:
+        repo.set_prompt_active(prompt.id, active=False, expect_active=True)
+        stale.context = "PRIVATE_STALE_BODY"
+
+        def fail_embedding(_text: str) -> list[float]:
+            raise AssertionError("embedding reached for stale edit")
+
+        def fail_index(*_args: object, **_kwargs: object) -> None:
+            raise AssertionError("index reached for stale edit")
+
+        monkeypatch.setattr(manager._embedding_provider, "embed", fail_embedding)  # type: ignore[reportPrivateUsage]
+        monkeypatch.setattr(collection, "upsert", fail_index)
+        with pytest.raises(RepositoryError, match="status changed"):
+            repo.update(stale)
+        with pytest.raises(PromptStorageError, match="status changed"):
+            manager.update_prompt(stale)
+        assert repo.get(prompt.id).context != stale.context
+        assert repo.get(prompt.id).is_active is False
+    finally:
+        manager.close()
 
 
 class _FakeRedis:
@@ -526,8 +564,8 @@ def test_get_prompt_reads_from_cache_before_repository() -> None:
     manager.close()
 
 
-def test_search_prompts_returns_chroma_records_when_sqlite_missing() -> None:
-    """Fallback to Chroma metadata when repository entry is absent."""
+def test_search_prompts_omits_chroma_records_when_sqlite_missing() -> None:
+    """Chroma metadata alone cannot establish a retained active catalog record."""
     collection = _FakeCollection()
     repo = _FakeRepository()
     manager = PromptManager(
@@ -558,10 +596,7 @@ def test_search_prompts_returns_chroma_records_when_sqlite_missing() -> None:
     )
 
     results = manager.search_prompts("lookup", limit=1)
-    assert results
-    prompt = results[0]
-    assert str(prompt.id) == prompt_id
-    assert prompt.description == "Recovered from metadata"
+    assert results == []
     manager.close()
 
 

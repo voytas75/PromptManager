@@ -453,7 +453,9 @@ class MainWindow(QMainWindow):
             parent=self,
             manager=self._manager,
             model_prompts_supplier=lambda: self._model.prompts(),
-            recent_catalog_prompts_supplier=lambda: self._manager.repository.list(),
+            recent_catalog_prompts_supplier=lambda: [
+                prompt for prompt in self._manager.repository.list() if prompt.is_active
+            ],
             current_prompt_supplier=self._current_prompt,
             detail_widget=self._detail_widget,
             prompt_search_controller=self._prompt_search_controller,

@@ -123,7 +123,7 @@ class PromptListPresenter:
     def load_catalog_for_recent(self) -> list[Prompt] | None:
         """Read the full catalog without changing the current list or detail."""
         try:
-            return list(self._manager.repository.list())
+            return [prompt for prompt in self._manager.repository.list() if prompt.is_active]
         except RepositoryError as exc:
             self._callbacks.show_error("Unable to load prompts", str(exc))
             return None

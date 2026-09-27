@@ -56,6 +56,7 @@ from core import (
     PromptChainStepRun,
     PromptManager,
     PromptManagerError,
+    RepositoryError,
 )
 from models.prompt_chain_model import PromptChain, PromptChainStep, chain_from_payload
 
@@ -658,7 +659,7 @@ class PromptChainManagerPanel(QWidget):
         editor = PromptChainEditorDialog(
             self,
             manager=self._manager,
-            prompts=self._available_prompts(),
+            prompts=self._prompts_for_existing_chain(duplicated_chain),
             chain=duplicated_chain,
         )
         if editor.exec() != QDialog.DialogCode.Accepted:
@@ -676,7 +677,7 @@ class PromptChainManagerPanel(QWidget):
         editor = PromptChainEditorDialog(
             self,
             manager=self._manager,
-            prompts=self._available_prompts(),
+            prompts=self._prompts_for_existing_chain(chain),
             chain=chain,
         )
         if editor.exec() != QDialog.DialogCode.Accepted:
@@ -721,15 +722,36 @@ class PromptChainManagerPanel(QWidget):
         try:
             list_prompts = getattr(self._manager, "list_prompts", None)
             if callable(list_prompts):
-                return cast("list[Prompt]", list_prompts(limit=500))
+                return [
+                    prompt for prompt in cast("list[Prompt]", list_prompts()) if prompt.is_active
+                ][:500]
             repository = getattr(self._manager, "repository", None)
             if repository is not None:
-                return cast("list[Prompt]", repository.list(limit=500))
+                return [
+                    prompt for prompt in cast("list[Prompt]", repository.list()) if prompt.is_active
+                ][:500]
         except PromptManagerError as exc:
             logger.warning("Unable to load prompts for chain editor", exc_info=exc)
         except Exception:  # pragma: no cover - defensive guard
             logger.warning("Unexpected prompt lookup failure", exc_info=True)
         return []
+
+    def _prompts_for_existing_chain(self, chain: PromptChain) -> list[Prompt]:
+        """Include retained references for inspection, without offering new use."""
+        prompts = self._available_prompts()
+        known_ids = {prompt.id for prompt in prompts}
+        repository_get = getattr(self._manager.repository, "get", None)
+        get_prompt = repository_get if callable(repository_get) else self._manager.get_prompt
+        for step in chain.steps:
+            if step.prompt_id in known_ids:
+                continue
+            try:
+                prompt = cast("Prompt", get_prompt(step.prompt_id))
+            except (RepositoryError, PromptManagerError):
+                continue
+            prompts.append(prompt)
+            known_ids.add(prompt.id)
+        return prompts
 
     def _select_chain(self, chain_id: UUID) -> None:
         """Select the list entry matching ``chain_id``."""

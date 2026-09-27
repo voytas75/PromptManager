@@ -15,11 +15,13 @@ from core import (
     CodexExecutionResult,
     ExecutionError,
     HistoryTracker,
+    PromptChainExecutionError,
     PromptExecutionError,
     PromptExecutionUnavailable,
     PromptManager,
     PromptRepository,
 )
+from models.prompt_chain_model import PromptChain, PromptChainStep
 from models.prompt_model import Prompt
 
 if TYPE_CHECKING:
@@ -199,6 +201,134 @@ def test_execute_prompt_returns_outcome_and_logs_history(tmp_path: Path) -> None
     manager.close()
 
 
+def test_inactive_prompt_refuses_direct_execution_even_with_cached_active_copy(
+    tmp_path: Path,
+) -> None:
+    """A standalone status write must win over a stale manager cache."""
+    executor = _StubExecutor()
+    manager, prompt, tracker = _manager_with_dependencies(tmp_path, executor)
+    try:
+        assert manager.get_prompt(prompt.id).is_active
+        changed, _ = manager.repository.set_prompt_active(
+            prompt.id, active=False, expect_active=True
+        )
+        assert changed
+        with pytest.raises(PromptExecutionError, match="inactive"):
+            manager.execute_prompt(prompt.id, "Do not send this to a provider")
+        assert not executor.called_with
+        assert tracker is not None and tracker.list_for_prompt(prompt.id) == []
+    finally:
+        manager.close()
+
+
+def test_inactive_chain_step_refuses_before_web_or_executor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executor = _StubExecutor()
+    manager, prompt, _tracker = _manager_with_dependencies(tmp_path, executor)
+    chain_id = uuid.uuid4()
+    chain = PromptChain(
+        id=chain_id,
+        name="Test chain",
+        description="test",
+        summarize_last_response=False,
+        steps=[
+            PromptChainStep(
+                id=uuid.uuid4(),
+                chain_id=chain_id,
+                prompt_id=prompt.id,
+                order_index=1,
+                input_template="",
+                output_variable="",
+            )
+        ],
+    )
+    manager.repository.add_chain(chain)
+    try:
+        manager.repository.set_prompt_active(prompt.id, active=False, expect_active=True)
+
+        def fail_search(*_args: object, **_kwargs: object) -> str:
+            raise AssertionError("web search reached for inactive prompt")
+
+        monkeypatch.setattr(manager, "_maybe_enrich_with_web_search", fail_search)
+        with pytest.raises(PromptChainExecutionError, match="inactive"):
+            manager.run_prompt_chain(chain.id, chain_input="INPUT", use_web_search=True)
+        assert not executor.called_with
+        assert manager.get_prompt_chain(chain.id).steps[0].prompt_id == prompt.id
+    finally:
+        manager.close()
+
+
+def test_chain_preflights_later_inactive_step_before_first_execution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executor = _StubExecutor()
+    manager, first, _tracker = _manager_with_dependencies(tmp_path, executor)
+    second = _make_prompt("Inactive second step")
+    manager.repository.add(second)
+    chain_id = uuid.uuid4()
+    manager.repository.add_chain(
+        PromptChain(
+            id=chain_id,
+            name="Two steps",
+            description="test",
+            summarize_last_response=False,
+            steps=[
+                PromptChainStep(uuid.uuid4(), chain_id, first.id, 1),
+                PromptChainStep(uuid.uuid4(), chain_id, second.id, 2),
+            ],
+        )
+    )
+    try:
+        manager.repository.set_prompt_active(second.id, active=False, expect_active=True)
+
+        def fail_search(*_args: object, **_kwargs: object) -> str:
+            raise AssertionError("web enrichment reached before chain preflight")
+
+        monkeypatch.setattr(manager, "_maybe_enrich_with_web_search", fail_search)
+        with pytest.raises(PromptChainExecutionError, match="inactive"):
+            manager.run_prompt_chain(chain_id, chain_input="SYNTHETIC", use_web_search=True)
+        assert not executor.called_with
+    finally:
+        manager.close()
+
+
+def test_chain_rechecks_step_if_status_changes_after_preflight(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executor = _StubExecutor()
+    manager, first, _tracker = _manager_with_dependencies(tmp_path, executor)
+    second = _make_prompt("Later step")
+    manager.repository.add(second)
+    chain_id = uuid.uuid4()
+    manager.repository.add_chain(
+        PromptChain(
+            id=chain_id,
+            name="Changing status",
+            description="test",
+            summarize_last_response=False,
+            steps=[
+                PromptChainStep(uuid.uuid4(), chain_id, first.id, 1),
+                PromptChainStep(uuid.uuid4(), chain_id, second.id, 2),
+            ],
+        )
+    )
+    original_execute = executor.execute
+
+    def deactivate_after_first(*args: Any, **kwargs: Any) -> CodexExecutionResult:
+        result = original_execute(*args, **kwargs)
+        manager.repository.set_prompt_active(second.id, active=False, expect_active=True)
+        return result
+
+    monkeypatch.setattr(executor, "execute", deactivate_after_first)
+    try:
+        with pytest.raises(PromptChainExecutionError, match="inactive"):
+            manager.run_prompt_chain(chain_id, chain_input="SYNTHETIC", use_web_search=False)
+        assert executor.called_with == "SYNTHETIC"
+    finally:
+        manager.close()
+
+
 def test_execute_prompt_logs_failure(tmp_path: Path) -> None:
     """Record failure events in tracker when execution raises errors."""
     manager, prompt, tracker = _manager_with_dependencies(tmp_path, _FailingExecutor())
@@ -358,6 +488,20 @@ def test_benchmark_prompts_returns_runs_with_history(tmp_path: Path) -> None:
     assert run.error is None
     assert run.history is not None
     manager.close()
+
+
+def test_benchmark_rejects_inactive_prompt_even_with_cached_copy(tmp_path: Path) -> None:
+    executor = _StubExecutor()
+    manager, prompt, tracker = _manager_with_dependencies(tmp_path, executor)
+    try:
+        assert manager.get_prompt(prompt.id).is_active
+        manager.repository.set_prompt_active(prompt.id, active=False, expect_active=True)
+        with pytest.raises(PromptExecutionError, match="inactive"):
+            manager.benchmark_prompts([prompt.id], "synthetic request", persist_history=True)
+        assert not executor.called_with
+        assert tracker is not None and tracker.list_for_prompt(prompt.id) == []
+    finally:
+        manager.close()
 
 
 def test_benchmark_prompts_persists_history_when_requested(tmp_path: Path) -> None:

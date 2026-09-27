@@ -165,6 +165,17 @@ These areas define PromptManager and should receive the strongest product focus.
 - status / active flag
 - lineage / provenance signals
 
+Prompt lifecycle contract: a stable UUID owns the asset and its current body;
+fork lineage, `related_prompts`, and chain steps refer to UUIDs, without pinning
+historical parent contents. An inactive prompt retains its body and relations
+for explicit inspection by ID, but is excluded from ordinary discovery and
+refused for execution (including chain steps and benchmark) and fork creation.
+Status transitions are explicit and reversible. Physical deletion of a
+referenced prompt is blocked rather than silently disconnecting dependents.
+This is a local-first safety contract, not a cross-store atomicity guarantee:
+status changes can race a provider call after the last repository check, and
+uncertain index/catalog deletion requires inspection.
+
 ### 4. Retrieval and discovery
 - full-text search
 - metadata filtering

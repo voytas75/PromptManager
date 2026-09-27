@@ -56,7 +56,7 @@ class PromptListCoordinator:
     def fetch_prompts(self, search_text: str) -> PromptLoadResult:
         """Return prompt data queried from the repository and optional search."""
         stripped = search_text.strip()
-        all_prompts = list(self._manager.repository.list())
+        all_prompts = [prompt for prompt in self._manager.repository.list() if prompt.is_active]
         search_results: list[Prompt] | None = None
         search_error: str | None = None
         preserve_order = False
@@ -64,7 +64,11 @@ class PromptListCoordinator:
 
         if stripped:
             try:
-                search_results = list(self._manager.search_prompts(stripped, limit=50))
+                search_results = [
+                    prompt
+                    for prompt in self._manager.search_prompts(stripped, limit=50)
+                    if prompt.is_active
+                ]
             except PromptManagerError as exc:
                 search_error = str(exc)
                 operator_state_label = "Search unavailable"

@@ -29,6 +29,7 @@ from ..history_tracker import (
     TokenUsageTotals,
 )
 from ..notifications import NotificationCenter, NotificationLevel
+from ..repository import RepositoryError, RepositoryNotFoundError
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
@@ -109,6 +110,21 @@ class BenchmarkReport:
 class ExecutionHistoryMixin:
     """Shared execution workflows, benchmarking, and history logging helpers."""
 
+    def _active_prompt_for_execution(self, prompt_id: uuid.UUID) -> Prompt:
+        """Read canonical activity state instead of trusting a cached prompt copy."""
+        repository = getattr(self, "_repository", None)
+        if repository is None:
+            raise PromptExecutionError("Unable to verify prompt activity state.")
+        try:
+            prompt = repository.get(prompt_id)
+        except RepositoryNotFoundError as exc:
+            raise PromptExecutionError("Prompt is no longer available.") from exc
+        except RepositoryError as exc:
+            raise PromptExecutionError("Unable to verify prompt activity state.") from exc
+        if not prompt.is_active:
+            raise PromptExecutionError("Prompt is inactive; activate it before running.")
+        return prompt
+
     _notification_center: NotificationCenter
     _executor: CodexExecutor | None
     _history_tracker: HistoryTracker | None
@@ -178,7 +194,7 @@ class ExecutionHistoryMixin:
 
         conversation_history = _normalise_conversation(conversation)
         deps = cast("_PromptAccessor", self)
-        prompt = deps.get_prompt(prompt_id)
+        prompt = self._active_prompt_for_execution(prompt_id)
         stream_enabled = self._executor.stream if stream is None else bool(stream)
         task_id = f"prompt-exec:{prompt.id}:{uuid.uuid4()}"
         metadata = {
@@ -288,8 +304,9 @@ class ExecutionHistoryMixin:
             seen_prompts.add(prompt_id)
             unique_prompt_ids.append(prompt_id)
 
-        deps = cast("_PromptAccessor", self)
-        prompts: list[Prompt] = [deps.get_prompt(prompt_id) for prompt_id in unique_prompt_ids]
+        prompts: list[Prompt] = [
+            self._active_prompt_for_execution(prompt_id) for prompt_id in unique_prompt_ids
+        ]
 
         model_candidates: list[str] = []
         if models:
@@ -351,6 +368,7 @@ class ExecutionHistoryMixin:
             history = prompt_analytics.get(prompt.id)
             for model_name in model_candidates:
                 executor_for_model = _executor_for_model(model_name)
+                prompt = self._active_prompt_for_execution(prompt.id)
                 try:
                     result = executor_for_model.execute(
                         prompt,

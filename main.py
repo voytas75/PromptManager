@@ -38,6 +38,10 @@ if __name__ == "__main__":
     from cli.parser import parse_args as _early_parse_args
 
     _early_args = _early_parse_args()
+    if getattr(_early_args, "command", None) == "prompt-status":
+        from cli.prompt_status import run_prompt_status as _early_run_prompt_status
+
+        raise SystemExit(_early_run_prompt_status(_early_args))
     if getattr(_early_args, "command", None) == "note":
         from cli.note import run_note as _early_run_note
 
@@ -235,6 +239,10 @@ def _run_application(args: Namespace) -> int:
         from cli.prompt_edit import run_prompt_edit
 
         return run_prompt_edit(args)
+    if getattr(args, "command", None) == "prompt-status":
+        from cli.prompt_status import run_prompt_status
+
+        return run_prompt_status(args)
     if getattr(args, "command", None) == "note":
         from cli.note import run_note
 

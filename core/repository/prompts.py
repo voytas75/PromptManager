@@ -25,10 +25,12 @@ from .base import (
     parse_optional_datetime as _parse_optional_datetime,
     stringify_uuid as _stringify_uuid,
 )
+from .prompt_dependencies import PromptDeleteBlockedError, deletion_dependencies
+from .prompt_status import PromptStatusConflictError, set_prompt_active
 
 if TYPE_CHECKING:
     import uuid
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
     from pathlib import Path
 
 
@@ -163,6 +165,20 @@ class PromptStoreMixin:
             raise RepositoryNotFoundError(f"Prompt {prompt_id} not found")
         return self._row_to_prompt(row)
 
+    def set_prompt_active(
+        self, prompt_id: uuid.UUID, *, active: bool, expect_active: bool
+    ) -> tuple[bool, str]:
+        """Transition an existing prompt status without rewriting content or versions."""
+        try:
+            with _connect(self._db_path) as conn:
+                return set_prompt_active(
+                    conn, prompt_id, active=active, expect_active=expect_active
+                )
+        except (PromptStatusConflictError, RepositoryNotFoundError, RepositoryError):
+            raise
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to update prompt status") from exc
+
     def update(self, prompt: Prompt) -> Prompt:
         """Persist an existing prompt."""
         payload = self._prompt_to_row(prompt)
@@ -172,10 +188,12 @@ class PromptStoreMixin:
         query = f"UPDATE prompts SET {assignments} WHERE id = :id;"
         try:
             with _connect(self._db_path) as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                self._assert_prompt_activity_unchanged(conn, prompt)
                 cursor = conn.execute(query, payload)
                 if cursor.rowcount == 0:
                     raise RepositoryNotFoundError(f"Prompt {prompt.id} not found")
-        except RepositoryNotFoundError:
+        except (RepositoryNotFoundError, RepositoryError):
             raise
         except sqlite3.Error as exc:
             raise RepositoryError(f"Failed to update prompt {prompt.id}") from exc
@@ -198,6 +216,7 @@ class PromptStoreMixin:
         try:
             with _connect(self._db_path) as conn:
                 conn.execute("BEGIN IMMEDIATE;")
+                self._assert_prompt_activity_unchanged(conn, prompt)
                 parent_id = parent_version_id
                 if parent_id is None:
                     parent_id = self._get_latest_version_id(conn, prompt.id)
@@ -235,7 +254,7 @@ class PromptStoreMixin:
                     ),
                     (cursor.lastrowid,),
                 ).fetchone()
-        except RepositoryNotFoundError:
+        except (RepositoryNotFoundError, RepositoryError):
             raise
         except sqlite3.Error as exc:
             raise RepositoryError(f"Failed to update prompt {prompt.id} with version") from exc
@@ -243,10 +262,40 @@ class PromptStoreMixin:
             raise RepositoryError("Prompt version insert succeeded but row missing")
         return PromptVersion.from_row(row)
 
+    @staticmethod
+    def _assert_prompt_activity_unchanged(conn: sqlite3.Connection, prompt: Prompt) -> None:
+        """Prevent a stale full-record write from silently changing lifecycle state."""
+        row = conn.execute(
+            "SELECT is_active FROM prompts WHERE id = ?", (_stringify_uuid(prompt.id),)
+        ).fetchone()
+        if row is None:
+            raise RepositoryNotFoundError(f"Prompt {prompt.id} not found")
+        if row["is_active"] not in (0, 1) or bool(row["is_active"]) != bool(prompt.is_active):
+            raise RepositoryError("Prompt status changed; reload before editing")
+
     def delete(self, prompt_id: uuid.UUID) -> None:
         """Delete a prompt by UUID."""
+        self.delete_with_index(prompt_id, None)
+
+    def delete_with_index(
+        self, prompt_id: uuid.UUID, delete_index: Callable[[], None] | None
+    ) -> None:
+        """Hold the write lock over dependency check, optional index deletion, and row deletion."""
         try:
             with _connect(self._db_path) as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                if (
+                    conn.execute(
+                        "SELECT 1 FROM prompts WHERE id = ?", (_stringify_uuid(prompt_id),)
+                    ).fetchone()
+                    is None
+                ):
+                    raise RepositoryNotFoundError(f"Prompt {prompt_id} not found")
+                dependencies = deletion_dependencies(conn, prompt_id)
+                if dependencies:
+                    raise PromptDeleteBlockedError(dependencies)
+                if delete_index is not None:
+                    delete_index()
                 cursor = conn.execute(
                     "DELETE FROM prompts WHERE id = ?;",
                     (_stringify_uuid(prompt_id),),
@@ -255,8 +304,25 @@ class PromptStoreMixin:
                     raise RepositoryNotFoundError(f"Prompt {prompt_id} not found")
         except RepositoryNotFoundError:
             raise
+        except PromptDeleteBlockedError:
+            raise
         except sqlite3.Error as exc:
             raise RepositoryError(f"Failed to delete prompt {prompt_id}") from exc
+
+    def get_prompt_delete_dependencies(self, prompt_id: uuid.UUID) -> tuple[str, ...]:
+        """Read dependency kinds before cross-store deletion begins."""
+        try:
+            with _connect(self._db_path) as conn:
+                if (
+                    conn.execute(
+                        "SELECT 1 FROM prompts WHERE id = ?", (_stringify_uuid(prompt_id),)
+                    ).fetchone()
+                    is None
+                ):
+                    raise RepositoryNotFoundError(f"Prompt {prompt_id} not found")
+                return deletion_dependencies(conn, prompt_id)
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to inspect prompt dependencies") from exc
 
     def list(self, limit: int | None = None) -> list[Prompt]:
         """Return prompts ordered by most recently modified."""

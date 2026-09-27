@@ -31,6 +31,10 @@ def main() -> int:
         from cli.prompt_edit import run_prompt_edit
 
         return run_prompt_edit(args)
+    if getattr(args, "command", None) == "prompt-status":
+        from cli.prompt_status import run_prompt_status
+
+        return run_prompt_status(args)
     if getattr(args, "command", None) == "note":
         from cli.note import run_note
 

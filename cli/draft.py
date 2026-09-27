@@ -18,6 +18,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from config import SettingsError, load_settings
+from core.repository import RepositoryError
+from core.repository.prompt_dependencies import deletion_dependencies
 from models.prompt_model import Prompt
 
 if TYPE_CHECKING:
@@ -392,6 +394,17 @@ def _remove(conn: sqlite3.Connection, index: Path, draft_id: str) -> None:
     index_removed = False
     try:
         _one(conn, draft_id)  # Recheck while holding the SQLite write lock.
+        try:
+            dependencies = deletion_dependencies(conn, draft_id)
+        except RepositoryError as exc:
+            raise DraftError(
+                "CATALOG_INVALID", "Selected catalog has invalid prompt relations."
+            ) from exc
+        if dependencies:
+            raise DraftError(
+                "DEPENDENCIES_EXIST",
+                "Draft has prompt dependencies; deactivate instead of deleting.",
+            )
         index_removed = _delete_index(index, draft_id)
         conn.execute("DELETE FROM prompts WHERE id=?", (draft_id,))
         conn.execute(

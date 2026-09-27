@@ -56,6 +56,7 @@ from core.litellm_adapter import (
     get_completion,
     serialise_litellm_response,
 )
+from core.repository import RepositoryError
 from core.sharing import append_share_footer
 from core.web_search.context_formatting import (
     build_numbered_search_results,
@@ -324,6 +325,23 @@ class ExecutionController:
         self._query_input.setFocus(Qt.FocusReason.ShortcutFocusReason)
         self._toast("Prompt result copied to the text window.", 2500)
 
+    def _get_active_catalog_prompt(self, prompt_id: UUID) -> Prompt | None:
+        """Read fresh catalog state before an optional web or model call."""
+        try:
+            prompt = self._manager.repository.get(prompt_id)
+        except RepositoryError:
+            self._error("Prompt unavailable", "Unable to verify prompt activity state.")
+            return None
+        if not prompt.is_active:
+            self._error(
+                "Prompt execution refused", "Prompt is inactive; activate it before running."
+            )
+            return None
+        return prompt
+
+    def _check_catalog_prompt_active(self, prompt_id: UUID) -> bool:
+        return self._get_active_catalog_prompt(prompt_id) is not None
+
     def execute_prompt_with_text(
         self,
         prompt: Prompt,
@@ -337,6 +355,8 @@ class ExecutionController:
         trimmed = request_text.strip()
         if not trimmed:
             self._status(empty_text_message, 4000)
+            return
+        if not self._check_catalog_prompt_active(prompt.id):
             return
         if not getattr(self._manager, "llm_available", True):
             message = self._manager.llm_status_message("Prompt execution")
@@ -438,6 +458,8 @@ class ExecutionController:
         if not cleaned_context:
             self._status("Provide context text before executing.", 4000)
             return
+        if not self._check_catalog_prompt_active(prompt.id):
+            return
         execution_prompt = replace(prompt, context=cleaned_context)
         conversation_user_text = (
             "You will receive a task and a context block. "
@@ -474,6 +496,8 @@ class ExecutionController:
         if executor is None:
             self._error("Prompt execution unavailable", "Configure LiteLLM before running text.")
             self._status("Prompt execution unavailable.", 4000)
+            return
+        if count_usage_for_prompt and not self._check_catalog_prompt_active(display_prompt.id):
             return
         payload = self._maybe_enrich_request(execution_prompt, request_text)
         streaming_enabled = self._is_streaming_enabled()
@@ -568,10 +592,8 @@ class ExecutionController:
             self._status("Type a follow-up message before continuing the chat.", 4000)
             return
 
-        try:
-            prompt = self._manager.get_prompt(self._chat_prompt_id)
-        except (PromptNotFoundError, PromptManagerError) as exc:
-            self._error("Prompt unavailable", str(exc))
+        prompt = self._get_active_catalog_prompt(self._chat_prompt_id)
+        if prompt is None:
             self._reset_chat_session()
             return
 

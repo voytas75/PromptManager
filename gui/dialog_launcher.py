@@ -63,7 +63,9 @@ class DialogLauncher:
     def open_workbench(self) -> None:
         """Launch the Enhanced Prompt Workbench."""
         try:
-            templates = self._manager.repository.list(limit=200)
+            templates = [prompt for prompt in self._manager.repository.list() if prompt.is_active][
+                :200
+            ]
         except RepositoryError:
             templates = []
         dialog = WorkbenchModeDialog(templates, self._parent)

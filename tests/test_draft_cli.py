@@ -257,6 +257,70 @@ def test_draft_delete_retains_catalog_if_existing_index_unavailable(tmp_path: Pa
     assert PromptRepository(str(db)).get(uuid.UUID(draft_id)).context == "GUI body"
 
 
+@pytest.mark.parametrize("dependency", ["fork", "related", "chain"])
+def test_draft_delete_refuses_dependents_before_index_mutation(
+    tmp_path: Path, dependency: str
+) -> None:
+    import chromadb
+
+    from models.prompt_chain_model import PromptChain, PromptChainStep
+
+    config, db, index = _setup(tmp_path)
+    draft_id = _existing(db)
+    repo = PromptRepository(str(db))
+    if dependency == "fork":
+        child_id = _existing(db, draft=False)
+        repo.record_prompt_fork(uuid.UUID(draft_id), uuid.UUID(child_id))
+    elif dependency == "related":
+        child = repo.get(uuid.UUID(_existing(db, draft=False)))
+        repo.set_prompt_active(child.id, active=False, expect_active=True)
+        child = repo.get(child.id)
+        child.related_prompts = [draft_id]
+        repo.update(child)
+    else:
+        chain_id = uuid.uuid4()
+        repo.add_chain(
+            PromptChain(
+                id=chain_id,
+                name="Synthetic chain",
+                description="Test",
+                is_active=False,
+                steps=[
+                    PromptChainStep(
+                        id=uuid.uuid4(),
+                        chain_id=chain_id,
+                        prompt_id=uuid.UUID(draft_id),
+                        order_index=1,
+                    )
+                ],
+            )
+        )
+    client = chromadb.PersistentClient(path=str(index))
+    collection = client.get_or_create_collection("prompt_manager")
+    collection.add(ids=[draft_id], embeddings=[[0.1, 0.2]])
+    result = _run(tmp_path, config, "draft", "delete", draft_id, "--yes", "--json")
+    assert result.returncode != 0 and result.stdout == ""
+    assert json.loads(result.stderr)["error"]["code"] == "DEPENDENCIES_EXIST"
+    assert collection.get(ids=[draft_id])["ids"] == [draft_id]
+    assert repo.get(uuid.UUID(draft_id)).id == uuid.UUID(draft_id)
+
+
+def test_draft_delete_corrupt_relations_uses_safe_json_error(tmp_path: Path) -> None:
+    config, db, index = _setup(tmp_path)
+    draft_id = _existing(db)
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            "UPDATE prompts SET related_prompts=? WHERE id=?", ("SECRET_MALFORMED", draft_id)
+        )
+    result = _run(tmp_path, config, "draft", "delete", draft_id, "--yes", "--json")
+    assert result.returncode != 0 and result.stdout == ""
+    assert json.loads(result.stderr)["error"]["code"] == "CATALOG_INVALID"
+    assert "SECRET_MALFORMED" not in result.stderr
+    assert not index.exists()
+    with sqlite3.connect(db) as conn:
+        assert conn.execute("SELECT 1 FROM prompts WHERE id=?", (draft_id,)).fetchone()
+
+
 def test_draft_delete_removes_existing_local_index_entry(tmp_path: Path) -> None:
     import chromadb
 

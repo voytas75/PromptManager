@@ -181,6 +181,47 @@ def test_open_recent_prompts_orders_by_last_modified_and_selects_prompt() -> Non
     assert status_messages == []
 
 
+def test_recent_omits_inactive_without_hiding_active_outside_search() -> None:
+    inactive = _build_prompt(
+        prompt_id=uuid.UUID("00000000-0000-0000-0000-000000000014"),
+        name="Withdrawn",
+        modified_at=datetime(2026, 4, 5, 12, 0, tzinfo=UTC),
+    )
+    inactive.is_active = False
+    active = _build_prompt(
+        prompt_id=uuid.UUID("00000000-0000-0000-0000-000000000015"),
+        name="Available",
+        modified_at=datetime(2026, 4, 4, 12, 0, tzinfo=UTC),
+    )
+    factory = _RecentPromptsDialogFactoryStub(
+        dialog=_RecentPromptsDialogStub(selected_prompt_id=active.id), built_prompts=[]
+    )
+    handler = PromptActionsHandler(
+        parent=cast("QWidget", object()),
+        manager=cast("PromptManager", object()),
+        model_prompts_supplier=lambda: [active],
+        recent_catalog_prompts_supplier=lambda: [inactive, active],
+        current_prompt_supplier=lambda: None,
+        detail_widget=cast("PromptDetailWidget", object()),
+        prompt_search_controller=cast("PromptSearchController", object()),
+        prompt_actions_controller_supplier=lambda: None,
+        prompt_editor_flow_supplier=lambda: None,
+        catalog_controller_supplier=lambda: None,
+        settings_workflow_supplier=lambda: None,
+        dialog_launcher_supplier=lambda: None,
+        share_workflow_supplier=lambda: None,
+        recent_prompts_dialog_factory=cast("RecentPromptsDialogFactory", factory),
+        select_prompt=lambda _id: None,
+        reveal_recent_prompt=lambda _id: None,
+        load_prompts=lambda _text: None,
+        current_search_text=lambda: "",
+        status_callback=lambda _message, _duration: None,
+        exit_callback=lambda: None,
+    )
+    handler.open_recent_prompts()
+    assert factory.built_prompts and [p.id for p in factory.built_prompts[0]] == [active.id]
+
+
 def test_recent_can_reopen_a_prompt_hidden_by_search_results() -> None:
     """Recent uses the catalog, not the current result subset, and reveals its selection."""
     recent = _build_prompt(

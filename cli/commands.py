@@ -1540,12 +1540,12 @@ def run_prompt_random(
     args: argparse.Namespace,
     logger: logging.Logger,
 ) -> int:
-    """Display one randomly selected local prompt without changing repository state."""
+    """Display one randomly selected active local prompt without changing repository state."""
     del args, logger
     if manager is None:
         raise ValueError("Prompt Manager is required for random prompt display.")
     try:
-        prompts = manager.repository.list()
+        prompts = [prompt for prompt in manager.repository.list() if prompt.is_active]
     except Exception as exc:  # pragma: no cover - surfaced to CLI
         print(f"Unable to load prompts: {exc}")
         return 6
@@ -1615,6 +1615,8 @@ def run_prompt_list(
         tag = str(args.tag or "").strip().casefold()
         source = str(args.source or "").strip().casefold()
         active = args.active
+        if active is None:
+            active = "true"
         for prompt in prompts:
             if category and str(prompt.category or "").strip().casefold() != category:
                 continue
@@ -1680,7 +1682,7 @@ def run_prompt_find(
     tag_filter = str(getattr(args, "tag", "") or "").strip().lower()
     source_filter = str(getattr(args, "source", "") or "").strip().lower()
     active_raw = str(getattr(args, "active", "") or "").strip().lower()
-    active_filter: bool | None = None
+    active_filter: bool | None = True
     if active_raw:
         if active_raw in {"1", "true", "yes", "y", "active"}:
             active_filter = True
@@ -1709,7 +1711,10 @@ def run_prompt_find(
             return 5
 
     try:
-        prompts = manager.search_prompts(query, limit=limit)
+        if active_filter is False:
+            prompts = manager.search_prompts(query, limit=limit, include_inactive=True)
+        else:
+            prompts = manager.search_prompts(query, limit=limit)
     except PromptManagerError as exc:
         if bool(getattr(args, "json", False)):
             print(
@@ -1735,7 +1740,7 @@ def run_prompt_find(
             continue
         if source_filter and source_filter != str(prompt.source or "").strip().lower():
             continue
-        if active_filter is not None and bool(prompt.is_active) is not active_filter:
+        if bool(prompt.is_active) is not active_filter:
             continue
         matches.append(prompt)
         if len(matches) >= limit:

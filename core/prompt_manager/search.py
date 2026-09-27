@@ -121,6 +121,8 @@ class PromptSearchMixin:
         limit: int = 5,
         where: dict[str, Any] | None = None,
         embedding: Sequence[float] | None = None,
+        *,
+        include_inactive: bool = False,
     ) -> list[Prompt]:
         """Search prompts semantically using a text query or embedding."""
         if not query_text and embedding is None:
@@ -160,14 +162,10 @@ class PromptSearchMixin:
 
         prompts: list[Prompt] = []
         ids = results.get("ids", [[]])[0]
-        documents = results.get("documents", [[]])[0]
-        metadatas = results.get("metadatas", [[]])[0]
         distance_values = self._extract_distances(results, len(ids))
 
-        for prompt_id, document, metadata, distance in zip(
+        for prompt_id, distance in zip(
             ids,
-            documents,
-            metadatas,
             distance_values,
             strict=False,
         ):
@@ -182,12 +180,12 @@ class PromptSearchMixin:
             try:
                 prompt_record = self._repository.get(prompt_uuid)
             except RepositoryNotFoundError:
-                record = {"id": prompt_id, "document": document, "metadata": metadata}
-                prompt_record = self._hydrate_prompt(record)
+                # Orphaned index entries are not canonical catalog prompts.
+                continue
             except RepositoryError as exc:
-                raise PromptStorageError(
-                    f"Failed to hydrate prompt {prompt_id} from SQLite"
-                ) from exc
+                raise PromptStorageError("Failed to verify search result in the catalog") from exc
+            if not include_inactive and not prompt_record.is_active:
+                continue
 
             try:
                 if distance is not None:
@@ -214,7 +212,11 @@ class PromptSearchMixin:
         stripped = query_text.strip()
         if not stripped:
             try:
-                baseline = self._as_prompt_manager().repository.list(limit=limit)
+                baseline = [
+                    prompt
+                    for prompt in self._as_prompt_manager().repository.list()
+                    if prompt.is_active
+                ][:limit]
             except RepositoryError as exc:
                 raise PromptStorageError("Unable to load prompts for suggestions") from exc
             personalised = self._personalize_ranked_prompts(baseline)
@@ -247,7 +249,7 @@ class PromptSearchMixin:
             raw_results = []
 
         ranked = rank_by_hints(
-            raw_results,
+            [prompt for prompt in raw_results if prompt.is_active],
             category_hints=prediction.category_hints,
             tag_hints=prediction.tag_hints,
         )
@@ -269,7 +271,9 @@ class PromptSearchMixin:
             except PromptManagerError:
                 fallback_results = []
             else:
-                fallback_results = self._personalize_ranked_prompts(fallback_results)
+                fallback_results = self._personalize_ranked_prompts(
+                    [prompt for prompt in fallback_results if prompt.is_active]
+                )
             for prompt in fallback_results:
                 if prompt.id in seen_ids:
                     continue
@@ -281,7 +285,11 @@ class PromptSearchMixin:
         if not suggestions:
             fallback_used = True
             try:
-                suggestions = self._as_prompt_manager().repository.list(limit=limit)
+                suggestions = [
+                    prompt
+                    for prompt in self._as_prompt_manager().repository.list()
+                    if prompt.is_active
+                ][:limit]
             except RepositoryError as exc:
                 raise PromptStorageError("Unable to load prompts for suggestions") from exc
 

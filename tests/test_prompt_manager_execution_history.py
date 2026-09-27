@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 
 from core.execution import CodexExecutionResult, CodexExecutor
@@ -169,6 +170,7 @@ class _ExecutionHarness(ExecutionHistoryMixin):
         self._litellm_fast_model = None
         self._litellm_inference_model = None
         self._prompts = {prompt.id: prompt}
+        self._repository = SimpleNamespace(get=self.get_prompt)
         self.usage_calls: list[uuid.UUID] = []
         self.rating_calls: list[tuple[uuid.UUID, float]] = []
 

@@ -92,7 +92,7 @@ class QuickActionController:
     def execute_quick_action(self, action: QuickAction) -> None:
         """Run *action* and update the workspace accordingly."""
         try:
-            prompts = self._manager.repository.list()
+            prompts = [prompt for prompt in self._manager.repository.list() if prompt.is_active]
         except RepositoryError as exc:
             self._error_callback("Unable to load prompts", str(exc))
             return
