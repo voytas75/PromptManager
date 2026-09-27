@@ -971,6 +971,7 @@ def test_suggest_command_outputs_results(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setattr("sys.argv", ["prompt-manager", "suggest", "Find failing test"])
+    prompt_id = uuid.uuid4()
     settings = _DummySettings()
     _patch_main(monkeypatch, "load_settings", lambda: settings)
     manager = _DummyManager()
@@ -986,6 +987,7 @@ def test_suggest_command_outputs_results(
         prediction=prediction,
         prompts=[
             SimpleNamespace(
+                id=prompt_id,
                 name="Debug Sentinel",
                 category="Code Analysis",
                 quality_score=9.1,
@@ -1004,6 +1006,7 @@ def test_suggest_command_outputs_results(
     output = capsys.readouterr().out
     assert "Top 1 suggestions" in output
     assert "Debug Sentinel" in output
+    assert f"ID: {prompt_id}" in output
     assert manager.closed is True
 
 

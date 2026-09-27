@@ -4,6 +4,9 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- `suggest` now prints each suggested prompt's canonical ID alongside its existing readable attributes, so the result can be used directly with ID-based CLI commands. Ranking and retrieval are unchanged.
+
 ## [0.24.0] - 2026-09-27
 
 ### Added

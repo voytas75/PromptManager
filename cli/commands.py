@@ -1447,6 +1447,7 @@ def run_suggest(
             textwrap.dedent(
                 f"""\
                 {index}. {prompt.name} [{prompt.category or "Uncategorised"}]
+                   ID: {prompt.id}
                    Quality: {quality}  Tags: {tags}
                    Description: {prompt.description}
                 """
