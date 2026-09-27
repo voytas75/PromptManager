@@ -224,9 +224,13 @@ def _write_temp_prompt_payload(payload: object) -> Path:
         encoding="utf-8",
     )
     temp_path = Path(handle.name)
-    with handle:
-        json.dump(payload, handle, ensure_ascii=False, indent=2)
-        handle.write("\n")
+    try:
+        with handle:
+            json.dump(payload, handle, ensure_ascii=False, indent=2)
+            handle.write("\n")
+    except BaseException:
+        temp_path.unlink(missing_ok=True)
+        raise
     return temp_path
 
 
@@ -351,10 +355,12 @@ def _normalise_prompt_add_args(args: argparse.Namespace, parser: argparse.Argume
 
         payload = _build_inline_prompt_payload(args)
         args.path = _write_temp_prompt_payload(payload)
+        args._temporary_prompt_payload = True
         return
     if json_value not in (None, ""):
         payload = _parse_json_string_payload(str(json_value), parser)
         args.path = _write_temp_prompt_payload(payload)
+        args._temporary_prompt_payload = True
         return
     if input_file_value is not None:
         args.path = Path(input_file_value).expanduser()
@@ -362,6 +368,7 @@ def _normalise_prompt_add_args(args: argparse.Namespace, parser: argparse.Argume
     if use_stdin:
         payload = _read_stdin_json_payload(parser)
         args.path = _write_temp_prompt_payload(payload)
+        args._temporary_prompt_payload = True
 
 
 def parse_args() -> argparse.Namespace:

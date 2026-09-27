@@ -1566,6 +1566,16 @@ def run_prompt_show(
     raw_prompt_id = str(getattr(args, "prompt_id", "") or "").strip()
     prompt, exit_code, error_message = _resolve_prompt_reference(manager, raw_prompt_id)
     if prompt is None:
+        if bool(getattr(args, "json", False)):
+            code, message = {
+                4: ("PROMPT_NOT_FOUND", "Prompt not found."),
+                5: ("AMBIGUOUS_NAME", "Prompt name is ambiguous; use a UUID."),
+            }.get(exit_code, ("PROMPT_LOOKUP_FAILED", "Unable to load prompt."))
+            print(
+                json.dumps({"ok": False, "error": {"code": code, "message": message}}),
+                file=sys.stderr,
+            )
+            return exit_code
         print_and_log(logger, logging.ERROR, error_message or f"Prompt not found: {raw_prompt_id}")
         return exit_code
 
@@ -1652,6 +1662,17 @@ def run_prompt_find(
         raise ValueError("Prompt Manager is required for prompt search.")
     query = str(getattr(args, "query", "") or "").strip()
     if not query:
+        if bool(getattr(args, "json", False)):
+            print(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "error": {"code": "INVALID_QUERY", "message": "Query is required."},
+                    }
+                ),
+                file=sys.stderr,
+            )
+            return 5
         logger.error("Prompt search query must be provided.")
         return 5
     limit = max(1, int(getattr(args, "limit", 10) or 10))
@@ -1666,6 +1687,20 @@ def run_prompt_find(
         elif active_raw in {"0", "false", "no", "n", "inactive"}:
             active_filter = False
         else:
+            if bool(getattr(args, "json", False)):
+                print(
+                    json.dumps(
+                        {
+                            "ok": False,
+                            "error": {
+                                "code": "INVALID_ACTIVE",
+                                "message": "Use true/false for --active.",
+                            },
+                        }
+                    ),
+                    file=sys.stderr,
+                )
+                return 5
             print_and_log(
                 logger,
                 logging.ERROR,
@@ -1676,6 +1711,17 @@ def run_prompt_find(
     try:
         prompts = manager.search_prompts(query, limit=limit)
     except PromptManagerError as exc:
+        if bool(getattr(args, "json", False)):
+            print(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "error": {"code": "SEARCH_FAILED", "message": "Unable to find prompts."},
+                    }
+                ),
+                file=sys.stderr,
+            )
+            return 6
         print_and_log(logger, logging.ERROR, f"Failed to find prompts: {exc}")
         return 6
 
@@ -1696,6 +1742,9 @@ def run_prompt_find(
             break
 
     if not matches:
+        if bool(getattr(args, "json", False)):
+            print("[]")
+            return 0
         print(f"No prompts matched: {getattr(args, 'query', '')}")
         return 0
 

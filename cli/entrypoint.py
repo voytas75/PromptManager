@@ -44,6 +44,13 @@ def main() -> int:
 
         return run_prompt_part(args)
 
-    from main import main as application_main
+    from pathlib import Path
 
-    return application_main()
+    try:
+        from main import main as application_main
+
+        return application_main(args)
+    finally:
+        # The application cleans up after dispatch; also cover import/startup failure.
+        if getattr(args, "_temporary_prompt_payload", False):
+            Path(args.path).unlink(missing_ok=True)

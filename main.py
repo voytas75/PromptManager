@@ -25,6 +25,15 @@ from typing import TYPE_CHECKING, Any
 
 # Diagnose before importing core/GUI: their LiteLLM import can load .env and
 # change the selected configuration before a read-only check even begins.
+_early_args: Namespace | None = None
+
+
+def _cleanup_early_payload() -> None:
+    """Remove a parsed inline payload if application imports fail before dispatch."""
+    if _early_args is not None and getattr(_early_args, "_temporary_prompt_payload", False):
+        Path(_early_args.path).unlink(missing_ok=True)
+
+
 if __name__ == "__main__":
     from cli.parser import parse_args as _early_parse_args
 
@@ -63,28 +72,42 @@ if __name__ == "__main__":
         )
 
 try:
-    from config import load_settings
-except (ImportError, AttributeError):  # pragma: no cover - fallback for test stubs
-    import config as _config
+    try:
+        from config import load_settings
+    except (ImportError, AttributeError):  # pragma: no cover - fallback for test stubs
+        import config as _config
 
-    load_settings = _config.load_settings
+        load_settings = _config.load_settings
+except BaseException:
+    _cleanup_early_payload()
+    raise
 
 if TYPE_CHECKING:
+    from argparse import Namespace
+
     from config import PromptManagerSettings
 else:
     PromptManagerSettings = Any
-from cli.gui_launcher import run_default_mode
-from cli.parser import parse_args
-from cli.runtime import configure_litellm_logging, setup_logging as _runtime_setup_logging
-from cli.settings_summary import print_settings_summary
-from core import (
-    build_analytics_snapshot as _core_build_analytics_snapshot,
-    build_prompt_manager,
-    diff_prompt_catalog as _core_diff_prompt_catalog,
-    export_prompt_catalog as _core_export_prompt_catalog,
-    import_prompt_catalog as _core_import_prompt_catalog,
-    snapshot_dataset_rows as _core_snapshot_dataset_rows,
-)
+try:
+    from cli.commands import COMMAND_SPECS  # noqa: E402  (import moved for compatibility)
+    from cli.gui_launcher import run_default_mode  # noqa: E402
+    from cli.parser import parse_args  # noqa: E402
+    from cli.runtime import (  # noqa: E402
+        configure_litellm_logging,
+        setup_logging as _runtime_setup_logging,
+    )
+    from cli.settings_summary import print_settings_summary  # noqa: E402
+    from core import (  # noqa: E402
+        build_analytics_snapshot as _core_build_analytics_snapshot,
+        build_prompt_manager,
+        diff_prompt_catalog as _core_diff_prompt_catalog,
+        export_prompt_catalog as _core_export_prompt_catalog,
+        import_prompt_catalog as _core_import_prompt_catalog,
+        snapshot_dataset_rows as _core_snapshot_dataset_rows,
+    )
+except BaseException:
+    _cleanup_early_payload()
+    raise
 
 # Backwards-compatible re-exports for tests/legacy entry points.
 build_analytics_snapshot = _core_build_analytics_snapshot
@@ -99,8 +122,6 @@ CONFIG_TEMPLATE_PATH = Path("config/config.template.json")
 
 _setup_logging = _runtime_setup_logging
 
-
-from cli.commands import COMMAND_SPECS  # noqa: E402  (import moved for compatibility)
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from core.prompt_manager import PromptManager
@@ -190,9 +211,8 @@ def _prompt_create_default_config(logger: logging.Logger) -> bool:
     return True
 
 
-def main() -> int:
-    """Entrypoint that wires settings, services, and CLI commands."""
-    args = parse_args()
+def _run_application(args: Namespace) -> int:
+    """Wire resolved arguments to settings, services, and CLI commands."""
     if getattr(args, "command", None) == "doctor":
         from cli.doctor import run_doctor
 
@@ -274,5 +294,15 @@ def main() -> int:
             manager.close()
 
 
+def main(args: Namespace | None = None) -> int:
+    """Run the application and remove only generated prompt-add payloads."""
+    parsed = args if args is not None else parse_args()
+    try:
+        return _run_application(parsed)
+    finally:
+        if getattr(parsed, "_temporary_prompt_payload", False):
+            Path(parsed.path).unlink(missing_ok=True)
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(_early_args))

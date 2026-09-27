@@ -3564,6 +3564,134 @@ def test_prompt_show_command_outputs_json_payload(
     assert manager.closed is True
 
 
+def test_prompt_show_json_missing_has_only_structured_stderr(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-show", "missing", "--json"])
+    manager = _DummyManager()
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    assert main.main() == 4
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert json.loads(captured.err) == {
+        "ok": False,
+        "error": {"code": "PROMPT_NOT_FOUND", "message": "Prompt not found."},
+    }
+    assert manager.closed is True
+
+
+def test_prompt_show_json_ambiguous_has_only_structured_stderr(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-show", "Duplicate", "--json"])
+    manager = _DummyManager()
+    manager.repository.store.extend(
+        [
+            Prompt(id=uuid.uuid4(), name="Duplicate", description="duplicate", category="Testing")
+            for _ in range(2)
+        ]
+    )
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    assert main.main() == 5
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert json.loads(captured.err) == {
+        "ok": False,
+        "error": {"code": "AMBIGUOUS_NAME", "message": "Prompt name is ambiguous; use a UUID."},
+    }
+
+
+def test_prompt_show_json_lookup_failure_does_not_echo_backend_detail(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-show", "Existing", "--json"])
+    manager = _DummyManager()
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    def broken_list(limit: int | None = None) -> list[object]:
+        raise RuntimeError("PRIVATE_BACKEND_DETAIL")
+
+    monkeypatch.setattr(manager.repository, "list", broken_list)
+    assert main.main() == 6
+    captured = capsys.readouterr()
+    assert captured.out == "" and "PRIVATE_BACKEND_DETAIL" not in captured.err
+    assert json.loads(captured.err) == {
+        "ok": False,
+        "error": {"code": "PROMPT_LOOKUP_FAILED", "message": "Unable to load prompt."},
+    }
+
+
+@pytest.mark.parametrize(
+    ("query", "error_code", "exit_code"),
+    [(" ", "INVALID_QUERY", 5), ("failure", "SEARCH_FAILED", 6)],
+)
+def test_prompt_find_json_failure_is_sanitized(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    query: str,
+    error_code: str,
+    exit_code: int,
+) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", "prompt-find", query, "--json"])
+    manager = _DummyManager()
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+    if error_code == "SEARCH_FAILED":
+
+        def broken_search(query: str, limit: int = 5) -> list[Prompt]:
+            raise PromptManagerError("PRIVATE_BACKEND_DETAIL")
+
+        monkeypatch.setattr(manager, "search_prompts", broken_search)
+
+    assert main.main() == exit_code
+    captured = capsys.readouterr()
+    assert captured.out == "" and "PRIVATE_BACKEND_DETAIL" not in captured.err
+    assert json.loads(captured.err)["error"]["code"] == error_code
+
+
+@pytest.mark.parametrize(
+    ("args", "response", "code", "expected"),
+    [
+        (["prompt-find", "missing", "--json"], [], 0, []),
+        (
+            ["prompt-find", "query", "--active", "invalid", "--json"],
+            [],
+            5,
+            {
+                "ok": False,
+                "error": {"code": "INVALID_ACTIVE", "message": "Use true/false for --active."},
+            },
+        ),
+    ],
+)
+def test_prompt_find_json_empty_and_invalid_are_structured(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    args: list[str],
+    response: list[Prompt],
+    code: int,
+    expected: object,
+) -> None:
+    monkeypatch.setattr("sys.argv", ["prompt-manager", *args])
+    manager = _DummyManager()
+    manager.search_response = response
+    _patch_main(monkeypatch, "load_settings", _load_dummy_settings)
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+
+    assert main.main() == code
+    captured = capsys.readouterr()
+    assert json.loads(captured.out if code == 0 else captured.err) == expected
+    assert (captured.err if code == 0 else captured.out) == ""
+
+
 def test_prompt_show_command_full_json_includes_embedding_vector(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
