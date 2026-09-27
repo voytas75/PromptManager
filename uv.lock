@@ -1530,7 +1530,7 @@ wheels = [
 
 [[package]]
 name = "prompt-manager"
-version = "0.23.3"
+version = "0.24.0"
 source = { editable = "." }
 dependencies = [
     { name = "chromadb" },

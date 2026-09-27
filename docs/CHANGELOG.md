@@ -4,6 +4,8 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-09-27
+
 ### Added
 - Added provider-free `prompt-status <uuid> activate|deactivate --expect-active true|false [--json]` against an existing local catalog. The compare-and-set transition preserves prompt identity, body, lineage and version history; repeat transitions are no-ops and stale state is rejected. The lifecycle policy is enforced by separate fresh activity checks for execution, benchmark, chain and fork paths, not by the status CLI alone; a concurrent deactivation after a check can still race a provider call.
 - Added `prompt-list [--limit 1..100] [--category/--tag/--source/--active] [--json]` for bounded, query-free browsing of the existing local catalog. Filters apply before the result limit; compact JSON omits prompt bodies and embedding vectors. It uses the normal manager but does not perform semantic search or call a model to list records.

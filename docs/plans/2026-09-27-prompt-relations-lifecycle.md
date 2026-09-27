@@ -20,19 +20,19 @@ Keep stable prompt UUIDs as relation targets; do not introduce source-version pi
 - Disposable SQLite probe: inactive X retained fork + `related_prompts`, `doctor` clean; hard-delete X removed lineage via FK cascade while Y survived with stale related UUID and `CAT004`. Local checkout clean. Existing draft delete bypasses manager, drops SQLite row and index entry; manager deletes Chroma before repository. `doctor` reads all prompts including inactive.
 - Ambiguities resolved: all *current* relation kinds block deletion; inactive dependents still count; do not automatically strip links; malformed metadata is an integrity signal not a reason to silently allow deletion. Refine activity policy only after tracing actual run/discovery entrypoints.
 
-### S1 — block destructive deletion at storage and lifecycle boundaries — locally closed (uncommitted)
+### S1 — block destructive deletion at storage and lifecycle boundaries — delivered
 
 - RED: add focused disposable repository/manager/draft tests for each dependency kind (fork; canonical related UUID, including inactive child; chain step; independent target); assert declined deletion preserves row, fork link, chain step and vector index. Check missing target and benign no-dependency deletion. Include candidate rollback-fork cleanup behavior.
 - GREEN: one shared, provider-free dependency query on SQLite; repository `delete` checks within `BEGIN IMMEDIATE`; manager preflight checks before Chroma; draft deletion rechecks on the same SQLite write connection *before* index removal. Failure returns a distinct safe domain code, not a partial-delete claim. Avoid silently accepting unsupported schema or ambiguous metadata.
 - Acceptance: targeted pytest and real disposable installed CLI if draft touched; Ruff, formatter check, configured Pyright, `uv lock --check`, full pytest with `core >=80%`, `git diff --check`; inspect changed-file scope. Update this ledger with RED/GREEN, tests and remaining risk before S2.
 
-### S2 — explicit active/inactive transition — locally closed (uncommitted)
+### S2 — explicit active/inactive transition — delivered
 
 - RED: stable UUID, idempotence, no implicit version snapshot, stale-state protection, sanitized machine-readable output, active/inactive listing; explore cache/Chroma consistency and any existing `prompt-add` import side effects before implementing.
 - GREEN: single status update through the owner lifecycle, offline/provider-free where supported; CLI `prompt-deactivate`/`prompt-activate` or a small unified status surface. Reactivation does not rewrite lineage. GUI status operation only if the existing UI can share the same contract without broad rewrite; otherwise record a separate explicit decision.
 - Verify targeted GUI/CLI/subprocess and full local gates. Document exact semantics rather than equating inactivity with `draft` or favorite.
 
-### S3 — discovery and execution semantics — locally verified
+### S3 — discovery and execution semantics — delivered
 
 - Trace workspace run, direct manager run, chain steps, CLI find/list, GUI search and fork. Define whether inactive means hidden from suggestions only or a hard execution refusal across all entrypoints. Test both implicit and explicit-ID paths, count inactive as valid for doctor; maintain JSON and exit contracts. Do not label inactivity as a hard execution block until the actual execution seam is guarded.
 - Keep state/filter changes bounded; do not change ranking or provider calls without separate scope.
@@ -76,6 +76,7 @@ Keep stable prompt UUIDs as relation targets; do not introduce source-version pi
 30. 2026-09-27 — RED/GREEN offline regressions: preflight every chain step before the first web/model action while rechecking each step during execution; manager update compares canonical activity before embedding/index work, retaining the SQLite transactional guard; chain editor retains referenced inactive prompt detail for existing steps but filters new-step choices. Targeted chain, storage and GUI tests passed; scoped Ruff/Pyright passed. Updated product SSOT, developer CLI docs and changelog to state the bounded policy and race. Final full gate and delivery verification remain pending.
 31. 2026-09-27 — Final local gate on the repaired S1–S3 diff passed: Ruff check/format, configured Pyright, `uv lock --check`, `git diff --check`, headless provider-free pytest **1158 passed, 1 skipped**, core coverage **83.18%**. S3 locally verified after repairing all three review findings; external remote and exact-SHA CI remain to verify. No provider, real catalog, or Windows checkout operation.
 32. 2026-09-27 — Owner-approved S1–S3 code, tests, product SSOT, developer docs and this ledger committed as `fef7026a20d14457228f9449489645f8e9cd8a89` (`41` files; `1878` insertions, `69` deletions) and pushed to `origin/master` without force. Fresh fetch and live `ls-remote` matched local/tracking/live SHAs; worktree was clean. Exact-SHA GitHub Quality Gates [run 36335756125](https://github.com/voytas75/PromptManager/actions/runs/36335756125) completed successfully, including Ruff, Pyright, Pytest and clean-tree steps. This ledger closeout is a subsequent documentation-only commit, so its own remote/CI state must be checked separately. No Windows acceptance, provider invocation or real catalog repair is claimed.
+33. 2026-09-27 — Documentation closeout commit `6ced96c1988c5d20b5a00fb1b7eeddd375824637` was pushed; live remote/tracking/local SHAs matched and exact-SHA GitHub Quality Gates [run 36336090965](https://github.com/voytas75/PromptManager/actions/runs/36336090965) completed successfully (Ruff, Pyright, Pytest, clean-tree). Before the `0.24.0` release metadata update, native Windows checkout at `D:\repos\PromptManager` was clean and on that SHA. A native Python smoke using a disposable local `D:\pm0240-*` catalog verified `prompt-list` active-only default, explicit inactive listing, `prompt-status` CAS and relational retention; scratch was removed and native Git remained clean. The Windows environment had no pytest module; this was a public-CLI smoke, not a Windows test-suite pass. No real catalog or provider call.
 
 ## Current doubts / stop conditions
 
@@ -86,4 +87,4 @@ Keep stable prompt UUIDs as relation targets; do not introduce source-version pi
 
 ## Current recommended next slice
 
-S1–S3 delivery is complete; verify the documentation-only ledger closeout SHA and its CI before reporting final delivery. S4 impact display is an optional next slice requiring a separate decision; Windows native acceptance and repair of legacy `CAT004`/`VAL005` catalog findings remain out of scope.
+S1–S3 delivery and its documentation closeout are verified. The `0.24.0` metadata, lockfile and changelog belong to the release-closure commit; confirm publication from the remote SHA, exact-SHA CI, tag and GitHub release rather than inferring it from this ledger. S4 impact display is an optional next slice requiring a separate decision; repair of legacy `CAT004`/`VAL005` catalog findings remains out of scope.
