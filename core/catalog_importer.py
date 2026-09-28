@@ -148,7 +148,7 @@ def _entry_to_prompt(entry: CatalogEntry) -> Prompt:
     return Prompt.from_record(record)
 
 
-def load_prompt_catalog(catalog_path: Path | None) -> list[Prompt]:
+def load_prompt_catalog(catalog_path: Path | None, *, strict: bool = False) -> list[Prompt]:
     """Load prompts from a user-provided path."""
     if catalog_path is None:
         logger.debug("No prompt catalogue path provided; returning empty list.")
@@ -157,9 +157,13 @@ def load_prompt_catalog(catalog_path: Path | None) -> list[Prompt]:
     try:
         entries = _load_entries_from_path(catalog_path)
     except FileNotFoundError:
+        if strict:
+            raise
         logger.error("Prompt catalogue not found at %s", catalog_path)
         return []
     except ValueError as exc:
+        if strict:
+            raise
         logger.error("Skipping catalogue %s: %s", catalog_path, exc)
         return []
 
@@ -168,6 +172,8 @@ def load_prompt_catalog(catalog_path: Path | None) -> list[Prompt]:
         try:
             prompt = _entry_to_prompt(entry)
         except Exception as exc:
+            if strict:
+                raise ValueError("Invalid prompt catalogue entry") from exc
             logger.error("Skipping invalid prompt entry: %s", exc)
             continue
         prompts.append(prompt)
@@ -404,9 +410,10 @@ def diff_prompt_catalog(
     catalog_path: Path | None,
     *,
     overwrite: bool = True,
+    strict: bool = False,
 ) -> CatalogDiff:
     """Return a diff preview describing how a catalogue import would change prompts."""
-    prompts = load_prompt_catalog(catalog_path)
+    prompts = load_prompt_catalog(catalog_path, strict=strict)
     plan = _build_change_plan(manager, prompts, overwrite=overwrite)
     plan.diff.source = str(catalog_path) if catalog_path else None
     return plan.diff
@@ -418,9 +425,10 @@ def import_prompt_catalog(
     *,
     overwrite: bool = True,
     origin: Literal["cli", "gui"] = "gui",
+    strict: bool = False,
 ) -> CatalogImportResult:
     """Apply catalogue changes to the repository and return a summary result."""
-    prompts = load_prompt_catalog(catalog_path)
+    prompts = load_prompt_catalog(catalog_path, strict=strict)
     plan = _build_change_plan(manager, prompts, overwrite=overwrite)
 
     result = CatalogImportResult(preview=plan.diff, skipped=len(plan.skip))
@@ -430,7 +438,8 @@ def import_prompt_catalog(
             manager.create_prompt(prompt, origin=origin)
             result.added += 1
         except Exception as exc:
-            logger.error("Unable to create prompt %s: %s", prompt.name, exc)
+            if not strict:
+                logger.error("Unable to create prompt %s: %s", prompt.name, exc)
             result.errors += 1
 
     for existing, incoming in plan.update:
@@ -439,7 +448,8 @@ def import_prompt_catalog(
             manager.update_prompt(merged, origin=origin)
             result.updated += 1
         except Exception as exc:
-            logger.error("Unable to update prompt %s: %s", existing.name, exc)
+            if not strict:
+                logger.error("Unable to update prompt %s: %s", existing.name, exc)
             result.errors += 1
 
     return result

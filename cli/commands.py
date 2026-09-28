@@ -211,16 +211,54 @@ def run_catalog_import(
 ) -> int:
     if manager is None:
         raise ValueError("Prompt Manager is required for catalog import.")
+    result_json = args.command == "prompt-add" and bool(getattr(args, "result_json", False))
+
+    def fail(code: str, safe_message: str, legacy_message: str, *, partial: bool = False) -> int:
+        if result_json:
+            payload: dict[str, Any] = {
+                "ok": False,
+                "command": "prompt-add",
+                "error": {"code": code, "message": safe_message},
+            }
+            if partial:
+                payload["partial"] = True
+            print(json.dumps(payload), file=sys.stderr)
+        else:
+            print_and_log(logger, logging.ERROR, legacy_message)
+        return 6
+
     input_path = Path(args.path).expanduser()
     overwrite = not bool(getattr(args, "no_overwrite", False))
     if getattr(args, "dry_run", False):
         diff_fn = _get_main_callable("diff_prompt_catalog", diff_prompt_catalog)
         try:
-            diff = diff_fn(manager, input_path, overwrite=overwrite)
+            if result_json:
+                diff = diff_fn(manager, input_path, overwrite=overwrite, strict=True)
+            else:
+                diff = diff_fn(manager, input_path, overwrite=overwrite)
         except Exception as exc:  # pragma: no cover - surfaced to CLI
-            message = f"Failed to preview catalogue import: {exc}"
-            print_and_log(logger, logging.ERROR, message)
-            return 6
+            return fail(
+                "IMPORT_PREVIEW_FAILED",
+                "Unable to preview prompt import.",
+                f"Failed to preview catalogue import: {exc}",
+            )
+        if result_json:
+            print(
+                json.dumps(
+                    {
+                        "ok": True,
+                        "command": "prompt-add",
+                        "mode": "preview",
+                        "counts": {
+                            "added": diff.added,
+                            "updated": diff.updated,
+                            "skipped": diff.skipped,
+                            "unchanged": diff.unchanged,
+                        },
+                    }
+                )
+            )
+            return 0
         print_and_log(
             logger,
             logging.INFO,
@@ -232,11 +270,38 @@ def run_catalog_import(
 
     import_fn = _get_main_callable("import_prompt_catalog", import_prompt_catalog)
     try:
-        result = import_fn(manager, input_path, overwrite=overwrite, origin="cli")
+        if result_json:
+            result = import_fn(manager, input_path, overwrite=overwrite, origin="cli", strict=True)
+        else:
+            result = import_fn(manager, input_path, overwrite=overwrite, origin="cli")
     except Exception as exc:  # pragma: no cover - surfaced to CLI
-        message = f"Failed to import catalogue: {exc}"
-        print_and_log(logger, logging.ERROR, message)
-        return 6
+        return fail(
+            "IMPORT_FAILED",
+            "Unable to import prompts.",
+            f"Failed to import catalogue: {exc}",
+            partial=True,
+        )
+    if result_json:
+        counts = result.summary()
+        if result.errors:
+            print(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "command": "prompt-add",
+                        "partial": True,
+                        "counts": counts,
+                        "error": {
+                            "code": "IMPORT_PARTIAL",
+                            "message": "Import had errors; some records may have been written.",
+                        },
+                    }
+                ),
+                file=sys.stderr,
+            )
+            return 6
+        print(json.dumps({"ok": True, "command": "prompt-add", "mode": "apply", "counts": counts}))
+        return 0
     print_and_log(
         logger,
         logging.INFO,
@@ -1179,20 +1244,6 @@ def run_prompt_chain_run(
         logger.error("Invalid chain input: %s", exc)
         return 5
     use_web_search = not bool(getattr(args, "no_web_search", False))
-    try:
-        result = manager.run_prompt_chain(
-            chain_id,
-            chain_input=chain_input,
-            use_web_search=use_web_search,
-        )
-    except PromptChainExecutionError as exc:
-        logger.error("Chain execution failed: %s", exc)
-        return 5
-    except PromptChainError as exc:
-        logger.error("Unable to execute prompt chain: %s", exc)
-        return 5
-    final_status = result.run_status or "success"
-
     selective_flags_enabled = sum(
         1
         for enabled in (
@@ -1214,6 +1265,20 @@ def run_prompt_chain_run(
             "--final-step-meta, or --compact."
         )
         return 5
+
+    try:
+        result = manager.run_prompt_chain(
+            chain_id,
+            chain_input=chain_input,
+            use_web_search=use_web_search,
+        )
+    except PromptChainExecutionError as exc:
+        logger.error("Chain execution failed: %s", exc)
+        return 5
+    except PromptChainError as exc:
+        logger.error("Unable to execute prompt chain: %s", exc)
+        return 5
+    final_status = result.run_status or "success"
 
     if bool(getattr(args, "json", False)):
         payload_text = json.dumps(
@@ -2763,6 +2828,18 @@ def run_prompt_history(
 ) -> int:
     if manager is None:
         raise ValueError("Prompt Manager is required for prompt history.")
+    json_output = bool(getattr(args, "json", False))
+
+    def fail(code: str, message: str, exit_code: int, text_message: str) -> int:
+        if json_output:
+            print(
+                json.dumps({"ok": False, "error": {"code": code, "message": message}}),
+                file=sys.stderr,
+            )
+        else:
+            print_and_log(logger, logging.ERROR, text_message)
+        return exit_code
+
     raw_prompt_id = str(getattr(args, "prompt_id", "") or "").strip()
     limit = max(1, int(getattr(args, "limit", 5) or 5))
     status_raw = str(getattr(args, "status", "") or "").strip().lower()
@@ -2773,17 +2850,25 @@ def run_prompt_history(
         elif status_raw in {"failed", "failure", "error"}:
             status_filter = "failed"
         else:
-            print_and_log(
-                logger,
-                logging.ERROR,
+            return fail(
+                "INVALID_STATUS",
+                "Use success or failed for --status.",
+                5,
                 f"Invalid --status value: {getattr(args, 'status', '')}. Use success or failed.",
             )
-            return 5
     window_days = max(0, int(getattr(args, "window_days", 0) or 0))
     prompt, exit_code, error_message = _resolve_prompt_reference(manager, raw_prompt_id)
     if prompt is None:
-        print_and_log(logger, logging.ERROR, error_message or f"Prompt not found: {raw_prompt_id}")
-        return exit_code
+        code, message = {
+            4: ("PROMPT_NOT_FOUND", "Prompt not found."),
+            5: ("AMBIGUOUS_NAME", "Prompt name is ambiguous; use a UUID."),
+        }.get(exit_code, ("PROMPT_LOOKUP_FAILED", "Unable to load prompt."))
+        return fail(
+            code,
+            message,
+            exit_code,
+            error_message or f"Prompt not found: {raw_prompt_id}",
+        )
 
     analytics = None
     try:
@@ -2792,11 +2877,19 @@ def run_prompt_history(
             analytics = get_prompt_execution_analytics(prompt.id)
         executions = manager.list_executions_for_prompt(prompt.id, limit=limit)
     except PromptHistoryError as exc:
-        print_and_log(logger, logging.ERROR, f"Unable to load prompt history: {exc}")
-        return 7
+        return fail(
+            "HISTORY_LOAD_FAILED",
+            "Unable to load prompt history.",
+            7,
+            f"Unable to load prompt history: {exc}",
+        )
     except Exception as exc:  # pragma: no cover - surfaced to CLI
-        print_and_log(logger, logging.ERROR, f"Unable to load prompt history: {exc}")
-        return 7
+        return fail(
+            "HISTORY_LOAD_FAILED",
+            "Unable to load prompt history.",
+            7,
+            f"Unable to load prompt history: {exc}",
+        )
 
     if status_filter is not None:
         executions = [
@@ -2920,7 +3013,7 @@ COMMAND_SPECS: dict[str | None, CommandSpec] = {
     "tag-list": CommandSpec(run_tag_list),
     "tag-show": CommandSpec(run_tag_show),
     "prompt-tag": CommandSpec(run_prompt_tag),
-    "prompt-history": CommandSpec(run_prompt_history),
+    "prompt-history": CommandSpec(run_prompt_history, announce_offline_llm=False),
     "prompt-lineage": CommandSpec(run_prompt_lineage),
     "prompt-fork": CommandSpec(run_prompt_fork),
     "prompt-restore-version": CommandSpec(run_prompt_restore_version),

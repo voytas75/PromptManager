@@ -764,6 +764,14 @@ def parse_args() -> argparse.Namespace:
         help="Preview the add/update summary without writing any changes.",
     )
     prompt_add_parser.add_argument(
+        "--result-json",
+        action="store_true",
+        help=(
+            "Emit one machine-readable import receipt on stdout, or a sanitized "
+            "error on stderr; --json remains an input payload."
+        ),
+    )
+    prompt_add_parser.add_argument(
         "--no-overwrite",
         action="store_true",
         help="Skip updates when a prompt with the same name already exists.",
@@ -1541,7 +1549,7 @@ def parse_args() -> argparse.Namespace:
     chain_run_parser.add_argument(
         "--json",
         action="store_true",
-        help="Emit deterministic JSON output for prompt chain execution.",
+        help="Emit deterministic JSON output for prompt chain execution (exclusive output mode).",
     )
     chain_run_parser.add_argument(
         "--final-output-only",

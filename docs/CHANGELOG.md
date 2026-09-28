@@ -4,6 +4,13 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- `prompt-add --result-json` opt-in emits a single machine receipt for preview/apply while preserving `--json PAYLOAD` as input. Missing/malformed catalogues and invalid entries fail with one sanitized error instead of an empty-success receipt; apply errors include `partial:true` because writes may already have happened (aggregate counts are present when the importer returns). Inspect catalog state before retry. Default text `prompt-add` and `catalog-import` behavior is unchanged.
+
+### Fixed
+- `prompt-history --json` retains its existing `{prompt, analytics, executions}` success shape but now has empty stderr on the ordinary offline path. Selected invalid-status, missing/ambiguous lookup, and history-read failures return one sanitized `{ok:false,error:{code,message}}` object on stderr with empty stdout; text mode and exit codes remain unchanged.
+- `prompt-chain-run` rejects conflicting output selectors before calling the chain runner, so invalid output combinations cannot execute a model-backed chain and then return an error. Valid output modes and exit code 5 for conflicts are unchanged.
+
 ### Changed
 - `suggest` now prints each suggested prompt's canonical ID alongside its existing readable attributes, so the result can be used directly with ID-based CLI commands. Ranking and retrieval are unchanged.
 

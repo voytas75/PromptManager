@@ -284,6 +284,8 @@ def _run_application(args: Namespace) -> int:
     manager_required = spec is None or spec.requires_manager
     if manager_required:
         announce_offline_llm = spec is None or spec.announce_offline_llm
+        if command == "prompt-add" and bool(getattr(args, "result_json", False)):
+            announce_offline_llm = False
         manager = _initialise_manager(settings, logger, announce_offline_llm=announce_offline_llm)
         if manager is None:
             return 3

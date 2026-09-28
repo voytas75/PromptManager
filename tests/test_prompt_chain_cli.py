@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import sys
 import uuid
 from typing import TYPE_CHECKING, Any, cast
 
@@ -20,6 +21,7 @@ from cli.commands import (
     run_prompt_chain_show,
     run_prompt_chain_validate,
 )
+from cli.parser import parse_args
 from core.execution import CodexExecutionResult
 from core.prompt_manager.execution_history import ExecutionOutcome
 from models.prompt_chain_model import PromptChain, PromptChainStep
@@ -35,6 +37,7 @@ class _ChainCliManagerStub:
         self.chain = _make_chain()
         self.saved_chains: list[PromptChain] = []
         self.run_mode = "success"
+        self.run_calls = 0
         self.recent_runs: list[dict[str, str | None]] = []
 
     def get_prompt_chain(self, chain_id: uuid.UUID) -> PromptChain:
@@ -58,6 +61,7 @@ class _ChainCliManagerStub:
         chain_input: str,
         use_web_search: bool,
     ) -> Any:
+        self.run_calls += 1
         if chain_id != self.chain.id:
             raise ValueError("Chain not found")
         del use_web_search
@@ -1007,9 +1011,11 @@ def test_prompt_chain_run_final_step_meta_keeps_final_and_terminal_semantics_sep
 
 
 def test_prompt_chain_run_rejects_conflicting_selective_output_modes(
+    tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     manager = _ChainCliManagerStub()
+    artifact = tmp_path / "must-not-be-written.json"
     logger = logging.getLogger("test_prompt_chain_run_conflicting_output_modes")
     args = argparse.Namespace(
         chain_id=str(manager.chain.id),
@@ -1017,7 +1023,7 @@ def test_prompt_chain_run_rejects_conflicting_selective_output_modes(
         chain_input_file=None,
         no_web_search=False,
         json=True,
-        output_file=None,
+        output_file=artifact,
         final_output_only=False,
         summary_only=False,
         status_only=False,
@@ -1030,6 +1036,57 @@ def test_prompt_chain_run_rejects_conflicting_selective_output_modes(
     exit_code = run_prompt_chain_run(cast("Any", manager), args, logger)
 
     assert exit_code == 5
+    assert manager.run_calls == 0
+    assert not artifact.exists()
+    assert capsys.readouterr().out == ""
+
+
+def test_prompt_chain_run_rejects_other_conflicts_before_execution(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Even two text output selectors cannot trigger a chain run on failure."""
+    manager = _ChainCliManagerStub()
+    args = argparse.Namespace(
+        chain_id=str(manager.chain.id),
+        chain_input="CLI input text",
+        chain_input_file=None,
+        no_web_search=False,
+        json=False,
+        final_output_only=False,
+        summary_only=True,
+        status_only=False,
+        step_output=None,
+        step_alias=None,
+        final_step_meta=False,
+        compact=True,
+    )
+    exit_code = run_prompt_chain_run(
+        cast("Any", manager), args, logging.getLogger("test_chain_conflicts_preflight")
+    )
+
+    assert exit_code == 5
+    assert manager.run_calls == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_prompt_chain_run_parsed_conflict_does_not_execute(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Real parser selects the same pre-execution refusal path as the handler."""
+    manager = _ChainCliManagerStub()
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["prompt-manager", "prompt-chain-run", str(manager.chain.id), "--json", "--compact"],
+    )
+    args = parse_args()
+    exit_code = run_prompt_chain_run(
+        cast("Any", manager), args, logging.getLogger("test_chain_parsed_conflict")
+    )
+
+    assert exit_code == 5
+    assert manager.run_calls == 0
     assert capsys.readouterr().out == ""
 
 
