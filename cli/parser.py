@@ -91,14 +91,79 @@ _ROOT_HELP_COMMAND_COLUMN = 34
 _ROOT_HELP_OPTION_COLUMN = 34
 
 
+_ROOT_OPTIONS = ("--logging-config", "--print-settings", "--gui", "--no-gui")
+
+
+def _unique_option(token: str, options: tuple[str, ...]) -> str | None:
+    """Resolve an argparse-style unique long-option prefix (including --flag=value)."""
+    name = token.partition("=")[0]
+    if name in options:
+        return name
+    if not name.startswith("--"):
+        return None
+    matches = [option for option in options if option.startswith(name)]
+    return matches[0] if len(matches) == 1 else None
+
+
+def _invoked_command(arguments: list[str]) -> tuple[str | None, list[str]]:
+    """Find the positional root command without mistaking global option values for one."""
+    index = 0
+    while index < len(arguments):
+        token = arguments[index]
+        if token == "--":
+            index += 1
+            if index < len(arguments):
+                command = arguments[index]
+                commands = {name for _, group in ROOT_COMMAND_GROUPS for name in group}
+                return (command, arguments[index + 1 :]) if command in commands else (None, [])
+            return None, []
+        option = _unique_option(token, _ROOT_OPTIONS)
+        if option == "--logging-config" and "=" not in token:
+            index += 2
+        elif option is not None:
+            index += 1
+        elif token.startswith("-"):
+            # argparse leaves an unrecognized root option pending and still
+            # dispatches the following positional token as a subcommand.
+            index += 1
+        else:
+            commands = {command for _, group in ROOT_COMMAND_GROUPS for command in group}
+            return (token, arguments[index + 1 :]) if token in commands else (None, [])
+    return None, []
+
+
 class _DoctorUsageParser(argparse.ArgumentParser):
     """Hide user-supplied argument text in scoped CLI parse failures."""
 
     def error(self, message: str) -> NoReturn:
         """Sanitize scoped diagnostic JSON and note/draft usage failures."""
+        active_command, command_args = _invoked_command(sys.argv[1:])
+        if "--" in command_args:
+            command_args = command_args[: command_args.index("--")]
+        if (
+            active_command == "prompt-add"
+            and any(
+                _unique_option(token, ("--json", "--result-json")) == "--result-json"
+                for token in command_args
+            )
+        ) or (
+            active_command in {"prompt-list", "prompt-find", "prompt-show", "prompt-history"}
+            and any(_unique_option(token, ("--json",)) == "--json" for token in command_args)
+        ):
+            print(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "error": {
+                            "code": "INVALID_USAGE",
+                            "message": "Invalid command or arguments.",
+                        },
+                    }
+                ),
+                file=sys.stderr,
+            )
+            self.exit(2)
         arguments = sys.argv[1:]
-        command_names = {command for _, group in ROOT_COMMAND_GROUPS for command in group}
-        active_command = next((arg for arg in arguments if arg in command_names), None)
         if active_command in {"note", "draft", "prompt-part", "prompt-status"}:
             if "--json" in arguments[arguments.index(active_command) + 1 :]:
                 print(
@@ -898,6 +963,11 @@ def parse_args() -> argparse.Namespace:
         help="Render matching prompts as structured JSON.",
     )
     prompt_find_parser.add_argument(
+        "--explain",
+        action="store_true",
+        help="With --json, include the scope and counts of ranked candidates inspected.",
+    )
+    prompt_find_parser.add_argument(
         "--full",
         action="store_true",
         help="Include complete stored records, including embedding vectors (requires --json).",
@@ -1605,5 +1675,7 @@ def parse_args() -> argparse.Namespace:
     }
     if is_compact_prompt_read and args.full and not args.json:
         parser.error(f"{args.command} --full requires --json.")
+    if args.command == "prompt-find" and args.explain and not args.json:
+        parser.error("prompt-find --explain requires --json.")
     _normalise_prompt_add_args(args, parser)
     return args

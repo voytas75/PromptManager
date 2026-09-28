@@ -16,6 +16,7 @@ Updates:
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import sys
@@ -136,12 +137,30 @@ def _initialise_manager(
     logger: logging.Logger,
     *,
     announce_offline_llm: bool = True,
+    machine_error: bool = False,
 ) -> PromptManager | None:
     try:
         return build_prompt_manager(settings, announce_offline_llm=announce_offline_llm)
     except Exception as exc:  # pragma: no cover - surfaced to CLI
-        logger.error("Failed to initialise services: %s", exc)
+        if machine_error:
+            _emit_startup_error("MANAGER_INIT_FAILED", "Unable to initialise services.")
+        else:
+            logger.error("Failed to initialise services: %s", exc)
         return None
+
+
+def _machine_startup_result(args: Namespace) -> bool:
+    """Limit startup JSON errors to the explicitly supported local commands."""
+    command = getattr(args, "command", None)
+    if command == "prompt-add":
+        return bool(getattr(args, "result_json", False))
+    return command in {"prompt-list", "prompt-find", "prompt-show", "prompt-history"} and bool(
+        getattr(args, "json", False)
+    )
+
+
+def _emit_startup_error(code: str, message: str) -> None:
+    print(json.dumps({"ok": False, "error": {"code": code, "message": message}}), file=sys.stderr)
 
 
 def _resolve_config_template_path() -> Path | None:
@@ -254,9 +273,13 @@ def _run_application(args: Namespace) -> int:
     _runtime_setup_logging(args.logging_config)
 
     logger = logging.getLogger("prompt_manager.main")
+    machine_error = _machine_startup_result(args)
     try:
         settings = load_settings()
     except Exception as exc:  # pragma: no cover - surfaced to CLI
+        if machine_error:
+            _emit_startup_error("CONFIG_UNAVAILABLE", "Unable to load configuration.")
+            return 2
         if _should_offer_config_creation(exc):
             created = _prompt_create_default_config(logger)
             if created:
@@ -286,7 +309,9 @@ def _run_application(args: Namespace) -> int:
         announce_offline_llm = spec is None or spec.announce_offline_llm
         if command == "prompt-add" and bool(getattr(args, "result_json", False)):
             announce_offline_llm = False
-        manager = _initialise_manager(settings, logger, announce_offline_llm=announce_offline_llm)
+        manager = _initialise_manager(
+            settings, logger, announce_offline_llm=announce_offline_llm, machine_error=machine_error
+        )
         if manager is None:
             return 3
 

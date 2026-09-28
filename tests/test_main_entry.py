@@ -1761,6 +1761,76 @@ def test_prompt_find_command_filters_by_category_and_tag(
     assert manager.closed is True
 
 
+def test_prompt_find_explain_scopes_empty_filtered_result_to_candidates(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "prompt-manager",
+            "prompt-find",
+            "triage",
+            "--limit",
+            "1",
+            "--category",
+            "Wanted",
+            "--json",
+            "--explain",
+        ],
+    )
+    settings = _DummySettings()
+    _patch_main(monkeypatch, "load_settings", lambda: settings)
+    manager = _DummyManager()
+    manager.repository.store.extend(
+        [
+            Prompt(id=uuid.uuid4(), name="First", description="Candidate", category="Other"),
+            Prompt(id=uuid.uuid4(), name="Second", description="Candidate", category="Wanted"),
+        ]
+    )
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+    assert main.main() == 0
+    channels = capsys.readouterr()
+    assert channels.err == ""
+    assert json.loads(channels.out) == {
+        "results": [],
+        "retrieval": {
+            "scope": "retrieved_candidates",
+            "requested_limit": 1,
+            "retrieved_count": 1,
+            "matched_count": 0,
+        },
+    }
+    assert manager.search_calls == [("triage", 1)]
+    assert manager.closed is True
+
+
+def test_prompt_find_explain_preserves_compact_results_when_matches_exist(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(
+        "sys.argv",
+        ["prompt-manager", "prompt-find", "triage", "--limit", "2", "--json", "--explain"],
+    )
+    _patch_main(monkeypatch, "load_settings", _DummySettings)
+    manager = _DummyManager()
+    first = Prompt(id=uuid.uuid4(), name="First", description="Candidate", category="Wanted")
+    second = Prompt(id=uuid.uuid4(), name="Second", description="Candidate", category="Other")
+    manager.repository.store.extend([first, second])
+    _patch_main(monkeypatch, "build_prompt_manager", _build_manager_with(manager))
+    assert main.main() == 0
+    channels = capsys.readouterr()
+    assert channels.err == ""
+    payload = json.loads(channels.out)
+    assert [row["id"] for row in payload["results"]] == [str(first.id), str(second.id)]
+    assert payload["retrieval"] == {
+        "scope": "retrieved_candidates",
+        "requested_limit": 2,
+        "retrieved_count": 2,
+        "matched_count": 2,
+    }
+    assert manager.search_calls == [("triage", 2)] and manager.closed is True
+
+
 def test_prompt_find_command_filters_by_source_and_active_state(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

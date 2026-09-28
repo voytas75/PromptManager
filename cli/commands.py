@@ -51,6 +51,7 @@ from core import (
     snapshot_dataset_rows,
 )
 from core.catalog_check import run_catalog_check
+from core.catalog_importer import CatalogImportPreparationError
 from core.instant_fit import build_prompt_fit_summary
 from core.prompt_comparison import compare_prompts
 from core.prompt_linting import lint_prompt
@@ -274,6 +275,12 @@ def run_catalog_import(
             result = import_fn(manager, input_path, overwrite=overwrite, origin="cli", strict=True)
         else:
             result = import_fn(manager, input_path, overwrite=overwrite, origin="cli")
+    except CatalogImportPreparationError as exc:
+        return fail(
+            "IMPORT_INPUT_FAILED",
+            "Unable to prepare prompt import.",
+            f"Failed to prepare catalogue import: {exc}",
+        )
     except Exception as exc:  # pragma: no cover - surfaced to CLI
         return fail(
             "IMPORT_FAILED",
@@ -291,6 +298,7 @@ def run_catalog_import(
                         "command": "prompt-add",
                         "partial": True,
                         "counts": counts,
+                        "records": result.records,
                         "error": {
                             "code": "IMPORT_PARTIAL",
                             "message": "Import had errors; some records may have been written.",
@@ -300,7 +308,17 @@ def run_catalog_import(
                 file=sys.stderr,
             )
             return 6
-        print(json.dumps({"ok": True, "command": "prompt-add", "mode": "apply", "counts": counts}))
+        print(
+            json.dumps(
+                {
+                    "ok": True,
+                    "command": "prompt-add",
+                    "mode": "apply",
+                    "counts": counts,
+                    "records": result.records,
+                }
+            )
+        )
         return 0
     print_and_log(
         logger,
@@ -1811,6 +1829,26 @@ def run_prompt_find(
         matches.append(prompt)
         if len(matches) >= limit:
             break
+
+    if bool(getattr(args, "json", False)) and bool(getattr(args, "explain", False)):
+        print(
+            json.dumps(
+                {
+                    "results": [
+                        _prompt_json_payload(prompt, full=bool(getattr(args, "full", False)))
+                        for prompt in matches
+                    ],
+                    "retrieval": {
+                        "scope": "retrieved_candidates",
+                        "requested_limit": limit,
+                        "retrieved_count": len(prompts),
+                        "matched_count": len(matches),
+                    },
+                },
+                ensure_ascii=False,
+            )
+        )
+        return 0
 
     if not matches:
         if bool(getattr(args, "json", False)):

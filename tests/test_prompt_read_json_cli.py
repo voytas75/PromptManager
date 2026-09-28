@@ -59,6 +59,291 @@ def _run(
 
 
 @pytest.mark.parametrize("installed", [False, True])
+@pytest.mark.parametrize(
+    ("argv", "private_marker"),
+    [
+        (["prompt-add", "--json", "{PRIVATE_JSON_123", "--result-json"], "PRIVATE_JSON_123"),
+        (
+            ["prompt-add", "--json", "{PRIVATE_JSON_123", "--from-stdin", "--result-json"],
+            "PRIVATE_JSON_123",
+        ),
+        (["prompt-list", "--json", "--limit", "PRIVATE_LIMIT_123"], "PRIVATE_LIMIT_123"),
+        (["--bogus", "prompt-list", "--json", "--limit", "PRIVATE_LIMIT_123"], "PRIVATE_LIMIT_123"),
+        (["-x", "prompt-list", "--json", "--limit", "PRIVATE_LIMIT_123"], "PRIVATE_LIMIT_123"),
+        (
+            ["--bogus=value", "prompt-list", "--j", "--limit", "PRIVATE_LIMIT_123"],
+            "PRIVATE_LIMIT_123",
+        ),
+        (["--", "prompt-list", "--json", "--limit", "PRIVATE_LIMIT_123"], "PRIVATE_LIMIT_123"),
+        (["prompt-list", "--json", "--", "PRIVATE_LIMIT_123"], "PRIVATE_LIMIT_123"),
+        (
+            ["prompt-add", "--result-json", "--", "PRIVATE_INPUT_123", "EXTRA"],
+            "PRIVATE_INPUT_123",
+        ),
+        (
+            [
+                "--logging-conf",
+                "unused.ini",
+                "prompt-list",
+                "--json",
+                "--limit",
+                "PRIVATE_LIMIT_123",
+            ],
+            "PRIVATE_LIMIT_123",
+        ),
+        (
+            ["--logging-conf=unused.ini", "prompt-list", "--j", "--limit", "PRIVATE_LIMIT_123"],
+            "PRIVATE_LIMIT_123",
+        ),
+        (["prompt-list", "--j", "--limit", "PRIVATE_LIMIT_123"], "PRIVATE_LIMIT_123"),
+        (
+            ["prompt-add", "--json", "{PRIVATE_JSON_123", "--result-j"],
+            "PRIVATE_JSON_123",
+        ),
+        (["prompt-find", "query", "--json", "--limit", "PRIVATE_LIMIT_123"], "PRIVATE_LIMIT_123"),
+        (["prompt-find", "query", "--j", "--limit", "PRIVATE_LIMIT_123"], "PRIVATE_LIMIT_123"),
+        (["prompt-show", "--j"], "PRIVATE_ID_123"),
+        (["prompt-history", "--j"], "PRIVATE_ID_123"),
+        (["prompt-show", "--json"], "PRIVATE_ID_123"),
+        (["prompt-history", "--json"], "PRIVATE_ID_123"),
+    ],
+)
+def test_agent_json_parser_errors_are_bounded(
+    tmp_path: Path, installed: bool, argv: list[str], private_marker: str
+) -> None:
+    result = _run(tmp_path, tmp_path / "unused.json", installed, *argv)
+    assert result.returncode == 2
+    assert result.stdout == ""
+    assert json.loads(result.stderr) == {
+        "ok": False,
+        "error": {"code": "INVALID_USAGE", "message": "Invalid command or arguments."},
+    }
+    assert private_marker not in result.stderr
+    assert not (tmp_path / "catalog.db").exists()
+
+
+@pytest.mark.parametrize("installed", [False, True])
+def test_agent_json_parser_controls_keep_legacy_text_and_help(
+    tmp_path: Path, installed: bool
+) -> None:
+    config = tmp_path / "unused.json"
+    for argv in (
+        ("prompt-add", "--json", "{PRIVATE_JSON_123"),
+        ("prompt-add", "--j", "{PRIVATE_JSON_123"),
+        ("prompt-add", "--", "--result-json", "INVALID_POSITIONAL"),
+        ("prompt-add", "--", "--result-j", "INVALID_POSITIONAL"),
+        ("prompt-show", "--", "--json", "INVALID_POSITIONAL"),
+        ("prompt-show", "--", "--j", "INVALID_POSITIONAL"),
+        ("prompt-list", "--limit", "PRIVATE_LIMIT_123"),
+        ("--bogus", "prompt-list", "--limit", "PRIVATE_LIMIT_123"),
+    ):
+        result = _run(tmp_path, config, installed, *argv)
+        assert result.returncode == 2 and result.stdout == ""
+        assert "usage:" in result.stderr
+        with pytest.raises(json.JSONDecodeError):
+            json.loads(result.stderr)
+    help_result = _run(tmp_path, config, installed, "prompt-add", "--help")
+    assert help_result.returncode == 0
+    assert "--result-json" in help_result.stdout and help_result.stderr == ""
+
+
+@pytest.mark.parametrize("installed", [False, True])
+def test_agent_json_parser_does_not_select_command_from_global_value(
+    tmp_path: Path, installed: bool
+) -> None:
+    result = _run(
+        tmp_path,
+        tmp_path / "unused.json",
+        installed,
+        "--logging-config",
+        "prompt-add",
+        "prompt-list",
+        "--limit",
+        "PRIVATE_LIMIT_123",
+        "--json",
+    )
+    assert result.returncode == 2 and result.stdout == ""
+    assert json.loads(result.stderr)["error"]["code"] == "INVALID_USAGE"
+    assert "PRIVATE_LIMIT_123" not in result.stderr
+
+    abbreviated = _run(
+        tmp_path,
+        tmp_path / "unused.json",
+        installed,
+        "--logging-conf",
+        "prompt-add",
+        "prompt-list",
+        "--j",
+        "--limit",
+        "PRIVATE_LIMIT_123",
+    )
+    assert abbreviated.returncode == 2 and abbreviated.stdout == ""
+    assert json.loads(abbreviated.stderr)["error"]["code"] == "INVALID_USAGE"
+    assert "PRIVATE_LIMIT_123" not in abbreviated.stderr
+
+
+@pytest.mark.parametrize("installed", [False, True])
+def test_prompt_find_explain_requires_json_before_startup(tmp_path: Path, installed: bool) -> None:
+    result = _run(
+        tmp_path, tmp_path / "unused.json", installed, "prompt-find", "query", "--explain"
+    )
+    assert result.returncode == 2 and result.stdout == ""
+    assert "--explain requires --json" in result.stderr
+    assert not (tmp_path / "catalog.db").exists()
+
+
+@pytest.mark.parametrize("installed", [False, True])
+def test_prompt_find_explain_real_process_qualifies_empty_candidate_set(
+    tmp_path: Path, installed: bool
+) -> None:
+    config = tmp_path / "settings.json"
+    config.write_text(
+        json.dumps(
+            {
+                "database_path": str(tmp_path / "catalog.db"),
+                "chroma_path": str(tmp_path / "chroma"),
+                "embedding_backend": "deterministic",
+                "redis_dsn": None,
+                "litellm_model": None,
+                "litellm_inference_model": None,
+            }
+        ),
+        encoding="utf-8",
+    )
+    repository = PromptRepository(str(tmp_path / "catalog.db"))
+    stored = Prompt(
+        id=uuid.uuid4(),
+        name="Triage",
+        description="Triage",
+        category="Operations",
+        context="Diagnose workflows",
+        source="local",
+    )
+    repository.add(stored)
+    result = _run(
+        tmp_path,
+        config,
+        installed,
+        "prompt-find",
+        "workflow triage",
+        "--limit",
+        "1",
+        "--category",
+        "Writing",
+        "--json",
+        "--explain",
+    )
+    assert result.returncode == 0 and result.stderr == "", result
+    payload = json.loads(result.stdout)
+    assert payload == {
+        "results": [],
+        "retrieval": {
+            "scope": "retrieved_candidates",
+            "requested_limit": 1,
+            "retrieved_count": 0,
+            "matched_count": 0,
+        },
+    }
+    assert repository.get(stored.id).category == "Operations"
+
+
+@pytest.mark.parametrize("installed", [False, True])
+@pytest.mark.parametrize(
+    "machine_args",
+    [
+        ("prompt-list", "--json"),
+        ("prompt-find", "query", "--json"),
+        ("prompt-show", "missing", "--json"),
+        ("prompt-history", "missing", "--json"),
+        (
+            "prompt-add",
+            "--name",
+            "Test",
+            "--description",
+            "Test",
+            "--prompt-text",
+            "Body",
+            "--result-json",
+            "--dry-run",
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    ("failure_kind", "exit_code", "error_code"),
+    [("config", 2, "CONFIG_UNAVAILABLE"), ("manager", 3, "MANAGER_INIT_FAILED")],
+)
+def test_agent_json_startup_errors_are_bounded(
+    tmp_path: Path,
+    installed: bool,
+    machine_args: tuple[str, ...],
+    failure_kind: str,
+    exit_code: int,
+    error_code: str,
+) -> None:
+    config = tmp_path / "bad.json"
+    if failure_kind == "config":
+        config.write_text("{PRIVATE_CONFIG_MARKER", encoding="utf-8")
+    else:
+        db_directory = tmp_path / "catalog-directory"
+        db_directory.mkdir()
+        config.write_text(
+            json.dumps(
+                {
+                    "database_path": str(db_directory),
+                    "chroma_path": str(tmp_path / "chroma"),
+                    "embedding_backend": "deterministic",
+                    "redis_dsn": None,
+                    "litellm_model": None,
+                    "litellm_inference_model": None,
+                }
+            ),
+            encoding="utf-8",
+        )
+    result = _run(tmp_path, config, installed, *machine_args)
+    assert result.returncode == exit_code and result.stdout == "", result
+    assert json.loads(result.stderr) == {
+        "ok": False,
+        "error": {
+            "code": error_code,
+            "message": (
+                "Unable to load configuration."
+                if failure_kind == "config"
+                else "Unable to initialise services."
+            ),
+        },
+    }
+    assert "PRIVATE_CONFIG_MARKER" not in result.stderr
+    assert str(tmp_path) not in result.stderr
+
+
+@pytest.mark.parametrize("installed", [False, True])
+def test_agent_json_startup_legacy_error_is_still_text(tmp_path: Path, installed: bool) -> None:
+    config = tmp_path / "bad.json"
+    config.write_text("{bad", encoding="utf-8")
+    result = _run(tmp_path, config, installed, "prompt-list")
+    assert result.returncode == 2 and result.stdout == ""
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(result.stderr)
+
+
+@pytest.mark.parametrize("installed", [False, True])
+def test_agent_json_startup_missing_default_config_never_prompts_or_creates(
+    tmp_path: Path, installed: bool
+) -> None:
+    config = Path("config/config.json")
+    result = _run(tmp_path, config, installed, "prompt-list", "--json")
+    assert result.returncode == 2 and result.stdout == "", result
+    assert json.loads(result.stderr) == {
+        "ok": False,
+        "error": {
+            "code": "CONFIG_UNAVAILABLE",
+            "message": "Unable to load configuration.",
+        },
+    }
+    assert not (tmp_path / config).exists()
+
+
+@pytest.mark.parametrize("installed", [False, True])
 def test_prompt_read_json_process_outcomes(tmp_path: Path, installed: bool) -> None:
     db = tmp_path / "catalog.db"
     config = tmp_path / "settings.json"
@@ -223,7 +508,7 @@ def test_prompt_add_result_json_process_contract(tmp_path: Path, installed: bool
         assert result.returncode == 0, result
         assert result.stderr == ""
         receipt = json.loads(result.stdout)
-        assert receipt == {
+        expected: dict[str, Any] = {
             "ok": True,
             "command": "prompt-add",
             "mode": "preview" if preview else "apply",
@@ -233,12 +518,64 @@ def test_prompt_add_result_json_process_contract(tmp_path: Path, installed: bool
                 else {"added": 1, "updated": 0, "skipped": 0, "errors": 0}
             ),
         }
+        if not preview:
+            with closing(sqlite3.connect(tmp_path / "catalog.db")) as conn:
+                stored_id = conn.execute(
+                    "SELECT id FROM prompts WHERE name='Added by agent'"
+                ).fetchone()[0]
+            expected["records"] = [{"id": stored_id, "action": "created"}]
+        assert receipt == expected
         with closing(sqlite3.connect(tmp_path / "catalog.db")) as conn:
             count = conn.execute(
                 "SELECT COUNT(*) FROM prompts WHERE name='Added by agent'"
             ).fetchone()[0]
         assert count == (0 if preview else 1)
         assert not list(tmp_path.glob("prompt-add-inline-*.json"))
+
+
+@pytest.mark.parametrize("installed", [False, True])
+def test_prompt_add_result_json_update_and_skip_keep_canonical_id(
+    tmp_path: Path, installed: bool
+) -> None:
+    config = tmp_path / "settings.json"
+    config.write_text(
+        json.dumps(
+            {
+                "database_path": str(tmp_path / "catalog.db"),
+                "chroma_path": str(tmp_path / "chroma"),
+                "embedding_backend": "deterministic",
+                "redis_dsn": None,
+                "litellm_model": None,
+                "litellm_inference_model": None,
+            }
+        ),
+        encoding="utf-8",
+    )
+    original = json.dumps({"name": "Stable identity", "description": "Before", "context": "Body"})
+    changed = json.dumps({"name": "Stable identity", "description": "After", "context": "Body"})
+    first = _run(tmp_path, config, installed, "prompt-add", "--json", original, "--result-json")
+    assert first.returncode == 0 and first.stderr == "", first
+    created_id = json.loads(first.stdout)["records"][0]["id"]
+    updated = _run(tmp_path, config, installed, "prompt-add", "--json", changed, "--result-json")
+    assert updated.returncode == 0 and updated.stderr == "", updated
+    assert json.loads(updated.stdout)["records"] == [{"id": created_id, "action": "updated"}]
+    skipped = _run(
+        tmp_path,
+        config,
+        installed,
+        "prompt-add",
+        "--json",
+        original,
+        "--no-overwrite",
+        "--result-json",
+    )
+    assert skipped.returncode == 0 and skipped.stderr == "", skipped
+    assert json.loads(skipped.stdout)["records"] == []
+    with closing(sqlite3.connect(tmp_path / "catalog.db")) as conn:
+        rows = conn.execute(
+            "SELECT id, description FROM prompts WHERE name='Stable identity'"
+        ).fetchall()
+    assert rows == [(created_id, "After")]
 
 
 @pytest.mark.parametrize("installed", [False, True])
@@ -307,8 +644,7 @@ def test_prompt_add_result_json_bad_file_fails_without_raw_log(
     assert json.loads(result.stderr) == {
         "ok": False,
         "command": "prompt-add",
-        "partial": True,
-        "error": {"code": "IMPORT_FAILED", "message": "Unable to import prompts."},
+        "error": {"code": "IMPORT_INPUT_FAILED", "message": "Unable to prepare prompt import."},
     }
     assert "PRIVATE_INVALID" not in result.stderr
 
@@ -318,8 +654,14 @@ def test_prompt_add_result_json_partial_import_receipt(
 ) -> None:
     """A non-atomic import never presents an unsuccessful batch as safe to retry."""
 
+    stored_id = str(uuid.uuid4())
+
     def partial(*_args: object, **_kwargs: object) -> CatalogImportResult:
-        return CatalogImportResult(added=1, errors=1)
+        return CatalogImportResult(
+            added=1,
+            errors=1,
+            records=[{"id": stored_id, "action": "created"}],
+        )
 
     monkeypatch.setattr(
         "main.import_prompt_catalog",
@@ -340,6 +682,7 @@ def test_prompt_add_result_json_partial_import_receipt(
         "command": "prompt-add",
         "partial": True,
         "counts": {"added": 1, "updated": 0, "skipped": 0, "errors": 1},
+        "records": [{"id": stored_id, "action": "created"}],
         "error": {
             "code": "IMPORT_PARTIAL",
             "message": "Import had errors; some records may have been written.",
@@ -406,7 +749,8 @@ def test_prompt_add_result_json_invalid_entry_is_not_empty_success(
     result = _run(tmp_path, config, installed, "prompt-add", str(bad), "--result-json")
     assert result.returncode == 6, result
     assert result.stdout == ""
-    assert json.loads(result.stderr)["error"]["code"] == "IMPORT_FAILED"
+    assert json.loads(result.stderr)["error"]["code"] == "IMPORT_INPUT_FAILED"
+    assert "partial" not in json.loads(result.stderr)
     assert "PRIVATE_ENTRY" not in result.stderr
     with closing(sqlite3.connect(tmp_path / "catalog.db")) as conn:
         count = conn.execute(

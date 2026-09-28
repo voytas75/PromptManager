@@ -145,6 +145,89 @@ def test_import_prompt_catalog_adds_and_updates(tmp_path: Path) -> None:
     assert "logs" in refreshed_prompt.tags
 
 
+def test_strict_import_records_follow_successful_writes_only(tmp_path: Path) -> None:
+    manager = _StubManager()
+    path = tmp_path / "batch.json"
+    path.write_text(
+        json.dumps(
+            [
+                {
+                    "name": "First",
+                    "description": "Stored",
+                    "created_at": "2025-01-01T00:00:00+00:00",
+                    "last_modified": "2025-01-01T00:00:00+00:00",
+                },
+                {
+                    "name": "Second",
+                    "description": "Stored",
+                    "created_at": "2025-01-01T00:00:00+00:00",
+                    "last_modified": "2025-01-01T00:00:00+00:00",
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+    first = import_prompt_catalog(_as_prompt_manager(manager), path, strict=True)
+    assert first.summary() == {"added": 2, "updated": 0, "skipped": 0, "errors": 0}
+    assert first.records == [
+        {"id": str(prompt.id), "action": "created"} for prompt in manager.created
+    ]
+
+    path.write_text(
+        json.dumps(
+            [
+                {
+                    "name": "First",
+                    "description": "Changed",
+                    "created_at": "2025-01-01T00:00:00+00:00",
+                    "last_modified": "2025-01-01T00:00:00+00:00",
+                },
+                {
+                    "name": "Second",
+                    "description": "Stored",
+                    "created_at": "2025-01-01T00:00:00+00:00",
+                    "last_modified": "2025-01-01T00:00:00+00:00",
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+    updated = import_prompt_catalog(_as_prompt_manager(manager), path, strict=True)
+    assert updated.updated == 2
+    assert updated.records == [
+        {"id": str(prompt.id), "action": "updated"} for prompt in manager.updated
+    ]
+
+    skipped = import_prompt_catalog(_as_prompt_manager(manager), path, strict=True, overwrite=False)
+    assert skipped.skipped == 2 and skipped.records == []
+
+
+def test_strict_import_partial_records_do_not_claim_failed_write(tmp_path: Path) -> None:
+    class FailingManager(_StubManager):
+        def create_prompt(
+            self, prompt: Prompt, embedding: object | None = None, *, origin: str = "gui"
+        ) -> Prompt:
+            if prompt.name == "Second":
+                raise RuntimeError("PRIVATE_IMPORT_FAILURE")
+            return super().create_prompt(prompt, embedding, origin=origin)
+
+    manager = FailingManager()
+    path = tmp_path / "batch.json"
+    path.write_text(
+        json.dumps(
+            [
+                {"name": "First", "description": "Stored"},
+                {"name": "Second", "description": "Rejected"},
+            ]
+        ),
+        encoding="utf-8",
+    )
+    result = import_prompt_catalog(_as_prompt_manager(manager), path, strict=True)
+    assert result.summary() == {"added": 1, "updated": 0, "skipped": 0, "errors": 1}
+    assert result.records == [{"id": str(manager.created[0].id), "action": "created"}]
+    assert [prompt.name for prompt in manager.repository.list()] == ["First"]
+
+
 def test_diff_prompt_catalog_reports_expected_changes(tmp_path: Path) -> None:
     manager = _StubManager()
 

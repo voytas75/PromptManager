@@ -43,6 +43,10 @@ def _prompt_pair_list_factory() -> list[tuple[Prompt, Prompt]]:
     return []
 
 
+def _receipt_records_factory() -> list[dict[str, str]]:
+    return []
+
+
 logger = logging.getLogger("prompt_manager.catalog")
 
 try:  # pragma: no cover - optional dependency for YAML export
@@ -394,6 +398,7 @@ class CatalogImportResult:
     skipped: int = 0
     errors: int = 0
     preview: CatalogDiff | None = None
+    records: list[dict[str, str]] = field(default_factory=_receipt_records_factory)
 
     def summary(self) -> dict[str, int]:
         """Return aggregate counts from the previous import run."""
@@ -403,6 +408,10 @@ class CatalogImportResult:
             "skipped": self.skipped,
             "errors": self.errors,
         }
+
+
+class CatalogImportPreparationError(ValueError):
+    """Input or change planning failed before any import writes were attempted."""
 
 
 def diff_prompt_catalog(
@@ -428,15 +437,24 @@ def import_prompt_catalog(
     strict: bool = False,
 ) -> CatalogImportResult:
     """Apply catalogue changes to the repository and return a summary result."""
-    prompts = load_prompt_catalog(catalog_path, strict=strict)
-    plan = _build_change_plan(manager, prompts, overwrite=overwrite)
+    if strict:
+        try:
+            prompts = load_prompt_catalog(catalog_path, strict=True)
+            plan = _build_change_plan(manager, prompts, overwrite=overwrite)
+        except Exception as exc:
+            raise CatalogImportPreparationError("Unable to prepare prompt import") from exc
+    else:
+        prompts = load_prompt_catalog(catalog_path)
+        plan = _build_change_plan(manager, prompts, overwrite=overwrite)
 
     result = CatalogImportResult(preview=plan.diff, skipped=len(plan.skip))
 
     for prompt in plan.create:
         try:
-            manager.create_prompt(prompt, origin=origin)
+            stored = manager.create_prompt(prompt, origin=origin)
             result.added += 1
+            if strict:
+                result.records.append({"id": str(stored.id), "action": "created"})
         except Exception as exc:
             if not strict:
                 logger.error("Unable to create prompt %s: %s", prompt.name, exc)
@@ -445,8 +463,10 @@ def import_prompt_catalog(
     for existing, incoming in plan.update:
         try:
             merged = _merge_prompt(existing, incoming)
-            manager.update_prompt(merged, origin=origin)
+            stored = manager.update_prompt(merged, origin=origin)
             result.updated += 1
+            if strict:
+                result.records.append({"id": str(stored.id), "action": "updated"})
         except Exception as exc:
             if not strict:
                 logger.error("Unable to update prompt %s: %s", existing.name, exc)
