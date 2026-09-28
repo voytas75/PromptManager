@@ -1,6 +1,6 @@
 # PromptManager — kontrakt CLI dla lokalnego agenta AI
 
-Status: trzy zaplanowane wycinki A–C zakończone lokalnie; commit i push zatwierdzone przez użytkownika, stan dostawy i CI wymagają osobnej weryfikacji. Podlega `docs/product-ssot.md` oraz `docs/plans/2026-05-10-product-direction-ssot-next-cycle.md`; nie jest nową strategią produktową. Tylko lokalny CLI i istniejący cykl assetów. Bez GUI, HTTP, nowych zależności, zmian CI, katalogu operatora, dostawców live i edycji Windows checkout. Nie oznacza to ukończenia całego kontraktu agentowego CLI.
+Status: ukończony i dostarczony w ograniczonym zakresie trzech wycinków A–C; nie oznacza ukończenia całego kontraktu agentowego CLI. Podlega `docs/product-ssot.md` oraz `docs/plans/2026-05-10-product-direction-ssot-next-cycle.md`; nie jest nową strategią produktową. Tylko lokalny CLI i istniejący cykl assetów. Bez GUI, HTTP, nowych zależności, zmian CI, katalogu operatora, dostawców live i edycji Windows checkout.
 
 ## Potwierdzony stan
 
@@ -37,7 +37,7 @@ Najpierw gwarancja *invalid request = no chain execution*, następnie jednoznacz
 
 ## Granice i weryfikacja
 
-Zamknięcie lokalne po A–C: `QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q -n auto --cov=core --cov-report=term --cov-fail-under=80` → **1175 passed, 1 skipped, 83.18%**; `.venv/bin/ruff check .`, `.venv/bin/ruff format --check .`, skonfigurowany `.venv/bin/pyright`, scoped Pyright dla `tests/test_prompt_read_json_cli.py core/catalog_importer.py cli/parser.py main.py`, `uv lock --check` i `git diff --check` — pass. Świadectwo dotyczy aktualnego lokalnego diffu, nie zdalnego CI. `cli/commands.py` ma odziedziczony dług poza skonfigurowanym Pyright (wcześniejszy jawny skan: 123 błędy, zero w dotkniętym fragmencie A); nie deklarować pełnego strict coverage. Użytkownik osobno zatwierdził commit i push; nie zatwierdził płatnego provider call ani przebudowy API. Po puszu porównać lokalny HEAD, origin/master i ls-remote, a stan exact-SHA CI raportować osobno.
+Zamknięcie lokalne po A–C: `QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q -n auto --cov=core --cov-report=term --cov-fail-under=80` → **1175 passed, 1 skipped, 83.18%**; `.venv/bin/ruff check .`, `.venv/bin/ruff format --check .`, skonfigurowany `.venv/bin/pyright`, scoped Pyright dla `tests/test_prompt_read_json_cli.py core/catalog_importer.py cli/parser.py main.py`, `uv lock --check` i `git diff --check` — pass. Commit produktu i planu: `834baefd6561def20d42cf69f8a3b808f4d9f965` (9 plików, +636/−45). Po puszu lokalny HEAD, `origin/master` i `git ls-remote` były identyczne. Exact-SHA [Quality Gates](https://github.com/voytas75/PromptManager/actions/runs/36461684761) zakończyły się `success`: Ruff, skonfigurowany Pyright, Pytest i clean-tree check przeszły. Ta dokumentacyjna aktualizacja wyniku dostawy jest osobnym checkpointem, więc wynik CI wymieniony wyżej dotyczy commita produktu, nie jej późniejszego SHA. `cli/commands.py` ma odziedziczony dług poza skonfigurowanym Pyright (wcześniejszy jawny skan: 123 błędy, zero w dotkniętym fragmencie A); nie deklarować pełnego strict coverage. Nie wykonano płatnego provider call ani przebudowy API.
 
 ## Granice / do weryfikacji w osobnym zakresie
 
@@ -45,6 +45,6 @@ Zamknięcie lokalne po A–C: `QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q -n 
 - `prompt-chain-run` gwarantuje brak wykonania dla przetestowanych konfliktów trybu wyjścia, nie dla dowolnego błędu. `prompt-history` i `prompt-add` nadal inicjalizują managera; opcjonalne integracje i nietypowe warningi nie są ujęte w maszynowym kontrakcie. Nie twierdzić, że cały CLI jest agent-ready lub bez efektów ubocznych.
 - Osobny adapter/API dla współbieżnych agentów lub zdalnego dostępu dopiero po potwierdzeniu takiej potrzeby. Wznowić plan tylko przy konkretnym zgłoszeniu błędu parser/startup, potrzeby ID receipt, bezpiecznej promocji draftu lub izolacji sesji.
 
-## Aktualny następny krok
+## Decyzja zamknięcia
 
-Po zatwierdzonym commicie i pushu zweryfikować remote SHA oraz exact-SHA CI; bez nowego wycinka implementacyjnego w tym planie. Dalsze ulepszenia wymagają odrębnej decyzji zakresowej opartej na obserwowanej potrzebie.
+W ramach A–C nie ma już zadań implementacyjnych. Pozostałe granice są świadomie odłożone do osobnej decyzji zakresowej po obserwowalnym zgłoszeniu; nie otwierać kolejnego wycinka tylko po to, by nazwać cały CLI agent-ready.
