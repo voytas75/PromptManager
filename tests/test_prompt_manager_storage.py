@@ -253,6 +253,16 @@ class _FakeRepository:
         self._store[prompt.id] = _clone_prompt(prompt)
         return prompt
 
+    def add_with_version(
+        self, prompt: Prompt, *, commit_message: str | None = None
+    ) -> PromptVersion:
+        if prompt.id in self._store:
+            raise RepositoryError(f"Prompt {prompt.id} already exists")
+        stored = _clone_prompt(prompt)
+        version = self.record_prompt_version(prompt, commit_message=commit_message)
+        self._store[prompt.id] = stored
+        return version
+
     def get(self, prompt_id: uuid.UUID) -> Prompt:
         self.get_call_count += 1
         if self.fail_on_get:

@@ -314,10 +314,6 @@ def _constant_embedding(*args: object, **kwargs: object) -> list[float]:
     return [0.1, 0.2]
 
 
-def _version_stub(*args: object, **kwargs: object) -> types.SimpleNamespace:
-    return types.SimpleNamespace(id=1, version_number=1)
-
-
 def _as_history_tracker(tracker: object) -> HistoryTracker:
     return cast("HistoryTracker", tracker)
 
@@ -1578,8 +1574,6 @@ def test_create_prompt_embeds_and_persists(
     prompt_manager: tuple[PromptManager, _DummyCollection, _DummyChromaClient, Path],
 ) -> None:
     manager, _, _, _ = prompt_manager
-    repo = _InMemoryRepository()
-    manager._repository = repo  # type: ignore[assignment]
     prompt = _make_prompt("New Prompt")
     manager._embedding_provider = types.SimpleNamespace(  # type: ignore[assignment]
         embed=_constant_embedding
@@ -1591,20 +1585,18 @@ def test_create_prompt_embeds_and_persists(
         persisted.append(prompt_obj.id)
 
     manager._persist_embedding = fake_persist  # type: ignore[assignment]
-    manager._commit_prompt_version = (  # type: ignore[assignment]
-        _version_stub
-    )
     created = manager.create_prompt(prompt)
     assert created.id == prompt.id
     assert persisted == [prompt.id]
+    version = manager.get_latest_prompt_version(prompt.id)
+    assert version is not None
+    assert version.snapshot == manager.repository.get(prompt.id).to_record()
 
 
 def test_create_prompt_schedules_worker_on_embedding_failure(
     prompt_manager: tuple[PromptManager, _DummyCollection, _DummyChromaClient, Path],
 ) -> None:
     manager, _, _, _ = prompt_manager
-    repo = _InMemoryRepository()
-    manager._repository = repo  # type: ignore[assignment]
     prompt = _make_prompt("Needs Embedding")
 
     class _FailingEmbeddingProvider:
@@ -1616,12 +1608,12 @@ def test_create_prompt_schedules_worker_on_embedding_failure(
     manager._embedding_provider = _FailingEmbeddingProvider()  # type: ignore[assignment]
     manager._embedding_worker = types.SimpleNamespace(schedule=scheduled.append)  # type: ignore[assignment]
     manager._cache_prompt = lambda prompt_obj: cached.append(prompt_obj.id)  # type: ignore[assignment]
-    manager._commit_prompt_version = (  # type: ignore[assignment]
-        _version_stub
-    )
     manager.create_prompt(prompt)
     assert scheduled == [prompt.id]
     assert cached == [prompt.id]
+    version = manager.get_latest_prompt_version(prompt.id)
+    assert version is not None
+    assert version.snapshot == manager.repository.get(prompt.id).to_record()
 
 
 def test_run_category_generator_and_fallbacks(
@@ -1692,56 +1684,30 @@ def test_apply_category_metadata_error_paths(
 def test_persist_embedding_from_worker_updates_prompt(
     prompt_manager: tuple[PromptManager, _DummyCollection, _DummyChromaClient, Path],
 ) -> None:
-    manager, _, _, _ = prompt_manager
+    manager, collection, _, _ = prompt_manager
     prompt = _make_prompt()
-    called: dict[str, Any] = {}
-
-    class _Repo:
-        def update(self, prompt: Prompt) -> Prompt:
-            self.last_prompt = prompt
-            return prompt
-
-    repo = _Repo()
-    manager._repository = repo  # type: ignore[assignment]
-
-    def fake_persist(prompt_arg: Prompt, embedding: Sequence[float], *, is_new: bool) -> None:
-        called["prompt"] = prompt_arg
-        called["embedding"] = list(embedding)
-        called["is_new"] = is_new
-
-    manager._persist_embedding = fake_persist  # type: ignore[assignment]
+    manager.repository.add(prompt)
     _persist_embedding_from_worker(manager, prompt, [0.1, 0.2])
-
-    assert repo.last_prompt.ext4 == [0.1, 0.2]
-    assert called["embedding"] == [0.1, 0.2]
-    assert called["is_new"] is False
+    assert manager.repository.get(prompt.id).ext4 == [0.1, 0.2]
+    assert collection.upsert_payloads[-1]["embeddings"] == [[0.1, 0.2]]
 
 
 def test_persist_embedding_from_worker_rolls_back_ext4_when_chroma_upsert_fails(
     prompt_manager: tuple[PromptManager, _DummyCollection, _DummyChromaClient, Path],
 ) -> None:
     """A failed background Chroma update must restore the prior SQLite embedding."""
-    manager, _, _, _ = prompt_manager
+    manager, collection, _, _ = prompt_manager
     original = _make_prompt()
     original.ext4 = [0.9, 0.8]
-    stored: dict[str, Prompt] = {"prompt": original}
+    manager.repository.add(original)
 
-    class _Repo:
-        def update(self, prompt: Prompt) -> Prompt:
-            stored["prompt"] = prompt
-            return prompt
+    def fail_upsert(**_: Any) -> None:
+        raise _TestChromaError("Chroma unavailable")
 
-    manager._repository = _Repo()  # type: ignore[assignment]
-
-    def fail_persist(_: Prompt, __: Sequence[float], *, is_new: bool) -> None:
-        raise PromptStorageError("Chroma unavailable")
-
-    manager._persist_embedding = fail_persist  # type: ignore[assignment]
-
+    collection.upsert = fail_upsert  # type: ignore[assignment]
     with pytest.raises(PromptStorageError):
         _persist_embedding_from_worker(manager, original, [0.1, 0.2])
-
-    assert stored["prompt"].ext4 == [0.9, 0.8]
+    assert manager.repository.get(original.id).ext4 == [0.9, 0.8]
 
 
 def test_background_embedding_retry_restores_then_persists_current_vector(
@@ -1750,8 +1716,8 @@ def test_background_embedding_retry_restores_then_persists_current_vector(
     """A retried worker callback should leave SQLite and Chroma on the successful vector."""
     manager, collection, _, _ = prompt_manager
     prompt = _make_prompt("Retry consistency")
-    repository = _InMemoryRepository([prompt])
-    manager._repository = repository  # type: ignore[assignment]
+    repository = manager.repository
+    repository.add(prompt)
     attempted_vectors: list[list[float]] = []
     completed = threading.Event()
 

@@ -2,7 +2,7 @@
 
 Status: active
 Owner: Wojtek / Prompt Manager Team
-Updated: 2026-09-26
+Updated: 2026-09-30
 Canonical product SSOT: `docs/product-ssot.md`
 Canonical near-term plan: `docs/plans/2026-05-10-product-direction-ssot-next-cycle.md`
 
@@ -20,7 +20,23 @@ Do not use this file as a second product SSOT or a competing roadmap.
 
 ---
 
-## Latest delivery and acceptance — Prompt listing CLI v1
+## Local audit-repair checkpoint — 2026-09-30
+
+- Execution ledger: [bounded audit-repair campaign](plans/2026-09-30-audit-repair-campaign.md). A–F are complete and independently reviewed locally, based on `08e4a638cad13bab17ab3800220b0c5e4b606546`; final full gates and documentation closeout passed. Commit/push is now explicitly authorized; remote delivery and exact-SHA CI remain pending until verified.
+- Worker completion no longer rewrites a stale prompt record; public vector handoffs share the canonical SQLite lock and the worker evicts cache after commit. Ordinary creation commits the row and first snapshot together before index/cache/worker publication. Stream duration includes full consumption and persists to history. `prompt-list --json` read failure emits sanitized `LIST_FAILED` stderr with exit 6.
+- Final full local provider-free check after A–F: **1304 passed, 1 skipped; core 82.12%**. Ruff check/format, configured strict Pyright, lock and diff checks passed. Explicit CLI Pyright remains **123 inherited errors**, unchanged; `cli/` is excluded from the configured full/CI scopes. Do not infer full-project type cleanliness.
+- Implementation/verification used no live catalog, provider calls, interactive WSLg/Windows acceptance, dependency or CI-configuration changes. Commits/staging/push were subsequently authorized for this verified checkpoint. The wrapper failure smoke uses injected `runpy` dispatch, not a new wheel-install/shebang acceptance.
+- SQLite cannot undo a Chroma mutation-then-error; cross-store reconciliation and inherited public-writer/read-cache races are outside this bounded repair. Disabling web search disables enrichment only, not model traffic or cost.
+
+## Latest committed checkpoints present at audited HEAD
+
+These entries summarize retained Git history and delivery evidence in their ledgers; they are not a fresh remote-state/CI assertion for the local repair campaign.
+
+- CLI continuation product `2e0e995d1d7a47f4e27d990acbd3c056620d2156`, with documentation at audited HEAD `08e4a638cad13bab17ab3800220b0c5e4b606546`: scoped parser/startup machine errors, import record IDs and opt-in retrieval explanation. [Continuation ledger](plans/2026-09-28-agent-cli-contract-continuation.md) records product exact-SHA CI; draft promotion and exhaustive semantic filtering remain deferred.
+- Prior CLI repair product `834baefd6561def20d42cf69f8a3b808f4d9f965`, documentation checkpoint `810cf0d2af5376fdae96cd3de76abe22fd821179`: chain output-conflict refusal before execution, history JSON and `prompt-add --result-json`. [Repair ledger](plans/2026-09-28-agent-cli-contract-repair.md) records delivered evidence; its historical parser/startup/ID limitations were narrowed by the continuation, not by declaring every CLI command agent-ready.
+- Lifecycle product `fef7026a20d14457228f9449489645f8e9cd8a89` and documentation `6ced96c1988c5d20b5a00fb1b7eeddd375824637`: reference-aware deletion and inactive-state enforcement. [Lifecycle ledger](plans/2026-09-27-prompt-relations-lifecycle.md) records S1–S3 delivery; impact UI remains deferred. Current release metadata is 0.24.0 at `fbecf8f4a96d0ee81f04ea8dc33d6573e8bc827c`; the later `69f6d1b0590a349cd9bfb64a6c98583b13de3275` adds IDs to text suggestions.
+
+## Prior delivery and acceptance — Prompt listing CLI v1
 
 - `prompt-list` adds bounded query-free listing with filters and compact JSON over the canonical prompt repository. Delivered on `origin/master` as `4bf4ca98d0b1ff118ca564b053244ee86316743a`; exact-SHA [Quality Gates 36272100058](https://github.com/voytas75/PromptManager/actions/runs/36272100058) passed. Local gates and post-fix independent review are green; contract and follow-up boundary: `docs/plans/2026-09-26-prompt-list-cli-v1.md`. No Windows acceptance was performed.
 

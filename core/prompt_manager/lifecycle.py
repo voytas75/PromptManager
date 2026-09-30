@@ -1,6 +1,7 @@
 """Prompt lifecycle, caching, and embedding helpers for Prompt Manager.
 
 Updates:
+  v0.1.1 - 2026-09-30 - Guard worker freshness and commit creation snapshots atomically.
   v0.1.0 - 2025-12-03 - Extract prompt CRUD, caching, and embedding APIs into mixin.
 """
 
@@ -149,7 +150,7 @@ class PromptLifecycleMixin:
         origin: PromptActivityOrigin = "gui",
         record_activity: bool = True,
     ) -> Prompt:
-        """Persist a new prompt in SQLite/ChromaDB and prime the cache."""
+        """Commit the prompt/first snapshot before index, cache, or worker publication."""
         prompt = self._apply_category_metadata_for_lifecycle(prompt)
         self._update_category_insight_for_lifecycle(prompt, previous_prompt=None)
         generated_embedding: list[float] | None = None
@@ -166,7 +167,8 @@ class PromptLifecycleMixin:
         try:
             if generated_embedding is not None:
                 prompt.ext4 = list(generated_embedding)
-            stored_prompt = self._repository.add(prompt)
+            version = self._repository.add_with_version(prompt, commit_message=commit_message)
+            stored_prompt = prompt
         except RepositoryError as exc:
             raise PromptStorageError(f"Failed to persist prompt {prompt.id}") from exc
         if generated_embedding is not None:
@@ -181,10 +183,6 @@ class PromptLifecycleMixin:
                         extra={"prompt_id": str(prompt.id)},
                     )
                 raise exc
-        version = self._commit_prompt_version_for_lifecycle(
-            stored_prompt,
-            commit_message=commit_message,
-        )
         logger.debug(
             "Prompt version committed",
             extra={
@@ -305,46 +303,30 @@ class PromptLifecycleMixin:
                     "Scheduling background embedding refresh",
                     extra={"prompt_id": str(prompt.id)},
                 )
-        if should_commit_version:
-            embedding_persisted = False
-            if generated_embedding is not None:
-                prompt.ext4 = list(generated_embedding)
-                self._persist_embedding(prompt, generated_embedding, is_new=False)
-                embedding_persisted = True
-            try:
+        persist_index: Callable[[Prompt], None] | None = None
+        if generated_embedding is not None:
+            prompt.ext4 = list(generated_embedding)
+
+            def write_index(current: Prompt) -> None:
+                self._upsert_embedding_index(current, generated_embedding)
+
+            persist_index = write_index
+
+        try:
+            if should_commit_version:
                 version = self._repository.update_with_version(
                     prompt,
                     commit_message=commit_message,
+                    persist_index=persist_index,
                 )
-            except RepositoryNotFoundError as exc:
-                if embedding_persisted:
-                    self._restore_embedding_after_failed_update(previous_prompt, prompt.id)
-                raise PromptNotFoundError(f"Prompt {prompt.id} not found") from exc
-            except RepositoryError as exc:
-                if embedding_persisted:
-                    self._restore_embedding_after_failed_update(previous_prompt, prompt.id)
-                raise PromptStorageError(f"Failed to update prompt {prompt.id} in SQLite") from exc
-            updated_prompt = prompt
-        else:
-            try:
-                updated_prompt = self._repository.update(prompt)
-            except RepositoryNotFoundError as exc:
-                raise PromptNotFoundError(f"Prompt {prompt.id} not found") from exc
-            except RepositoryError as exc:
-                raise PromptStorageError(f"Failed to update prompt {prompt.id} in SQLite") from exc
-            version = None
-            if generated_embedding is not None:
-                try:
-                    self._persist_embedding(updated_prompt, generated_embedding, is_new=False)
-                except PromptStorageError:
-                    try:
-                        self._repository.update(previous_prompt)
-                    except RepositoryError:
-                        logger.error(
-                            "Unable to roll back SQLite update after Chroma failure",
-                            extra={"prompt_id": str(prompt.id)},
-                        )
-                    raise
+                updated_prompt = prompt
+            else:
+                updated_prompt = self._repository.update(prompt, persist_index=persist_index)
+                version = None
+        except RepositoryNotFoundError as exc:
+            raise PromptNotFoundError(f"Prompt {prompt.id} not found") from exc
+        except RepositoryError as exc:
+            raise PromptStorageError(f"Failed to update prompt {prompt.id} in SQLite") from exc
 
         if version is not None:
             logger.debug(
@@ -362,16 +344,15 @@ class PromptLifecycleMixin:
                 extra={"prompt_id": str(updated_prompt.id)},
             )
 
-        if generated_embedding is None:
-            if refresh_derived_state:
-                self._embedding_worker.schedule(updated_prompt.id)
-            try:
-                self._cache_prompt(updated_prompt)
-            except PromptCacheError:
-                logger.warning(
-                    "Prompt updated but cache refresh failed",
-                    extra={"prompt_id": str(prompt.id)},
-                )
+        if generated_embedding is None and refresh_derived_state:
+            self._embedding_worker.schedule(updated_prompt.id)
+        try:
+            self._cache_prompt(updated_prompt)
+        except PromptCacheError:
+            logger.warning(
+                "Prompt updated but cache refresh failed",
+                extra={"prompt_id": str(prompt.id)},
+            )
         if record_activity:
             self._record_prompt_activity_for_lifecycle(
                 updated_prompt.id,
@@ -630,17 +611,7 @@ class PromptLifecycleMixin:
         is_new: bool,
     ) -> None:
         """Persist embeddings to Chroma and refresh caches."""
-        payload: dict[str, Any] = {
-            "ids": [str(prompt.id)],
-            "documents": [prompt.document],
-            "metadatas": [prompt.to_metadata()],
-            "embeddings": [list(embedding)],
-        }
-        collection = self._as_prompt_manager().collection
-        try:
-            collection.upsert(**payload)
-        except ChromaError as exc:
-            raise PromptStorageError(f"Failed to persist embedding for prompt {prompt.id}") from exc
+        self._upsert_embedding_index(prompt, embedding)
         try:
             self._cache_prompt(prompt)
         except PromptCacheError:
@@ -654,27 +625,50 @@ class PromptLifecycleMixin:
                 extra={"prompt_id": str(prompt.id)},
             )
 
+    def _upsert_embedding_index(self, prompt: Prompt, embedding: Sequence[float]) -> None:
+        """Write the derived index without publishing a pre-commit cache entry."""
+        payload: dict[str, Any] = {
+            "ids": [str(prompt.id)],
+            "documents": [prompt.document],
+            "metadatas": [prompt.to_metadata()],
+            "embeddings": [list(embedding)],
+        }
+        collection = self._as_prompt_manager().collection
+        try:
+            collection.upsert(**payload)
+        except ChromaError as exc:
+            raise PromptStorageError(f"Failed to persist embedding for prompt {prompt.id}") from exc
+
     def _persist_embedding_from_worker(
         self,
         prompt: Prompt,
         embedding: Sequence[float],
     ) -> None:
-        """Callback invoked by background worker once embedding is generated."""
-        previous_embedding = list(prompt.ext4) if prompt.ext4 is not None else None
-        prompt.ext4 = list(embedding)
+        """Guard a current derived write, then evict rather than publish a snapshot."""
+
+        def persist_index(current: Prompt) -> None:
+            self._upsert_embedding_index(current, embedding)
+
         try:
-            self._repository.update(prompt)
+            current = self._repository.update_embedding_if_current(
+                prompt, embedding, persist_index=persist_index
+            )
         except RepositoryError as exc:
-            raise PromptStorageError(f"Failed to persist embedding for prompt {prompt.id}") from exc
+            raise PromptStorageError(
+                "Embedding persistence failed; inspect catalog/index consistency"
+            ) from exc
+        except PromptStorageError as exc:
+            raise PromptStorageError(
+                "Embedding index update failed; inspect catalog/index consistency"
+            ) from exc
+        if current is None:
+            logger.debug(
+                "Discarded stale background embedding", extra={"prompt_id": str(prompt.id)}
+            )
+            return
         try:
-            self._persist_embedding(prompt, embedding, is_new=False)
-        except PromptStorageError:
-            prompt.ext4 = previous_embedding
-            try:
-                self._repository.update(prompt)
-            except RepositoryError:
-                logger.error(
-                    "Unable to roll back SQLite embedding after Chroma failure",
-                    extra={"prompt_id": str(prompt.id)},
-                )
-            raise
+            self._evict_cached_prompt(current.id)
+        except PromptCacheError:
+            logger.warning(
+                "Embedding updated but cache eviction failed", extra={"prompt_id": str(prompt.id)}
+            )

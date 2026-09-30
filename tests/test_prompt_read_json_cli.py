@@ -25,7 +25,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def _run(
-    tmp_path: Path, config: Path, installed: bool, *args: str, stdin_text: str | None = None
+    tmp_path: Path,
+    config: Path,
+    installed: bool,
+    *args: str,
+    stdin_text: str | None = None,
+    composition_bootstrap: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     env = {
         key: value
@@ -41,10 +46,19 @@ def _run(
         PROMPT_MANAGER_ENV_FILE="",
         PYTHONDONTWRITEBYTECODE="1",
         CHROMA_ANONYMIZED_TELEMETRY="0",
+        LITELLM_LOCAL_MODEL_COST_MAP="True",
     )
     front = (
         [str(ROOT / ".venv/bin/prompt-manager")] if installed else [sys.executable, "-m", "main"]
     )
+    if composition_bootstrap is not None:
+        target = str(ROOT / ".venv/bin/prompt-manager") if installed else "main"
+        dispatch = (
+            "runpy.run_path(sys.argv.pop(1), run_name='__main__')"
+            if installed
+            else "sys.argv.pop(1); runpy.run_module('main', run_name='__main__')"
+        )
+        front = [sys.executable, "-c", composition_bootstrap + "\n" + dispatch, target]
     return subprocess.run(
         [*front, *args],
         cwd=tmp_path,
@@ -56,6 +70,78 @@ def _run(
         timeout=35,
         check=False,
     )
+
+
+@pytest.mark.parametrize("installed", [False, True])
+@pytest.mark.parametrize("json_output", [False, True])
+def test_prompt_list_repository_failure_process_channels(
+    tmp_path: Path, installed: bool, json_output: bool
+) -> None:
+    """Both entrypoints translate a composed repository failure without providers."""
+    config = tmp_path / "settings.json"
+    config.write_text(
+        json.dumps({"embedding_backend": "deterministic", "redis_dsn": None}),
+        encoding="utf-8",
+    )
+    receipt = tmp_path / "composition.json"
+    bootstrap = f"""
+import json
+import runpy
+import socket
+import sys
+from pathlib import Path
+
+calls = {{"factory": 0, "list": 0, "close": 0, "network": 0}}
+def forbid_network(*args, **kwargs):
+    calls["network"] += 1
+    raise AssertionError("UNEXPECTED_NETWORK_CALL")
+socket.socket.connect = forbid_network
+socket.socket.connect_ex = forbid_network
+socket.create_connection = forbid_network
+
+import core
+class FailingRepository:
+    def list(self):
+        calls["list"] += 1
+        raise RuntimeError("PRIVATE_LIST_DETAIL /private/catalog.db token=PRIVATE_TOKEN")
+class FakeManager:
+    repository = FailingRepository()
+    def close(self):
+        calls["close"] += 1
+        Path({str(receipt)!r}).write_text(json.dumps(calls), encoding="utf-8")
+def fake_factory(*args, **kwargs):
+    calls["factory"] += 1
+    return FakeManager()
+core.build_prompt_manager = fake_factory
+"""
+    args = ["prompt-list", "--json"] if json_output else ["prompt-list"]
+    result = _run(tmp_path, config, installed, *args, composition_bootstrap=bootstrap)
+    (tmp_path / "process.json").write_text(
+        json.dumps({"exit": result.returncode, "stdout": result.stdout, "stderr": result.stderr}),
+        encoding="utf-8",
+    )
+    assert result.returncode == 6, result
+    assert result.stdout == ""
+    assert json.loads(receipt.read_text(encoding="utf-8")) == {
+        "factory": 1,
+        "list": 1,
+        "close": 1,
+        "network": 0,
+    }
+    assert "PRIVATE_LIST_DETAIL" not in result.stderr
+    assert "PRIVATE_TOKEN" not in result.stderr
+    assert "/private/catalog.db" not in result.stderr
+    assert "Traceback" not in result.stderr
+    assert len(result.stderr.splitlines()) == 1
+    if json_output:
+        assert json.loads(result.stderr) == {
+            "ok": False,
+            "error": {"code": "LIST_FAILED", "message": "Unable to list local prompts."},
+        }
+    else:
+        assert result.stderr == "Unable to list local prompts.\n"
+    assert not (tmp_path / "catalog.db").exists()
+    assert not (tmp_path / "chroma").exists()
 
 
 @pytest.mark.parametrize("installed", [False, True])

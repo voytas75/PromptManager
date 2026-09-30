@@ -38,7 +38,7 @@ from models.prompt_model import Prompt, PromptForkLink, PromptVersion, UserProfi
 
 if TYPE_CHECKING:
     import builtins
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
     from chromadb.api import ClientAPI  # type: ignore[reportMissingTypeArgument]
 
@@ -161,11 +161,25 @@ class _RecordingRepository:
         self.storage[prompt.id] = _clone_prompt(prompt)
         return prompt
 
-    def update(self, prompt: Prompt) -> Prompt:
+    def add_with_version(
+        self, prompt: Prompt, *, commit_message: str | None = None
+    ) -> PromptVersion:
+        if prompt.id in self.storage:
+            raise RepositoryError("duplicate prompt")
+        stored = _clone_prompt(prompt)
+        version = self.record_prompt_version(prompt, commit_message=commit_message)
+        self.storage[prompt.id] = stored
+        return version
+
+    def update(
+        self, prompt: Prompt, *, persist_index: Callable[[Prompt], None] | None = None
+    ) -> Prompt:
         if self.update_error is not None:
             raise self.update_error
         if prompt.id not in self.storage:
             raise RepositoryNotFoundError("missing prompt")
+        if persist_index is not None:
+            persist_index(prompt)
         self.storage[prompt.id] = _clone_prompt(prompt)
         return prompt
 
@@ -175,10 +189,11 @@ class _RecordingRepository:
         *,
         commit_message: str | None = None,
         parent_version_id: int | None = None,
+        persist_index: Callable[[Prompt], None] | None = None,
     ) -> PromptVersion:
         if self.version_error is not None:
             raise self.version_error
-        self.update(prompt)
+        self.update(prompt, persist_index=persist_index)
         return self.record_prompt_version(
             prompt,
             commit_message=commit_message,
@@ -189,6 +204,8 @@ class _RecordingRepository:
         if prompt_id not in self.storage:
             raise RepositoryNotFoundError("missing delete")
         del self.storage[prompt_id]
+        for version in self._versions.pop(prompt_id, []):
+            self._version_index.pop(version.id, None)
         self.deleted.append(prompt_id)
 
     def record_prompt_activity(
@@ -875,7 +892,10 @@ def test_generate_prompt_category_falls_back_when_llm_fails() -> None:
 
 def test_create_prompt_raises_when_repository_fails() -> None:
     class _AddFailRepo(_RecordingRepository):
-        def add(self, prompt: Prompt) -> Prompt:  # type: ignore[override]
+        @override
+        def add_with_version(
+            self, prompt: Prompt, *, commit_message: str | None = None
+        ) -> PromptVersion:
             raise RepositoryError("add fail")
 
     repo = _AddFailRepo()
@@ -932,7 +952,9 @@ def test_get_prompt_logs_when_cache_update_fails() -> None:
 
 def test_update_prompt_handles_repository_errors() -> None:
     class _ErrorRepo(_RecordingRepository):
-        def update(self, prompt: Prompt) -> Prompt:  # type: ignore[override]
+        def update(
+            self, prompt: Prompt, *, persist_index: Callable[[Prompt], None] | None = None
+        ) -> Prompt:
             raise RepositoryError("update fail")
 
     repo = _ErrorRepo()
@@ -943,7 +965,9 @@ def test_update_prompt_handles_repository_errors() -> None:
         manager.update_prompt(prompt)
 
     class _MissingRepo(_RecordingRepository):
-        def update(self, prompt: Prompt) -> Prompt:  # type: ignore[override]
+        def update(
+            self, prompt: Prompt, *, persist_index: Callable[[Prompt], None] | None = None
+        ) -> Prompt:
             raise RepositoryNotFoundError("missing")
 
     repo_missing = _MissingRepo()
@@ -1214,9 +1238,11 @@ def test_increment_usage_updates_repository() -> None:
             super().__init__()
             self.update_calls = 0
 
-        def update(self, prompt: Prompt) -> Prompt:  # type: ignore[override]
+        def update(
+            self, prompt: Prompt, *, persist_index: Callable[[Prompt], None] | None = None
+        ) -> Prompt:
             self.update_calls += 1
-            return super().update(prompt)
+            return super().update(prompt, persist_index=persist_index)
 
     repo = _CountingRepo()
     prompt = _sample_prompt()
@@ -1422,7 +1448,7 @@ def test_prompt_fork_rolls_back_when_initial_version_persistence_fails() -> None
     manager.create_prompt(prompt)
     repo.version_error = RepositoryError("initial version write failed")
 
-    with pytest.raises(PromptManagerError, match="Failed to record version"):
+    with pytest.raises(PromptStorageError, match="Failed to persist prompt"):
         manager.fork_prompt(prompt.id, name="Versionless experiment")
 
     assert set(repo.storage) == {prompt.id}

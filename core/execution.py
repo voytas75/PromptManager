@@ -1,6 +1,7 @@
 """LiteLLM-backed prompt execution helpers.
 
 Updates:
+  v0.4.6 - 2026-09-30 - Include full stream consumption in successful execution duration.
   v0.4.5 - 2025-12-11 - Fall back to estimated token usage when providers return null usage.
   v0.4.4 - 2025-12-10 - Estimate token usage when providers omit usage metadata (Azure streaming).
   v0.4.3 - 2025-12-10 - Normalise LiteLLM usage payloads so token counts persist across platforms.
@@ -177,7 +178,6 @@ class CodexExecutor:
             raise ExecutionError(f"LiteLLM execution failed: {exc}") from exc
         except Exception as exc:  # pragma: no cover - defensive
             raise ExecutionError("Unexpected error while calling LiteLLM") from exc
-        duration_ms = int((time.perf_counter() - started) * 1000)
 
         usage: dict[str, Any]
         response_text: str
@@ -192,7 +192,9 @@ class CodexExecutor:
                 on_stream,
                 LiteLLMException,
             )
+            duration_ms = int((time.perf_counter() - started) * 1000)
         else:
+            duration_ms = int((time.perf_counter() - started) * 1000)
             payload_mapping: Mapping[str, Any]
             if isinstance(response, Mapping):
                 payload_mapping = cast("Mapping[str, Any]", response)

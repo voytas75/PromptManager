@@ -1,6 +1,7 @@
 """Prompt persistence, categories, versions, and list helpers.
 
 Updates:
+  v0.11.2 - 2026-09-30 - Add guarded derived writes and atomic initial snapshots.
   v0.11.1 - 2025-12-07 - Restrict Path import to type-checking contexts.
   v0.11.0 - 2025-12-04 - Extract prompt CRUD/category/version helpers into mixin.
 """
@@ -150,6 +151,21 @@ class PromptStoreMixin:
             raise RepositoryError(f"Failed to insert prompt {prompt.id}") from exc
         return prompt
 
+    def add_with_version(
+        self, prompt: Prompt, *, commit_message: str | None = None
+    ) -> PromptVersion:
+        """Commit a new prompt and its initial snapshot in one SQLite transaction."""
+        payload = self._prompt_to_row(prompt)
+        placeholders = ", ".join(f":{column}" for column in self._COLUMNS)
+        query = f"INSERT INTO prompts ({', '.join(self._COLUMNS)}) VALUES ({placeholders});"
+        try:
+            with _connect(self._db_path) as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                conn.execute(query, payload)
+                return self._insert_prompt_version(conn, prompt, commit_message=commit_message)
+        except sqlite3.Error as exc:
+            raise RepositoryError(f"Failed to insert prompt {prompt.id} with version") from exc
+
     def get(self, prompt_id: uuid.UUID) -> Prompt:
         """Fetch a prompt by UUID."""
         try:
@@ -179,8 +195,10 @@ class PromptStoreMixin:
         except sqlite3.Error as exc:
             raise RepositoryError("Failed to update prompt status") from exc
 
-    def update(self, prompt: Prompt) -> Prompt:
-        """Persist an existing prompt."""
+    def update(
+        self, prompt: Prompt, *, persist_index: Callable[[Prompt], None] | None = None
+    ) -> Prompt:
+        """Persist an existing prompt, guarding an optional index handoff."""
         payload = self._prompt_to_row(prompt)
         assignments = ", ".join(
             f"{column} = :{column}" for column in self._COLUMNS if column != "id"
@@ -193,11 +211,52 @@ class PromptStoreMixin:
                 cursor = conn.execute(query, payload)
                 if cursor.rowcount == 0:
                     raise RepositoryNotFoundError(f"Prompt {prompt.id} not found")
+                if persist_index is not None:
+                    persist_index(prompt)
         except (RepositoryNotFoundError, RepositoryError):
             raise
         except sqlite3.Error as exc:
             raise RepositoryError(f"Failed to update prompt {prompt.id}") from exc
         return prompt
+
+    def update_embedding_if_current(
+        self,
+        source: Prompt,
+        embedding: Sequence[float],
+        *,
+        persist_index: Callable[[Prompt], None],
+    ) -> Prompt | None:
+        """Write only a current derived vector while guarding the index handoff.
+
+        A rejected stale result is a no-op. SQLite rollback cannot undo an index
+        operation that mutates and then fails; callers must report that uncertainty.
+        """
+        try:
+            with _connect(self._db_path) as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                row = conn.execute(
+                    "SELECT * FROM prompts WHERE id = ?;", (_stringify_uuid(source.id),)
+                ).fetchone()
+                if row is None:
+                    return None
+                current = self._row_to_prompt(row)
+                if (
+                    current.document != source.document
+                    or current.version != source.version
+                    or current.is_active != source.is_active
+                    or current.last_modified != source.last_modified
+                    or current.ext4 != source.ext4
+                ):
+                    return None
+                current.ext4 = list(embedding)
+                conn.execute(
+                    "UPDATE prompts SET ext4 = ? WHERE id = ?;",
+                    (_json_dumps(current.ext4), _stringify_uuid(source.id)),
+                )
+                persist_index(current)
+        except sqlite3.Error as exc:
+            raise RepositoryError("Failed to persist current prompt embedding") from exc
+        return current
 
     def update_with_version(
         self,
@@ -205,8 +264,12 @@ class PromptStoreMixin:
         *,
         commit_message: str | None = None,
         parent_version_id: int | None = None,
+        persist_index: Callable[[Prompt], None] | None = None,
     ) -> PromptVersion:
-        """Atomically persist a prompt update and its version snapshot."""
+        """Commit prompt/snapshot together and guard an optional index handoff.
+
+        SQLite rollback cannot undo an index mutation followed by an error.
+        """
         assignments = ", ".join(
             f"{column} = :{column}" for column in self._COLUMNS if column != "id"
         )
@@ -254,6 +317,8 @@ class PromptStoreMixin:
                     ),
                     (cursor.lastrowid,),
                 ).fetchone()
+                if persist_index is not None:
+                    persist_index(prompt)
         except (RepositoryNotFoundError, RepositoryError):
             raise
         except sqlite3.Error as exc:
@@ -548,49 +613,51 @@ class PromptStoreMixin:
         parent_version_id: int | None = None,
     ) -> PromptVersion:
         """Persist a snapshot of the prompt for version history tracking."""
-        snapshot_json = _prompt_snapshot_json(prompt)
-        timestamp = datetime.now(UTC).isoformat()
-
         try:
             with _connect(self._db_path) as conn:
-                parent_id = parent_version_id
-                if parent_id is None:
-                    parent_id = self._get_latest_version_id(conn, prompt.id)
-                version_number = self._next_version_number(conn, prompt.id)
-                cursor = conn.execute(
-                    """
-                    INSERT INTO prompt_versions (
-                        prompt_id,
-                        parent_version,
-                        version_number,
-                        created_at,
-                        commit_message,
-                        snapshot_json
-                    ) VALUES (?, ?, ?, ?, ?, ?);
-                    """,
-                    (
-                        _stringify_uuid(prompt.id),
-                        parent_id,
-                        version_number,
-                        timestamp,
-                        commit_message,
-                        snapshot_json,
-                    ),
+                return self._insert_prompt_version(
+                    conn, prompt, commit_message=commit_message, parent_version_id=parent_version_id
                 )
-                version_id = cursor.lastrowid
-                row = conn.execute(
-                    (
-                        "SELECT version_id, prompt_id, parent_version, version_number, created_at, "
-                        "commit_message, snapshot_json FROM prompt_versions WHERE version_id = ?;"
-                    ),
-                    (version_id,),
-                ).fetchone()
         except sqlite3.Error as exc:
             raise RepositoryError("Failed to record prompt version") from exc
 
+    def _insert_prompt_version(
+        self,
+        conn: sqlite3.Connection,
+        prompt: Prompt,
+        *,
+        commit_message: str | None,
+        parent_version_id: int | None = None,
+    ) -> PromptVersion:
+        """Insert and hydrate a snapshot inside the caller-owned transaction."""
+        parent_id = parent_version_id
+        if parent_id is None:
+            parent_id = self._get_latest_version_id(conn, prompt.id)
+        version_number = self._next_version_number(conn, prompt.id)
+        cursor = conn.execute(
+            """
+            INSERT INTO prompt_versions (
+                prompt_id, parent_version, version_number, created_at, commit_message, snapshot_json
+            ) VALUES (?, ?, ?, ?, ?, ?);
+            """,
+            (
+                _stringify_uuid(prompt.id),
+                parent_id,
+                version_number,
+                datetime.now(UTC).isoformat(),
+                commit_message,
+                _prompt_snapshot_json(prompt),
+            ),
+        )
+        if cursor.rowcount != 1:
+            raise RepositoryError("Prompt version insert did not create a snapshot")
+        row = conn.execute(
+            "SELECT version_id, prompt_id, parent_version, version_number, created_at, "
+            "commit_message, snapshot_json FROM prompt_versions WHERE version_id = ?;",
+            (cursor.lastrowid,),
+        ).fetchone()
         if row is None:  # pragma: no cover - defensive
             raise RepositoryError("Prompt version insert succeeded but row missing")
-
         return PromptVersion.from_row(row)
 
     def list_prompt_versions(

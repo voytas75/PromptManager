@@ -1,6 +1,7 @@
 """CLI command handlers for Prompt Manager.
 
 Updates:
+  v0.34.1 - 2026-09-30 - Emit sanitized JSON stderr for prompt-list read failures.
   v0.34.0 - 2026-09-22 - Mark quiet local catalog commands at startup.
   v0.33.9 - 2026-04-29 - Add prompt-history JSON output for structured execution evidence reads.
   v0.33.8 - 2026-04-29 - Add prompt-history CLI command for per-prompt execution evidence.
@@ -1734,7 +1735,21 @@ def run_prompt_list(
         else:
             print("No prompts matched. Add a prompt or adjust filters.")
     except Exception:  # pragma: no cover - bounded CLI error boundary
-        print("Unable to list local prompts.", file=sys.stderr)
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "error": {
+                            "code": "LIST_FAILED",
+                            "message": "Unable to list local prompts.",
+                        },
+                    }
+                ),
+                file=sys.stderr,
+            )
+        else:
+            print("Unable to list local prompts.", file=sys.stderr)
         return 6
     return 0
 
