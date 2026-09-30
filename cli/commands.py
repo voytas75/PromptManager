@@ -1,6 +1,7 @@
 """CLI command handlers for Prompt Manager.
 
 Updates:
+  v0.34.2 - 2026-09-30 - Preflight chain output and sanitize artifact write errors.
   v0.34.1 - 2026-09-30 - Emit sanitized JSON stderr for prompt-list read failures.
   v0.34.0 - 2026-09-22 - Mark quiet local catalog commands at startup.
   v0.33.9 - 2026-04-29 - Add prompt-history JSON output for structured execution evidence reads.
@@ -77,6 +78,7 @@ from models.prompt_chain_model import (
 
 from .utils import (
     format_metric,
+    prepare_output_file,
     print_and_log,
     resolve_export_format,
     write_csv_rows,
@@ -1285,6 +1287,30 @@ def run_prompt_chain_run(
         )
         return 5
 
+    def output_error(code: str, message: str) -> int:
+        if bool(getattr(args, "json", False)):
+            print(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "command": "prompt-chain-run",
+                        "error": {"code": code, "message": message},
+                    }
+                ),
+                file=sys.stderr,
+            )
+        else:
+            print(message, file=sys.stderr)
+        return 5
+
+    output_file = getattr(args, "output_file", None)
+    output_path = Path(output_file) if output_file is not None else None
+    if output_path is not None:
+        try:
+            prepare_output_file(output_path)
+        except OSError:
+            return output_error("OUTPUT_UNAVAILABLE", "Unable to prepare chain output file.")
+
     try:
         result = manager.run_prompt_chain(
             chain_id,
@@ -1305,11 +1331,11 @@ def run_prompt_chain_run(
             indent=2,
             ensure_ascii=False,
         )
-        output_file = getattr(args, "output_file", None)
-        if output_file is not None:
-            output_path = Path(output_file)
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_text(payload_text + "\n", encoding="utf-8")
+        if output_path is not None:
+            try:
+                output_path.write_text(payload_text + "\n", encoding="utf-8")
+            except (OSError, UnicodeError):
+                return output_error("OUTPUT_WRITE_FAILED", "Unable to write chain output file.")
             print(f"Saved prompt chain run artifact to {output_path}.")
             return 0
         print(payload_text)
@@ -1357,11 +1383,11 @@ def run_prompt_chain_run(
         )
     elif bool(getattr(args, "compact", False)):
         text_output = _build_prompt_chain_compact_output(result, final_status)
-    output_file = getattr(args, "output_file", None)
-    if output_file is not None:
-        output_path = Path(output_file)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(text_output + "\n", encoding="utf-8")
+    if output_path is not None:
+        try:
+            output_path.write_text(text_output + "\n", encoding="utf-8")
+        except (OSError, UnicodeError):
+            return output_error("OUTPUT_WRITE_FAILED", "Unable to write chain output file.")
         print(f"Saved prompt chain run artifact to {output_path}.")
         return 0
     print(text_output)

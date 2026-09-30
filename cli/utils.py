@@ -1,12 +1,15 @@
 """Shared CLI utility functions for Prompt Manager commands.
 
 Updates:
+  v0.1.1 - 2026-09-30 - Add best-effort non-truncating chain output preflight.
   v0.1.0 - 2025-12-04 - Extract stdout logging, masking, path helpers, and exporters.
 """
 
 from __future__ import annotations
 
 import csv
+import os
+import stat
 from os import PathLike
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -18,6 +21,24 @@ else:  # pragma: no cover - runtime placeholders for type-only imports
     Mapping = Sequence = Logger = Any
 
 PathInput = str | PathLike[str] | Path
+
+
+def prepare_output_file(path: Path) -> None:
+    """Prepare parents and reject obvious output failures without truncating a file.
+
+    Access checks are best-effort only: a later write can still fail or race.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        target_mode = path.stat().st_mode
+    except FileNotFoundError:
+        if not os.access(path.parent, os.W_OK | os.X_OK):
+            raise PermissionError("Output parent is not writable.") from None
+    else:
+        if not stat.S_ISREG(target_mode):
+            raise OSError("Output target is not a regular file.")
+        if not os.access(path, os.W_OK):
+            raise PermissionError("Output file is not writable.")
 
 
 def print_and_log(logger: Logger, level: int, message: str) -> None:

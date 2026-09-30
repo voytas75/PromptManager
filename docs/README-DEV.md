@@ -394,6 +394,21 @@ The installed wheel exposes `prompt-manager`; the `python -m main` forms below r
 
 | `python -m main --help` | Compact root help card grouped by task area; use `python -m main <command> --help` for authoritative command-specific options. |
 
+## CLI chain output-file boundary
+
+`prompt-chain-run --output-file PATH` prepares missing parent directories and checks
+the destination **before chain execution** (after normal manager startup). It preserves
+overwrite of a writable regular file and rejects obvious preparation failures with exit 5,
+empty stdout and a sanitized stderr message (`OUTPUT_UNAVAILABLE` in `--json` mode).
+Preparation does not open/truncate the target; newly created parent directories can remain
+if a later operation fails. Checks are best-effort, not a write reservation or atomic save.
+Permissions, links, disk capacity or other writers can change after preflight. A later
+write/encoding failure returns exit 5 and sanitized `OUTPUT_WRITE_FAILED` in JSON mode;
+the chain has already run once and is not retried. Inspect run history and the destination
+before retrying: the artifact may be partial/truncated. This does not repair chain
+run-status exit semantics or JSON success/file receipts, nor qualify the whole execution
+family for autonomous use. The active bounded tracker is [CLI quick wins](plans/2026-09-30-cli-quick-wins.md).
+
 ### GUI Prompt Chain Manager
 
 - Open the **Chain** tab (next to Template) in the main window to access the embedded manager, which reuses the full JSON import, CRUD, and run controls without a separate dialog.
