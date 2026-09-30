@@ -20,12 +20,12 @@ Do not use this file as a second product SSOT or a competing roadmap.
 
 ---
 
-## Local audit-repair checkpoint — 2026-09-30
+## Latest delivery — audit-repair campaign, 2026-09-30
 
-- Execution ledger: [bounded audit-repair campaign](plans/2026-09-30-audit-repair-campaign.md). A–F are complete and independently reviewed locally, based on `08e4a638cad13bab17ab3800220b0c5e4b606546`; final full gates and documentation closeout passed. Commit/push is now explicitly authorized; remote delivery and exact-SHA CI remain pending until verified.
+- Execution ledger: [bounded audit-repair campaign](plans/2026-09-30-audit-repair-campaign.md). A–F are complete and independently reviewed. Product/test/docs commit `ccfcfbf4fdc46b060005b5f09a560843c640b2af` is delivered on master; local/tracking/live SHA equality and clean tree were verified. Exact-SHA [Quality Gates 36739943990](https://github.com/voytas75/PromptManager/actions/runs/36739943990) succeeded, including Ruff, CI-scope Pyright, Pytest and clean-tree checks. This factual documentation tail is a separate commit and gets its own post-push verification.
 - Worker completion no longer rewrites a stale prompt record; public vector handoffs share the canonical SQLite lock and the worker evicts cache after commit. Ordinary creation commits the row and first snapshot together before index/cache/worker publication. Stream duration includes full consumption and persists to history. `prompt-list --json` read failure emits sanitized `LIST_FAILED` stderr with exit 6.
 - Final full local provider-free check after A–F: **1304 passed, 1 skipped; core 82.12%**. Ruff check/format, configured strict Pyright, lock and diff checks passed. Explicit CLI Pyright remains **123 inherited errors**, unchanged; `cli/` is excluded from the configured full/CI scopes. Do not infer full-project type cleanliness.
-- Implementation/verification used no live catalog, provider calls, interactive WSLg/Windows acceptance, dependency or CI-configuration changes. Commits/staging/push were subsequently authorized for this verified checkpoint. The wrapper failure smoke uses injected `runpy` dispatch, not a new wheel-install/shebang acceptance.
+- Implementation/verification used no live catalog, provider calls, interactive WSLg/Windows acceptance, dependency or CI-configuration changes. Commits/staging/push were subsequently authorized and completed for the verified product checkpoint; no security/branch rules or dependency changes were made. The wrapper failure smoke uses injected `runpy` dispatch, not a new wheel-install/shebang acceptance.
 - SQLite cannot undo a Chroma mutation-then-error; cross-store reconciliation and inherited public-writer/read-cache races are outside this bounded repair. Disabling web search disables enrichment only, not model traffic or cost.
 
 ## Latest committed checkpoints present at audited HEAD

@@ -1,13 +1,13 @@
 # PromptManager — bounded audit repair campaign
 
-Status: A–F verified locally — commit/push authorized; remote delivery and exact-SHA CI pending.
+Status: completed and delivered — A–F product commit verified remotely with exact-SHA CI; this factual documentation tail is separately verified after push.
 Owner: Wojtek / Prompt Manager Team
 Baseline: `master@08e4a638cad13bab17ab3800220b0c5e4b606546`, clean worktree.
 Product authority: `docs/product-ssot.md`; this file is the execution ledger, not a new product roadmap.
 
 ## Goal and confirmed state
 
-Completed A–F without expanding the product: stale worker writes are guarded, ordinary row/first snapshot creation is atomic in SQLite, streaming duration covers consumption, and prompt-list machine errors are sanitized JSON. Developer web-search wording and STATUS delivery history are corrected. Final local proof: 1304 passed / 1 skipped, core 82.12%, Ruff, configured/touched strict Pyright and lock pass; explicit CLI remains 123 inherited errors with no delta. No remote delivery/CI, live providers, user-catalog repair or native GUI acceptance is claimed.
+Completed A–F without expanding the product: stale worker writes are guarded, ordinary row/first snapshot creation is atomic in SQLite, streaming duration covers consumption, and prompt-list machine errors are sanitized JSON. Developer web-search wording and STATUS delivery history are corrected. Final local proof: 1304 passed / 1 skipped, core 82.12%, Ruff, configured/touched strict Pyright and lock pass; explicit CLI remains 123 inherited errors with no delta. Delivery subsequently confirmed for product commit `ccfcfbf4fdc46b060005b5f09a560843c640b2af`, with exact-SHA Quality Gates success; live providers, user-catalog repair and native GUI acceptance remain outside scope.
 
 Baseline evidence: 1251 passed / 1 skipped, core coverage 81.95% in provider-free scratch-CWD run; Ruff check/format, uv lock, CI-scope and configured full strict Pyright pass. Explicit `pyright cli` has 123 errors, all in `cli/commands.py`; CLI is outside both configured full scope and CI. Exact baseline HEAD Quality Gates run 36480325926 succeeded. These are baseline facts, not post-change results.
 
@@ -139,11 +139,15 @@ Run provider-free full tests with coverage, Ruff check/format, configured strict
 
 41. **Delivery authorization / preflight:** owner explicitly requested commit and push. Verified all 15 files byte-identical to the final local checkpoint; fetch/prune showed **0 ahead / 0 behind**, local/tracking/live remote at baseline `08e4a638cad13bab17ab3800220b0c5e4b606546`. GitHub reports master unprotected and no active branch rules. Publish one campaign commit, verify its exact-SHA Quality Gates, then commit/push a narrow factual status/ledger tail and verify that SHA too. No new implementation, providers, dependency or CI-policy changes.
 
+42. **Product commit/push and exact-SHA CI verified:** staged only the 15 approved files; cached whitespace/name-status/numstat checks passed (**+1615/-185**, including authorization ledger update). Committed `ccfcfbf4fdc46b060005b5f09a560843c640b2af` and ordinary-pushed master; fresh fetch and live ls-remote matched local/tracking/live SHAs, clean tree. GitHub [Quality Gates 36739943990](https://github.com/voytas75/PromptManager/actions/runs/36739943990) for this exact SHA is **success**, with dependency installation, Ruff verify, CI-scope Pyright, Pytest and clean-tree steps all successful. An initial gh list command typo was corrected; long watch exceeded tool timeout, then direct run readback confirmed success—no duplicate push/run. GitHub advisory of 8 vulnerabilities is deferred, not a delivery blocker/remediation claim.
+
+43. **Factual delivery tail:** updated this ledger and STATUS only, recording real product SHA/CI and completed-delivery state. No source/test/dependency/CI changes. Publish this docs-only tail and independently verify its own local/tracking/live SHA, clean tree and exact-SHA CI; do not recursively create a third documentation commit solely to record the tail SHA.
+
 ## Current blockers / doubts
 
-- No blocker for implementation A–F. Commit/push approved; remote delivery and exact-SHA CI pending.
+- No blocker for product A–F delivery: `ccfcfbf` is remote and CI-successful. Only this documentation-tail delivery verification remains during publication.
 - SQLite/index are not a distributed transaction; mutation-then-error can require separately approved reconciliation. Inherited two-public-writer and read-cache publication races remain outside this bounded worker repair.
 
 ## Next execution step
 
-Commit/stage exact approved paths, push normally to origin/master, verify local/tracking/live SHA and exact-SHA CI; then publish factual documentation tail. Native acceptance, type-debt reduction and cross-store reconciliation remain separately approved scope.
+All A–F implementation and product delivery are closed. Verify this factual tail after its publication; then stop. Native acceptance, type-debt reduction and cross-store reconciliation remain separate scope decisions.
