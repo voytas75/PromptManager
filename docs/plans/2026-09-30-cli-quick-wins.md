@@ -1,6 +1,6 @@
 # PromptManager — CLI quick wins
 
-Status: plan QW1–QW5 wykonany — QW1 dostarczony `cd0a3a5`, Quality Gates PASS; QW2–QW5 ukończone lokalnie, commit/push zatwierdzony i w toku. Wynik remote/CI jeszcze do potwierdzenia.
+Status: plan QW1–QW5 dostarczony — QW1 `cd0a3a5`, QW2–QW5 `5c1d6ed`; Quality Gates produktu PASS. Ten dokumentacyjny checkpoint publikuje potwierdzony wynik; jego SHA/CI sprawdzić osobno, bez kolejnego self-referential commitu.
 Owner: Wojtek / Prompt Manager Team
 Baseline: `master@29e6bdbbccdf06dfcb64bf43f38eade508d6942c`, czyste drzewo przed utworzeniem planu.
 Authority: `docs/product-ssot.md`; ten dokument jest trackerem wykonania, nie zmianą kierunku produktu.
@@ -37,9 +37,9 @@ Done: niepoprawny output odrzucony przed execution w obu entrypointach; zachowan
 
 ## QW2 — receipt i runtime-error dla chain JSON
 
-Status: ukończony lokalnie — implementacja, testy/bramki/docs i niezależny review PASS; nie commitowano/pushowano.
+Status: dostarczony w `5c1d6ed` — implementacja, testy/bramki/docs, review i Quality Gates PASS.
 Zakres: handler chain i renderer receipt, odpowiednie testy procesowe, developer guide/changelog/tracker.
-- `--json --output-file`: jeden JSON receipt `{command:"prompt-chain-run",artifact_path:PATH,run_status:STATUS}` po zapisie zamiast tekstowego `Saved ...`. Path zachowuje zapis argumentu jak dotychczas; nie dodawać misleading `ok:true` dla failed run. Status jak obecny handler `result.run_status or "success"`; pełny payload pliku i JSON stdout bez pliku bez zmian. Receipt nie zawiera inputu/outputu/name/provider metadata.
+- `--json --output-file`: jeden JSON receipt `{command:"prompt-chain-run",artifact_path:PATH,run_status:STATUS}` po zapisie zamiast tekstowego `Saved ...`. Path zachowuje zapis argumentu jak dotychczas; nie dodawać misleading `ok:true` dla failed run. Na etapie QW2 status zachowywał dawny fallback `success`; QW3 zastąpił go `unknown` (aktualny handler), zgodnie z kontraktem poniżej. Pełny payload pliku i JSON stdout bez pliku bez zmian. Receipt nie zawiera inputu/outputu/name/provider metadata.
 - Wyjątki chain w JSON: sanitarny error JSON stderr, pusty stdout, zachowane kody błędów. Nie echo surowego provider exception.
 - Schemat błędu jak QW1 `{ok:false,command:"prompt-chain-run",error:{code,message}}`, exit 5. `PromptChainExecutionError` => `CHAIN_EXECUTION_FAILED`, `PromptChainError` => `CHAIN_RUN_FAILED`, unexpected `Exception` w samym runner call => `CHAIN_RUN_FAILED` tylko w JSON (text pozostawia dotychczasowy wyjątek). Nie obejmuje parsera/startupu, invalid input/selectors ani serializacji sukcesu całej rodziny.
 - Zachować default text, payload JSON bez pliku i run-status semantics do QW3.
@@ -47,7 +47,7 @@ Done: sukces/wyjątek/file-mode z obu entrypointów, readback artefaktu, marker 
 
 ## QW3 — exit code a domain success
 
-Status: ukończony lokalnie — kontrakt, docs, pełne bramki i niezależny review PASS; nie commitowano/pushowano.
+Status: dostarczony w `5c1d6ed` — kontrakt, docs, pełne bramki, review i Quality Gates PASS.
 Zakres: istniejące chain/benchmark handlers, testy sukces/partial/failure, docs/changelog/tracker.
 - Przed kodem ustalić mapowanie success/partial/failed/no-runs do exit oraz zidentyfikować istniejące oczekiwania klientów/testów.
 - Failed chain i benchmark all-errors nie powinny udawać sukcesu run. Wariant węższy: opt-in strict status, jeżeli zmiana domyślnego exit łamie potwierdzonego klienta.
@@ -62,7 +62,7 @@ Kontrakt QW3 (zatwierdzony zakres, bez nowych flag):
 
 ## QW4 — oczekiwane offline warnings w wybranych JSON success
 
-Status: ukończony lokalnie — JSON-only bootstrap, testy, pełne bramki, docs i niezależny review PASS; nie commitowano/pushowano.
+Status: dostarczony w `5c1d6ed` — JSON-only bootstrap, testy, pełne bramki, docs, review i Quality Gates PASS.
 Zakres: CommandSpec/bootstrap flags tylko dla `prompt-render --json` i `tag-list --json`, odpowiednie testy, docs/changelog/tracker.
 - Użyć istniejącej kontroli `announce_offline_llm`; nie wyciszać błędów/globalnych loggerów ani zmieniać zwykłego text-mode.
 - Próby ze scratch CWD i repozytoryjną przykładową konfiguracją logowania.
@@ -72,7 +72,7 @@ Kontrakt: w istniejącym bootstrapie `main.py` przekazać `announce_offline_llm=
 
 ## QW5 — early dispatch prompt-edit parity
 
-Status: ukończony lokalnie — early module dispatch, pełne bramki, docs i niezależny review PASS; nie commitowano/pushowano.
+Status: dostarczony w `5c1d6ed` — early module dispatch, pełne bramki, docs, review i Quality Gates PASS.
 Zakres: `main.py`, wąskie process/import-boundary tests, docs/changelog/tracker.
 - W modułowym entrypoincie dispatch `prompt-edit` przed heavy runtime imports, analogicznie do installed launcher.
 - Bez zmiany SQL/mutation/value/backup contract.
@@ -94,12 +94,12 @@ Alternatywa: wykonać najpierw QW4, jeśli potwierdzony konsument jest wyłączn
 
 ## Bieżące blokery / do weryfikacji / następny krok
 
-- Bramka następnego zadania: QW1–QW5 wykonane, QW2–QW5 zamknięte lokalnie; commit/push zatwierdzony przez „Zatwierdzam” na pytanie o publikację. Nie dodawać kolejnego quick win bez nowej decyzji.
+- Bramka następnego zadania: QW1–QW5 dostarczone, produkt Quality Gates PASS; commit/push zatwierdzony przez „Zatwierdzam”. Nie dodawać kolejnego quick win bez nowej decyzji.
 - Potwierdzone QW2: review PASS; końcowy focused 257 PASS, full 1401 PASS / 1 skipped, core coverage 82.12%; nowe executable statements 9/9 = 100%; Ruff/format/lock/diff PASS. Oba testy strict Pyright 0, commands.py odziedziczone 123 bez nowych fingerprintów.
 - Potwierdzone QW3: review PASS; końcowy focused 422 PASS, full 1565 PASS / 1 skipped, core 82.12%; changed executable statements 10/10. Ruff/format, configured Pyright i strict trzy testy PASS; commands inherited123, fingerprint delta 0; lock/diff PASS.
 - Potwierdzone QW4: focused 190 PASS, full 1611 PASS / 1 skipped, core 82.12%; strict main/test i configured Pyright PASS; commands inherited123 delta0, Ruff/format/lock/diff PASS, changed statements 2/2. Niezależny review PASS; sugestie logger/izolacja ustawień wdrożone i bramki powtórzone.
 - Potwierdzone QW5: po sugestiach review pack 56 PASS, focused 194 PASS, full 1667 PASS / 1 skipped, core 82.12%, changed statements 3/3; Ruff/format, configured i strict main/test Pyright, lock/diff PASS; commands inherited123 delta0. Niezależny review PASS, bez security/logic findings, sugestie testowe wdrożone.
-- Następny krok: commit/push QW2–QW5, trzy SHA i exact-SHA CI, następnie dokumentacyjny delivery checkpoint. Bez automatycznego poszerzania na odłożone prace autonomii/security.
+- Następny krok: potwierdzić remote SHA i exact-SHA CI tego dokumentacyjnego checkpointu, następnie zakończyć publikację. Bez automatycznego poszerzania na odłożone prace autonomii/security.
 
 ## Dziennik wykonania
 
@@ -161,6 +161,8 @@ Tracker ma również zgodę/discovery i aktualizacje checkpointów, jego numstat
 18. **QW4 bramki/review checkpoint:** dodano cztery process controls `--validate-only` JSON (bez zmiany produkcji). Focused **190 PASS**, changed executable statements **2/2**. Repo Ruff/format, configured Pyright i strict main/test PASS; main0, commands inherited123 przed/po, fingerprint delta0. Security scan added production clean, offline lock/diff PASS. Pierwszy full suite osiągnął limit 400 s bez końcowego podsumowania; nie raportować PASS, potwierdzono brak pozostawionego pytest. Powtórzony pełny provider-free suite działa jako `proc_0ba04950bdfe`, notify-on-complete, wyniki w scratch. Review `deleg_5dffd517` aktywny. Baseline przed QW4 w scratch pozwala oddzielić wcześniejsze QW2/QW3; nowe pliki nie stage'owane. Bez providers/CI/deps/Git delivery/Windows/QW5.
 
 ## Końcowe checkpointy i inventory
+
+25. **QW2–QW5 delivery verified:** commit produktu `5c1d6ed545443520c230803515ed1f04471d50d6` (`fix(cli): complete agent-facing quick wins`), 10 files +1289/-38, zwykły push na master. Fetch i live ls-remote potwierdziły HEAD=origin/master=remote oraz clean tree; brak komunikatu bypass. Quality Gates [36776607815](https://github.com/voytas75/PromptManager/actions/runs/36776607815) success dla tego SHA: Ruff, Pyright, Pytest i Ensure clean tree PASS. Pierwszy observer timeout 420 s nie zakończył CI; readback potwierdził Pytest w toku, kolejny watch zakończył się exit0. Push banner o 8 Dependabot findings odłożony, bez alert triage/deps zmian. Ten docs-only tail zastępuje aktywne uncommitted/pending statusy i historyczny QW2 fallback claim; wcześniejsze dzienniki pozostają historyczne. Tail ma osobną weryfikację remote/CI, nie tworzyć kolejnego commitu tylko do zapisania SHA taila.
 
 24. **QW2–QW5 delivery intake:** użytkownik zatwierdził commit/push ukończonych QW2–QW5. Scope: dziesięć dirty paths (osiem tracked i dwa nowe testy), bez innych zmian. Fetch potwierdził HEAD=origin/master=`cd0a3a5`, brak outgoing/incoming commits; protection endpoint zwrócił Branch not protected, branch rules `[]`. Real suite evidence 1667 PASS/1 skipped i core82.12%, review każdego QW PASS; produkcja i wcześniejsze code/tests zachowane względem zakończonych checkpointów. Zatwierdzony zwykły push na master, bez force/policy/deps/security/Windows zmian. Remote/CI jeszcze niepotwierdzone; aktualizację delivery docs wykonać po weryfikacji produktu.
 
