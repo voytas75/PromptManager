@@ -1,6 +1,8 @@
 """Prompt chain CLI legibility tests.
 
 Updates:
+  v0.1.2 - 2026-09-30 - Require full domain success for chain exit zero.
+  v0.1.1 - 2026-09-30 - Assert machine receipt for JSON chain file output.
   v0.1.0 - 2026-05-04 - Cover bounded prompt-chain show/run output clarity cues.
 """
 
@@ -12,6 +14,8 @@ import logging
 import sys
 import uuid
 from typing import TYPE_CHECKING, Any, cast
+
+import pytest
 
 from cli.commands import (
     run_prompt_chain_apply,
@@ -28,8 +32,6 @@ from models.prompt_chain_model import PromptChain, PromptChainStep
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-    import pytest
 
 
 class _ChainCliManagerStub:
@@ -800,7 +802,13 @@ def test_prompt_chain_run_supports_output_file_for_json_mode(
     assert payload["chain"]["id"] == str(manager.chain.id)
     assert payload["final_step_output_key"] == "step_1"
     assert payload["step_aliases"] == {"final": "step_1"}
-    assert output_path.as_posix() in capsys.readouterr().out
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert json.loads(captured.out) == {
+        "command": "prompt-chain-run",
+        "artifact_path": str(output_path),
+        "run_status": "success",
+    }
 
 
 def test_prompt_chain_run_supports_summary_only_mode(
@@ -879,8 +887,50 @@ def test_prompt_chain_run_status_only_uses_backend_run_status(
 
     exit_code = run_prompt_chain_run(cast("Any", manager), args, logger)
 
-    assert exit_code == 0
+    assert exit_code == 5
     assert capsys.readouterr().out == "partial_success\n"
+
+
+@pytest.mark.parametrize(
+    "status", ["success", "partial_success", "failed", "skipped", "", "future"]
+)
+@pytest.mark.parametrize("json_mode", [False, True])
+@pytest.mark.parametrize("file_mode", [False, True])
+def test_chain_handler_preserves_result_before_domain_exit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    status: str,
+    json_mode: bool,
+    file_mode: bool,
+) -> None:
+    manager = _ChainCliManagerStub()
+    original_run = manager.run_prompt_chain
+
+    def run_chain(*args: Any, **kwargs: Any) -> Any:
+        result = original_run(*args, **kwargs)
+        result.run_status = status
+        return result
+
+    monkeypatch.setattr(manager, "run_prompt_chain", run_chain)
+    target = tmp_path / "artifact" if file_mode else None
+    args = argparse.Namespace(
+        chain_id=str(manager.chain.id),
+        chain_input="Synthetic input",
+        json=json_mode,
+        output_file=target,
+    )
+    exit_code = run_prompt_chain_run(cast("Any", manager), args, logging.getLogger(__name__))
+    captured = capsys.readouterr()
+    assert exit_code == (0 if status == "success" else 5)
+    assert manager.run_calls == 1
+    assert captured.err == ""
+    text = target.read_text(encoding="utf-8") if target is not None else captured.out
+    if json_mode:
+        assert json.loads(text)["run_status"] == status
+        if target is not None:
+            assert json.loads(captured.out)["run_status"] == (status or "unknown")
+    assert "Final response text that should stay visible." in text
 
 
 def test_prompt_chain_run_supports_step_output_mode(
@@ -997,7 +1047,7 @@ def test_prompt_chain_run_final_step_meta_keeps_final_and_terminal_semantics_sep
 
     exit_code = run_prompt_chain_run(cast("Any", manager), args, logger)
 
-    assert exit_code == 0
+    assert exit_code == 5
     assert json.loads(capsys.readouterr().out) == {
         "final_step_id": str(manager.chain.steps[0].id),
         "final_step_output_key": "step_1",

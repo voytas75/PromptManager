@@ -1,6 +1,7 @@
 """CLI command handlers for Prompt Manager.
 
 Updates:
+  v0.34.3 - 2026-09-30 - Emit chain JSON file receipts and sanitized runner failures.
   v0.34.2 - 2026-09-30 - Preflight chain output and sanitize artifact write errors.
   v0.34.1 - 2026-09-30 - Emit sanitized JSON stderr for prompt-list read failures.
   v0.34.0 - 2026-09-22 - Mark quiet local catalog commands at startup.
@@ -444,11 +445,11 @@ def run_benchmark(
 
     if not report.runs:
         logger.info("No benchmark runs were executed.")
-        return 0
+        return 5
 
     print("\nBenchmark results\n-----------------")
     for run in report.runs:
-        status = "ERROR" if run.error else "OK"
+        status = "ERROR" if run.error is not None else "OK"
         usage_parts: list[str] = []
         usage_map = run.usage if isinstance(run.usage, dict) else {}
         prompt_tokens = usage_map.get("prompt_tokens")
@@ -462,7 +463,7 @@ def run_benchmark(
             usage_parts.append(f"total={total_tokens}")
         usage_text = f"tokens({', '.join(usage_parts)})" if usage_parts else "tokens(n/a)"
 
-        if run.error:
+        if run.error is not None:
             print(f"- {run.prompt_name} [{run.model}] -> {status}: {run.error}")
         else:
             duration_text = f"{run.duration_ms} ms" if run.duration_ms is not None else "n/a"
@@ -488,7 +489,7 @@ def run_benchmark(
         if run.error is None and not run.response_preview:
             print("  preview: (empty response)")
 
-    return 0
+    return 0 if all(run.error is None for run in report.runs) else 5
 
 
 def run_refresh_scenarios(
@@ -1318,12 +1319,21 @@ def run_prompt_chain_run(
             use_web_search=use_web_search,
         )
     except PromptChainExecutionError as exc:
+        if bool(getattr(args, "json", False)):
+            return output_error("CHAIN_EXECUTION_FAILED", "Unable to execute prompt chain.")
         logger.error("Chain execution failed: %s", exc)
         return 5
     except PromptChainError as exc:
+        if bool(getattr(args, "json", False)):
+            return output_error("CHAIN_RUN_FAILED", "Unable to execute prompt chain.")
         logger.error("Unable to execute prompt chain: %s", exc)
         return 5
-    final_status = result.run_status or "success"
+    except Exception:
+        if bool(getattr(args, "json", False)):
+            return output_error("CHAIN_RUN_FAILED", "Unable to execute prompt chain.")
+        raise
+    final_status = result.run_status or "unknown"
+    run_exit_code = 0 if result.run_status == "success" else 5
 
     if bool(getattr(args, "json", False)):
         payload_text = json.dumps(
@@ -1336,10 +1346,19 @@ def run_prompt_chain_run(
                 output_path.write_text(payload_text + "\n", encoding="utf-8")
             except (OSError, UnicodeError):
                 return output_error("OUTPUT_WRITE_FAILED", "Unable to write chain output file.")
-            print(f"Saved prompt chain run artifact to {output_path}.")
-            return 0
+            print(
+                json.dumps(
+                    {
+                        "command": "prompt-chain-run",
+                        "artifact_path": str(output_path),
+                        "run_status": final_status,
+                    },
+                    ensure_ascii=False,
+                )
+            )
+            return run_exit_code
         print(payload_text)
-        return 0
+        return run_exit_code
 
     text_output = _build_prompt_chain_run_text_output(result, final_status)
     if bool(getattr(args, "final_output_only", False)):
@@ -1389,9 +1408,9 @@ def run_prompt_chain_run(
         except (OSError, UnicodeError):
             return output_error("OUTPUT_WRITE_FAILED", "Unable to write chain output file.")
         print(f"Saved prompt chain run artifact to {output_path}.")
-        return 0
+        return run_exit_code
     print(text_output)
-    return 0
+    return run_exit_code
 
 
 def run_history_analytics(

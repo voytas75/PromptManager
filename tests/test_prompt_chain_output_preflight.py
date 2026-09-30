@@ -1,6 +1,8 @@
 """Provider-free process regressions for chain output preparation.
 
 Updates:
+  v0.1.2 - 2026-09-30 - Align chain/benchmark process exits with domain outcomes.
+  v0.1.1 - 2026-09-30 - Cover JSON chain receipts and sanitized runtime errors.
   v0.1.0 - 2026-09-30 - Cover output failures before and after chain execution.
 """
 
@@ -20,6 +22,7 @@ import pytest
 
 from cli.commands import run_prompt_chain_run
 from cli.utils import prepare_output_file
+from core import PromptChainError, PromptChainExecutionError
 
 ROOT = Path(__file__).resolve().parents[1]
 CHAIN_ID = "00000000-0000-0000-0000-000000000991"
@@ -35,6 +38,7 @@ socket.socket.connect = deny_network
 socket.socket.connect_ex = deny_network
 socket.create_connection = deny_network
 import core
+from core import PromptChainError, PromptChainExecutionError
 
 receipt = Path(os.environ['TEST_RECEIPT'])
 target = Path(os.environ['TEST_OUTPUT'])
@@ -42,8 +46,26 @@ mode = os.environ['TEST_MODE']
 calls = []
 original_write_text = Path.write_text
 class Manager:
+    def benchmark_prompts(self, *args, **kwargs):
+        calls.append('benchmark')
+        errors = {
+            'benchmark_success': [None, None],
+            'benchmark_mixed': [None, 'Synthetic failure'],
+            'benchmark_failed': ['Synthetic failure', 'Second failure'],
+            'benchmark_empty_error': [''],
+            'benchmark_empty': [],
+        }[mode]
+        return NS(runs=[NS(prompt_name=f'Synthetic prompt {i}', model='offline-stub',
+            error=error, usage={}, duration_ms=1, response_preview='Synthetic result',
+            history=None) for i, error in enumerate(errors)])
     def run_prompt_chain(self, *args, **kwargs):
         calls.append('chain')
+        if mode == 'execution_error':
+            raise PromptChainExecutionError('PRIVATE_SYNTHETIC_OUTPUT_123')
+        if mode == 'chain_error':
+            raise PromptChainError('PRIVATE_SYNTHETIC_OUTPUT_123')
+        if mode == 'unexpected_error':
+            raise RuntimeError('PRIVATE_SYNTHETIC_OUTPUT_123')
         if mode in {'late_write_failure', 'late_encoding_failure'}:
             def fail_write(path, *args, **kwargs):
                 if path == target:
@@ -60,7 +82,10 @@ class Manager:
         return NS(**fields, chain=NS(id='00000000-0000-0000-0000-000000000991',
             name='Synthetic chain'), chain_input='Synthetic input',
             final_output_text='Synthetic result', final_summary_text='',
-            run_status='success', step_aliases={}, step_outputs={}, steps=[])
+            run_status={'empty_status': '', 'unknown_status': 'future_status'}.get(mode,
+                mode if mode in {'failed', 'partial_success', 'skipped'} else 'success'),
+            step_aliases={'final': 'step_1'},
+            step_outputs={'step_1': 'Synthetic result'}, steps=[])
     def close(self):
         original_write_text(receipt, json.dumps(calls))
 core.build_prompt_manager = lambda *args, **kwargs: Manager()
@@ -89,7 +114,14 @@ if mode == 'stat_failure':
 
 
 def _run(
-    tmp_path: Path, *, installed: bool, json_mode: bool, mode: str, target: Path | None
+    tmp_path: Path,
+    *,
+    installed: bool,
+    json_mode: bool,
+    mode: str,
+    target: Path | None,
+    command: str = "prompt-chain-run",
+    extra_args: tuple[str, ...] = (),
 ) -> tuple[subprocess.CompletedProcess[str], list[str]]:
     config = tmp_path / "settings.json"
     config.write_text(
@@ -142,7 +174,12 @@ def _run(
         if installed
         else "sys.argv.pop(1); runpy.run_module('main', run_name='__main__')"
     )
-    args = ["prompt-chain-run", CHAIN_ID, "--input", "Synthetic input", "--no-web-search"]
+    args = (
+        ["benchmark", "--prompt", CHAIN_ID, "--request", "Synthetic input"]
+        if command == "benchmark"
+        else ["prompt-chain-run", CHAIN_ID, "--input", "Synthetic input", "--no-web-search"]
+    )
+    args.extend(extra_args)
     if json_mode:
         args.append("--json")
     if target is not None:
@@ -254,7 +291,14 @@ def test_output_file_preserves_creation_and_overwrite(
     assert calls == ["chain"]
     assert result.returncode == 0, result.stderr
     assert result.stderr == ""
-    assert result.stdout == f"Saved prompt chain run artifact to {target}.\n"
+    if json_mode:
+        assert json.loads(result.stdout) == {
+            "command": "prompt-chain-run",
+            "artifact_path": str(target),
+            "run_status": "success",
+        }
+    else:
+        assert result.stdout == f"Saved prompt chain run artifact to {target}.\n"
     artifact = target.read_text(encoding="utf-8")
     if json_mode:
         assert json.loads(artifact)["final_output_text"] == "Synthetic result"
@@ -362,4 +406,251 @@ def test_handler_sanitizes_output_errors(
         result,
         json_mode=json_mode,
         code="OUTPUT_WRITE_FAILED" if late_failure else "OUTPUT_UNAVAILABLE",
+    )
+
+
+@pytest.mark.parametrize("installed", [False, True])
+@pytest.mark.parametrize("existing", [None, False, True])
+@pytest.mark.parametrize("mode", ["execution_error", "chain_error", "unexpected_error"])
+def test_json_runner_error_preserves_artifact(
+    tmp_path: Path, installed: bool, existing: bool | None, mode: str
+) -> None:
+    target = tmp_path / "artifact.json" if existing is not None else None
+    if existing and target is not None:
+        target.write_text("Original artifact", encoding="utf-8")
+    result, calls = _run(tmp_path, installed=installed, json_mode=True, mode=mode, target=target)
+    assert calls == ["chain"]
+    assert result.returncode == 5
+    assert result.stdout == ""
+    code = "CHAIN_EXECUTION_FAILED" if mode == "execution_error" else "CHAIN_RUN_FAILED"
+    assert json.loads(result.stderr) == {
+        "ok": False,
+        "command": "prompt-chain-run",
+        "error": {"code": code, "message": "Unable to execute prompt chain."},
+    }
+    assert PRIVATE_MARKER not in result.stderr
+    assert "Synthetic input" not in result.stderr
+    assert "Synthetic result" not in result.stderr
+    if existing and target is not None:
+        assert target.read_text(encoding="utf-8") == "Original artifact"
+    elif target is not None:
+        assert not target.exists()
+    else:
+        assert not (tmp_path / "unused").exists()
+
+
+@pytest.mark.parametrize("installed", [False, True])
+@pytest.mark.parametrize("file_mode", [False, True])
+@pytest.mark.parametrize(
+    "status", ["success", "partial_success", "failed", "skipped", "empty_status", "unknown_status"]
+)
+def test_json_receipt_preserves_outcome_before_domain_exit(
+    tmp_path: Path, installed: bool, file_mode: bool, status: str
+) -> None:
+    target = tmp_path / "artifact.json" if file_mode else None
+    result, calls = _run(tmp_path, installed=installed, json_mode=True, mode=status, target=target)
+    assert calls == ["chain"]
+    assert result.returncode == (0 if status == "success" else 5)
+    assert result.stderr == ""
+    payload = json.loads(result.stdout)
+    if target is not None:
+        assert payload == {
+            "command": "prompt-chain-run",
+            "artifact_path": str(target),
+            "run_status": {"empty_status": "unknown", "unknown_status": "future_status"}.get(
+                status, status
+            ),
+        }
+        payload = json.loads(target.read_text(encoding="utf-8"))
+    assert payload["run_status"] == {"empty_status": "", "unknown_status": "future_status"}.get(
+        status, status
+    )
+    assert payload["final_output_text"] == "Synthetic result"
+    assert payload["chain_input"] == "Synthetic input"
+
+
+@pytest.mark.parametrize("installed", [False, True])
+@pytest.mark.parametrize("file_mode", [False, True])
+@pytest.mark.parametrize("status", ["success", "partial_success", "failed"])
+@pytest.mark.parametrize(
+    "selector",
+    [
+        (),
+        ("--compact",),
+        ("--final-output-only",),
+        ("--summary-only",),
+        ("--status-only",),
+        ("--step-output", "step_1"),
+        ("--step-alias", "final"),
+        ("--final-step-meta",),
+    ],
+)
+def test_text_selectors_preserve_output_before_domain_exit(
+    tmp_path: Path, installed: bool, file_mode: bool, status: str, selector: tuple[str, ...]
+) -> None:
+    target = tmp_path / "artifact.txt" if file_mode else None
+    result, calls = _run(
+        tmp_path,
+        installed=installed,
+        json_mode=False,
+        mode=status,
+        target=target,
+        extra_args=selector,
+    )
+    assert calls == ["chain"]
+    assert result.returncode == (0 if status == "success" else 5)
+    assert result.stderr == ""
+    text = result.stdout
+    if target is not None:
+        assert text == f"Saved prompt chain run artifact to {target}.\n"
+        text = target.read_text(encoding="utf-8")
+    if selector == ("--status-only",):
+        assert text == status + "\n"
+    elif selector == ("--final-step-meta",):
+        assert json.loads(text)["run_status"] == status
+    elif selector == ("--summary-only",):
+        assert text == "\n"
+    else:
+        assert "Synthetic result" in text
+
+
+@pytest.mark.parametrize("installed", [False, True])
+@pytest.mark.parametrize("file_mode", [False, True])
+@pytest.mark.parametrize("status", ["empty_status", "unknown_status"])
+@pytest.mark.parametrize("selector", ["--status-only", "--compact"])
+def test_text_status_views_do_not_present_unknown_as_success(
+    tmp_path: Path, installed: bool, file_mode: bool, status: str, selector: str
+) -> None:
+    target = tmp_path / "artifact.txt" if file_mode else None
+    result, calls = _run(
+        tmp_path,
+        installed=installed,
+        json_mode=False,
+        mode=status,
+        target=target,
+        extra_args=(selector,),
+    )
+    assert calls == ["chain"]
+    assert result.returncode == 5
+    assert result.stderr == ""
+    text = result.stdout
+    if target is not None:
+        assert text == f"Saved prompt chain run artifact to {target}.\n"
+        text = target.read_text(encoding="utf-8")
+    expected_status = "unknown" if status == "empty_status" else "future_status"
+    if selector == "--status-only":
+        assert text == expected_status + "\n"
+    else:
+        assert f"Status: {expected_status}" in text
+        assert "Synthetic result" in text
+
+
+@pytest.mark.parametrize("installed", [False, True])
+@pytest.mark.parametrize(
+    "mode",
+    [
+        "benchmark_success",
+        "benchmark_mixed",
+        "benchmark_failed",
+        "benchmark_empty_error",
+        "benchmark_empty",
+    ],
+)
+def test_benchmark_process_exit_preserves_report(
+    tmp_path: Path, installed: bool, mode: str
+) -> None:
+    result, calls = _run(
+        tmp_path,
+        installed=installed,
+        json_mode=False,
+        mode=mode,
+        target=None,
+        command="benchmark",
+    )
+    assert calls == ["benchmark"]
+    assert result.returncode == (0 if mode == "benchmark_success" else 5)
+    assert "Traceback" not in result.stderr
+    if mode == "benchmark_empty":
+        assert result.stdout == ""
+        assert "No benchmark runs were executed." in result.stderr
+    else:
+        assert result.stderr == ""
+        assert result.stdout.startswith("\nBenchmark results\n-----------------\n")
+        if mode in {"benchmark_success", "benchmark_mixed"}:
+            assert "-> OK:" in result.stdout
+            assert "preview: Synthetic result" in result.stdout
+        if mode != "benchmark_success":
+            assert "-> ERROR:" in result.stdout
+        if mode in {"benchmark_failed", "benchmark_empty_error"}:
+            assert "-> OK:" not in result.stdout
+
+
+@pytest.mark.parametrize("installed", [False, True])
+@pytest.mark.parametrize("mode", ["execution_error", "chain_error"])
+def test_text_runner_error_preserves_legacy_diagnostic(
+    tmp_path: Path, installed: bool, mode: str
+) -> None:
+    result, calls = _run(tmp_path, installed=installed, json_mode=False, mode=mode, target=None)
+    assert calls == ["chain"]
+    assert result.returncode == 5
+    assert result.stdout == ""
+    assert PRIVATE_MARKER in result.stderr
+
+
+@pytest.mark.parametrize("json_mode", [False, True])
+@pytest.mark.parametrize("error_type", [PromptChainExecutionError, PromptChainError, RuntimeError])
+def test_handler_runner_exception_boundary(
+    capsys: pytest.CaptureFixture[str], json_mode: bool, error_type: type[Exception]
+) -> None:
+    calls: list[str] = []
+
+    def fail_run(*_args: Any, **_kwargs: Any) -> Any:
+        calls.append("chain")
+        raise error_type(PRIVATE_MARKER)
+
+    manager = cast("Any", SimpleNamespace(run_prompt_chain=fail_run))
+    args = Namespace(chain_id=CHAIN_ID, chain_input="Synthetic input", json=json_mode)
+    if not json_mode and error_type is RuntimeError:
+        with pytest.raises(RuntimeError, match=PRIVATE_MARKER):
+            run_prompt_chain_run(manager, args, logging.getLogger(__name__))
+    else:
+        assert run_prompt_chain_run(manager, args, logging.getLogger(__name__)) == 5
+    captured = capsys.readouterr()
+    assert calls == ["chain"]
+    assert captured.out == ""
+    if json_mode:
+        code = (
+            "CHAIN_EXECUTION_FAILED"
+            if error_type is PromptChainExecutionError
+            else "CHAIN_RUN_FAILED"
+        )
+        assert json.loads(captured.err) == {
+            "ok": False,
+            "command": "prompt-chain-run",
+            "error": {"code": code, "message": "Unable to execute prompt chain."},
+        }
+
+
+@pytest.mark.parametrize("installed", [False, True])
+@pytest.mark.parametrize("relative", [False, True])
+def test_json_receipt_preserves_unicode_artifact_path(
+    tmp_path: Path, installed: bool, relative: bool
+) -> None:
+    target = Path("wyniki ze spacją") / "Łańcuch.json"
+    if not relative:
+        target = tmp_path / target
+    result, calls = _run(
+        tmp_path, installed=installed, json_mode=True, mode="success", target=target
+    )
+    assert calls == ["chain"]
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert json.loads(result.stdout) == {
+        "command": "prompt-chain-run",
+        "artifact_path": str(target),
+        "run_status": "success",
+    }
+    artifact = tmp_path / target if relative else target
+    assert (
+        json.loads(artifact.read_text(encoding="utf-8"))["final_output_text"] == "Synthetic result"
     )

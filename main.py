@@ -1,6 +1,8 @@
 """Application entry point for Prompt Manager.
 
 Updates:
+  v0.9.6 - 2026-09-30 - Dispatch prompt-edit before heavy imports in module startup.
+  v0.9.5 - 2026-09-30 - Mute expected offline announcements for render/tag JSON only.
   v0.9.4 - 2026-09-22 - Keep local catalog commands quiet when LiteLLM is offline.
   v0.9.3 - 2025-12-10 - Apply LiteLLM logging toggle from settings.
   v0.9.2 - 2025-12-09 - Offer to create config/config.json from template when missing.
@@ -39,6 +41,10 @@ if __name__ == "__main__":
     from cli.parser import parse_args as _early_parse_args
 
     _early_args = _early_parse_args()
+    if getattr(_early_args, "command", None) == "prompt-edit":
+        from cli.prompt_edit import run_prompt_edit as _early_run_prompt_edit
+
+        raise SystemExit(_early_run_prompt_edit(_early_args))
     if getattr(_early_args, "command", None) == "prompt-status":
         from cli.prompt_status import run_prompt_status as _early_run_prompt_status
 
@@ -308,6 +314,8 @@ def _run_application(args: Namespace) -> int:
     if manager_required:
         announce_offline_llm = spec is None or spec.announce_offline_llm
         if command == "prompt-add" and bool(getattr(args, "result_json", False)):
+            announce_offline_llm = False
+        if command in {"prompt-render", "tag-list"} and bool(getattr(args, "json", False)):
             announce_offline_llm = False
         manager = _initialise_manager(
             settings, logger, announce_offline_llm=announce_offline_llm, machine_error=machine_error

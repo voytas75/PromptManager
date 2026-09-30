@@ -394,6 +394,37 @@ The installed wheel exposes `prompt-manager`; the `python -m main` forms below r
 
 | `python -m main --help` | Compact root help card grouped by task area; use `python -m main <command> --help` for authoritative command-specific options. |
 
+## Prompt-edit entrypoint parity
+
+Both `prompt-manager prompt-edit ...` and `python -m main prompt-edit ...` now
+dispatch directly to the same lightweight SQLite handler before importing the
+full application command/runtime, core, GUI or provider stack. The module path
+retains normal parsing and propagates the handler exit code unchanged.
+
+This only changes startup ordering. The existing `related_prompts` allowlist,
+default read-only preview, explicit apply preconditions, exclusive backup,
+pending-journal checks, expected-value guard, result/error shapes and readback
+remain unchanged. No manager, Chroma or Redis bootstrap is needed for this
+command. Existing configuration loading still occurs in its handler; this is
+not an import-free or configuration-free command, a new mutation contract, or a
+guarantee about other CLI commands.
+
+## Selected JSON offline announcements
+
+`prompt-render --json` (including `--validate-only`) and `tag-list --json` omit the
+expected startup announcement that LLM-backed features are offline. With otherwise
+quiet offline services, stdout contains one unchanged JSON result and stderr is empty;
+this also avoids that warning contaminating stdout with the shipped example logger.
+Normal text mode retains its existing offline warning/notification.
+
+Only the existing factory announcement/notification switch is disabled: manager LLM
+availability and its offline reason remain intact. Logger levels/handlers, unrelated
+warnings, service failures, parser errors and command errors are not suppressed or
+redesigned. A custom logger or unrelated service warning can still affect the channels.
+Both commands still use normal manager startup, which can initialize local services;
+this is not a bootstrap-free or sandboxed-rendering guarantee. Use only trusted
+templates with the current renderer. No provider policy or execution routing changes.
+
 ## CLI chain output-file boundary
 
 `prompt-chain-run --output-file PATH` prepares missing parent directories and checks
@@ -405,9 +436,49 @@ if a later operation fails. Checks are best-effort, not a write reservation or a
 Permissions, links, disk capacity or other writers can change after preflight. A later
 write/encoding failure returns exit 5 and sanitized `OUTPUT_WRITE_FAILED` in JSON mode;
 the chain has already run once and is not retried. Inspect run history and the destination
-before retrying: the artifact may be partial/truncated. This does not repair chain
-run-status exit semantics or JSON success/file receipts, nor qualify the whole execution
-family for autonomous use. The active bounded tracker is [CLI quick wins](plans/2026-09-30-cli-quick-wins.md).
+before retrying: the artifact may be partial/truncated.
+
+After a successful file write, `--json --output-file PATH` prints exactly one receipt:
+`{"command":"prompt-chain-run","artifact_path":"PATH","run_status":"success"}`.
+The path uses the same spelling as the writer (relative to the command CWD); the artifact
+still contains the full run JSON. Without an output file, JSON stdout retains that full
+payload; text mode retains its readable `Saved ...` confirmation. `run_status` can also
+be `partial_success`, `failed` or `skipped`: receipt delivery is not proof of domain
+success. The domain exit policy below applies after output/file delivery.
+
+In JSON mode, exceptions raised by the runner call return exit 5, empty stdout and one
+sanitized `{ok:false,command,error:{code,message}}` object on stderr. The message is
+`Unable to execute prompt chain.`; `PromptChainExecutionError` uses `CHAIN_EXECUTION_FAILED`,
+other chain errors or unexpected runner exceptions use `CHAIN_RUN_FAILED`. No new artifact
+is written and an existing one is retained; execution/history effects may already have
+happened, so inspect before retrying. Text diagnostics remain unchanged. Parser/startup,
+invalid chain input/selectors, payload serialization and provider-emitted logs are not
+covered by this narrow error translation. It does not qualify the whole execution family
+for autonomous use. Tracker: [CLI quick wins](plans/2026-09-30-cli-quick-wins.md).
+
+## CLI execution outcome exits
+
+Both `prompt-manager` and `python -m main` return **0 only for full domain success**
+from `prompt-chain-run` and `benchmark`:
+
+- Chain: backend `run_status == "success"` returns 0; `partial_success`, `failed`,
+  `skipped`, empty or unknown statuses return 5. This applies to JSON, file output
+  and every text selector, including a successful selected step in a partial run.
+  CLI does not recalculate the backend status. Empty status is displayed as `unknown`
+  in receipts/status views; full JSON retains the raw backend value.
+- Benchmark: a nonempty report with every `run.error is None` returns 0. Mixed
+  success/error, all-error and no-run reports return 5. An empty error string is
+  still an error and renders as `ERROR`, not `OK`. Empty response content alone
+  is not a failure verdict here; QW3 does not assess response quality.
+
+A returned partial/failed result still goes to stdout (or the requested chain file)
+with its existing diagnostic content and receipt. Exit 5 does **not** mean stdout
+is empty or the artifact was not saved. Only thrown runner/output failures use
+the separate error path described above. No automatic retry is added: inspect
+results/history before retrying, as execution may already have incurred cost.
+This intentionally changes the former exit-0 behavior for partial/failed/no-run
+outcomes; external scripts must not assume that successful rendering means a
+successful run. Backend, GUI, history and provider execution behavior are unchanged.
 
 ### GUI Prompt Chain Manager
 
