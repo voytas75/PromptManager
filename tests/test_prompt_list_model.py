@@ -1,6 +1,7 @@
 """Focused tests for bounded retrieval previews in the main prompt list.
 
 Updates:
+  v0.1.7 - 2026-10-03 - Cover inspect-first title matches and templates without run history.
   v0.1.6 - 2026-09-02 - Cover description-match reason and inspect-first handoff cues.
   v0.1.5 - 2026-04-12 - Cover active-search scenario-priority while keeping
              source and description precedence unchanged.
@@ -166,7 +167,7 @@ def test_prompt_list_model_reports_title_match_reason_when_title_is_visible_matc
     assert index.data(PromptListModel.MatchReasonRole) == "Matched in title"
 
 
-def test_prompt_list_model_exposes_title_match_handoff_cue_for_immediate_reuse(
+def test_prompt_list_model_exposes_inspect_first_handoff_cue_for_title_match(
     qt_app: QApplication,
 ) -> None:
     """A title match should expose one compact list-side handoff cue."""
@@ -181,7 +182,26 @@ def test_prompt_list_model_exposes_title_match_handoff_cue_for_immediate_reuse(
     index = model.index(0, 0)
 
     assert index.data(PromptListModel.MatchReasonRole) == "Matched in title"
-    assert index.data(PromptListModel.HandoffCueRole) == "Ready to reuse"
+    assert index.data(PromptListModel.HandoffCueRole) == "Inspect before reuse"
+
+
+def test_prompt_list_model_inspect_first_handoff_for_template_without_run_history(
+    qt_app: QApplication,
+) -> None:
+    """A title match must not promote an unvalidated template into readiness."""
+    prompt = _build_prompt(
+        description="Summarize a supplied incident timeline for a named handoff audience.",
+        context="Incident: {{ incident }}\nAudience: {{ audience }}",
+    )
+    model = PromptListModel([prompt])
+    model.set_active_search_text("incident")
+    index = model.index(0, 0)
+
+    assert prompt.usage_count == 0
+    assert prompt.rating_count == 0
+    assert index.data(PromptListModel.MatchReasonRole) == "Matched in title"
+    assert PromptListDelegate.fit_cue_text(index) == "No run evidence yet"
+    assert PromptListDelegate.handoff_cue_text(index) == "Inspect before reuse"
 
 
 def test_prompt_list_model_exposes_compact_fit_evidence_from_existing_aggregates(

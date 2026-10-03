@@ -1,6 +1,7 @@
 """Qt list model that exposes prompt summaries for list views.
 
 Updates:
+  v0.1.7 - 2026-10-03 - Use inspect-first title-match guidance without claiming reuse readiness.
   v0.1.6 - 2026-09-02 - Expose description-match reason and inspect-first handoff cues.
   v0.1.5 - 2026-04-12 - Let active-search source-matched previews reuse the existing preview role.
   v0.1.4 - 2026-04-12 - Expose bounded active-search match spans for prompt title and preview text.
@@ -187,7 +188,7 @@ class PromptListModel(QAbstractListModel):
             match_reason == "Matched in title"
             and str((prompt.ext2 or {}).get("capture_state") or "").strip() != "draft"
         ):
-            return "Ready to reuse"
+            return "Inspect before reuse"
         if match_reason in {"Matched in source", "Matched in scenario", "Matched in description"}:
             return "Inspect before reuse"
         return None
