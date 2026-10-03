@@ -1,10 +1,10 @@
 # PromptManager — template preview operator-flow probe
 
-Status: local reset implementation and independent review PASS; approved delivery in progress.
+Status: reset repair delivered at `cf62ae13939da0db94764881fe139a47d450ef74`; exact-SHA Quality Gates success; approved scope closed.
 Baseline: `master@8e9a6bdd04723cd731bf4af7f957e5733efd0f9d`; clean worktree at intake.
 Authority: `docs/product-ssot.md`; priority 1 retrieval/inspect/reuse confidence.
 
-## Approved scope
+## Historical diagnosis scope
 
 One real-Qt synthetic flow: select/inspect a variable template, open its workspace, fill missing inputs partially then completely, switch to a second prompt, return and clear selection. Inspect preview and Run availability, but never Run. No production or test-code changes, dependencies, CI, user catalog/settings, native Windows acceptance, commit or push. Only this factual checkpoint added; scripts/data stay in managed scratch.
 
@@ -48,7 +48,7 @@ Impact proven: stale visible input state and stale public payload with no select
 - Network-blocked composed probe plus minimal reset probe exercised real widgets, no source/test edits. Tracked Git diff remains empty; this checkpoint is the only untracked file. No new CI/native/provider claim.
 Evidence: `/home/voytas/.hermes/cache/scratch/promptmanager-template-flow-wamxnrvs/` (`initial-receipt.json`, `refined-receipt.json`, `reset-reproduction.json`, process logs, `adjacent-junit.xml`). Scratch expires; summary here retains the result.
 
-## Decision / next bounded repair (not approved)
+## Historical decision / proposed repair (then unapproved)
 
 Recommend empty-template reset on the existing widget seam: remove old variable widgets/label maps and make public payload empty when no template is selected; preserve per-prompt QSettings so returning to A restores its inputs. Cover clear-after-empty, clear-after-filled, disabled Run/shortcut, empty rendered view and restore-on-reselect with real-Qt regressions; keep search, execution, schema, persistence format and CLI unchanged. No additional missing-status wording change in this slice.
 Strongest alternative: keep old fields as deliberate workspace draft state. Prefer it only if an explicit product contract names that state and separates it from the selected-prompt payload; currently no such contract is established, and the reset API/empty-selection message point to a clear state.
@@ -58,7 +58,7 @@ Daily approved scope at diagnosis publication: asset-loop diagnosis completed; t
 
 ## Approved reset repair and delivery
 
-User now approved implementation, commit and push. Baseline: `eda7d57f3d37aedbd1a87e0cd40108a1a7717a7a`, clean. Scope: existing empty-template branch, one real-Qt regression module, this checkpoint and one changelog line. Clear runtime editors/labels/payload, keep saved per-prompt QSettings and restore-on-reselect. No execution, schema/settings-format, CLI, dependencies, CI or native changes. Status: local GREEN, review/delivery in progress. Evidence: `/home/voytas/.hermes/cache/scratch/promptmanager-reset-fix-ld80xbm0/`.
+User now approved implementation, commit and push. Baseline: `eda7d57f3d37aedbd1a87e0cd40108a1a7717a7a`, clean. Scope: existing empty-template branch, one real-Qt regression module, this checkpoint and one changelog line. Clear runtime editors/labels/payload, keep saved per-prompt QSettings and restore-on-reselect. No execution, schema/settings-format, CLI, dependencies, CI or native changes. Status: product delivered and verified; factual documentation closeout follows. Evidence: `/home/voytas/.hermes/cache/scratch/promptmanager-reset-fix-ld80xbm0/`.
 
 - RED: 2 real-widget cases failed on old behavior (empty input: visible old field; filled input: nonempty public payload).
 - Minimal production change: call existing `_rebuild_variable_inputs()` in the empty-template branch; no settings deletion or format changes.
@@ -66,4 +66,7 @@ User now approved implementation, commit and push. Baseline: `eda7d57f3d37aedbd1
 - Retained real-Qt composed smoke: 30/30 PASS, exit 0, 0 network/execution/embedding attempts, catalog bytes/record set unchanged. The two prior reset failures now pass.
 - Ruff all-repo check/format and strict Pyright for runtime/new tests passed (0 errors/warnings). Selected widget coverage: 340/372 statements, 91.40%; changed reset line 100 executed. No directory-wide GUI coverage claim.
 - Independent read-only review: PASS, no security/logic issues or suggestions. Reviewer independently reran all 96 adjacent tests with zero network attempts and confirmed QSettings monkeypatch restoration.
-- Unreleased changelog updated. Approved product commit/push follows this checkpoint; exact-SHA remote content and full CI remain to verify. Local gates do not claim native Windows or model acceptance.
+- Product delivery: `cf62ae13939da0db94764881fe139a47d450ef74` (`fix(gui): clear template inputs on empty selection`) on `origin/master`, 4 files +154/-3. Local HEAD, fetched `origin/master` and exact remote branch SHA matched; all four exact-ref remote files matched intended hashes; clean tree. No branch-policy bypass reported.
+- [Product Quality Gates 37139840917](https://github.com/voytas75/PromptManager/actions/runs/37139840917): success on the product SHA; Python 3.13, dev profile, full pytest collection 1671 items, **1670 passed, 1 skipped**, Ruff/Pyright and clean-tree gates succeeded. New regressions are in default full collection; the independently recorded local real-Qt evidence remains the target-specific execution proof. Native Windows and model acceptance not performed or implied.
+- Host advisory banner reported 15 vulnerabilities; security/Dependabot remains explicitly deferred and outside this non-security delivery. No alert triage or dependency change performed.
+- Approved daily PromptManager tasks now complete, including the newly authorized reset repair. No active implementation follow-up; native visual/model/schema-matrix/persistence-across-process evidence boundaries are not automatically new tasks. This documentation-only closeout changes only this checkpoint and requires its own exact-ref/CI verification, reported in chat without another recursive documentation commit.
