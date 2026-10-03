@@ -1,6 +1,7 @@
 """Workspace template preview widget with live variable validation.
 
 Updates:
+  v0.2.6 - 2026-10-03 - Clear live variable fields on empty-template reset, preserving saved state.
   v0.2.5 - 2026-04-12 - Add subtle per-variable missing and invalid state styling.
   v0.2.4 - 2026-04-12 - Bound missing-variable status summaries in template preview.
   v0.2.3 - 2025-12-08 - Align Qt enums, wrapping modes, and schema helpers for Pyright.
@@ -96,6 +97,7 @@ class TemplatePreviewWidget(QWidget):
         if not self._template_text.strip():
             self._variable_names = []
             self._template_hint.setText("No template selected.")
+            self._rebuild_variable_inputs()
             self._update_preview()
             return
         try:

@@ -1,6 +1,6 @@
 # PromptManager — template preview operator-flow probe
 
-Status: diagnosis completed; one reset defect reproduced, repair not approved.
+Status: local reset implementation and independent review PASS; approved delivery in progress.
 Baseline: `master@8e9a6bdd04723cd731bf4af7f957e5733efd0f9d`; clean worktree at intake.
 Authority: `docs/product-ssot.md`; priority 1 retrieval/inspect/reuse confidence.
 
@@ -52,6 +52,18 @@ Evidence: `/home/voytas/.hermes/cache/scratch/promptmanager-template-flow-wamxnr
 
 Recommend empty-template reset on the existing widget seam: remove old variable widgets/label maps and make public payload empty when no template is selected; preserve per-prompt QSettings so returning to A restores its inputs. Cover clear-after-empty, clear-after-filled, disabled Run/shortcut, empty rendered view and restore-on-reselect with real-Qt regressions; keep search, execution, schema, persistence format and CLI unchanged. No additional missing-status wording change in this slice.
 Strongest alternative: keep old fields as deliberate workspace draft state. Prefer it only if an explicit product contract names that state and separates it from the selected-prompt payload; currently no such contract is established, and the reset API/empty-selection message point to a clear state.
-Diagnosis closed. Checkpoint-only commit/push is now authorized; exact-SHA remote delivery and CI are reported separately after publication. Reset implementation and native/model acceptance remain unapproved.
+Diagnosis publication was authorized separately and delivered as `eda7d57`; its Quality Gates succeeded. Reset implementation was unapproved at that historical closeout; follow-up authorization is recorded below. Native/model acceptance remains unapproved.
 
-Daily approved scope: asset-loop diagnosis completed; title-match wording repair completed, independently reviewed and delivered at baseline SHA with successful Quality Gates; template-preview diagnosis completed with the reset defect recorded. No approved implementation task remains open. The recommended reset repair is a newly identified, separately scoped candidate, not a completed fix.
+Daily approved scope at diagnosis publication: asset-loop diagnosis completed; title-match wording repair completed, independently reviewed and delivered at baseline SHA with successful Quality Gates; template-preview diagnosis completed with the reset defect recorded. The reset repair was then a newly identified, unapproved candidate, not a completed fix.
+
+## Approved reset repair and delivery
+
+User now approved implementation, commit and push. Baseline: `eda7d57f3d37aedbd1a87e0cd40108a1a7717a7a`, clean. Scope: existing empty-template branch, one real-Qt regression module, this checkpoint and one changelog line. Clear runtime editors/labels/payload, keep saved per-prompt QSettings and restore-on-reselect. No execution, schema/settings-format, CLI, dependencies, CI or native changes. Status: local GREEN, review/delivery in progress. Evidence: `/home/voytas/.hermes/cache/scratch/promptmanager-reset-fix-ld80xbm0/`.
+
+- RED: 2 real-widget cases failed on old behavior (empty input: visible old field; filled input: nonempty public payload).
+- Minimal production change: call existing `_rebuild_variable_inputs()` in the empty-template branch; no settings deletion or format changes.
+- GREEN: new regression module plus five nearby suites, 96 passed in 2.52s; blocked network, no Run signals. Own saved QSettings entry survives reset/reselect.
+- Retained real-Qt composed smoke: 30/30 PASS, exit 0, 0 network/execution/embedding attempts, catalog bytes/record set unchanged. The two prior reset failures now pass.
+- Ruff all-repo check/format and strict Pyright for runtime/new tests passed (0 errors/warnings). Selected widget coverage: 340/372 statements, 91.40%; changed reset line 100 executed. No directory-wide GUI coverage claim.
+- Independent read-only review: PASS, no security/logic issues or suggestions. Reviewer independently reran all 96 adjacent tests with zero network attempts and confirmed QSettings monkeypatch restoration.
+- Unreleased changelog updated. Approved product commit/push follows this checkpoint; exact-SHA remote content and full CI remain to verify. Local gates do not claim native Windows or model acceptance.
