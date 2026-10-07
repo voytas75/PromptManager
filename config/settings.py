@@ -280,6 +280,10 @@ class PromptManagerSettings(BaseSettings):
             "'fast' or 'inference'."
         ),
     )
+    use_web_search: bool = Field(
+        default=True,
+        description="Include web search context in workspace runs when enabled.",
+    )
     web_search_provider: (
         Literal[
             "exa",
@@ -508,6 +512,7 @@ class PromptManagerSettings(BaseSettings):
                 "chat_font_color": ["CHAT_FONT_COLOR", "chat_font_color"],
                 "chat_user_bubble_color": ["CHAT_USER_BUBBLE_COLOR", "chat_user_bubble_color"],
                 "prompt_templates": ["PROMPT_TEMPLATES", "prompt_templates"],
+                "use_web_search": ["USE_WEB_SEARCH", "use_web_search"],
                 "web_search_provider": ["WEB_SEARCH_PROVIDER", "web_search_provider"],
                 "exa_api_key": ["EXA_API_KEY", "exa_api_key"],
                 "tavily_api_key": ["TAVILY_API_KEY", "tavily_api_key"],
@@ -911,6 +916,7 @@ class PromptManagerSettings(BaseSettings):
                 "embedding_model": [f"{prefix}EMBEDDING_MODEL"],
                 "embedding_device": [f"{prefix}EMBEDDING_DEVICE"],
                 "quick_actions": [f"{prefix}QUICK_ACTIONS"],
+                "use_web_search": [f"{prefix}USE_WEB_SEARCH"],
                 "web_search_provider": [f"{prefix}WEB_SEARCH_PROVIDER"],
                 "exa_api_key": [f"{prefix}EXA_API_KEY"],
                 "tavily_api_key": [f"{prefix}TAVILY_API_KEY"],
@@ -966,6 +972,7 @@ class PromptManagerSettings(BaseSettings):
                     "LITELLM_LOGS",
                     "litellm_logs",
                 ],
+                "use_web_search": ["USE_WEB_SEARCH", "use_web_search"],
                 "web_search_provider": ["WEB_SEARCH_PROVIDER", "web_search_provider"],
                 "exa_api_key": ["EXA_API_KEY", "exa_api_key"],
                 "tavily_api_key": ["TAVILY_API_KEY", "tavily_api_key"],
@@ -1132,6 +1139,7 @@ class PromptManagerSettings(BaseSettings):
                     "chat_colors",
                     "theme_mode",
                     "prompt_templates",
+                    "use_web_search",
                     "web_search_provider",
                     "auto_open_share_links",
                     "privatebin_url",

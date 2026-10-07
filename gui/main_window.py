@@ -404,6 +404,7 @@ class MainWindow(QMainWindow):
             execute_from_prompt_body=self._prompt_actions_bridge.execute_prompt_from_body,
         )
         bind_main_view(self, components=components, config=binder_config)
+        self._bind_web_search_preference()
         self._update_web_search_tooltip()
         self._workspace_history_controller = WorkspaceHistoryController(
             manager=self._manager,
@@ -509,6 +510,21 @@ class MainWindow(QMainWindow):
         self._share_result_button.setEnabled(False)
         self._continue_chat_button.setEnabled(False)
         self._end_chat_button.setEnabled(False)
+
+    def _bind_web_search_preference(self) -> None:
+        """Restore and persist the workspace toggle independently of provider settings."""
+        from config.persistence import persist_settings_to_config
+
+        checkbox = self._web_search_checkbox
+        checkbox.setChecked(bool(self._runtime_settings.get("use_web_search", True)))
+
+        def save_preference(enabled: bool) -> None:
+            persist_settings_to_config({"use_web_search": enabled})
+            self._runtime_settings["use_web_search"] = enabled
+            if self._settings is not None:
+                self._settings.use_web_search = enabled
+
+        checkbox.toggled.connect(save_preference)
 
     def _update_web_search_tooltip(self) -> None:
         """Refresh the workspace web search tooltip to reflect the provider setting."""

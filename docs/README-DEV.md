@@ -129,6 +129,7 @@ All settings are defined via `pydantic-settings` in `config/settings.py`. Use JS
 | `PROMPT_MANAGER_LITELLM_LOGGING` | Allow LiteLLM library logs to surface (`true`/`false`) | `false` |
 | `PROMPT_MANAGER_LITELLM_TTS_MODEL` | LiteLLM text-to-speech model id used for voice playback | `openai/tts-1` |
 | `PROMPT_MANAGER_LITELLM_TTS_STREAM` | Stream LiteLLM TTS audio so playback starts mid-download (`true`/`false`) | `true` |
+| `PROMPT_MANAGER_USE_WEB_SEARCH` | Workspace web-enrichment preference (`true`/`false`; default `true`, saved JSON takes precedence) | `false` |
 | `PROMPT_MANAGER_WEB_SEARCH_PROVIDER` | Web search provider slug (`exa`, `tavily`, `serper`, `serpapi`, `google`, `random`, or leave empty to disable) | `tavily` |
 | `PROMPT_MANAGER_EXA_API_KEY` / `EXA_API_KEY` | Exa web search API key (environment only) | `exa_***` |
 | `PROMPT_MANAGER_TAVILY_API_KEY` / `TAVILY_API_KEY` | Tavily web search API key (environment only) | `tvly-***` |
@@ -178,6 +179,8 @@ So `PROMPT_MANAGER_LITELLM_LOGGING=false` does **not** silence broad debug outpu
 For normal local GUI use, prefer `INFO` or `WARN` in `config/logging.conf`.
 
 Selecting `PROMPT_MANAGER_WEB_SEARCH_PROVIDER="random"` rotates calls between whichever providers currently have API keys configured; if only one provider has a key, Random behaves like that provider until another key is available.
+
+The workspace “Use web search” checkbox immediately persists `use_web_search` to the active JSON configuration, including `false`, and restores it at startup (default `true`). Settings saves preserve it independently of provider selection. `PROMPT_MANAGER_USE_WEB_SEARCH` is used when JSON has no `use_web_search` value; saved JSON takes precedence over this environment variable. The Chain tab independently persists `chainWebSearchEnabled` in `QSettings("PromptManager", "PromptChainManagerPanel")`, not in the workspace JSON field.
 
 See [`docs/web_search_plan.md`](web_search_plan.md) for the staged web search integration plan (Exa + Tavily + Serper + SerpApi + Google Programmable Search) if you are extending the provider surface.
 
@@ -247,7 +250,7 @@ This keeps repo truth and runtime-visible package metadata aligned without prete
 - LiteLLM embedding readiness and actual calls are distinct: missing credentials can be reported as a readiness issue, but this does not guarantee deterministic fallback. An available LiteLLM embedding function may still be selected and fail on use; choose `embedding_backend: "deterministic"` explicitly in JSON when provider-free indexing and search are required. A deterministic fallback is used when the LiteLLM embedding function itself is unavailable.
 - Search queries embed the entire user phrase and ask ChromaDB for nearest neighbours; results are already cosine-ranked and displayed as-is in the GUI.
 - The GUI shows similarity scores (`[0.91]`) when search is active; the sort dropdown is disabled to preserve ranking integrity.
-- When a provider (Exa, Tavily, Serper, SerpApi, or Google Programmable Search) is configured, the workspace and Chain tab expose a “Use web search” checkbox (checked by default). Leaving it on runs a provider query (prompt metadata + user input) before execution and prepends available summaries/highlights with source links. In the workspace path only, web context over ~5,000 words may be condensed by the fast LiteLLM model; the Chain path prepends context without that condensation. Unchecking the box (or running `prompt-chain-run --no-web-search`) disables web-search enrichment only. Execution still requires the configured LiteLLM model and can contact its provider and incur cost; this is not an offline or provider-free run.
+- When a provider (Exa, Tavily, Serper, SerpApi, or Google Programmable Search) is configured, the workspace and Chain tab expose separate “Use web search” checkboxes (ON when their respective saved preference is absent). Leaving it on runs a provider query (prompt metadata + user input) before execution and prepends available summaries/highlights with source links. In the workspace path only, web context over ~5,000 words may be condensed by the fast LiteLLM model; the Chain path prepends context without that condensation. Unchecking the box (or running `prompt-chain-run --no-web-search`) disables web-search enrichment only. Execution still requires the configured LiteLLM model and can contact its provider and incur cost; this is not an offline or provider-free run.
 
 ## Running the GUI
 
@@ -490,7 +493,7 @@ successful run. Backend, GUI, history and provider execution behavior are unchan
 - The left pane lists every stored chain (active + inactive) with refresh and JSON import controls; imports reuse the same validation as the CLI helper.
 - The right pane surfaces description, ordered steps, and a plain-text field where you type the input that feeds the first step; that text is persisted per chain so you can rerun workflows quickly.
 - Running a chain triggers the busy indicator (required for LLM work) while toast notifications confirm non-LLM actions such as refresh/import; results capture outputs plus per-step summaries for quick inspection.
-- The Run Chain panel includes a persistent “Use web search” checkbox (default on) that mirrors the workspace toggle so each step can preload live context when a provider is configured; uncheck it to disable web enrichment only. Chain execution still invokes the configured model and may send prompt/input data to a remote provider and incur cost.
+- The Run Chain panel includes its own persistent “Use web search” checkbox (default on when no Chain preference is saved), independent of the workspace toggle, so each step can preload live context when a provider is configured; uncheck it to disable web enrichment only. Chain execution still invokes the configured model and may send prompt/input data to a remote provider and incur cost.
 
 ### Prompt Chain Definitions
 

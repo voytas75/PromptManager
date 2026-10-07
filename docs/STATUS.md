@@ -20,7 +20,14 @@ Do not use this file as a second product SSOT or a competing roadmap.
 
 ---
 
-## Latest delivery — audit-repair campaign, 2026-09-30
+## Local checkpoint — workspace web preference documentation audit
+
+- Scope: preserve the in-flight workspace checkbox fix; align active README/developer guidance with JSON `use_web_search` persistence, independent Chain QSettings persistence, and the committed adaptive voice route at `b135014`.
+- Ordered checks: correct user guidance and duplicated developer claims; verify affected settings/web/voice regressions provider-free; run Ruff, changed-file Pyright, formatting, local links and diff checks.
+- Status: local verification complete; no commit/push or remote CI assertion. Affected web/settings/Chain/voice tests: **181 passed, 1 skipped** in an isolated scratch working directory with cleared provider environment, separate HOME/XDG QSettings, disabled repository dotenv loading, and a fail-on-connect/DNS guard. Initial harness runs failed because an explicit config override hid test fixtures, then because the isolated directory lacked the tracked config template; both harness issues were corrected without product/test edits.
+- Acceptance: `.venv/bin/ruff check .` passed; `.venv/bin/ruff format --check .` reported 290 files formatted; changed-file Pyright reported 0 errors/warnings; JSON/default/environment precedence probe passed; 27 relative link targets across changed documentation resolved; `git diff --check` passed. Historical changelog and research-plan text were retained, not reinterpreted as current contracts. No native Windows or full live GUI acceptance is claimed. The user's voice-success report is not a detailed deployment/playback receipt.
+
+## Historical delivery — audit-repair campaign, 2026-09-30
 
 - Execution ledger: [bounded audit-repair campaign](plans/2026-09-30-audit-repair-campaign.md). A–F are complete and independently reviewed. Product/test/docs commit `ccfcfbf4fdc46b060005b5f09a560843c640b2af` is delivered on master; local/tracking/live SHA equality and clean tree were verified. Exact-SHA [Quality Gates 36739943990](https://github.com/voytas75/PromptManager/actions/runs/36739943990) succeeded, including Ruff, CI-scope Pyright, Pytest and clean-tree checks. This factual documentation tail is a separate commit and gets its own post-push verification.
 - Worker completion no longer rewrites a stale prompt record; public vector handoffs share the canonical SQLite lock and the worker evicts cache after commit. Ordinary creation commits the row and first snapshot together before index/cache/worker publication. Stream duration includes full consumption and persists to history. `prompt-list --json` read failure emits sanitized `LIST_FAILED` stderr with exit 6.

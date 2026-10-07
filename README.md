@@ -18,8 +18,6 @@ Canonical product direction lives in [`docs/product-ssot.md`](docs/product-ssot.
   <img src="docs/images/template.png" alt="Template preview validating JSON variables" width="45%">
 </p>
 
-TODO: error with tts model when try to read the text (moved ftom azure\tts-hd to azure\gpt-audio-1.5)
-
 ## Who it is for
 
 PromptManager is designed for people who actively work with prompts and want a more structured local-first workflow:
@@ -251,6 +249,10 @@ PromptManager supports optional integrations for:
 - **LiteLLM** for prompt execution
 - **Tavily / Exa / Serper / SerpApi / Google Programmable Search** for web search enrichment
 - **Redis** for caching
+
+The workspace **Use web search** checkbox saves ON/OFF to the active JSON configuration as `use_web_search` and restores it on startup; configurations without this field default to ON. Saving Settings preserves the preference independently of the selected search provider. The Chain tab has its own separately persisted checkbox. Turning web search off disables enrichment only, not model calls or possible provider cost.
+
+For optional voice playback, configure a compatible audio model in Settings. Known GPT audio-chat model names use audio Chat Completions; other names start with speech synthesis. Only an explicit operation/model incompatibility permits one alternate operation with the same model — not authentication, rate-limit or network failures. See the [voice routing details](docs/README-DEV.md#executing-prompts) for limits and verification boundaries.
 
 For developer-oriented setup and deeper configuration notes, see [`README-DEV.md`](README-DEV.md).
 The repository root also includes [`.env.example`](.env.example) as a safe starting point for local configuration.

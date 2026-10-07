@@ -312,6 +312,7 @@ class RuntimeSettingsService:
                 if settings and settings.prompt_templates
                 else None
             ),
+            "use_web_search": getattr(settings, "use_web_search", True),
             "web_search_provider": settings.web_search_provider if settings else None,
             "exa_api_key": settings.exa_api_key if settings else None,
             "tavily_api_key": settings.tavily_api_key if settings else None,
@@ -836,6 +837,7 @@ class RuntimeSettingsService:
                 ),
                 "theme_mode": runtime.get("theme_mode"),
                 "prompt_templates": runtime.get("prompt_templates"),
+                "use_web_search": runtime.get("use_web_search", True),
                 "web_search_provider": runtime.get("web_search_provider"),
                 "auto_open_share_links": runtime.get("auto_open_share_links"),
             }
