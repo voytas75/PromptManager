@@ -18,6 +18,8 @@ Canonical product direction lives in [`docs/product-ssot.md`](docs/product-ssot.
   <img src="docs/images/template.png" alt="Template preview validating JSON variables" width="45%">
 </p>
 
+TODO: error with tts model when try to read the text (moved ftom azure\tts-hd to azure\gpt-audio-1.5)
+
 ## Who it is for
 
 PromptManager is designed for people who actively work with prompts and want a more structured local-first workflow:
