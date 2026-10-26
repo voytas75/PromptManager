@@ -46,10 +46,22 @@ def test_offline_gui_capture_reuse_and_run_guard(tmp_path: Path) -> None:
     script = """
 import sys
 import traceback
+import socket
 from unittest.mock import patch
+
+def blocked_network(*args, **kwargs):
+    raise AssertionError("Network/DNS forbidden in offline GUI smoke")
+
+socket.socket.connect = blocked_network
+socket.socket.connect_ex = blocked_network
+socket.create_connection = blocked_network
+socket.getaddrinfo = blocked_network
+socket.gethostbyname = blocked_network
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QGuiApplication
-from PySide6.QtWidgets import QApplication, QDialog, QLineEdit, QPlainTextEdit, QPushButton
+from PySide6.QtWidgets import (
+    QApplication, QDialog, QLineEdit, QMessageBox, QPlainTextEdit, QPushButton,
+)
 import main
 from gui.main_window import MainWindow
 from gui.dialogs import PromptDialog
@@ -95,9 +107,47 @@ def verify():
             dialog._on_accept()
             return QDialog.DialogCode.Accepted
 
+        acknowledged = []
+        edited = []
+        acknowledgement_errors = []
+        acknowledgement_timer = QTimer()
+        acknowledgement_timer.setInterval(10)
+
+        def acknowledge_capture():
+            message = QApplication.activeModalWidget()
+            if not isinstance(message, QMessageBox):
+                return
+            acknowledgement_timer.stop()
+            try:
+                assert message.windowTitle() == "Quick Capture saved"
+                assert message.text() == "Draft created; metadata skipped: no model configured."
+                saved = manager.repository.list()
+                assert len(saved) == 2
+                draft = next(
+                    item for item in saved if (item.ext2 or {}).get("capture_state") == "draft"
+                )
+                assert draft.context == "Write a compact review of this draft."
+                assert (draft.ext2 or {}).get("capture_method") == "quick_capture"
+                assert not edited
+                acknowledged.append(draft.id)
+            except Exception:
+                acknowledgement_errors.append(traceback.format_exc())
+            finally:
+                message.button(QMessageBox.StandardButton.Ok).click()
+
+        def observe_editor(prompt):
+            assert not acknowledgement_errors, "".join(acknowledgement_errors)
+            assert acknowledged == [prompt.id]
+            edited.append(prompt.id)
+
+        acknowledgement_timer.timeout.connect(acknowledge_capture)
+        acknowledgement_timer.start()
         with patch.object(QuickCaptureDialog, "exec", accept_capture):
-            with patch.object(flow, "edit_prompt", lambda _: None):
+            with patch.object(flow, "edit_prompt", observe_editor):
                 flow.quick_capture_prompt()
+        acknowledgement_timer.stop()
+        assert not acknowledgement_errors, "".join(acknowledgement_errors)
+        assert edited == acknowledged and len(acknowledged) == 1
         prompts = manager.repository.list()
         assert len(prompts) == 2
         prompt = next(item for item in prompts if (item.ext2 or {}).get("capture_state") == "draft")

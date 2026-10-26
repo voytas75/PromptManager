@@ -85,7 +85,9 @@ def test_entry_dialog_clarity_cues_remain_local_widget_text(qt_app: QApplication
     assert quick_capture_guidance is not None
     assert quick_capture_guidance.text() == (
         "Paste a raw prompt or query. PromptManager only cleans obvious outer wrappers "
-        "before saving the draft."
+        "before saving the draft. Save Draft automatically sends the cleaned body to the "
+        "configured model for metadata. Explicit title and note are kept; tags are merged. "
+        "Without a model or on failure, the original draft is still saved."
     )
     assert not hasattr(quick_capture, "decision_summary")
     assert not hasattr(quick_capture, "next_action_summary")
