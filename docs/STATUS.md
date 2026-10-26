@@ -20,6 +20,13 @@ Do not use this file as a second product SSOT or a competing roadmap.
 
 ---
 
+## Local checkpoint — storage fault/recovery qualification, 2026-10-19
+
+- Completed bounded provider-free diagnostic slice at source `e861b0166a6e038cc89d609abd0349d6a74e26fe`; ledger: [storage fault qualification](plans/2026-10-19-storage-fault-qualification.md).
+- Four disposable probes: fake mutation-then-error create/update, controlled worker interruption/reopen, and real local persistent Chroma missing-record recovery. Existing rebuild recovers stale/missing records; ordinary rebuild leaves a creation orphan, while reset rebuild removed it in the fake backend. At this first-stage checkpoint, real Chroma orphan/reset and actual process-crash recovery were still unqualified; the approved successor below closes orphan/reset only.
+- Targeted regression suites: **37 passed, 0 failed/errors/skipped**; blocked-network guard recorded zero connection attempts. Parent verified receipts/JUnit/guard and unchanged clean source HEAD. No canonical-data loss reproduced; index partial states were reproduced. Scratch evidence is ephemeral.
+- Approved successor completed: real disposable Chroma orphan/reset qualification passed with two canonical prompts and three preserved history snapshots. Ordinary rebuild retained the orphan; reset rebuilt exactly the canonical ID set. Separate-process reopen matched the full final snapshot; pre-delete injected refusal preserved state. 25 main and 8 reopen assertions, exit 0, zero network attempts; parent independently verified receipts/hash/state. Prior tests were not rerun. Diagnostic queue closed; actual crashes, post-delete reset failures and concurrent writers remain outside qualification. No live reset, product repair, commit/push or provider calls.
+
 ## Local checkpoint — workspace web preference documentation audit
 
 - Scope: preserve the in-flight workspace checkbox fix; align active README/developer guidance with JSON `use_web_search` persistence, independent Chain QSettings persistence, and the committed adaptive voice route at `b135014`.
