@@ -1,6 +1,7 @@
 """Minimal dialog and helpers for quick prompt capture.
 
 Updates:
+  v0.1.6 - 2026-10-26 - Disclose automatic model-backed draft metadata before saving.
   v0.1.7 - 2026-09-22 - Add explicit clipboard-to-editable-draft capture.
   v0.1.6 - 2026-04-12 - Strip one outer `User:` wrapper only for clearly
   single-turn quick-capture input.
@@ -229,7 +230,9 @@ class QuickCaptureDialog(QDialog):
 
         self._entry_guidance_label = QLabel(
             "Paste a raw prompt or query. PromptManager only cleans obvious outer wrappers "
-            "before saving the draft.",
+            "before saving the draft. Save Draft automatically sends the cleaned body to the "
+            "configured model for metadata. Explicit title and note are kept; tags are merged. "
+            "Without a model or on failure, the original draft is still saved.",
             self,
         )
         self._entry_guidance_label.setObjectName("quickCaptureEntryGuidanceLabel")

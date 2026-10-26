@@ -1,6 +1,7 @@
 """Prompt dialog factory and editor flow helpers.
 
 Updates:
+  v0.1.6 - 2026-10-26 - Generate draft metadata before persistence and report outcome.
   v0.1.5 - 2026-04-04 - Add advisory similar-prompt lookup to draft promotion.
   v0.1.4 - 2026-04-04 - Add bounded draft-promotion flow that reuses prompt updates.
   v0.1.3 - 2026-04-04 - Add quick-capture draft flow that hands off into the editor.
@@ -13,13 +14,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Protocol, cast
 
-from PySide6.QtWidgets import QDialog, QWidget
+from PySide6.QtWidgets import QDialog, QMessageBox, QWidget
 
 from core import PromptManager, PromptManagerError, PromptNotFoundError, PromptStorageError
 
 from .dialogs import PromptDialog
 from .dialogs.draft_promote import DraftPromoteDialog, is_prompt_draft
-from .dialogs.quick_capture import QuickCaptureDialog
+from .dialogs.quick_capture import QuickCaptureDialog, QuickCaptureDraft
 from .processing_indicator import ProcessingIndicator
 
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
@@ -148,6 +149,8 @@ class PromptEditorFlow:
         delete_prompt: DeletePromptCallable,
         status_callback: Callable[[str, int], None],
         error_callback: Callable[[str, str], None],
+        quick_capture_metadata_generator: Callable[[QuickCaptureDraft], tuple[Prompt, str]]
+        | None = None,
     ) -> None:
         """Store dependencies needed for prompt CRUD flows."""
         self._parent = parent
@@ -161,6 +164,7 @@ class PromptEditorFlow:
         self._delete_prompt = delete_prompt
         self._status_callback = status_callback
         self._error_callback = error_callback
+        self._quick_capture_metadata_generator = quick_capture_metadata_generator
 
     def create_prompt(self) -> None:
         """Open a creation dialog and persist the resulting prompt."""
@@ -187,13 +191,25 @@ class PromptEditorFlow:
         if draft is None:
             return
         try:
-            created = self._manager.create_prompt(draft.to_prompt())
-        except (PromptStorageError, ValueError) as exc:
+
+            def generate_and_save() -> tuple[Prompt, str]:
+                prompt = draft.to_prompt()
+                status = "Draft prompt created."
+                if self._quick_capture_metadata_generator is not None:
+                    prompt, status = self._quick_capture_metadata_generator(draft)
+                return self._manager.create_prompt(prompt), status
+
+            created, status = ProcessingIndicator(
+                self._parent, "Generating metadata and saving draft…"
+            ).run(generate_and_save)
+        except (PromptManagerError, ValueError) as exc:
             self._error_callback("Unable to create draft prompt", str(exc))
             return
         self._load_prompts("")
         self._select_prompt(created.id)
-        self._status_callback("Draft prompt created.", 4000)
+        self._status_callback(status, 8000 if self._quick_capture_metadata_generator else 4000)
+        if self._quick_capture_metadata_generator is not None:
+            QMessageBox.information(self._parent, "Quick Capture saved", status)
         self.edit_prompt(created)
 
     def promote_draft_prompt(self, prompt: Prompt) -> None:

@@ -4,6 +4,9 @@ All notable changes to **Prompt Manager** will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- Quick Capture Save Draft automatically generates blank title/description, category, tags and scenarios using the configured model. Category/tags use a strictly validated model JSON response, with no classifier or keyword fallback. Explicit title/note, source, cleaned body and draft state are retained; model tags merge after explicit tags. Capture guidance discloses model use; an acknowledged, untimed saved-outcome message precedes the editor and reports model-generated success, no model, or failure. Category/tags respect the independent category route, generated category slugs are recomputed and registry-compatible, and Quick Capture scenarios reject invalid JSON values without changing ordinary-editor parsing. Metadata generation and initial creation share the background processing indicator; creation domain errors are reported. Failed/incomplete generation saves the deterministic draft; ordinary create/edit remains explicit-consent only.
+
 ### Added
 - Opt-in `prompt-find --json --explain` returns the unchanged compact result records in a `{results,retrieval}` envelope with the requested limit and retrieved/matched candidate counts. The `retrieved_candidates` scope does not claim exhaustive catalog search; default JSON array, text output and semantic ranking remain unchanged.
 - `prompt-add --result-json` opt-in emits a single machine receipt for preview/apply while preserving `--json PAYLOAD` as input. Missing/malformed catalogues and invalid entries fail with one sanitized error instead of an empty-success receipt; pre-write input failures have no partial flag, while apply-stage errors may include `partial:true` because writes may already have happened (aggregate counts are present when the importer returns). Inspect catalog state before retry. Default text `prompt-add` and `catalog-import` behavior is unchanged.

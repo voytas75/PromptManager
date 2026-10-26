@@ -1,6 +1,7 @@
 """Focused tests for the quick capture dialog and draft conversion.
 
 Updates:
+  v0.1.6 - 2026-10-26 - Cover capture-time model disclosure and metadata retention cue.
   v0.1.5 - 2026-04-12 - Cover one outer `User:` strip and unchanged transcript-like role input.
   v0.1.4 - 2026-04-11 - Cover one obvious outer blockquote unwrap and unchanged mixed input.
   v0.1.3 - 2026-04-11 - Cover one allowed outer prompt label strip and unchanged ambiguous input.
@@ -48,7 +49,9 @@ def test_quick_capture_dialog_shows_raw_input_entry_guidance(qt_app: QApplicatio
     assert guidance_label is not None
     assert guidance_label.text() == (
         "Paste a raw prompt or query. PromptManager only cleans obvious outer wrappers "
-        "before saving the draft."
+        "before saving the draft. Save Draft automatically sends the cleaned body to the "
+        "configured model for metadata. Explicit title and note are kept; tags are merged. "
+        "Without a model or on failure, the original draft is still saved."
     )
 
 

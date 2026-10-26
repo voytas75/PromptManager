@@ -1,6 +1,7 @@
 """Tests covering :mod:`gui.prompt_editor_flow` helpers.
 
 Updates:
+  v0.1.5 - 2026-10-26 - Cover automatic draft metadata handoff and outcome status.
   v0.1.4 - 2026-04-04 - Cover advisory similar-prompt paths in draft promotion.
   v0.1.3 - 2026-04-04 - Add bounded draft-promotion happy-path coverage.
   v0.1.2 - 2026-04-04 - Add quick-capture happy-path coverage for draft creation handoff.
@@ -14,6 +15,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, cast
 
+import pytest
 from PySide6.QtWidgets import QDialog
 
 import gui.prompt_editor_flow as prompt_editor_flow_module
@@ -26,7 +28,6 @@ from models.prompt_model import Prompt
 if TYPE_CHECKING:  # pragma: no cover - typing helpers
     from collections.abc import Callable
 
-    import pytest
     from PySide6.QtWidgets import QWidget
 
     from core import PromptManager
@@ -224,6 +225,7 @@ def _build_flow(
     load_prompts: Callable[[str], None],
     select_prompt: Callable[[uuid.UUID], None],
     status_callback: Callable[[str, int], None],
+    metadata_generator: Callable[[QuickCaptureDraft], tuple[Prompt, str]] | None = None,
 ) -> PromptEditorFlow:
     """Create a PromptEditorFlow with lightweight doubles."""
     return PromptEditorFlow(
@@ -238,6 +240,7 @@ def _build_flow(
         delete_prompt=delete_prompt,
         status_callback=status_callback,
         error_callback=_ignore_error,
+        quick_capture_metadata_generator=metadata_generator,
     )
 
 
@@ -285,8 +288,18 @@ def test_edit_prompt_delete_requests_skip_confirmation_keyword() -> None:
     assert captured == {"prompt": prompt, "skip_confirmation": True}
 
 
-def test_quick_capture_creates_draft_selects_prompt_and_opens_editor() -> None:
+@pytest.mark.parametrize("generated", [False, True])
+def test_quick_capture_creates_draft_selects_prompt_and_opens_editor(
+    generated: bool,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Quick capture should persist a draft and hand it off to the editor flow."""
+    monkeypatch.setattr(prompt_editor_flow_module, "ProcessingIndicator", _ProcessingIndicatorStub)
+    monkeypatch.setattr(prompt_editor_flow_module.QMessageBox, "information", _ignore_status)
+
+    def generate(draft: QuickCaptureDraft) -> tuple[Prompt, str]:
+        return draft.to_prompt(), "Metadata generated."
+
     manager = _ManagerStub()
     load_calls: list[str] = []
     selected_ids: list[uuid.UUID] = []
@@ -328,6 +341,7 @@ def test_quick_capture_creates_draft_selects_prompt_and_opens_editor() -> None:
         load_prompts=load_calls.append,
         select_prompt=selected_ids.append,
         status_callback=lambda message, duration: status_messages.append((message, duration)),
+        metadata_generator=generate if generated else None,
     )
 
     flow.quick_capture_prompt()
@@ -348,7 +362,9 @@ def test_quick_capture_creates_draft_selects_prompt_and_opens_editor() -> None:
     }
     assert load_calls == [""]
     assert selected_ids == [created.id]
-    assert status_messages == [("Draft prompt created.", 4000)]
+    assert status_messages == (
+        [("Metadata generated.", 8000)] if generated else [("Draft prompt created.", 4000)]
+    )
     assert editor_builds == [created]
 
 
@@ -664,3 +680,107 @@ def test_promote_draft_passes_similar_matches_and_can_open_existing(
     assert load_calls == [""]
     assert selected_ids == [existing.id]
     assert status_messages == [("Opened likely duplicate instead of promoting.", 4000)]
+
+
+@pytest.mark.parametrize("outcome", ["generated", "failed", "no model"])
+def test_quick_capture_worker_and_acknowledged_outcome(
+    monkeypatch: pytest.MonkeyPatch, outcome: str
+) -> None:
+    import threading
+
+    from PySide6.QtCore import QTimer
+    from PySide6.QtWidgets import QApplication, QMessageBox, QWidget
+
+    app = QApplication.instance() or QApplication([])
+    parent = QWidget()
+    calls: list[str] = []
+    main_thread = threading.get_ident()
+    threads: list[int] = []
+    stored: list[Prompt] = []
+
+    class Manager:
+        def create_prompt(self, prompt: Prompt) -> Prompt:
+            threads.append(threading.get_ident())
+            stored.append(prompt)
+            calls.append("saved")
+            return prompt
+
+    def generate(draft: QuickCaptureDraft) -> tuple[Prompt, str]:
+        threads.append(threading.get_ident())
+        return draft.to_prompt(), outcome
+
+    flow = PromptEditorFlow(
+        parent=parent,
+        manager=cast("PromptManager", Manager()),
+        dialog_factory=cast("PromptDialogFactory", object()),
+        quick_capture_dialog_factory=cast(
+            "QuickCaptureDialogFactory",
+            _QuickCaptureDialogFactoryStub(_QuickCaptureDialogStub(QuickCaptureDraft(body="Body"))),
+        ),
+        draft_promote_dialog_factory=cast("DraftPromoteDialogFactory", object()),
+        load_prompts=lambda _: None,
+        current_search_text=lambda: "",
+        select_prompt=lambda _: None,
+        delete_prompt=cast("Any", _ignore_status),
+        status_callback=_ignore_status,
+        error_callback=_ignore_error,
+        quick_capture_metadata_generator=generate,
+    )
+
+    def edit(prompt: Prompt) -> None:
+        assert calls == ["saved", "acknowledged"]
+        assert prompt is stored[0]
+        calls.append("editor")
+
+    flow.edit_prompt = edit
+    timer = QTimer()
+    timer.setInterval(10)
+
+    def acknowledge() -> None:
+        for widget in QApplication.topLevelWidgets():
+            if isinstance(widget, QMessageBox) and widget.isVisible():
+                assert widget.text() == outcome
+                assert widget.isModal()
+                assert calls == ["saved"]
+                calls.append("acknowledged")
+                widget.accept()
+
+    timer.timeout.connect(acknowledge)
+    timer.start()
+    try:
+        flow.quick_capture_prompt()
+    finally:
+        timer.stop()
+        parent.close()
+    assert app is not None
+    assert calls == ["saved", "acknowledged", "editor"]
+    assert len(threads) == 2
+    assert threads[0] == threads[1] != main_thread
+
+
+def test_quick_capture_reports_creation_domain_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(prompt_editor_flow_module, "ProcessingIndicator", _ProcessingIndicatorStub)
+    errors: list[str] = []
+
+    class Manager:
+        def create_prompt(self, prompt: Prompt) -> Prompt:
+            raise PromptManagerError("category admission failed")
+
+    flow = PromptEditorFlow(
+        parent=cast("QWidget", object()),
+        manager=cast("PromptManager", Manager()),
+        dialog_factory=cast("PromptDialogFactory", object()),
+        quick_capture_dialog_factory=cast(
+            "QuickCaptureDialogFactory",
+            _QuickCaptureDialogFactoryStub(_QuickCaptureDialogStub(QuickCaptureDraft(body="Body"))),
+        ),
+        draft_promote_dialog_factory=cast("DraftPromoteDialogFactory", object()),
+        load_prompts=lambda _: pytest.fail("Must not reload after failure"),
+        current_search_text=lambda: "",
+        select_prompt=lambda _: pytest.fail("Must not select after failure"),
+        delete_prompt=cast("Any", _ignore_status),
+        status_callback=_ignore_status,
+        error_callback=lambda title, message: errors.append(message),
+    )
+    flow.quick_capture_prompt()
+    assert errors == ["category admission failed"]

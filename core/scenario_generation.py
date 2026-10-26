@@ -122,7 +122,9 @@ class LiteLLMScenarioGenerator:
     default_max_scenarios: int = 3
     system_prompt: str | None = None
 
-    def generate(self, context: str, *, max_scenarios: int | None = None) -> list[str]:
+    def generate(
+        self, context: str, *, max_scenarios: int | None = None, strict: bool = False
+    ) -> list[str]:
         """Return a ranked list of usage scenarios for the supplied prompt body."""
         if not context.strip():
             raise ScenarioGenerationError("Prompt context is required to generate scenarios.")
@@ -201,7 +203,23 @@ class LiteLLMScenarioGenerator:
             raise ScenarioGenerationError("LiteLLM response is missing content")
         message = content_value
 
-        candidates = _extract_candidates(str(message))
+        if strict:
+            if not isinstance(message, str):
+                raise ScenarioGenerationError("Invalid scenario content type")
+            try:
+                payload: object = json.loads(_strip_code_fences(message))
+            except ValueError as exc:
+                raise ScenarioGenerationError("Invalid scenario JSON") from exc
+            if not isinstance(payload, list):
+                raise ScenarioGenerationError("Scenarios must be a JSON array")
+            items = cast("list[object]", payload)
+            if not items or any(
+                not isinstance(item, str) or not item.strip().lstrip("-*").strip() for item in items
+            ):
+                raise ScenarioGenerationError("Scenarios must be nonempty strings")
+            candidates = cast("list[str]", items)
+        else:
+            candidates = _extract_candidates(str(message))
         scenarios = _normalise_scenarios(candidates, limit)
         if not scenarios:
             raise ScenarioGenerationError("LiteLLM returned no scenarios to surface.")
