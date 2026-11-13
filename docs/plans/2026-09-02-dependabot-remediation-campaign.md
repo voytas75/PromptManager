@@ -144,14 +144,16 @@ Confirmed on 2026-09-02:
 5. After every pushed dependency slice, verify the exact remote SHA, CI, Dependency Graph, and REST plus GraphQL alert state.
 6. Stop and update this ledger when a resolver conflict, provider runtime incompatibility, or new advisory materially changes the campaign order.
 
-## Transport follow-up — qualified checkpoint, publication pending
+## Transport follow-up — delivered qualified checkpoint
 
 - Qualified base: `84861efbd505b6479dc191e4deef43d2528909c8`. Approved product scope is only `uv.lock` (+210/-155) and `tests/test_settings.py` (+4/-1); the latter isolates an unsupported-backend test from bootstrap JSON without changing shipped settings precedence.
 - Locked transport resolutions: `oauthlib==4.0.1`, `filelock==4.2.1`, `aiohttp==3.14.4`, `fsspec==2026.6.0`, and `urllib3==2.8.0`. Required `yarl` remains in the lock; no Python, package-version, provider-policy or CI change is included.
 - Local qualification: targeted 180 passed; full 1736 passed, one skipped, no failures/errors; core coverage 82.31%. Frozen lock/package checks, Ruff, formatter and CI-scope Pyright passed. These are local frozen-uv results, not hosted pip-install parity or live-provider/native acceptance.
 - Additional reported advisories remain outside this transport slice: `multidict` GHSA-54p9-h82j-f925 (locked 6.7.1; reported patched floor 6.9.1) and `opentelemetry-api` GHSA-xcq7-p3pf-p88h (locked 1.41.0; reported patched floor 1.45.1). The four accepted-but-open ChromaDB advisories and their existing local-only risk boundary remain unchanged. Historical aggregate counts above are not current security-clearance claims.
-- Commit/push of the qualified slice is approved. This checkpoint is pending independent documentation review before staging; exact-SHA hosted CI, Dependency Graph and direct REST/GraphQL alert reconciliation remain unverified. No alert is declared fixed here and no release is being cut.
+- Reviewed three-file publication delivered to `master` as `e581de06c938bc93736fdf8ed372846afa351fa8`; local HEAD, fetched origin and live remote SHA matched, and all three remote files matched the reviewed SHA256 bytes. Ordinary push reported no protection bypass; the original project checkout and runtime were left unchanged. No release is being cut.
+- Exact-product-SHA [Quality Gates](https://github.com/voytas75/PromptManager/actions/runs/43505114392) succeeded, including hosted Pytest (1736 passed, one skipped), Ruff, Pyright and clean-tree verification. [Dependency Graph](https://github.com/voytas75/PromptManager/actions/runs/43505125981) also succeeded. These hosted checks do not extend live-provider/native acceptance.
+- Direct alert readback confirmed all 25 qualified transport targets fixed: OAuthLib 4, filelock 9, aiohttp 8, fsspec 1 and urllib3 3. REST and GraphQL open-alert number sets reconciled at seven: ChromaDB #65/#99/#100/#101, multidict #121 and opentelemetry-api #128/#146. Newly observed #146 (GHSA-mf5v-w3w3-f6cg) was published before this push and affects the unchanged locked opentelemetry-api 1.41.0; it is not a version introduced by this slice. Residual advisories remain deferred without dependency updates.
 
 ## Current active step
 
-**Transport follow-up: documentation review, then approved publication and exact-SHA CI/alert verification. Stop after this closeout; further advisory remediation requires a separate scope decision.**
+**Transport closeout delivered and verified; no active repair. Further advisory remediation or live-provider/native acceptance requires a separate scope decision.**
