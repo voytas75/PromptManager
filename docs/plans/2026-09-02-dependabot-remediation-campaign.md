@@ -144,6 +144,14 @@ Confirmed on 2026-09-02:
 5. After every pushed dependency slice, verify the exact remote SHA, CI, Dependency Graph, and REST plus GraphQL alert state.
 6. Stop and update this ledger when a resolver conflict, provider runtime incompatibility, or new advisory materially changes the campaign order.
 
+## Transport follow-up — qualified checkpoint, publication pending
+
+- Qualified base: `84861efbd505b6479dc191e4deef43d2528909c8`. Approved product scope is only `uv.lock` (+210/-155) and `tests/test_settings.py` (+4/-1); the latter isolates an unsupported-backend test from bootstrap JSON without changing shipped settings precedence.
+- Locked transport resolutions: `oauthlib==4.0.1`, `filelock==4.2.1`, `aiohttp==3.14.4`, `fsspec==2026.6.0`, and `urllib3==2.8.0`. Required `yarl` remains in the lock; no Python, package-version, provider-policy or CI change is included.
+- Local qualification: targeted 180 passed; full 1736 passed, one skipped, no failures/errors; core coverage 82.31%. Frozen lock/package checks, Ruff, formatter and CI-scope Pyright passed. These are local frozen-uv results, not hosted pip-install parity or live-provider/native acceptance.
+- Additional reported advisories remain outside this transport slice: `multidict` GHSA-54p9-h82j-f925 (locked 6.7.1; reported patched floor 6.9.1) and `opentelemetry-api` GHSA-xcq7-p3pf-p88h (locked 1.41.0; reported patched floor 1.45.1). The four accepted-but-open ChromaDB advisories and their existing local-only risk boundary remain unchanged. Historical aggregate counts above are not current security-clearance claims.
+- Commit/push of the qualified slice is approved. This checkpoint is pending independent documentation review before staging; exact-SHA hosted CI, Dependency Graph and direct REST/GraphQL alert reconciliation remain unverified. No alert is declared fixed here and no release is being cut.
+
 ## Current active step
 
-**Phase 5 complete — ChromaDB accepted-but-open risk decision; monitor upstream patches and block non-local/server use pending a new decision.**
+**Transport follow-up: documentation review, then approved publication and exact-SHA CI/alert verification. Stop after this closeout; further advisory remediation requires a separate scope decision.**

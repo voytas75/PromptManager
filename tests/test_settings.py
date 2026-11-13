@@ -975,8 +975,11 @@ def test_embedding_model_auto_switches_backend(monkeypatch: MonkeyPatch, tmp_pat
     assert settings.embedding_model == "text-embedding-3-small"
 
 
-def test_embedding_backend_rejects_unknown(monkeypatch: MonkeyPatch) -> None:
+def test_embedding_backend_rejects_unknown(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
     """Raise SettingsError when an unsupported backend is configured."""
+    config_path = tmp_path / "config.json"
+    config_path.write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("PROMPT_MANAGER_CONFIG_JSON", str(config_path))
     monkeypatch.setenv("PROMPT_MANAGER_EMBEDDING_BACKEND", "unsupported")
     with pytest.raises(SettingsError):
         load_settings()
