@@ -1,6 +1,7 @@
 """Qt list model that exposes prompt summaries for list views.
 
 Updates:
+  v0.1.8 - 2026-11-18 - Map case-folded highlights back to displayed character positions.
   v0.1.7 - 2026-10-03 - Use inspect-first title-match guidance without claiming reuse readiness.
   v0.1.6 - 2026-09-02 - Expose description-match reason and inspect-first handoff cues.
   v0.1.5 - 2026-04-12 - Let active-search source-matched previews reuse the existing preview role.
@@ -220,6 +221,10 @@ class PromptListModel(QAbstractListModel):
             return ()
 
         lowered_text = text.casefold()
+        source_positions: Sequence[int] = range(len(text))
+        if len(lowered_text) != len(text):
+            # Every character in an expansion (e.g. ß → ss) belongs to one display position.
+            source_positions = [i for i, char in enumerate(text) for _ in char.casefold()]
         occupied = [False] * len(text)
         spans: list[tuple[int, int]] = []
         for term in sorted(self._active_search_terms, key=lambda value: (-len(value), value)):
@@ -229,9 +234,11 @@ class PromptListModel(QAbstractListModel):
                 if index < 0:
                     break
                 end = index + len(term)
-                if not any(occupied[index:end]):
-                    spans.append((index, len(term)))
-                    for offset in range(index, end):
+                source_start = source_positions[index]
+                source_end = source_positions[end - 1] + 1
+                if not any(occupied[source_start:source_end]):
+                    spans.append((source_start, source_end - source_start))
+                    for offset in range(source_start, source_end):
                         occupied[offset] = True
                 start = end
         spans.sort()

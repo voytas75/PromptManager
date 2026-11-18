@@ -1,6 +1,7 @@
 """Prompt list presenter abstraction for MainWindow.
 
 Updates:
+  v0.1.2 - 2026-11-18 - Keep filter selection and detail panels aligned across model resets.
   v0.1.1 - 2026-04-12 - Mirror active plain-text search state into prompt-list highlight rendering.
   v0.1.0 - 2025-12-01 - Extract presenter to centralize prompt list filtering logic.
 """
@@ -146,10 +147,20 @@ class PromptListPresenter:
             if use_preserve_flag
             else self._coordinator.sort_prompts(filtered, self._sort_order)
         )
+        selection = self._list_view.selectionModel()
+        rows = selection.selectedRows()
+        selected = self._model.prompt_at(rows[0].row()) if rows else None
+        keep_selected = selected is not None and any(p.id == selected.id for p in prompts_to_show)
+        if selected is not None and not keep_selected:
+            # A model reset drops selection silently. Notify detail listeners while
+            # the old selection still exists and current_prompt() already returns None.
+            selection.clearCurrentIndex()
+            selection.clearSelection()
         self._model.set_active_search_text(self._active_search_text)
         self._model.set_prompts(prompts_to_show)
-        self._list_view.clearSelection()
-        if not prompts_to_show:
+        if keep_selected and selected is not None:
+            self._callbacks.select_prompt(selected.id)
+        elif selected is None:
             self._detail_widget.clear()
         self._callbacks.update_intent_hint(prompts_to_show)
 

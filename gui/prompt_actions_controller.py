@@ -1,6 +1,7 @@
 """Prompt-specific actions separated from the main window.
 
 Updates:
+  v0.1.5 - 2026-11-18 - Enable Copy Prompt in the menu only for copyable stored bodies.
   v0.1.4 - 2026-04-06 - Align prompt body copy menu terminology with the shared Copy Prompt label.
   v0.1.3 - 2026-04-06 - Restrict prompt copying to the stored prompt body.
   v0.1.2 - 2026-04-04 - Add a non-executing workspace handoff for prompt detail reuse.
@@ -118,7 +119,7 @@ class PromptActionsController:
             controller = self._execution_controller_supplier()
             can_execute = bool((prompt.context or prompt.description) and controller)
             execute_action.setEnabled(can_execute)
-            has_context_body = bool((prompt.context or "").strip())
+            has_context_body = self._copyable_prompt_body(prompt) is not None
             execute_context_action.setEnabled(bool(controller) and has_context_body)
             if not has_context_body:
                 execute_context_action.setToolTip(
@@ -129,8 +130,7 @@ class PromptActionsController:
                 execute_context_action.setToolTip(
                     "Run the stored prompt body as context for an ad-hoc task."
                 )
-            if not (prompt.context or prompt.description):
-                copy_action.setEnabled(False)
+            copy_action.setEnabled(has_context_body)
             if not (prompt.description and prompt.description.strip()):
                 description_action.setEnabled(False)
             if self._similar_callback is None:

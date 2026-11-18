@@ -20,6 +20,8 @@ Do not use this file as a second product SSOT or a competing roadmap.
 
 ---
 
+Retrieval → inspect → reuse (2026-11-18): [implementation ledger](plans/2026-11-18-retrieval-reuse-continuity.md); S1–S3 locally implemented and independently verified, uncommitted. Native GUI and full-suite coverage not rerun.
+
 ## Local checkpoint — storage fault/recovery qualification, 2026-10-19
 
 - Completed bounded provider-free diagnostic slice at source `e861b0166a6e038cc89d609abd0349d6a74e26fe`; ledger: [storage fault qualification](plans/2026-10-19-storage-fault-qualification.md).

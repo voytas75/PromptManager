@@ -1,6 +1,7 @@
 """Focused tests for bounded prompt-list presenter retrieval cues.
 
 Updates:
+  v0.1.1 - 2026-11-18 - Exercise filter selection and detail state through Qt signals.
   v0.1.0 - 2026-04-27 - Cover similar-result path meaning cues without widening presenter workflow.
 """
 
@@ -13,15 +14,17 @@ from typing import Any, cast
 
 import pytest
 
-from gui.prompt_list_coordinator import PromptListCoordinator
+from gui.prompt_list_coordinator import PromptListCoordinator, PromptSortOrder
 from gui.prompt_list_model import PromptListModel
 from gui.prompt_list_presenter import PromptListCallbacks, PromptListPresenter
+from gui.widgets.prompt_detail_widget import PromptDetailWidget
 from gui.widgets.prompt_filter_panel import PromptFilterPanel
+from gui.workspace_history_controller import WorkspaceHistoryController
 from models.prompt_model import Prompt
 
 try:
     from PySide6.QtCore import QModelIndex
-    from PySide6.QtWidgets import QApplication, QWidget
+    from PySide6.QtWidgets import QApplication, QListView, QWidget
 except ImportError:  # pragma: no cover - optional dependency in test environments
     pytest.skip("PySide6 is not available", allow_module_level=True)
 
@@ -40,6 +43,12 @@ class _ManagerStub:
         self._similar_results = list(similar_results)
 
     def list_categories(self) -> list[object]:
+        return []
+
+    def get_prompt_parent_fork(self, _prompt_id: uuid.UUID) -> None:
+        return None
+
+    def list_prompt_forks(self, _prompt_id: uuid.UUID) -> list[object]:
         return []
 
     def search_prompts(
@@ -183,6 +192,63 @@ def _build_presenter(
         parent=_ParentStub(),
     )
     return presenter, callbacks
+
+
+@pytest.mark.parametrize(
+    ("keep_selected", "keep_other"),
+    [(True, False), (False, True), (False, False)],
+    ids=["retained", "excluded", "empty"],
+)
+def test_filter_refresh_synchronizes_selection_and_details(
+    qt_app: QApplication, keep_selected: bool, keep_other: bool
+) -> None:
+    selected, other = _prompt("Alpha"), _prompt("Beta")
+    selected.is_favorite, other.is_favorite = keep_selected, keep_other
+    manager = _ManagerStub([selected, other], [])
+    model = PromptListModel()
+    view = QListView()
+    view.setModel(model)
+    detail, template_detail = PromptDetailWidget(), PromptDetailWidget()
+    panel = PromptFilterPanel(sort_options=[])
+    callbacks = _CallbackRecorder.create().build()
+    presenter = PromptListPresenter(
+        manager=cast("Any", manager),
+        coordinator=PromptListCoordinator(cast("Any", manager)),
+        model=model,
+        detail_widget=detail,
+        list_view=view,
+        filter_panel=panel,
+        toolbar=None,
+        callbacks=callbacks,
+        parent=view,
+    )
+    history = WorkspaceHistoryController(
+        manager=cast("Any", manager),
+        model=model,
+        detail_widget=detail,
+        list_view=view,
+        current_prompt_supplier=presenter.current_prompt,
+        template_detail_widget_supplier=lambda: template_detail,
+        template_preview_controller_supplier=lambda: None,
+        execution_controller_supplier=lambda: None,
+    )
+    callbacks.select_prompt = history.select_prompt
+    view.selectionModel().selectionChanged.connect(history.handle_selection_changed)
+    presenter.display_prompt_collection([selected, other], preserve_order=False)
+    presenter.update_sort_order(PromptSortOrder.NAME_DESC)
+    assert view.currentIndex().row() == 1
+    assert presenter.current_prompt() is detail.current_prompt() is selected
+    assert template_detail.current_prompt() is selected
+
+    panel.set_favorites_only(True)
+    presenter.refresh_filtered_view()
+
+    assert model.prompts() == tuple(p for p in (other, selected) if p.is_favorite)
+    expected = selected if keep_selected else None
+    assert presenter.current_prompt() is expected
+    assert view.selectionModel().selectedRows() == ([model.index(0, 0)] if keep_selected else [])
+    assert detail.current_prompt() is expected
+    assert template_detail.current_prompt() is expected
 
 
 def test_recent_handoff_does_not_restore_pending_filter_that_hides_target(

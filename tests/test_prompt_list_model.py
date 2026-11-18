@@ -1,6 +1,7 @@
 """Focused tests for bounded retrieval previews in the main prompt list.
 
 Updates:
+  v0.1.8 - 2026-11-18 - Check highlight spans against the original displayed characters.
   v0.1.7 - 2026-10-03 - Cover inspect-first title matches and templates without run history.
   v0.1.6 - 2026-09-02 - Cover description-match reason and inspect-first handoff cues.
   v0.1.5 - 2026-04-12 - Cover active-search scenario-priority while keeping
@@ -466,6 +467,29 @@ def test_prompt_list_model_exposes_title_and_preview_match_spans_for_active_sear
         "incident",
         "updates",
     ]
+
+
+@pytest.mark.parametrize(
+    ("title", "query", "expected"),
+    [
+        ("Straße", "STRASSE", ((0, 6),)),
+        ("Maße prüfen!", "prüfen", ((5, 6),)),
+        ("aßb", "as sb", ((0, 2),)),
+        ("ß", "s", ((0, 1),)),
+        ("Triage TRIAGE", "triage age", ((0, 6), (7, 6))),
+    ],
+)
+def test_title_highlights_use_displayed_character_positions(
+    qt_app: QApplication, title: str, query: str, expected: tuple[tuple[int, int], ...]
+) -> None:
+    """Highlight each displayed character at most once, even across folded overlaps."""
+    prompt = _build_prompt()
+    prompt.name = title
+    prompt.category = ""
+    model = PromptListModel([prompt])
+    model.set_active_search_text(query)
+
+    assert model.data(model.index(0, 0), PromptListModel.TitleMatchRole) == expected
 
 
 def test_prompt_list_model_emits_preview_role_when_search_changes_preview_choice(

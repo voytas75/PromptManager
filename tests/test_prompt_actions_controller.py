@@ -1,6 +1,7 @@
 """Focused tests for bounded prompt reuse actions.
 
 Updates:
+  v0.1.3 - 2026-11-18 - Cover stored-body copy availability and workspace description fallback.
   v0.1.2 - 2026-04-06 - Lock the prompt actions menu copy label to the shared Copy Prompt wording.
   v0.1.1 - 2026-04-06 - Lock prompt copying to the stored body with deterministic toast feedback.
   v0.1.0 - 2026-04-04 - Cover clipboard copy and non-executing workspace handoff paths.
@@ -270,7 +271,17 @@ def test_open_prompt_in_workspace_surfaces_stale_validation_handoff_hint(
     assert stale_hint != generic_hint
 
 
-def test_open_prompt_in_workspace_seeds_text_without_running(qt_app: QApplication) -> None:
+@pytest.mark.parametrize(
+    ("body", "expected_text"),
+    [
+        ("Prompt body to reuse", "Prompt body to reuse"),
+        (None, "Fallback description"),
+        ("", "Fallback description"),
+    ],
+)
+def test_open_prompt_in_workspace_seeds_text_without_running(
+    qt_app: QApplication, body: str | None, expected_text: str
+) -> None:
     """Workspace handoff should populate the editor and keep one bounded generic next step."""
     query_input = QPlainTextEdit()
     workspace_view = WorkspaceViewController(
@@ -297,14 +308,14 @@ def test_open_prompt_in_workspace_seeds_text_without_running(qt_app: QApplicatio
         toast_messages=toast_messages,
         execution_supplier=_execution_supplier,
     )
-    prompt = _build_prompt(context="Prompt body to reuse", description="Fallback description")
+    prompt = _build_prompt(context=body, description="Fallback description")
 
     controller.open_prompt_in_workspace(prompt)
     qt_app.processEvents()
 
     generic_hint = "Prompt ready in workspace. Run current prompt to validate before refining."
 
-    assert query_input.toPlainText() == "Prompt body to reuse"
+    assert query_input.toPlainText() == expected_text
     assert execution_calls == 0
     assert status_messages == [(generic_hint, 3000)]
     assert toast_messages == [("Opened 'Reusable prompt' in the workspace.", 2500)]
@@ -741,18 +752,25 @@ def test_show_context_menu_keeps_execute_actions_bounded_and_distinct(
     assert "workflow" not in execute_context_tooltip.lower()
 
 
-def test_show_context_menu_uses_shared_copy_prompt_label(
+@pytest.mark.parametrize(
+    ("body", "can_copy"),
+    [(None, False), ("", False), (" \t\n", False), ("Prompt body to reuse", True)],
+    ids=["none", "empty", "whitespace", "stored-body"],
+)
+def test_show_context_menu_copy_requires_stored_body(
     qt_app: QApplication,
     monkeypatch: pytest.MonkeyPatch,
+    body: str | None,
+    can_copy: bool,
 ) -> None:
-    """Context menu should label body-only prompt copying as Copy Prompt."""
+    """A description alone must not enable the Copy Prompt action."""
     _MenuStub.instances.clear()
     monkeypatch.setattr("gui.prompt_actions_controller.QMenu", _MenuStub)
     query_input = QPlainTextEdit()
     list_view = QListView()
     status_messages: list[tuple[str, int]] = []
     toast_messages: list[tuple[str, int]] = []
-    prompt = _build_prompt(context="Prompt body to reuse", description="Fallback description")
+    prompt = _build_prompt(context=body, description="Fallback description")
 
     controller = PromptActionsController(
         parent=QWidget(),
@@ -777,6 +795,6 @@ def test_show_context_menu_uses_shared_copy_prompt_label(
     qt_app.processEvents()
 
     assert len(_MenuStub.instances) == 1
-    menu_texts = [action.text for action in _MenuStub.instances[0].actions]
-    assert "Copy Prompt" in menu_texts
-    assert "Copy Prompt Text" not in menu_texts
+    actions = {action.text: action for action in _MenuStub.instances[0].actions}
+    assert actions["Copy Prompt"].enabled is can_copy
+    assert "Copy Prompt Text" not in actions
