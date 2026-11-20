@@ -2,7 +2,7 @@
 
 Status: active
 Owner: Wojtek / Prompt Manager Team
-Updated: 2026-09-22
+Updated: 2026-11-20
 Canonical product SSOT: `docs/product-ssot.md`
 Status/history sink: `docs/STATUS.md`
 
@@ -50,13 +50,35 @@ is validated on real prompts and materially improves reuse/refinement choices;
 see `docs/product-ssot.md` for the canonical semantics. This is a planning
 posture, not a request to remove existing rating functionality.
 
-Closed-slice history belongs in `docs/STATUS.md`, not here.
+## Current execution checkpoint
+
+The product direction remains valid; the execution plan now starts with evidence-led selection rather than another predefined cue or feature.
+
+- Most recently delivered bounded slice: [retrieval → inspect → reuse continuity](2026-11-18-retrieval-reuse-continuity.md), product commit `897260fea994cc8242005bca40cb253f21c93ecb`; its documentation correction is delivered as `bf389a9c22d9ac147349cb5ecb27334caa7b0443`.
+- Exact documentation-SHA [Quality Gates 44820516127](https://github.com/voytas75/PromptManager/actions/runs/44820516127) succeeded: 1749 passed, 1 skipped; core coverage 82.25%. This is remote CI evidence, not native Windows GUI or provider qualification.
+- Fresh local `.venv/bin/pyright --stats`: 273 files checked, 0 errors/warnings/informations under `pyrightconfig.json`. This configured scope excludes `cli/` and `scripts/`; no repository-wide typing cleanup is selected from this result.
+- Code and focused test definitions already cover Unicode highlighting, filter/detail selection continuity, copy-body availability and the validate-path detail decision package. Do not schedule those delivered contracts again without a reproduced regression.
+- No implementation successor is selected. Older plan headers saying `active` or `proposed` are not sufficient evidence of unfinished work; some ledgers retain such headers despite completed tasks and delivered closure sections. Their historical results must not be presented as fresh acceptance.
+- Native Windows GUI acceptance remains unverified, not a confirmed defect or an automatic release blocker. Security work, live providers and cross-store crash/concurrency qualification remain separate scope decisions.
+
+### Immediate sequence
+
+1. **Bounded discovery — next planning action.** Inspect one end-to-end path on existing surfaces: search/filter → selected detail → Copy Prompt or Open in Workspace → edit/fork. Compare implementation and nearby tests with the intended stored-body, selected-UUID and lineage contracts. Record at most one consequential gap; classify it as reproduced defect, missing contract coverage, native-only uncertainty, or no real gap. Do not infer user hesitation or retrieval quality from unit tests alone.
+2. **Select one successor only if evidence warrants it.** Prefer a reproducible continuity/asset-safety defect over another wording-only change. Specify exact files, acceptance criteria and provider-free regression scope in one new execution ledger. If no gap is found, close discovery without inventing implementation work; retain the current product baseline.
+3. **Implement and qualify only the chosen scope after implementation authorization.** Use tests-first development and the existing environment. Update its ledger after each task; run affected/adjacent tests, Ruff and relevant Pyright checks. Imports and tests must use an inspected provider-free harness with isolated temporary state; no real catalog or provider credentials.
+4. **Separate delivery from qualification.** Commit/push and exact-SHA CI verification follow explicit publication authorization. Native GUI or live-provider acceptance is added only when separately approved or necessary to resolve a concrete uncertainty in the selected capability.
+
+### Decision check
+
+Primary approach: bounded offline continuity discovery before any new feature. Strongest alternative: native Windows GUI acceptance of the delivered path. Switch to that alternative when an owner report or a reproduced host-specific discrepancy points to selection, clipboard or workspace behavior that offscreen/isolated tests cannot resolve. Neither path authorizes ranking redesign, new panels or broad technical cleanup.
+
+Closed-slice history belongs in `docs/STATUS.md`, not here. This checkpoint summarizes selection evidence only; the linked ledger owns detailed historical receipts.
 
 ### September reconciliation
 
 The 2026-09-20–22 CLI delivery set is closed supporting work, not a new product center. `catalog-check`, `prompt-validate`, `prompt-test`, `prompt-compare`, `prompt-lint`, `prompt-template-list`, and tag operations remain asset-supporting because they inspect, validate, compare, or organize existing prompt records without provider calls by default.
 
-Do not extend this set automatically. The only active follow-up priority after the audit is controlled maintenance of delivery trust: keep the lockfile reproducible, keep the CI type-checking contract truthful, and select the next user-visible slice from retrieval → inspect → reuse/refine. Provider-backed evaluation, dependency/impact graphs, broad chain work, and new integration surfaces remain separate decisions.
+Do not extend this set automatically. Delivery-trust maintenance remains supporting work: lockfile reproducibility and the CI type-checking contract are known governance considerations, not newly authorized repairs or blockers for every slice. Select the next user-visible scope through the current execution checkpoint above. Provider-backed evaluation, dependency/impact graphs, broad chain work, and new integration surfaces remain separate decisions.
 
 ---
 
