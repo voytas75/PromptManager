@@ -1,7 +1,11 @@
 # Retrieval → inspect → reuse: bounded execution
 
-Status: done — locally verified, uncommitted
+Status: done — delivered on `origin/master`, exact-SHA CI passed
 Baseline: `3bfe623afef65a18d23d0bc7744f08ef22af2298`
+Delivered product commit: `897260fea994cc8242005bca40cb253f21c93ecb`
+CI: [Quality Gates 44378113049](https://github.com/voytas75/PromptManager/actions/runs/44378113049) — success; 1749 passed, 1 skipped; core coverage 82.25% (2026-11-18).
+Delivery verification: local HEAD matched live `origin/master`; exact-SHA CI status and logs checked on 2026-11-20. This documentation correction is a separate follow-up and is not covered by that product CI run.
+Evidence boundary: historical local checkpoints below retain their original no-commit/push scope. Subsequent delivery is recorded here; native GUI acceptance and a fresh full local pytest/coverage run are not claimed.
 Owner: Wojtek
 Product authority: `docs/product-ssot.md`
 Near-term direction: `2026-05-10-product-direction-ssot-next-cycle.md`

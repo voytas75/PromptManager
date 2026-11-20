@@ -20,7 +20,7 @@ Do not use this file as a second product SSOT or a competing roadmap.
 
 ---
 
-Retrieval → inspect → reuse (2026-11-18): [implementation ledger](plans/2026-11-18-retrieval-reuse-continuity.md); S1–S3 locally implemented and independently verified, uncommitted. Native GUI and full-suite coverage not rerun.
+Retrieval → inspect → reuse (2026-11-18): [implementation ledger](plans/2026-11-18-retrieval-reuse-continuity.md); S1–S3 implemented, independently verified and delivered on `origin/master` as `897260fea994cc8242005bca40cb253f21c93ecb`. Exact-SHA [Quality Gates 44378113049](https://github.com/voytas75/PromptManager/actions/runs/44378113049) succeeded: 1749 passed, 1 skipped; core coverage 82.25%. Full local pytest/coverage and native GUI acceptance were not rerun. Delivery and CI were rechecked against the remote on 2026-11-20; this documentation correction is not part of the qualified product commit.
 
 ## Local checkpoint — storage fault/recovery qualification, 2026-10-19
 
